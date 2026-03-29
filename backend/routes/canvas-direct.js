@@ -725,44 +725,36 @@ router.post('/canvas-video', protect, requireCredits('videoGenerate'), async (re
 
         console.log(`🎬 Canvas Video: "${prompt.substring(0, 60)}..." | duration=${duration || 5}`);
 
-        // Use PiAPI Seedance for I2V if source image, otherwise use Kling for T2V
-        if (sourceImageUrl) {
-            const { submitPiApiImageToVideo } = await import('../agents/videoStudio/piApiClient.js');
-            const result = await submitPiApiImageToVideo({
-                imageUrl: sourceImageUrl,
-                prompt: prompt.trim(),
-                duration: duration || 5,
-                aspectRatio: aspectRatio || '16:9',
-                qualityMode: 'fast',
-            });
-            return res.json({
-                success: true,
-                taskId: result.taskId,
-                provider: 'piapi-seedance',
-                pollUrl: `/api/video-studio/${result.taskId}/status`,
-                message: 'Video generation started — poll for status',
-            });
-        } else {
-            const { advancedGenerateNode } = await import('../agents/videoStudio/nodes.js');
-            const state = await advancedGenerateNode({
-                prompt: prompt.trim(),
-                model: 'kling-3.0',
-                duration: duration || 5,
-                resolution: '1080p',
-                qualityMode: 'fast',
-                aspectRatio: aspectRatio || '16:9',
-                firstImageUrl: '',
-                generateAudio: false,
-                referenceImages: [],
-            });
-            return res.json({
-                success: true,
-                taskId: state.generation?.falRequestId,
-                provider: state.generation?.provider || 'piapi',
-                generation: state.generation,
-                message: 'Video generation started',
-            });
-        }
+        // Route both I2V and T2V through the main pipeline for LZ-first routing
+        // I2V: uses seedance-2.0 (LZ-first → PiAPI fallback)
+        // T2V: uses kling-3.0 (fal.ai direct, no LZ equivalent)
+        const { advancedGenerateNode } = await import('../agents/videoStudio/nodes.js');
+        const selectedModel = sourceImageUrl ? 'seedance-2.0' : 'kling-3.0';
+
+        const state = await advancedGenerateNode({
+            prompt: prompt.trim(),
+            model: selectedModel,
+            duration: duration || 5,
+            resolution: '1080p',
+            qualityMode: 'fast',
+            aspectRatio: aspectRatio || '16:9',
+            firstImageUrl: sourceImageUrl || '',
+            generateAudio: false,
+            referenceImages: [],
+        });
+
+        // LaoZhang sync: if _laozhangVideoUrl is available, video is already done
+        const isComplete = !!state.generation?._laozhangVideoUrl;
+
+        return res.json({
+            success: true,
+            taskId: state.generation?.falRequestId,
+            provider: state.generation?.provider || 'fal',
+            generation: state.generation,
+            completed: isComplete,
+            videoUrl: isComplete ? state.generation._laozhangVideoUrl : undefined,
+            message: isComplete ? 'Video generated successfully' : 'Video generation started — poll for status',
+        });
     } catch (err) {
         console.error('Canvas video error:', err.message);
         if (req.creditsDeducted > 0) {

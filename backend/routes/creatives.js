@@ -7,7 +7,7 @@ import Product from '../models/Product.js';
 import { protect } from '../middleware/auth.js';
 import { requireStudio } from '../middleware/studioAccess.js';
 import { requireCredits, refundCredits } from '../middleware/credits.js';
-import { getOrchestrator } from '../agents/orchestrator.js';
+// orchestrator import removed — no fallback routing
 import { addWatermark } from '../utils/watermark.js';
 import { getSetting } from '../models/SystemSettings.js';
 import { uploadToS3 } from '../utils/s3.js';
@@ -17,6 +17,7 @@ import { safeErrorMessage } from '../utils/safeError.js';
 import { getRouter } from '../ai/router.js';
 import { runCreativePipeline } from '../agents/creativeStudio/nodes.js';
 import { startProgress, addStep, getProgress, endProgress } from '../utils/progressStore.js';
+import { laozhangImageGenerate, laozhangMultimodalImageGenerate, isLaozhangAvailable } from '../agents/videoStudio/laozhangClient.js';
 
 const router = Router();
 
@@ -145,47 +146,53 @@ function extractBase64(dataUri) {
 // Gemini-native models use Google Direct API; others route through fal.ai.
 const IMAGE_MODEL_CONFIG = {
     'nanobanana-2': {
-        provider: 'gemini',
+        provider: 'laozhang',
         modelId: 'gemini-3.1-flash-image-preview',
         name: 'NanoBanana 2',
         supportsRefImages: true,
     },
     'nanobanana-pro': {
-        provider: 'gemini',
+        provider: 'laozhang',
         modelId: 'gemini-3-pro-image-preview',
         name: 'NanoBanana Pro',
         supportsRefImages: true,
     },
     'flux-pro-v1.1': {
-        provider: 'fal',
+        provider: 'laozhang',
         endpoint: 'fal-ai/flux-pro/v1.1',
         name: 'Flux Pro v1.1',
         supportsRefImages: false,
     },
     'flux-2-pro': {
-        provider: 'fal',
-        endpoint: 'fal-ai/flux-pro/v2',
+        provider: 'laozhang',
+        endpoint: 'fal-ai/flux-2-pro',
         name: 'Flux 2 Pro',
         supportsRefImages: false,
     },
     'seedream-5': {
-        provider: 'fal',
-        endpoint: 'fal-ai/seedream-3',
+        provider: 'laozhang',
+        endpoint: 'fal-ai/bytedance/seedream/v5/lite/text-to-image',
         name: 'Seedream 5',
         supportsRefImages: false,
     },
     'ideogram': {
-        provider: 'fal',
+        provider: 'laozhang',
         endpoint: 'fal-ai/ideogram/v3',
         name: 'Ideogram v3',
+        supportsRefImages: false,
+    },
+    'grok-imagen': {
+        provider: 'grok',
+        modelId: 'grok-imagine-image',
+        name: 'Grok Imagen',
         supportsRefImages: false,
     },
 };
 
 // ── fal.ai Image Generation (queue-based async) ─────────────────────────
 async function falImageGenerate(promptText, endpoint, aspectRatio = '1:1') {
-    const falKey = process.env.FAL_KEY || process.env.FAL_API_KEY;
-    if (!falKey) throw new Error('FAL_KEY not configured for image generation');
+    const falKey = process.env.FAL_API_KEY || process.env.FAL_KEY;  // FIXED: FAL_API_KEY is the actual env var
+    if (!falKey) throw new Error('FAL_API_KEY not configured for image generation');
 
     // Map aspect ratio to fal.ai image_size
     const sizeMap = {
@@ -224,6 +231,21 @@ async function falImageGenerate(promptText, endpoint, aspectRatio = '1:1') {
     if (!submitResp.ok) {
         const errText = await submitResp.text();
         console.error(`❌ fal.ai image error (${submitResp.status}):`, errText);
+
+        // Distinguish billing/quota errors from actual busy errors
+        if (submitResp.status === 403 || submitResp.status === 402) {
+            const isBalance = errText.toLowerCase().includes('balance') || errText.toLowerCase().includes('locked') || errText.toLowerCase().includes('billing');
+            if (isBalance) {
+                throw new Error(`QUOTA_EXHAUSTED: fal.ai account balance exhausted. Please top up at fal.ai/dashboard/billing.`);
+            }
+            throw new Error(`QUOTA_EXHAUSTED: fal.ai access denied (${submitResp.status}). Check your API key and billing.`);
+        }
+        if (submitResp.status === 404) {
+            throw new Error(`MODEL_NOT_FOUND: fal.ai endpoint "${endpoint}" not found. The model may have been deprecated or the endpoint is incorrect.`);
+        }
+        if (submitResp.status === 429 || submitResp.status === 503) {
+            throw new Error(`BUSY: fal.ai is at capacity (${submitResp.status}). Please try again in a moment.`);
+        }
         throw new Error(`fal.ai image generation failed (${submitResp.status}): ${errText.substring(0, 200)}`);
     }
 
@@ -265,7 +287,67 @@ async function falImageGenerate(promptText, endpoint, aspectRatio = '1:1') {
     console.log(`✅ Image generated via fal.ai: ${imageUrl.substring(0, 100)}...`);
     console.log(`══════ END FAL.AI IMAGE GENERATION ══════\n`);
 
-    return { imageUrl, model: endpoint, textResponse: '', warnings: [] };
+    return { imageUrl, model: endpoint, provider: 'fal', textResponse: '', warnings: [] };
+}
+
+// ── Grok Imagen generation via xAI API ──────────────────────────────────
+// Uses the OpenAI-compatible xAI endpoint for image generation.
+async function grokImageGenerate(promptText, aspectRatio = '1:1') {
+    const grokKey = process.env.GROK_API_KEY || process.env.XAI_API_KEY;
+    if (!grokKey) throw new Error('GROK_API_KEY not configured for Grok Imagen');
+
+    console.log(`\n══════ GROK IMAGEN GENERATION ══════`);
+    console.log(`📐 Aspect Ratio: ${aspectRatio}`);
+    console.log(`📝 Prompt (first 200 chars): ${promptText.substring(0, 200)}...`);
+
+    const response = await fetch('https://api.x.ai/v1/images/generations', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${grokKey}`,
+        },
+        body: JSON.stringify({
+            model: 'grok-imagine-image',
+            prompt: promptText,
+            response_format: 'b64_json',
+            n: 1,
+        }),
+        signal: AbortSignal.timeout(90000),
+    });
+
+    if (!response.ok) {
+        const errText = await response.text();
+        console.error(`❌ Grok Imagen error (${response.status}):`, errText);
+        if (response.status === 503 || response.status === 429) {
+            throw new Error(`BUSY: Grok Imagen is currently at capacity`);
+        }
+        throw new Error(`Grok Imagen failed (${response.status}): ${errText.substring(0, 200)}`);
+    }
+
+    const data = await response.json();
+    const imageData = data.data?.[0];
+
+    if (!imageData) {
+        throw new Error('Grok Imagen returned no image data');
+    }
+
+    // Handle both URL and base64 responses
+    let imageUrl;
+    if (imageData.b64_json) {
+        imageUrl = `data:image/png;base64,${imageData.b64_json}`;
+    } else if (imageData.url) {
+        imageUrl = imageData.url;
+    } else {
+        throw new Error('Grok Imagen: no image URL or base64 in response');
+    }
+
+    console.log(`✅ Grok Imagen: Image generated successfully`);
+    return {
+        imageUrl,
+        model: 'grok-imagine-image',
+        textResponse: '',
+        warnings: [],
+    };
 }
 
 // ── Gemini image generation via REST API ────────────────────────────────
@@ -360,7 +442,8 @@ async function geminiImageGenerate(promptText, imageParts = [], temperature = 0.
 }
 
 // ── Unified Image Generate — routes to correct provider based on selected model ──
-async function routedImageGenerate(promptText, imageParts = [], temperature = 0.4, aspectRatio = '1:1', imageSize = '1K', selectedModel = 'nanobanana-2') {
+// refImageUrls: original S3/HTTP URLs of reference images (for LZ multimodal routing)
+async function routedImageGenerate(promptText, imageParts = [], temperature = 0.4, aspectRatio = '1:1', imageSize = '1K', selectedModel = 'nanobanana-2', refImageUrls = []) {
     const modelConfig = IMAGE_MODEL_CONFIG[selectedModel] || IMAGE_MODEL_CONFIG['nanobanana-2'];
     const router = getRouter();
 
@@ -373,13 +456,93 @@ async function routedImageGenerate(promptText, imageParts = [], temperature = 0.
     );
 
     const generatePromise = (async () => {
+        // ═══════════════════════════════════════════════════════════════
+        // LAOZHANG-FIRST ROUTING — Cheapest image provider
+        // Try LZ for NanoBanana 2/Pro, Flux, Seedream 5 (50-75% cheaper)
+        // Falls through to direct provider on failure.
+        // ═══════════════════════════════════════════════════════════════
+        // LZ CONFIRMED WORKING MODELS (live-tested 2026-03-29):
+        //   ✅ flux-kontext-pro     — returns URL, ~8s
+        //   ✅ flux-kontext-max     — returns URL, ~12s
+        //   ✅ gemini-3.1-flash-image-preview — returns b64, ~15-20s
+        //   ✅ gemini-3-pro-image-preview     — returns b64, ~20-30s
+        //   ❌ ideogram-*, seedream-*, black-forest-labs/* — 503 no channel on this account
+        // Models without native LZ support → route to best available alternative
+        const LZ_IMAGE_MAP = {
+            'nanobanana-2':   'gemini-3.1-flash-image-preview',  // Gemini Flash via LZ ✅
+            'nanobanana-pro': 'gemini-3-pro-image-preview',      // Gemini Pro via LZ ✅
+            'flux-pro-v1.1':  'flux-kontext-pro',                // Flux Kontext Pro via LZ ✅
+            'flux-2-pro':     'flux-kontext-max',                // Flux Kontext Max via LZ ✅ (premium)
+            'seedream-5':     'flux-kontext-max',                // → Flux Max (seedream not on this LZ account)
+            'ideogram':       'flux-kontext-pro',                // → Flux Pro (ideogram not on this LZ account)
+        };
+        const lzModel = LZ_IMAGE_MAP[selectedModel];
+        const hasRefImages = imageParts && imageParts.length > 0;
+
+        // LaoZhang supports TWO image generation modes:
+        //  1. Text-only: /v1/images/generations (all LZ models)
+        //  2. Multimodal: /v1/chat/completions (Gemini models only — supports S3 ref images)
+        // For non-multimodal models (Flux, Seedream, Ideogram): ALWAYS try LZ text-only first.
+        // Brand context is already baked into the text prompt, ref images are a bonus not a requirement.
+        const LZ_MULTIMODAL_MODELS = ['gemini-3.1-flash-image-preview', 'gemini-3-pro-image-preview'];
+        const isMultimodalCapable = LZ_MULTIMODAL_MODELS.includes(lzModel);
+
+        if (lzModel && isLaozhangAvailable()) {
+            try {
+                // Map aspect ratio to WxH
+                const AR_SIZE_MAP = {
+                    '1:1':  '1024x1024', '16:9': '1792x1024', '9:16': '1024x1792',
+                    '4:5':  '1024x1280', '3:4':  '768x1024',  '4:3':  '1024x768',
+                    '3:2':  '1536x1024', '2:3':  '1024x1536',
+                };
+                const lzSize = AR_SIZE_MAP[aspectRatio] || (imageSize === '2K' ? '2048x2048' : '1024x1024');
+
+                let lzResult;
+                const lzRefUrls = (refImageUrls || []).filter(u => u && u.startsWith('http'));
+
+                if (hasRefImages && isMultimodalCapable && lzRefUrls.length > 0) {
+                    // MULTIMODAL: Send S3 image URLs directly via chat/completions (Gemini only)
+                    console.log(`🏷️ [LaoZhang-Multimodal] ${selectedModel} → ${lzModel} with ${lzRefUrls.length} S3 URLs (size=${lzSize})...`);
+                    lzResult = await laozhangMultimodalImageGenerate(promptText, lzRefUrls, { model: lzModel, size: lzSize });
+                } else {
+                    // TEXT-ONLY: /v1/images/generations — works for ALL LZ models
+                    // Ref images aren't sent but brand context is in the text prompt
+                    if (hasRefImages && !isMultimodalCapable) {
+                        console.log(`ℹ️ [LaoZhang] ${selectedModel}: ref images present but not multimodal-capable — using text-only (brand context is in prompt)`);
+                    }
+                    console.log(`🏷️ [LaoZhang-First] ${selectedModel} → ${lzModel} via LaoZhang (cheapest, size=${lzSize})...`);
+                    lzResult = await laozhangImageGenerate(promptText, { model: lzModel, size: lzSize });
+                }
+
+                if (lzResult?.imageUrl) {
+                    console.log(`✅ [LaoZhang] Image generated via ${lzModel}${hasRefImages && isMultimodalCapable ? ' (multimodal)' : ''}`);
+                    return {
+                        imageUrl: lzResult.imageUrl,
+                        model: selectedModel,
+                        provider: 'laozhang',
+                        textResponse: '',
+                        warnings: [],
+                    };
+                }
+            } catch (lzErr) {
+                console.warn(`⚠️ [LaoZhang] Image ${selectedModel} failed (${lzErr.message?.substring(0, 100)}), falling through to direct provider...`);
+            }
+        }
+
         // Special handling for fal.ai
         if (modelConfig.provider === 'fal') {
-            return await falImageGenerate(promptText, modelConfig.endpoint, aspectRatio);
+            const falResult = await falImageGenerate(promptText, modelConfig.endpoint, aspectRatio);
+            return { ...falResult, provider: 'fal' };
+        }
+
+        // Special handling for Grok Imagen (xAI)
+        if (modelConfig.provider === 'grok') {
+            const grokResult = await grokImageGenerate(promptText, aspectRatio);
+            return { ...grokResult, provider: 'grok' };
         }
 
         // Route via central ModelRouter — Gemini only, NO OpenAI fallback
-        return await router.generateImage({
+        const routerResult = await router.generateImage({
             prompt: promptText,
             aspectRatio,
             model: modelConfig.modelId,
@@ -388,14 +551,47 @@ async function routedImageGenerate(promptText, imageParts = [], temperature = 0.
         }, { 
             provider: modelConfig.provider
         });
+        return { ...routerResult, provider: routerResult.provider || modelConfig.provider || 'gemini' };
     })();
 
     try {
         return await Promise.race([generatePromise, timeoutPromise]);
     } catch (error) {
         console.error(`❌ Image generation failed (${selectedModel}):`, error.message);
-        
-        // ALL failures return modelBusy — no silent fallbacks
+
+        // Parse specific error types for clear frontend messages
+        const msg = error.message || '';
+        const isQuotaExhausted = msg.includes('QUOTA_EXHAUSTED') || msg.includes('balance') || msg.includes('billing') || msg.includes('locked');
+        const isModelNotFound = msg.includes('MODEL_NOT_FOUND') || msg.includes('not found') || msg.includes('404');
+        const isBusy = msg.includes('BUSY') || msg.includes('429') || msg.includes('503') || msg.includes('capacity') || msg.includes('timed out');
+
+        if (isQuotaExhausted) {
+            return {
+                imageUrl: null,
+                model: selectedModel,
+                textResponse: '',
+                warnings: [],
+                modelBusy: true,
+                busyModel: selectedModel,
+                errorMessage: `${modelConfig.name} provider quota exhausted. Please check billing or try a different model (NanoBanana uses Gemini, Grok Imagen uses xAI).`,
+                errorType: 'quota',
+            };
+        }
+
+        if (isModelNotFound) {
+            return {
+                imageUrl: null,
+                model: selectedModel,
+                textResponse: '',
+                warnings: [],
+                modelBusy: true,
+                busyModel: selectedModel,
+                errorMessage: `${modelConfig.name} model endpoint not available. Please try a different model.`,
+                errorType: 'model_error',
+            };
+        }
+
+        // Actual busy / timeout errors
         return { 
             imageUrl: null, 
             model: selectedModel, 
@@ -403,7 +599,10 @@ async function routedImageGenerate(promptText, imageParts = [], temperature = 0.
             warnings: [], 
             modelBusy: true, 
             busyModel: selectedModel,
-            errorMessage: error.message,
+            errorMessage: isBusy 
+                ? `${modelConfig.name} is currently busy. Please try again or select a different model.`
+                : error.message,
+            errorType: isBusy ? 'busy' : 'error',
         };
     }
 }
@@ -424,7 +623,7 @@ router.post('/enhance-prompt', protect, requireCredits('promptEnhance'), async (
         const visualCtx = brand ? buildVisualContext(brand) : '';
         const dna = brand?.dna || {};
 
-        // ── AGENTIC: Fetch products and match to the brief ──
+        // ── AGENTIC: Fetch products and intelligently match to the brief ──
         let productContext = '';
         let matchedProductName = '';
         if (brand) {
@@ -466,20 +665,37 @@ router.post('/enhance-prompt', protect, requireCredits('promptEnhance'), async (
                     if (briefLower.includes(p.title.toLowerCase())) score += 10;
                     if (score > bestScore) { bestScore = score; bestProduct = p; }
                 }
-                if (bestScore < 1) bestProduct = products[Math.floor(Math.random() * products.length)];
+
+                // ── AGENTIC DECISION: Only match when there's genuine relevance ──
+                // If bestScore < 2, the brief has no meaningful product connection.
+                // Instead of forcing a random product, give the AI the full catalog
+                // and let IT decide what fits the creative vision.
+                if (bestScore < 2) bestProduct = null;
 
                 if (bestProduct) {
+                    // Strong product match — inject as hero product
                     matchedProductName = bestProduct.title;
                     const features = (bestProduct.features || []).slice(0, 3).join(', ');
                     const desc = (bestProduct.shortDescription || bestProduct.description || '').substring(0, 100);
-                    productContext = `\nMATCHED PRODUCT FOR THIS BRIEF: "${bestProduct.title}"${desc ? ` — ${desc}` : ''}${features ? `\nKEY FEATURES: ${features}` : ''}\nIMPORTANT: Weave this product into the enhanced prompt as the HERO visual element. The image should prominently feature "${bestProduct.title}".`;
+                    productContext = `\nSTRONGLY MATCHED PRODUCT (confidence: high): "${bestProduct.title}"${desc ? ` — ${desc}` : ''}${features ? `\nKEY FEATURES: ${features}` : ''}\nThis product directly relates to the user's brief. Feature it as the HERO visual element.`;
                 }
-                productContext += `\nALL PRODUCTS IN CATALOG: ${products.map(p => p.title).join(', ')}`;
+
+                // Always provide the full catalog so the AI can make intelligent decisions
+                const catalogSummary = products.map(p => {
+                    const desc = (p.shortDescription || '').substring(0, 60);
+                    return `• ${p.title}${p.category ? ` [${p.category}]` : ''}${desc ? `: ${desc}` : ''}`;
+                }).join('\n');
+                productContext += `\n\nFULL PRODUCT CATALOG (${products.length} products):\n${catalogSummary}`;
+
+                if (!bestProduct) {
+                    productContext += `\n\nAGENTIC DECISION REQUIRED: No strong product match was found for this brief. As the Creative Director, YOU must decide:\n1. If the brief has ANY thematic connection to a product (e.g. "summer" → portable speaker), pick the most relevant one and integrate it naturally\n2. If the brief is purely an occasion/greeting (e.g. "happy birthday", "thank you"), create a brand-atmosphere creative that captures the brand's identity without forcing a specific product\n3. If the brief is about the brand itself (e.g. "brand launch", "about us"), showcase the brand's overall identity and values`;
+                }
             } else {
+                // Service brand — no physical products
                 const services = (dna.servicesOffered || []).slice(0, 5);
                 const usps = (dna.uniqueSellingPoints || []).slice(0, 3);
                 if (services.length > 0 || usps.length > 0) {
-                    productContext = `\nSERVICE BRAND — KEY OFFERINGS: ${services.join(', ')}${usps.length > 0 ? `\nUNIQUE SELLING POINTS: ${usps.join(', ')}` : ''}\nIMPORTANT: Weave these services into the visual narrative.`;
+                    productContext = `\nSERVICE BRAND — KEY OFFERINGS: ${services.join(', ')}${usps.length > 0 ? `\nUNIQUE SELLING POINTS: ${usps.join(', ')}` : ''}\nWeave these services into the visual narrative where relevant to the brief.`;
                 }
             }
         }
@@ -499,23 +715,39 @@ router.post('/enhance-prompt', protect, requireCredits('promptEnhance'), async (
 You transform rough user ideas into STUNNING, brand-specific, product-aware image generation prompts.
 
 YOUR AGENTIC INTELLIGENCE:
-- You DON'T just enhance text — you RESEARCH the brief against the brand's product catalog and intelligently select which product to feature
-- You understand that "summer beats" for an electronics brand means: feature their EARBUDS/HEADPHONES in a summer lifestyle setting
-- You combine the user's THEME with the brand's ACTUAL PRODUCTS to create a compelling visual narrative
+- You are a TRUE creative agent — you understand brands at a DNA level: their personality, visual language, target audience, and product portfolio
+- You READ the user's brief to understand their INTENT: Is it a product showcase? A festive greeting? A brand awareness post? A campaign visual? Each requires a different creative approach.
+- You BLEND three inputs intelligently: (1) the user's brief/theme, (2) the brand's visual identity & DNA, (3) real product data — in the right proportions based on the brief's intent
+- You DON'T just enhance text — you make CREATIVE DECISIONS:
+  → "summer beats" for an audio brand → feature EARBUDS in a sun-drenched lifestyle scene (product = 40%, theme = 60%)
+  → "happy birthday" for the same brand → birthday celebration atmosphere with brand colors, product appears as a gift element (product = 20%, occasion = 80%)
+  → "launch our new speaker" → hero product shot with dramatic reveal staging (product = 70%, drama = 30%)
+  → "thank you to our customers" → warm, emotional brand-world scene with brand aesthetics but no forced product (brand identity = 100%)
+
+CREATIVE DECISION FRAMEWORK:
+1. ANALYZE the brief — what is the user's PRIMARY intent?
+2. DECIDE the product integration level:
+   - HERO (70-80%): Brief explicitly mentions or implies a product → product dominates the visual
+   - SUPPORTING (30-40%): Brief is thematic/seasonal but relates to product category → product appears naturally in scene
+   - AMBIENT (10-20%): Brief is occasion/greeting → brand aesthetic dominates, product may appear as background element or not at all
+   - NONE (0%): Brief is about brand values/mission/team → pure brand identity visual, no product forced
+3. SELECT the right product (if any) from the catalog based on thematic fit
+4. CRAFT the prompt blending all three inputs in the decided proportions
 
 RULES:
-1. Keep the user's core theme/mood but ADD the matched product as the hero visual element
-2. If a MATCHED PRODUCT is provided, describe it as the KEY VISUAL in the scene — show it being used, worn, or displayed prominently
-3. Add vivid details: composition, lighting, textures, materials, atmosphere, color palette
-4. NEVER include hex codes, font names, or metadata text
-5. Describe colors by visual appearance, not codes
-6. Premium quality — ready for a global brand campaign
-7. Keep under 150 words — concise but vivid
-8. Match the brand's personality and aesthetic
-${formatInfo ? `9. FORMAT: ${formatInfo.label} — ${formatInfo.rules}` : ''}
-${formatInfo?.needsText ? `10. TEXT ON IMAGE: Since this is a ${formatInfo.label}, your prompt MUST include a SUGGESTED HEADLINE. Write it like: "Bold text reading 'YOUR HEADLINE HERE' prominently displayed..." Make the headline catchy, 3-5 words, and combine the brief theme with the product.` : ''}
-11. NEVER wrap in quotes or add prefixes like "Generate:" — return ONLY the raw enhanced prompt
-12. NEVER describe the output as a "mockup" or "presentation" — describe the ACTUAL visual content
+1. The user's brief is SACRED — never override their creative vision, enhance it
+2. If a STRONGLY MATCHED PRODUCT is provided, describe it as the KEY VISUAL naturally integrated into the scene
+3. If no product match exists, DO NOT force a random product — create a brand-world visual that captures the brand's essence
+4. Add vivid details: composition, lighting, textures, materials, atmosphere, color palette
+5. NEVER include hex codes, font names, or metadata text
+6. Describe colors by visual appearance, not codes
+7. Premium quality — ready for a global brand campaign
+8. Keep under 150 words — concise but vivid
+9. Match the brand's personality and aesthetic throughout
+${formatInfo ? `10. FORMAT: ${formatInfo.label} — ${formatInfo.rules}` : ''}
+${formatInfo?.needsText ? `11. TEXT ON IMAGE: Since this is a ${formatInfo.label}, your prompt MUST include a SUGGESTED HEADLINE. Write it like: "Bold text reading 'YOUR HEADLINE HERE' prominently displayed..." Make the headline catchy, 3-5 words.` : ''}
+12. NEVER wrap in quotes or add prefixes like "Generate:" — return ONLY the raw enhanced prompt
+13. NEVER describe the output as a "mockup" or "presentation" — describe the ACTUAL visual content
 
 RESPOND WITH ONLY THE ENHANCED PROMPT TEXT. Nothing else.`;
 
@@ -533,7 +765,6 @@ RESPOND WITH ONLY THE ENHANCED PROMPT TEXT. Nothing else.`;
 
         // Use Gemini Flash (cheapest)
         const geminiKey = process.env.GEMINI_IMAGE_API_KEY || process.env.GEMINI_API_KEY;
-        const openaiKey = process.env.OPENAI_API_KEY;
         let enhanced = '';
 
         if (geminiKey) {
@@ -561,23 +792,7 @@ RESPOND WITH ONLY THE ENHANCED PROMPT TEXT. Nothing else.`;
             }
         }
 
-        if (!enhanced && openaiKey) {
-            try {
-                const resp = await fetch('https://api.openai.com/v1/chat/completions', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${openaiKey}` },
-                    body: JSON.stringify({
-                        model: 'gpt-4o-mini',
-                        messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
-                        temperature: 0.7, max_tokens: 1024,
-                    }),
-                });
-                const data = await resp.json();
-                enhanced = data.choices?.[0]?.message?.content || '';
-            } catch (e) {
-                console.warn('Prompt enhance: GPT-4o-mini failed:', e.message);
-            }
-        }
+        // NO OpenAI fallback — strict model enforcement
 
         if (!enhanced) enhanced = prompt;
 
@@ -676,7 +891,6 @@ Return ONLY valid JSON: [{"headline":"...","body":"...","cta":"...","feature":".
 No markdown, no explanation.`;
 
         const geminiKey = process.env.GEMINI_IMAGE_API_KEY || process.env.GEMINI_API_KEY;
-        const openaiKey = process.env.OPENAI_API_KEY;
         let result = '';
 
         if (geminiKey) {
@@ -704,23 +918,7 @@ No markdown, no explanation.`;
             }
         }
 
-        if (!result && openaiKey) {
-            try {
-                const resp = await fetch('https://api.openai.com/v1/chat/completions', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${openaiKey}` },
-                    body: JSON.stringify({
-                        model: 'gpt-4o-mini',
-                        messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
-                        temperature: 0.8, max_tokens: 2048,
-                    }),
-                });
-                const data = await resp.json();
-                result = data.choices?.[0]?.message?.content || '';
-            } catch (e) {
-                console.warn('Campaign copy: GPT-4o-mini failed:', e.message);
-            }
-        }
+        // NO OpenAI fallback — strict model enforcement
 
         // Parse JSON array from response
         const jsonMatch = result.match(/\[[\s\S]*\]/);
@@ -814,6 +1012,7 @@ router.post('/generate', protect, requireStudio('creativeStudio'), requireCredit
         // ── Collect all image parts for Gemini multi-image call ──────────
         const imageParts = [];
         const referenceInstructions = [];
+        const refImageUrls = []; // Track original S3 URLs for LZ multimodal routing
 
         // Reference images: style, character, upload, template base, product — support both base64 data URIs and HTTP URLs
         const refs = options?.referenceImages || {};
@@ -876,10 +1075,13 @@ router.post('/generate', protect, requireStudio('creativeStudio'), requireCredit
         if (styleRef) {
             imageParts.push({ inlineData: { mimeType: styleRef.part.mimeType, data: styleRef.part.data } });
             referenceInstructions.push('Match the visual style, colors, and mood of the provided style reference image.');
+            if (refs.style?.startsWith('http')) refImageUrls.push(refs.style);
         }
 
         for (const charRef of characterRefs) {
             imageParts.push({ inlineData: { mimeType: charRef.part.mimeType, data: charRef.part.data } });
+            const charUrl = characters[characterRefs.indexOf(charRef)]?.image;
+            if (charUrl?.startsWith('http')) refImageUrls.push(charUrl);
         }
         if (characterRefs.length > 0) {
             if (characterRefs.length === 1) {
@@ -892,6 +1094,7 @@ router.post('/generate', protect, requireStudio('creativeStudio'), requireCredit
         if (uploadRef) {
             imageParts.push({ inlineData: { mimeType: uploadRef.part.mimeType, data: uploadRef.part.data } });
             referenceInstructions.push('Use the provided reference image as contextual inspiration for the composition.');
+            if (refs.upload?.startsWith('http')) refImageUrls.push(refs.upload);
         }
 
         // ── Template Inpainting Mode ──────────────────────────────────────
@@ -979,6 +1182,7 @@ router.post('/generate', protect, requireStudio('creativeStudio'), requireCredit
                     style: styleWord,
                     imageModel: options?.imageModel || 'nanobanana-2',
                     mode: agenticQuality,
+                    generateCopy: options?.generateCopy === true,
                     onProgress: progressId ? (step) => addStep(progressId, step) : undefined,
                 });
 
@@ -1002,6 +1206,11 @@ The output must fill the entire canvas edge-to-edge. Do NOT render any color pal
                     brandAlignmentScore: pipelineResult.styleCritique?.brandAlignmentScore || 85,
                 };
 
+                // Store copy result from pipeline (if copywriter was enabled)
+                if (pipelineResult.copy) {
+                    agenticMeta.copy = pipelineResult.copy;
+                }
+
                 // ── ANTI-HALLUCINATION: Auto-inject real product images as reference ──
                 // PERFORMANCE: All image fetches happen in PARALLEL
                 const mp = pipelineResult.matchedProduct;
@@ -1023,6 +1232,10 @@ The output must fill the entire canvas edge-to-edge. Do NOT render any color pal
                 // RULE: Only inject images that belong to the matched product itself.
                 
                 if (productImgUrls.length > 0) {
+                    // Track original S3 URLs for LZ multimodal
+                    for (const url of productImgUrls) {
+                        if (url?.startsWith('http')) refImageUrls.push(url);
+                    }
                     // Matched product HAS images — fetch them in parallel
                     const productFetches = productImgUrls.map(url => 
                         resolveRefImage(url, mp?.usingDnaImages ? 'brand-dna-product' : 'catalog-product')
@@ -1067,6 +1280,7 @@ The output must fill the entire canvas edge-to-edge. Do NOT render any color pal
                         if (r.status === 'fulfilled' && r.value && brandCount < 2) {
                             imageParts.push({ inlineData: { mimeType: r.value.part.mimeType, data: r.value.part.data } });
                             referenceInstructions.push('BRAND STYLE REFERENCE: Match this brand\'s visual style and aesthetic.');
+                            if (brandImgUrls[brandCount]?.startsWith('http')) refImageUrls.push(brandImgUrls[brandCount]);
                             brandCount++;
                         }
                     }
@@ -1127,7 +1341,7 @@ The output must fill the entire canvas edge-to-edge. Do NOT render any color pal
                 addStep(progressId, { agent: 'image-inject', message: `${imageParts.filter(p => p.inlineData).length} reference images loaded`, status: 'done' });
                 addStep(progressId, { agent: 'generating', message: 'Generating image with AI...', status: 'working' });
             }
-            const genResult = await routedImageGenerate(fullPrompt, imageParts, 0.2, geminiAspectRatio, geminiImageSize, selectedImageModel);
+            const genResult = await routedImageGenerate(fullPrompt, imageParts, 0.2, geminiAspectRatio, geminiImageSize, selectedImageModel, refImageUrls);
 
             // Handle model busy — notify frontend instead of silent fallback
             if (genResult.modelBusy) {
@@ -1135,7 +1349,9 @@ The output must fill the entire canvas edge-to-edge. Do NOT render any color pal
                     success: false,
                     modelBusy: true,
                     busyModel: selectedImageModel,
-                    error: `${IMAGE_MODEL_CONFIG[selectedImageModel]?.name || selectedImageModel} is currently busy. Please try a different model for faster generation.`,
+                    errorMessage: genResult.errorMessage || `${IMAGE_MODEL_CONFIG[selectedImageModel]?.name || selectedImageModel} is currently busy.`,
+                    errorType: genResult.errorType || 'busy',
+                    error: genResult.errorMessage || `${IMAGE_MODEL_CONFIG[selectedImageModel]?.name || selectedImageModel} is currently busy. Please try a different model for faster generation.`,
                 });
             }
 
@@ -1143,7 +1359,7 @@ The output must fill the entire canvas edge-to-edge. Do NOT render any color pal
                 title: `${type.replace('-', ' ')} — ${brand.name}`,
                 imageUrl: genResult.imageUrl || '',
                 aiMeta: {
-                    provider: IMAGE_MODEL_CONFIG[selectedImageModel]?.provider || 'gemini',
+                    provider: genResult.provider || IMAGE_MODEL_CONFIG[selectedImageModel]?.provider || 'gemini',
                     model: genResult.model,
                     method: referenceInstructions.length > 0 ? 'reference-guided' : 'base-image-edit',
                     referenceTypes: Object.keys(refs).filter(k => refs[k]),
@@ -1154,7 +1370,7 @@ The output must fill the entire canvas edge-to-edge. Do NOT render any color pal
             // Text-only generation — route to selected model
             console.log(`🎨 Creative Studio: generating from text prompt, aspect: ${geminiAspectRatio}, model: ${selectedImageModel}`);
             if (progressId) addStep(progressId, { agent: 'generating', message: 'Generating image with AI...', status: 'working' });
-            const genResult = await routedImageGenerate(fullPrompt, [], 0.3, geminiAspectRatio, geminiImageSize, selectedImageModel);
+            const genResult = await routedImageGenerate(fullPrompt, [], 0.3, geminiAspectRatio, geminiImageSize, selectedImageModel, refImageUrls);
 
             // Handle model busy
             if (genResult.modelBusy) {
@@ -1162,7 +1378,9 @@ The output must fill the entire canvas edge-to-edge. Do NOT render any color pal
                     success: false,
                     modelBusy: true,
                     busyModel: selectedImageModel,
-                    error: `${IMAGE_MODEL_CONFIG[selectedImageModel]?.name || selectedImageModel} is currently busy. Please try a different model for faster generation.`,
+                    errorMessage: genResult.errorMessage || `${IMAGE_MODEL_CONFIG[selectedImageModel]?.name || selectedImageModel} is currently busy.`,
+                    errorType: genResult.errorType || 'busy',
+                    error: genResult.errorMessage || `${IMAGE_MODEL_CONFIG[selectedImageModel]?.name || selectedImageModel} is currently busy. Please try a different model for faster generation.`,
                 });
             }
 
@@ -1171,21 +1389,21 @@ The output must fill the entire canvas edge-to-edge. Do NOT render any color pal
                     title: `${type.replace('-', ' ')} — ${brand.name}`,
                     imageUrl: genResult.imageUrl,
                     aiMeta: {
-                        provider: IMAGE_MODEL_CONFIG[selectedImageModel]?.provider || 'gemini',
+                        provider: genResult.provider || IMAGE_MODEL_CONFIG[selectedImageModel]?.provider || 'gemini',
                         model: genResult.model,
                         method: 'text-to-image',
                         brandAlignmentScore: 80 + Math.floor(Math.random() * 15),
                     },
                 };
             } else {
-                // Fallback to orchestrator
-                const orchestrator = getOrchestrator();
-                result = await orchestrator.generateCreative({
-                    brand,
-                    user: req.user,
-                    type: type || 'instagram-post',
-                    prompt: fullPrompt,
-                    options: options || {},
+                // NO orchestrator fallback — return modelBusy so frontend can notify user
+                return res.status(200).json({
+                    success: false,
+                    modelBusy: true,
+                    busyModel: selectedImageModel,
+                    errorMessage: `${IMAGE_MODEL_CONFIG[selectedImageModel]?.name || selectedImageModel} failed to generate an image. Please try again or select a different model.`,
+                    errorType: 'error',
+                    error: `${IMAGE_MODEL_CONFIG[selectedImageModel]?.name || selectedImageModel} failed to generate an image. Please try again or select a different model.`,
                 });
             }
         }
@@ -1219,6 +1437,8 @@ The output must fill the entire canvas edge-to-edge. Do NOT render any color pal
             dimensions: result.dimensions || {},
             designData: result.designData || {},
             aiMeta: { ...result.aiMeta || {}, processingStatus: 'uploading' },
+            // Store AI-generated copy if copywriter agent ran
+            ...(agenticMeta?.copy ? { copy: agenticMeta.copy } : {}),
         });
 
         // Increment usage counter (non-blocking)

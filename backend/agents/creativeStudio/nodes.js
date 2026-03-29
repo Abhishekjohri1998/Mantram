@@ -1,7 +1,8 @@
 /**
  * Creative Studio — Agentic Pipeline Node Functions (v2)
  * 
- * 5-agent chain: BrandIntel → ArtDirector → PromptEngineer → [StyleCritic] → generate
+ * 6-agent chain: BrandIntel → ArtDirector → PromptEngineer → [StyleCritic] → generate
+ * Optional: CopywriterAgent runs in PARALLEL with image generation.
  * VariationGenerator available for A/B mode.
  * Each node: (state) → updatedState
  */
@@ -15,6 +16,7 @@ import {
     PROMPT_ENGINEER_PROMPT,
     STYLE_CRITIC_PROMPT,
     VARIATION_PROMPT,
+    COPYWRITER_PROMPT,
 } from './prompts.js';
 
 
@@ -160,16 +162,12 @@ export async function brandIntelligenceNode(state) {
         }
     }
 
-    // If no specific match but brand has products, pick a random product for variety
+    // ── AGENTIC DECISION: No random product injection ──
+    // When no product matches the brief, DON'T force a random one.
+    // Instead, provide the full catalog context and let the downstream
+    // Art Director and Prompt Engineer agents make intelligent decisions.
     if (!matchedProduct && hasProducts) {
-        const productsWithImages = products.filter(p => (p.images || []).length > 0);
-        if (productsWithImages.length > 0) {
-            matchedProduct = productsWithImages[Math.floor(Math.random() * productsWithImages.length)];
-            console.log(`📦 No specific product match — auto-selecting product with images: "${matchedProduct.title}"`);
-        } else {
-            matchedProduct = products[Math.floor(Math.random() * products.length)];
-            console.log(`📦 No products have images — auto-selecting "${matchedProduct.title}" for prompt grounding (will use brand DNA images)`);
-        }
+        console.log(`🧠 No specific product match for brief: "${state.brief}" — downstream agents will decide if/which product to feature`);
     }
 
     // ── Brand DNA Image Discovery — find product-relevant images from brand DNA ──
@@ -442,8 +440,9 @@ export async function artDirectorNode(state) {
         state.references ? `REFERENCE NOTES: ${state.references}` : '',
         state.productName ? `PRODUCT: ${state.productName}` : '',
         productContext,
-        intel.brandType === 'product' && !mp ? `NOTE: This brand sells physical products. If the brief involves a product, base your direction on the brand's actual product catalog.` : '',
-        !mp && intel.productCandidates?.length > 0 ? `AVAILABLE PRODUCTS IN CATALOG (pick the most relevant for this brief):\n${intel.productCandidates.map(c => `• ${c.title}${c.category ? ` [${c.category}]` : ''}: ${c.description || 'No description'}`).join('\n')}` : '',
+        // When no product is matched, give the agent the full catalog + decision authority
+        intel.brandType === 'product' && !mp ? `\n🧠 AGENTIC DECISION REQUIRED — NO PRODUCT WAS AUTO-MATCHED:\nThe user's brief didn't clearly reference any specific product. As the Art Director, YOU must decide:\n1. ANALYZE the brief — does it have ANY thematic connection to a product category? (e.g. "summer vibes" → portable speakers/earbuds)\n2. If YES → pick the most relevant product from the catalog below and integrate it naturally at a SUPPORTING level (30-40% of the image)\n3. If the brief is an OCCASION/GREETING → create a brand-atmosphere scene using the brand's visual identity, colors, and personality. Products appear as ambient props if at all (10-20%), NOT as the hero.\n4. If the brief is PURELY about brand identity → showcase the brand's world without forcing any product.\n\nDO NOT randomly pick a product just to fill space. Make a creative decision.` : '',
+        !mp && intel.productCandidates?.length > 0 ? `\nAVAILABLE PRODUCTS IN CATALOG (pick ONLY if relevant to the brief):\n${intel.productCandidates.map(c => `• ${c.title}${c.category ? ` [${c.category}]` : ''}: ${c.description || 'No description'}${c.images?.length > 0 ? ' 📸' : ''}`).join('\n')}` : '',
     ].filter(Boolean).join('\n');
 
     const result = await callAgent(ART_DIRECTOR_PROMPT(brandContext), userPrompt, 0.7);
@@ -515,6 +514,9 @@ export async function fastCreativeDirectorNode(state) {
         intel.colors?.length > 0 ? `BRAND COLORS: ${intel.colors.join(', ')}` : '',
         `IMAGE MODEL: ${state.imageModel || 'gemini'} — optimize prompt accordingly`,
         productContext,
+        // When no product is matched, give the agent catalog + decision authority
+        intel.brandType === 'product' && !mp ? `\n🧠 AGENTIC DECISION: No product was auto-matched to this brief. You must decide:\n- If the brief relates to a product category → pick the best fit from the catalog and integrate at SUPPORTING level\n- If it's an occasion/greeting → create a brand-atmosphere visual without forcing a product\n- If it's about brand identity → pure brand visual, no product insertion` : '',
+        !mp && intel.productCandidates?.length > 0 ? `\nCATALOG (pick ONLY if relevant):\n${intel.productCandidates.map(c => `• ${c.title}${c.category ? ` [${c.category}]` : ''}${c.images?.length > 0 ? ' 📸' : ''}`).join('\n')}` : '',
     ].filter(Boolean).join('\n');
 
     const result = await callAgent(FAST_CREATIVE_DIRECTOR_PROMPT(brandContext), userPrompt, 0.6, 2048);
@@ -666,6 +668,69 @@ export async function variationGeneratorNode(state) {
 
 
 // ══════════════════════════════════════════════════════════════════════════════
+// NODE 5: COPYWRITER — Generates brand-aware marketing copy alongside visuals
+// Runs in PARALLEL with image generation for zero added latency
+// ══════════════════════════════════════════════════════════════════════════════
+export async function copywriterNode(state) {
+    console.log('✍️  Creative Agent: Copywriter — writing brand copy...');
+    const startMs = Date.now();
+
+    const brandContext = state.brandContext || (await loadBrandContext(state.brandId)).brandContext;
+    const intel = state.brandIntel || {};
+    const mp = state.matchedProduct;
+
+    // ── Build rich context for the copywriter ──
+    const formatKey = state.format || 'instagram-post';
+    const platformMap = {
+        'instagram-post': 'Instagram Post',
+        'instagram-story': 'Instagram Story / Reel',
+        'facebook-ad': 'Facebook Ad',
+        'linkedin-post': 'LinkedIn Post',
+        'youtube-thumb': 'YouTube Thumbnail',
+        'twitter-post': 'Twitter / X Post',
+        'banner': 'Website Banner',
+    };
+    const platformLabel = platformMap[formatKey] || formatKey;
+
+    const userPrompt = [
+        `CREATIVE BRIEF: ${state.brief}`,
+        `PLATFORM: ${platformLabel}`,
+        `VISUAL MOOD: ${state.artDirection?.mood || 'professional'}`,
+        `VISUAL STYLE: ${state.artDirection?.visualStyle || 'modern'}`,
+        state.artDirection?.suggestedHeadline ? `VISUAL HEADLINE ON IMAGE: "${state.artDirection.suggestedHeadline}" — your caption should COMPLEMENT this, not repeat it` : '',
+        // Brand personality for copy tone
+        intel.personality ? `BRAND VOICE: ${intel.personality}` : '',
+        intel.tagline ? `BRAND TAGLINE: ${intel.tagline}` : '',
+        intel.values?.length > 0 ? `BRAND VALUES: ${intel.values.join(', ')}` : '',
+        intel.contentDos?.length > 0 ? `CONTENT DOS: ${intel.contentDos.join('; ')}` : '',
+        intel.contentDonts?.length > 0 ? `CONTENT DON'TS: ${intel.contentDonts.join('; ')}` : '',
+        // Product context
+        mp ? `FEATURED PRODUCT: "${mp.title}"${mp.description ? ` — ${mp.description}` : ''}` : '',
+        mp?.features?.length > 0 ? `PRODUCT USPs: ${mp.features.slice(0, 4).join(', ')}` : '',
+        // Target audience
+        intel.targetAudience ? `TARGET AUDIENCE: ${intel.targetAudience}` : '',
+        intel.usps?.length > 0 ? `BRAND USPs: ${intel.usps.join(', ')}` : '',
+    ].filter(Boolean).join('\n');
+
+    const result = await callAgent(COPYWRITER_PROMPT(brandContext), userPrompt, 0.75, 2048);
+    console.log(`✍️  Copywriter done in ${Date.now() - startMs}ms — headline: "${result.headline || '?'}"`);
+
+    return {
+        ...state,
+        copy: {
+            headline: result.headline || '',
+            caption: result.caption || '',
+            cta: result.cta || '',
+            hashtags: result.hashtags || [],
+            altText: result.altText || '',
+            copyNotes: result.copyNotes || '',
+        },
+        status: 'copywriting',
+    };
+}
+
+
+// ══════════════════════════════════════════════════════════════════════════════
 // RUNNER: Execute the full agentic pipeline
 // ══════════════════════════════════════════════════════════════════════════════
 /**
@@ -679,13 +744,14 @@ export async function variationGeneratorNode(state) {
  * @param {string} params.style - User-selected style
  * @param {string} params.imageModel - Selected image model
  * @param {string} params.mode - 'fast' (skip critic) | 'quality' (full chain)
+ * @param {boolean} params.generateCopy - If true, run Copywriter Agent in parallel
  * @param {function} params.onProgress - Optional callback: (step) => void, for live progress tracking
- * @returns {object} { finalPrompt, artDirection, engineeredPrompt, styleCritique, brandIntel }
+ * @returns {object} { finalPrompt, artDirection, engineeredPrompt, styleCritique, brandIntel, copy? }
  */
 export async function runCreativePipeline(params) {
-    const { brandId, brief, format, aspectRatio, style, imageModel, mode = 'fast', onProgress } = params;
+    const { brandId, brief, format, aspectRatio, style, imageModel, mode = 'fast', generateCopy = false, onProgress } = params;
     const pipelineStart = Date.now();
-    console.log(`\n══════════ AGENTIC CREATIVE PIPELINE (${mode.toUpperCase()}) ══════════`);
+    console.log(`\n══════════ AGENTIC CREATIVE PIPELINE (${mode.toUpperCase()}${generateCopy ? ' + COPY' : ''}) ══════════`);
 
     const emit = (agent, message, status = 'working', detail = '') => {
         if (onProgress) onProgress({ agent, message, status, detail });
@@ -710,6 +776,9 @@ export async function runCreativePipeline(params) {
     const productName = state.matchedProduct?.title || '';
     emit('brand-intel', productName ? `Matched product: ${productName}` : 'Brand context loaded', 'done', productName ? `Using "${productName}" as hero product` : '');
 
+    // ── Track copywriter promise (fires in parallel after art direction) ──
+    let copyPromise = null;
+
     if (mode === 'fast') {
         // ══════════════════════════════════════════════════════════════════
         // FAST MODE: Single LLM call — Art Director + Prompt Engineer combined
@@ -719,6 +788,21 @@ export async function runCreativePipeline(params) {
         state = await fastCreativeDirectorNode(state);
         emit('art-director', `Direction: ${state.artDirection?.mood || 'defined'}`, 'done', state.artDirection?.visualStyle || '');
         state.finalPrompt = state.engineeredPrompt?.primaryPrompt || brief;
+
+        // ── Fire copywriter in PARALLEL (non-blocking) ──
+        if (generateCopy) {
+            emit('copywriter', 'Copywriter crafting brand copy...', 'working');
+            copyPromise = copywriterNode(state)
+                .then(copyState => {
+                    emit('copywriter', `Copy ready: "${copyState.copy?.headline || ''}"`, 'done');
+                    return copyState.copy;
+                })
+                .catch(err => {
+                    console.warn('✍️  Copywriter failed (non-critical):', err.message);
+                    emit('copywriter', 'Copy generation skipped', 'done');
+                    return null;
+                });
+        }
     } else {
         // ══════════════════════════════════════════════════════════════════
         // QUALITY MODE: Sequential agents for maximum quality
@@ -726,6 +810,21 @@ export async function runCreativePipeline(params) {
         emit('art-director', 'Art Director crafting creative vision...', 'working');
         state = await artDirectorNode(state);
         emit('art-director', `Creative direction: ${state.artDirection?.mood || 'defined'}`, 'done', state.artDirection?.visualStyle || '');
+
+        // ── Fire copywriter in PARALLEL with prompt engineering ──
+        if (generateCopy) {
+            emit('copywriter', 'Copywriter crafting brand copy...', 'working');
+            copyPromise = copywriterNode(state)
+                .then(copyState => {
+                    emit('copywriter', `Copy ready: "${copyState.copy?.headline || ''}"`, 'done');
+                    return copyState.copy;
+                })
+                .catch(err => {
+                    console.warn('✍️  Copywriter failed (non-critical):', err.message);
+                    emit('copywriter', 'Copy generation skipped', 'done');
+                    return null;
+                });
+        }
 
         emit('prompt-engineer', 'Prompt Engineer optimizing for image model...', 'working');
         state = await promptEngineerNode(state);
@@ -738,8 +837,14 @@ export async function runCreativePipeline(params) {
         state.finalPrompt = state.styleCritique?.improvedPrompt || state.engineeredPrompt?.primaryPrompt || brief;
     }
 
+    // ── Await copywriter result (if it was fired) ──
+    let copyResult = null;
+    if (copyPromise) {
+        copyResult = await copyPromise;
+    }
+
     const totalMs = Date.now() - pipelineStart;
-    console.log(`══════════ PIPELINE COMPLETE (${totalMs}ms) ══════════\n`);
+    console.log(`══════════ PIPELINE COMPLETE (${totalMs}ms)${copyResult ? ' — copy included' : ''} ══════════\n`);
 
     return {
         finalPrompt: state.finalPrompt || state.engineeredPrompt?.primaryPrompt || brief,
@@ -748,6 +853,7 @@ export async function runCreativePipeline(params) {
         styleCritique: state.styleCritique || null,
         brandIntel: state.brandIntel,
         matchedProduct: state.matchedProduct || null,
+        copy: copyResult || null,
         pipelineTimeMs: totalMs,
         mode,
     };

@@ -15,6 +15,7 @@ import Brand from '../models/Brand.js';
 import { protect } from '../middleware/auth.js';
 import { requireCredits, refundCredits } from '../middleware/credits.js';
 import { safeErrorMessage } from '../utils/safeError.js';
+import { laozhangImageGenerate, isLaozhangAvailable } from '../agents/videoStudio/laozhangClient.js';
 import {
     researchNode,
     contentStrategistNode,
@@ -761,7 +762,51 @@ router.post('/blog/:id/generate-image', protect, async (req, res) => {
         console.log(`   Prompt: ${imagePrompt.substring(0, 120)}...`);
         console.log(`   SEO Alt: ${seoAltText}`);
 
-        // ── Call NanoBanana 2 (gemini-3.1-flash-image-preview) directly ──
+        // ── LaoZhang-First: Try LZ when no brand ref image (cheaper) ──
+        // LZ doesn't support inline reference images, only plain text prompts
+        if (!brandImageRef && isLaozhangAvailable()) {
+            try {
+                const blogAR = isHero ? '16:9' : '3:2';
+                const AR_SIZE_MAP = { '16:9': '1792x1024', '3:2': '1536x1024', '1:1': '1024x1024' };
+                const lzSize = AR_SIZE_MAP[blogAR] || '1024x1024';
+                console.log(`🏷️ [LaoZhang-First] Blog image via LZ (${lzSize})...`);
+                const lzResult = await laozhangImageGenerate(imagePrompt, { model: 'gemini-3.1-flash-image-preview', size: lzSize });
+                if (lzResult?.imageUrl) {
+                    console.log(`✅ [LaoZhang] Blog image generated successfully`);
+                    // Upload to S3 if it's a base64 data URI
+                    let imageUrl = lzResult.imageUrl;
+                    if (imageUrl.startsWith('data:image/')) {
+                        try {
+                            const { uploadToS3 } = await import('../utils/s3.js');
+                            const b64Match = imageUrl.match(/^data:image\/(\w+);base64,(.+)$/);
+                            if (b64Match) {
+                                const buffer = Buffer.from(b64Match[2], 'base64');
+                                const ext = b64Match[1] === 'png' ? 'png' : 'jpg';
+                                const fileName = `blog-images/${content._id}/${isHero ? 'hero' : `section-${sectionIndex}`}-${Date.now()}.${ext}`;
+                                imageUrl = await uploadToS3(buffer, fileName, `image/${b64Match[1]}`);
+                            }
+                        } catch (s3E) { console.warn('S3 upload failed for LZ blog image:', s3E.message); }
+                    }
+
+                    // Save to content
+                    if (isHero) {
+                        content.blogMeta.heroImageUrl = imageUrl;
+                        content.blogMeta.heroImagePrompt = imagePrompt;
+                        content.blogMeta.heroImageAlt = seoAltText;
+                    } else {
+                        content.blogMeta.sections[sectionIndex].imageUrl = imageUrl;
+                        content.blogMeta.sections[sectionIndex].imageAlt = seoAltText;
+                    }
+                    content.markModified('blogMeta');
+                    await content.save();
+                    return res.json({ success: true, imageUrl, altText: seoAltText, sectionIndex: isHero ? -1 : sectionIndex, model: 'NanoBanana 2 (LaoZhang)' });
+                }
+            } catch (lzErr) {
+                console.warn(`⚠️ [LaoZhang] Blog image failed (${lzErr.message?.substring(0, 80)}), falling through to Gemini direct...`);
+            }
+        }
+
+        // ── Fallback: Call NanoBanana 2 (gemini-3.1-flash-image-preview) directly ──
         const imageKey = process.env.GEMINI_IMAGE_API_KEY || process.env.GEMINI_API_KEY;
         if (!imageKey) return res.status(500).json({ success: false, error: 'Image generation API key not configured' });
 

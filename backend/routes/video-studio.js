@@ -279,16 +279,30 @@ router.post('/advanced/generate', protect, requireCredits('videoGenerate'), asyn
         });
 
         // Update project with generation details
-        await VideoProject.findByIdAndUpdate(project._id, {
+        // LaoZhang sync: state.status may be 'critique' (already completed)
+        const projectStatus = state.status === 'critique' ? 'completed' : 'advanced-generating';
+        const updatePayload = {
+            status: projectStatus,
             generation: state.generation,
             backendPrompt: prompt.trim(),
-        });
+        };
+        if (state.generation?.videoUrl) {
+            updatePayload.finalVideoUrl = state.generation.videoUrl;
+        }
+        await VideoProject.findByIdAndUpdate(project._id, updatePayload);
+
+        // LaoZhang sync: video is already generated — upload to S3 before CDN expires
+        // This normally happens in the polling loop, but LZ projects skip polling
+        if (projectStatus === 'completed' && state.generation?.videoUrl) {
+            downloadAndUploadVideoToS3(project._id.toString(), state.generation.videoUrl)
+                .catch(e => console.warn('⚠️ LZ Video S3 upload failed:', e.message));
+        }
 
         res.json({
             success: true,
             project: {
                 _id: project._id,
-                status: 'advanced-generating',
+                status: projectStatus,
                 mode: 'advanced',
                 generation: state.generation,
                 costPreview: state.costPreview,
@@ -1839,10 +1853,24 @@ ${language && language !== 'english' ? `The script is in ${language}. Keep the l
             temperature: 0.6,
         });
 
-        const humanizedScript = (result.text || result.content || '')
+        let humanizedScript = (result.text || result.content || '')
             .replace(/<think>[\s\S]*?<\/think>/gi, '')
             .replace(/<\/?think>/gi, '')
+            .replace(/```(?:json)?\s*/g, '').replace(/```\s*/g, '')
             .trim();
+
+        // If AI returned JSON despite instructions, extract the script text
+        if (humanizedScript.startsWith('{')) {
+            try {
+                const obj = JSON.parse(humanizedScript);
+                humanizedScript = obj.humanizedScript || obj.script || obj.text || humanizedScript;
+            } catch { /* not JSON */ }
+        }
+        // Strip wrapping quotes
+        if ((humanizedScript.startsWith('"') && humanizedScript.endsWith('"')) ||
+            (humanizedScript.startsWith("'") && humanizedScript.endsWith("'"))) {
+            humanizedScript = humanizedScript.slice(1, -1);
+        }
 
         if (!humanizedScript) throw new Error('AI did not return humanized script');
 
@@ -3232,6 +3260,7 @@ router.get('/', protect, async (req, res) => {
                         if (model === 'veo-3.1-fast') provider = 'kie';
                         else if (model === 'seedance-2.0') provider = 'piapi';
                         else if (model === 'grok-imagine') provider = 'grok';
+                        else if (model === 'sora-2') provider = 'laozhang';
                         else if (model.startsWith('heygen')) provider = 'heygen';
                         else provider = 'fal';
                     }
@@ -3510,7 +3539,7 @@ Duration: ${duration || 6}s | Aspect ratio: ${aspectRatio || '16:9'} | Model: ${
 ${brandContext}
 ${brandContext ? '- CRITICAL: Weave the brand name, tagline, colors, and voice into the CTA. The ad must FEEL like this brand.' : ''}
 - If the user mentions @image1, @image2 etc., keep those tags as-is in the prompt
-- Output ONLY valid JSON: {"enhancedPrompt": "...", "changes": ["change1", "change2"]}`
+- Output ONLY the enhanced prompt text. Do NOT output JSON, code blocks, or any formatting. Just the enhanced cinematic prompt as plain text.`
 
             : `You are a cinematic AI video prompt enhancer. Take the user's raw prompt and rewrite it into a detailed, production-ready video generation prompt.
 
@@ -3522,27 +3551,63 @@ Rules:
 ${brandContext}
 ${brandContext ? '- IMPORTANT: Align the visual style, colors, mood, and tone with the brand identity above' : ''}
 - If the user mentions @image1, @image2 etc., keep those tags as-is in the prompt
-- Output ONLY valid JSON: {"enhancedPrompt": "...", "changes": ["change1", "change2"]}`;
+- Output ONLY the enhanced prompt text. Do NOT output JSON, code blocks, or any formatting. Just the enhanced cinematic prompt as plain text.`;
 
         const result = await aiRouter.generateText({
             systemPrompt,
             userPrompt: `Enhance this video prompt:\n\n"${prompt.trim()}"`,
             temperature: 0.5,
-            maxTokens: 1024,
-        }); // Use best available provider
+            maxTokens: 4096, // Gemini 2.5 Flash uses ~1300 thinking tokens — needs large budget
+        });
 
-        let parsed;
-        try {
-            const jsonMatch = (result.text || '').match(/\{[\s\S]*\}/);
-            parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : { enhancedPrompt: result.text };
-        } catch {
-            parsed = { enhancedPrompt: result.text || prompt };
+        // Clean up AI response — strip any accidental JSON/code block wrapping
+        let enhanced = (result.text || prompt).trim();
+
+        // Strip <think>...</think> reasoning tags (Gemini sometimes includes these)
+        enhanced = enhanced.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+
+        // If AI returned JSON despite instructions, extract the prompt text from it
+        // Check anywhere in the response, not just the start
+        const jsonMatch = enhanced.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+            try {
+                const obj = JSON.parse(jsonMatch[0]);
+                // Try common field names
+                const extracted = obj.enhancedPrompt || obj.enhanced_prompt || obj.prompt ||
+                    obj.text || obj.description || obj.content || obj.output;
+                if (extracted && typeof extracted === 'string' && extracted.length > 30) {
+                    enhanced = extracted;
+                }
+            } catch {
+                // Not valid JSON — continue with stripping
+            }
+        }
+
+        // Strip code fences (```json ... ``` or ``` ... ```)
+        enhanced = enhanced.replace(/```(?:json)?\s*/g, '').replace(/```\s*/g, '').trim();
+
+        // Strip any leading/trailing quotes the AI might add
+        if ((enhanced.startsWith('"') && enhanced.endsWith('"')) ||
+            (enhanced.startsWith("'") && enhanced.endsWith("'"))) {
+            enhanced = enhanced.slice(1, -1);
+        }
+
+        // If we still have JSON-looking text, strip everything except the longest text value
+        if (enhanced.startsWith('{') && enhanced.endsWith('}')) {
+            try {
+                const obj = JSON.parse(enhanced);
+                const values = Object.values(obj).filter(v => typeof v === 'string');
+                const longest = values.sort((a, b) => b.length - a.length)[0];
+                if (longest && longest.length > 30) {
+                    enhanced = longest;
+                }
+            } catch { /* not JSON, keep as-is */ }
         }
 
         res.json({
             success: true,
-            enhancedPrompt: parsed.enhancedPrompt || prompt,
-            changes: parsed.changes || [],
+            enhancedPrompt: enhanced,
+            changes: [],
         });
     } catch (error) {
         console.error('Enhance prompt error:', error);

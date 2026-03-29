@@ -12,45 +12,52 @@ import { useBrand } from '../context/BrandContext'
 // INTENT CONFIG
 // ============================================================================
 const INTENTS = [
-    { id: 'campaign', icon: 'campaign', label: 'Campaign', desc: 'Full marketing campaign strategy', color: 'from-violet-500 to-purple-600' },
-    { id: 'ad-film', icon: 'movie', label: 'Ad Film / Brand Film', desc: 'Script, concept & production plan', color: 'from-red-500 to-orange-600' },
-    { id: 'festival', icon: 'celebration', label: 'Festival Activation', desc: 'Festive campaign with cultural hooks', color: 'from-amber-500 to-orange-600' },
-    { id: 'product-launch', icon: 'rocket_launch', label: 'Product Launch', desc: 'Launch strategy & execution plan', color: 'from-cyan-500 to-blue-600' },
-    { id: 'naming', icon: 'abc', label: 'Product Naming', desc: 'Brand names, taglines, sub-lines', color: 'from-emerald-500 to-green-600' },
-    { id: 'offer', icon: 'sell', label: 'Offer Strategy', desc: 'Pricing, bundles, promotions', color: 'from-rose-500 to-pink-600' },
-    { id: 'positioning', icon: 'target', label: 'Brand Positioning', desc: 'Differentiation & market stance', color: 'from-indigo-500 to-blue-700' },
-    { id: 'trend-hijack', icon: 'trending_up', label: 'Trend Hijack', desc: 'Ride viral moments & trends', color: 'from-fuchsia-500 to-purple-700' },
-    { id: 'brand-strategy', icon: 'architecture', label: 'Brand Strategy', desc: 'Full 1–3 month measurable strategy', color: 'from-amber-500 to-yellow-600' },
-    { id: 'custom', icon: 'edit', label: 'Something Custom', desc: 'Free-form brainstorm session', color: 'from-slate-500 to-gray-700' },
+    { id: 'campaign', icon: 'campaign', label: 'Campaign', desc: 'Full marketing campaign strategy', glow: 'glow-violet', iconColor: 'text-violet-400' },
+    { id: 'ad-film', icon: 'movie_edit', label: 'Ad Film / Brand Film', desc: 'Script, concept & production plan', glow: 'glow-red', iconColor: 'text-red-400' },
+    { id: 'festival', icon: 'celebration', label: 'Festival Activation', desc: 'Festive campaign with cultural hooks', glow: 'glow-amber', iconColor: 'text-amber-400' },
+    { id: 'product-launch', icon: 'rocket_launch', label: 'Product Launch', desc: 'Launch strategy & execution plan', glow: 'glow-cyan', iconColor: 'text-cyan-400' },
+    { id: 'naming', icon: 'spellcheck', label: 'Product Naming', desc: 'Brand names, taglines, sub-lines', glow: 'glow-emerald', iconColor: 'text-emerald-400' },
+    { id: 'offer', icon: 'sell', label: 'Offer Strategy', desc: 'Pricing, bundles, promotions', glow: 'glow-rose', iconColor: 'text-rose-400' },
+    { id: 'positioning', icon: 'adjust', label: 'Brand Positioning', desc: 'Differentiation & market stance', glow: 'glow-indigo', iconColor: 'text-indigo-400' },
+    { id: 'trend-hijack', icon: 'trending_up', label: 'Trend Hijack', desc: 'Ride viral moments & trends', glow: 'glow-fuchsia', iconColor: 'text-fuchsia-400' },
+    { id: 'brand-strategy', icon: 'architecture', label: 'Brand Strategy', desc: 'Full 1–3 month measurable strategy', glow: 'glow-amber', iconColor: 'text-amber-400' },
+    { id: 'custom', icon: 'edit_note', label: 'Something Custom', desc: 'Free-form brainstorm session', glow: 'glow-slate', iconColor: 'text-slate-400' },
 ]
 
 // Score config
 const SCORE_META = [
-    { key: 'virality', icon: '🔥', label: 'Virality', color: 'bg-orange-500' },
-    { key: 'salesImpact', icon: '💰', label: 'Sales Impact', color: 'bg-emerald-500' },
-    { key: 'emotionalConnect', icon: '❤️', label: 'Emotional', color: 'bg-rose-500' },
-    { key: 'easeOfExecution', icon: '⚡', label: 'Ease', color: 'bg-blue-500' },
+    { key: 'virality', icon: 'local_fire_department', label: 'Virality', color: 'text-orange-400', barColor: 'bg-gradient-to-r from-orange-500 to-amber-400' },
+    { key: 'salesImpact', icon: 'payments', label: 'Sales Impact', color: 'text-emerald-400', barColor: 'bg-gradient-to-r from-emerald-500 to-teal-400' },
+    { key: 'emotionalConnect', icon: 'favorite', label: 'Emotional', color: 'text-rose-400', barColor: 'bg-gradient-to-r from-rose-500 to-pink-400' },
+    { key: 'easeOfExecution', icon: 'bolt', label: 'Ease', color: 'text-blue-400', barColor: 'bg-gradient-to-r from-blue-500 to-cyan-400' },
 ]
 
 const FILM_SCORE_META = [
-    { key: 'virality', icon: '🔥', label: 'Virality', color: 'bg-orange-500' },
-    { key: 'emotionalConnect', icon: '❤️', label: 'Emotional', color: 'bg-rose-500' },
-    { key: 'brandRecall', icon: '🧠', label: 'Brand Recall', color: 'bg-violet-500' },
-    { key: 'easeOfProduction', icon: '🎬', label: 'Producibility', color: 'bg-cyan-500' },
+    { key: 'virality', icon: 'local_fire_department', label: 'Virality', color: 'text-orange-400', barColor: 'bg-gradient-to-r from-orange-500 to-amber-400' },
+    { key: 'emotionalConnect', icon: 'favorite', label: 'Emotional', color: 'text-rose-400', barColor: 'bg-gradient-to-r from-rose-500 to-pink-400' },
+    { key: 'brandRecall', icon: 'psychology', label: 'Brand Recall', color: 'text-violet-400', barColor: 'bg-gradient-to-r from-violet-500 to-purple-400' },
+    { key: 'easeOfProduction', icon: 'videocam', label: 'Producibility', color: 'text-cyan-400', barColor: 'bg-gradient-to-r from-cyan-500 to-blue-400' },
 ]
 
 // ============================================================================
 // SCORE BAR COMPONENT
 // ============================================================================
-function ScoreBar({ score, color, label, icon }) {
+function ScoreBar({ score, color, barColor, label, icon }) {
     return (
-        <div className="flex items-center gap-2">
-            <span className="text-xs w-4">{icon}</span>
-            <div className="flex-1 h-1.5 bg-white/5 rounded-full overflow-hidden">
-                <div className={`h-full rounded-full ${color} transition-all duration-700`}
-                    style={{ width: `${score * 10}%` }} />
+        <div className="flex items-center gap-2.5 group">
+            <div className={`glass-icon sm ${color}`}>
+                <span className={`material-symbols-outlined text-xs ${color}`}>{icon}</span>
             </div>
-            <span className="text-sm text-slate-400 w-4 text-right">{score}</span>
+            <div className="flex-1">
+                <div className="flex items-center justify-between mb-1">
+                    <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">{label}</span>
+                    <span className="text-[10px] font-bold text-slate-300">{score}/10</span>
+                </div>
+                <div className="glass-score-bar">
+                    <div className={`glass-score-fill ${barColor}`}
+                        style={{ width: `${score * 10}%` }} />
+                </div>
+            </div>
         </div>
     )
 }
@@ -65,30 +72,31 @@ function IdeaCard({ idea, index, onExpand, onAction, isFilm, onFeedback, feedbac
         : 0
 
     return (
-        <div className={`glass-panel rounded-2xl p-5 transition-all group animate-fade-in ${feedbackState === 'like' ? 'border-emerald-500/40 bg-emerald-500/5' : feedbackState === 'dislike' ? 'border-rose-500/20 opacity-50' : 'hover:border-primary/30'}`}
+        <div className={`glass-card transition-all group animate-fade-in ${feedbackState === 'like' ? 'border-emerald-500/40 bg-emerald-500/5' : feedbackState === 'dislike' ? 'border-rose-500/20 opacity-50' : ''}`}
             style={{ animationDelay: `${index * 100}ms` }}>
             {/* Header */}
             <div className="flex items-start justify-between mb-3">
                 <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                        <span className="text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                    <div className="flex items-center gap-2 mb-1.5">
+                        <span className="glass-chip text-primary border-primary/20 bg-primary/10">
                             {isFilm ? `Film ${index + 1}` : `Concept ${index + 1}`}
                         </span>
-                        <span className="text-sm text-slate-500">
-                            Score: {avgScore}/10
+                        <span className="glass-chip">
+                            <span className="material-symbols-outlined text-[10px] text-amber-400">star</span>
+                            {avgScore}/10
                         </span>
-                        {feedbackState === 'like' && <span className="text-xs">✅</span>}
+                        {feedbackState === 'like' && <span className="material-symbols-outlined text-emerald-400 text-sm">check_circle</span>}
                     </div>
                     <h3 className="text-base font-bold text-white">{idea.title}</h3>
                 </div>
                 {/* Like/Dislike */}
                 <div className="flex gap-1 ml-2">
                     <button onClick={() => onFeedback(idea, 'like')}
-                        className={`p-1.5 rounded-lg transition-all cursor-pointer ${feedbackState === 'like' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-white/5 text-slate-500 hover:text-emerald-400 hover:bg-emerald-500/10'}`}>
+                        className={`glass-btn p-1.5 ${feedbackState === 'like' ? 'active !border-emerald-400/40 !bg-emerald-500/15 !text-emerald-400' : 'hover:!text-emerald-400 hover:!border-emerald-500/30'}`}>
                         <span className="material-symbols-outlined text-sm">thumb_up</span>
                     </button>
                     <button onClick={() => onFeedback(idea, 'dislike')}
-                        className={`p-1.5 rounded-lg transition-all cursor-pointer ${feedbackState === 'dislike' ? 'bg-rose-500/20 text-rose-400' : 'bg-white/5 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10'}`}>
+                        className={`glass-btn p-1.5 ${feedbackState === 'dislike' ? 'active !border-rose-400/40 !bg-rose-500/15 !text-rose-400' : 'hover:!text-rose-400 hover:!border-rose-500/30'}`}>
                         <span className="material-symbols-outlined text-sm">thumb_down</span>
                     </button>
                 </div>
@@ -105,14 +113,14 @@ function IdeaCard({ idea, index, onExpand, onAction, isFilm, onFeedback, feedbac
             <p className="text-sm text-slate-300 leading-relaxed mb-3">{idea.synopsis || idea.description}</p>
 
             {/* Film metadata */}
-            <div className="flex flex-wrap gap-2 mb-3">
-                {idea.format && <span className="text-xs bg-amber-500/10 text-amber-300 px-2 py-0.5 rounded-full">🎬 {idea.format}</span>}
-                {idea.emotion && <span className="text-xs bg-rose-500/10 text-rose-300 px-2 py-0.5 rounded-full">💫 {idea.emotion}</span>}
-                {idea.targetPersona && <span className="text-xs bg-violet-500/10 text-violet-300 px-2 py-0.5 rounded-full">🎯 {idea.targetPersona}</span>}
-                {idea.visualStyle && <span className="text-xs bg-cyan-500/10 text-cyan-300 px-2 py-0.5 rounded-full">🎨 {idea.visualStyle}</span>}
-                {idea.visualDirection && !idea.visualStyle && <span className="text-xs bg-cyan-500/10 text-cyan-300 px-2 py-0.5 rounded-full">🎨 {idea.visualDirection}</span>}
-                {idea.targetPlatform && <span className="text-xs bg-blue-500/10 text-blue-300 px-2 py-0.5 rounded-full">📺 {idea.targetPlatform}</span>}
-                {idea.platforms?.map(p => <span key={p} className="text-xs bg-white/5 text-slate-400 px-2 py-0.5 rounded-full">{p}</span>)}
+            <div className="flex flex-wrap gap-1.5 mb-3">
+                {idea.format && <span className="glass-chip"><span className="material-symbols-outlined text-[10px] text-amber-400">videocam</span> {idea.format}</span>}
+                {idea.emotion && <span className="glass-chip"><span className="material-symbols-outlined text-[10px] text-rose-400">mood</span> {idea.emotion}</span>}
+                {idea.targetPersona && <span className="glass-chip"><span className="material-symbols-outlined text-[10px] text-violet-400">person_search</span> {idea.targetPersona}</span>}
+                {idea.visualStyle && <span className="glass-chip"><span className="material-symbols-outlined text-[10px] text-cyan-400">palette</span> {idea.visualStyle}</span>}
+                {idea.visualDirection && !idea.visualStyle && <span className="glass-chip"><span className="material-symbols-outlined text-[10px] text-cyan-400">palette</span> {idea.visualDirection}</span>}
+                {idea.targetPlatform && <span className="glass-chip"><span className="material-symbols-outlined text-[10px] text-blue-400">smart_display</span> {idea.targetPlatform}</span>}
+                {idea.platforms?.map(p => <span key={p} className="glass-chip">{p}</span>)}
             </div>
 
             {/* Scores */}
@@ -125,24 +133,24 @@ function IdeaCard({ idea, index, onExpand, onAction, isFilm, onFeedback, feedbac
             )}
 
             {/* Actions */}
-            <div className="flex gap-2 pt-3 border-t border-white/5">
+            <div className="flex gap-2 pt-3 border-t border-white/[0.04]">
                 <button onClick={() => onExpand(idea)}
-                    className="flex-1 py-2 rounded-xl bg-primary/10 text-primary text-[11px] font-bold hover:bg-primary/20 cursor-pointer transition-all flex items-center justify-center gap-1">
+                    className="glass-btn flex-1 justify-center py-2.5 hover:!border-primary/40 hover:!text-primary">
                     <span className="material-symbols-outlined text-sm">unfold_more</span> Deep Dive
                 </button>
                 {isFilm && (
                     <button onClick={() => onScreenplay(idea)}
-                        className="flex-1 py-2 rounded-xl bg-emerald-500/10 text-emerald-400 text-[11px] font-bold hover:bg-emerald-500/20 cursor-pointer transition-all flex items-center justify-center gap-1">
+                        className="glass-btn flex-1 justify-center py-2.5 hover:!border-emerald-500/40 hover:!text-emerald-400">
                         <span className="material-symbols-outlined text-sm">description</span> Screenplay
                     </button>
                 )}
                 <button onClick={() => onAction('content', idea)}
-                    className="py-2 px-3 rounded-xl bg-white/5 text-slate-300 text-[11px] font-bold hover:bg-white/10 cursor-pointer transition-all"
+                    className="glass-btn py-2.5 hover:!border-primary/40 hover:!text-primary"
                     title="Generate Content">
                     <span className="material-symbols-outlined text-sm">edit_note</span>
                 </button>
                 <button onClick={() => onAction('creative', idea)}
-                    className="py-2 px-3 rounded-xl bg-white/5 text-slate-300 text-[11px] font-bold hover:bg-white/10 cursor-pointer transition-all"
+                    className="glass-btn py-2.5 hover:!border-violet-500/40 hover:!text-violet-400"
                     title="Generate Visual">
                     <span className="material-symbols-outlined text-sm">palette</span>
                 </button>
@@ -616,10 +624,10 @@ export default function BrainstormStudio() {
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto">
                         {INTENTS.map((item, i) => (
                             <button key={item.id} onClick={() => selectIntent(item.id)} disabled={loading}
-                                className="glass-panel rounded-2xl p-5 text-left hover:border-primary/30 hover:scale-[1.02] transition-all cursor-pointer group animate-fade-in"
+                                className="glass-card p-5 text-left cursor-pointer group animate-fade-in"
                                 style={{ animationDelay: `${i * 60}ms` }}>
-                                <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${item.color} flex items-center justify-center mb-3 group-hover:scale-110 transition-transform`}>
-                                    <span className="material-symbols-outlined text-white text-lg">{item.icon}</span>
+                                <div className={`glass-icon ${item.glow} mb-3 group-hover:scale-110 transition-transform`}>
+                                    <span className={`material-symbols-outlined ${item.iconColor} text-lg`}>{item.icon}</span>
                                 </div>
                                 <h3 className="text-base font-bold text-white mb-1">{item.label}</h3>
                                 <p className="text-sm text-slate-500 leading-relaxed">{item.desc}</p>
@@ -853,7 +861,7 @@ export default function BrainstormStudio() {
                                 <div className="flex items-center gap-2 mb-4">
                                     <span className="material-symbols-outlined text-primary">{intent === 'ad-film' ? 'movie' : 'campaign'}</span>
                                     <h3 className="text-lg font-bold text-white">{intent === 'ad-film' ? 'Film Concepts' : 'Campaign Concepts'}</h3>
-                                    <span className="text-sm text-slate-500 ml-1">{intent === 'ad-film' ? '👍 Approve a film to generate screenplay' : 'Layer 1 — Big Ideas'}</span>
+                                    <span className="text-sm text-slate-500 ml-1">{intent === 'ad-film' ? 'Approve a film to generate screenplay' : 'Layer 1 — Big Ideas'}</span>
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     {(ideas.filmConcepts || ideas.campaignConcepts)?.map((idea, i) => (
@@ -881,15 +889,15 @@ export default function BrainstormStudio() {
                                                 <p className="text-sm text-primary font-bold mb-3 uppercase">{p.filmRef}</p>
                                                 <div className="space-y-3">
                                                     <div className="p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/10">
-                                                        <p className="text-sm text-emerald-400 font-bold mb-1">💰 Low Budget</p>
+                                                        <p className="text-sm text-emerald-400 font-bold mb-1 flex items-center gap-1"><span className="material-symbols-outlined text-xs">savings</span> Low Budget</p>
                                                         <p className="text-sm text-slate-300">{p.lowBudget}</p>
                                                     </div>
                                                     <div className="p-3 rounded-xl bg-amber-500/5 border border-amber-500/10">
-                                                        <p className="text-sm text-amber-400 font-bold mb-1">💎 Mid Budget</p>
+                                                        <p className="text-sm text-amber-400 font-bold mb-1 flex items-center gap-1"><span className="material-symbols-outlined text-xs">diamond</span> Mid Budget</p>
                                                         <p className="text-sm text-slate-300">{p.midBudget}</p>
                                                     </div>
                                                     <div className="p-3 rounded-xl bg-violet-500/5 border border-violet-500/10">
-                                                        <p className="text-sm text-violet-400 font-bold mb-1">🎬 High Budget</p>
+                                                        <p className="text-sm text-violet-400 font-bold mb-1 flex items-center gap-1"><span className="material-symbols-outlined text-xs">movie</span> High Budget</p>
                                                         <p className="text-sm text-slate-300">{p.highBudget}</p>
                                                     </div>
                                                 </div>
@@ -913,31 +921,31 @@ export default function BrainstormStudio() {
                                                 <div className="space-y-2.5">
                                                     {t.reelIdea && (
                                                         <div className="flex items-start gap-2">
-                                                            <span className="text-xs">🎬</span>
+                                                            <span className="material-symbols-outlined text-xs text-amber-400 mt-0.5">smart_display</span>
                                                             <div><p className="text-sm text-slate-500 font-bold">Reel Idea</p><p className="text-sm text-white">{t.reelIdea}</p></div>
                                                         </div>
                                                     )}
                                                     {t.influencerAngle && (
                                                         <div className="flex items-start gap-2">
-                                                            <span className="text-xs">🤝</span>
+                                                            <span className="material-symbols-outlined text-xs text-violet-400 mt-0.5">person_celebrate</span>
                                                             <div><p className="text-sm text-slate-500 font-bold">Influencer</p><p className="text-sm text-white">{t.influencerAngle}</p></div>
                                                         </div>
                                                     )}
                                                     {t.hashtag && (
                                                         <div className="flex items-start gap-2">
-                                                            <span className="text-xs">#️⃣</span>
+                                                            <span className="material-symbols-outlined text-xs text-primary mt-0.5">tag</span>
                                                             <p className="text-sm text-primary font-bold">{t.hashtag}</p>
                                                         </div>
                                                     )}
                                                     {t.contestIdea && (
                                                         <div className="flex items-start gap-2">
-                                                            <span className="text-xs">🎉</span>
+                                                            <span className="material-symbols-outlined text-xs text-emerald-400 mt-0.5">emoji_events</span>
                                                             <div><p className="text-sm text-slate-500 font-bold">Contest</p><p className="text-sm text-white">{t.contestIdea}</p></div>
                                                         </div>
                                                     )}
                                                     {t.ugcPrompt && (
                                                         <div className="flex items-start gap-2">
-                                                            <span className="text-xs">📱</span>
+                                                            <span className="material-symbols-outlined text-xs text-cyan-400 mt-0.5">smartphone</span>
                                                             <div><p className="text-sm text-slate-500 font-bold">UGC</p><p className="text-sm text-white">{t.ugcPrompt}</p></div>
                                                         </div>
                                                     )}
@@ -981,7 +989,7 @@ export default function BrainstormStudio() {
                                         {/* Taglines */}
                                         {ideas.namingIdeas.taglines && (
                                             <div className="mt-4 pt-4 border-t border-white/5">
-                                                <p className="text-xs font-bold text-primary mb-2">✨ Taglines</p>
+                                                <p className="text-xs font-bold text-primary mb-2"><span className="material-symbols-outlined text-xs align-middle mr-0.5">auto_awesome</span> Taglines</p>
                                                 <div className="flex flex-wrap gap-2">
                                                     {ideas.namingIdeas.taglines.map((t, i) => (
                                                         <span key={i} className="text-xs bg-primary/10 text-primary px-3 py-1.5 rounded-full font-medium">"{t}"</span>
@@ -1050,7 +1058,7 @@ export default function BrainstormStudio() {
                                         {/* Launch Day */}
                                         {ideas.executionPlan.launchDayStrategy && (
                                             <div className="p-3 rounded-xl bg-gradient-to-r from-primary/10 to-transparent border-l-2 border-primary">
-                                                <p className="text-sm text-primary font-bold mb-1">🚀 LAUNCH DAY STRATEGY</p>
+                                                <p className="text-sm text-primary font-bold mb-1 flex items-center gap-1"><span className="material-symbols-outlined text-xs">rocket_launch</span> LAUNCH DAY STRATEGY</p>
                                                 <p className="text-sm text-slate-300">{ideas.executionPlan.launchDayStrategy}</p>
                                             </div>
                                         )}
@@ -1163,7 +1171,7 @@ export default function BrainstormStudio() {
                                             <div className="space-y-1 mt-2">
                                                 <p className="text-[10px] text-slate-500 uppercase font-bold">Key Dependencies</p>
                                                 {strategyData.success_probability.key_dependencies.map((d, i) => (
-                                                    <p key={i} className="text-[11px] text-slate-400 flex items-start gap-1.5"><span className="text-amber-400">⚡</span> {d}</p>
+                                                    <p key={i} className="text-[11px] text-slate-400 flex items-start gap-1.5"><span className="material-symbols-outlined text-xs text-amber-400">bolt</span> {d}</p>
                                                 ))}
                                             </div>
                                         )}
@@ -1183,7 +1191,7 @@ export default function BrainstormStudio() {
                                             </div>
                                         )}
                                         <p className="text-xs text-slate-400 mb-2"><strong className="text-slate-300">Strengths:</strong> {strategyData.competitive_landscape.competitor_strengths}</p>
-                                        <p className="text-xs text-emerald-300 mb-3"><strong className="text-emerald-200">🎯 Gap:</strong> {strategyData.competitive_landscape.competitive_gaps}</p>
+                                        <p className="text-xs text-emerald-300 mb-3"><strong className="text-emerald-200 flex items-center gap-0.5 inline-flex"><span className="material-symbols-outlined text-xs">target</span> Gap:</strong> {strategyData.competitive_landscape.competitive_gaps}</p>
                                         {strategyData.competitive_landscape.industry_benchmarks && (
                                             <div className="grid grid-cols-2 gap-2">
                                                 {Object.entries(strategyData.competitive_landscape.industry_benchmarks).map(([k, v]) => (
@@ -1264,7 +1272,7 @@ export default function BrainstormStudio() {
                             {/* Quick Wins */}
                             {strategyData.quick_wins?.length > 0 && (
                                 <div className="glass-panel rounded-2xl p-4 mb-6 border-l-4 border-emerald-500">
-                                    <h3 className="text-sm font-bold text-emerald-400 uppercase mb-2">⚡ Quick Wins</h3>
+                                    <h3 className="text-sm font-bold text-emerald-400 uppercase mb-2 flex items-center gap-1"><span className="material-symbols-outlined text-xs">bolt</span> Quick Wins</h3>
                                     <div className="space-y-1">
                                         {strategyData.quick_wins.map((w, i) => (
                                             <p key={i} className="text-sm text-slate-300 flex items-start gap-2"><span className="text-emerald-400 mt-0.5">•</span> {w}</p>
@@ -1280,17 +1288,19 @@ export default function BrainstormStudio() {
                                 </h3>
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                     {strategyData.channels && Object.entries(strategyData.channels).filter(([, d]) => d?.enabled).map(([key, ch]) => {
-                                        const icons = { social_media: '📱', seo_sem: '🔍', performance_marketing: '📊', influencer_marketing: '🤝', content_marketing: '✍️', ad_films_reels: '🎬', offline_campaigns: '🏪' }
+                                        const icons = { social_media: 'share', seo_sem: 'search', performance_marketing: 'monitoring', influencer_marketing: 'person_celebrate', content_marketing: 'edit_note', ad_films_reels: 'movie', offline_campaigns: 'storefront' }
                                         const colorMap = { social_media: '#8b5cf6', seo_sem: '#3b82f6', performance_marketing: '#10b981', influencer_marketing: '#f43f5e', content_marketing: '#06b6d4', ad_films_reels: '#f59e0b', offline_campaigns: '#64748b' }
                                         const hex = colorMap[key] || '#64748b'
                                         return (
-                                            <div key={key} className="glass-panel rounded-2xl p-5 border-t-2" style={{ borderTopColor: `${hex}66` }}>
+                                            <div key={key} className="glass-card border-t-2" style={{ borderTopColor: `${hex}66` }}>
                                                 <div className="flex items-center gap-2 mb-3">
-                                                    <span className="text-lg">{icons[key] || '📌'}</span>
+                                                    <div className="glass-icon sm" style={{ background: `${hex}15`, borderColor: `${hex}30` }}>
+                                                        <span className="material-symbols-outlined text-sm" style={{ color: hex }}>{icons[key] || 'campaign'}</span>
+                                                    </div>
                                                     <h4 className="text-sm font-bold text-white capitalize">{key.replace(/_/g, ' ')}</h4>
                                                     <span className="text-[10px] ml-auto px-2 py-0.5 rounded-full font-bold" style={{ backgroundColor: `${hex}1a`, color: hex }}>{ch.budget_split}</span>
                                                 </div>
-                                                {ch.why_this_channel && <p className="text-[10px] text-primary italic mb-2">💡 {ch.why_this_channel}</p>}
+                                                {ch.why_this_channel && <p className="text-[10px] text-primary italic mb-2 flex items-center gap-0.5"><span className="material-symbols-outlined text-[10px]">lightbulb</span> {ch.why_this_channel}</p>}
                                                 <p className="text-xs text-slate-300 leading-relaxed mb-3">{ch.strategy}</p>
                                                 {ch.tactics?.length > 0 && (
                                                     <div className="space-y-1 mb-3">
@@ -1299,8 +1309,8 @@ export default function BrainstormStudio() {
                                                         ))}
                                                     </div>
                                                 )}
-                                                {ch.expected_output && <p className="text-[10px] text-emerald-300/70 mb-2">📊 {ch.expected_output}</p>}
-                                                {ch.budget_rationale && <p className="text-[10px] text-amber-300/60 mb-2">💰 {ch.budget_rationale}</p>}
+                                                {ch.expected_output && <p className="text-[10px] text-emerald-300/70 mb-2 flex items-center gap-0.5"><span className="material-symbols-outlined text-[10px]">monitoring</span> {ch.expected_output}</p>}
+                                                {ch.budget_rationale && <p className="text-[10px] text-amber-300/60 mb-2 flex items-center gap-0.5"><span className="material-symbols-outlined text-[10px]">payments</span> {ch.budget_rationale}</p>}
                                                 {ch.platforms?.length > 0 && (
                                                     <div className="flex flex-wrap gap-1">
                                                         {ch.platforms.map(p => <span key={p} className="text-[10px] bg-white/5 text-slate-400 px-1.5 py-0.5 rounded-full">{p}</span>)}
@@ -1436,7 +1446,7 @@ export default function BrainstormStudio() {
                                     <div className="space-y-2">
                                         {strategyData.risk_mitigation.map((r, i) => (
                                             <div key={i} className="flex items-start gap-2 text-xs">
-                                                <span className="text-rose-400 font-bold shrink-0">⚠️ {r.risk}:</span>
+                                                <span className="text-rose-400 font-bold shrink-0 flex items-center gap-0.5"><span className="material-symbols-outlined text-xs">warning</span> {r.risk}:</span>
                                                 <span className="text-slate-300">{r.mitigation}</span>
                                             </div>
                                         ))}
@@ -1621,17 +1631,17 @@ export default function BrainstormStudio() {
 
                                 {/* Film metadata chips */}
                                 <div className="flex flex-wrap gap-2 mb-4">
-                                    {expandedIdea.format && <span className="text-xs bg-amber-500/10 text-amber-300 px-2 py-0.5 rounded-full">🎬 {expandedIdea.format}</span>}
-                                    {expandedIdea.emotion && <span className="text-xs bg-rose-500/10 text-rose-300 px-2 py-0.5 rounded-full">💫 {expandedIdea.emotion}</span>}
-                                    {expandedIdea.visualStyle && <span className="text-xs bg-cyan-500/10 text-cyan-300 px-2 py-0.5 rounded-full">🎨 {expandedIdea.visualStyle}</span>}
-                                    {expandedIdea.targetPlatform && <span className="text-xs bg-blue-500/10 text-blue-300 px-2 py-0.5 rounded-full">📺 {expandedIdea.targetPlatform}</span>}
+                                    {expandedIdea.format && <span className="glass-chip"><span className="material-symbols-outlined text-[10px] text-amber-400">videocam</span> {expandedIdea.format}</span>}
+                                    {expandedIdea.emotion && <span className="glass-chip"><span className="material-symbols-outlined text-[10px] text-rose-400">mood</span> {expandedIdea.emotion}</span>}
+                                    {expandedIdea.visualStyle && <span className="glass-chip"><span className="material-symbols-outlined text-[10px] text-cyan-400">palette</span> {expandedIdea.visualStyle}</span>}
+                                    {expandedIdea.targetPlatform && <span className="glass-chip"><span className="material-symbols-outlined text-[10px] text-blue-400">smart_display</span> {expandedIdea.targetPlatform}</span>}
                                 </div>
 
                                 {/* Film detail fields */}
                                 <div className="space-y-3 mb-5">
                                     {expandedIdea.openingShot && (
                                         <div className="flex items-start gap-2">
-                                            <span className="text-xs">🎬</span>
+                                            <span className="material-symbols-outlined text-xs text-amber-400">movie</span>
                                             <div><p className="text-sm text-slate-500 font-bold">Opening Shot</p><p className="text-sm text-white">{expandedIdea.openingShot}</p></div>
                                         </div>
                                     )}
@@ -1698,13 +1708,13 @@ export default function BrainstormStudio() {
                                 <div className="space-y-3 mb-6">
                                     {expandedIdea.targetPersona && (
                                         <div className="flex items-start gap-2">
-                                            <span className="text-xs">🎯</span>
+                                            <span className="material-symbols-outlined text-xs text-primary">target</span>
                                             <div><p className="text-sm text-slate-500 font-bold">Target Persona</p><p className="text-sm text-white">{expandedIdea.targetPersona}</p></div>
                                         </div>
                                     )}
                                     {expandedIdea.visualDirection && (
                                         <div className="flex items-start gap-2">
-                                            <span className="text-xs">🎨</span>
+                                            <span className="material-symbols-outlined text-xs text-cyan-400">palette</span>
                                             <div><p className="text-sm text-slate-500 font-bold">Visual Direction</p><p className="text-sm text-white">{expandedIdea.visualDirection}</p></div>
                                         </div>
                                     )}
@@ -1908,7 +1918,7 @@ export default function BrainstormStudio() {
                         {/* Director Notes */}
                         {screenplay.directorNotes && (
                             <div className="p-4 rounded-xl bg-white/3 mb-4">
-                                <p className="text-sm text-amber-400 font-bold mb-1">🎬 Director's Notes</p>
+                                <p className="text-sm text-amber-400 font-bold mb-1 flex items-center gap-1"><span className="material-symbols-outlined text-xs">movie</span> Director's Notes</p>
                                 <p className="text-sm text-slate-300">{screenplay.directorNotes}</p>
                             </div>
                         )}

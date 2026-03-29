@@ -598,8 +598,9 @@ Bold, ${moodPhrase} visual suitable for advertising and social media. ${ratioPhr
             'nanobanana-pro': { provider: 'gemini', modelId: 'gemini-3-pro-image-preview', name: 'NanoBanana Pro' },
             'flux-pro-v1.1':  { provider: 'fal', endpoint: 'fal-ai/flux-pro/v1.1', name: 'Flux Pro v1.1' },
             'flux-2-pro':     { provider: 'fal', endpoint: 'fal-ai/flux-pro/v2', name: 'Flux 2 Pro' },
-            'seedream-5':     { provider: 'fal', endpoint: 'fal-ai/seedream-3', name: 'Seedream 5' },
+            'seedream-5':     { provider: 'fal', endpoint: 'fal-ai/bytedance/seedream/v3/text-to-image', name: 'Seedream 5' },
             'ideogram':       { provider: 'fal', endpoint: 'fal-ai/ideogram/v3', name: 'Ideogram v3' },
+            'grok-imagen':    { provider: 'grok', name: 'Grok Imagen' },
         };
 
         const modelCfg = PHOTOSHOOT_MODELS[imageModel] || PHOTOSHOOT_MODELS['nanobanana-2'];
@@ -697,6 +698,66 @@ Bold, ${moodPhrase} visual suitable for advertising and social media. ${ratioPhr
                     return res.status(200).json({ success: false, error: `${modelCfg.name} took too long to respond. Try again or switch to NanoBanana 2 for faster results.` });
                 }
                 throw falErr;
+            }
+        }
+
+        // ── Grok Imagen path (xAI) — text-to-image only ──
+        if (modelCfg.provider === 'grok') {
+            const grokKey = process.env.GROK_API_KEY || process.env.XAI_API_KEY;
+            if (!grokKey) {
+                return res.status(200).json({ success: false, error: `Grok Imagen requires GROK_API_KEY to be configured.` });
+            }
+
+            const grokWarnings = [];
+            if (styleRef || characterRef) {
+                grokWarnings.push('Note: Reference images are not supported by Grok Imagen and were ignored.');
+            }
+
+            try {
+                console.log(`🎨 Photoshoot via Grok Imagen (xAI)`);
+                const grokResp = await fetch('https://api.x.ai/v1/images/generations', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${grokKey}`,
+                    },
+                    body: JSON.stringify({
+                        model: 'grok-imagine-image',
+                        prompt: photoshootPrompt,
+                        response_format: 'b64_json',
+                        n: 1,
+                    }),
+                    signal: AbortSignal.timeout(90000),
+                });
+
+                if (!grokResp.ok) {
+                    const errText = await grokResp.text();
+                    console.error(`❌ Grok Imagen photoshoot error (${grokResp.status}):`, errText);
+                    if (grokResp.status === 429 || grokResp.status === 503) {
+                        return res.status(200).json({ success: false, modelBusy: true, error: `Grok Imagen is currently busy. Please try again or switch to a different model.` });
+                    }
+                    return res.status(200).json({ success: false, error: `Grok Imagen generation failed: ${errText.substring(0, 200)}` });
+                }
+
+                const grokData = await grokResp.json();
+                const grokImgData = grokData.data?.[0];
+                if (grokImgData?.b64_json) {
+                    resultImage = `data:image/png;base64,${grokImgData.b64_json}`;
+                } else if (grokImgData?.url) {
+                    resultImage = grokImgData.url;
+                }
+
+                if (!resultImage) {
+                    return res.status(200).json({ success: false, error: `Grok Imagen returned no image. Try a different prompt or model.` });
+                }
+                usedModel = 'Grok Imagen';
+                resultText = grokWarnings.join(' ');
+            } catch (grokErr) {
+                console.error(`Grok Imagen photoshoot exception:`, grokErr.message);
+                if (grokErr.name === 'TimeoutError' || grokErr.message?.includes('timed out')) {
+                    return res.status(200).json({ success: false, error: `Grok Imagen took too long to respond. Try again or switch model.` });
+                }
+                throw grokErr;
             }
         }
 

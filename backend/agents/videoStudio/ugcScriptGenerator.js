@@ -159,10 +159,10 @@ RESPONSE FORMAT (respond in valid JSON only):
     // Get AI router and generate
     const router = getRouter();
     const aiResult = await router.generateText({
-        systemPrompt: `You are an expert UGC video scriptwriter. Always respond with valid JSON only.${language.toLowerCase() !== 'english' ? ` IMPORTANT: Write the script, hook, and cta fields in ${language} using native script characters. Do NOT use English.` : ''}`,
+        systemPrompt: `You are an expert UGC video scriptwriter. Always respond with valid JSON only. Keep your script concise — under 100 words.${language.toLowerCase() !== 'english' ? ` IMPORTANT: Write the script, hook, and cta fields in ${language} using native script characters. Do NOT use English.` : ''}`,
         userPrompt: prompt,
         temperature: 0.8,
-        maxTokens: 1000,
+        maxTokens: 4096, // Gemini 2.5 Flash uses thinking tokens — needs large budget
     }); // Router auto-selects cheapest provider
 
     // Extract text from result (providers return { text, tokensUsed })
@@ -171,25 +171,107 @@ RESPONSE FORMAT (respond in valid JSON only):
     // Parse response
     let result;
     try {
-        // Extract JSON from response (handle markdown code blocks)
-        const jsonMatch = response.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-            result = JSON.parse(jsonMatch[0]);
-        } else {
-            throw new Error('No JSON found in response');
+        // Strip <think>...</think> reasoning tags that some models add
+        let cleanResponse = response.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+
+        // Strip markdown code fences BEFORE trying to parse JSON
+        // This is critical — Gemini frequently wraps JSON in ```json ... ```
+        cleanResponse = cleanResponse
+            .replace(/^```(?:json)?\s*\n?/i, '')  // opening fence
+            .replace(/\n?```\s*$/i, '')            // closing fence
+            .trim();
+
+        // Try 1: Direct parse (if AI returned clean JSON)
+        try {
+            result = JSON.parse(cleanResponse);
+        } catch {
+            // Try 2: Extract outermost JSON object via regex
+            const jsonMatch = cleanResponse.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+                result = JSON.parse(jsonMatch[0]);
+            } else {
+                throw new Error('No valid JSON found (likely truncated response)');
+            }
         }
     } catch (e) {
-        console.warn('⚠️ Failed to parse UGC script JSON, using raw text');
+        console.warn('⚠️ Failed to parse UGC script JSON:', e.message);
+        // Clean the raw response for fallback — strip all JSON/markdown artifacts
+        let fallbackText = response
+            .replace(/<think>[\s\S]*?<\/think>/gi, '')
+            .replace(/```(?:json)?\s*/g, '').replace(/```\s*/g, '')
+            .trim();
+
+        // CRITICAL: Handle truncated JSON — extract "script" field value via regex
+        // AI often truncates mid-JSON when response is too long
+        const scriptFieldMatch = fallbackText.match(/"script"\s*:\s*"([\s\S]*?)(?:"\s*[,}]|$)/);
+        if (scriptFieldMatch) {
+            // Unescape JSON string escapes
+            fallbackText = scriptFieldMatch[1]
+                .replace(/\\n/g, '\n')
+                .replace(/\\"/g, '"')
+                .replace(/\\\\/g, '\\')
+                .trim();
+        } else if (fallbackText.startsWith('{')) {
+            // Last resort: grab everything after the first ":" in the JSON
+            const anyValueMatch = fallbackText.match(/"(?:script|text)"\s*:\s*"([\s\S]+)/);
+            if (anyValueMatch) {
+                fallbackText = anyValueMatch[1]
+                    .replace(/\\n/g, '\n')
+                    .replace(/\\"/g, '"')
+                    .replace(/\\\\/g, '\\')
+                    .replace(/"\s*,?\s*"(?:hook|cta|key)[\s\S]*$/, '') // Strip trailing JSON fields
+                    .trim();
+            }
+        }
+
+        // Also try to extract hook/cta from truncated JSON
+        const hookMatch = response.match(/"hook"\s*:\s*"([\s\S]*?)(?:"\s*[,}])/);
+        const ctaMatch = response.match(/"cta"\s*:\s*"([\s\S]*?)(?:"\s*[,}])/);
+
         result = {
-            script: response,
-            hook: response.split('.')[0] || '',
-            cta: '',
+            script: fallbackText,
+            hook: hookMatch ? hookMatch[1].replace(/\\n/g, '\n').replace(/\\"/g, '"') : (fallbackText.split('.')[0] || ''),
+            cta: ctaMatch ? ctaMatch[1].replace(/\\n/g, '\n').replace(/\\"/g, '"') : '',
             keyBenefits: [],
             estimatedDuration: duration,
             tone: 'conversational',
             suggestedAvatarStyle: 'casual',
         };
     }
+
+    // ── Clean up script/hook/cta fields — strip any JSON/markdown wrapping ──
+    const cleanTextField = (text) => {
+        if (!text || typeof text !== 'string') return text || '';
+        let cleaned = text.trim();
+        // Strip <think> tags
+        cleaned = cleaned.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+        // Strip markdown code fences (```json ... ``` or ``` ... ```)
+        cleaned = cleaned.replace(/```(?:json)?\s*/g, '').replace(/```\s*/g, '').trim();
+        // If the cleaned text itself is a JSON object, extract the 'script' or longest string value
+        if (cleaned.startsWith('{') && cleaned.endsWith('}')) {
+            try {
+                const inner = JSON.parse(cleaned);
+                const extracted = inner.script || inner.text || inner.content;
+                if (extracted && typeof extracted === 'string') {
+                    return extracted.trim();
+                }
+                // Fallback: get the longest string value
+                const values = Object.values(inner).filter(v => typeof v === 'string');
+                const longest = values.sort((a, b) => b.length - a.length)[0];
+                if (longest && longest.length > 10) return longest.trim();
+            } catch { /* not JSON, keep as-is */ }
+        }
+        // Strip leading/trailing quotes
+        if ((cleaned.startsWith('"') && cleaned.endsWith('"')) ||
+            (cleaned.startsWith("'") && cleaned.endsWith("'"))) {
+            cleaned = cleaned.slice(1, -1);
+        }
+        return cleaned;
+    };
+
+    result.script = cleanTextField(result.script);
+    result.hook = cleanTextField(result.hook);
+    result.cta = cleanTextField(result.cta);
 
     return {
         ...result,

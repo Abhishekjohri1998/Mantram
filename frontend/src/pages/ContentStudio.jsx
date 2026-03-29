@@ -19,7 +19,7 @@ const GOALS = [
     {
         id: 'promote', icon: 'campaign', label: 'Promote Something',
         desc: 'Product, service, offer, sale, or discount',
-        color: 'from-orange-500/20 to-amber-500/10', accent: '#F59E0B',
+        glow: 'glow-amber', iconColor: 'text-amber-400', accent: '#F59E0B',
         subTypes: [
             { id: 'product', icon: 'inventory_2', label: 'Product Push' },
             { id: 'service', icon: 'handyman', label: 'Service Highlight' },
@@ -32,7 +32,7 @@ const GOALS = [
     {
         id: 'celebrate', icon: 'celebration', label: 'Celebrate Something',
         desc: 'Festival, occasion, milestone, or trending event',
-        color: 'from-pink-500/20 to-purple-500/10', accent: '#EC4899',
+        glow: 'glow-pink', iconColor: 'text-pink-400', accent: '#EC4899',
         subTypes: [
             { id: 'festival', icon: 'auto_awesome', label: 'Festival' },
             { id: 'national_day', icon: 'flag', label: 'National / World Day' },
@@ -45,7 +45,7 @@ const GOALS = [
     {
         id: 'launch', icon: 'rocket_launch', label: 'Launch Something',
         desc: 'New product, store, campaign, or announcement',
-        color: 'from-blue-500/20 to-cyan-500/10', accent: '#3B82F6',
+        glow: 'glow-blue', iconColor: 'text-blue-400', accent: '#3B82F6',
         subTypes: [
             { id: 'product_launch', icon: 'new_releases', label: 'Product Launch' },
             { id: 'store_launch', icon: 'store', label: 'Store Launch' },
@@ -58,7 +58,7 @@ const GOALS = [
     {
         id: 'educate', icon: 'school', label: 'Educate / Inform',
         desc: 'Blog, SEO article, thought leadership, how-to guide',
-        color: 'from-emerald-500/20 to-teal-500/10', accent: '#10B981',
+        glow: 'glow-emerald', iconColor: 'text-emerald-400', accent: '#10B981',
         subTypes: [
             { id: 'seo_blog', icon: 'search', label: 'SEO Blog Article' },
             { id: 'thought_leader', icon: 'psychology', label: 'Thought Leadership' },
@@ -71,7 +71,7 @@ const GOALS = [
     {
         id: 'brand', icon: 'diamond', label: 'Build Brand',
         desc: 'Brand story, about us, website copy, taglines',
-        color: 'from-violet-500/20 to-indigo-500/10', accent: '#8B5CF6',
+        glow: 'glow-violet', iconColor: 'text-violet-400', accent: '#8B5CF6',
         subTypes: [
             { id: 'about_us', icon: 'info', label: 'About Us' },
             { id: 'brand_story', icon: 'auto_stories', label: 'Brand Story' },
@@ -84,7 +84,7 @@ const GOALS = [
     {
         id: 'blog', icon: 'edit_note', label: 'Write Blog / Article',
         desc: 'Long-form blogs, SEO articles, listicles, pillar content',
-        color: 'from-teal-500/20 to-cyan-500/10', accent: '#14B8A6',
+        glow: 'glow-teal', iconColor: 'text-teal-400', accent: '#14B8A6',
         subTypes: [
             { id: 'seo_blog', icon: 'search', label: 'SEO Blog Article' },
             { id: 'long_form', icon: 'article', label: 'Long-form Article' },
@@ -97,7 +97,7 @@ const GOALS = [
     {
         id: 'press_release', icon: 'newspaper', label: 'Write Press Release',
         desc: 'Professional PR for launches, announcements, events',
-        color: 'from-rose-500/20 to-pink-500/10', accent: '#F43F5E',
+        glow: 'glow-rose', iconColor: 'text-rose-400', accent: '#F43F5E',
         subTypes: [
             { id: 'product_pr', icon: 'new_releases', label: 'Product / Service Launch' },
             { id: 'partnership_pr', icon: 'handshake', label: 'Partnership / Collaboration' },
@@ -112,7 +112,7 @@ const GOALS = [
     {
         id: 'product_content', icon: 'shopping_bag', label: 'Write Product Content',
         desc: 'Platform-specific product descriptions, listings & pages',
-        color: 'from-cyan-500/20 to-blue-500/10', accent: '#06B6D4',
+        glow: 'glow-cyan', iconColor: 'text-cyan-400', accent: '#06B6D4',
         subTypes: [
             { id: 'amazon', icon: 'shopping_cart', label: 'Amazon Listing' },
             { id: 'flipkart', icon: 'storefront', label: 'Flipkart Listing' },
@@ -126,17 +126,17 @@ const GOALS = [
     {
         id: 'youtube_content', icon: 'smart_display', label: 'YouTube Content',
         desc: 'Scripts, titles, descriptions, tags for Videos & Shorts',
-        color: 'from-red-500/20 to-rose-500/10', accent: '#FF0000',
+        glow: 'glow-red', iconColor: 'text-red-400', accent: '#FF0000',
         subTypes: [
-            { id: 'youtube_seo', icon: 'rocket_launch', label: '🚀 Publish Optimizer', desc: 'Title, description, tags & keywords — SEO only, no script' },
-            { id: 'video_script', icon: 'movie', label: '📝 Video Script', desc: 'Full script + all metadata' },
-            { id: 'shorts_script', icon: 'slow_motion_video', label: '📝 Shorts Script', desc: 'Short-form script + metadata' },
-            { id: 'tutorial', icon: 'school', label: '📝 Tutorial / How-To' },
-            { id: 'review', icon: 'rate_review', label: '📝 Review / Unboxing' },
-            { id: 'vlog', icon: 'videocam', label: '📝 Vlog' },
-            { id: 'podcast', icon: 'podcasts', label: '📝 Podcast Highlights' },
-            { id: 'commentary', icon: 'chat', label: '📝 Commentary / Reaction' },
-            { id: 'explainer', icon: 'lightbulb', label: '📝 Explainer Video' },
+            { id: 'youtube_seo', icon: 'rocket_launch', label: 'Publish Optimizer', desc: 'Title, description, tags & keywords — SEO only, no script' },
+            { id: 'video_script', icon: 'movie', label: 'Video Script', desc: 'Full script + all metadata' },
+            { id: 'shorts_script', icon: 'slow_motion_video', label: 'Shorts Script', desc: 'Short-form script + metadata' },
+            { id: 'tutorial', icon: 'school', label: 'Tutorial / How-To' },
+            { id: 'review', icon: 'rate_review', label: 'Review / Unboxing' },
+            { id: 'vlog', icon: 'videocam', label: 'Vlog' },
+            { id: 'podcast', icon: 'podcasts', label: 'Podcast Highlights' },
+            { id: 'commentary', icon: 'chat', label: 'Commentary / Reaction' },
+            { id: 'explainer', icon: 'lightbulb', label: 'Explainer Video' },
         ],
     },
 ]
@@ -258,10 +258,10 @@ function StepGoal({ onSelect }) {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-4xl mx-auto">
             {GOALS.map((g, i) => (
                 <button key={g.id} onClick={() => onSelect(g.id)}
-                    className="glass-panel rounded-2xl p-5 text-left hover:border-primary/30 hover:scale-[1.02] transition-all cursor-pointer group animate-fade-in"
+                    className="glass-card p-5 text-left cursor-pointer group animate-fade-in"
                     style={{ animationDelay: `${i * 60}ms` }}>
-                    <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${g.color} flex items-center justify-center mb-3 group-hover:scale-110 transition-transform`}>
-                        <span className="material-symbols-outlined text-white text-lg">{g.icon}</span>
+                    <div className={`glass-icon ${g.glow} mb-3 group-hover:scale-110 transition-transform`}>
+                        <span className={`material-symbols-outlined ${g.iconColor} text-lg`}>{g.icon}</span>
                     </div>
                     <h3 className="text-base font-bold text-white mb-1">{g.label}</h3>
                     <p className="text-sm text-slate-500 leading-relaxed">{g.desc}</p>
@@ -279,7 +279,9 @@ function StepSubType({ goal, onSelect, onBack }) {
                 <span className="material-symbols-outlined text-sm">arrow_back</span> Back
             </button>
             <div className="flex items-center gap-3 mb-6">
-                <span className="material-symbols-outlined text-2xl" style={{ color: goalData?.accent }}>{goalData?.icon}</span>
+                <div className={`glass-icon ${goalData?.glow}`}>
+                    <span className={`material-symbols-outlined text-xl ${goalData?.iconColor}`}>{goalData?.icon}</span>
+                </div>
                 <div>
                     <h3 className="text-xl font-extrabold text-white">{goalData?.label}</h3>
                     <p className="text-sm text-slate-400">What specifically?</p>
@@ -288,7 +290,7 @@ function StepSubType({ goal, onSelect, onBack }) {
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                 {goalData?.subTypes.map((st, i) => (
                     <button key={st.id} onClick={() => onSelect(st.id)}
-                        className="glass-panel rounded-xl p-4 text-left hover:bg-white/[0.06] hover:border-primary/30 transition-all cursor-pointer animate-fade-in group"
+                        className="glass-card p-4 text-left cursor-pointer animate-fade-in group"
                         style={{ animationDelay: `${i * 60}ms` }}>
                         <span className="material-symbols-outlined text-xl text-slate-400 group-hover:text-primary transition-colors mb-2 block">{st.icon}</span>
                         <p className="text-base font-bold text-white">{st.label}</p>
@@ -977,7 +979,7 @@ function StepTone({ onComplete, onBack, goal, activeBrand, availableProviders, m
                     <span className="uppercase tracking-widest font-bold">AI Model</span>
                     <span className="flex-1 h-px bg-white/[0.06]" />
                     <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${modelOverride === 'auto' ? 'bg-primary/10 text-primary' : 'bg-amber-400/10 text-amber-400'} `}>
-                        {modelOverride === 'auto' ? '🤖 Auto' : `👤 ${(availableProviders.find(p => p.id === modelOverride)?.label || modelOverride)} `}
+                        {modelOverride === 'auto' ? 'Auto' : `${(availableProviders.find(p => p.id === modelOverride)?.label || modelOverride)} `}
                     </span>
                 </button>
                 {showAdvanced && (
@@ -1020,7 +1022,7 @@ function StepTone({ onComplete, onBack, goal, activeBrand, availableProviders, m
                     </button>
                 </div>
                 <p className="text-xs text-slate-600 mt-2 text-center">
-                    {researchDepth === 'quick' ? '⚡ Uses Grok for fast trending intelligence' : '🔬 Uses Perplexity + full web research for deeper insights'}
+                    {researchDepth === 'quick' ? 'Uses Grok for fast trending intelligence' : 'Uses Perplexity + full web research for deeper insights'}
                 </p>
             </div>
 
@@ -1028,7 +1030,7 @@ function StepTone({ onComplete, onBack, goal, activeBrand, availableProviders, m
                 <button onClick={() => onComplete({ tone, length, sellStyle, language, langStyle, scriptType, researchDepth })}
                     className="btn-primary w-full py-3.5 rounded-xl text-sm font-bold">
                     <span className="material-symbols-outlined text-sm">auto_awesome</span>
-                    {researchDepth === 'deep' ? '🔬 Generate with Deep Research' : '⚡ Generate Content'} <CreditBadge action="content" />
+                    {researchDepth === 'deep' ? 'Generate with Deep Research' : 'Generate Content'} <CreditBadge action="content" />
                 </button>
             </CreditTooltipWrapper>
         </div>
@@ -1308,7 +1310,7 @@ function StepPressRelease({ onComplete, onBack, activeBrand, goal, availableProv
                             <span className="uppercase tracking-widest font-bold">AI Model</span>
                             <span className="flex-1 h-px bg-white/[0.06]" />
                             <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${modelOverride === 'auto' ? 'bg-primary/10 text-primary' : 'bg-amber-400/10 text-amber-400'} `}>
-                                {modelOverride === 'auto' ? '🤖 Auto' : `👤 ${(availableProviders.find(p => p.id === modelOverride)?.label || modelOverride)} `}
+                                {modelOverride === 'auto' ? 'Auto' : `${(availableProviders.find(p => p.id === modelOverride)?.label || modelOverride)} `}
                             </span>
                         </button>
                         {showAdvanced && (
@@ -1419,7 +1421,7 @@ function StepYouTubeWizard({ onComplete, onBack, activeBrand, availableProviders
                         <VoiceInput onResult={(text) => setBrief(prev => prev ? prev + ' ' + text : text)} size="small" />
                     </div>
                 </div>
-                <p className="text-xs text-slate-600 mt-1.5">💡 Be specific — include the hook, key points, or angle you want</p>
+                <p className="text-xs text-slate-600 mt-1.5 flex items-center gap-0.5"><span className="material-symbols-outlined text-[10px]">lightbulb</span> Be specific — include the hook, key points, or angle you want</p>
             </div>
 
             {/* Format Selection */}
@@ -1688,7 +1690,7 @@ function YouTubeResultView({ result, youtubeData, onNewContent, generating, acti
                         <div className="animate-fade-in space-y-3">
                             {keywords.primary?.length > 0 && (
                                 <div>
-                                    <p className="text-xs font-bold text-cyan-400 mb-1.5">🎯 Primary Keywords</p>
+                                    <p className="text-xs font-bold text-cyan-400 mb-1.5 flex items-center gap-0.5"><span className="material-symbols-outlined text-xs">target</span> Primary Keywords</p>
                                     <div className="flex flex-wrap gap-2">
                                         {keywords.primary.map((kw, i) => (
                                             <span key={i} className="px-3 py-1.5 rounded-lg bg-cyan-500/10 text-cyan-300 text-xs font-bold border border-cyan-500/20">{kw}</span>
@@ -1812,14 +1814,14 @@ function StepYouTubeSeoWizard({ onComplete, onBack, activeBrand, availableProvid
     const [language, setLanguage] = useState(defaultLang)
 
     const VIDEO_CATEGORIES = [
-        { id: 'music_video', icon: 'music_note', label: '🎵 Music Video / Song', desc: 'Music video, lyric video, song release' },
-        { id: 'film_trailer', icon: 'movie', label: '🎬 Film / Trailer / Short Film', desc: 'Movie, web series, short film' },
-        { id: 'review_unboxing', icon: 'rate_review', label: '📱 Review / Unboxing', desc: 'Product review, tech review, comparison' },
-        { id: 'tutorial', icon: 'school', label: '📚 Tutorial / How-To', desc: 'Educational, how-to, guide' },
-        { id: 'podcast_interview', icon: 'podcasts', label: '🎙️ Podcast / Interview', desc: 'Podcast episode, guest interview' },
-        { id: 'vlog_travel', icon: 'videocam', label: '📷 Vlog / Travel / Lifestyle', desc: 'Daily vlog, travel, experience' },
-        { id: 'gaming', icon: 'sports_esports', label: '🎮 Gaming / Entertainment', desc: 'Gameplay, walkthrough, reaction' },
-        { id: 'business', icon: 'trending_up', label: '💼 Business / Motivational', desc: 'Marketing, business, motivation' },
+        { id: 'music_video', icon: 'music_note', label: 'Music Video / Song', desc: 'Music video, lyric video, song release' },
+        { id: 'film_trailer', icon: 'movie', label: 'Film / Trailer / Short Film', desc: 'Movie, web series, short film' },
+        { id: 'review_unboxing', icon: 'rate_review', label: 'Review / Unboxing', desc: 'Product review, tech review, comparison' },
+        { id: 'tutorial', icon: 'school', label: 'Tutorial / How-To', desc: 'Educational, how-to, guide' },
+        { id: 'podcast_interview', icon: 'podcasts', label: 'Podcast / Interview', desc: 'Podcast episode, guest interview' },
+        { id: 'vlog_travel', icon: 'videocam', label: 'Vlog / Travel / Lifestyle', desc: 'Daily vlog, travel, experience' },
+        { id: 'gaming', icon: 'sports_esports', label: 'Gaming / Entertainment', desc: 'Gameplay, walkthrough, reaction' },
+        { id: 'business', icon: 'trending_up', label: 'Business / Motivational', desc: 'Marketing, business, motivation' },
     ]
 
     const LANGUAGES = [
@@ -1877,7 +1879,7 @@ function StepYouTubeSeoWizard({ onComplete, onBack, activeBrand, availableProvid
                         <VoiceInput onResult={(text) => setBrief(prev => prev ? prev + ' ' + text : text)} size="small" />
                     </div>
                 </div>
-                <p className="text-xs text-slate-600 mt-1.5">💡 Include specific names — artists, products, brands, topics. We'll research them for accurate metadata</p>
+                <p className="text-xs text-slate-600 mt-1.5 flex items-center gap-0.5"><span className="material-symbols-outlined text-[10px]">lightbulb</span> Include specific names — artists, products, brands, topics. We'll research them for accurate metadata</p>
             </div>
 
             {/* Video Category — CRITICAL for context-aware output */}
@@ -2042,7 +2044,7 @@ function YouTubeSeoResultView({ result, youtubeSeoData, onNewContent }) {
                                 <div className="flex items-start justify-between gap-3">
                                     <div className="flex-1">
                                         <p className="text-base font-bold text-white leading-relaxed">{t.text}</p>
-                                        {t.strategy && <p className="text-xs text-slate-500 mt-1.5 italic">💡 {t.strategy}</p>}
+                                        {t.strategy && <p className="text-xs text-slate-500 mt-1.5 italic flex items-center gap-0.5"><span className="material-symbols-outlined text-[10px]">lightbulb</span> {t.strategy}</p>}
                                     </div>
                                     <div className="flex flex-col items-end gap-1 flex-shrink-0">
                                         <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${color.bg} ${color.text}`}>
@@ -2129,7 +2131,7 @@ function YouTubeSeoResultView({ result, youtubeSeoData, onNewContent }) {
                     <div className="space-y-3">
                         {keywords.primary?.length > 0 && (
                             <div>
-                                <p className="text-xs font-bold text-cyan-400 mb-1.5">🎯 Primary — High Volume Search Terms</p>
+                                <p className="text-xs font-bold text-cyan-400 mb-1.5 flex items-center gap-0.5"><span className="material-symbols-outlined text-xs">target</span> Primary — High Volume Search Terms</p>
                                 <div className="flex flex-wrap gap-2">
                                     {keywords.primary.map((kw, i) => (
                                         <span key={i} className="px-3 py-1.5 rounded-lg bg-cyan-500/10 text-cyan-300 text-xs font-bold border border-cyan-500/20">{kw}</span>
@@ -2166,9 +2168,9 @@ function YouTubeSeoResultView({ result, youtubeSeoData, onNewContent }) {
                             </div>
                         </div>
                         <div className="space-y-1.5 text-xs">
-                            {seoScore.titleOptimization && <p className="text-slate-400">📌 Title: <span className="text-white">{seoScore.titleOptimization}</span></p>}
-                            {seoScore.descriptionOptimization && <p className="text-slate-400">📋 Desc: <span className="text-white">{seoScore.descriptionOptimization}</span></p>}
-                            {seoScore.tagCoverage && <p className="text-slate-400">🏷️ Tags: <span className="text-white">{seoScore.tagCoverage}</span></p>}
+                            {seoScore.titleOptimization && <p className="text-slate-400 flex items-center gap-0.5"><span className="material-symbols-outlined text-xs">push_pin</span> Title: <span className="text-white">{seoScore.titleOptimization}</span></p>}
+                            {seoScore.descriptionOptimization && <p className="text-slate-400 flex items-center gap-0.5"><span className="material-symbols-outlined text-xs">description</span> Desc: <span className="text-white">{seoScore.descriptionOptimization}</span></p>}
+                            {seoScore.tagCoverage && <p className="text-slate-400 flex items-center gap-0.5"><span className="material-symbols-outlined text-xs">sell</span> Tags: <span className="text-white">{seoScore.tagCoverage}</span></p>}
                         </div>
                     </div>
                 )}
@@ -2249,7 +2251,7 @@ function StepBlogWizard({ activeBrand, blogType, onGenerate, onBack, generating 
                     <span className="material-symbols-outlined text-lg text-slate-400">arrow_back</span>
                 </button>
                 <div>
-                    <h3 className="text-xl font-extrabold text-white">✍️ Blog <span className="text-primary">Editor</span></h3>
+                    <h3 className="text-xl font-extrabold text-white"><span className="material-symbols-outlined text-xl align-middle mr-1">edit_note</span> Blog <span className="text-primary">Editor</span></h3>
                     <p className="text-sm text-slate-500">AI-powered blog generation with research intelligence</p>
                 </div>
             </div>
@@ -2317,7 +2319,7 @@ function StepBlogWizard({ activeBrand, blogType, onGenerate, onBack, generating 
                 disabled={!topic.trim() || generating}
                 className="w-full py-4 rounded-2xl bg-gradient-to-r from-primary to-violet-500 text-white font-bold text-base disabled:opacity-30 hover:shadow-lg hover:shadow-primary/20 transition-all cursor-pointer flex items-center justify-center gap-2">
                 <span className="material-symbols-outlined">{generating ? 'progress_activity' : 'auto_awesome'}</span>
-                {generating ? 'Generating your blog...' : '✨ Generate Blog Article'}
+                {generating ? 'Generating your blog...' : 'Generate Blog Article'}
             </button>
         </div>
     )
@@ -2791,7 +2793,7 @@ function BlogEditorView({ content, activeBrand, onNewContent, onGenerateImage })
                             {generatingSection === -1 ? 'progress_activity' : 'add_photo_alternate'}
                         </span>
                         <span className="text-sm font-semibold text-slate-500 group-hover:text-white transition-colors">
-                            {generatingSection === -1 ? 'Generating hero image...' : '🎨 Generate AI Hero Image'}
+                            {generatingSection === -1 ? 'Generating hero image...' : 'Generate AI Hero Image'}
                         </span>
                         <span className="text-xs text-slate-600">Choose style & NanoBanana 2 generates a contextual image</span>
                     </button>
@@ -2960,7 +2962,7 @@ function BlogEditorView({ content, activeBrand, onNewContent, onGenerateImage })
                             <span className={`material-symbols-outlined text-sm ${generatingSection === i ? 'animate-spin' : ''}`}>
                                 {generatingSection === i ? 'progress_activity' : 'add_photo_alternate'}
                             </span>
-                            {generatingSection === i ? 'Generating with NanoBanana 2...' : '🎨 Add AI Image to Section'}
+                            {generatingSection === i ? 'Generating with NanoBanana 2...' : 'Add AI Image to Section'}
                         </button>
                     )}
 
@@ -3123,7 +3125,7 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
                             <div className="size-12 rounded-xl bg-violet-400/10 flex items-center justify-center text-violet-400 mb-3 group-hover:scale-110 transition-transform">
                                 <span className={`material-symbols-outlined text-2xl ${abTestLoading ? 'animate-spin' : ''}`}>{abTestLoading ? 'progress_activity' : 'science'}</span>
                             </div>
-                            <h4 className="text-base font-bold text-white mb-1">{abTestLoading ? 'Creating...' : '🔬 A/B Test'}</h4>
+                            <h4 className="text-base font-bold text-white mb-1 flex items-center gap-1">{abTestLoading ? 'Creating...' : <><span className="material-symbols-outlined text-sm">science</span> A/B Test</>}</h4>
                             <p className="text-[11px] text-slate-500">Generate 2-3 variants to test what performs best</p>
                         </button>
                     )}
@@ -3137,7 +3139,7 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
                     </button>
                 </div>
                 <div className="p-3 rounded-xl bg-primary/5 border border-primary/10 text-center">
-                    <p className="text-sm text-primary font-bold">🧠 AI is learning from your acceptance</p>
+                    <p className="text-sm text-primary font-bold flex items-center gap-1"><span className="material-symbols-outlined text-sm">psychology</span> AI is learning from your acceptance</p>
                     <p className="text-sm text-slate-500">Future content will align closer to this style and tone</p>
                 </div>
 
@@ -3164,7 +3166,7 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
                                     </div>
                                     <p className="text-sm text-slate-300 whitespace-pre-line line-clamp-4">{v.content}</p>
                                     {v.abTestHypothesis && (
-                                        <p className="text-xs text-slate-500 mt-2 italic">💡 {v.abTestHypothesis}</p>
+                                        <p className="text-xs text-slate-500 mt-2 italic flex items-center gap-0.5"><span className="material-symbols-outlined text-[10px]">lightbulb</span> {v.abTestHypothesis}</p>
                                     )}
                                     <button onClick={() => { navigator.clipboard.writeText(v.content); }}
                                         className="mt-2 text-xs text-slate-500 hover:text-white flex items-center gap-1 transition-colors cursor-pointer">
@@ -3207,7 +3209,7 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
                                     s === 'Competitors' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' :
                                     'bg-white/[0.04] text-slate-400 border-white/[0.06]'
                                 }`}>
-                                    {s === 'Playbook' ? '📊' : s === 'GA4' ? '📈' : s === 'Competitors' ? '🔍' : s === 'Trending' ? '📰' : s === 'SEO Audit' ? '🔧' : s === 'Web' ? '🌐' : '📝'} {s}
+                                    {s === 'Playbook' ? '' : s === 'GA4' ? '' : s === 'Competitors' ? '' : s === 'Trending' ? '' : s === 'SEO Audit' ? '' : s === 'Web' ? '' : ''} {s}
                                 </span>
                             ))}
                         </div>
@@ -3233,7 +3235,7 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
                     <span className="text-sm text-slate-500">{(editing ? editContent : result.content)?.split(/\s+/).length} words</span>
                     {result.aiMeta?.provider && (
                         <span className="text-sm text-slate-500 bg-white/[0.04] px-2 py-0.5 rounded-full flex items-center gap-1">
-                            {result.aiMeta.routingIcon || '🤖'} {result.aiMeta.provider}
+                            {result.aiMeta.routingIcon || ''} {result.aiMeta.provider}
                             {result.aiMeta.routingReason && <span className="text-slate-600">— {result.aiMeta.routingReason}</span>}
                         </span>
                     )}

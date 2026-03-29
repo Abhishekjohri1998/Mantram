@@ -55,7 +55,7 @@ async function callAgent(systemPrompt, userPrompt, temperature = 0.7) {
 
 // ── Call Gemini Flash — for utility nodes (router, curator, critic, editor) ──
 // ~10x faster than Claude, great for structured JSON tasks
-async function callFastAgent(systemPrompt, userPrompt, temperature = 0.3, maxTokens = 1024) {
+async function callFastAgent(systemPrompt, userPrompt, temperature = 0.3, maxTokens = 4096) {
     const router = getRouter();
     const result = await router.generateText({
         systemPrompt,
@@ -309,7 +309,7 @@ export async function videoGeneratorNode(state) {
     // Pass shots for Kling multi-prompt support
     const shots = state.script?.shots || [];
 
-    const { requestId, endpoint, statusUrl, resultUrl, provider, _piApiPayload } = await submitVideoGeneration({
+    const { requestId, endpoint, statusUrl, resultUrl, provider, _piApiPayload, _laozhangVideoUrl } = await submitVideoGeneration({
         model,
         prompt,
         imageUrl,
@@ -326,17 +326,19 @@ export async function videoGeneratorNode(state) {
         generation: {
             falRequestId: requestId,
             falEndpoint: endpoint,
-            falStatusUrl: statusUrl,   // null for Grok
-            falResultUrl: resultUrl,   // null for Grok
-            provider: provider || 'fal', // 'grok', 'fal', 'kie', 'piapi'
+            falStatusUrl: statusUrl,   // null for Grok & LZ
+            falResultUrl: resultUrl,   // null for Grok & LZ
+            provider: provider || 'fal', // 'grok', 'fal', 'kie', 'piapi', 'laozhang'
             _piApiPayload: _piApiPayload || null, // For PiAPI auto-retry
-            videoUrl: '',
+            _laozhangVideoUrl: _laozhangVideoUrl || null, // LZ sync video URL
+            videoUrl: _laozhangVideoUrl || '',
             thumbnailUrl: '',
-            progress: 5,
+            progress: _laozhangVideoUrl ? 100 : 5,
             startedAt: new Date(),
+            ...((_laozhangVideoUrl) ? { completedAt: new Date() } : {}),
             error: '',
         },
-        status: 'generating',
+        status: _laozhangVideoUrl ? 'critique' : 'generating',
     };
 }
 
@@ -347,6 +349,21 @@ export async function pollGenerationStatus(state) {
     if (!state.generation?.falRequestId) return state;
 
     let statusResult;
+
+    // LaoZhang: Video was generated synchronously — URL already stored
+    if (state.generation?.provider === 'laozhang') {
+        return {
+            ...state,
+            generation: {
+                ...state.generation,
+                status: 'COMPLETED',
+                progress: 100,
+                videoUrl: state.generation._laozhangVideoUrl || state.generation.videoUrl || '',
+                completedAt: state.generation.completedAt || new Date(),
+            },
+            status: 'critique',
+        };
+    }
 
     // Branch polling based on provider
     if (state.generation?.provider === 'grok' || state.routing?.selectedModel === 'grok-imagine') {
@@ -486,13 +503,16 @@ export async function editorNode(state) {
  * Takes user's raw prompt → rewrites into a production-ready video prompt.
  */
 export async function enhancePromptNode(state) {
+    // Load brand context — CRITICAL: without this, enhanced prompts lose brand DNA
+    const { brandContext, styleMemory } = await loadContext(state.brandId, state.userId);
+
     const userPrompt = `Enhance this video generation prompt:\n\n"${state.prompt}"\n\nModel being used: ${state.model || 'general'}\nDesired duration: ${state.duration || 5}s\nAspect ratio: ${state.aspectRatio || '16:9'}`;
 
     const result = await callFastAgent(
-        PROMPT_ENHANCER_PROMPT,
+        PROMPT_ENHANCER_PROMPT(brandContext, styleMemory),
         userPrompt,
         0.5,
-        1024
+        4096
     );
 
     return {
@@ -626,11 +646,13 @@ export async function advancedGenerateNode(state) {
             falResultUrl: result.resultUrl,
             provider: result.provider || 'fal',
             _piApiPayload: result._piApiPayload || null, // For PiAPI auto-retry
-            videoUrl: '',
-            progress: 5,
+            _laozhangVideoUrl: result._laozhangVideoUrl || null, // LZ sync video URL
+            videoUrl: result._laozhangVideoUrl || '', // Pre-fill if LZ sync
+            progress: result._laozhangVideoUrl ? 100 : 5,
             startedAt: new Date(),
+            ...(result._laozhangVideoUrl ? { completedAt: new Date() } : {}),
         },
         costPreview: estimateCost(model, duration, state.resolution || '1080p', state.qualityMode || 'fast'),
-        status: 'advanced-generating',
+        status: result._laozhangVideoUrl ? 'critique' : 'advanced-generating',
     };
 }

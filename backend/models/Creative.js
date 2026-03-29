@@ -20,6 +20,16 @@ const creativeSchema = new mongoose.Schema({
         fonts: [String],
     },
 
+    // AI-generated marketing copy (optional — generated when "Add Copy" is enabled)
+    copy: {
+        headline: { type: String, default: '' },
+        caption: { type: String, default: '' },
+        cta: { type: String, default: '' },
+        hashtags: [String],
+        altText: { type: String, default: '' },
+        copyNotes: { type: String, default: '' },
+    },
+
     // AI metadata
     aiMeta: {
         provider: { type: String, default: '' },

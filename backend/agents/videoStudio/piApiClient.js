@@ -208,7 +208,7 @@ async function submitPiApiPayload(payload) {
  * Returns { taskId, provider: 'piapi', _payload }
  */
 export async function submitPiApiVideoGeneration({ prompt, imageUrl, duration, aspectRatio, generateAudio = true, referenceImages = [], qualityMode = 'fast' }) {
-    const dur = Math.min(Math.max(duration || 5, 4), 15);
+    const dur = Math.min(Math.max(parseInt(duration, 10) || 5, 5), 15);
 
     console.log(`🎞️ PiAPI received: ${referenceImages.length} ref images, imageUrl: ${imageUrl ? 'yes' : 'no'}, quality: ${qualityMode}`);
 
@@ -296,7 +296,7 @@ export async function resubmitPiApiTask(storedPayload) {
 export async function submitPiApiImageToVideo({ imageUrl, prompt, duration, aspectRatio, qualityMode = 'fast', referenceImages = [] }) {
     if (!imageUrl) throw new Error('Image URL is required for Image-to-Video');
 
-    const dur = Math.min(Math.max(duration || 5, 4), 15);
+    const dur = Math.min(Math.max(parseInt(duration, 10) || 5, 5), 15);
 
     console.log(`🖼️→🎬 PiAPI I2V: imageUrl=${imageUrl.substring(0, 60)}..., refs=${referenceImages.length}, quality=${qualityMode}`);
 
@@ -355,7 +355,7 @@ export async function submitPiApiImageToVideo({ imageUrl, prompt, duration, aspe
 export async function submitPiApiVideoExtend({ parentTaskId, prompt, duration, qualityMode = 'fast' }) {
     if (!parentTaskId) throw new Error('Parent task ID is required for Video Extend');
 
-    const dur = Math.min(Math.max(duration || 5, 4), 10);
+    const dur = Math.min(Math.max(parseInt(duration, 10) || 5, 5), 10);
 
     console.log(`🔗 PiAPI Extend: parentTaskId=${parentTaskId}, duration=${dur}s, quality=${qualityMode}`);
 

@@ -206,7 +206,9 @@ RESPONSE FORMAT — respond with ONLY valid JSON:
 // ADVANCED MODE PROMPTS
 // ──────────────────────────────────────────────────────────────────────────────
 
-export const PROMPT_ENHANCER_PROMPT = `You are an AI Video Prompt Enhancer. You take a user's raw video prompt and rewrite it into a highly detailed, production-ready prompt optimized for AI video generation models.
+export const PROMPT_ENHANCER_PROMPT = (brandContext = '', styleMemory = '') => `You are an AI Video Prompt Enhancer. You take a user's raw video prompt and rewrite it into a highly detailed, production-ready prompt optimized for AI video generation models.
+
+${brandContext}${styleMemory}
 
 RULES:
 1. ADD vivid visual details: lighting, camera movement, composition, color palette.
@@ -216,6 +218,7 @@ RULES:
 5. REMOVE any text overlay requests (AI models can't render text well).
 6. Keep it under 300 words — models don't process very long prompts well.
 7. Write in present tense, as if describing the video as it plays.
+${brandContext ? '8. IMPORTANT: Align all visual choices (color palette, mood, lighting, atmosphere) with the brand identity provided above.' : ''}
 
 RESPONSE FORMAT — respond with ONLY valid JSON:
 {

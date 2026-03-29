@@ -379,15 +379,23 @@ const MODEL_COSTS = {
     // ── Video models (flat cost per generation in USD cents) ──
     'seedance-1.0': { flatCost: 10.0, type: 'video' },
     'piapi-seedance': { flatCost: 10.0, type: 'video' },
-    'laozhang-veo': { flatCost: 5.0, type: 'video' },      // Lao Zhang Veo 3.1 Fast
+    'laozhang-veo': { flatCost: 5.0, type: 'video' },         // Lao Zhang Veo 3.1
+    'laozhang-veo-fast': { flatCost: 3.0, type: 'video' },    // Lao Zhang Veo 3.1 Fast
+    'laozhang-seedance': { flatCost: 4.0, type: 'video' },    // Lao Zhang Seedance 2.0
+    'laozhang-sora-2': { flatCost: 8.0, type: 'video' },      // Lao Zhang Sora 2
     'piapi-wan': { flatCost: 8.0, type: 'video' },
-    'laozhang-nanobanana2': { flatCost: 5.0, type: 'image' }, // Lao Zhang image fallback
+    'laozhang-nanobanana2': { flatCost: 1.0, type: 'image' }, // Lao Zhang NanoBanana 2
+    'laozhang-nanobanana-pro': { flatCost: 3.0, type: 'image' }, // Lao Zhang NanoBanana Pro
+    'laozhang-ideogram': { flatCost: 2.0, type: 'image' },    // Lao Zhang Ideogram v3
+    'laozhang-flux': { flatCost: 2.0, type: 'image' },        // Lao Zhang Flux Kontext Pro
+    'laozhang-seedream': { flatCost: 2.0, type: 'image' },    // Lao Zhang Seedream 5
     // ── New selectable image models (fal.ai) ──
     'fal-ai/flux-pro/v1.1': { flatCost: 5.0, type: 'image' },    // Flux Pro v1.1
     'fal-ai/flux-pro/v2': { flatCost: 8.0, type: 'image' },      // Flux 2 Pro (premium)
-    'fal-ai/seedream-3': { flatCost: 5.0, type: 'image' },        // Seedream 5
+    'fal-ai/bytedance/seedream/v3/text-to-image': { flatCost: 5.0, type: 'image' },        // Seedream 5
     'fal-ai/ideogram/v3': { flatCost: 6.0, type: 'image' },       // Ideogram v3
     'gemini-3-pro-image-preview': { flatCost: 6.0, type: 'image' }, // NanoBanana Pro
+    'grok-imagine-image': { flatCost: 7.0, type: 'image' },        // Grok Imagen (xAI)
     // ── Voice models (flat cost per call in USD cents) ──
     'sarvam-stt-saaras-v3': { flatCost: 0.5, type: 'voice' },
     'sarvam-tts-bulbul-v2': { flatCost: 1.0, type: 'voice' },
@@ -488,7 +496,7 @@ export const logTokenUsage = async (userId, tokenData, meta = {}) => {
                 await setSetting('provider_budgets', budgets);
             } else if (p) {
                 // Initialize if missing but provider is known
-                const knownProviders = ['gemini', 'openai', 'anthropic', 'grok', 'piapi', 'fal', 'heygen', 'sarvam'];
+                const knownProviders = ['gemini', 'openai', 'anthropic', 'grok', 'piapi', 'fal', 'heygen', 'sarvam', 'laozhang'];
                 if (knownProviders.includes(p)) {
                     budgets[p] = { budget: 1000, consumed: estimatedCost, lastUpdate: new Date() }; // Default $10 budget
                     await setSetting('provider_budgets', budgets);

@@ -351,12 +351,13 @@ export default function CreativeStudio() {
 
     // ── Image Model Definitions ──
     const IMAGE_MODELS = [
-        { id: 'nanobanana-2', name: 'NanoBanana 2', icon: 'auto_awesome', desc: 'Default • Fast • Best with references', provider: 'Gemini', badge: '⚡', color: '#a855f7' },
-        { id: 'nanobanana-pro', name: 'NanoBanana Pro', icon: 'diamond', desc: 'Premium quality • Better details', provider: 'Gemini', badge: '💎', color: '#ec4899' },
-        { id: 'flux-pro-v1.1', name: 'Flux Pro v1.1', icon: 'bolt', desc: 'Photorealistic • Great anatomy', provider: 'fal.ai', badge: '🔥', color: '#f97316' },
-        { id: 'flux-2-pro', name: 'Flux 2 Pro', icon: 'stars', desc: 'Latest Flux • Premium photorealism', provider: 'fal.ai', badge: '✨', color: '#eab308' },
-        { id: 'seedream-5', name: 'Seedream 5', icon: 'park', desc: 'Creative • Artistic style', provider: 'fal.ai', badge: '🌱', color: '#22c55e' },
-        { id: 'ideogram', name: 'Ideogram v3', icon: 'text_fields', desc: 'Best for text in images', provider: 'fal.ai', badge: '🎨', color: '#06b6d4' },
+        { id: 'nanobanana-2', name: 'NanoBanana 2', icon: 'auto_awesome', desc: 'Default • Fast • Best with references', provider: 'LaoZhang', badge: '⚡', color: '#a855f7' },
+        { id: 'nanobanana-pro', name: 'NanoBanana Pro', icon: 'diamond', desc: 'Premium quality • Better details', provider: 'LaoZhang', badge: '💎', color: '#ec4899' },
+        { id: 'flux-pro-v1.1', name: 'Flux Pro v1.1', icon: 'bolt', desc: 'Photorealistic • Great anatomy', provider: 'LaoZhang', badge: '🔥', color: '#f97316' },
+        { id: 'flux-2-pro', name: 'Flux 2 Pro', icon: 'stars', desc: 'Latest Flux • Premium photorealism', provider: 'LaoZhang', badge: '✨', color: '#eab308' },
+        { id: 'seedream-5', name: 'Seedream 5', icon: 'park', desc: 'Creative • Artistic style', provider: 'LaoZhang', badge: '🌱', color: '#22c55e' },
+        { id: 'ideogram', name: 'Ideogram v3', icon: 'text_fields', desc: 'Best for text in images', provider: 'LaoZhang', badge: '🎨', color: '#06b6d4' },
+        { id: 'grok-imagen', name: 'Grok Imagen', icon: 'smart_toy', desc: 'xAI • High quality generation', provider: 'xAI', badge: '🤖', color: '#ef4444' },
     ]
 
     // ── Animate State ──
@@ -695,6 +696,8 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
     const [viewMode, setViewMode] = useState('list')
     const [showAdvanced, setShowAdvanced] = useState(false)
     const [agenticQuality, setAgenticQuality] = useState('fast') // 'fast' | 'quality'
+    const [generateCopy, setGenerateCopy] = useState(false) // Opt-in: generate marketing copy alongside image
+    const [copiedField, setCopiedField] = useState(null) // Track which copy field was just copied
     const [activeQuickTemplate, setActiveQuickTemplate] = useState(null)
     const [showQuickStart, setShowQuickStart] = useState(true)
     const [guidedForm, setGuidedForm] = useState(null)
@@ -1109,6 +1112,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
                 aspectRatio,
                 imageModel,
                 agenticQuality,
+                generateCopy,
                 progressId, // Pass to backend for progress tracking
             }
             if (designBaseImage) {
@@ -1179,7 +1183,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
             // Handle model busy notification
             if (data.modelBusy) {
                 const busyModel = IMAGE_MODELS.find(m => m.id === data.busyModel) || { name: data.busyModel }
-                setBusyModelInfo(busyModel)
+                setBusyModelInfo({ ...busyModel, errorMessage: data.errorMessage, errorType: data.errorType })
                 setShowBusyModal(true)
                 return
             }
@@ -2270,6 +2274,21 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 </div>
                             </div>
 
+                            {/* ✍️ Generate Copy Toggle */}
+                            <div className="flex items-center justify-between pb-3 border-b border-white/[0.05]">
+                                <div className="flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-sm text-violet-400">edit_note</span>
+                                    <div>
+                                        <p className="text-xs font-bold text-white">Generate Copy</p>
+                                        <p className="text-[10px] text-slate-500">{generateCopy ? 'AI writes caption, CTA & hashtags' : 'Image only — no caption'}</p>
+                                    </div>
+                                </div>
+                                <button onClick={() => setGenerateCopy(!generateCopy)}
+                                    className={`w-9 h-5 rounded-full transition-all cursor-pointer ${generateCopy ? 'bg-violet-500' : 'bg-white/[0.1]'}`}>
+                                    <div className={`w-3.5 h-3.5 rounded-full bg-white shadow transition-transform ${generateCopy ? 'translate-x-4.5' : 'translate-x-0.5'}`} />
+                                </button>
+                            </div>
+
                             {/* Format moved to above prompt area — this section now just shows the lock */}
                             <div className="flex items-center gap-2 py-2 px-3 rounded-xl bg-primary/5 border border-primary/10">
                                 <span className="material-symbols-outlined text-sm text-primary">{selectedTypeInfo?.icon || 'photo_camera'}</span>
@@ -2593,7 +2612,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                             </div>
                                         )}
                                     </div>
-                                    <button onClick={() => setPublishData({ image: result?.imageUrl, text: result?.title || '' })}
+                                    <button onClick={() => setPublishData({ image: result?.imageUrl, text: result?.copy?.caption || result?.title || '' })}
                                         className="p-1.5 rounded-lg text-slate-500 hover:text-[#1877F2] hover:bg-[#1877F2]/10 cursor-pointer transition-all" title="Publish">
                                         <span className="material-symbols-outlined text-sm">share</span>
                                     </button>
@@ -2613,6 +2632,106 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                         className="ml-auto p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-white/[0.06] cursor-pointer transition-all" title="Regenerate">
                                         <span className="material-symbols-outlined text-sm">refresh</span>
                                     </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* ── AI Copy Card ── */}
+                        {result?.copy?.caption && (
+                            <div className="studio-card p-0 mb-5 overflow-hidden border border-violet-500/20 animate-in fade-in slide-in-from-bottom-3 duration-500" style={{ animationDelay: '200ms' }}>
+                                {/* Header */}
+                                <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-violet-500/10 to-fuchsia-500/10 border-b border-white/[0.06]">
+                                    <div className="flex items-center gap-2">
+                                        <span className="material-symbols-outlined text-sm text-violet-400">edit_note</span>
+                                        <h4 className="text-xs font-bold text-white">AI Copy</h4>
+                                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-300 border border-violet-500/30">AGENTIC</span>
+                                    </div>
+                                    <button onClick={() => {
+                                        const c = result.copy
+                                        const full = [c.headline, '', c.caption, '', c.cta, '', (c.hashtags || []).map(h => h.startsWith('#') ? h : `#${h}`).join(' ')].join('\n')
+                                        navigator.clipboard.writeText(full)
+                                        setCopiedField('all')
+                                        setTimeout(() => setCopiedField(null), 2000)
+                                    }} className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${copiedField === 'all' ? 'bg-emerald-500/20 text-emerald-400' : 'text-slate-400 hover:text-white hover:bg-white/[0.06]'}`}>
+                                        <span className="material-symbols-outlined text-xs">{copiedField === 'all' ? 'check' : 'content_copy'}</span>
+                                        {copiedField === 'all' ? 'Copied!' : 'Copy All'}
+                                    </button>
+                                </div>
+
+                                {/* Copy Content */}
+                                <div className="p-4 space-y-3">
+                                    {/* Headline */}
+                                    {result.copy.headline && (
+                                        <div className="group">
+                                            <div className="flex items-center justify-between mb-1">
+                                                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Headline</p>
+                                                <button onClick={() => { navigator.clipboard.writeText(result.copy.headline); setCopiedField('headline'); setTimeout(() => setCopiedField(null), 1500) }}
+                                                    className={`opacity-0 group-hover:opacity-100 transition-all text-[10px] px-1.5 py-0.5 rounded cursor-pointer ${copiedField === 'headline' ? 'text-emerald-400' : 'text-slate-500 hover:text-white'}`}>
+                                                    {copiedField === 'headline' ? '✓' : 'Copy'}
+                                                </button>
+                                            </div>
+                                            <p className="text-sm font-bold text-white leading-snug">{result.copy.headline}</p>
+                                        </div>
+                                    )}
+
+                                    {/* Caption */}
+                                    <div className="group">
+                                        <div className="flex items-center justify-between mb-1">
+                                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Caption</p>
+                                            <button onClick={() => { navigator.clipboard.writeText(result.copy.caption); setCopiedField('caption'); setTimeout(() => setCopiedField(null), 1500) }}
+                                                className={`opacity-0 group-hover:opacity-100 transition-all text-[10px] px-1.5 py-0.5 rounded cursor-pointer ${copiedField === 'caption' ? 'text-emerald-400' : 'text-slate-500 hover:text-white'}`}>
+                                                {copiedField === 'caption' ? '✓' : 'Copy'}
+                                            </button>
+                                        </div>
+                                        <p className="text-xs text-slate-300 leading-relaxed whitespace-pre-wrap">{result.copy.caption}</p>
+                                    </div>
+
+                                    {/* CTA */}
+                                    {result.copy.cta && (
+                                        <div className="group">
+                                            <div className="flex items-center justify-between mb-1">
+                                                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Call to Action</p>
+                                                <button onClick={() => { navigator.clipboard.writeText(result.copy.cta); setCopiedField('cta'); setTimeout(() => setCopiedField(null), 1500) }}
+                                                    className={`opacity-0 group-hover:opacity-100 transition-all text-[10px] px-1.5 py-0.5 rounded cursor-pointer ${copiedField === 'cta' ? 'text-emerald-400' : 'text-slate-500 hover:text-white'}`}>
+                                                    {copiedField === 'cta' ? '✓' : 'Copy'}
+                                                </button>
+                                            </div>
+                                            <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-violet-500/20 to-fuchsia-500/20 border border-violet-500/30">
+                                                <span className="text-xs font-bold text-violet-300">{result.copy.cta}</span>
+                                                <span className="material-symbols-outlined text-xs text-violet-400">arrow_forward</span>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Hashtags */}
+                                    {result.copy.hashtags?.length > 0 && (
+                                        <div className="group">
+                                            <div className="flex items-center justify-between mb-1.5">
+                                                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Hashtags</p>
+                                                <button onClick={() => { navigator.clipboard.writeText(result.copy.hashtags.map(h => h.startsWith('#') ? h : `#${h}`).join(' ')); setCopiedField('hashtags'); setTimeout(() => setCopiedField(null), 1500) }}
+                                                    className={`opacity-0 group-hover:opacity-100 transition-all text-[10px] px-1.5 py-0.5 rounded cursor-pointer ${copiedField === 'hashtags' ? 'text-emerald-400' : 'text-slate-500 hover:text-white'}`}>
+                                                    {copiedField === 'hashtags' ? '✓' : 'Copy'}
+                                                </button>
+                                            </div>
+                                            <div className="flex flex-wrap gap-1">
+                                                {result.copy.hashtags.map((tag, i) => (
+                                                    <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-white/[0.04] text-blue-400 border border-blue-500/10">
+                                                        {tag.startsWith('#') ? tag : `#${tag}`}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Copy Notes (collapsible) */}
+                                    {result.copy.copyNotes && (
+                                        <div className="pt-2 border-t border-white/[0.04]">
+                                            <p className="text-[10px] text-slate-600 italic">
+                                                <span className="material-symbols-outlined text-[10px] align-middle mr-1">lightbulb</span>
+                                                {result.copy.copyNotes}
+                                            </p>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         )}
@@ -3643,7 +3762,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                             // Auto-save to image bank
                                             saveToImageBank(data)
                                         } else if (data.modelBusy) {
-                                            setPhotoshootError(`⚡ Model is busy — try switching to a different model using the selector above.`)
+                                            setPhotoshootError(data.errorMessage || `⚡ Model is busy — try switching to a different model using the selector above.`)
                                         } else {
                                             setPhotoshootError({
                                                 message: data.error || 'Generation failed',
@@ -8319,17 +8438,29 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                         <div className="absolute -bottom-24 -right-24 h-48 w-48 rounded-full bg-rose-500/10 blur-[80px]" />
 
                         {/* Icon */}
-                        <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-amber-500/10 text-amber-500 ring-8 ring-amber-500/5">
-                            <span className="material-symbols-outlined text-4xl">hourglass_empty</span>
+                        <div className={`mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full ring-8 ${
+                            busyModelInfo?.errorType === 'quota'
+                                ? 'bg-rose-500/10 text-rose-400 ring-rose-500/5'
+                                : 'bg-amber-500/10 text-amber-500 ring-amber-500/5'
+                        }`}>
+                            <span className="material-symbols-outlined text-4xl">
+                                {busyModelInfo?.errorType === 'quota' ? 'account_balance_wallet' : 'hourglass_empty'}
+                            </span>
                         </div>
 
                         {/* Text Content */}
                         <h3 className="mb-2 text-2xl font-bold text-white">
-                            {busyModelInfo?.name || 'Engine'} is Busy
+                            {busyModelInfo?.errorType === 'quota'
+                                ? `${busyModelInfo?.name || 'Provider'} Quota Exhausted`
+                                : `${busyModelInfo?.name || 'Engine'} is Busy`
+                            }
                         </h3>
                         <p className="mb-8 text-slate-400 text-sm leading-relaxed">
-                            We're experiencing unusually high demand for this specific AI model right now. 
-                            Spikes in demand are usually temporary and last only a few minutes.
+                            {busyModelInfo?.errorMessage
+                                || (busyModelInfo?.errorType === 'quota'
+                                    ? 'The provider\'s billing quota has been exhausted. Please switch to a model from a different provider.'
+                                    : 'We\'re experiencing unusually high demand for this specific AI model right now. Spikes in demand are usually temporary and last only a few minutes.')
+                            }
                         </p>
 
                         {/* Action Buttons */}
@@ -8347,7 +8478,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                 onClick={() => setShowBusyModal(false)}
                                 className="w-full rounded-2xl border border-white/10 bg-white/5 px-6 py-4 text-sm font-bold text-slate-300 transition-all hover:bg-white/10 active:scale-[0.98]"
                             >
-                                Wait and Try Again
+                                {busyModelInfo?.errorType === 'quota' ? 'Close' : 'Wait and Try Again'}
                             </button>
                         </div>
 

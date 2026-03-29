@@ -3,22 +3,25 @@
  * 
  * Supported models (verified endpoints as of March 2026):
  *   - Kling 3.0 (v3) — 3-15s, multi-prompt, native audio, voice IDs       [fal.ai]
- *   - Google Veo 3 / 3.1 — 5-8s, extend-video, native audio              [fal.ai]
- *   - Google Veo 3.1 Fast — 5-8s, faster + cheaper variant                [kie.ai]
+ *   - Google Veo 3 / 3.1 — 5-8s, extend-video, native audio              [fal.ai / LaoZhang]
+ *   - Google Veo 3.1 Fast — 5-8s, faster + cheaper variant                [kie.ai / LaoZhang]
  *   - Seedance 1.0 Lite — 5-10s, fast & affordable                        [fal.ai]
- *   - Seedance 2.0 Pro — 5-15s, native audio, camera control, cinematic   [kie.ai]
+ *   - Seedance 2.0 Pro — 5-15s, native audio, camera control, cinematic   [PiAPI / LaoZhang]
+ *   - Sora 2 — 10-15s, OpenAI video gen                                   [LaoZhang only]
  * 
- * Provider routing:
- *   - fal.ai: Kling 3.0, Veo 3.1, Seedance 1.0 (queue-based async)
- *   - kie.ai: Veo 3.1 Fast (taskId-based async)
- *   - PiAPI:  Seedance 2.0 (task-based async)
- *   - xAI:   Grok Imagine (native REST)
+ * Provider routing (priority order):
+ *   - LaoZhang: PRIMARY for Veo 3.1, Veo 3.1 Fast, Seedance 2.0, Sora 2 (cheapest)
+ *   - fal.ai:   FALLBACK for Kling 3.0, Veo 3.1, Seedance 1.0 (queue-based async)
+ *   - kie.ai:   FALLBACK for Veo 3.1 Fast (taskId-based async)
+ *   - PiAPI:    FALLBACK for Seedance 2.0 (task-based async)
+ *   - xAI:     Grok Imagine (native REST, no LZ equivalent)
  */
 
 import config from '../../config/env.js';
 import { submitKieVideoGeneration } from './kieClient.js';
 import { submitPiApiVideoGeneration } from './piApiClient.js';
 import { ensureS3Url } from '../../utils/s3.js';
+import { isLaozhangAvailable, submitLaozhangVideoGeneration } from './laozhangClient.js';
 
 
 const FAL_BASE_URL = 'https://queue.fal.run';
@@ -69,17 +72,19 @@ const MODEL_AVAILABLE = {
     'seedance-2.0': true,
     'grok-imagine': true,
     'hunyuan': true,
+    'sora-2': true,  // LaoZhang only
 };
 
 // ── Cost table (USD per second of video) ──
 export const COST_PER_SECOND = {
     'kling-3.0': { fast: 0.07, quality: 0.12 },
-    'veo-3.1': { fast: 0.15, quality: 0.40 },
-    'veo-3.1-fast': { fast: 0.08, quality: 0.15 },  // kie.ai
+    'veo-3.1': { fast: 0.10, quality: 0.25 },       // LaoZhang primary (was 0.15/0.40 on fal.ai)
+    'veo-3.1-fast': { fast: 0.06, quality: 0.10 },   // LaoZhang primary (was 0.08/0.15 on kie.ai)
     'seedance-1.0': { fast: 0.05, quality: 0.08 },
-    'seedance-2.0': { fast: 0.08, quality: 0.15 },  // PiAPI
+    'seedance-2.0': { fast: 0.05, quality: 0.10 },   // LaoZhang primary (was 0.08/0.15 on PiAPI)
     'grok-imagine': { fast: 0.08, quality: 0.08 },
     'hunyuan': { fast: 0.03, quality: 0.05 },
+    'sora-2': { fast: 0.10, quality: 0.15 },         // LaoZhang only
 };
 
 // ── Duration limits per model ──
@@ -91,6 +96,7 @@ const DURATION_LIMITS = {
     'seedance-2.0': { min: 5, max: 15, supported: [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] },
     'grok-imagine': { min: 1, max: 15, supported: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] },
     'hunyuan': { min: 3, max: 10, supported: [3, 4, 5, 6, 7, 8, 9, 10] },
+    'sora-2': { min: 5, max: 15, supported: [5, 10, 15] },
 };
 
 // ── Resolution config ──
@@ -102,7 +108,7 @@ const RESOLUTION_MAP = {
 // ── Full Model Capabilities Matrix (exported for frontend) ──
 export const MODEL_CAPABILITIES = {
     'kling-3.0': {
-        id: 'kling-3.0', name: 'Kling 3.0', icon: '🎥', provider: 'fal',
+        id: 'kling-3.0', name: 'Kling 3.0', icon: '🎥', provider: 'laozhang',
         description: 'Best motion & physics — multi-shot, native audio, voice IDs',
         bestFor: 'Product demos, action shots, storyboard videos',
         duration: { min: 3, max: 15, native: 15, step: 1 },
@@ -195,6 +201,22 @@ export const MODEL_CAPABILITIES = {
         },
         maxReferenceImages: 0,
         costPerSecond: COST_PER_SECOND['hunyuan'],
+        recommended: false,
+    },
+    'sora-2': {
+        id: 'sora-2', name: 'Sora 2', icon: '🎞️', provider: 'laozhang',
+        description: 'OpenAI Sora 2 — cinematic storytelling, world-model understanding',
+        bestFor: 'Cinematic ads, narrative storytelling, creative experiments',
+        duration: { min: 5, max: 15, native: 15, step: 5 },
+        resolutions: ['720p', '1080p'],
+        aspectRatios: ['16:9', '9:16', '1:1'],
+        features: {
+            firstFrame: false, lastFrame: false, referenceImages: false,
+            extendVideo: false, multiShot: false, nativeAudio: true,
+            voiceIds: false, cameraControl: false,
+        },
+        maxReferenceImages: 0,
+        costPerSecond: COST_PER_SECOND['sora-2'],
         recommended: false,
     },
 };
@@ -415,7 +437,7 @@ export async function getGrokGenerationStatus(requestId) {
  */
 export async function submitVideoGeneration({ model, prompt, imageUrl, duration, resolution, mode, shots, generateAudio, aspectRatio, referenceImages }) {
     if (!MODEL_AVAILABLE[model]) {
-        throw new Error(`Model '${model}' is not available. Use kling-3.0, veo-3.1, veo-3.1-fast, seedance-1.0, seedance-2.0, or grok-imagine.`);
+        throw new Error(`Model '${model}' is not available. Use kling-3.0, veo-3.1, veo-3.1-fast, seedance-1.0, seedance-2.0, sora-2, or grok-imagine.`);
     }
 
     // Standardize storage: Upload all images to S3 in parallel
@@ -423,6 +445,49 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
         ensureS3Url(imageUrl, 'video-studio/generations'),
         ...(referenceImages || []).map(img => ensureS3Url(img, 'video-studio/references'))
     ]);
+
+    // ══════════════════════════════════════════════════════════════════
+    // LAOZHANG-FIRST ROUTING — Cheapest provider, synchronous return
+    // Only models CONFIRMED WORKING on LZ (March 30, 2026):
+    //   ✅ veo-3.1, veo-3.1-fast, sora-2 
+    //   ❌ kling-3.0, seedance-2.0 → 503 "no billing channel" 
+    //   ❌ seedance-1.0 → 503 "no available channel"
+    // To enable more models: activate billing channels on LZ dashboard
+    // Falls through to direct provider on failure.
+    // ══════════════════════════════════════════════════════════════════
+    const LZ_VIDEO_MODELS = ['sora-2', 'veo-3.1', 'veo-3.1-fast'];
+    if (LZ_VIDEO_MODELS.includes(model) && isLaozhangAvailable()) {
+        try {
+            console.log(`🏷️ [LaoZhang-First] Attempting ${model} via LaoZhang (cheapest)...`);
+            const lzResult = await submitLaozhangVideoGeneration({
+                model,
+                prompt,
+                imageUrl: s3ImageUrl,
+                duration: duration || 5,
+                aspectRatio: aspectRatio || '16:9',
+                generateAudio: generateAudio !== false,
+            });
+
+            if (lzResult?.videoUrl) {
+                console.log(`✅ [LaoZhang] ${model} video generated successfully (sync). URL: ${lzResult.videoUrl.substring(0, 80)}...`);
+                return {
+                    requestId: `lz-${Date.now()}`,
+                    endpoint: `laozhang-${model}`,
+                    statusUrl: null,
+                    resultUrl: null,
+                    provider: 'laozhang',
+                    // Store the video URL directly since LZ is synchronous
+                    _laozhangVideoUrl: lzResult.videoUrl,
+                };
+            }
+        } catch (lzErr) {
+            // Sora 2 is LZ-only — don't fall through
+            if (model === 'sora-2') {
+                throw new Error(`Sora 2 generation failed: ${lzErr.message}`);
+            }
+            console.warn(`⚠️ [LaoZhang] ${model} failed (${lzErr.message?.substring(0, 150)}), falling through to direct provider...`);
+        }
+    }
 
     // ── Grok Imagine: use native xAI API instead of fal.ai ──
     if (model === 'grok-imagine') {
@@ -788,6 +853,17 @@ export function getModelsInfo() {
             duration: DURATION_LIMITS['hunyuan'],
             features: ['text-to-video', 'image-to-video', '3-10s', 'cheapest', 'draft'],
             available: true,
+            recommended: false,
+        },
+        {
+            id: 'sora-2',
+            name: 'Sora 2',
+            description: 'OpenAI Sora 2 — cinematic storytelling with world-model understanding',
+            bestFor: 'Cinematic ads, narrative storytelling, creative experiments',
+            costPerSecond: COST_PER_SECOND['sora-2'],
+            duration: DURATION_LIMITS['sora-2'],
+            features: ['text-to-video', 'native-audio', '5-15s', 'cinematic', 'storytelling'],
+            available: isLaozhangAvailable(),
             recommended: false,
         },
     ];
