@@ -152,10 +152,11 @@ function buildPayload(model, { prompt, imageUrl, duration, resolution, mode, sho
     throw new Error(`Unknown fal.ai model: ${model}`);
 }
 
-// ── LaoZhang cascade for seedance-2.0 ──
-// Try seedance-2.0, fallback to sora_video2 (confirmed working on LZ)
+// ── Cascade for seedance-2.0 on LaoZhang ──────────────────────────────────
+// Priority: seedance-2.0 → veo-3.1-fast (fast & reliable)
+// NOTE: sora_video2 removed from cascade — confirmed hangs >5min in production
 async function tryLaozhangSeedance({ prompt, imageUrl, duration, aspectRatio, generateAudio }) {
-    // Attempt 1: seedance-2.0 natively
+    // Attempt 1: seedance-2.0 on LaoZhang
     try {
         const result = await submitLaozhangVideoGeneration({
             model: 'seedance-2.0', prompt, imageUrl,
@@ -167,23 +168,23 @@ async function tryLaozhangSeedance({ prompt, imageUrl, duration, aspectRatio, ge
             return result.videoUrl;
         }
     } catch (e) {
-        console.warn(`⚠️ [LaoZhang] seedance-2.0 failed: ${e.message}`);
+        console.warn(`⚠️ [LaoZhang] seedance-2.0 failed (${e.message?.substring(0, 120)}) — cascading to veo-3.1-fast`);
     }
 
-    // Attempt 2: sora_video2 as fallback (confirmed working on LZ, similar quality)
-    console.log(`🔁 [LaoZhang] Cascading seedance-2.0 → sora_video2...`);
+    // Attempt 2: veo-3.1-fast as fallback (confirmed reliable on LZ, ~30-60s)
+    console.log(`🔁 [LaoZhang] Cascade seedance-2.0 → veo-3.1-fast...`);
     try {
         const result = await submitLaozhangVideoGeneration({
-            model: 'sora-2', prompt, imageUrl: null, // sora_video2 is text-only on LZ
-            duration: Math.min(duration || 5, 10), aspectRatio: aspectRatio || '16:9',
+            model: 'veo-3.1-fast', prompt, imageUrl: null, // veo doesn't support imageUrl same way
+            duration: Math.min(duration || 5, 8), aspectRatio: aspectRatio || '16:9',
             generateAudio: generateAudio !== false,
         });
         if (result?.videoUrl) {
-            console.log(`✅ [LaoZhang] sora_video2 cascade done`);
+            console.log(`✅ [LaoZhang] veo-3.1-fast cascade done`);
             return result.videoUrl;
         }
     } catch (e) {
-        console.warn(`⚠️ [LaoZhang] sora_video2 cascade failed: ${e.message}`);
+        console.warn(`⚠️ [LaoZhang] veo-3.1-fast cascade failed: ${e.message?.substring(0, 120)}`);
     }
 
     return null;
@@ -203,16 +204,15 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
 
         if (isLaozhangAvailable()) {
             const videoUrl = await tryLaozhangSeedance({
-                prompt, imageUrl: lzImageUrl,
-                duration, aspectRatio, generateAudio,
+                prompt, imageUrl: lzImageUrl, duration, aspectRatio, generateAudio,
             });
             if (videoUrl) {
                 return { requestId: `lz-${Date.now()}`, endpoint: 'laozhang-seedance-2.0', provider: 'laozhang', _laozhangVideoUrl: videoUrl };
             }
         }
 
-        // Last resort: PiAPI text-to-video (will fail if insufficient_credits, throws immediately)
-        console.log(`🎮 [PiAPI] Last resort: seedance-2.0 text-to-video...`);
+        // Last resort: PiAPI — throws immediately on insufficient_credits
+        console.log(`🎮 [PiAPI] Last resort: seedance-2.0 text-to-video (no images)...`);
         try {
             const result = await submitPiApiVideoGeneration({
                 prompt, imageUrl: null, duration,
@@ -222,14 +222,14 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
             return { requestId: result.taskId, endpoint: 'piapi-seedance-2.0', provider: 'piapi', _piApiPayload: result._payload };
         } catch (piErr) {
             if (piErr.message.startsWith('PiAPI_INSUFFICIENT_CREDITS')) {
-                throw new Error('Video generation failed: PiAPI account has insufficient credits. Please top up at piapi.ai, or the LaoZhang seedance channel is temporarily unavailable — try again in a few minutes.');
+                throw new Error('Video generation failed: All providers unavailable. LaoZhang seedance channel is down and PiAPI has insufficient credits. Please try again in a few minutes or top up PiAPI at piapi.ai.');
             }
             throw piErr;
         }
     }
 
-    // ── LaoZhang-First Routing (other models) ──
-    const LZ_VIDEO_MODELS = ['sora-2', 'veo-3.1', 'veo-3.1-fast', 'kling-3.0'];
+    // ── LaoZhang-First Routing (other LZ-native models) ──
+    const LZ_VIDEO_MODELS = ['sora-2', 'veo-3.1', 'kling-3.0'];
     if (LZ_VIDEO_MODELS.includes(model) && isLaozhangAvailable()) {
         try {
             console.log(`🏷️ [LaoZhang] Attempting ${model}...`);
