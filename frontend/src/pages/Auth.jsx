@@ -77,8 +77,17 @@ export default function Auth() {
             if (isLogin) {
                 res = await login(form.email, form.password)
             } else {
-                res = await register(form.name, form.email, form.password, form.company)
+                // Check for pending website in localStorage or URL
+                let initialWebsite = scanUrl || ''
+                if (!initialWebsite) {
+                    try {
+                        const pending = JSON.parse(localStorage.getItem('mantram_pending_brand') || '{}')
+                        initialWebsite = pending.website || ''
+                    } catch (e) {}
+                }
+                res = await register(form.name, form.email, form.password, form.company, initialWebsite)
             }
+
 
             // After auth, redirect to intended destination
             let dest = redirect;

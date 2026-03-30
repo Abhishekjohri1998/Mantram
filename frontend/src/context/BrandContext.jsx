@@ -43,20 +43,27 @@ export function BrandProvider({ children }) {
 
                     const currentData = await brandsAPI.list();
                     const currentBrands = (currentData.brands || []).filter(b => b.status !== 'archived');
-                    const existingBrand = pendingWebsite
+                    
+                    // 1. Try to match by website
+                    let targetBrand = pendingWebsite
                         ? currentBrands.find(b => normalizeUrl(b.website) === pendingWebsite)
                         : null;
 
-                    if (existingBrand) {
-                        console.log('🔄 Brand with same website found, updating:', existingBrand.name, '→', pendingBrand.name);
-                        const updated = await brandsAPI.update(existingBrand._id, {
-                            name: pendingBrand.name || existingBrand.name,
-                            website: pendingBrand.website || existingBrand.website,
-                            onboardingMethod: pendingBrand.onboardingMethod || existingBrand.onboardingMethod,
-                            dna: { ...existingBrand.dna, ...pendingBrand.dna },
-                            rawScanData: pendingBrand.rawScanData || existingBrand.rawScanData,
+                    // 2. Fallback: If only one brand exists (new account) and it has no website, use it
+                    if (!targetBrand && currentBrands.length === 1 && !currentBrands[0].website) {
+                        targetBrand = currentBrands[0];
+                    }
+
+                    if (targetBrand) {
+                        console.log('🔄 Reconciling pending data into brand:', targetBrand.name);
+                        const updated = await brandsAPI.update(targetBrand._id, {
+                            name: pendingBrand.name || targetBrand.name,
+                            website: pendingBrand.website || targetBrand.website,
+                            onboardingMethod: pendingBrand.onboardingMethod || targetBrand.onboardingMethod,
+                            dna: { ...targetBrand.dna, ...pendingBrand.dna },
+                            rawScanData: pendingBrand.rawScanData || targetBrand.rawScanData,
                         });
-                        if (updated.brand) console.log('✅ Existing brand updated:', updated.brand.name);
+                        if (updated.brand) console.log('✅ Brand reconciled successfully:', updated.brand.name);
                     } else {
                         const saved = await brandsAPI.create({
                             name: pendingBrand.name,
@@ -65,8 +72,9 @@ export function BrandProvider({ children }) {
                             dna: pendingBrand.dna,
                             rawScanData: pendingBrand.rawScanData,
                         });
-                        if (saved.brand) console.log('✅ New brand created:', saved.brand.name);
+                        if (saved.brand) console.log('✅ New brand created from pending scan:', saved.brand.name);
                     }
+
                     
                     // CRITICAL: Refresh user to update brandCount in AuthContext
                     if (refreshUser) {

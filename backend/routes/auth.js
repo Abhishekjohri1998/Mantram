@@ -33,7 +33,8 @@ function requireDB(req, res) {
 router.post('/register', async (req, res) => {
     if (!requireDB(req, res)) return;
     try {
-        const { name, email, password, company } = req.body;
+        // POST /api/auth/register
+        const { name, email, password, company, initialWebsite } = req.body;
 
         // Input validation
         if (!name || name.trim().length < 2) {
@@ -85,20 +86,21 @@ router.post('/register', async (req, res) => {
             approvalStatus: 'approved',
             queueNumber,
             milestones: {
-                addedBrand: !!company
+                addedBrand: !!(company || initialWebsite)
             }
         });
         
-        // Auto-create initial brand if company is provided
-        if (company) {
+        // Auto-create initial brand if company or initialWebsite is provided
+        if (company || initialWebsite) {
             try {
                 // Detect if company input is a URL (e.g. example.com, www.test.in)
-                const isUrl = /^(https?:\/\/)?([\da-z.-]+)\.([a-z.]{2,6})([/\w .-]*)*\/?$/.test(company.trim());
-                let websiteUrl = '';
-                let brandName = company;
+                const companyTrim = company ? company.trim() : '';
+                const isUrl = companyTrim && /^(https?:\/\/)?([\da-z.-]+)\.([a-z.]{2,6})([/\w .-]*)*\/?$/.test(companyTrim);
+                let websiteUrl = initialWebsite || '';
+                let brandName = company || (initialWebsite ? initialWebsite.split('.')[0].replace(/^https?:\/\//, '').replace(/^www\./, '') : 'New Brand');
 
-                if (isUrl) {
-                    websiteUrl = company.trim();
+                if (isUrl && !websiteUrl) {
+                    websiteUrl = companyTrim;
                     if (!/^https?:\/\//i.test(websiteUrl)) websiteUrl = `https://${websiteUrl}`;
                     // Extract clean name from URL if possible
                     try {
@@ -117,14 +119,15 @@ router.post('/register', async (req, res) => {
                     onboardingMethod: 'website',
                     status: 'active',
                     dna: {
-                        brandDescription: `Brand automatically created for ${company} during registration. ${isUrl ? '[Website detected]' : ''}`
+                        brandDescription: `Brand automatically created for ${brandName} during registration. ${isUrl || initialWebsite ? '[Website detected]' : ''}`
                     }
                 });
-                console.log(`✨ Auto-created initial brand for: ${user.email} (${brandName}) ${isUrl ? '[with website]' : ''}`);
+                console.log(`✨ Auto-created initial brand for: ${user.email} (${brandName}) ${websiteUrl ? '[with website]' : ''}`);
             } catch (brandErr) {
                 console.error('⚠️ Failed to auto-create initial brand:', brandErr.message);
             }
         }
+
 
         
         // Update waitlist status if exists

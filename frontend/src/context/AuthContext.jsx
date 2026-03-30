@@ -29,9 +29,10 @@ export function AuthProvider({ children }) {
         return { ...data, user: profileData.user };
     };
 
-    const register = async (name, email, password, company) => {
-        const data = await authAPI.register({ name, email, password, company });
+    const register = async (name, email, password, company, initialWebsite) => {
+        const data = await authAPI.register({ name, email, password, company, initialWebsite });
         // If registration leads to immediate login (auto-approve)
+
         if (data.token) {
             setToken(data.token);
             const profileData = await authAPI.getProfile();
