@@ -92,20 +92,40 @@ router.post('/register', async (req, res) => {
         // Auto-create initial brand if company is provided
         if (company) {
             try {
+                // Detect if company input is a URL (e.g. example.com, www.test.in)
+                const isUrl = /^(https?:\/\/)?([\da-z.-]+)\.([a-z.]{2,6})([/\w .-]*)*\/?$/.test(company.trim());
+                let websiteUrl = '';
+                let brandName = company;
+
+                if (isUrl) {
+                    websiteUrl = company.trim();
+                    if (!/^https?:\/\//i.test(websiteUrl)) websiteUrl = `https://${websiteUrl}`;
+                    // Extract clean name from URL if possible
+                    try {
+                        const urlObj = new URL(websiteUrl);
+                        brandName = urlObj.hostname.replace(/^www\./, '').split('.')[0];
+                        brandName = brandName.charAt(0).toUpperCase() + brandName.slice(1);
+                    } catch (e) {
+                        brandName = company;
+                    }
+                }
+
                 await Brand.create({
                     user: user._id,
-                    name: company,
+                    name: brandName,
+                    website: websiteUrl,
                     onboardingMethod: 'website',
                     status: 'active',
                     dna: {
-                        brandDescription: `Brand automatically created for ${company} during registration.`
+                        brandDescription: `Brand automatically created for ${company} during registration. ${isUrl ? '[Website detected]' : ''}`
                     }
                 });
-                console.log(`✨ Auto-created initial brand for: ${user.email} (${company})`);
+                console.log(`✨ Auto-created initial brand for: ${user.email} (${brandName}) ${isUrl ? '[with website]' : ''}`);
             } catch (brandErr) {
                 console.error('⚠️ Failed to auto-create initial brand:', brandErr.message);
             }
         }
+
         
         // Update waitlist status if exists
         await Waitlist.findOneAndUpdate({ email: email.toLowerCase() }, { status: 'registered' });

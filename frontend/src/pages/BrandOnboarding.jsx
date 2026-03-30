@@ -232,7 +232,7 @@ function FileUpload({ onComplete, onBack }) {
     const [files, setFiles] = useState([])
     const [brandName, setBrandName] = useState('')
     const [industry, setIndustry] = useState('')
-    const [country, setCountry] = useState('India')
+    const [website, setWebsite] = useState('')
     const [uploading, setUploading] = useState(false)
     const [error, setError] = useState(null)
 
@@ -247,8 +247,10 @@ function FileUpload({ onComplete, onBack }) {
         setUploading(true)
         setError(null)
         try {
+            const normalizedWebsite = website.trim() ? (website.startsWith('http') ? website : `https://${website}`) : ''
             const data = await brandsAPI.create({
                 name: brandName,
+                website: normalizedWebsite,
                 onboardingMethod: 'upload',
                 dna: {
                     industry,
@@ -257,6 +259,7 @@ function FileUpload({ onComplete, onBack }) {
                 },
             })
             onComplete(data.brand)
+
         } catch (err) {
             setUploading(false)
             setError({
@@ -276,8 +279,12 @@ function FileUpload({ onComplete, onBack }) {
             <p className="text-slate-400 mb-8">Upload your logo, brand guidelines, or any brand-related content.</p>
 
             <div className="space-y-6">
-                <input value={brandName} onChange={e => setBrandName(e.target.value)} placeholder="Brand Name *" className="input-glass w-full py-3 text-lg" autoFocus />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <input value={brandName} onChange={e => setBrandName(e.target.value)} placeholder="Brand Name *" className="input-glass w-full py-3 text-lg" autoFocus />
+                    <input value={website} onChange={e => setWebsite(e.target.value)} placeholder="Website (e.g., example.com)" className="input-glass w-full py-3 text-lg" />
+                </div>
                 <input value={industry} onChange={e => setIndustry(e.target.value)} placeholder="Industry (e.g., Technology, Fashion, Food)" className="input-glass w-full py-3" />
+
 
                 {/* Country Picker */}
                 <div>
@@ -345,11 +352,13 @@ function FileUpload({ onComplete, onBack }) {
 function Brainstorm({ onComplete, onBack }) {
     const [step, setStep] = useState(0)
     const [brandName, setBrandName] = useState('')
+    const [website, setWebsite] = useState('')
     const [industry, setIndustry] = useState('')
     const [country, setCountry] = useState('India')
     const [description, setDescription] = useState('')
     const [targetAudience, setTargetAudience] = useState('')
     const [keywords, setKeywords] = useState([])
+
     const [keywordInput, setKeywordInput] = useState('')
     const [personality, setPersonality] = useState('')
     const [hasLogo, setHasLogo] = useState(null)
@@ -448,10 +457,12 @@ function Brainstorm({ onComplete, onBack }) {
             const brandData = {
                 ...suggestion,
                 name: brandName,
+                website: website.trim() ? (website.startsWith('http') ? website : `https://${website}`) : '',
                 industry,
                 country,
                 logoUrl: generatedLogo || '',
             }
+
             const data = await agents.saveBrainstorm(brandData)
             onComplete(data.brand)
         } catch (err) {
@@ -485,12 +496,21 @@ function Brainstorm({ onComplete, onBack }) {
             {/* Step 0: Brand Name & Industry */}
             {step === 0 && (
                 <div className="space-y-6 animate-fade-in">
-                    <div>
-                        <label className="text-sm text-slate-500 uppercase tracking-widest font-bold mb-2 block">What's your brand name? *</label>
-                        <input value={brandName} onChange={e => setBrandName(e.target.value)}
-                            placeholder="e.g., Nike, Apple, Zara" className="input-glass w-full py-4 text-lg" autoFocus />
-                        <p className="text-xs text-slate-600 mt-1">This is what customers will know you as</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label className="text-sm text-slate-500 uppercase tracking-widest font-bold mb-2 block">What's your brand name? *</label>
+                            <input value={brandName} onChange={e => setBrandName(e.target.value)}
+                                placeholder="e.g., Nike, Apple, Zara" className="input-glass w-full py-4 text-lg" autoFocus />
+                            <p className="text-xs text-slate-600 mt-1">This is what customers will know you as</p>
+                        </div>
+                        <div>
+                            <label className="text-sm text-slate-500 uppercase tracking-widest font-bold mb-2 block">Website (Optional)</label>
+                            <input value={website} onChange={e => setWebsite(e.target.value)}
+                                placeholder="e.g., example.com" className="input-glass w-full py-4 text-lg" />
+                            <p className="text-xs text-slate-600 mt-1">Used for SEO and performance analysis</p>
+                        </div>
                     </div>
+
                     <div>
                         <label className="text-sm text-slate-500 uppercase tracking-widest font-bold mb-2 block">Industry *</label>
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">

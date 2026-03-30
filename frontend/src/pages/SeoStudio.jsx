@@ -1087,9 +1087,28 @@ small{color:#94a3b8;font-size:10px}
                                 style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', boxShadow: '0 2px 12px rgba(99,102,241,0.25)' }}>
                                 <span className="material-symbols-outlined text-white text-lg">travel_explore</span>
                             </div>
-                            <div className="min-w-0 mr-2">
+                            <div className="min-w-0 mr-2 group relative">
                                 <h2 className="text-sm font-bold text-white truncate">{activeBrand.name}</h2>
-                                <p className="text-[10px] text-slate-500 truncate flex items-center gap-1"><span className="w-1 h-1 rounded-full bg-emerald-400" />{website || 'No website'}</p>
+                                {website ? (
+                                    <p className="text-[10px] text-slate-500 truncate flex items-center gap-1">
+                                        <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
+                                        {website}
+                                    </p>
+                                ) : (
+                                    <button 
+                                        onClick={() => {
+                                            const url = prompt('Enter your website URL (e.g. example.com):');
+                                            if (url) {
+                                                const normalized = url.startsWith('http') ? url : `https://${url}`;
+                                                updateBrand({ website: normalized }).catch(e => alert(e.message));
+                                            }
+                                        }}
+                                        className="text-[10px] font-bold text-primary flex items-center gap-1 hover:text-primary/80 transition-all cursor-pointer bg-primary/10 px-1.5 py-0.5 rounded leading-none"
+                                    >
+                                        <span className="material-symbols-outlined text-[10px]">add_link</span>
+                                        Add Website
+                                    </button>
+                                )}
                             </div>
                             <div className="flex-1 flex items-center gap-2 rounded-xl px-3 py-2" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
                                 <span className="material-symbols-outlined text-violet-400 text-sm">auto_awesome</span>
@@ -1099,6 +1118,7 @@ small{color:#94a3b8;font-size:10px}
                                     className="px-3 py-1 rounded-lg text-[10px] font-bold cursor-pointer disabled:opacity-30 transition-all"
                                     style={{ background: askQuery.trim() ? 'linear-gradient(135deg, #6366f1, #8b5cf6)' : 'rgba(255,255,255,0.03)', color: askQuery.trim() ? 'white' : '#475569' }}>Ask</button>
                             </div>
+
                             <StudioReportButton studio="seo" brandId={activeBrand?._id} />
                             <button onClick={() => setShowGuide(!showGuide)} title="How It Works"
                                 className={`size-9 rounded-xl flex items-center justify-center cursor-pointer transition-all ${showGuide ? 'bg-primary/20 text-primary' : 'bg-white/[0.04] border border-white/[0.06] text-slate-500 hover:text-white hover:bg-white/[0.08]'}`}>

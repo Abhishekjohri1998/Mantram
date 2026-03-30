@@ -157,12 +157,18 @@ router.put('/:id', protect, async (req, res) => {
         );
         if (!brand) return res.status(404).json({ success: false, error: 'Brand not found' });
 
-        await logAudit(brand, req.user, 'dna_updated', {
-            summary: `Brand settings updated`,
-            changes: { updatedFields: Object.keys(req.body) },
-        });
+        // If website is added/updated, trigger SEO baseline audit in background
+        if (req.body.website && (req.body.website !== brand.website)) {
+            import('../services/seoBaseline.js').then(async ({ runSEOBaseline }) => {
+                try {
+                    await runSEOBaseline(brand);
+                    console.log(`✅ SEO Baseline auto-triggered for ${brand.name} following website update.`);
+                } catch (e) { console.warn('⚠️ Background SEO Baseline failed after website update:', e.message); }
+            });
+        }
 
         res.json({ success: true, brand });
+
     } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
