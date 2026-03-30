@@ -223,6 +223,9 @@ router.post('/advanced/generate', protect, requireCredits('videoGenerate'), asyn
             generateAudio, qualityMode, brandId,
         } = req.body;
 
+        // 🔍 DIAGNOSTIC: Log start of handler
+        console.log(`🎬 [ADVANCED] Start generate for User: ${req.user.email} | Model: ${model || 'kling-3.0'} | Duration: ${duration || 5}s`);
+
         if (!prompt || !prompt.trim()) {
             return res.status(400).json({ success: false, error: 'Prompt is required' });
         }

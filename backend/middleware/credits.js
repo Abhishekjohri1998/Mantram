@@ -171,17 +171,16 @@ export const requireCredits = (actionOrCost = 1) => {
             }
             req.providerMultiplier = providerMultiplier;
 
-            // Bypass credit checks ONLY for superadmins
-            const isSuperAdmin = user.role === 'superadmin' || user.plan === 'enterprise';
-
+            // Bypass credit checks for Superadmins and Enterprise early
+            const isSuperAdmin = user.role === 'superadmin' || user.role === 'admin' || user.plan === 'enterprise';
             if (isSuperAdmin) {
-                // Log usage (fire-and-forget) – don't block superadmins
+                console.log(`🛡️ [CREDITS] ${user.email} (Role: ${user.role}, Plan: ${user.plan}) is bypassing credits for "${actionName}" (Cost: ${cost})`);
                 CreditUsage.create({
                     user: new mongoose.Types.ObjectId(user._id),
                     action: actionName || 'unknown',
                     cost,
                     balanceAfter: Infinity,
-                    description: (ACTION_LABELS[actionName] || actionName || 'AI Operation') + ' (Superadmin Bypass)',
+                    description: (ACTION_LABELS[actionName] || actionName || 'AI Operation') + ' (Admin Bypass)',
                     metadata: {
                         route: req.originalUrl,
                         brandId: req.body?.brandId || req.params?.brandId,
@@ -194,13 +193,13 @@ export const requireCredits = (actionOrCost = 1) => {
                 return next();
             }
 
-
             // Include topUp credits if not expired
             const topUp = (user.credits?.topUp > 0 && user.credits?.topUpExpiry && new Date(user.credits.topUpExpiry) > new Date())
                 ? user.credits.topUp : 0;
             const remaining = (user.credits?.total || 0) + (user.credits?.bonus || 0) + topUp - (user.credits?.used || 0);
 
             if (remaining < cost) {
+                console.warn(`❌ [CREDITS] ${user.email} (Remaining: ${remaining}) has insufficient credits for "${actionName}" (Cost: ${cost} | Mult: ${providerMultiplier}x)`);
                 return res.status(403).json({
                     success: false,
                     error: 'Insufficient credits',

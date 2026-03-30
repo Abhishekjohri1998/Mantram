@@ -19,10 +19,10 @@ async function api(path, opts = {}) {
 
 /* ── Models ── */
 const MODELS = {
-    'seedance-2.0': { id: 'seedance-2.0', name: 'Seedance 2.0', icon: '🎞️', dur: [4, 15], ratios: ['16:9', '9:16', '1:1', '4:3', '21:9'], has: { firstFrame: true, refImages: true, refVideo: true, refAudio: true, audio: true }, cost: 0.08 },
+    'seedance-2.0': { id: 'seedance-2.0', name: 'Seedance 2.0', icon: '🎞️', dur: [5, 15], ratios: ['16:9', '9:16', '1:1', '4:3', '21:9'], has: { firstFrame: true, refImages: true, refVideo: true, audio: true }, cost: 0.05 },
     'kling-3.0': { id: 'kling-3.0', name: 'Kling 3.0', icon: '🎥', dur: [3, 15], ratios: ['16:9', '9:16', '1:1'], has: { firstFrame: true, lastFrame: true, audio: true }, cost: 0.07 },
-    'veo-3.1': { id: 'veo-3.1', name: 'Veo 3.1', icon: '🎬', dur: [4, 8], ratios: ['16:9', '9:16'], has: { firstFrame: true, lastFrame: true, refImages: true, audio: true }, cost: 0.15 },
-    'veo-3.1-fast': { id: 'veo-3.1-fast', name: 'Veo 3.1 Fast', icon: '⚡', dur: [4, 8], ratios: ['16:9', '9:16'], has: { firstFrame: true, refImages: true, audio: true }, cost: 0.08 },
+    'veo-3.1': { id: 'veo-3.1', name: 'Veo 3.1', icon: '🎬', dur: [5, 8], ratios: ['16:9', '9:16'], has: { firstFrame: true, lastFrame: true, refImages: true, audio: true }, cost: 0.10 },
+    'veo-3.1-fast': { id: 'veo-3.1-fast', name: 'Veo 3.1 Fast', icon: '⚡', dur: [5, 8], ratios: ['16:9', '9:16'], has: { firstFrame: true, refImages: true, audio: true }, cost: 0.06 },
     'seedance-1.0': { id: 'seedance-1.0', name: 'Seedance 1.0', icon: '🌱', dur: [5, 10], ratios: ['16:9', '9:16', '1:1', '4:3'], has: { firstFrame: true, lastFrame: true }, cost: 0.05 },
     'grok-imagine': { id: 'grok-imagine', name: 'Grok Imagine', icon: '🤖', dur: [1, 15], ratios: ['16:9', '9:16', '1:1'], has: { firstFrame: true }, cost: 0.08 },
 }
@@ -269,7 +269,9 @@ export default function AdvancedMode({ activeBrand, initialData }) {
     const promptRef = useRef(null)
 
     const m = MODELS[model] || MODELS['seedance-2.0']
-    const credits = Math.ceil(m.cost * duration * 30)
+    // Sync with backend: credits = Math.max(Math.ceil(usd * 70), 5)
+    // where usd = costPerSec * duration
+    const credits = Math.max(Math.ceil(m.cost * (quality === 'quality' ? 2 : 1) * duration * 70), 5)
 
     // ── Refill from initialData (history re-use) ──
     useEffect(() => {
