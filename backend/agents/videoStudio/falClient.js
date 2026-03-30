@@ -1,5 +1,11 @@
 /**
  * Video Generation Client — Multi-provider SDK wrapper + cost calculator
+ *
+ * seedance-2.0 cascade order:
+ *   1. LaoZhang seedance-2.0  (cheapest, synchronous)
+ *   2. LaoZhang veo-3.1-fast  (reliable fallback, synchronous)
+ *   3. kie.ai   seedance-2.0  (async/polling, returns taskId, always works)
+ *   4. PiAPI    seedance-2.0  (last resort, requires credits)
  */
 
 import config from '../../config/env.js';
@@ -12,12 +18,12 @@ const FAL_BASE_URL = 'https://queue.fal.run';
 const GROK_BASE_URL = 'https://api.x.ai/v1';
 
 const MODEL_ENDPOINTS = {
-    'kling-3.0': { textToVideo: 'fal-ai/kling-video/v3/standard/text-to-video', imageToVideo: 'fal-ai/kling-video/v3/standard/image-to-video' },
-    'veo-3.1': { textToVideo: 'fal-ai/veo3', imageToVideo: 'fal-ai/veo3/image-to-video', extendVideo: 'fal-ai/veo3.1/extend-video' },
-    'veo-3.1-fast': { textToVideo: 'fal-ai/veo3/fast', imageToVideo: 'fal-ai/veo3/fast/image-to-video', extendVideo: 'fal-ai/veo3.1/fast/extend-video' },
-    'seedance-1.0': { textToVideo: 'fal-ai/bytedance/seedance/v1/lite/text-to-video', imageToVideo: 'fal-ai/bytedance/seedance/v1/lite/image-to-video' },
-    'seedance-2.0': { textToVideo: 'fal-ai/bytedance/seedance/v2/pro/text-to-video', imageToVideo: 'fal-ai/bytedance/seedance/v2/pro/image-to-video' },
-    'hunyuan': { textToVideo: 'fal-ai/hunyuan-video/video-to-video', imageToVideo: 'fal-ai/hunyuan-video/image-to-video' },
+    'kling-3.0':   { textToVideo: 'fal-ai/kling-video/v3/standard/text-to-video', imageToVideo: 'fal-ai/kling-video/v3/standard/image-to-video' },
+    'veo-3.1':     { textToVideo: 'fal-ai/veo3', imageToVideo: 'fal-ai/veo3/image-to-video', extendVideo: 'fal-ai/veo3.1/extend-video' },
+    'veo-3.1-fast':{ textToVideo: 'fal-ai/veo3/fast', imageToVideo: 'fal-ai/veo3/fast/image-to-video', extendVideo: 'fal-ai/veo3.1/fast/extend-video' },
+    'seedance-1.0':{ textToVideo: 'fal-ai/bytedance/seedance/v1/lite/text-to-video', imageToVideo: 'fal-ai/bytedance/seedance/v1/lite/image-to-video' },
+    'seedance-2.0':{ textToVideo: 'fal-ai/bytedance/seedance/v2/pro/text-to-video', imageToVideo: 'fal-ai/bytedance/seedance/v2/pro/image-to-video' },
+    'hunyuan':     { textToVideo: 'fal-ai/hunyuan-video/video-to-video', imageToVideo: 'fal-ai/hunyuan-video/image-to-video' },
 };
 
 const MODEL_AVAILABLE = {
@@ -27,25 +33,25 @@ const MODEL_AVAILABLE = {
 };
 
 export const COST_PER_SECOND = {
-    'kling-3.0': { fast: 0.07, quality: 0.12 },
-    'veo-3.1': { fast: 0.10, quality: 0.25 },
-    'veo-3.1-fast': { fast: 0.06, quality: 0.10 },
-    'seedance-1.0': { fast: 0.05, quality: 0.08 },
-    'seedance-2.0': { fast: 0.05, quality: 0.10 },
-    'grok-imagine': { fast: 0.08, quality: 0.08 },
-    'hunyuan': { fast: 0.03, quality: 0.05 },
-    'sora-2': { fast: 0.10, quality: 0.15 },
+    'kling-3.0':   { fast: 0.07, quality: 0.12 },
+    'veo-3.1':     { fast: 0.10, quality: 0.25 },
+    'veo-3.1-fast':{ fast: 0.06, quality: 0.10 },
+    'seedance-1.0':{ fast: 0.05, quality: 0.08 },
+    'seedance-2.0':{ fast: 0.05, quality: 0.10 },
+    'grok-imagine':{ fast: 0.08, quality: 0.08 },
+    'hunyuan':     { fast: 0.03, quality: 0.05 },
+    'sora-2':      { fast: 0.10, quality: 0.15 },
 };
 
 const DURATION_LIMITS = {
-    'kling-3.0': { min: 3, max: 15 },
-    'veo-3.1': { min: 5, max: 8 },
-    'veo-3.1-fast': { min: 5, max: 8 },
-    'seedance-1.0': { min: 5, max: 10 },
-    'seedance-2.0': { min: 5, max: 15 },
-    'grok-imagine': { min: 1, max: 15 },
-    'hunyuan': { min: 3, max: 10 },
-    'sora-2': { min: 5, max: 15 },
+    'kling-3.0':   { min: 3, max: 15 },
+    'veo-3.1':     { min: 5, max: 8  },
+    'veo-3.1-fast':{ min: 5, max: 8  },
+    'seedance-1.0':{ min: 5, max: 10 },
+    'seedance-2.0':{ min: 5, max: 15 },
+    'grok-imagine':{ min: 1, max: 15 },
+    'hunyuan':     { min: 3, max: 10 },
+    'sora-2':      { min: 5, max: 15 },
 };
 
 export const MODEL_CAPABILITIES = {
@@ -152,42 +158,81 @@ function buildPayload(model, { prompt, imageUrl, duration, resolution, mode, sho
     throw new Error(`Unknown fal.ai model: ${model}`);
 }
 
-// ── Cascade for seedance-2.0 on LaoZhang ──────────────────────────────────
-// Priority: seedance-2.0 → veo-3.1-fast (fast & reliable)
-// NOTE: sora_video2 removed from cascade — confirmed hangs >5min in production
-async function tryLaozhangSeedance({ prompt, imageUrl, duration, aspectRatio, generateAudio }) {
-    // Attempt 1: seedance-2.0 on LaoZhang
-    try {
-        const result = await submitLaozhangVideoGeneration({
-            model: 'seedance-2.0', prompt, imageUrl,
-            duration: duration || 5, aspectRatio: aspectRatio || '16:9',
-            generateAudio: generateAudio !== false,
-        });
-        if (result?.videoUrl) {
-            console.log(`✅ [LaoZhang] seedance-2.0 done`);
-            return result.videoUrl;
+// ── Full cascade for seedance-2.0 ───────────────────────────────────────
+// Order: LZ seedance-2.0 → LZ veo-3.1-fast → kie.ai seedance-2.0 → PiAPI
+async function trySeedanceCascade({ prompt, imageUrl, duration, aspectRatio, generateAudio, mode }) {
+    // ─ Step 1: LaoZhang seedance-2.0 (synchronous, cheapest) ─
+    if (isLaozhangAvailable()) {
+        try {
+            const r = await submitLaozhangVideoGeneration({
+                model: 'seedance-2.0', prompt, imageUrl,
+                duration: duration || 5, aspectRatio: aspectRatio || '16:9',
+                generateAudio: generateAudio !== false,
+            });
+            if (r?.videoUrl) {
+                console.log(`✅ [Cascade] Step 1 done: LaoZhang seedance-2.0`);
+                return { videoUrl: r.videoUrl, provider: 'laozhang' };
+            }
+        } catch (e) {
+            console.warn(`⚠️ [Cascade] Step 1 LZ seedance-2.0 failed: ${e.message?.substring(0, 100)}`);
         }
-    } catch (e) {
-        console.warn(`⚠️ [LaoZhang] seedance-2.0 failed (${e.message?.substring(0, 120)}) — cascading to veo-3.1-fast`);
+
+        // ─ Step 2: LaoZhang veo-3.1-fast (synchronous, reliable) ─
+        console.log(`🔁 [Cascade] Step 2: LaoZhang veo-3.1-fast...`);
+        try {
+            const r = await submitLaozhangVideoGeneration({
+                model: 'veo-3.1-fast', prompt, imageUrl: null,
+                duration: Math.min(duration || 5, 8), aspectRatio: aspectRatio || '16:9',
+                generateAudio: generateAudio !== false,
+            });
+            if (r?.videoUrl) {
+                console.log(`✅ [Cascade] Step 2 done: LaoZhang veo-3.1-fast`);
+                return { videoUrl: r.videoUrl, provider: 'laozhang' };
+            }
+        } catch (e) {
+            console.warn(`⚠️ [Cascade] Step 2 LZ veo-3.1-fast failed: ${e.message?.substring(0, 100)}`);
+        }
     }
 
-    // Attempt 2: veo-3.1-fast as fallback (confirmed reliable on LZ, ~30-60s)
-    console.log(`🔁 [LaoZhang] Cascade seedance-2.0 → veo-3.1-fast...`);
+    // ─ Step 3: kie.ai seedance-2.0 (async/polling — always reliable) ─
+    console.log(`🔁 [Cascade] Step 3: kie.ai seedance-2.0 (async)...`);
     try {
-        const result = await submitLaozhangVideoGeneration({
-            model: 'veo-3.1-fast', prompt, imageUrl: null, // veo doesn't support imageUrl same way
-            duration: Math.min(duration || 5, 8), aspectRatio: aspectRatio || '16:9',
-            generateAudio: generateAudio !== false,
+        const kieResult = await submitKieVideoGeneration({
+            model: 'seedance-2.0', prompt,
+            imageUrl: imageUrl || null,
+            duration: duration || 5,
+            aspectRatio: aspectRatio || '16:9',
         });
-        if (result?.videoUrl) {
-            console.log(`✅ [LaoZhang] veo-3.1-fast cascade done`);
-            return result.videoUrl;
+        if (kieResult?.taskId) {
+            console.log(`✅ [Cascade] Step 3 done: kie.ai taskId=${kieResult.taskId}`);
+            // Return as kie async job — status polling will handle completion
+            return { taskId: kieResult.taskId, provider: 'kie', async: true };
         }
     } catch (e) {
-        console.warn(`⚠️ [LaoZhang] veo-3.1-fast cascade failed: ${e.message?.substring(0, 120)}`);
+        console.warn(`⚠️ [Cascade] Step 3 kie.ai failed: ${e.message?.substring(0, 100)}`);
     }
 
-    return null;
+    // ─ Step 4: PiAPI (last resort) ─
+    console.log(`🎮 [Cascade] Step 4: PiAPI last resort...`);
+    try {
+        const piResult = await submitPiApiVideoGeneration({
+            prompt, imageUrl: null, duration,
+            aspectRatio: aspectRatio || '16:9',
+            generateAudio, referenceImages: [], qualityMode: mode || 'fast',
+        });
+        if (piResult?.taskId) {
+            console.log(`✅ [Cascade] Step 4 done: PiAPI taskId=${piResult.taskId}`);
+            return { taskId: piResult.taskId, provider: 'piapi', async: true, _piApiPayload: piResult._payload };
+        }
+    } catch (piErr) {
+        if (piErr.message.startsWith('PiAPI_INSUFFICIENT_CREDITS')) {
+            console.error(`🚫 [Cascade] Step 4 PiAPI: insufficient credits`);
+            throw new Error('All video providers failed: LaoZhang channels are temporarily down and PiAPI has insufficient credits. Please try again in a few minutes.');
+        }
+        throw piErr;
+    }
+
+    throw new Error('All video providers exhausted without a result.');
 }
 
 export async function submitVideoGeneration({ model, prompt, imageUrl, duration, resolution, mode, shots, generateAudio, aspectRatio, referenceImages }) {
@@ -198,39 +243,32 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
         ...(referenceImages || []).map(img => ensureS3Url(img, 'video-studio/references'))
     ]);
 
-    // ── Seedance 2.0: LaoZhang cascade first, PiAPI text-only last resort ──
+    // ── Seedance 2.0: full cascade ──
     if (model === 'seedance-2.0') {
         const lzImageUrl = s3ImageUrl || s3ReferenceImages[0] || null;
+        const result = await trySeedanceCascade({
+            prompt, imageUrl: lzImageUrl, duration, aspectRatio, generateAudio, mode,
+        });
 
-        if (isLaozhangAvailable()) {
-            const videoUrl = await tryLaozhangSeedance({
-                prompt, imageUrl: lzImageUrl, duration, aspectRatio, generateAudio,
-            });
-            if (videoUrl) {
-                return { requestId: `lz-${Date.now()}`, endpoint: 'laozhang-seedance-2.0', provider: 'laozhang', _laozhangVideoUrl: videoUrl };
-            }
+        // Synchronous LaoZhang result — video URL already available
+        if (result.videoUrl) {
+            return { requestId: `lz-${Date.now()}`, endpoint: 'laozhang-seedance-2.0', provider: 'laozhang', _laozhangVideoUrl: result.videoUrl };
         }
 
-        // Last resort: PiAPI — throws immediately on insufficient_credits
-        console.log(`🎮 [PiAPI] Last resort: seedance-2.0 text-to-video (no images)...`);
-        try {
-            const result = await submitPiApiVideoGeneration({
-                prompt, imageUrl: null, duration,
-                aspectRatio: aspectRatio || '16:9',
-                generateAudio, referenceImages: [], qualityMode: mode || 'fast',
-            });
-            return { requestId: result.taskId, endpoint: 'piapi-seedance-2.0', provider: 'piapi', _piApiPayload: result._payload };
-        } catch (piErr) {
-            if (piErr.message.startsWith('PiAPI_INSUFFICIENT_CREDITS')) {
-                throw new Error('Video generation failed: All providers unavailable. LaoZhang seedance channel is down and PiAPI has insufficient credits. Please try again in a few minutes or top up PiAPI at piapi.ai.');
-            }
-            throw piErr;
+        // Async kie.ai result — polling required
+        if (result.provider === 'kie') {
+            return { requestId: result.taskId, endpoint: 'kie-seedance-2.0', provider: 'kie' };
+        }
+
+        // Async PiAPI result — polling required
+        if (result.provider === 'piapi') {
+            return { requestId: result.taskId, endpoint: 'piapi-seedance-2.0', provider: 'piapi', _piApiPayload: result._piApiPayload };
         }
     }
 
-    // ── LaoZhang-First Routing (other LZ-native models) ──
-    const LZ_VIDEO_MODELS = ['sora-2', 'veo-3.1', 'kling-3.0'];
-    if (LZ_VIDEO_MODELS.includes(model) && isLaozhangAvailable()) {
+    // ── LaoZhang-first routing (other LZ-native models) ──
+    const LZ_DIRECT_MODELS = ['sora-2', 'veo-3.1', 'kling-3.0'];
+    if (LZ_DIRECT_MODELS.includes(model) && isLaozhangAvailable()) {
         try {
             console.log(`🏷️ [LaoZhang] Attempting ${model}...`);
             const lzResult = await submitLaozhangVideoGeneration({
@@ -265,7 +303,7 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
         return { requestId: result.taskId, endpoint: `kie-${model}`, provider: 'kie' };
     }
 
-    // ── fal.ai ──
+    // ── fal.ai fallback ──
     const apiKey = getApiKey();
     const endpoints = MODEL_ENDPOINTS[model];
     if (!endpoints) throw new Error(`Unknown video model: ${model}`);
