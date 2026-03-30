@@ -589,6 +589,13 @@ export const superadmin = {
     getPricingMonitor: () => apiFetch('/superadmin/pricing-monitor'),
     triggerPricingCheck: () => apiFetch('/superadmin/pricing-monitor/check', { method: 'POST' }),
     dismissPricingAlerts: () => apiFetch('/superadmin/pricing-monitor/dismiss', { method: 'POST' }),
+
+    // Video Provider Switching
+    getVideoProviders: () => apiFetch('/superadmin/video-providers'),
+    updateVideoProvider: (data) => apiFetch('/superadmin/video-providers', { method: 'PUT', body: JSON.stringify(data) }),
+    addVideoProvider: (data) => apiFetch('/superadmin/video-providers/provider', { method: 'POST', body: JSON.stringify(data) }),
+    modifyVideoProvider: (data) => apiFetch('/superadmin/video-providers/provider', { method: 'PATCH', body: JSON.stringify(data) }),
+    removeVideoProvider: (data) => apiFetch('/superadmin/video-providers/provider', { method: 'DELETE', body: JSON.stringify(data) }),
 };
 
 // ============ Credits API ============

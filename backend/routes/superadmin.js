@@ -980,6 +980,7 @@ const API_PROVIDERS = {
     anthropic: { label: 'Anthropic (Claude)', fields: [{ key: 'apiKey', env: 'ANTHROPIC_API_KEY', label: 'API Key' }], testUrl: 'https://api.anthropic.com/v1/models', testHeader: 'x-api-key', icon: 'smart_toy' },
     grok:      { label: 'xAI (Grok)', fields: [{ key: 'apiKey', env: 'GROK_API_KEY', label: 'API Key' }], testUrl: 'https://api.x.ai/v1/models', testHeader: 'Bearer', icon: 'bolt' },
     piapi:     { label: 'PiAPI (Seedance)', fields: [{ key: 'apiKey', env: 'PIAPI_API_KEY', label: 'API Key' }], testUrl: 'https://api.piapi.ai/api/v1/account', testHeader: 'Bearer', icon: 'movie' },
+    muapi:     { label: 'MuAPI (Seedance)', fields: [{ key: 'apiKey', env: 'MUAPI_API_KEY', label: 'API Key' }], testUrl: 'https://api.muapi.ai/api/v1/predictions/test/result', testHeader: 'x-api-key', icon: 'movie_filter' },
     fal:       { label: 'fal.ai (Kling)', fields: [{ key: 'apiKey', env: 'FAL_API_KEY', label: 'API Key' }], testUrl: 'https://queue.fal.run/fal-ai/fast-sdxl', testHeader: 'Key', icon: 'videocam' },
     heygen:    { label: 'HeyGen (UGC)', fields: [{ key: 'apiKey', env: 'HEYGEN_API_KEY', label: 'API Key' }], testUrl: 'https://api.heygen.com/v2/user/remaining_quota', testHeader: 'x-api-key', icon: 'person_play' },
     kie:       { label: 'kie.ai (Veo)', fields: [{ key: 'apiKey', env: 'KIE_API_KEY', label: 'API Key' }], icon: 'play_circle' },
@@ -1163,6 +1164,401 @@ router.put('/system-settings', async (req, res) => {
     }
 });
 
+// ══════════════════════════════════════════════════════════════
+// VIDEO PROVIDER MANAGEMENT — Global API Switcher
+// Manage ALL video model providers: add, remove, switch, modify
+// ══════════════════════════════════════════════════════════════
+
+// ── Default registry: ALL video models with their known providers ──
+// This serves as the base template; custom providers stored in DB are merged in
+const VIDEO_PROVIDER_REGISTRY = {
+    'seedance-2.0': {
+        name: 'Seedance 2.0 Pro',
+        icon: 'movie_filter',
+        category: 'cinematic',
+        defaultProvider: 'muapi',
+        providers: [
+            { id: 'muapi', name: 'MuAPI', envKey: 'MUAPI_API_KEY', costPerSecond: 0.12, description: 'Primary — reliable, 5/10/15s, async polling', builtIn: true },
+            { id: 'piapi', name: 'PiAPI', envKey: 'PIAPI_API_KEY', costPerSecond: 0.08, description: 'Legacy — intermittent 10000 errors', builtIn: true },
+        ],
+    },
+    'kling-3.0': {
+        name: 'Kling 3.0',
+        icon: 'movie',
+        category: 'motion',
+        defaultProvider: 'fal',
+        providers: [
+            { id: 'fal', name: 'fal.ai', envKey: 'FAL_API_KEY', costPerSecond: 0.07, description: 'Primary — queue-based async, multi-shot + audio', builtIn: true },
+            { id: 'laozhang', name: 'LaoZhang', envKey: 'LAOZHANG_API_KEY', costPerSecond: 0.05, description: 'Cheaper — 503 on some billing channels', builtIn: true },
+        ],
+    },
+    'veo-3.1': {
+        name: 'Google Veo 3.1',
+        icon: 'smart_display',
+        category: 'cinematic',
+        defaultProvider: 'laozhang',
+        providers: [
+            { id: 'laozhang', name: 'LaoZhang', envKey: 'LAOZHANG_API_KEY', costPerSecond: 0.10, description: 'Primary — cheapest, sync return', builtIn: true },
+            { id: 'fal', name: 'fal.ai', envKey: 'FAL_API_KEY', costPerSecond: 0.25, description: 'Fallback — queue-based, higher quality', builtIn: true },
+        ],
+    },
+    'veo-3.1-fast': {
+        name: 'Veo 3.1 Fast',
+        icon: 'bolt',
+        category: 'fast',
+        defaultProvider: 'laozhang',
+        providers: [
+            { id: 'laozhang', name: 'LaoZhang', envKey: 'LAOZHANG_API_KEY', costPerSecond: 0.06, description: 'Primary — cheapest, sync return', builtIn: true },
+            { id: 'kie', name: 'kie.ai', envKey: 'KIE_API_KEY', costPerSecond: 0.08, description: 'Fallback — taskId-based async', builtIn: true },
+        ],
+    },
+    'seedance-1.0': {
+        name: 'Seedance 1.0 Lite',
+        icon: 'play_circle',
+        category: 'budget',
+        defaultProvider: 'fal',
+        providers: [
+            { id: 'fal', name: 'fal.ai', envKey: 'FAL_API_KEY', costPerSecond: 0.05, description: 'Only provider — queue-based async', builtIn: true },
+        ],
+    },
+    'grok-imagine': {
+        name: 'Grok Imagine',
+        icon: 'auto_awesome',
+        category: 'experimental',
+        defaultProvider: 'grok',
+        providers: [
+            { id: 'grok', name: 'xAI (Grok)', envKey: 'GROK_API_KEY', costPerSecond: 0.08, description: 'Native xAI API — fast, 1-15s', builtIn: true },
+        ],
+    },
+    'hunyuan': {
+        name: 'HunyuanVideo',
+        icon: 'palette',
+        category: 'budget',
+        defaultProvider: 'fal',
+        providers: [
+            { id: 'fal', name: 'fal.ai', envKey: 'FAL_API_KEY', costPerSecond: 0.03, description: 'Only provider — cheapest draft tier', builtIn: true },
+        ],
+    },
+    'sora-2': {
+        name: 'Sora 2',
+        icon: 'theaters',
+        category: 'cinematic',
+        defaultProvider: 'laozhang',
+        providers: [
+            { id: 'laozhang', name: 'LaoZhang', envKey: 'LAOZHANG_API_KEY', costPerSecond: 0.10, description: 'Only provider — OpenAI via LZ gateway', builtIn: true },
+        ],
+    },
+};
+
+// Category labels for UI grouping
+const CATEGORY_LABELS = {
+    cinematic: { label: 'Cinematic', color: 'violet', icon: 'theaters' },
+    motion: { label: 'Motion & Action', color: 'cyan', icon: 'animation' },
+    fast: { label: 'Fast & Affordable', color: 'emerald', icon: 'bolt' },
+    budget: { label: 'Budget & Draft', color: 'amber', icon: 'savings' },
+    experimental: { label: 'Experimental', color: 'rose', icon: 'science' },
+};
+
+/**
+ * Merge default registry with custom providers stored in DB
+ * Custom providers are stored in SystemSettings under 'video_provider_custom'
+ */
+async function getMergedProviderRegistry() {
+    const customProviders = await getSetting('video_provider_custom', {});
+    const merged = {};
+
+    // Start with defaults
+    for (const [modelId, config] of Object.entries(VIDEO_PROVIDER_REGISTRY)) {
+        merged[modelId] = {
+            ...config,
+            providers: [...config.providers],
+        };
+    }
+
+    // Merge in custom entries
+    for (const [modelId, customData] of Object.entries(customProviders)) {
+        if (!merged[modelId]) {
+            // Entirely new model added by admin
+            merged[modelId] = {
+                name: customData.name || modelId,
+                icon: customData.icon || 'movie',
+                category: customData.category || 'experimental',
+                defaultProvider: customData.defaultProvider || customData.providers?.[0]?.id,
+                providers: [],
+            };
+        }
+        // Merge custom providers into the model
+        if (customData.providers) {
+            for (const cp of customData.providers) {
+                const existing = merged[modelId].providers.findIndex(p => p.id === cp.id);
+                if (existing >= 0) {
+                    // Update existing (custom overrides built-in fields like cost/description)
+                    merged[modelId].providers[existing] = { ...merged[modelId].providers[existing], ...cp };
+                } else {
+                    // Add new provider
+                    merged[modelId].providers.push({ ...cp, builtIn: false });
+                }
+            }
+        }
+        // Remove providers marked for deletion
+        if (customData.removedProviders) {
+            merged[modelId].providers = merged[modelId].providers.filter(
+                p => !customData.removedProviders.includes(p.id)
+            );
+        }
+        // Override default provider if set
+        if (customData.defaultProvider) {
+            merged[modelId].defaultProvider = customData.defaultProvider;
+        }
+    }
+
+    return merged;
+}
+
+// GET /superadmin/video-providers — list ALL models with their providers + active selection
+router.get('/video-providers', async (req, res) => {
+    try {
+        const registry = await getMergedProviderRegistry();
+        const providerRoutes = await getSetting('video_provider_routes', {});
+        const storedKeys = await getSetting('api_keys', {});
+
+        const models = Object.entries(registry).map(([modelId, config]) => {
+            const activeProvider = providerRoutes[modelId]?.active || config.defaultProvider;
+            const lastSwitched = providerRoutes[modelId]?.updatedAt || null;
+
+            const providers = config.providers.map(p => {
+                const dbKey = storedKeys[p.id]?.apiKey;
+                const envKey = process.env[p.envKey || ''];
+                return {
+                    id: p.id,
+                    name: p.name,
+                    envKey: p.envKey || '',
+                    costPerSecond: p.costPerSecond || 0,
+                    description: p.description || '',
+                    hasKey: !!(dbKey || envKey),
+                    keySource: dbKey ? 'database' : envKey ? 'env' : 'none',
+                    isActive: p.id === activeProvider,
+                    builtIn: p.builtIn !== false,
+                };
+            });
+
+            return {
+                id: modelId,
+                name: config.name,
+                icon: config.icon || 'movie',
+                category: config.category || 'experimental',
+                activeProvider,
+                lastSwitched,
+                providers,
+                multiProvider: providers.length > 1,
+            };
+        });
+
+        res.json({ success: true, models, categories: CATEGORY_LABELS });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// PUT /superadmin/video-providers — switch active provider for a model
+router.put('/video-providers', async (req, res) => {
+    try {
+        const { modelId, provider } = req.body;
+        if (!modelId || !provider) return res.status(400).json({ success: false, error: 'modelId and provider required' });
+
+        const registry = await getMergedProviderRegistry();
+        const modelConfig = registry[modelId];
+        if (!modelConfig) return res.status(400).json({ success: false, error: `Unknown model: ${modelId}` });
+
+        const validProvider = modelConfig.providers.find(p => p.id === provider);
+        if (!validProvider) return res.status(400).json({ success: false, error: `Unknown provider '${provider}' for '${modelId}'. Available: ${modelConfig.providers.map(p => p.id).join(', ')}` });
+
+        // Verify API key exists
+        const storedKeys = await getSetting('api_keys', {});
+        const hasKey = !!(storedKeys[provider]?.apiKey || process.env[validProvider.envKey || '']);
+        if (!hasKey) return res.status(400).json({ success: false, error: `No API key configured for ${validProvider.name}. Add it in API Key Management first.` });
+
+        // Update the routes
+        const providerRoutes = await getSetting('video_provider_routes', {});
+        providerRoutes[modelId] = { active: provider, updatedAt: new Date(), updatedBy: req.user._id };
+        await setSetting('video_provider_routes', providerRoutes, req.user._id);
+
+        await logAudit(req, {
+            action: 'SWITCH_VIDEO_PROVIDER',
+            targetModel: 'SystemSettings',
+            targetId: modelId,
+            severity: 'high',
+            metadata: { modelId, provider, providerName: validProvider.name },
+        });
+
+        console.log(`🔀 [SuperAdmin] Video provider switched: ${modelId} → ${validProvider.name} (${provider}) by ${req.user.email}`);
+        res.json({ success: true, message: `${modelConfig.name} now using ${validProvider.name}`, modelId, provider });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// POST /superadmin/video-providers/provider — add a new provider to a model
+router.post('/video-providers/provider', async (req, res) => {
+    try {
+        const { modelId, providerId, providerName, envKey, costPerSecond, description } = req.body;
+        if (!modelId || !providerId || !providerName) {
+            return res.status(400).json({ success: false, error: 'modelId, providerId, and providerName are required' });
+        }
+
+        // Validate providerId format (alphanumeric + hyphens only)
+        if (!/^[a-z0-9-]+$/.test(providerId)) {
+            return res.status(400).json({ success: false, error: 'providerId must be lowercase alphanumeric with hyphens (e.g., "my-provider")' });
+        }
+
+        // Check for conflicts with built-in providers
+        const registry = await getMergedProviderRegistry();
+        const modelConfig = registry[modelId];
+        if (modelConfig) {
+            const existing = modelConfig.providers.find(p => p.id === providerId);
+            if (existing?.builtIn) {
+                return res.status(400).json({ success: false, error: `Cannot add provider '${providerId}' — conflicts with built-in provider. Use PATCH to modify it.` });
+            }
+        }
+
+        // Store in custom providers
+        const customProviders = await getSetting('video_provider_custom', {});
+        if (!customProviders[modelId]) {
+            customProviders[modelId] = { providers: [] };
+        }
+        if (!customProviders[modelId].providers) {
+            customProviders[modelId].providers = [];
+        }
+
+        // Remove from removed list if it was previously removed
+        if (customProviders[modelId].removedProviders) {
+            customProviders[modelId].removedProviders = customProviders[modelId].removedProviders.filter(id => id !== providerId);
+        }
+
+        // Remove existing entry with same ID and add new
+        customProviders[modelId].providers = customProviders[modelId].providers.filter(p => p.id !== providerId);
+        customProviders[modelId].providers.push({
+            id: providerId,
+            name: providerName,
+            envKey: envKey || `${providerId.toUpperCase().replace(/-/g, '_')}_API_KEY`,
+            costPerSecond: parseFloat(costPerSecond) || 0,
+            description: description || `Custom provider: ${providerName}`,
+            builtIn: false,
+            addedAt: new Date(),
+            addedBy: req.user._id,
+        });
+
+        await setSetting('video_provider_custom', customProviders, req.user._id);
+
+        await logAudit(req, {
+            action: 'ADD_VIDEO_PROVIDER',
+            targetModel: 'SystemSettings',
+            targetId: `${modelId}/${providerId}`,
+            severity: 'medium',
+            metadata: { modelId, providerId, providerName },
+        });
+
+        console.log(`➕ [SuperAdmin] Provider added: ${providerName} (${providerId}) → ${modelId} by ${req.user.email}`);
+        res.json({ success: true, message: `${providerName} added to ${modelConfig?.name || modelId}` });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// PATCH /superadmin/video-providers/provider — modify an existing provider's details
+router.patch('/video-providers/provider', async (req, res) => {
+    try {
+        const { modelId, providerId, updates } = req.body;
+        if (!modelId || !providerId || !updates) {
+            return res.status(400).json({ success: false, error: 'modelId, providerId, and updates required' });
+        }
+
+        const allowedFields = ['name', 'envKey', 'costPerSecond', 'description'];
+        const filtered = {};
+        for (const key of allowedFields) {
+            if (updates[key] !== undefined) filtered[key] = updates[key];
+        }
+        if (Object.keys(filtered).length === 0) {
+            return res.status(400).json({ success: false, error: `No valid fields to update. Allowed: ${allowedFields.join(', ')}` });
+        }
+
+        const customProviders = await getSetting('video_provider_custom', {});
+        if (!customProviders[modelId]) customProviders[modelId] = { providers: [] };
+        if (!customProviders[modelId].providers) customProviders[modelId].providers = [];
+
+        // Find existing custom entry or create override for built-in
+        const idx = customProviders[modelId].providers.findIndex(p => p.id === providerId);
+        if (idx >= 0) {
+            customProviders[modelId].providers[idx] = { ...customProviders[modelId].providers[idx], ...filtered };
+        } else {
+            // Create an override entry (will merge with built-in on read)
+            customProviders[modelId].providers.push({ id: providerId, ...filtered });
+        }
+
+        await setSetting('video_provider_custom', customProviders, req.user._id);
+
+        await logAudit(req, {
+            action: 'MODIFY_VIDEO_PROVIDER',
+            targetModel: 'SystemSettings',
+            targetId: `${modelId}/${providerId}`,
+            severity: 'medium',
+            metadata: { modelId, providerId, updates: filtered },
+        });
+
+        res.json({ success: true, message: `Provider ${providerId} updated for ${modelId}` });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// DELETE /superadmin/video-providers/provider — remove a provider from a model
+router.delete('/video-providers/provider', async (req, res) => {
+    try {
+        const { modelId, providerId } = req.body;
+        if (!modelId || !providerId) {
+            return res.status(400).json({ success: false, error: 'modelId and providerId required' });
+        }
+
+        // Check if it's the currently active provider
+        const providerRoutes = await getSetting('video_provider_routes', {});
+        if (providerRoutes[modelId]?.active === providerId) {
+            return res.status(400).json({ success: false, error: 'Cannot remove the currently active provider. Switch to another provider first.' });
+        }
+
+        const customProviders = await getSetting('video_provider_custom', {});
+        if (!customProviders[modelId]) customProviders[modelId] = {};
+
+        // Check if built-in — can only "hide" it, not truly delete
+        const builtIn = VIDEO_PROVIDER_REGISTRY[modelId]?.providers?.find(p => p.id === providerId);
+        if (builtIn) {
+            // Mark as removed (hides it from UI, won't be routed)
+            if (!customProviders[modelId].removedProviders) customProviders[modelId].removedProviders = [];
+            if (!customProviders[modelId].removedProviders.includes(providerId)) {
+                customProviders[modelId].removedProviders.push(providerId);
+            }
+        } else {
+            // Custom provider — truly remove
+            if (customProviders[modelId].providers) {
+                customProviders[modelId].providers = customProviders[modelId].providers.filter(p => p.id !== providerId);
+            }
+        }
+
+        await setSetting('video_provider_custom', customProviders, req.user._id);
+
+        await logAudit(req, {
+            action: 'REMOVE_VIDEO_PROVIDER',
+            targetModel: 'SystemSettings',
+            targetId: `${modelId}/${providerId}`,
+            severity: 'high',
+            metadata: { modelId, providerId, wasBuiltIn: !!builtIn },
+        });
+
+        console.log(`➖ [SuperAdmin] Provider removed: ${providerId} from ${modelId} by ${req.user.email}`);
+        res.json({ success: true, message: `Provider ${providerId} removed${builtIn ? ' (hidden — can be re-added)' : ''}` });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
 // ══════════════════════════════════════════════════════════════
 // WATERMARK MANAGEMENT
 // ══════════════════════════════════════════════════════════════

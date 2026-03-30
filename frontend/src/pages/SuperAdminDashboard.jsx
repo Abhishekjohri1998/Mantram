@@ -94,6 +94,12 @@ export default function SuperAdminDashboard() {
     const [impersonateResults, setImpersonateResults] = useState([])
     const [impersonateLoading, setImpersonateLoading] = useState(false)
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+    // Video Provider Switching state
+    const [videoProviders, setVideoProviders] = useState(null)
+    const [videoCategories, setVideoCategories] = useState({})
+    const [switchingProvider, setSwitchingProvider] = useState(null)
+    const [addProviderForm, setAddProviderForm] = useState(null) // { modelId, ... }
+    const [editProviderData, setEditProviderData] = useState(null) // { modelId, providerId, ... }
     // Credit Packs management
     const [creditPacksList, setCreditPacksList] = useState([])
     const [showPackForm, setShowPackForm] = useState(false)
@@ -153,7 +159,7 @@ export default function SuperAdminDashboard() {
         if (tab === 'waitlist') loadWaitlist()
         if (tab === 'coupons') loadCoupons()
         if (tab === 'content') { loadBrands(); loadContent() }
-        if (tab === 'ai') { loadAIHealth(); loadSettings(); loadCreditCosts(); loadApiKeys() }
+        if (tab === 'ai') { loadAIHealth(); loadSettings(); loadCreditCosts(); loadApiKeys(); loadVideoProviders() }
         if (tab === 'studios') { loadStudioVisibility() }
         if (tab === 'integrations') loadIntegrations()
         if (tab === 'packages') loadPackages()
@@ -225,6 +231,12 @@ export default function SuperAdminDashboard() {
     const handleSaveApiKey = async (provider) => { try { await API.updateApiKeys(provider, editProviderKeys); showToast('API key updated'); setEditingProvider(null); setEditProviderKeys({}); loadApiKeys() } catch (e) { showToast(e.error || 'Failed', 'error') } }
     const handleDeleteApiKey = async (provider) => { if (!confirm(`Remove stored key for ${provider}? Env vars will still apply.`)) return; try { await API.deleteApiKeys(provider); showToast('Key removed'); loadApiKeys() } catch (e) { showToast(e.error || 'Failed', 'error') } }
     const handleTestApiKey = async (provider) => { setTestingProvider(provider); try { const d = await API.testApiKey(provider); setTestResults(r => ({ ...r, [provider]: d })) } catch (e) { setTestResults(r => ({ ...r, [provider]: { success: false, status: 'error', message: e.message } })) } finally { setTestingProvider(null) } }
+    // Video Provider functions
+    const loadVideoProviders = async () => { try { const d = await API.getVideoProviders(); setVideoProviders(d.models || []); setVideoCategories(d.categories || {}) } catch (e) { console.error('Failed to load video providers:', e) } }
+    const handleSwitchVideoProvider = async (modelId, provider) => { setSwitchingProvider(`${modelId}-${provider}`); try { const d = await API.updateVideoProvider({ modelId, provider }); showToast(d.message || 'Provider switched'); loadVideoProviders() } catch (e) { showToast(e.error || e.message || 'Failed to switch provider', 'error') } finally { setSwitchingProvider(null) } }
+    const handleAddVideoProvider = async () => { if (!addProviderForm?.modelId || !addProviderForm?.providerId || !addProviderForm?.providerName) return showToast('Fill all required fields', 'error'); try { const d = await API.addVideoProvider(addProviderForm); showToast(d.message || 'Provider added'); setAddProviderForm(null); loadVideoProviders() } catch (e) { showToast(e.error || e.message || 'Failed', 'error') } }
+    const handleRemoveVideoProvider = async (modelId, providerId) => { if (!confirm(`Remove provider "${providerId}" from this model?`)) return; try { const d = await API.removeVideoProvider({ modelId, providerId }); showToast(d.message || 'Provider removed'); loadVideoProviders() } catch (e) { showToast(e.error || e.message || 'Failed', 'error') } }
+    const handleEditVideoProvider = async () => { if (!editProviderData) return; try { const { modelId, providerId, ...updates } = editProviderData; const d = await API.modifyVideoProvider({ modelId, providerId, updates }); showToast(d.message || 'Provider updated'); setEditProviderData(null); loadVideoProviders() } catch (e) { showToast(e.error || e.message || 'Failed', 'error') } }
     // Watermark functions
     const handleWatermarkLogoUpload = async (e) => { const file = e.target.files?.[0]; if (!file) return; const reader = new FileReader(); reader.onload = async (ev) => { const dataUrl = ev.target.result; setWatermarkLogoPreview(dataUrl); try { const d = await API.uploadWatermarkLogo(dataUrl); showToast('Watermark logo uploaded'); loadSettings() } catch (err) { showToast(err.error || 'Upload failed', 'error') } }; reader.readAsDataURL(file) }
     const handleWatermarkSettingsUpdate = async (updates) => { try { await API.updateWatermarkSettings(updates); showToast('Watermark settings updated'); loadSettings() } catch (e) { showToast(e.error || 'Failed', 'error') } }
@@ -2075,6 +2087,196 @@ export default function SuperAdminDashboard() {
                                         <p className={`text-xs font-bold ${f.avgSentiment > 0 ? 'text-emerald-400' : f.avgSentiment < 0 ? 'text-rose-400' : 'text-slate-500'}`}>{f.avgSentiment?.toFixed(2)}</p>
                                     </div>
                                 ))}</div>
+                            </div>
+                        )}
+
+                        {/* ═══ Video Provider Management — Global API Switcher ═══ */}
+                        <h3 className="text-lg font-bold text-white mb-2 flex items-center gap-2">
+                            <span className="material-symbols-outlined text-violet-400">movie_filter</span>
+                            Video Provider Management
+                            <span className="text-[9px] font-black text-violet-400 bg-violet-500/10 px-2 py-0.5 rounded-full uppercase tracking-wider">Global API Switcher</span>
+                        </h3>
+                        <p className="text-[11px] text-slate-500 mb-5">Switch active providers, add new APIs, or remove unused ones for any video model. Changes take effect immediately.</p>
+
+                        {videoProviders && videoProviders.length > 0 ? (() => {
+                            // Group models by category
+                            const catColors = { cinematic: 'violet', motion: 'cyan', fast: 'emerald', budget: 'amber', experimental: 'rose' };
+                            const grouped = {};
+                            videoProviders.forEach(m => { const cat = m.category || 'experimental'; if (!grouped[cat]) grouped[cat] = []; grouped[cat].push(m); });
+                            const catOrder = ['cinematic', 'motion', 'fast', 'budget', 'experimental'];
+                            return (
+                                <div className="space-y-6 mb-8">
+                                    {catOrder.filter(c => grouped[c]).map(cat => {
+                                        const catInfo = videoCategories[cat] || { label: cat, color: catColors[cat] || 'slate', icon: 'movie' };
+                                        const color = catColors[cat] || 'slate';
+                                        return (
+                                            <div key={cat}>
+                                                <div className="flex items-center gap-2 mb-3">
+                                                    <span className={`material-symbols-outlined text-${color}-400 text-sm`}>{catInfo.icon}</span>
+                                                    <span className={`text-xs font-black uppercase tracking-wider text-${color}-400`}>{catInfo.label}</span>
+                                                    <div className={`flex-1 h-px bg-${color}-500/10`} />
+                                                </div>
+                                                <div className="space-y-3">
+                                                    {grouped[cat].map(model => (
+                                                        <div key={model.id} className="glass-panel rounded-2xl p-5 border border-white/[0.04]">
+                                                            <div className="flex items-center gap-3 mb-3">
+                                                                <span className={`material-symbols-outlined text-${color}-400`}>{model.icon || 'movie'}</span>
+                                                                <div className="flex-1 min-w-0">
+                                                                    <h4 className="text-sm font-bold text-white">{model.name}</h4>
+                                                                    <p className="text-[10px] text-slate-500">
+                                                                        Active: <span className={`text-${color}-400 font-bold`}>{model.providers.find(p => p.isActive)?.name || '—'}</span>
+                                                                        {model.lastSwitched && <span className="ml-2 text-slate-600">· switched {new Date(model.lastSwitched).toLocaleDateString()}</span>}
+                                                                    </p>
+                                                                </div>
+                                                                {model.multiProvider && <span className="text-[8px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-black uppercase">Multi-Provider</span>}
+                                                                {!model.multiProvider && <span className="text-[8px] px-1.5 py-0.5 rounded bg-slate-500/10 text-slate-500 font-black uppercase">Single</span>}
+                                                                <button onClick={() => setAddProviderForm({ modelId: model.id, providerId: '', providerName: '', envKey: '', costPerSecond: '', description: '' })}
+                                                                    className="text-[10px] px-2 py-1 rounded-lg bg-white/[0.04] text-slate-400 hover:text-violet-400 hover:bg-violet-500/10 transition-all cursor-pointer flex items-center gap-1">
+                                                                    <span className="material-symbols-outlined text-[12px]">add</span>Add Provider
+                                                                </button>
+                                                            </div>
+
+                                                            {/* Provider cards */}
+                                                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                                                                {model.providers.map(provider => {
+                                                                    const isSwitching = switchingProvider === `${model.id}-${provider.id}`;
+                                                                    return (
+                                                                        <div key={provider.id}
+                                                                            className={`relative p-3 rounded-xl border-2 transition-all group ${
+                                                                                provider.isActive
+                                                                                    ? `border-${color}-500/40 bg-${color}-500/5`
+                                                                                    : provider.hasKey
+                                                                                        ? `border-white/[0.06] hover:border-${color}-500/20 cursor-pointer hover:bg-white/[0.02]`
+                                                                                        : 'border-white/[0.04] opacity-50'
+                                                                            }`}
+                                                                        >
+                                                                            {/* Top row: radio + name + actions */}
+                                                                            <div className="flex items-center gap-2 mb-1.5">
+                                                                                <div onClick={() => !provider.isActive && provider.hasKey && !isSwitching && handleSwitchVideoProvider(model.id, provider.id)}
+                                                                                    className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center transition-all cursor-pointer ${
+                                                                                        provider.isActive ? `border-${color}-500` : 'border-slate-600 hover:border-slate-400'
+                                                                                    }`}>
+                                                                                    {provider.isActive && <div className={`w-1.5 h-1.5 rounded-full bg-${color}-500`} />}
+                                                                                    {isSwitching && <span className="material-symbols-outlined text-[8px] animate-spin text-violet-400">progress_activity</span>}
+                                                                                </div>
+                                                                                <span className="text-[11px] font-bold text-white flex-1">{provider.name}</span>
+                                                                                {provider.isActive && <span className={`text-[7px] px-1 py-0.5 rounded bg-${color}-500/20 text-${color}-400 font-black uppercase`}>Active</span>}
+                                                                                {/* Action buttons (visible on hover) */}
+                                                                                <div className="hidden group-hover:flex items-center gap-1">
+                                                                                    <button onClick={(e) => { e.stopPropagation(); setEditProviderData({ modelId: model.id, providerId: provider.id, name: provider.name, costPerSecond: provider.costPerSecond, description: provider.description }) }}
+                                                                                        className="text-[10px] text-slate-500 hover:text-cyan-400 cursor-pointer" title="Edit">
+                                                                                        <span className="material-symbols-outlined text-[12px]">edit</span>
+                                                                                    </button>
+                                                                                    {!provider.isActive && (
+                                                                                        <button onClick={(e) => { e.stopPropagation(); handleRemoveVideoProvider(model.id, provider.id) }}
+                                                                                            className="text-[10px] text-slate-500 hover:text-rose-400 cursor-pointer" title="Remove">
+                                                                                            <span className="material-symbols-outlined text-[12px]">close</span>
+                                                                                        </button>
+                                                                                    )}
+                                                                                </div>
+                                                                            </div>
+                                                                            {/* Description + cost */}
+                                                                            <p className="text-[9px] text-slate-500 mb-1.5 leading-relaxed line-clamp-2">{provider.description}</p>
+                                                                            <div className="flex items-center gap-2 flex-wrap">
+                                                                                <span className="text-[9px] font-bold text-slate-400">${provider.costPerSecond}/s</span>
+                                                                                <span className={`text-[8px] px-1 py-0.5 rounded-full font-bold ${provider.hasKey ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
+                                                                                    {provider.hasKey ? `✓ ${provider.keySource}` : '✗ No Key'}
+                                                                                </span>
+                                                                                {!provider.builtIn && <span className="text-[7px] px-1 py-0.5 rounded bg-amber-500/10 text-amber-400 font-black uppercase">Custom</span>}
+                                                                            </div>
+                                                                        </div>
+                                                                    );
+                                                                })}
+                                                            </div>
+
+                                                            {/* Add Provider inline form */}
+                                                            {addProviderForm?.modelId === model.id && (
+                                                                <div className="mt-3 p-4 rounded-xl border border-violet-500/20 bg-violet-500/[0.03]">
+                                                                    <h5 className="text-[11px] font-bold text-violet-400 mb-3 flex items-center gap-1">
+                                                                        <span className="material-symbols-outlined text-[13px]">add_circle</span>Add New Provider to {model.name}
+                                                                    </h5>
+                                                                    <div className="grid grid-cols-2 gap-2 mb-3">
+                                                                        <input placeholder="Provider ID (e.g., replicate)" value={addProviderForm.providerId}
+                                                                            onChange={e => setAddProviderForm(f => ({ ...f, providerId: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') }))}
+                                                                            className="px-2 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-[11px] focus:border-violet-500/40 outline-none" />
+                                                                        <input placeholder="Provider Name (e.g., Replicate)" value={addProviderForm.providerName}
+                                                                            onChange={e => setAddProviderForm(f => ({ ...f, providerName: e.target.value }))}
+                                                                            className="px-2 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-[11px] focus:border-violet-500/40 outline-none" />
+                                                                        <input placeholder="Env Key (e.g., REPLICATE_API_KEY)" value={addProviderForm.envKey}
+                                                                            onChange={e => setAddProviderForm(f => ({ ...f, envKey: e.target.value }))}
+                                                                            className="px-2 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-[11px] focus:border-violet-500/40 outline-none" />
+                                                                        <input placeholder="Cost/sec (e.g., 0.10)" value={addProviderForm.costPerSecond} type="number" step="0.01"
+                                                                            onChange={e => setAddProviderForm(f => ({ ...f, costPerSecond: e.target.value }))}
+                                                                            className="px-2 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-[11px] focus:border-violet-500/40 outline-none" />
+                                                                    </div>
+                                                                    <input placeholder="Description (optional)" value={addProviderForm.description}
+                                                                        onChange={e => setAddProviderForm(f => ({ ...f, description: e.target.value }))}
+                                                                        className="w-full px-2 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-[11px] focus:border-violet-500/40 outline-none mb-3" />
+                                                                    <div className="flex gap-2">
+                                                                        <button onClick={handleAddVideoProvider}
+                                                                            className="px-3 py-1.5 rounded-lg bg-violet-500/20 text-violet-400 text-[11px] font-bold hover:bg-violet-500/30 cursor-pointer transition-all">
+                                                                            Add Provider
+                                                                        </button>
+                                                                        <button onClick={() => setAddProviderForm(null)}
+                                                                            className="px-3 py-1.5 rounded-lg bg-white/[0.04] text-slate-500 text-[11px] hover:text-white cursor-pointer transition-all">
+                                                                            Cancel
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                    <p className="text-[10px] text-slate-600 italic">Click the radio button to switch providers. Hover over a provider card to edit or remove. Add custom providers with the + button.</p>
+                                </div>
+                            );
+                        })() : (
+                            <div className="glass-panel rounded-2xl p-6 mb-8 text-center text-slate-500 text-sm">
+                                <span className="material-symbols-outlined text-2xl mb-2 block text-slate-600">movie_filter</span>
+                                Loading video providers...
+                            </div>
+                        )}
+
+                        {/* Edit Provider Modal */}
+                        {editProviderData && (
+                            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center" onClick={() => setEditProviderData(null)}>
+                                <div className="glass-panel border border-white/[0.08] rounded-2xl p-6 w-full max-w-md" onClick={e => e.stopPropagation()}>
+                                    <h4 className="text-base font-bold text-white mb-4 flex items-center gap-2">
+                                        <span className="material-symbols-outlined text-cyan-400">edit</span>
+                                        Edit Provider: {editProviderData.name}
+                                    </h4>
+                                    <div className="space-y-3 mb-5">
+                                        <div>
+                                            <label className="text-[10px] text-slate-500 uppercase font-bold block mb-1">Display Name</label>
+                                            <input value={editProviderData.name || ''} onChange={e => setEditProviderData(d => ({ ...d, name: e.target.value }))}
+                                                className="w-full px-3 py-2 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm focus:border-cyan-500/40 outline-none" />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] text-slate-500 uppercase font-bold block mb-1">Cost Per Second ($)</label>
+                                            <input value={editProviderData.costPerSecond || ''} type="number" step="0.01"
+                                                onChange={e => setEditProviderData(d => ({ ...d, costPerSecond: parseFloat(e.target.value) || 0 }))}
+                                                className="w-full px-3 py-2 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm focus:border-cyan-500/40 outline-none" />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] text-slate-500 uppercase font-bold block mb-1">Description</label>
+                                            <input value={editProviderData.description || ''} onChange={e => setEditProviderData(d => ({ ...d, description: e.target.value }))}
+                                                className="w-full px-3 py-2 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm focus:border-cyan-500/40 outline-none" />
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <button onClick={handleEditVideoProvider}
+                                            className="px-4 py-2 rounded-xl bg-cyan-500/20 text-cyan-400 text-sm font-bold hover:bg-cyan-500/30 cursor-pointer transition-all flex-1">
+                                            Save Changes
+                                        </button>
+                                        <button onClick={() => setEditProviderData(null)}
+                                            className="px-4 py-2 rounded-xl bg-white/[0.04] text-slate-500 text-sm hover:text-white cursor-pointer transition-all">
+                                            Cancel
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                         )}
 

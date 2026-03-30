@@ -11,8 +11,10 @@
 import config from '../../config/env.js';
 import { submitKieVideoGeneration } from './kieClient.js';
 import { submitPiApiVideoGeneration } from './piApiClient.js';
+import { submitMuApiVideoGeneration } from './muapiClient.js';
 import { ensureS3Url } from '../../utils/s3.js';
 import { isLaozhangAvailable, submitLaozhangVideoGeneration } from './laozhangClient.js';
+import { getSetting } from '../../models/SystemSettings.js';
 
 const FAL_BASE_URL = 'https://queue.fal.run';
 const GROK_BASE_URL = 'https://api.x.ai/v1';
@@ -83,7 +85,7 @@ export const MODEL_CAPABILITIES = {
         maxReferenceImages: 3, costPerSecond: COST_PER_SECOND['veo-3.1-fast'], recommended: false,
     },
     'seedance-2.0': {
-        id: 'seedance-2.0', name: 'Seedance 2.0 Pro', icon: '🎞️', provider: 'laozhang',
+        id: 'seedance-2.0', name: 'Seedance 2.0 Pro', icon: '🎞️', provider: 'dynamic',
         description: 'Cinematic video with native audio, camera control & physics',
         bestFor: 'Premium ads, product showcases, brand films',
         duration: { min: 4, max: 15, native: 15, step: 1 },
@@ -243,67 +245,183 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
         ...(referenceImages || []).map(img => ensureS3Url(img, 'video-studio/references'))
     ]);
 
-    // ── Seedance 2.0: full cascade ──
-    if (model === 'seedance-2.0') {
-        const lzImageUrl = s3ImageUrl || s3ReferenceImages[0] || null;
-        const result = await trySeedanceCascade({
-            prompt, imageUrl: lzImageUrl, duration, aspectRatio, generateAudio, mode,
-        });
-
-        // Synchronous LaoZhang result — video URL already available
-        if (result.videoUrl) {
-            return { requestId: `lz-${Date.now()}`, endpoint: 'laozhang-seedance-2.0', provider: 'laozhang', _laozhangVideoUrl: result.videoUrl };
-        }
-
-        // Async kie.ai result — polling required
-        if (result.provider === 'kie') {
-            return { requestId: result.taskId, endpoint: 'kie-seedance-2.0', provider: 'kie' };
-        }
-
-        // Async PiAPI result — polling required
-        if (result.provider === 'piapi') {
-            return { requestId: result.taskId, endpoint: 'piapi-seedance-2.0', provider: 'piapi', _piApiPayload: result._piApiPayload };
-        }
+    // ══════════════════════════════════════════════════════════════════
+    // DYNAMIC PROVIDER ROUTING — SuperAdmin-controlled via SystemSettings
+    // Reads 'video_provider_routes' from DB for each model.
+    // Default providers (no DB entry): defined in comments below.
+    // Falls through to direct provider on failure.
+    // ══════════════════════════════════════════════════════════════════
+    let activeProvider = null;
+    try {
+        const providerRoutes = await getSetting('video_provider_routes', {});
+        activeProvider = providerRoutes[model]?.active || null;
+    } catch (e) {
+        console.warn('⚠️ Could not read video_provider_routes from DB:', e.message);
     }
 
-    // ── LaoZhang-first routing (other LZ-native models) ──
-    const LZ_DIRECT_MODELS = ['sora-2', 'veo-3.1', 'kling-3.0'];
-    if (LZ_DIRECT_MODELS.includes(model) && isLaozhangAvailable()) {
-        try {
-            console.log(`🏷️ [LaoZhang] Attempting ${model}...`);
+    // ── Provider routing map: model → activeProvider → handler ──
+    // If no activeProvider in DB, use the default provider for each model
+
+    // ── Sora 2: LaoZhang ONLY ──
+    if (model === 'sora-2') {
+        const provider = activeProvider || 'laozhang';
+        if (provider === 'laozhang' && isLaozhangAvailable()) {
+            console.log(`🎬 [Sora 2] Using LaoZhang (${activeProvider ? 'SuperAdmin' : 'default'})...`);
             const lzResult = await submitLaozhangVideoGeneration({
-                model, prompt, imageUrl: s3ImageUrl,
-                duration: duration || 5, aspectRatio: aspectRatio || '16:9',
-                generateAudio: generateAudio !== false,
+                model, prompt, imageUrl: s3ImageUrl, duration: duration || 5,
+                aspectRatio: aspectRatio || '16:9', generateAudio: generateAudio !== false,
             });
             if (lzResult?.videoUrl) {
-                console.log(`✅ [LaoZhang] ${model} done.`);
-                return { requestId: `lz-${Date.now()}`, endpoint: `laozhang-${model}`, provider: 'laozhang', _laozhangVideoUrl: lzResult.videoUrl };
+                return {
+                    requestId: `lz-${Date.now()}`, endpoint: `laozhang-sora-2`,
+                    statusUrl: null, resultUrl: null, provider: 'laozhang',
+                    _laozhangVideoUrl: lzResult.videoUrl,
+                };
             }
-        } catch (lzErr) {
-            if (model === 'sora-2') throw new Error(`Sora 2 failed: ${lzErr.message}`);
-            console.warn(`⚠️ [LaoZhang] ${model} failed, falling through...`);
+        }
+        throw new Error('Sora 2 generation failed — LaoZhang is the only provider.');
+    }
+
+    // ── Veo 3.1: LaoZhang (default) or fal.ai ──
+    if (model === 'veo-3.1') {
+        const provider = activeProvider || 'laozhang';
+        // Try LaoZhang first if selected
+        if (provider === 'laozhang' && isLaozhangAvailable()) {
+            try {
+                console.log(`🎬 [Veo 3.1] Using LaoZhang (${activeProvider ? 'SuperAdmin' : 'default'})...`);
+                const lzResult = await submitLaozhangVideoGeneration({
+                    model, prompt, imageUrl: s3ImageUrl, duration: duration || 5,
+                    aspectRatio: aspectRatio || '16:9', generateAudio: generateAudio !== false,
+                });
+                if (lzResult?.videoUrl) {
+                    return {
+                        requestId: `lz-${Date.now()}`, endpoint: `laozhang-veo-3.1`,
+                        statusUrl: null, resultUrl: null, provider: 'laozhang',
+                        _laozhangVideoUrl: lzResult.videoUrl,
+                    };
+                }
+            } catch (lzErr) {
+                if (provider === 'laozhang' && activeProvider) throw lzErr; // Admin explicitly chose LZ, don't fallback
+                console.warn(`⚠️ [LaoZhang] Veo 3.1 failed, falling through to fal.ai...`);
+            }
+        }
+        // Fall through to fal.ai (handled at the bottom)
+    }
+
+    // ── Veo 3.1 Fast: LaoZhang (default) or kie.ai ──
+    if (model === 'veo-3.1-fast') {
+        const provider = activeProvider || 'laozhang';
+        // Try LaoZhang first if selected
+        if (provider === 'laozhang' && isLaozhangAvailable()) {
+            try {
+                console.log(`🎬 [Veo 3.1 Fast] Using LaoZhang (${activeProvider ? 'SuperAdmin' : 'default'})...`);
+                const lzResult = await submitLaozhangVideoGeneration({
+                    model, prompt, imageUrl: s3ImageUrl, duration: duration || 5,
+                    aspectRatio: aspectRatio || '16:9', generateAudio: generateAudio !== false,
+                });
+                if (lzResult?.videoUrl) {
+                    return {
+                        requestId: `lz-${Date.now()}`, endpoint: `laozhang-veo-3.1-fast`,
+                        statusUrl: null, resultUrl: null, provider: 'laozhang',
+                        _laozhangVideoUrl: lzResult.videoUrl,
+                    };
+                }
+            } catch (lzErr) {
+                if (provider === 'laozhang' && activeProvider) throw lzErr;
+                console.warn(`⚠️ [LaoZhang] Veo 3.1 Fast failed, falling through to kie.ai...`);
+            }
+        }
+        // Use kie.ai
+        if (provider === 'kie' || !activeProvider) {
+            console.log(`🎬 [Veo 3.1 Fast] Using kie.ai...`);
+            const result = await submitKieVideoGeneration({
+                model, prompt, imageUrl: s3ImageUrl, duration,
+                aspectRatio: aspectRatio || '16:9',
+            });
+            return {
+                requestId: result.taskId, endpoint: `kie-${model}`,
+                statusUrl: null, resultUrl: null, provider: 'kie',
+            };
         }
     }
 
-    // ── Grok Imagine ──
+    // ── Grok Imagine: xAI native ──
     if (model === 'grok-imagine') {
-        const apiKey = getGrokApiKey();
-        const payload = { model: 'grok-imagine-video', prompt, duration: Math.min(Math.max(duration || 5, 1), 15), aspect_ratio: aspectRatio || '16:9', resolution: resolution === '480p' ? '480p' : '720p' };
-        if (s3ImageUrl) payload.image = { url: s3ImageUrl };
-        const response = await fetch(`${GROK_BASE_URL}/videos/generations`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` }, body: JSON.stringify(payload) });
-        if (!response.ok) throw new Error(`Grok failed (${response.status}): ${await response.text()}`);
-        const data = await response.json();
-        return { requestId: data.request_id, endpoint: 'grok-imagine-video', provider: 'grok' };
+        console.log(`🎬 [Grok Imagine] Using xAI native API...`);
+        const result = await submitGrokVideoGeneration({
+            prompt, imageUrl: s3ImageUrl, duration, resolution, aspectRatio,
+        });
+        return {
+            requestId: result.requestId, endpoint: 'grok-imagine-video',
+            statusUrl: null, resultUrl: null, provider: 'grok',
+        };
     }
 
-    // ── Veo 3.1 Fast: kie.ai ──
-    if (model === 'veo-3.1-fast') {
-        const result = await submitKieVideoGeneration({ model, prompt, imageUrl: s3ImageUrl, duration, aspectRatio: aspectRatio || '16:9' });
-        return { requestId: result.taskId, endpoint: `kie-${model}`, provider: 'kie' };
+    // ── Kling 3.0: fal.ai (default) or LaoZhang ──
+    if (model === 'kling-3.0') {
+        const provider = activeProvider || 'fal';
+        if (provider === 'laozhang' && isLaozhangAvailable()) {
+            try {
+                console.log(`🎬 [Kling 3.0] Using LaoZhang (SuperAdmin)...`);
+                const lzResult = await submitLaozhangVideoGeneration({
+                    model, prompt, imageUrl: s3ImageUrl, duration: duration || 5,
+                    aspectRatio: aspectRatio || '16:9', generateAudio: generateAudio !== false,
+                });
+                if (lzResult?.videoUrl) {
+                    return {
+                        requestId: `lz-${Date.now()}`, endpoint: `laozhang-kling-3.0`,
+                        statusUrl: null, resultUrl: null, provider: 'laozhang',
+                        _laozhangVideoUrl: lzResult.videoUrl,
+                    };
+                }
+            } catch (lzErr) {
+                if (activeProvider) throw lzErr;
+                console.warn(`⚠️ [LaoZhang] Kling 3.0 failed, falling through to fal.ai...`);
+            }
+        }
+        // Fall through to fal.ai (handled at the bottom)
     }
 
-    // ── fal.ai fallback ──
+    // ── Seedance 2.0: Dynamic (MuAPI default, PiAPI fallback) ──
+    if (model === 'seedance-2.0') {
+        const provider = activeProvider || 'muapi';
+        console.log(`🎬 [Seedance 2.0] Routing to ${provider} (${activeProvider ? 'SuperAdmin' : 'default'})...`);
+
+        if (provider === 'muapi') {
+            const muApiKey = process.env.MUAPI_API_KEY;
+            if (!muApiKey) {
+                throw new Error('Seedance 2.0 (MuAPI) requires MUAPI_API_KEY. Add it to .env or switch provider in SuperAdmin.');
+            }
+            const result = await submitMuApiVideoGeneration({
+                prompt, imageUrl: s3ImageUrl, duration,
+                aspectRatio: aspectRatio || '16:9', qualityMode: mode || 'fast',
+                generateAudio, referenceImages: s3ReferenceImages,
+            });
+            return {
+                requestId: result.taskId, endpoint: `muapi-seedance-2.0`,
+                statusUrl: null, resultUrl: null, provider: 'muapi',
+                _muApiPayload: result._muApiPayload,
+            };
+        } else if (provider === 'piapi') {
+            const piApiKey = process.env.PIAPI_API_KEY;
+            if (!piApiKey) {
+                throw new Error('Seedance 2.0 (PiAPI) requires PIAPI_API_KEY. Add it to .env or switch provider in SuperAdmin.');
+            }
+            const result = await submitPiApiVideoGeneration({
+                prompt, imageUrl: s3ImageUrl, duration,
+                aspectRatio: aspectRatio || '16:9', generateAudio,
+                referenceImages: s3ReferenceImages, qualityMode: mode || 'fast',
+            });
+            return {
+                requestId: result.taskId, endpoint: `piapi-seedance-2.0`,
+                statusUrl: null, resultUrl: null, provider: 'piapi',
+                _piApiPayload: result._payload,
+            };
+        }
+        throw new Error(`Unknown provider '${provider}' for Seedance 2.0. Configure in SuperAdmin.`);
+    }
+
+    // ── fal.ai models (Kling, Veo 3.1 standard, Seedance 1.0) ──
     const apiKey = getApiKey();
     const endpoints = MODEL_ENDPOINTS[model];
     if (!endpoints) throw new Error(`Unknown video model: ${model}`);

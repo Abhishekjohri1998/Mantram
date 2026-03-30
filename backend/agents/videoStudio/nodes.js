@@ -27,6 +27,7 @@ import {
 import { estimateCost, submitVideoGeneration, getGenerationStatus, getGrokGenerationStatus, MODEL_CAPABILITIES } from './falClient.js';
 import { getKieGenerationStatus } from './kieClient.js';
 import { getPiApiGenerationStatus, resubmitPiApiTask, uploadImageToHostedUrl } from './piApiClient.js';
+import { getMuApiGenerationStatus, resubmitMuApiTask } from './muapiClient.js';
 
 import { getPastProjects } from './selfLearning.js';
 
@@ -309,7 +310,7 @@ export async function videoGeneratorNode(state) {
     // Pass shots for Kling multi-prompt support
     const shots = state.script?.shots || [];
 
-    const { requestId, endpoint, statusUrl, resultUrl, provider, _piApiPayload, _laozhangVideoUrl } = await submitVideoGeneration({
+    const { requestId, endpoint, statusUrl, resultUrl, provider, _piApiPayload, _muApiPayload, _laozhangVideoUrl } = await submitVideoGeneration({
         model,
         prompt,
         imageUrl,
@@ -328,8 +329,9 @@ export async function videoGeneratorNode(state) {
             falEndpoint: endpoint,
             falStatusUrl: statusUrl,   // null for Grok & LZ
             falResultUrl: resultUrl,   // null for Grok & LZ
-            provider: provider || 'fal', // 'grok', 'fal', 'kie', 'piapi', 'laozhang'
+            provider: provider || 'fal', // 'grok', 'fal', 'kie', 'piapi', 'muapi', 'laozhang'
             _piApiPayload: _piApiPayload || null, // For PiAPI auto-retry
+            _muApiPayload: _muApiPayload || null, // For MuAPI auto-retry
             _laozhangVideoUrl: _laozhangVideoUrl || null, // LZ sync video URL
             videoUrl: _laozhangVideoUrl || '',
             thumbnailUrl: '',
@@ -365,13 +367,12 @@ export async function pollGenerationStatus(state) {
         };
     }
 
-    // Branch polling based on provider
-    if (state.generation?.provider === 'grok' || state.routing?.selectedModel === 'grok-imagine') {
+    // Branch polling based on provider (strict provider-based routing)
+    if (state.generation?.provider === 'grok') {
         statusResult = await getGrokGenerationStatus(state.generation.falRequestId);
-    } else if (state.generation?.provider === 'piapi' || state.routing?.selectedModel === 'seedance-2.0') {
-        // PiAPI polling — Seedance 2.0
+    } else if (state.generation?.provider === 'piapi') {
+        // PiAPI polling — Seedance 2.0 (when PiAPI is active provider)
         statusResult = await getPiApiGenerationStatus(state.generation.falRequestId);
-
         // AUTO-RETRY: PiAPI intermittently fails with "failed to process task" (code 10000)
         // Automatically resubmit up to 2 times using the stored payload
         if (statusResult.status === 'FAILED' && statusResult.retryable && state.generation._piApiPayload) {
@@ -401,8 +402,39 @@ export async function pollGenerationStatus(state) {
                 console.warn(`⚠️ PiAPI exhausted ${MAX_RETRIES} auto-retries, reporting failure`);
             }
         }
-    } else if (state.generation?.provider === 'kie' || state.routing?.selectedModel === 'veo-3.1-fast') {
-        // kie.ai polling — Veo 3.1 Fast only
+    } else if (state.generation?.provider === 'muapi') {
+        // MuAPI polling — Seedance 2.0 (dynamic provider)
+        statusResult = await getMuApiGenerationStatus(state.generation.falRequestId);
+
+        // AUTO-RETRY: MuAPI failures — resubmit up to 2 times
+        if (statusResult.status === 'FAILED' && statusResult.retryable && state.generation._muApiPayload) {
+            const retryCount = state.generation._muApiRetryCount || 0;
+            const MAX_RETRIES = 2;
+            if (retryCount < MAX_RETRIES) {
+                console.log(`🔄 MuAPI auto-retry ${retryCount + 1}/${MAX_RETRIES}: resubmitting task...`);
+                try {
+                    const retryResult = await resubmitMuApiTask(state.generation._muApiPayload);
+                    return {
+                        ...state,
+                        generation: {
+                            ...state.generation,
+                            falRequestId: retryResult.taskId,
+                            progress: 5,
+                            startedAt: new Date(),
+                            error: '',
+                            _muApiRetryCount: retryCount + 1,
+                        },
+                        status: state.status,
+                    };
+                } catch (retryErr) {
+                    console.error(`❌ MuAPI auto-retry failed: ${retryErr.message}`);
+                }
+            } else {
+                console.warn(`⚠️ MuAPI exhausted ${MAX_RETRIES} auto-retries, reporting failure`);
+            }
+        }
+    } else if (state.generation?.provider === 'kie') {
+        // kie.ai polling — Veo 3.1 Fast
         statusResult = await getKieGenerationStatus(state.generation.falRequestId, state.routing?.selectedModel);
     } else {
         // fal.ai polling — use stored URLs

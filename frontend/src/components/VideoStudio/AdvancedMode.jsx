@@ -19,7 +19,7 @@ async function api(path, opts = {}) {
 
 /* ── Models ── */
 const MODELS = {
-    'seedance-2.0': { id: 'seedance-2.0', name: 'Seedance 2.0', icon: '🎞️', dur: [5, 15], ratios: ['16:9', '9:16', '1:1', '4:3', '21:9'], has: { firstFrame: true, refImages: true, refVideo: true, audio: true }, cost: 0.05 },
+    'seedance-2.0': { id: 'seedance-2.0', name: 'Seedance 2.0', icon: '🎞️', dur: [5, 15], ratios: ['16:9', '9:16', '1:1', '4:3', '21:9'], has: { firstFrame: true, refImages: true, refVideo: true, refAudio: true, audio: true }, cost: 0.08 },
     'kling-3.0': { id: 'kling-3.0', name: 'Kling 3.0', icon: '🎥', dur: [3, 15], ratios: ['16:9', '9:16', '1:1'], has: { firstFrame: true, lastFrame: true, audio: true }, cost: 0.07 },
     'veo-3.1': { id: 'veo-3.1', name: 'Veo 3.1', icon: '🎬', dur: [5, 8], ratios: ['16:9', '9:16'], has: { firstFrame: true, lastFrame: true, refImages: true, audio: true }, cost: 0.10 },
     'veo-3.1-fast': { id: 'veo-3.1-fast', name: 'Veo 3.1 Fast', icon: '⚡', dur: [5, 8], ratios: ['16:9', '9:16'], has: { firstFrame: true, refImages: true, audio: true }, cost: 0.06 },
