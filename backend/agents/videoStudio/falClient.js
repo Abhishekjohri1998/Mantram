@@ -98,7 +98,7 @@ export const MODEL_CAPABILITIES = {
         maxReferenceImages: 3, costPerSecond: COST_PER_SECOND['veo-3.1-fast'], recommended: false,
     },
     'seedance-2.0': {
-        id: 'seedance-2.0', name: 'Seedance 2.0 Pro', icon: '🎞️', provider: 'piapi',
+        id: 'seedance-2.0', name: 'Seedance 2.0 Pro', icon: '🎥', provider: 'piapi',
         description: 'Cinematic video with native audio, camera control & physics',
         bestFor: 'Premium ads, product showcases, brand films',
         duration: { min: 4, max: 15, native: 15, step: 1 },
@@ -125,7 +125,7 @@ export const MODEL_CAPABILITIES = {
         maxReferenceImages: 0, costPerSecond: COST_PER_SECOND['hunyuan'], recommended: false,
     },
     'sora-2': {
-        id: 'sora-2', name: 'Sora 2', icon: '🎞️', provider: 'laozhang',
+        id: 'sora-2', name: 'Sora 2', icon: '🎥', provider: 'laozhang',
         description: 'OpenAI Sora 2 — cinematic storytelling, world-model understanding',
         bestFor: 'Cinematic ads, narrative storytelling, creative experiments',
         duration: { min: 5, max: 15, native: 15, step: 5 },
@@ -193,8 +193,26 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
         ...(referenceImages || []).map(img => ensureS3Url(img, 'video-studio/references'))
     ]);
 
-    // ── LaoZhang-First Routing ──
-    const LZ_VIDEO_MODELS = ['sora-2', 'veo-3.1', 'veo-3.1-fast', 'kling-3.0', 'seedance-2.0'];
+    // ── Seedance 2.0: Always go directly to PiAPI ──
+    // LaoZhang doesn't support image_urls for Seedance, and even for text-only
+    // Seedance it's intermittent (billing channel issues). PiAPI is the reliable path.
+    if (model === 'seedance-2.0') {
+        console.log(`🎮 [PiAPI] Routing seedance-2.0 directly (LaoZhang skipped — no image_urls support)`);
+        // Pass already-uploaded S3 refs directly — PiAPI client will NOT re-upload http(s) URLs
+        const result = await submitPiApiVideoGeneration({
+            prompt,
+            imageUrl: s3ImageUrl,
+            duration,
+            aspectRatio: aspectRatio || '16:9',
+            generateAudio,
+            referenceImages: s3ReferenceImages, // already S3-hosted, skip re-upload
+            qualityMode: mode || 'fast',
+        });
+        return { requestId: result.taskId, endpoint: 'piapi-seedance-2.0', provider: 'piapi', _piApiPayload: result._payload };
+    }
+
+    // ── LaoZhang-First Routing (non-seedance models) ──
+    const LZ_VIDEO_MODELS = ['sora-2', 'veo-3.1', 'veo-3.1-fast', 'kling-3.0'];
     if (LZ_VIDEO_MODELS.includes(model) && isLaozhangAvailable()) {
         try {
             console.log(`🏷️ [LaoZhang] Attempting ${model}...`);
@@ -232,12 +250,6 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
     if (model === 'veo-3.1-fast') {
         const result = await submitKieVideoGeneration({ model, prompt, imageUrl: s3ImageUrl, duration, aspectRatio: aspectRatio || '16:9' });
         return { requestId: result.taskId, endpoint: `kie-${model}`, provider: 'kie' };
-    }
-
-    // ── Seedance 2.0: PiAPI ──
-    if (model === 'seedance-2.0') {
-        const result = await submitPiApiVideoGeneration({ prompt, imageUrl: s3ImageUrl, duration, aspectRatio: aspectRatio || '16:9', generateAudio, referenceImages: s3ReferenceImages, qualityMode: mode || 'fast' });
-        return { requestId: result.taskId, endpoint: 'piapi-seedance-2.0', provider: 'piapi', _piApiPayload: result._payload };
     }
 
     // ── fal.ai ──
