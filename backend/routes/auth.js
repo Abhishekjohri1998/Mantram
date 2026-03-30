@@ -82,7 +82,7 @@ router.post('/register', async (req, res) => {
             verificationToken,
             verificationExpires,
             isVerified: false,
-            approvalStatus: autoApprove ? 'approved' : 'pending',
+            approvalStatus: 'approved',
             queueNumber,
             milestones: {
                 addedBrand: !!company
@@ -127,7 +127,7 @@ router.post('/register', async (req, res) => {
 
         res.status(201).json({
             success: true,
-            message: `Registration successful. You are at position #${queueNumber} in the queue. Please check your email for confirmation and to verify your account.`,
+            message: `Registration successful. Please check your email for confirmation and to verify your account.`,
             queueNumber,
             verifyEmail: user.email
         });
@@ -162,16 +162,7 @@ router.post('/login', async (req, res) => {
             });
         }
 
-        // 2. Approval Check
-        if (user.approvalStatus === 'pending') {
-            return res.status(403).json({
-                success: false,
-                error: `Your account is pending approval. You are currently at position #${user.queueNumber || 'N/A'} in the waitlist. We'll notify you via email once approved.`,
-                isPending: true,
-                queueNumber: user.queueNumber
-            });
-        }
-
+        // 2. Approval Check (Bypassed: Direct access after verification)
         if (user.approvalStatus === 'rejected') {
             return res.status(403).json({
                 success: false,
@@ -604,7 +595,7 @@ router.get('/google/callback', async (req, res) => {
                 isGoogleUser: true,
                 isVerified: true, // Google users are pre-verified
                 password: Math.random().toString(36).slice(-12),
-                approvalStatus: autoApprove ? 'approved' : 'pending'
+                approvalStatus: 'approved'
             });
             // Update waitlist status if exists
             await Waitlist.findOneAndUpdate({ email: profileData.email.toLowerCase() }, { status: 'registered' });

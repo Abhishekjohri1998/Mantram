@@ -116,7 +116,7 @@ const userSchema = new mongoose.Schema({
     approvalStatus: { 
         type: String, 
         enum: ['pending', 'approved', 'rejected'], 
-        default: 'pending' 
+        default: 'approved' 
     },
     queueNumber: { type: Number },
 }, { timestamps: true });
