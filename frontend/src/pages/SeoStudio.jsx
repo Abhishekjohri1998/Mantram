@@ -87,6 +87,8 @@ export default function SeoStudio() {
 function SeoStudioInner({ activeBrand, activeSection, setActiveSection }) {
     const navigate = useNavigate()
     const { startTask, cancelTask, tasks } = useSeoTasks()
+    const { updateBrand } = useBrand()
+
 
     const SIDEBAR = SIDEBAR_SECTIONS
     const allItems = SIDEBAR.flatMap(s => s.items)
@@ -1100,9 +1102,10 @@ small{color:#94a3b8;font-size:10px}
                                             const url = prompt('Enter your website URL (e.g. example.com):');
                                             if (url) {
                                                 const normalized = url.startsWith('http') ? url : `https://${url}`;
-                                                updateBrand({ website: normalized }).catch(e => alert(e.message));
+                                                updateBrand(activeBrand._id, { website: normalized }).catch(e => alert(e.message));
                                             }
                                         }}
+
                                         className="text-[10px] font-bold text-primary flex items-center gap-1 hover:text-primary/80 transition-all cursor-pointer bg-primary/10 px-1.5 py-0.5 rounded leading-none"
                                     >
                                         <span className="material-symbols-outlined text-[10px]">add_link</span>
