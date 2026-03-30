@@ -776,8 +776,11 @@ export async function runCreativePipeline(params) {
     const productName = state.matchedProduct?.title || '';
     emit('brand-intel', productName ? `Matched product: ${productName}` : 'Brand context loaded', 'done', productName ? `Using "${productName}" as hero product` : '');
 
-    // ── Track copywriter promise (fires in parallel after art direction) ──
-    let copyPromise = null;
+    // ── Copywriter result — runs BEFORE image prompt is finalized ──
+    // When generateCopy is ON, the copywriter generates headline/CTA first,
+    // then those texts are INJECTED into the image prompt so the AI model
+    // actually renders the copy on the generated image.
+    let copyResult = null;
 
     if (mode === 'fast') {
         // ══════════════════════════════════════════════════════════════════
@@ -789,19 +792,25 @@ export async function runCreativePipeline(params) {
         emit('art-director', `Direction: ${state.artDirection?.mood || 'defined'}`, 'done', state.artDirection?.visualStyle || '');
         state.finalPrompt = state.engineeredPrompt?.primaryPrompt || brief;
 
-        // ── Fire copywriter in PARALLEL (non-blocking) ──
+        // ── Run copywriter BEFORE finalizing prompt (so copy goes INTO the image) ──
         if (generateCopy) {
             emit('copywriter', 'Copywriter crafting brand copy...', 'working');
-            copyPromise = copywriterNode(state)
-                .then(copyState => {
-                    emit('copywriter', `Copy ready: "${copyState.copy?.headline || ''}"`, 'done');
-                    return copyState.copy;
-                })
-                .catch(err => {
-                    console.warn('✍️  Copywriter failed (non-critical):', err.message);
-                    emit('copywriter', 'Copy generation skipped', 'done');
-                    return null;
-                });
+            try {
+                const copyState = await copywriterNode(state);
+                copyResult = copyState.copy || null;
+                if (copyResult) {
+                    emit('copywriter', `Copy ready: "${copyResult.headline || ''}"`, 'done');
+                    // ── INJECT copy text into the image prompt ──
+                    const copyInjection = buildCopyInjection(copyResult);
+                    if (copyInjection) {
+                        state.finalPrompt = state.finalPrompt + '\n\n' + copyInjection;
+                        console.log(`✍️  Copy injected into image prompt: "${copyResult.headline}" | CTA: "${copyResult.cta}"`);
+                    }
+                }
+            } catch (err) {
+                console.warn('✍️  Copywriter failed (non-critical):', err.message);
+                emit('copywriter', 'Copy generation skipped', 'done');
+            }
         }
     } else {
         // ══════════════════════════════════════════════════════════════════
@@ -811,19 +820,19 @@ export async function runCreativePipeline(params) {
         state = await artDirectorNode(state);
         emit('art-director', `Creative direction: ${state.artDirection?.mood || 'defined'}`, 'done', state.artDirection?.visualStyle || '');
 
-        // ── Fire copywriter in PARALLEL with prompt engineering ──
+        // ── Run copywriter BEFORE prompt engineering (so copy informs the prompt) ──
         if (generateCopy) {
             emit('copywriter', 'Copywriter crafting brand copy...', 'working');
-            copyPromise = copywriterNode(state)
-                .then(copyState => {
-                    emit('copywriter', `Copy ready: "${copyState.copy?.headline || ''}"`, 'done');
-                    return copyState.copy;
-                })
-                .catch(err => {
-                    console.warn('✍️  Copywriter failed (non-critical):', err.message);
-                    emit('copywriter', 'Copy generation skipped', 'done');
-                    return null;
-                });
+            try {
+                const copyState = await copywriterNode(state);
+                copyResult = copyState.copy || null;
+                if (copyResult) {
+                    emit('copywriter', `Copy ready: "${copyResult.headline || ''}"`, 'done');
+                }
+            } catch (err) {
+                console.warn('✍️  Copywriter failed (non-critical):', err.message);
+                emit('copywriter', 'Copy generation skipped', 'done');
+            }
         }
 
         emit('prompt-engineer', 'Prompt Engineer optimizing for image model...', 'working');
@@ -835,16 +844,19 @@ export async function runCreativePipeline(params) {
         emit('style-critic', 'Brand alignment verified', 'done');
 
         state.finalPrompt = state.styleCritique?.improvedPrompt || state.engineeredPrompt?.primaryPrompt || brief;
-    }
 
-    // ── Await copywriter result (if it was fired) ──
-    let copyResult = null;
-    if (copyPromise) {
-        copyResult = await copyPromise;
+        // ── INJECT copy text into the final image prompt ──
+        if (copyResult) {
+            const copyInjection = buildCopyInjection(copyResult);
+            if (copyInjection) {
+                state.finalPrompt = state.finalPrompt + '\n\n' + copyInjection;
+                console.log(`✍️  Copy injected into image prompt: "${copyResult.headline}" | CTA: "${copyResult.cta}"`);
+            }
+        }
     }
 
     const totalMs = Date.now() - pipelineStart;
-    console.log(`══════════ PIPELINE COMPLETE (${totalMs}ms)${copyResult ? ' — copy included' : ''} ══════════\n`);
+    console.log(`══════════ PIPELINE COMPLETE (${totalMs}ms)${copyResult ? ' — copy included & injected' : ''} ══════════\n`);
 
     return {
         finalPrompt: state.finalPrompt || state.engineeredPrompt?.primaryPrompt || brief,
@@ -857,4 +869,22 @@ export async function runCreativePipeline(params) {
         pipelineTimeMs: totalMs,
         mode,
     };
+}
+
+
+/**
+ * Build copy injection text for the image prompt.
+ * Instructs the AI model to render the headline and CTA as bold, readable text on the image.
+ */
+function buildCopyInjection(copy) {
+    if (!copy) return '';
+    const parts = [];
+    if (copy.headline) {
+        parts.push(`TEXT ON IMAGE — HEADLINE: Display the text "${copy.headline}" prominently in large, bold, high-contrast typography. This must be clearly readable and be the primary text element on the image.`);
+    }
+    if (copy.cta) {
+        parts.push(`TEXT ON IMAGE — CTA BUTTON: Include a call-to-action button or badge with the text "${copy.cta}" in a contrasting color. Position it at the bottom or lower-third of the image.`);
+    }
+    if (parts.length === 0) return '';
+    return `MARKETING COPY TO RENDER ON THE IMAGE:\n${parts.join('\n')}\nIMPORTANT: These text elements must be rendered as actual readable text ON the image, not as decoration. Use clean, modern typography that matches the brand style.`;
 }

@@ -2026,6 +2026,23 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             </p>
                         )}
 
+                        {/* ── Copywriter Agent Toggle ── */}
+                        <div className={`flex items-center justify-between px-3 py-2 rounded-xl mb-3 border transition-all ${generateCopy ? 'bg-violet-500/10 border-violet-500/30' : 'bg-white/[0.03] border-white/[0.06]'}`}>
+                            <div className="flex items-center gap-2.5">
+                                <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${generateCopy ? 'bg-violet-500/20' : 'bg-white/[0.06]'}`}>
+                                    <span className={`material-symbols-outlined text-sm ${generateCopy ? 'text-violet-400' : 'text-slate-500'}`}>edit_note</span>
+                                </div>
+                                <div>
+                                    <p className="text-xs font-bold text-white leading-tight">Copywriter Agent</p>
+                                    <p className="text-[10px] text-slate-500 leading-tight">{generateCopy ? 'AI writes headline, caption, CTA & hashtags' : 'Image only — enable for marketing copy'}</p>
+                                </div>
+                            </div>
+                            <button onClick={() => setGenerateCopy(!generateCopy)}
+                                className={`w-9 h-5 rounded-full transition-all cursor-pointer ${generateCopy ? 'bg-violet-500' : 'bg-white/[0.1]'}`}>
+                                <div className={`w-3.5 h-3.5 rounded-full bg-white shadow transition-transform ${generateCopy ? 'translate-x-4.5' : 'translate-x-0.5'}`} />
+                            </button>
+                        </div>
+
                         {/* ── Prompt Area ── */}
                         <div className="relative mb-3">
                             <textarea
@@ -2274,20 +2291,13 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 </div>
                             </div>
 
-                            {/* ✍️ Generate Copy Toggle */}
-                            <div className="flex items-center justify-between pb-3 border-b border-white/[0.05]">
-                                <div className="flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-sm text-violet-400">edit_note</span>
-                                    <div>
-                                        <p className="text-xs font-bold text-white">Generate Copy</p>
-                                        <p className="text-[10px] text-slate-500">{generateCopy ? 'AI writes caption, CTA & hashtags' : 'Image only — no caption'}</p>
-                                    </div>
+                            {/* ✍️ Generate Copy status — toggle is now above prompt area */}
+                            {generateCopy && (
+                                <div className="flex items-center gap-2 pb-3 border-b border-white/[0.05]">
+                                    <span className="material-symbols-outlined text-sm text-violet-400">check_circle</span>
+                                    <p className="text-xs text-violet-400 font-medium">Copywriter Agent active — will generate headline, caption, CTA & hashtags</p>
                                 </div>
-                                <button onClick={() => setGenerateCopy(!generateCopy)}
-                                    className={`w-9 h-5 rounded-full transition-all cursor-pointer ${generateCopy ? 'bg-violet-500' : 'bg-white/[0.1]'}`}>
-                                    <div className={`w-3.5 h-3.5 rounded-full bg-white shadow transition-transform ${generateCopy ? 'translate-x-4.5' : 'translate-x-0.5'}`} />
-                                </button>
-                            </div>
+                            )}
 
                             {/* Format moved to above prompt area — this section now just shows the lock */}
                             <div className="flex items-center gap-2 py-2 px-3 rounded-xl bg-primary/5 border border-primary/10">
