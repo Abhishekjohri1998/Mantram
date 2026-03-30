@@ -98,7 +98,7 @@ export const MODEL_CAPABILITIES = {
         maxReferenceImages: 3, costPerSecond: COST_PER_SECOND['veo-3.1-fast'], recommended: false,
     },
     'seedance-2.0': {
-        id: 'seedance-2.0', name: 'Seedance 2.0 Pro', icon: '🎥', provider: 'piapi',
+        id: 'seedance-2.0', name: 'Seedance 2.0 Pro', icon: '🎞️', provider: 'piapi',
         description: 'Cinematic video with native audio, camera control & physics',
         bestFor: 'Premium ads, product showcases, brand films',
         duration: { min: 4, max: 15, native: 15, step: 1 },
@@ -125,7 +125,7 @@ export const MODEL_CAPABILITIES = {
         maxReferenceImages: 0, costPerSecond: COST_PER_SECOND['hunyuan'], recommended: false,
     },
     'sora-2': {
-        id: 'sora-2', name: 'Sora 2', icon: '🎥', provider: 'laozhang',
+        id: 'sora-2', name: 'Sora 2', icon: '🎞️', provider: 'laozhang',
         description: 'OpenAI Sora 2 — cinematic storytelling, world-model understanding',
         bestFor: 'Cinematic ads, narrative storytelling, creative experiments',
         duration: { min: 5, max: 15, native: 15, step: 5 },
@@ -193,25 +193,50 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
         ...(referenceImages || []).map(img => ensureS3Url(img, 'video-studio/references'))
     ]);
 
-    // ── Seedance 2.0: Always go directly to PiAPI ──
-    // LaoZhang doesn't support image_urls for Seedance, and even for text-only
-    // Seedance it's intermittent (billing channel issues). PiAPI is the reliable path.
+    // ── Seedance 2.0: LaoZhang first (supports multimodal image), PiAPI text-only fallback ──
+    // PiAPI's image_urls requires a paid image-to-video channel — use LaoZhang multimodal instead.
+    // Strategy:
+    //   1. Try LaoZhang with first ref image as imageUrl (multimodal chat/completions)
+    //   2. If LaoZhang fails → PiAPI text-to-video only (no image_urls)
     if (model === 'seedance-2.0') {
-        console.log(`🎮 [PiAPI] Routing seedance-2.0 directly (LaoZhang skipped — no image_urls support)`);
-        // Pass already-uploaded S3 refs directly — PiAPI client will NOT re-upload http(s) URLs
+        // Use first ref image or explicit imageUrl for LaoZhang multimodal
+        const lzImageUrl = s3ImageUrl || s3ReferenceImages[0] || null;
+
+        if (isLaozhangAvailable()) {
+            try {
+                console.log(`🎬 [LaoZhang] Attempting seedance-2.0 ${lzImageUrl ? 'with image' : 'text-only'}...`);
+                const lzResult = await submitLaozhangVideoGeneration({
+                    model: 'seedance-2.0',
+                    prompt,
+                    imageUrl: lzImageUrl, // LaoZhang uses multimodal chat format — works with single image
+                    duration: duration || 5,
+                    aspectRatio: aspectRatio || '16:9',
+                    generateAudio: generateAudio !== false,
+                });
+                if (lzResult?.videoUrl) {
+                    console.log(`✅ [LaoZhang] seedance-2.0 done: ${lzResult.videoUrl.substring(0, 80)}`);
+                    return { requestId: `lz-${Date.now()}`, endpoint: `laozhang-seedance-2.0`, provider: 'laozhang', _laozhangVideoUrl: lzResult.videoUrl };
+                }
+            } catch (lzErr) {
+                console.warn(`⚠️ [LaoZhang] seedance-2.0 failed: ${lzErr.message} — falling back to PiAPI text-only`);
+            }
+        }
+
+        // PiAPI fallback — text-to-video ONLY (no image_urls, avoids 500)
+        console.log(`🎮 [PiAPI] Falling back to seedance-2.0 text-to-video (no images)...`);
         const result = await submitPiApiVideoGeneration({
             prompt,
-            imageUrl: s3ImageUrl,
+            imageUrl: null,          // No image — avoids PiAPI image_urls 500
             duration,
             aspectRatio: aspectRatio || '16:9',
             generateAudio,
-            referenceImages: s3ReferenceImages, // already S3-hosted, skip re-upload
+            referenceImages: [],     // Empty — text-to-video only on current PiAPI plan
             qualityMode: mode || 'fast',
         });
         return { requestId: result.taskId, endpoint: 'piapi-seedance-2.0', provider: 'piapi', _piApiPayload: result._payload };
     }
 
-    // ── LaoZhang-First Routing (non-seedance models) ──
+    // ── LaoZhang-First Routing (other models) ──
     const LZ_VIDEO_MODELS = ['sora-2', 'veo-3.1', 'veo-3.1-fast', 'kling-3.0'];
     if (LZ_VIDEO_MODELS.includes(model) && isLaozhangAvailable()) {
         try {
