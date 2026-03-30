@@ -455,9 +455,12 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
     // Falls through to direct provider on failure.
     // ══════════════════════════════════════════════════════════════════
     const LZ_VIDEO_MODELS = ['sora-2', 'veo-3.1', 'veo-3.1-fast', 'kling-3.0', 'seedance-2.0'];
-    if (LZ_VIDEO_MODELS.includes(model) && isLaozhangAvailable()) {
-        try {
-            console.log(`🏷️ [LaoZhang-First] Attempting ${model} via LaoZhang (cheapest)...`);
+    const lzAvailable = isLaozhangAvailable();
+    
+    if (LZ_VIDEO_MODELS.includes(model)) {
+        if (lzAvailable) {
+            try {
+                console.log(`🏷️ [LaoZhang-First] Attempting ${model} via LaoZhang (cheapest)...`);
             const lzResult = await submitLaozhangVideoGeneration({
                 model,
                 prompt,
@@ -473,18 +476,36 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
                     requestId: `lz-${Date.now()}`,
                     endpoint: `laozhang-${model}`,
                     statusUrl: null,
-                    resultUrl: null,
-                    provider: 'laozhang',
-                    // Store the video URL directly since LZ is synchronous
-                    _laozhangVideoUrl: lzResult.videoUrl,
-                };
+                const lzResult = await submitLaozhangVideoGeneration({
+                    model,
+                    prompt,
+                    imageUrl: s3ImageUrl,
+                    duration: duration || 5,
+                    aspectRatio: aspectRatio || '16:9',
+                    generateAudio: generateAudio !== false,
+                });
+
+                if (lzResult?.videoUrl) {
+                    console.log(`✅ [LaoZhang] ${model} video generated successfully (sync). URL: ${lzResult.videoUrl.substring(0, 80)}...`);
+                    return {
+                        requestId: `lz-${Date.now()}`,
+                        endpoint: `laozhang-${model}`,
+                        statusUrl: null,
+                        resultUrl: null,
+                        provider: 'laozhang',
+                        // Store the video URL directly since LZ is synchronous
+                        _laozhangVideoUrl: lzResult.videoUrl,
+                    };
+                }
+            } catch (lzErr) {
+                // Sora 2 is LZ-only — don't fall through
+                if (model === 'sora-2') {
+                    throw new Error(`Sora 2 generation failed: ${lzErr.message}`);
+                }
+                console.warn(`⚠️ [LaoZhang] ${model} failed (${lzErr.message?.substring(0, 150)}), falling through to direct provider...`);
             }
-        } catch (lzErr) {
-            // Sora 2 is LZ-only — don't fall through
-            if (model === 'sora-2') {
-                throw new Error(`Sora 2 generation failed: ${lzErr.message}`);
-            }
-            console.warn(`⚠️ [LaoZhang] ${model} failed (${lzErr.message?.substring(0, 150)}), falling through to direct provider...`);
+        } else {
+            console.warn(`⚠️ [LaoZhang] ${model} requested but LaoZhang is not configured (missing LAOZHANG_API_KEY). Falling through...`);
         }
     }
 
