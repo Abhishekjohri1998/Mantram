@@ -28,6 +28,7 @@
  *   NOTE: output.video (NOT output.video_url)
  */
 
+import fetch from 'node-fetch';
 import config from '../../config/env.js';
 import sharp from 'sharp';
 import { uploadToS3, ensureS3Url } from '../../utils/s3.js';

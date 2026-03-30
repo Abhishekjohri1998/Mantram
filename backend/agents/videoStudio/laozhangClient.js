@@ -24,6 +24,8 @@
  * API Base: https://api.laozhang.ai/v1
  */
 
+import fetch from 'node-fetch';
+
 const LAOZHANG_BASE_URL = process.env.LAOZHANG_BASE_URL || 'https://api.laozhang.ai/v1';
 
 function getApiKey() {
