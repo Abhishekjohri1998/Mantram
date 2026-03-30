@@ -606,15 +606,23 @@ export async function durationPlannerNode(state) {
  * Submits video generation with user-provided or enhanced prompt.
  */
 export async function advancedGenerateNode(state) {
-    const prompt = state.enhancedPrompt || state.prompt;
+    const prompt = (state.enhancedPrompt || state.prompt || '').trim();
     const model = state.model || 'kling-3.0';
     const cap = MODEL_CAPABILITIES[model];
+    
+    // Safety check for duration to prevent NaN
+    const minDur = cap?.duration?.min || 3;
+    const maxDur = cap?.duration?.native || 15;
     const duration = Math.min(
-        Math.max(state.duration || 5, cap?.duration.min || 3),
-        cap?.duration.native || 15
+        Math.max(Number(state.duration) || 5, minDur),
+        maxDur
     );
 
-    console.log(`🎬 Advanced Generate: ${model}, ${duration}s, refImages: ${(state.referenceImages || []).length}, prompt: ${prompt.substring(0, 100)}...`);
+    console.log(`🎬 Advanced Generate: Model=${model}, Dur=${duration}s, refImages=${(state.referenceImages || []).length}, prompt="${prompt.substring(0, 60)}..."`);
+
+    if (!prompt) {
+        throw new Error('Video generation failed: Prompt is missing or empty after processing.');
+    }
 
     // For PiAPI (seedance), base64 is supported in image_urls — other providers use ensureS3Url
     let imageUrl = state.firstImageUrl || undefined;

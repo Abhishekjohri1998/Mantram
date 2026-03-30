@@ -157,12 +157,16 @@ function getGrokApiKey() {
 }
 
 function buildPayload(model, { prompt, imageUrl, duration, resolution, mode, shots, generateAudio }) {
-    const dur = Math.min(Math.max(duration || 5, DURATION_LIMITS[model]?.min || 3), DURATION_LIMITS[model]?.max || 15);
+    const limits = DURATION_LIMITS[model] || { min: 3, max: 15 };
+    const dur = Math.min(Math.max(Number(duration) || 5, limits.min), limits.max);
 
     if (model === 'kling-3.0') {
         const payload = { aspect_ratio: '16:9', negative_prompt: 'blur, distort, and low quality', cfg_scale: 0.5, generate_audio: generateAudio !== false };
         if (shots && shots.length > 1) {
-            payload.multi_prompt = shots.map(s => ({ prompt: s.visual || s.prompt || prompt, duration: String(Math.min(Math.max(s.duration || 5, 3), 15)) }));
+            payload.multi_prompt = shots.map(s => {
+                const sDur = Math.min(Math.max(Number(s.duration) || 5, 3), 15);
+                return { prompt: s.visual || s.prompt || prompt, duration: String(sDur) };
+            });
             payload.shot_type = 'customize';
         } else {
             payload.prompt = prompt;
