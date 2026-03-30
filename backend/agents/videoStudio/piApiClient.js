@@ -26,6 +26,11 @@
  * Get task response (completed):
  *   { "data": { "status": "completed", "output": { "video": "https://..." } } }
  *   NOTE: output.video (NOT output.video_url)
+ * 
+ * ⚠️ CRITICAL PIAPI LIMITATION (confirmed March 2026):
+ *   - seedance-2-fast-preview: does NOT support image_urls — text-to-video ONLY
+ *   - seedance-2-preview: supports image_urls for image-to-video/ref images
+ *   When images are provided, we auto-upgrade to seedance-2-preview regardless of qualityMode.
  */
 
 import fetch from 'node-fetch';
@@ -60,6 +65,21 @@ function getPiApiKey() {
     const key = config.piapi?.apiKey || process.env.PIAPI_API_KEY;
     if (!key) throw new Error('PIAPI_API_KEY not configured. Add it to .env');
     return key;
+}
+
+/**
+ * Resolve the correct task_type for a given qualityMode + whether images are present.
+ * 
+ * ⚠️ seedance-2-fast-preview does NOT support image_urls — it will always return 500.
+ * When images are present, we MUST use seedance-2-preview regardless of qualityMode.
+ */
+function resolveTaskType(qualityMode, hasImages) {
+    if (hasImages) {
+        // Fast mode does not support image_urls — force quality (standard) preview
+        console.log(`📌 PiAPI: images present → forcing seedance-2-preview (fast-preview doesn't support image_urls)`);
+        return 'seedance-2-preview';
+    }
+    return qualityMode === 'quality' ? 'seedance-2-preview' : 'seedance-2-fast-preview';
 }
 
 /**
@@ -128,12 +148,10 @@ async function verifyHostedUrl(url) {
 }
 
 /**
- * Upload a base64 image to a free file hosting service to get a public URL.
- * Uses catbox.moe (primary) and tmpfiles.org / 0x0.st (fallbacks).
+ * Upload a base64 image to S3 to get a public URL.
  * Returns hosted URL or null.
  */
 export async function uploadImageToHostedUrl(base64DataUri) {
-    // This helper now uses the central ensureS3Url utility
     return await ensureS3Url(base64DataUri, 'video-studio/piapi');
 }
 
@@ -147,7 +165,6 @@ async function submitPiApiPayload(payload) {
     const MAX_ATTEMPTS = 3;
 
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-        // 🕵️ DIAGNOSTIC: Log the pre-sent payload (simplified for clarity)
         console.log(`🎬 PiAPI submit attempt ${attempt}/${MAX_ATTEMPTS}:`, JSON.stringify({
             model: payload.model,
             task_type: payload.task_type,
@@ -155,7 +172,7 @@ async function submitPiApiPayload(payload) {
                 ...payload.input,
                 prompt: payload.input.prompt.substring(0, 100) + '...',
                 image_urls: payload.input.image_urls ? `${payload.input.image_urls.length} images` : undefined,
-                duration: `${payload.input.duration} (${typeof payload.input.duration})` // Confirming type
+                duration: payload.input.duration, // Number — confirmed correct type
             }
         }, null, 2));
 
@@ -210,13 +227,11 @@ async function submitPiApiPayload(payload) {
 /**
  * Submit video generation to PiAPI (Seedance 2.0)
  * Returns { taskId, provider: 'piapi', _payload }
+ * 
+ * ⚠️ AUTO-UPGRADES to seedance-2-preview when images are provided,
+ * because seedance-2-fast-preview does not support image_urls (returns 500).
  */
 export async function submitPiApiVideoGeneration({ prompt, imageUrl, duration, aspectRatio, generateAudio = true, referenceImages = [], qualityMode = 'fast' }) {
-    // ⚠️ CRITICAL: 'seedance-2-fast-preview' (Fast mode) is strictly limited to 5 seconds by the PiAPI backend.
-    // Standard 'seedance-2-preview' (Quality mode) supports up to 15 seconds.
-    const maxDur = qualityMode === 'quality' ? 15 : 5;
-    const dur = Math.min(Math.max(parseInt(duration, 10) || 5, 5), maxDur);
-
     console.log(`🎞️ PiAPI received: ${referenceImages.length} ref images, imageUrl: ${imageUrl ? 'yes' : 'no'}, quality: ${qualityMode}`);
 
     let finalPrompt = prompt;
@@ -253,22 +268,29 @@ export async function submitPiApiVideoGeneration({ prompt, imageUrl, duration, a
     finalPrompt = finalPrompt.replace(/<img>[^<]*<\/img>/g, '').trim();
     finalPrompt = truncatePrompt(finalPrompt);
 
+    // ⚠️ CRITICAL: fast-preview doesn't support image_urls — auto-upgrade when images present
+    const hasImages = imageUrls.length > 0;
+    const taskType = resolveTaskType(qualityMode, hasImages);
+
+    // Duration cap: fast-preview max 5s, standard preview max 15s
+    const maxDur = taskType === 'seedance-2-fast-preview' ? 5 : 15;
+    const dur = Math.min(Math.max(parseInt(duration, 10) || 5, 5), maxDur);
+
+    console.log(`🎯 PiAPI task_type: ${taskType} | duration: ${dur}s | images: ${imageUrls.length}`);
+
     // Build task input
     const taskInput = {
         prompt: finalPrompt,
         aspect_ratio: aspectRatio || '16:9',
-        duration: dur, // Reverted to Number — PiAPI is strict for Seedance 2
+        duration: dur,
         generate_audio: generateAudio !== false,
-        no_watermark: true, // Remove watermark on paid PiAPI plans
+        no_watermark: true,
     };
 
     if (imageUrls.length > 0) {
         taskInput.image_urls = imageUrls;
         console.log(`📸 Sending ${imageUrls.length} image(s) via input.image_urls:`, imageUrls.map(u => u.substring(0, 60)));
     }
-
-    const taskType = qualityMode === 'quality' ? 'seedance-2-preview' : 'seedance-2-fast-preview';
-    console.log(`🎯 PiAPI task_type: ${taskType} (quality mode: ${qualityMode})`);
 
     const payload = {
         model: 'seedance',
@@ -299,13 +321,10 @@ export async function resubmitPiApiTask(storedPayload) {
 
 /**
  * Submit Image-to-Video generation to PiAPI (Seedance 2.0)
+ * Always uses seedance-2-preview because image_urls are required.
  */
 export async function submitPiApiImageToVideo({ imageUrl, prompt, duration, aspectRatio, qualityMode = 'fast', referenceImages = [] }) {
     if (!imageUrl) throw new Error('Image URL is required for Image-to-Video');
-
-    // ⚠️ CRITICAL: Match duration limits with fast-preview requirements (max 5s)
-    const maxDur = qualityMode === 'quality' ? 15 : 5;
-    const dur = Math.min(Math.max(parseInt(duration, 10) || 5, 5), maxDur);
 
     console.log(`🖼️→🎬 PiAPI I2V: imageUrl=${imageUrl.substring(0, 60)}..., refs=${referenceImages.length}, quality=${qualityMode}`);
 
@@ -331,8 +350,11 @@ export async function submitPiApiImageToVideo({ imageUrl, prompt, duration, aspe
     finalPrompt = finalPrompt.replace(/<img>[^<]*<\/img>/g, '').trim();
     finalPrompt = truncatePrompt(finalPrompt);
 
-    const taskType = qualityMode === 'quality' ? 'seedance-2-preview' : 'seedance-2-fast-preview';
-    console.log(`🎯 PiAPI I2V task_type: ${taskType}`);
+    // ⚠️ I2V always has images → always use seedance-2-preview
+    const taskType = 'seedance-2-preview';
+    const dur = Math.min(Math.max(parseInt(duration, 10) || 5, 5), 15);
+
+    console.log(`🎯 PiAPI I2V task_type: ${taskType} | duration: ${dur}s`);
 
     const payload = {
         model: 'seedance',
@@ -341,8 +363,8 @@ export async function submitPiApiImageToVideo({ imageUrl, prompt, duration, aspe
             prompt: finalPrompt,
             image_urls: [hostedUrl, ...hostedRefs.filter(Boolean)],
             aspect_ratio: aspectRatio || '16:9',
-            duration: dur, // Reverted to Number
-            no_watermark: true, // Remove watermark on paid PiAPI plans
+            duration: dur,
+            no_watermark: true,
         },
     };
 
@@ -368,6 +390,7 @@ export async function submitPiApiVideoExtend({ parentTaskId, prompt, duration, q
 
     console.log(`🔗 PiAPI Extend: parentTaskId=${parentTaskId}, duration=${dur}s, quality=${qualityMode}`);
 
+    // Extend has no image_urls — safe to use fast-preview
     const taskType = qualityMode === 'quality' ? 'seedance-2-preview' : 'seedance-2-fast-preview';
 
     const payload = {
@@ -375,9 +398,9 @@ export async function submitPiApiVideoExtend({ parentTaskId, prompt, duration, q
         task_type: taskType,
         input: {
             prompt: prompt || '',
-            duration: dur, // Reverted to Number
+            duration: dur,
             parent_task_id: parentTaskId,
-            no_watermark: true, // Remove watermark on paid PiAPI plans
+            no_watermark: true,
         },
     };
 
