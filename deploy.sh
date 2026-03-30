@@ -1,8 +1,11 @@
 #!/bin/bash
 # Mantram Deploy Script
 # Usage: bash /home/ec2-user/Mantram/deploy.sh
+# Or full one-liner: cd /home/ec2-user/Mantram && git pull origin main && bash deploy.sh
 
 set -e
+
+APP_DIR="/home/ec2-user/Mantram/backend"
 
 echo "🚀 Starting Mantram deployment..."
 
@@ -10,22 +13,22 @@ echo "🚀 Starting Mantram deployment..."
 cd /home/ec2-user/Mantram
 git pull origin main
 
-# Find latest deployment folder
-LATEST=$(ls /home/ec2-user/deployments/ | sort | tail -1)
-BACKEND_PATH="/home/ec2-user/deployments/${LATEST}/backend"
+# Install any new dependencies
+echo "📦 Installing dependencies..."
+cd "$APP_DIR"
+npm install --omit=dev
 
-echo "📁 Latest deployment: ${LATEST}"
-echo "📂 Backend path: ${BACKEND_PATH}"
+cd /home/ec2-user/Mantram
 
-# Start or restart PM2 — always pass --update-env to pick up any .env changes
+# Start or restart PM2 — always pointing at Mantram/backend directly
 if pm2 describe mantram-server > /dev/null 2>&1; then
-    echo "🔄 Process found — restarting with updated env..."
+    echo "🔄 Restarting with updated env..."
     pm2 restart mantram-server --update-env
 else
-    echo "▶️  No process found — starting fresh..."
-    pm2 start "${BACKEND_PATH}/index.js" --name mantram-server
+    echo "▶️  Starting fresh..."
+    pm2 start "$APP_DIR/index.js" --name mantram-server -i 2 --update-env
 fi
 
 pm2 save
-echo "✅ Deploy complete! Server is running."
+echo "✅ Deploy complete!"
 pm2 list
