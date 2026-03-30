@@ -449,13 +449,12 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
     // ══════════════════════════════════════════════════════════════════
     // LAOZHANG-FIRST ROUTING — Cheapest provider, synchronous return
     // Only models CONFIRMED WORKING on LZ (March 30, 2026):
-    //   ✅ veo-3.1, veo-3.1-fast, sora-2 
-    //   ❌ kling-3.0, seedance-2.0 → 503 "no billing channel" 
+    //   ✅ veo-3.1, veo-3.1-fast, sora-2, kling-3.0, seedance-2.0 
     //   ❌ seedance-1.0 → 503 "no available channel"
     // To enable more models: activate billing channels on LZ dashboard
     // Falls through to direct provider on failure.
     // ══════════════════════════════════════════════════════════════════
-    const LZ_VIDEO_MODELS = ['sora-2', 'veo-3.1', 'veo-3.1-fast'];
+    const LZ_VIDEO_MODELS = ['sora-2', 'veo-3.1', 'veo-3.1-fast', 'kling-3.0', 'seedance-2.0'];
     if (LZ_VIDEO_MODELS.includes(model) && isLaozhangAvailable()) {
         try {
             console.log(`🏷️ [LaoZhang-First] Attempting ${model} via LaoZhang (cheapest)...`);
