@@ -17,10 +17,10 @@ BACKEND_PATH="/home/ec2-user/deployments/${LATEST}/backend"
 echo "📁 Latest deployment: ${LATEST}"
 echo "📂 Backend path: ${BACKEND_PATH}"
 
-# Start or restart PM2
+# Start or restart PM2 — always pass --update-env to pick up any .env changes
 if pm2 describe mantram-server > /dev/null 2>&1; then
-    echo "🔄 Process found — restarting..."
-    pm2 restart mantram-server
+    echo "🔄 Process found — restarting with updated env..."
+    pm2 restart mantram-server --update-env
 else
     echo "▶️  No process found — starting fresh..."
     pm2 start "${BACKEND_PATH}/index.js" --name mantram-server
