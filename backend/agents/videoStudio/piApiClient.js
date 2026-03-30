@@ -146,12 +146,15 @@ async function submitPiApiPayload(payload) {
     const MAX_ATTEMPTS = 3;
 
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+        // 🕵️ DIAGNOSTIC: Log the pre-sent payload (simplified for clarity)
         console.log(`🎬 PiAPI submit attempt ${attempt}/${MAX_ATTEMPTS}:`, JSON.stringify({
-            ...payload,
+            model: payload.model,
+            task_type: payload.task_type,
             input: {
                 ...payload.input,
-                prompt: payload.input.prompt.substring(0, 200) + '...',
-                image_urls: payload.input.image_urls?.map(u => u.substring(0, 60) + '...'),
+                prompt: payload.input.prompt.substring(0, 100) + '...',
+                image_urls: payload.input.image_urls ? `${payload.input.image_urls.length} images` : undefined,
+                duration: `${payload.input.duration} (${typeof payload.input.duration})` // Confirming type
             }
         }, null, 2));
 
@@ -253,7 +256,7 @@ export async function submitPiApiVideoGeneration({ prompt, imageUrl, duration, a
     const taskInput = {
         prompt: finalPrompt,
         aspect_ratio: aspectRatio || '16:9',
-        duration: String(dur),
+        duration: dur, // Reverted to Number — PiAPI is strict for Seedance 2
         generate_audio: generateAudio !== false,
         no_watermark: true, // Remove watermark on paid PiAPI plans
     };
@@ -337,7 +340,7 @@ export async function submitPiApiImageToVideo({ imageUrl, prompt, duration, aspe
             prompt: finalPrompt,
             image_urls: [hostedUrl, ...hostedRefs.filter(Boolean)],
             aspect_ratio: aspectRatio || '16:9',
-            duration: String(dur),
+            duration: dur, // Reverted to Number
             no_watermark: true, // Remove watermark on paid PiAPI plans
         },
     };
@@ -371,7 +374,7 @@ export async function submitPiApiVideoExtend({ parentTaskId, prompt, duration, q
         task_type: taskType,
         input: {
             prompt: prompt || '',
-            duration: String(dur),
+            duration: dur, // Reverted to Number
             parent_task_id: parentTaskId,
             no_watermark: true, // Remove watermark on paid PiAPI plans
         },
