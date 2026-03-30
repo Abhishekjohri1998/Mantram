@@ -78,13 +78,13 @@ const MODEL_AVAILABLE = {
 // ── Cost table (USD per second of video) ──
 export const COST_PER_SECOND = {
     'kling-3.0': { fast: 0.07, quality: 0.12 },
-    'veo-3.1': { fast: 0.10, quality: 0.25 },       // LaoZhang primary (was 0.15/0.40 on fal.ai)
-    'veo-3.1-fast': { fast: 0.06, quality: 0.10 },   // LaoZhang primary (was 0.08/0.15 on kie.ai)
+    'veo-3.1': { fast: 0.10, quality: 0.25 },
+    'veo-3.1-fast': { fast: 0.06, quality: 0.10 },
     'seedance-1.0': { fast: 0.05, quality: 0.08 },
-    'seedance-2.0': { fast: 0.05, quality: 0.10 },   // LaoZhang primary (was 0.08/0.15 on PiAPI)
+    'seedance-2.0': { fast: 0.05, quality: 0.10 },
     'grok-imagine': { fast: 0.08, quality: 0.08 },
     'hunyuan': { fast: 0.03, quality: 0.05 },
-    'sora-2': { fast: 0.10, quality: 0.15 },         // LaoZhang only
+    'sora-2': { fast: 0.10, quality: 0.15 },
 };
 
 // ── Duration limits per model ──
@@ -229,8 +229,6 @@ export function estimateCost(model = 'kling-3.0', durationSeconds = 5, resolutio
     const resMult = resolution === '720p' ? 0.7 : 1.0;
     const usd = Number((costPerSec * durationSeconds * resMult).toFixed(2));
     const inr = Number((usd * 85).toFixed(0));
-    // ceil(usd × 70) ensures ~75% gross margin at ₹5/credit floor price
-    // Min 5 credits for any video generation
     const credits = Math.max(Math.ceil(usd * 70), 5);
 
     return {
@@ -259,24 +257,20 @@ function buildPayload(model, { prompt, imageUrl, duration, resolution, mode, sho
     );
 
     if (model === 'kling-3.0') {
-        // Kling 3.0 — supports multi_prompt for shot-by-shot
         const payload = {
             aspect_ratio: '16:9',
             negative_prompt: 'blur, distort, and low quality',
             cfg_scale: 0.5,
-            generate_audio: generateAudio !== false, // Default true
+            generate_audio: generateAudio !== false,
         };
 
-        // Multi-prompt: if we have shots, use per-shot prompts
         if (shots && shots.length > 1) {
-            // IMPORTANT: When using multi_prompt, do NOT set top-level duration or prompt
             payload.multi_prompt = shots.map(shot => ({
                 prompt: shot.visual || shot.prompt || prompt,
                 duration: String(Math.min(Math.max(shot.duration || 5, 3), 15)),
             }));
             payload.shot_type = 'customize';
         } else {
-            // Single prompt mode
             payload.prompt = prompt;
             payload.duration = String(dur);
         }
@@ -295,7 +289,6 @@ function buildPayload(model, { prompt, imageUrl, duration, resolution, mode, sho
     }
 
     if (model === 'seedance-1.0') {
-        // Seedance 1.0 only supports 5 or 10
         const seedDur = dur >= 8 ? '10' : '5';
         return {
             prompt,
@@ -335,13 +328,12 @@ function getGrokApiKey() {
 }
 
 /**
- * Submit video generation to Grok Imagine API (xAI native, not fal.ai)
- * Returns { requestId, provider: 'grok' }
+ * Submit video generation to Grok Imagine API
  */
 async function submitGrokVideoGeneration({ prompt, imageUrl, duration, resolution, aspectRatio }) {
     const apiKey = getGrokApiKey();
     const dur = Math.min(Math.max(duration || 5, 1), 15);
-    const res = resolution === '480p' ? '480p' : '720p'; // Grok only supports 480p/720p
+    const res = resolution === '480p' ? '480p' : '720p';
 
     const payload = {
         model: 'grok-imagine-video',
@@ -351,16 +343,11 @@ async function submitGrokVideoGeneration({ prompt, imageUrl, duration, resolutio
         resolution: res,
     };
 
-    // Image-to-video: xAI API requires nested { image: { url: "..." } } format
-    // Reference: https://docs.x.ai/docs/guides/video-generation#generate-videos-from-images
     if (imageUrl) {
         payload.image = { url: imageUrl };
     }
 
     console.log(`🎬 Submitting to Grok Imagine: grok-imagine-video (${dur}s, ${res}, ratio: ${aspectRatio || '16:9'})`);
-    console.log(`   📸 image: ${payload.image?.url ? payload.image.url.substring(0, 120) + '...' : 'NONE (text-to-video)'}`);
-    console.log(`   📝 prompt: ${prompt.substring(0, 120)}...`);
-    console.log(`   📦 Full payload:`, JSON.stringify(payload, null, 2).substring(0, 600));
 
     const response = await fetch(`${GROK_BASE_URL}/videos/generations`, {
         method: 'POST',
@@ -373,22 +360,15 @@ async function submitGrokVideoGeneration({ prompt, imageUrl, duration, resolutio
 
     if (!response.ok) {
         const errText = await response.text();
-        console.error(`❌ Grok Imagine error (${response.status}):`, errText);
         throw new Error(`Grok video submission failed (${response.status}): ${errText}`);
     }
 
     const data = await response.json();
-    console.log(`✅ Grok Imagine queued: requestId=${data.request_id}`);
-
-    return {
-        requestId: data.request_id,
-        provider: 'grok',
-    };
+    return { requestId: data.request_id, provider: 'grok' };
 }
 
 /**
  * Poll Grok Imagine video generation status
- * Returns { status, progress, videoUrl }
  */
 export async function getGrokGenerationStatus(requestId) {
     const apiKey = getGrokApiKey();
@@ -398,12 +378,10 @@ export async function getGrokGenerationStatus(requestId) {
     });
 
     if (!response.ok) {
-        console.error(`❌ Grok status check failed: ${response.status}`);
         return { status: 'FAILED', progress: 0, error: `Status check failed: ${response.status}` };
     }
 
     const data = await response.json();
-    console.log(`📊 Grok Imagine status for ${requestId}: ${data.status}`);
 
     if (data.status === 'done') {
         return {
@@ -417,65 +395,33 @@ export async function getGrokGenerationStatus(requestId) {
     }
 
     if (data.status === 'expired') {
-        return {
-            status: 'FAILED',
-            progress: 0,
-            error: 'Grok video generation request expired. Try again.',
-        };
+        return { status: 'FAILED', progress: 0, error: 'Grok video generation request expired. Try again.' };
     }
 
-    // pending
-    return {
-        status: 'IN_PROGRESS',
-        progress: 40,
-    };
+    return { status: 'IN_PROGRESS', progress: 40 };
 }
 
 /**
  * Submit video generation — routes to the correct provider
- * Returns { requestId, endpoint, statusUrl, resultUrl, provider }
  */
 export async function submitVideoGeneration({ model, prompt, imageUrl, duration, resolution, mode, shots, generateAudio, aspectRatio, referenceImages }) {
     if (!MODEL_AVAILABLE[model]) {
         throw new Error(`Model '${model}' is not available. Use kling-3.0, veo-3.1, veo-3.1-fast, seedance-1.0, seedance-2.0, sora-2, or grok-imagine.`);
     }
 
-    // Standardize storage: Upload all images to S3 in parallel
     const [s3ImageUrl, ...s3ReferenceImages] = await Promise.all([
         ensureS3Url(imageUrl, 'video-studio/generations'),
         ...(referenceImages || []).map(img => ensureS3Url(img, 'video-studio/references'))
     ]);
 
-    // ══════════════════════════════════════════════════════════════════
-    // LAOZHANG-FIRST ROUTING — Cheapest provider, synchronous return
-    // Only models CONFIRMED WORKING on LZ (March 30, 2026):
-    //   ✅ veo-3.1, veo-3.1-fast, sora-2, kling-3.0, seedance-2.0 
-    //   ❌ seedance-1.0 → 503 "no available channel"
-    // To enable more models: activate billing channels on LZ dashboard
-    // Falls through to direct provider on failure.
-    // ══════════════════════════════════════════════════════════════════
+    // ── LaoZhang-First Routing ──
     const LZ_VIDEO_MODELS = ['sora-2', 'veo-3.1', 'veo-3.1-fast', 'kling-3.0', 'seedance-2.0'];
     const lzAvailable = isLaozhangAvailable();
-    
+
     if (LZ_VIDEO_MODELS.includes(model)) {
         if (lzAvailable) {
             try {
                 console.log(`🏷️ [LaoZhang-First] Attempting ${model} via LaoZhang (cheapest)...`);
-            const lzResult = await submitLaozhangVideoGeneration({
-                model,
-                prompt,
-                imageUrl: s3ImageUrl,
-                duration: duration || 5,
-                aspectRatio: aspectRatio || '16:9',
-                generateAudio: generateAudio !== false,
-            });
-
-            if (lzResult?.videoUrl) {
-                console.log(`✅ [LaoZhang] ${model} video generated successfully (sync). URL: ${lzResult.videoUrl.substring(0, 80)}...`);
-                return {
-                    requestId: `lz-${Date.now()}`,
-                    endpoint: `laozhang-${model}`,
-                    statusUrl: null,
                 const lzResult = await submitLaozhangVideoGeneration({
                     model,
                     prompt,
@@ -486,38 +432,30 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
                 });
 
                 if (lzResult?.videoUrl) {
-                    console.log(`✅ [LaoZhang] ${model} video generated successfully (sync). URL: ${lzResult.videoUrl.substring(0, 80)}...`);
+                    console.log(`✅ [LaoZhang] ${model} video generated successfully (sync).`);
                     return {
                         requestId: `lz-${Date.now()}`,
                         endpoint: `laozhang-${model}`,
                         statusUrl: null,
                         resultUrl: null,
                         provider: 'laozhang',
-                        // Store the video URL directly since LZ is synchronous
                         _laozhangVideoUrl: lzResult.videoUrl,
                     };
                 }
             } catch (lzErr) {
-                // Sora 2 is LZ-only — don't fall through
                 if (model === 'sora-2') {
                     throw new Error(`Sora 2 generation failed: ${lzErr.message}`);
                 }
                 console.warn(`⚠️ [LaoZhang] ${model} failed (${lzErr.message?.substring(0, 150)}), falling through to direct provider...`);
             }
         } else {
-            console.warn(`⚠️ [LaoZhang] ${model} requested but LaoZhang is not configured (missing LAOZHANG_API_KEY). Falling through...`);
+            console.warn(`⚠️ [LaoZhang] ${model} requested but LaoZhang is not configured. Falling through...`);
         }
     }
 
-    // ── Grok Imagine: use native xAI API instead of fal.ai ──
+    // ── Grok Imagine ──
     if (model === 'grok-imagine') {
-        const result = await submitGrokVideoGeneration({ 
-            prompt, 
-            imageUrl: s3ImageUrl, 
-            duration, 
-            resolution, 
-            aspectRatio 
-        });
+        const result = await submitGrokVideoGeneration({ prompt, imageUrl: s3ImageUrl, duration, resolution, aspectRatio });
         return {
             requestId: result.requestId,
             endpoint: 'grok-imagine-video',
@@ -530,13 +468,7 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
     // ── Veo 3.1 Fast: kie.ai ──
     if (model === 'veo-3.1-fast') {
         console.log(`🎬 [Veo 3.1 Fast] Using kie.ai...`);
-        const result = await submitKieVideoGeneration({ 
-            model, 
-            prompt, 
-            imageUrl: s3ImageUrl, 
-            duration, 
-            aspectRatio: aspectRatio || '16:9' 
-        });
+        const result = await submitKieVideoGeneration({ model, prompt, imageUrl: s3ImageUrl, duration, aspectRatio: aspectRatio || '16:9' });
         return {
             requestId: result.taskId,
             endpoint: `kie-${model}`,
@@ -550,19 +482,11 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
     if (model === 'seedance-2.0') {
         const piApiKey = process.env.PIAPI_API_KEY;
         if (!piApiKey) {
-            throw new Error('Seedance 2.0 requires PIAPI_API_KEY to be configured. Please add it to .env or try a different video model.');
+            throw new Error('Seedance 2.0 requires PIAPI_API_KEY to be configured.');
         }
 
         console.log(`🎬 [Seedance 2.0] Using PiAPI...`);
-        const result = await submitPiApiVideoGeneration({ 
-            prompt, 
-            imageUrl: s3ImageUrl, 
-            duration, 
-            aspectRatio: aspectRatio || '16:9', 
-            generateAudio, 
-            referenceImages: s3ReferenceImages, 
-            qualityMode: mode || 'fast' 
-        });
+        const result = await submitPiApiVideoGeneration({ prompt, imageUrl: s3ImageUrl, duration, aspectRatio: aspectRatio || '16:9', generateAudio, referenceImages: s3ReferenceImages, qualityMode: mode || 'fast' });
         return {
             requestId: result.taskId,
             endpoint: `piapi-seedance-2.0`,
@@ -573,33 +497,19 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
         };
     }
 
-    // ── fal.ai models (Kling, Veo 3.1 standard, Seedance 1.0) ──
+    // ── fal.ai models (Kling, Veo 3.1 standard, Seedance 1.0, HunyuanVideo) ──
     const apiKey = getApiKey();
-
     const endpoints = MODEL_ENDPOINTS[model];
     if (!endpoints) throw new Error(`Unknown video model: ${model}`);
 
-    // Choose text-to-video vs image-to-video
     const endpoint = s3ImageUrl ? endpoints.imageToVideo : endpoints.textToVideo;
+    const payload = buildPayload(model, { prompt, imageUrl: s3ImageUrl, duration, resolution, mode, shots, generateAudio });
 
-    // Build payload
-    const payload = buildPayload(model, { 
-        prompt, 
-        imageUrl: s3ImageUrl, 
-        duration, 
-        resolution, 
-        mode, 
-        shots, 
-        generateAudio 
-    });
-
-    // Add image URL for image-to-video
     if (s3ImageUrl) {
         payload.image_url = s3ImageUrl;
     }
 
     console.log(`🎬 Submitting to fal.ai: ${endpoint} (model: ${model})`);
-    console.log(`   Payload:`, JSON.stringify(payload, null, 2).substring(0, 500));
 
     let response;
     try {
@@ -614,39 +524,33 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
         });
     } catch (fetchError) {
         if (fetchError.name === 'TimeoutError' || fetchError.name === 'AbortError') {
-            throw new Error(`fal.ai (${model}) generation timed out after 35 seconds. The provider may be experiencing high traffic.`);
+            throw new Error(`fal.ai (${model}) generation timed out after 35 seconds.`);
         }
         throw fetchError;
     }
 
     if (!response.ok) {
         const errText = await response.text();
-        console.error(`❌ fal.ai error (${response.status}):`, errText);
         throw new Error(`fal.ai submission failed (${response.status}): ${errText}`);
     }
 
     const data = await response.json();
     console.log(`✅ fal.ai queued: requestId=${data.request_id}`);
-    console.log(`   status_url: ${data.status_url}`);
-    console.log(`   response_url: ${data.response_url}`);
 
     return {
         requestId: data.request_id,
-        endpoint, // Store for reference
-        statusUrl: data.status_url,   // Use fal.ai's EXACT status URL
-        resultUrl: data.response_url, // Use fal.ai's EXACT result URL
+        endpoint,
+        statusUrl: data.status_url,
+        resultUrl: data.response_url,
     };
 }
 
 /**
  * Extend a video (Veo 3.1 only)
- * Takes an existing video URL and extends it with a new prompt
  */
 export async function extendVideo({ videoUrl, prompt, duration = 7 }) {
     const apiKey = getApiKey();
     const endpoint = MODEL_ENDPOINTS['veo-3.1'].extendVideo;
-
-    console.log(`🎬 Extending video via: ${endpoint}`);
 
     const response = await fetch(`${FAL_BASE_URL}/${endpoint}`, {
         method: 'POST',
@@ -669,22 +573,16 @@ export async function extendVideo({ videoUrl, prompt, duration = 7 }) {
     }
 
     const data = await response.json();
-    return {
-        requestId: data.request_id,
-        endpoint,
-    };
+    return { requestId: data.request_id, endpoint };
 }
 
 /**
  * Check generation status
- * Returns { status: 'IN_QUEUE'|'IN_PROGRESS'|'COMPLETED'|'FAILED', progress, videoUrl }
  */
 export async function getGenerationStatus(requestId, statusUrl, resultUrl) {
     const apiKey = getApiKey();
 
-    // Use the exact URLs from fal.ai submission response
     if (!statusUrl) {
-        console.warn(`⚠️ No statusUrl provided, constructing fallback`);
         statusUrl = `${FAL_BASE_URL}/fal-ai/kling-video/requests/${requestId}/status`;
     }
     if (!resultUrl) {
@@ -696,41 +594,27 @@ export async function getGenerationStatus(requestId, statusUrl, resultUrl) {
     });
 
     if (!response.ok) {
-        console.error(`❌ fal.ai status check failed: ${response.status}`);
-        // Don't immediately fail — could be a transient error
         return { status: 'IN_PROGRESS', progress: 30 };
     }
 
     const data = await response.json();
-    console.log(`📊 fal.ai status for ${requestId}: ${data.status}`);
 
-    // ── COMPLETED ──
     if (data.status === 'COMPLETED') {
         return await fetchFalResult(apiKey, resultUrl);
     }
 
-    // ── FAILED ──
     if (data.status === 'FAILED') {
-        // Sometimes fal says FAILED but video is still accessible — try fetching
         try {
             const tryResult = await fetchFalResult(apiKey, resultUrl);
-            if (tryResult.videoUrl) {
-                console.log(`⚠️ fal.ai said FAILED but video URL exists — treating as COMPLETED`);
-                return tryResult;
-            }
+            if (tryResult.videoUrl) return tryResult;
         } catch (e) { /* ignore */ }
 
         let errorMsg = 'Video generation failed on fal.ai';
         try {
-            const resultRes = await fetch(resultUrl, {
-                headers: { 'Authorization': `Key ${apiKey}` },
-            });
+            const resultRes = await fetch(resultUrl, { headers: { 'Authorization': `Key ${apiKey}` } });
             const result = await resultRes.json();
             errorMsg = result.error || result.detail || result.message || errorMsg;
-            console.error(`❌ fal.ai generation failed:`, JSON.stringify(result).substring(0, 500));
-        } catch (e) {
-            console.error(`❌ Could not fetch error details:`, e.message);
-        }
+        } catch (e) { /* ignore */ }
 
         return { status: 'FAILED', progress: 0, error: errorMsg };
     }
@@ -742,7 +626,7 @@ export async function getGenerationStatus(requestId, statusUrl, resultUrl) {
 }
 
 /**
- * Fetch fal.ai result and extract video URL from various response formats
+ * Fetch fal.ai result and extract video URL
  */
 async function fetchFalResult(apiKey, resultUrl) {
     const resultRes = await fetch(resultUrl, {
@@ -750,39 +634,25 @@ async function fetchFalResult(apiKey, resultUrl) {
     });
     const result = await resultRes.json();
 
-    console.log(`📦 fal.ai result keys:`, Object.keys(result));
-    console.log(`📦 fal.ai result snippet:`, JSON.stringify(result).substring(0, 800));
-
-    // Comprehensive video URL extraction — covers ALL known fal.ai response formats
     const videoUrl =
-        // Standard: { video: { url: "..." } }
         result.video?.url
-        // Kling/Veo: { video: { file_url: "..." } }
         || result.video?.file_url
-        // Direct URL field
         || result.video_url
-        // Nested data: { data: { video_url: "..." } }
         || result.data?.video_url
         || result.data?.video?.url
-        // Output pattern: { output: { url: "..." } }
         || result.output?.url
         || result.output?.video_url
         || result.output?.video?.url
-        // Array of videos: { videos: [{ url: "..." }] }
         || result.videos?.[0]?.url
         || result.videos?.[0]?.file_url
-        // Result array: { result: [{ url: "..." }] }
         || result.result?.[0]?.url
         || result.result?.url
         || result.result?.video_url
-        // URL directly on root
         || result.url
         || '';
 
     const thumbnailUrl = result.thumbnail?.url || result.thumbnailUrl || result.thumbnail_url || '';
     const audioUrl = result.audio?.url || result.audioUrl || result.audio_url || '';
-
-    console.log(`✅ Video URL extracted: ${videoUrl ? videoUrl.substring(0, 100) + '...' : 'NONE FOUND'}`);
 
     return {
         status: 'COMPLETED',
@@ -799,19 +669,16 @@ async function fetchFalResult(apiKey, resultUrl) {
 export function getModelsInfo() {
     return [
         {
-            id: 'kling-3.0',
-            name: 'Kling 3.0',
+            id: 'kling-3.0', name: 'Kling 3.0',
             description: 'Best motion & physics — multi-shot, native audio, voice IDs',
             bestFor: 'Product demos, action shots, storyboard videos',
             costPerSecond: COST_PER_SECOND['kling-3.0'],
             duration: DURATION_LIMITS['kling-3.0'],
             features: ['multi-shot', 'native-audio', 'voice-ids', 'image-to-video', '3-15s'],
-            available: true,
-            recommended: true,
+            available: true, recommended: true,
         },
         {
-            id: 'grok-imagine',
-            name: 'Grok Imagine',
+            id: 'grok-imagine', name: 'Grok Imagine',
             description: 'xAI native video — fast, affordable, 1-15s, text & image-to-video',
             bestFor: 'Social reels, creative experiments, quick turnaround',
             costPerSecond: COST_PER_SECOND['grok-imagine'],
@@ -821,20 +688,17 @@ export function getModelsInfo() {
             recommended: false,
         },
         {
-            id: 'veo-3.1',
-            name: 'Google Veo 3.1',
+            id: 'veo-3.1', name: 'Google Veo 3.1',
             description: 'Cinematic quality with native audio + extend-video',
             bestFor: 'Premium brand films, cinematic ads',
             costPerSecond: COST_PER_SECOND['veo-3.1'],
             duration: DURATION_LIMITS['veo-3.1'],
             features: ['native-audio', 'cinematic', 'extend-video', '5-8s'],
-            available: true,
-            recommended: false,
+            available: true, recommended: false,
         },
         {
-            id: 'veo-3.1-fast',
-            name: 'Google Veo 3.1 Fast',
-            description: 'Faster & cheaper Veo 3.1 — great for prototyping & high-volume',
+            id: 'veo-3.1-fast', name: 'Google Veo 3.1 Fast',
+            description: 'Faster & cheaper Veo 3.1 — great for prototyping',
             bestFor: 'Quick iterations, content series, social video',
             costPerSecond: COST_PER_SECOND['veo-3.1-fast'],
             duration: DURATION_LIMITS['veo-3.1-fast'],
@@ -843,19 +707,16 @@ export function getModelsInfo() {
             recommended: false,
         },
         {
-            id: 'seedance-1.0',
-            name: 'Seedance 1.0 Lite',
+            id: 'seedance-1.0', name: 'Seedance 1.0 Lite',
             description: 'Fast & affordable video generation',
             bestFor: 'Quick prototypes, social content, UGC',
             costPerSecond: COST_PER_SECOND['seedance-1.0'],
             duration: DURATION_LIMITS['seedance-1.0'],
             features: ['fast', 'affordable', 'image-to-video', '5-10s'],
-            available: true,
-            recommended: false,
+            available: true, recommended: false,
         },
         {
-            id: 'seedance-2.0',
-            name: 'Seedance 2.0 Pro',
+            id: 'seedance-2.0', name: 'Seedance 2.0 Pro',
             description: 'Cinematic video with native audio, camera control & real-world physics',
             bestFor: 'Premium ads, product showcases, brand films',
             costPerSecond: COST_PER_SECOND['seedance-2.0'],
@@ -865,19 +726,16 @@ export function getModelsInfo() {
             recommended: false,
         },
         {
-            id: 'hunyuan',
-            name: 'HunyuanVideo',
-            description: 'Tencent draft-tier — cheapest model for fast iterations & prototyping',
+            id: 'hunyuan', name: 'HunyuanVideo',
+            description: 'Tencent draft-tier — cheapest model for fast iterations',
             bestFor: 'Quick drafts, prototyping, budget-friendly iterations',
             costPerSecond: COST_PER_SECOND['hunyuan'],
             duration: DURATION_LIMITS['hunyuan'],
             features: ['text-to-video', 'image-to-video', '3-10s', 'cheapest', 'draft'],
-            available: true,
-            recommended: false,
+            available: true, recommended: false,
         },
         {
-            id: 'sora-2',
-            name: 'Sora 2',
+            id: 'sora-2', name: 'Sora 2',
             description: 'OpenAI Sora 2 — cinematic storytelling with world-model understanding',
             bestFor: 'Cinematic ads, narrative storytelling, creative experiments',
             costPerSecond: COST_PER_SECOND['sora-2'],
