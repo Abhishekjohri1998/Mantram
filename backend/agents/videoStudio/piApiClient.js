@@ -208,7 +208,10 @@ async function submitPiApiPayload(payload) {
  * Returns { taskId, provider: 'piapi', _payload }
  */
 export async function submitPiApiVideoGeneration({ prompt, imageUrl, duration, aspectRatio, generateAudio = true, referenceImages = [], qualityMode = 'fast' }) {
-    const dur = Math.min(Math.max(parseInt(duration, 10) || 5, 5), 15);
+    // ⚠️ CRITICAL: 'seedance-2-fast-preview' (Fast mode) is strictly limited to 5 seconds by the PiAPI backend.
+    // Standard 'seedance-2-preview' (Quality mode) supports up to 15 seconds.
+    const maxDur = qualityMode === 'quality' ? 15 : 5;
+    const dur = Math.min(Math.max(parseInt(duration, 10) || 5, 5), maxDur);
 
     console.log(`🎞️ PiAPI received: ${referenceImages.length} ref images, imageUrl: ${imageUrl ? 'yes' : 'no'}, quality: ${qualityMode}`);
 
@@ -250,7 +253,7 @@ export async function submitPiApiVideoGeneration({ prompt, imageUrl, duration, a
     const taskInput = {
         prompt: finalPrompt,
         aspect_ratio: aspectRatio || '16:9',
-        duration: dur,
+        duration: String(dur),
         generate_audio: generateAudio !== false,
         no_watermark: true, // Remove watermark on paid PiAPI plans
     };
@@ -296,7 +299,9 @@ export async function resubmitPiApiTask(storedPayload) {
 export async function submitPiApiImageToVideo({ imageUrl, prompt, duration, aspectRatio, qualityMode = 'fast', referenceImages = [] }) {
     if (!imageUrl) throw new Error('Image URL is required for Image-to-Video');
 
-    const dur = Math.min(Math.max(parseInt(duration, 10) || 5, 5), 15);
+    // ⚠️ CRITICAL: Match duration limits with fast-preview requirements (max 5s)
+    const maxDur = qualityMode === 'quality' ? 15 : 5;
+    const dur = Math.min(Math.max(parseInt(duration, 10) || 5, 5), maxDur);
 
     console.log(`🖼️→🎬 PiAPI I2V: imageUrl=${imageUrl.substring(0, 60)}..., refs=${referenceImages.length}, quality=${qualityMode}`);
 
@@ -332,7 +337,7 @@ export async function submitPiApiImageToVideo({ imageUrl, prompt, duration, aspe
             prompt: finalPrompt,
             image_urls: [hostedUrl, ...hostedRefs.filter(Boolean)],
             aspect_ratio: aspectRatio || '16:9',
-            duration: dur,
+            duration: String(dur),
             no_watermark: true, // Remove watermark on paid PiAPI plans
         },
     };
@@ -366,7 +371,7 @@ export async function submitPiApiVideoExtend({ parentTaskId, prompt, duration, q
         task_type: taskType,
         input: {
             prompt: prompt || '',
-            duration: dur,
+            duration: String(dur),
             parent_task_id: parentTaskId,
             no_watermark: true, // Remove watermark on paid PiAPI plans
         },
