@@ -4,8 +4,11 @@ import { useAuth } from '../context/AuthContext'
 import { useBrand } from '../context/BrandContext'
 import { useCredits } from '../context/CreditContext'
 import { superadmin } from '../services/api'
-import NexusBar from './NexusBar'
-import AgentFidatoPanel from './AgentFidatoPanel'
+import { useUI } from '../context/UIContext'
+
+// Removed local NexusBar import
+
+// Removed local AgentFidatoPanel import
 
 export default function Header({ title, subtitle, onMenuToggle }) {
     const { user, logout } = useAuth()
@@ -15,8 +18,7 @@ export default function Header({ title, subtitle, onMenuToggle }) {
     const location = useLocation()
     const [showMenu, setShowMenu] = useState(false)
     const [showBrandMenu, setShowBrandMenu] = useState(false)
-    const [showIntelPanel, setShowIntelPanel] = useState(false)
-    const [intelMissionCount, setIntelMissionCount] = useState(0)
+    const { fidatoOpen, toggleFidato, intelMissionCount, refreshIntelCount } = useUI()
     const [platformBudgets, setPlatformBudgets] = useState(null)
     const [resumeJobs, setResumeJobs] = useState([])
     const menuRef = useRef(null)
@@ -42,23 +44,7 @@ export default function Header({ title, subtitle, onMenuToggle }) {
         }
     }, [activeBrand?._id])
 
-    // Fetch active mission count for INTEL badge
-    const fetchIntelCount = useCallback(async () => {
-        if (!activeBrand?._id) return
-        try {
-            const token = localStorage.getItem('mantram_token')
-            const API_BASE = import.meta.env.VITE_API_URL || `${window.location.origin}/api`
-            const resp = await fetch(`${API_BASE}/intel/missions?brandId=${activeBrand._id}`, {
-                headers: token ? { Authorization: `Bearer ${token}` } : {},
-            })
-            if (resp.ok) {
-                const data = await resp.json()
-                setIntelMissionCount((data.missions || []).filter(m => m.status === 'active').length)
-            }
-        } catch { /* silent */ }
-    }, [activeBrand?._id])
-
-    useEffect(() => { fetchIntelCount() }, [fetchIntelCount])
+    useEffect(() => { refreshIntelCount(activeBrand?._id) }, [activeBrand?._id, refreshIntelCount])
 
     const handleLogout = () => {
         logout()
@@ -295,7 +281,7 @@ export default function Header({ title, subtitle, onMenuToggle }) {
 
                     {/* Agent Fidato INTEL */}
                     <button
-                        onClick={() => setShowIntelPanel(true)}
+                        onClick={toggleFidato}
                         className="relative cursor-pointer group"
                         title="Agent Fidato — Competitive Intelligence"
                         style={{ padding: 0, background: 'none', border: 'none' }}
@@ -409,16 +395,10 @@ export default function Header({ title, subtitle, onMenuToggle }) {
             </header>
         </div>
 
-        <NexusBar />
+        {/* NexusBar — Now rendered globally in App.jsx */}
+        {/* <NexusBar /> */}
 
-        {/* Agent Fidato INTEL — Global Side Panel */}
-        {showIntelPanel && (
-            <AgentFidatoPanel
-                studio="global"
-                panelOnly
-                onClose={() => { setShowIntelPanel(false); fetchIntelCount() }}
-            />
-        )}
+        {/* Agent Fidato INTEL — Now controlled globally via UIContext */}
     </>
 )
 }

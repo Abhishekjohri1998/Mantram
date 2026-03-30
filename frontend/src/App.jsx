@@ -4,8 +4,11 @@ import { AuthProvider } from './context/AuthContext'
 import { BrandProvider } from './context/BrandContext'
 import { CreditProvider } from './context/CreditContext'
 import { ShopifyProvider } from './context/ShopifyContext'
+import { UIProvider } from './context/UIContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import PlanGatedRoute from './components/PlanGatedRoute'
+import AgentFidatoPanel from './components/AgentFidatoPanel'
+import NexusBar from './components/NexusBar'
 
 // ── Static Imports (Critical/Fast) ──
 import Auth from './pages/Auth'
@@ -65,69 +68,68 @@ function LoadingSpinner() {
 
 
 function App() {
-  // const isProduction = window.location.hostname.includes('mantram.ai');
-  // if (isProduction) {
-  //   return <UnderConstruction />
-  // }
-
   return (
     <BrowserRouter>
       <ShopifyProvider>
         <AuthProvider>
           <BrandProvider>
             <CreditProvider>
-              <Suspense fallback={<LoadingSpinner />}>
-                <Routes>
-                  {/* Public routes */}
-                  <Route path="/" element={<Landing />} />
-                  <Route path="/about" element={<About />} />
-                  <Route path="/auth" element={<Auth />} />
-                  <Route path="/login" element={<Auth />} />
-                  <Route path="/signup" element={<Auth />} />
-                  <Route path="/verify-email" element={<VerifyEmail />} />
-                  <Route path="/reset-password" element={<ResetPassword />} />
-                  <Route path="/onboarding" element={<BrandOnboarding />} />
-                  <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-                  <Route path="/terms" element={<TermsOfService />} />
-                  <Route path="/data-deletion" element={<DataDeletion />} />
-                  <Route path="/data-deletion-status" element={<DataDeletion />} />
-                  <Route path="/studio/:slug" element={<StudioPreview />} />
-                  <Route path="/join/:token" element={<JoinTeam />} />
+              <UIProvider>
+                <Suspense fallback={<LoadingSpinner />}>
+                  <Routes>
+                    {/* Public routes */}
+                    <Route path="/" element={<Landing />} />
+                    <Route path="/about" element={<About />} />
+                    <Route path="/auth" element={<Auth />} />
+                    <Route path="/login" element={<Auth />} />
+                    <Route path="/signup" element={<Auth />} />
+                    <Route path="/verify-email" element={<VerifyEmail />} />
+                    <Route path="/reset-password" element={<ResetPassword />} />
+                    <Route path="/onboarding" element={<BrandOnboarding />} />
+                    <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+                    <Route path="/terms" element={<TermsOfService />} />
+                    <Route path="/data-deletion" element={<DataDeletion />} />
+                    <Route path="/data-deletion-status" element={<DataDeletion />} />
+                    <Route path="/studio/:slug" element={<StudioPreview />} />
+                    <Route path="/join/:token" element={<JoinTeam />} />
 
-                  {/* Protected routes — require authentication */}
-                  <Route path="/nexus" element={<ProtectedRoute><Nexus /></ProtectedRoute>} />
-                  <Route path="/brand-dna" element={<ProtectedRoute><BrandDNA /></ProtectedRoute>} />
-                  <Route path="/brands" element={<ProtectedRoute><BrandManagement /></ProtectedRoute>} />
-                  <Route path="/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
-                  <Route path="/dashboard" element={<ProtectedRoute><UserDashboard /></ProtectedRoute>} />
-                  <Route path="/admin" element={<ProtectedRoute allowedRoles={['admin', 'superadmin']}><AdminDashboard /></ProtectedRoute>} />
-                  <Route path="/team" element={<ProtectedRoute><TeamDashboard /></ProtectedRoute>} />
-                  <Route path="/content-studio" element={<ProtectedRoute><ContentStudio /></ProtectedRoute>} />
-                  <Route path="/creative-studio" element={<ProtectedRoute><CreativeStudio /></ProtectedRoute>} />
-                  <Route path="/ai-canvas" element={<ProtectedRoute><CanvasEditor /></ProtectedRoute>} />
-                  <Route path="/video-studio" element={<ProtectedRoute><VideoStudio /></ProtectedRoute>} />
-                  <Route path="/performance-marketing" element={<ProtectedRoute><PerformanceMarketing /></ProtectedRoute>} />
-                  <Route path="/d2c-analytics" element={<ProtectedRoute><D2CAnalytics /></ProtectedRoute>} />
-                  <Route path="/integrations" element={<ProtectedRoute><Integrations /></ProtectedRoute>} />
-                  <Route path="/funnel-studio" element={<ProtectedRoute><FunnelStudio /></ProtectedRoute>} />
-                  <Route path="/social-media-studio" element={<ProtectedRoute><SocialMediaStudio /></ProtectedRoute>} />
-                  <Route path="/smart-calendar" element={<Navigate to="/social-media-studio" replace />} />
-                  <Route path="/publish" element={<Navigate to="/social-media-studio" replace />} />
-                  <Route path="/brainstorm" element={<ProtectedRoute><BrainstormStudio /></ProtectedRoute>} />
-                  <Route path="/seo-studio" element={<ProtectedRoute><SeoStudio /></ProtectedRoute>} />
-                  <Route path="/conversations" element={<ProtectedRoute><ConversationStudio /></ProtectedRoute>} />
-                  <Route path="/conversations/automations" element={<ProtectedRoute><Automations /></ProtectedRoute>} />
-                  <Route path="/conversations/ai-settings" element={<ProtectedRoute><AISettings /></ProtectedRoute>} />
-                  <Route path="/conversations/insights" element={<ProtectedRoute><Insights /></ProtectedRoute>} />
-                  <Route path="/credits" element={<ProtectedRoute><CreditsPage /></ProtectedRoute>} />
-                  <Route path="/settings" element={<ProtectedRoute><UserSettings /></ProtectedRoute>} />
-                  <Route path="/skills" element={<ProtectedRoute><SkillsHub /></ProtectedRoute>} />
-                  <Route path="/superadmin" element={<ProtectedRoute allowedRoles={['superadmin']}><SuperAdminDashboard /></ProtectedRoute>} />
-                  <Route path="/retention-studio" element={<ProtectedRoute><RetentionStudio /></ProtectedRoute>} />
-                </Routes>
-              </Suspense>
+                    {/* Protected routes — require authentication */}
+                    <Route path="/nexus" element={<ProtectedRoute><Nexus /></ProtectedRoute>} />
+                    <Route path="/brand-dna" element={<ProtectedRoute><BrandDNA /></ProtectedRoute>} />
+                    <Route path="/brands" element={<ProtectedRoute><BrandManagement /></ProtectedRoute>} />
+                    <Route path="/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
+                    <Route path="/dashboard" element={<ProtectedRoute><UserDashboard /></ProtectedRoute>} />
+                    <Route path="/admin" element={<ProtectedRoute allowedRoles={['admin', 'superadmin']}><AdminDashboard /></ProtectedRoute>} />
+                    <Route path="/team" element={<ProtectedRoute><TeamDashboard /></ProtectedRoute>} />
+                    <Route path="/content-studio" element={<ProtectedRoute><ContentStudio /></ProtectedRoute>} />
+                    <Route path="/creative-studio" element={<ProtectedRoute><CreativeStudio /></ProtectedRoute>} />
+                    <Route path="/ai-canvas" element={<ProtectedRoute><CanvasEditor /></ProtectedRoute>} />
+                    <Route path="/video-studio" element={<ProtectedRoute><VideoStudio /></ProtectedRoute>} />
+                    <Route path="/performance-marketing" element={<ProtectedRoute><PerformanceMarketing /></ProtectedRoute>} />
+                    <Route path="/d2c-analytics" element={<ProtectedRoute><D2CAnalytics /></ProtectedRoute>} />
+                    <Route path="/integrations" element={<ProtectedRoute><Integrations /></ProtectedRoute>} />
+                    <Route path="/funnel-studio" element={<ProtectedRoute><FunnelStudio /></ProtectedRoute>} />
+                    <Route path="/social-media-studio" element={<ProtectedRoute><SocialMediaStudio /></ProtectedRoute>} />
+                    <Route path="/smart-calendar" element={<Navigate to="/social-media-studio" replace />} />
+                    <Route path="/publish" element={<Navigate to="/social-media-studio" replace />} />
+                    <Route path="/brainstorm" element={<ProtectedRoute><BrainstormStudio /></ProtectedRoute>} />
+                    <Route path="/seo-studio" element={<ProtectedRoute><SeoStudio /></ProtectedRoute>} />
+                    <Route path="/conversations" element={<ProtectedRoute><ConversationStudio /></ProtectedRoute>} />
+                    <Route path="/conversations/automations" element={<ProtectedRoute><Automations /></ProtectedRoute>} />
+                    <Route path="/conversations/ai-settings" element={<ProtectedRoute><AISettings /></ProtectedRoute>} />
+                    <Route path="/conversations/insights" element={<ProtectedRoute><Insights /></ProtectedRoute>} />
+                    <Route path="/credits" element={<ProtectedRoute><CreditsPage /></ProtectedRoute>} />
+                    <Route path="/settings" element={<ProtectedRoute><UserSettings /></ProtectedRoute>} />
+                    <Route path="/skills" element={<ProtectedRoute><SkillsHub /></ProtectedRoute>} />
+                    <Route path="/superadmin" element={<ProtectedRoute allowedRoles={['superadmin']}><SuperAdminDashboard /></ProtectedRoute>} />
+                    <Route path="/retention-studio" element={<ProtectedRoute><RetentionStudio /></ProtectedRoute>} />
+                  </Routes>
+                </Suspense>
 
-
+                {/* Global Fidato Assistant — Stays mounted across all routes */}
+                <AgentFidatoPanel studio="global" panelOnly />
+                <NexusBar />
+              </UIProvider>
             </CreditProvider>
           </BrandProvider>
         </AuthProvider>

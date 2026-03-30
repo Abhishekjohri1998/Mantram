@@ -7,6 +7,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useBrand } from '../context/BrandContext'
+import { useUI } from '../context/UIContext'
 import IntelReportViewer from './IntelReportViewer'
 
 const API_BASE = import.meta.env.VITE_API_URL || `${window.location.origin}/api`
@@ -42,7 +43,15 @@ export default function AgentFidatoPanel({ studio = 'seo', panelOnly = false, on
     const [selectedMission, setSelectedMission] = useState(null)
     const [findings, setFindings] = useState(null)
     const [runningMission, setRunningMission] = useState(null)
-    const [panelOpen, setPanelOpen] = useState(panelOnly)
+    const { fidatoOpen, closeFidato, refreshIntelCount } = useUI()
+    const [panelOpen, setPanelOpen] = useState(panelOnly ? fidatoOpen : false)
+
+    // Sync local panelOpen with global fidatoOpen when in panelOnly mode
+    useEffect(() => {
+        if (panelOnly) {
+            setPanelOpen(fidatoOpen)
+        }
+    }, [fidatoOpen, panelOnly])
     const [showReport, setShowReport] = useState(false)
     const [reportMission, setReportMission] = useState(null)
 
@@ -183,7 +192,14 @@ export default function AgentFidatoPanel({ studio = 'seo', panelOnly = false, on
     const unreadCount = missions.reduce((acc, m) => acc + (m.findings?.filter(f => !f.notified)?.length || 0), 0)
     const activeMissions = missions.filter(m => m.status === 'active')
     const totalInsights = missions.reduce((a, m) => a + (m.totalFindings || 0), 0)
-    const closePanel = () => { setPanelOpen(false); setSelectedMission(null); setFindings(null); if (onClose) onClose() }
+    const closePanel = () => { 
+        setPanelOpen(false); 
+        closeFidato();
+        refreshIntelCount(brandId); // Sync count back to header
+        setSelectedMission(null); 
+        setFindings(null); 
+        if (onClose) onClose();
+    }
 
     if (!brandId) return null
 
