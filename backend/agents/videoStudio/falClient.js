@@ -11,34 +11,13 @@ import { isLaozhangAvailable, submitLaozhangVideoGeneration } from './laozhangCl
 const FAL_BASE_URL = 'https://queue.fal.run';
 const GROK_BASE_URL = 'https://api.x.ai/v1';
 
-// ── Model Endpoint Map ──
 const MODEL_ENDPOINTS = {
-    'kling-3.0': {
-        textToVideo: 'fal-ai/kling-video/v3/standard/text-to-video',
-        imageToVideo: 'fal-ai/kling-video/v3/standard/image-to-video',
-    },
-    'veo-3.1': {
-        textToVideo: 'fal-ai/veo3',
-        imageToVideo: 'fal-ai/veo3/image-to-video',
-        extendVideo: 'fal-ai/veo3.1/extend-video',
-    },
-    'veo-3.1-fast': {
-        textToVideo: 'fal-ai/veo3/fast',
-        imageToVideo: 'fal-ai/veo3/fast/image-to-video',
-        extendVideo: 'fal-ai/veo3.1/fast/extend-video',
-    },
-    'seedance-1.0': {
-        textToVideo: 'fal-ai/bytedance/seedance/v1/lite/text-to-video',
-        imageToVideo: 'fal-ai/bytedance/seedance/v1/lite/image-to-video',
-    },
-    'seedance-2.0': {
-        textToVideo: 'fal-ai/bytedance/seedance/v2/pro/text-to-video',
-        imageToVideo: 'fal-ai/bytedance/seedance/v2/pro/image-to-video',
-    },
-    'hunyuan': {
-        textToVideo: 'fal-ai/hunyuan-video/video-to-video',
-        imageToVideo: 'fal-ai/hunyuan-video/image-to-video',
-    },
+    'kling-3.0': { textToVideo: 'fal-ai/kling-video/v3/standard/text-to-video', imageToVideo: 'fal-ai/kling-video/v3/standard/image-to-video' },
+    'veo-3.1': { textToVideo: 'fal-ai/veo3', imageToVideo: 'fal-ai/veo3/image-to-video', extendVideo: 'fal-ai/veo3.1/extend-video' },
+    'veo-3.1-fast': { textToVideo: 'fal-ai/veo3/fast', imageToVideo: 'fal-ai/veo3/fast/image-to-video', extendVideo: 'fal-ai/veo3.1/fast/extend-video' },
+    'seedance-1.0': { textToVideo: 'fal-ai/bytedance/seedance/v1/lite/text-to-video', imageToVideo: 'fal-ai/bytedance/seedance/v1/lite/image-to-video' },
+    'seedance-2.0': { textToVideo: 'fal-ai/bytedance/seedance/v2/pro/text-to-video', imageToVideo: 'fal-ai/bytedance/seedance/v2/pro/image-to-video' },
+    'hunyuan': { textToVideo: 'fal-ai/hunyuan-video/video-to-video', imageToVideo: 'fal-ai/hunyuan-video/image-to-video' },
 };
 
 const MODEL_AVAILABLE = {
@@ -59,14 +38,14 @@ export const COST_PER_SECOND = {
 };
 
 const DURATION_LIMITS = {
-    'kling-3.0': { min: 3, max: 15, supported: [3,4,5,6,7,8,9,10,11,12,13,14,15] },
-    'veo-3.1': { min: 5, max: 8, supported: [5,6,7,8] },
-    'veo-3.1-fast': { min: 5, max: 8, supported: [5,6,7,8] },
-    'seedance-1.0': { min: 5, max: 10, supported: [5,10] },
-    'seedance-2.0': { min: 5, max: 15, supported: [5,6,7,8,9,10,11,12,13,14,15] },
-    'grok-imagine': { min: 1, max: 15, supported: [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15] },
-    'hunyuan': { min: 3, max: 10, supported: [3,4,5,6,7,8,9,10] },
-    'sora-2': { min: 5, max: 15, supported: [5,10,15] },
+    'kling-3.0': { min: 3, max: 15 },
+    'veo-3.1': { min: 5, max: 8 },
+    'veo-3.1-fast': { min: 5, max: 8 },
+    'seedance-1.0': { min: 5, max: 10 },
+    'seedance-2.0': { min: 5, max: 15 },
+    'grok-imagine': { min: 1, max: 15 },
+    'hunyuan': { min: 3, max: 10 },
+    'sora-2': { min: 5, max: 15 },
 };
 
 export const MODEL_CAPABILITIES = {
@@ -98,7 +77,7 @@ export const MODEL_CAPABILITIES = {
         maxReferenceImages: 3, costPerSecond: COST_PER_SECOND['veo-3.1-fast'], recommended: false,
     },
     'seedance-2.0': {
-        id: 'seedance-2.0', name: 'Seedance 2.0 Pro', icon: '🎞️', provider: 'piapi',
+        id: 'seedance-2.0', name: 'Seedance 2.0 Pro', icon: '🎞️', provider: 'laozhang',
         description: 'Cinematic video with native audio, camera control & physics',
         bestFor: 'Premium ads, product showcases, brand films',
         duration: { min: 4, max: 15, native: 15, step: 1 },
@@ -157,36 +136,57 @@ function getGrokApiKey() {
 }
 
 function buildPayload(model, { prompt, imageUrl, duration, resolution, mode, shots, generateAudio }) {
-    const limits = DURATION_LIMITS[model] || { min: 3, max: 15 };
-    const dur = Math.min(Math.max(Number(duration) || 5, limits.min), limits.max);
-
+    const dur = Math.min(Math.max(duration || 5, DURATION_LIMITS[model]?.min || 3), DURATION_LIMITS[model]?.max || 15);
     if (model === 'kling-3.0') {
         const payload = { aspect_ratio: '16:9', negative_prompt: 'blur, distort, and low quality', cfg_scale: 0.5, generate_audio: generateAudio !== false };
         if (shots && shots.length > 1) {
-            payload.multi_prompt = shots.map(s => {
-                const sDur = Math.min(Math.max(Number(s.duration) || 5, 3), 15);
-                return { prompt: s.visual || s.prompt || prompt, duration: String(sDur) };
-            });
+            payload.multi_prompt = shots.map(s => ({ prompt: s.visual || s.prompt || prompt, duration: String(Math.min(Math.max(s.duration || 5, 3), 15)) }));
             payload.shot_type = 'customize';
-        } else {
-            payload.prompt = prompt;
-            payload.duration = String(dur);
-        }
+        } else { payload.prompt = prompt; payload.duration = String(dur); }
         return payload;
     }
-    if (model === 'veo-3.1' || model === 'veo-3.1-fast') {
-        return { prompt, aspect_ratio: '16:9', resolution: resolution === '720p' ? '720p' : '1080p', generate_audio: generateAudio !== false, auto_fix: true };
-    }
-    if (model === 'seedance-1.0') {
-        return { prompt, duration: dur >= 8 ? '10' : '5', aspect_ratio: '16:9', seed: Math.floor(Math.random() * 999999) };
-    }
-    if (model === 'seedance-2.0') {
-        return { prompt, duration: String(dur), aspect_ratio: '16:9', generate_audio: generateAudio !== false, seed: Math.floor(Math.random() * 999999) };
-    }
-    if (model === 'hunyuan') {
-        return { prompt, video_length: dur, seed: Math.floor(Math.random() * 999999), resolution: resolution === '1080p' ? '1080p' : '720p' };
-    }
+    if (model === 'veo-3.1' || model === 'veo-3.1-fast') return { prompt, aspect_ratio: '16:9', resolution: resolution === '720p' ? '720p' : '1080p', generate_audio: generateAudio !== false, auto_fix: true };
+    if (model === 'seedance-1.0') return { prompt, duration: dur >= 8 ? '10' : '5', aspect_ratio: '16:9', seed: Math.floor(Math.random() * 999999) };
+    if (model === 'seedance-2.0') return { prompt, duration: String(dur), aspect_ratio: '16:9', generate_audio: generateAudio !== false, seed: Math.floor(Math.random() * 999999) };
+    if (model === 'hunyuan') return { prompt, video_length: dur, seed: Math.floor(Math.random() * 999999), resolution: resolution === '1080p' ? '1080p' : '720p' };
     throw new Error(`Unknown fal.ai model: ${model}`);
+}
+
+// ── LaoZhang cascade for seedance-2.0 ──
+// Try seedance-2.0, fallback to sora_video2 (confirmed working on LZ)
+async function tryLaozhangSeedance({ prompt, imageUrl, duration, aspectRatio, generateAudio }) {
+    // Attempt 1: seedance-2.0 natively
+    try {
+        const result = await submitLaozhangVideoGeneration({
+            model: 'seedance-2.0', prompt, imageUrl,
+            duration: duration || 5, aspectRatio: aspectRatio || '16:9',
+            generateAudio: generateAudio !== false,
+        });
+        if (result?.videoUrl) {
+            console.log(`✅ [LaoZhang] seedance-2.0 done`);
+            return result.videoUrl;
+        }
+    } catch (e) {
+        console.warn(`⚠️ [LaoZhang] seedance-2.0 failed: ${e.message}`);
+    }
+
+    // Attempt 2: sora_video2 as fallback (confirmed working on LZ, similar quality)
+    console.log(`🔁 [LaoZhang] Cascading seedance-2.0 → sora_video2...`);
+    try {
+        const result = await submitLaozhangVideoGeneration({
+            model: 'sora-2', prompt, imageUrl: null, // sora_video2 is text-only on LZ
+            duration: Math.min(duration || 5, 10), aspectRatio: aspectRatio || '16:9',
+            generateAudio: generateAudio !== false,
+        });
+        if (result?.videoUrl) {
+            console.log(`✅ [LaoZhang] sora_video2 cascade done`);
+            return result.videoUrl;
+        }
+    } catch (e) {
+        console.warn(`⚠️ [LaoZhang] sora_video2 cascade failed: ${e.message}`);
+    }
+
+    return null;
 }
 
 export async function submitVideoGeneration({ model, prompt, imageUrl, duration, resolution, mode, shots, generateAudio, aspectRatio, referenceImages }) {
@@ -197,47 +197,35 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
         ...(referenceImages || []).map(img => ensureS3Url(img, 'video-studio/references'))
     ]);
 
-    // ── Seedance 2.0: LaoZhang first (supports multimodal image), PiAPI text-only fallback ──
-    // PiAPI's image_urls requires a paid image-to-video channel — use LaoZhang multimodal instead.
-    // Strategy:
-    //   1. Try LaoZhang with first ref image as imageUrl (multimodal chat/completions)
-    //   2. If LaoZhang fails → PiAPI text-to-video only (no image_urls)
+    // ── Seedance 2.0: LaoZhang cascade first, PiAPI text-only last resort ──
     if (model === 'seedance-2.0') {
-        // Use first ref image or explicit imageUrl for LaoZhang multimodal
         const lzImageUrl = s3ImageUrl || s3ReferenceImages[0] || null;
 
         if (isLaozhangAvailable()) {
-            try {
-                console.log(`🎬 [LaoZhang] Attempting seedance-2.0 ${lzImageUrl ? 'with image' : 'text-only'}...`);
-                const lzResult = await submitLaozhangVideoGeneration({
-                    model: 'seedance-2.0',
-                    prompt,
-                    imageUrl: lzImageUrl, // LaoZhang uses multimodal chat format — works with single image
-                    duration: duration || 5,
-                    aspectRatio: aspectRatio || '16:9',
-                    generateAudio: generateAudio !== false,
-                });
-                if (lzResult?.videoUrl) {
-                    console.log(`✅ [LaoZhang] seedance-2.0 done: ${lzResult.videoUrl.substring(0, 80)}`);
-                    return { requestId: `lz-${Date.now()}`, endpoint: `laozhang-seedance-2.0`, provider: 'laozhang', _laozhangVideoUrl: lzResult.videoUrl };
-                }
-            } catch (lzErr) {
-                console.warn(`⚠️ [LaoZhang] seedance-2.0 failed: ${lzErr.message} — falling back to PiAPI text-only`);
+            const videoUrl = await tryLaozhangSeedance({
+                prompt, imageUrl: lzImageUrl,
+                duration, aspectRatio, generateAudio,
+            });
+            if (videoUrl) {
+                return { requestId: `lz-${Date.now()}`, endpoint: 'laozhang-seedance-2.0', provider: 'laozhang', _laozhangVideoUrl: videoUrl };
             }
         }
 
-        // PiAPI fallback — text-to-video ONLY (no image_urls, avoids 500)
-        console.log(`🎮 [PiAPI] Falling back to seedance-2.0 text-to-video (no images)...`);
-        const result = await submitPiApiVideoGeneration({
-            prompt,
-            imageUrl: null,          // No image — avoids PiAPI image_urls 500
-            duration,
-            aspectRatio: aspectRatio || '16:9',
-            generateAudio,
-            referenceImages: [],     // Empty — text-to-video only on current PiAPI plan
-            qualityMode: mode || 'fast',
-        });
-        return { requestId: result.taskId, endpoint: 'piapi-seedance-2.0', provider: 'piapi', _piApiPayload: result._payload };
+        // Last resort: PiAPI text-to-video (will fail if insufficient_credits, throws immediately)
+        console.log(`🎮 [PiAPI] Last resort: seedance-2.0 text-to-video...`);
+        try {
+            const result = await submitPiApiVideoGeneration({
+                prompt, imageUrl: null, duration,
+                aspectRatio: aspectRatio || '16:9',
+                generateAudio, referenceImages: [], qualityMode: mode || 'fast',
+            });
+            return { requestId: result.taskId, endpoint: 'piapi-seedance-2.0', provider: 'piapi', _piApiPayload: result._payload };
+        } catch (piErr) {
+            if (piErr.message.startsWith('PiAPI_INSUFFICIENT_CREDITS')) {
+                throw new Error('Video generation failed: PiAPI account has insufficient credits. Please top up at piapi.ai, or the LaoZhang seedance channel is temporarily unavailable — try again in a few minutes.');
+            }
+            throw piErr;
+        }
     }
 
     // ── LaoZhang-First Routing (other models) ──
@@ -265,11 +253,7 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
         const apiKey = getGrokApiKey();
         const payload = { model: 'grok-imagine-video', prompt, duration: Math.min(Math.max(duration || 5, 1), 15), aspect_ratio: aspectRatio || '16:9', resolution: resolution === '480p' ? '480p' : '720p' };
         if (s3ImageUrl) payload.image = { url: s3ImageUrl };
-        const response = await fetch(`${GROK_BASE_URL}/videos/generations`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-            body: JSON.stringify(payload),
-        });
+        const response = await fetch(`${GROK_BASE_URL}/videos/generations`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` }, body: JSON.stringify(payload) });
         if (!response.ok) throw new Error(`Grok failed (${response.status}): ${await response.text()}`);
         const data = await response.json();
         return { requestId: data.request_id, endpoint: 'grok-imagine-video', provider: 'grok' };
@@ -288,13 +272,7 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
     const endpoint = s3ImageUrl ? endpoints.imageToVideo : endpoints.textToVideo;
     const payload = buildPayload(model, { prompt, imageUrl: s3ImageUrl, duration, resolution, mode, shots, generateAudio });
     if (s3ImageUrl) payload.image_url = s3ImageUrl;
-
-    const response = await fetch(`${FAL_BASE_URL}/${endpoint}`, {
-        method: 'POST',
-        headers: { 'Authorization': `Key ${apiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-        signal: AbortSignal.timeout(35000),
-    });
+    const response = await fetch(`${FAL_BASE_URL}/${endpoint}`, { method: 'POST', headers: { 'Authorization': `Key ${apiKey}`, 'Content-Type': 'application/json' }, body: JSON.stringify(payload), signal: AbortSignal.timeout(35000) });
     if (!response.ok) throw new Error(`fal.ai failed (${response.status}): ${await response.text()}`);
     const data = await response.json();
     console.log(`✅ fal.ai queued: ${data.request_id}`);
@@ -303,11 +281,7 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
 
 export async function extendVideo({ videoUrl, prompt, duration = 7 }) {
     const apiKey = getApiKey();
-    const response = await fetch(`${FAL_BASE_URL}/${MODEL_ENDPOINTS['veo-3.1'].extendVideo}`, {
-        method: 'POST',
-        headers: { 'Authorization': `Key ${apiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ video_url: videoUrl, prompt, duration: String(duration), generate_audio: true, auto_fix: true }),
-    });
+    const response = await fetch(`${FAL_BASE_URL}/${MODEL_ENDPOINTS['veo-3.1'].extendVideo}`, { method: 'POST', headers: { 'Authorization': `Key ${apiKey}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ video_url: videoUrl, prompt, duration: String(duration), generate_audio: true, auto_fix: true }) });
     if (!response.ok) throw new Error(`fal.ai extend failed: ${await response.text()}`);
     const data = await response.json();
     return { requestId: data.request_id, provider: 'fal' };
@@ -317,17 +291,12 @@ export async function getGenerationStatus(requestId, statusUrl, resultUrl) {
     const apiKey = getApiKey();
     if (!statusUrl) statusUrl = `${FAL_BASE_URL}/fal-ai/kling-video/requests/${requestId}/status`;
     if (!resultUrl) resultUrl = statusUrl.replace('/status', '');
-
     const response = await fetch(statusUrl, { headers: { 'Authorization': `Key ${apiKey}` } });
     if (!response.ok) return { status: 'IN_PROGRESS', progress: 30 };
     const data = await response.json();
-
     if (data.status === 'COMPLETED') return await fetchFalResult(apiKey, resultUrl);
     if (data.status === 'FAILED') {
-        try {
-            const r = await fetchFalResult(apiKey, resultUrl);
-            if (r.videoUrl) return r;
-        } catch (_) {}
+        try { const r = await fetchFalResult(apiKey, resultUrl); if (r.videoUrl) return r; } catch (_) {}
         return { status: 'FAILED', progress: 0, error: 'fal.ai generation failed' };
     }
     return { status: data.status || 'IN_PROGRESS', progress: data.status === 'IN_QUEUE' ? 10 : 50 };
@@ -335,14 +304,10 @@ export async function getGenerationStatus(requestId, statusUrl, resultUrl) {
 
 export async function getGrokGenerationStatus(requestId) {
     const apiKey = getGrokApiKey();
-    const response = await fetch(`${GROK_BASE_URL}/videos/${requestId}`, {
-        headers: { 'Authorization': `Bearer ${apiKey}` },
-    });
+    const response = await fetch(`${GROK_BASE_URL}/videos/${requestId}`, { headers: { 'Authorization': `Bearer ${apiKey}` } });
     if (!response.ok) return { status: 'FAILED', progress: 0, error: `Grok status check failed: ${response.status}` };
     const data = await response.json();
-    if (data.status === 'done') {
-        return { status: 'COMPLETED', progress: 100, videoUrl: data.video?.url || '', thumbnailUrl: '', audioUrl: '', duration: data.video?.duration || 0 };
-    }
+    if (data.status === 'done') return { status: 'COMPLETED', progress: 100, videoUrl: data.video?.url || '', thumbnailUrl: '', audioUrl: '', duration: data.video?.duration || 0 };
     if (data.status === 'expired') return { status: 'FAILED', progress: 0, error: 'Grok request expired.' };
     return { status: 'IN_PROGRESS', progress: 40 };
 }
@@ -350,18 +315,8 @@ export async function getGrokGenerationStatus(requestId) {
 async function fetchFalResult(apiKey, resultUrl) {
     const res = await fetch(resultUrl, { headers: { 'Authorization': `Key ${apiKey}` } });
     const data = await res.json();
-    const videoUrl =
-        data.video?.url || data.video?.file_url || data.video_url ||
-        data.data?.video_url || data.data?.video?.url ||
-        data.output?.url || data.output?.video_url || data.output?.video?.url ||
-        data.videos?.[0]?.url || data.videos?.[0]?.file_url ||
-        data.result?.[0]?.url || data.result?.url || data.url || '';
-    return {
-        status: 'COMPLETED', progress: 100,
-        videoUrl,
-        thumbnailUrl: data.thumbnail?.url || data.thumbnail_url || '',
-        audioUrl: data.audio?.url || data.audio_url || '',
-    };
+    const videoUrl = data.video?.url || data.video?.file_url || data.video_url || data.data?.video_url || data.data?.video?.url || data.output?.url || data.output?.video_url || data.output?.video?.url || data.videos?.[0]?.url || data.videos?.[0]?.file_url || data.result?.[0]?.url || data.result?.url || data.url || '';
+    return { status: 'COMPLETED', progress: 100, videoUrl, thumbnailUrl: data.thumbnail?.url || data.thumbnail_url || '', audioUrl: data.audio?.url || data.audio_url || '' };
 }
 
 export function getModelsInfo() {
