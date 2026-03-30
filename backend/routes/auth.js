@@ -148,8 +148,16 @@ router.post('/login', async (req, res) => {
         // Select verification fields to check status
         const user = await User.findOne({ email }).select('+password +verificationToken +verificationExpires');
 
-        if (!user || !(await user.matchPassword(password))) {
-            return res.status(401).json({ success: false, error: 'Invalid credentials' });
+        if (!user) {
+            return res.status(401).json({ 
+                success: false, 
+                error: 'Account not found. It looks like you haven\'t signed up yet!',
+                code: 'USER_NOT_FOUND' 
+            });
+        }
+
+        if (!(await user.matchPassword(password))) {
+            return res.status(401).json({ success: false, error: 'Incorrect password. Please try again.' });
         }
 
         // 1. Verification Check

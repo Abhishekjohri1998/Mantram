@@ -1215,7 +1215,7 @@ function ReviewBrand({ brand, onFinish }) {
 export default function BrandOnboarding() {
     const navigate = useNavigate()
     const [searchParams] = useSearchParams()
-    const { isAuthenticated, user, loading: authLoading } = useAuth()
+    const { isAuthenticated, user, loading: authLoading, refreshUser } = useAuth()
     const { addBrand } = useBrand()
     const [step, setStep] = useState(0) // 0=choose, 1=path, 2=review
     const [path, setPath] = useState(null)
@@ -1260,7 +1260,11 @@ export default function BrandOnboarding() {
         setBrand(brandData)
         // If brand is a real DB record, add it immediately
         if (brandData._id && brandData._id !== 'preview') {
-            addBrand(brandData)
+            addBrand(brandData);
+            // Sync user profile to update brandCount immediately
+            if (typeof refreshUser === 'function') {
+                refreshUser();
+            }
         } else {
             // Preview brand — save to localStorage for later persistence
             localStorage.setItem('mantram_pending_brand', JSON.stringify(brandData))

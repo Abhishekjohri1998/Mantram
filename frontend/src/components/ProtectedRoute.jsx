@@ -26,5 +26,27 @@ export default function ProtectedRoute({ children, allowedRoles }) {
         return <Navigate to="/dashboard" replace />
     }
 
+    // --- Onboarding Enforcement ---
+    // If user has NO brands, they MUST go through onboarding before accessing any other tool.
+    // Exclude certain paths to prevent infinite loops or allow basic account management.
+    const hasBrand = (user?.brandCount ?? 0) > 0;
+    const isWhitelisted = [
+        '/onboarding',
+        '/settings',
+        '/credits',
+        '/verify-email',
+        '/auth',
+        '/login',
+        '/signup',
+        '/reset-password',
+        '/terms',
+        '/privacy-policy'
+    ].some(path => location.pathname.startsWith(path));
+
+    if (!hasBrand && !isWhitelisted) {
+        console.log('🔄 No brands found, redirecting to onboarding...');
+        return <Navigate to="/onboarding" replace />;
+    }
+
     return children
 }

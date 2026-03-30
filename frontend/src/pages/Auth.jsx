@@ -99,7 +99,12 @@ export default function Auth() {
             navigate(dest, { replace: true })
 
         } catch (err) {
-            setError(err.message || 'Something went wrong')
+            if (err.code === 'USER_NOT_FOUND' || err.message?.includes('not found')) {
+                setIsLogin(false);
+                setError('Account not found. Let\'s create one for you!');
+            } else {
+                setError(err.message || 'Something went wrong');
+            }
         } finally {
             setLoading(false)
         }
