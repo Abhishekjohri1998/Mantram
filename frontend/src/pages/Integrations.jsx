@@ -152,10 +152,17 @@ export default function Integrations() {
     }, [navigate, loadAllStatuses])
 
     // ── Google Analytics Actions ──
-    const connectGA = () => {
+    const connectGA = async () => {
         setGaLoading(true)
-        // Redirect to backend with flow=redirect to avoid COOP/Popup issues
-        window.location.href = `${API_BASE}/google-analytics/connect?flow=redirect&brandId=${brandId || ''}`
+        try {
+            // This is an authorized AJAX call to get the Google Auth URL
+            const d = await gaAPI.connect(brandId, 'redirect')
+            if (d.authUrl) {
+                // Now redirect the main window to the Google Auth URL
+                window.location.href = d.authUrl
+            }
+        } catch (e) { alert(`Connection failed: ${e.message}`) }
+        finally { setGaLoading(false) }
     }
     const disconnectGA = async () => {
         if (!confirm('Disconnect Google Analytics for this brand?')) return
