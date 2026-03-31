@@ -1222,4 +1222,386 @@ router.patch('/strategies/:id/status', protect, async (req, res) => {
   }
 });
 
+// ============================================================================
+// FIDATO-CHAT  — Conversational Brainstorm Engine (SSE)
+// MCoT: Stage 1 reasons about session state, Stage 2 executes action
+// ============================================================================
+
+// ── SSE helpers ───────────────────────────────────────────────────────────────
+function sseEvent(res, data) {
+  try { res.write(`data: ${JSON.stringify(data)}\n\n`); } catch {}
+}
+
+async function streamWords(res, text, delayMs = 18) {
+  const words = text.split(' ');
+  for (const word of words) {
+    sseEvent(res, { type: 'token', text: word + ' ' });
+    await new Promise(r => setTimeout(r, delayMs));
+  }
+}
+
+// ── Brand context builder ──────────────────────────────────────────────────────
+function buildCtx(brand) {
+  if (!brand?.dna) return brand ? `Brand: ${brand.name}.` : '';
+  const d = brand.dna;
+  return [
+    `Brand: ${brand.name}`,
+    d.industry && `Industry: ${d.industry}`,
+    d.brandDescription && `Description: ${d.brandDescription}`,
+    d.targetAudience && `Audience: ${d.targetAudience}`,
+    d.voice?.personality && `Voice: ${d.voice.personality}`,
+    d.voice?.keywords?.length && `Voice keywords: ${d.voice.keywords.join(', ')}`,
+    d.contentStyle?.dos?.length && `Dos: ${d.contentStyle.dos.slice(0,3).join(', ')}`,
+    d.contentStyle?.donts?.length && `Don'ts: ${d.contentStyle.donts.slice(0,3).join(', ')}`,
+    d.country && `Country: ${d.country}`,
+    d.defaultLanguage && `Language: ${d.defaultLanguage}`,
+  ].filter(Boolean).join('\n');
+}
+
+// ── MCoT Stage 1: Reason about conversation ────────────────────────────────────
+async function mcotReason(message, history, sessionState, brandCtx) {
+  const historyText = history.slice(-10)
+    .map(m => `${m.role === 'fidato' ? 'FIDATO' : 'USER'}: ${m.content}`)
+    .join('\n');
+
+  const userMessageCount = history.filter(m => m.role === 'user').length;
+  const forceGenerate = userMessageCount >= 4 && !sessionState.ideasGenerated;
+
+  const systemPrompt = `You are Fidato's internal reasoning engine for a brainstorming session on Mantram AI.
+Analyze the conversation and return a strict JSON decision. Think carefully.
+
+BRAND:
+${brandCtx || 'No brand loaded yet'}
+
+CURRENT SESSION STATE:
+- Intent: ${sessionState.intent || 'not determined yet'}
+- Info collected: ${JSON.stringify(sessionState.collectedAnswers || {})}
+- Ideas generated: ${sessionState.ideasGenerated || false}
+- Screenplay generated: ${sessionState.screenplayGenerated || false}
+- User messages so far: ${userMessageCount}
+${forceGenerate ? '\n⚠ FORCE GENERATE: User has answered 4+ questions. Generate ideas NOW even if some info is missing.' : ''}
+
+Return STRICT JSON — no explanation, no markdown:
+{
+  "intent": "ad-film|campaign|festival|product-launch|naming|offer|positioning|trend-hijack|brand-strategy|custom",
+  "collectedAnswers": {
+    "product": "...",
+    "audience": "...",
+    "emotion": "...",
+    "objective": "...",
+    "duration": "...",
+    "reference": "...",
+    "budget": "..."
+  },
+  "readyToGenerate": false,
+  "action": "ask_question|generate_ideas|generate_screenplay|generate_strategy|refine_ideas|general_chat",
+  "fidatoResponse": "Fidato's actual reply — short, warm, conversational. No markdown, no asterisks, no bullet points. 1-3 sentences max. Like texting a smart friend.",
+  "preGenerationMessage": "What Fidato says just before generating — excited, brief. e.g. 'Okay I have everything I need! Give me a second to cook up something 🔥'",
+  "questionId": "product|audience|emotion|objective|duration|budget|reference|null"
+}
+
+RULES:
+- readyToGenerate = true when you have: intent + at least 3 of (product/what, audience/who, emotion/feel)
+- ${forceGenerate ? 'readyToGenerate MUST be true now. action MUST be generate_ideas or generate_strategy.' : 'Ask ONE question at a time. Max 4-5 questions before generating.'}
+- fidatoResponse = what Fidato says (her ACTUAL words, not a description of what she says)
+- For generate_screenplay: only when user explicitly says "write screenplay", "write script", "give me the script"
+- For refine_ideas: when ideas are already generated AND user asks to change/improve them
+- For generate_strategy: when intent = brand-strategy
+- For general_chat: when ideasGenerated=true and user is discussing ideas, NOT asking for screenplay
+- Keep responses casual and short. Fidato is energetic, real, not formal.`;
+
+  const userPrompt = `CONVERSATION:
+${historyText}
+
+LATEST USER MESSAGE: ${message}
+
+Decide what Fidato should do next.`;
+
+  try {
+    const result = await aiCall(systemPrompt, userPrompt, { temperature: 0.2, maxTokens: 900 });
+    return parseJSON(result) || {};
+  } catch {
+    return {
+      intent: sessionState.intent || 'custom',
+      collectedAnswers: sessionState.collectedAnswers || {},
+      readyToGenerate: false,
+      action: 'ask_question',
+      fidatoResponse: "Hmm, let me think... tell me more about what you're working on!",
+      questionId: 'product',
+    };
+  }
+}
+
+// ── Inline idea generation (mirrors /generate route logic) ─────────────────────
+async function generateIdeasInline(intent, answers, brand) {
+  const dna = brand?.dna || {};
+  const brandContext = brand
+    ? `Brand: ${brand.name}. Industry: ${dna.industry || 'N/A'}. Voice: ${dna.voice?.personality || 'professional'}. Target Audience: ${dna.targetAudience || 'N/A'}. Description: ${dna.brandDescription || 'N/A'}. Country: ${dna.country || 'India'}.`
+    : '';
+
+  const answersText = Object.entries(answers).filter(([,v]) => v).map(([k,v]) => `${k}: ${v}`).join('\n');
+  const isAdFilm = intent === 'ad-film';
+  const isNaming = intent === 'naming';
+
+  let scriptCount = 3;
+  if (isAdFilm && answers.scriptCount) {
+    const n = parseInt(String(answers.scriptCount).replace(/\D/g, ''));
+    if (n >= 2 && n <= 5) scriptCount = n;
+  }
+
+  let outputFormat;
+  if (isAdFilm) {
+    outputFormat = `{
+  "filmConcepts": [
+    {
+      "title": "Concept name",
+      "logline": "One-line hook",
+      "synopsis": "3-4 sentence story arc",
+      "emotion": "Core emotion",
+      "format": "60-sec Digital Film",
+      "visualStyle": "Cinematic warm tones / Raw handheld / etc",
+      "openingShot": "First shot description",
+      "closingShot": "Final shot + brand reveal",
+      "castSuggestion": "Who stars in this",
+      "musicMood": "Music direction",
+      "targetPlatform": "YouTube / Instagram / TV",
+      "scores": { "virality": 8, "emotionalConnect": 9, "brandRecall": 7, "easeOfProduction": 6 }
+    }
+  ],
+  "productionApproaches": [
+    { "filmRef": "Concept title", "lowBudget": "...", "midBudget": "...", "highBudget": "..." }
+  ],
+  "namingIdeas": { "filmTitles": [], "taglines": [], "hashtags": [] },
+  "followUpSuggestions": ["Make it more emotional", "Try a humorous version", "Shorten to 30 seconds"]
+}`;
+  } else if (isNaming) {
+    outputFormat = `{
+  "campaignConcepts": [{ "title": "Direction name", "hook": "Creative angle", "description": "2-3 sentences", "targetPersona": "Who this appeals to", "visualDirection": "Aesthetic", "platforms": ["Packaging"], "scores": { "virality": 8, "salesImpact": 7, "emotionalConnect": 9, "easeOfExecution": 6 } }],
+  "namingIdeas": {
+    "premiumEnglish": [{"name": "Name", "meaning": "Why it works"}],
+    "culturalInspired": [{"name": "Name", "meaning": "Cultural significance"}],
+    "modernMinimal": [{"name": "Name", "meaning": "Why it works"}],
+    "emotional": [{"name": "Name", "meaning": "Emotional connection"}],
+    "taglines": ["Tagline 1", "Tagline 2"]
+  },
+  "followUpSuggestions": ["More playful names", "Try Hindi-inspired", "Make shorter"]
+}`;
+  } else {
+    outputFormat = `{
+  "campaignConcepts": [
+    {
+      "title": "Campaign theme",
+      "hook": "1-line emotional hook",
+      "description": "2-3 sentence concept",
+      "targetPersona": "Specific audience segment",
+      "visualDirection": "Visual style",
+      "platforms": ["Instagram", "YouTube"],
+      "scores": { "virality": 8, "salesImpact": 7, "emotionalConnect": 9, "easeOfExecution": 6 }
+    }
+  ],
+  "tacticalIdeas": [
+    { "campaignRef": "Campaign title", "reelIdea": "Reel concept", "influencerAngle": "How to use creators", "hashtag": "#Tag", "contestIdea": "Contest mechanic", "ugcPrompt": "UGC prompt" }
+  ],
+  "namingIdeas": { "campaignNames": [], "taglines": [], "hashtags": [] },
+  "executionPlan": {
+    "phases": [{ "name": "Tease", "duration": "X days", "actions": [] }, { "name": "Launch", "duration": "X days", "actions": [] }, { "name": "Sustain", "duration": "X days", "actions": [] }],
+    "contentMap": { "posts": 3, "reels": 2, "stories": 5 },
+    "launchDayStrategy": "Launch day plan"
+  },
+  "followUpSuggestions": ["Make it bolder", "Lower-budget version", "Youth focus"]
+}`;
+  }
+
+  const systemPrompt = `You are an elite creative team brainstorming for a brand. Generate BOLD, SPECIFIC, CULTURALLY RELEVANT ideas. Not generic.
+${isAdFilm ? `Generate exactly ${scriptCount} distinct film concepts with different emotional approaches. Think like a film director.` : 'Generate 3 campaign concepts with tactical execution details.'}
+Respond in STRICT JSON:
+${outputFormat}`;
+
+  const actResult = await aiCall(systemPrompt, `Intent: ${intent}\n${brandContext}\n\nBrief:\n${answersText}`, {
+    temperature: 0.85, maxTokens: 6000,
+  });
+  return parseJSON(actResult) || {};
+}
+
+// ── Inline screenplay generation ───────────────────────────────────────────────
+async function generateScreenplayInline(filmConcept, brand) {
+  const brandContext = brand
+    ? `Brand: ${brand.name}. Voice: ${brand.dna?.voice?.personality || 'professional'}. Target: ${brand.dna?.targetAudience || 'N/A'}. Country: ${brand.dna?.country || 'India'}.`
+    : '';
+
+  const systemPrompt = `You are an award-winning ad film scriptwriter. Write a production-ready screenplay.
+Rules: Scene-by-scene with visual descriptions + dialogue. Include camera directions. Include music/sound cues. End with brand logo reveal + tagline. Make it emotionally powerful.
+Respond in JSON:
+{
+  "title": "Film title", "format": "Duration", "totalScenes": 5,
+  "scenes": [{ "sceneNumber": 1, "duration": "0:00-0:08", "location": "INT. KITCHEN - MORNING", "visual": "What we see", "action": "What happens", "dialogue": "VO or dialogue", "cameraDirection": "CLOSE UP", "music": "Music mood", "mood": "Emotional tone" }],
+  "endCard": { "visual": "Brand logo reveal", "tagline": "End line", "superText": "Any text overlay" },
+  "directorNotes": "Overall direction — casting, color palette, pacing",
+  "estimatedBudget": { "low": "Low-budget version", "mid": "Mid approach", "high": "Full production" }
+}`;
+
+  const userPrompt = `Film: ${filmConcept.title}\nLogline: ${filmConcept.logline || ''}\nSynopsis: ${filmConcept.synopsis || ''}\nFormat: ${filmConcept.format || '60 sec'}\nVisual Style: ${filmConcept.visualStyle || ''}\nEmotion: ${filmConcept.emotion || ''}\n${brandContext}`;
+
+  const result = await aiCall(systemPrompt, userPrompt, { temperature: 0.7, maxTokens: 6000 });
+  return parseJSON(result) || {};
+}
+
+// ── Inline strategy generation ─────────────────────────────────────────────────
+async function generateStrategyInline(answers, brand) {
+  const dna = brand?.dna || {};
+  const brandContext = brand
+    ? `Brand: ${brand.name}. Industry: ${dna.industry || 'N/A'}. Voice: ${dna.voice?.personality || 'professional'}. Audience: ${dna.targetAudience || 'N/A'}. Country: ${dna.country || 'India'}.`
+    : '';
+  const answersText = Object.entries(answers).filter(([,v]) => v).map(([k,v]) => `${k}: ${v}`).join('\n');
+  const duration = (answers.duration || '').toLowerCase().includes('3') ? '3-month' : '1-month';
+
+  const systemPrompt = `You are a world-class CMO and Brand Strategist. Create a practical, measurable ${duration} brand strategy. Every number must have a logical basis — show your math.
+Respond in JSON with these keys: title, executive_summary, objective, duration, budget_total, target_kpis (array of {metric, current, target, achievability, rationale}), channel_strategy (array of {channel, budget_pct, budget_amount, why, expected_output, tactics}), content_plan ({weekly_cadence, content_types, pillar_themes}), quick_wins (array of {action, effort, impact, timeline}), risk_factors (array), channel_synergy (string explaining how channels reinforce each other)`;
+
+  const result = await aiCall(systemPrompt, `${brandContext}\n\nBrief:\n${answersText}`, {
+    temperature: 0.6, maxTokens: 6000,
+  });
+  return parseJSON(result) || {};
+}
+
+// ── POST /api/brainstorm-studio/fidato-chat — Main conversational SSE endpoint ──
+router.post('/fidato-chat', protect, requireStudio('brainstormStudio'), async (req, res) => {
+  // Set SSE headers
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  try { res.flushHeaders(); } catch {}
+
+  const { message, history = [], sessionState = {}, brand } = req.body;
+
+  const onClose = () => { try { res.end(); } catch {} };
+  req.on('close', onClose);
+
+  try {
+    const brandCtx = buildCtx(brand);
+
+    // ── STAGE 1: MCoT Reasoning ─────────────────────────────────────────────
+    const reasoning = await mcotReason(message, history, sessionState, brandCtx);
+    const {
+      action = 'ask_question',
+      fidatoResponse = "Tell me more!",
+      preGenerationMessage,
+      collectedAnswers = {},
+      intent = sessionState.intent || 'custom',
+      questionId,
+    } = reasoning;
+
+    const newSessionState = {
+      ...sessionState,
+      intent,
+      collectedAnswers: { ...sessionState.collectedAnswers, ...collectedAnswers },
+    };
+
+    // ── STAGE 2: Execute Action ─────────────────────────────────────────────
+
+    if (action === 'ask_question' || action === 'general_chat') {
+      // ── Just stream Fidato's conversational response ──
+      await streamWords(res, fidatoResponse);
+      sseEvent(res, { type: 'done', sessionState: newSessionState });
+
+    } else if (action === 'generate_ideas') {
+      // ── Stream "thinking" → generate ideas → stream follow-up ──
+      const preMsg = preGenerationMessage || "Okay, I have enough to work with! Give me a moment to cook up some ideas 🔥";
+      await streamWords(res, preMsg);
+      sseEvent(res, { type: 'thinking' });
+
+      const ideas = await generateIdeasInline(intent, newSessionState.collectedAnswers, brand);
+
+      sseEvent(res, { type: 'ideas', payload: ideas, intent });
+
+      const postMsg = fidatoResponse || "Here's what I came up with! What do you think? Want me to refine any of these, or should I write a full screenplay for one?";
+      await streamWords(res, postMsg);
+
+      sseEvent(res, {
+        type: 'done',
+        sessionState: { ...newSessionState, ideasGenerated: true, lastIdeas: ideas },
+      });
+
+    } else if (action === 'generate_screenplay') {
+      // ── Find the right film concept to script ──
+      const concepts = sessionState.lastIdeas?.filmConcepts || [];
+      // Try to find the concept the user mentioned, or use first
+      let targetConcept = concepts[0];
+      if (concepts.length > 1 && message) {
+        const lowerMsg = message.toLowerCase();
+        const found = concepts.find(c =>
+          lowerMsg.includes(c.title?.toLowerCase()) ||
+          lowerMsg.includes('first') && concepts.indexOf(c) === 0 ||
+          lowerMsg.includes('second') && concepts.indexOf(c) === 1 ||
+          lowerMsg.includes('third') && concepts.indexOf(c) === 2
+        );
+        if (found) targetConcept = found;
+      }
+
+      if (!targetConcept) {
+        await streamWords(res, "Hmm, I need a film concept first! Let me generate some ideas and then we can pick one to script 🎬");
+        sseEvent(res, { type: 'done', sessionState: newSessionState });
+        return res.end();
+      }
+
+      await streamWords(res, preGenerationMessage || `Writing the full screenplay for "${targetConcept.title}"... this is going to be 🔥`);
+      sseEvent(res, { type: 'thinking' });
+
+      const screenplay = await generateScreenplayInline(targetConcept, brand);
+      sseEvent(res, { type: 'screenplay', payload: screenplay, conceptTitle: targetConcept.title });
+
+      await streamWords(res, fidatoResponse || "Here's your full production screenplay! Every scene, shot direction, and music cue is in there. Want to send this to the Video Studio?");
+
+      sseEvent(res, {
+        type: 'done',
+        sessionState: { ...newSessionState, screenplayGenerated: true, lastScreenplay: screenplay },
+      });
+
+    } else if (action === 'generate_strategy') {
+      // ── Full brand strategy generation ──
+      await streamWords(res, preGenerationMessage || "Alright, building your complete brand strategy! This one takes a moment ✍️");
+      sseEvent(res, { type: 'thinking' });
+
+      const strategy = await generateStrategyInline(newSessionState.collectedAnswers, brand);
+      sseEvent(res, { type: 'strategy', payload: strategy });
+
+      await streamWords(res, fidatoResponse || "Your full strategy is ready! Every channel has a budget, every target has a calculation behind it. Want me to explain any part?");
+
+      sseEvent(res, {
+        type: 'done',
+        sessionState: { ...newSessionState, ideasGenerated: true, lastStrategy: strategy },
+      });
+
+    } else if (action === 'refine_ideas') {
+      // ── Refine existing ideas with user feedback ──
+      const currentIdeas = sessionState.lastIdeas;
+      if (!currentIdeas) {
+        await streamWords(res, "Let me generate some ideas first, then we can refine them together!");
+        sseEvent(res, { type: 'done', sessionState: newSessionState });
+        return res.end();
+      }
+
+      await streamWords(res, preGenerationMessage || "Got it! Let me remix these with your feedback 🔄");
+      sseEvent(res, { type: 'thinking' });
+
+      const refined = await generateIdeasInline(intent, { ...newSessionState.collectedAnswers, refinementHint: message }, brand);
+      sseEvent(res, { type: 'ideas', payload: refined, intent });
+
+      await streamWords(res, fidatoResponse || "Here's the refined version! Better?");
+      sseEvent(res, {
+        type: 'done',
+        sessionState: { ...newSessionState, ideasGenerated: true, lastIdeas: refined },
+      });
+    }
+
+    res.end();
+  } catch (err) {
+    console.error('fidato-chat error:', err);
+    sseEvent(res, { type: 'error', message: err.message || 'Something went wrong' });
+    res.end();
+  }
+});
+
 export default router;
+

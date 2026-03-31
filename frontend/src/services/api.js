@@ -639,7 +639,51 @@ export const brainstormStudio = {
     updateKpi: (id, data) => apiFetch(`/brainstorm-studio/strategies/${id}/kpi`, { method: 'PATCH', body: JSON.stringify(data) }),
     toggleMilestone: (id, data) => apiFetch(`/brainstorm-studio/strategies/${id}/milestone`, { method: 'PATCH', body: JSON.stringify(data) }),
     updateStrategyStatus: (id, data) => apiFetch(`/brainstorm-studio/strategies/${id}/status`, { method: 'PATCH', body: JSON.stringify(data) }),
+
+    // ── Fidato Chat: streaming SSE (POST with ReadableStream) ──
+    fidatoChat: async (payload, { onToken, onThinking, onIdeas, onScreenplay, onStrategy, onDone, onError } = {}) => {
+        const token = localStorage.getItem('mantram_token') || '';
+        const response = await fetch(`${API_BASE}/brainstorm-studio/fidato-chat`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+            body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({ error: 'Request failed' }));
+            onError?.(err.error || `HTTP ${response.status}`);
+            return;
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+            for (const line of lines) {
+                if (!line.startsWith('data: ')) continue;
+                const raw = line.slice(6).trim();
+                if (!raw || raw === '[DONE]') continue;
+                try {
+                    const evt = JSON.parse(raw);
+                    if (evt.type === 'token') onToken?.(evt.text);
+                    else if (evt.type === 'thinking') onThinking?.();
+                    else if (evt.type === 'ideas') onIdeas?.(evt.payload, evt.intent);
+                    else if (evt.type === 'screenplay') onScreenplay?.(evt.payload, evt.conceptTitle);
+                    else if (evt.type === 'strategy') onStrategy?.(evt.payload);
+                    else if (evt.type === 'done') onDone?.(evt.sessionState);
+                    else if (evt.type === 'error') onError?.(evt.message);
+                } catch { /* ignore malformed SSE */ }
+            }
+        }
+    },
 };
+
 
 // ============ Agent Command API ============
 export const agentCommand = {
