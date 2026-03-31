@@ -17,6 +17,7 @@ import { useAuth } from '../context/AuthContext';
 const STORAGE_KEY = 'mantram_bg_jobs';
 const POLL_INTERVAL_MS = 5000; // Poll every 5 seconds
 const MAX_AGE_MS = 48 * 60 * 60 * 1000; // Don't track jobs older than 48h
+const STALE_JOB_MS = 10 * 60 * 1000; // Auto-fail jobs stuck >10 minutes
 
 // ── Persist/read from localStorage ──────────────────────────────────────────
 
@@ -107,26 +108,73 @@ export function useBackgroundJobs() {
         );
         if (activeJobs.length === 0) return;
 
+        const now = Date.now();
+
         await Promise.allSettled(
             activeJobs.map(async (job) => {
-                try {
-                    const data = await creativesAPI.pollJob(job.jobId);
-                    if (!data?.success || !data?.job) return;
-                    const serverJob = data.job;
-
-                    if (!mountedRef.current) return;
-
+                // ── STALE JOB CHECK: Auto-fail jobs stuck too long ──
+                const jobAge = now - (job.createdAt || 0);
+                if (jobAge > STALE_JOB_MS) {
+                    console.warn(`[BackgroundJobs] Job ${job.jobId} stale (${Math.round(jobAge / 60000)}m) — marking failed`);
                     setJobs(prev => {
-                        if (!prev[job.jobId]) return prev; // was removed
+                        if (!prev[job.jobId]) return prev;
                         return {
                             ...prev,
                             [job.jobId]: {
                                 ...prev[job.jobId],
-                                status: serverJob.status,
+                                status: 'failed',
+                                errorMessage: 'Generation timed out. Please try again.',
+                                completedAt: now,
+                            },
+                        };
+                    });
+                    return;
+                }
+
+                try {
+                    const data = await creativesAPI.pollJob(job.jobId);
+
+                    // ── 404 or missing: job doesn't exist on server anymore ──
+                    if (!data?.success || !data?.job) {
+                        setJobs(prev => {
+                            if (!prev[job.jobId]) return prev;
+                            return {
+                                ...prev,
+                                [job.jobId]: {
+                                    ...prev[job.jobId],
+                                    status: 'failed',
+                                    errorMessage: 'Job not found on server. It may have expired.',
+                                    completedAt: now,
+                                },
+                            };
+                        });
+                        return;
+                    }
+
+                    const serverJob = data.job;
+                    if (!mountedRef.current) return;
+
+                    // ── Server still says processing but it's been too long → fail it ──
+                    const serverCreated = serverJob.createdAt ? new Date(serverJob.createdAt).getTime() : job.createdAt;
+                    const serverAge = now - serverCreated;
+                    const effectiveStatus = (
+                        (serverJob.status === 'pending' || serverJob.status === 'processing') &&
+                        serverAge > STALE_JOB_MS
+                    ) ? 'failed' : serverJob.status;
+
+                    setJobs(prev => {
+                        if (!prev[job.jobId]) return prev;
+                        return {
+                            ...prev,
+                            [job.jobId]: {
+                                ...prev[job.jobId],
+                                status: effectiveStatus,
                                 imageUrl: serverJob.imageUrl || prev[job.jobId].imageUrl,
                                 creativeId: serverJob.creativeId,
-                                errorMessage: serverJob.errorMessage,
-                                completedAt: serverJob.completedAt,
+                                errorMessage: effectiveStatus === 'failed' && !serverJob.errorMessage
+                                    ? 'Generation timed out. Please try again.'
+                                    : serverJob.errorMessage,
+                                completedAt: serverJob.completedAt || (effectiveStatus === 'failed' ? now : undefined),
                                 result: serverJob.result,
                                 warnings: serverJob.warnings,
                             },
@@ -179,29 +227,35 @@ export function useBackgroundJobs() {
                 for (const serverJob of data.jobs) {
                     const { jobId } = serverJob;
                     const existing = storedJobs[jobId];
+                    const serverCreatedAt = new Date(serverJob.createdAt).getTime();
+                    const isStale = (Date.now() - serverCreatedAt) > STALE_JOB_MS;
+                    const isStillActive = serverJob.status === 'processing' || serverJob.status === 'pending';
 
                     if (existing) {
-                        // Update status of known jobs
+                        // Update status of known jobs — but auto-fail if stale
                         updates[jobId] = {
                             ...existing,
-                            status: serverJob.status,
+                            status: (isStillActive && isStale) ? 'failed' : serverJob.status,
                             imageUrl: serverJob.imageUrl || existing.imageUrl,
                             creativeId: serverJob.creativeId,
-                            errorMessage: serverJob.errorMessage,
+                            errorMessage: (isStillActive && isStale)
+                                ? 'Generation timed out. Please try again.'
+                                : serverJob.errorMessage,
                         };
-                    } else if (serverJob.status === 'processing' || serverJob.status === 'pending') {
-                        // Reconnect to orphaned in-progress jobs (e.g. after browser close)
+                    } else if (isStillActive && !isStale) {
+                        // Reconnect to recent in-progress jobs (e.g. after browser close)
                         updates[jobId] = {
                             jobId,
                             status: serverJob.status,
-                            createdAt: new Date(serverJob.createdAt).getTime(),
+                            createdAt: serverCreatedAt,
                             prompt: serverJob.prompt || '',
                             format: serverJob.format || '',
                             imageUrl: serverJob.imageUrl || null,
                             _dismissed: false,
-                            _reconnected: true, // Flag so UI can show "Reconnected"
+                            _reconnected: true,
                         };
                     }
+                    // If stale + not in localStorage → just ignore it (don't reconnect)
                 }
 
                 if (Object.keys(updates).length > 0 && mountedRef.current) {
@@ -213,6 +267,24 @@ export function useBackgroundJobs() {
         };
 
         reconcileFromServer();
+
+        // ── Auto-cleanup: remove old dismissed/failed jobs from localStorage ──
+        const stored = readStoredJobs();
+        const now = Date.now();
+        let changed = false;
+        for (const [jobId, job] of Object.entries(stored)) {
+            const age = now - (job.createdAt || 0);
+            const isDone = job.status === 'completed' || job.status === 'failed' || job.status === 'cancelled';
+            // Remove finished jobs older than 5 minutes, or dismissed jobs
+            if ((isDone && age > 5 * 60 * 1000) || job._dismissed) {
+                delete stored[jobId];
+                changed = true;
+            }
+        }
+        if (changed && mountedRef.current) {
+            writeStoredJobs(stored);
+            setJobs(stored);
+        }
     }, [user?._id]); // Only re-run if the logged-in user changes
 
     // ── Derived state ─────────────────────────────────────────────────────────

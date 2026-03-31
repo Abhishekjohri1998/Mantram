@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import DashboardLayout from '../components/DashboardLayout'
+import FormattedText from '../components/FormattedText'
 import { brainstormStudio as bsAPI } from '../services/api'
 import { useBrand } from '../context/BrandContext'
 import { useAuth } from '../context/AuthContext'
@@ -45,6 +46,63 @@ function ThinkingDots() {
       <span />
       <span />
       <span />
+    </div>
+  )
+}
+
+// ── Reasoning Panel (Deep Research style) ─────────────────────────────────────
+function ReasoningPanel({ steps, citations, visible }) {
+  const [collapsed, setCollapsed] = useState(false)
+  if (!visible || steps.length === 0) return null
+
+  return (
+    <div className={`bs-reasoning-panel ${collapsed ? 'collapsed' : ''}`}>
+      <button className="bs-reasoning-toggle" onClick={() => setCollapsed(c => !c)}>
+        <span className="bs-reasoning-icon">🧠</span>
+        <span className="bs-reasoning-title">Fidato is thinking...</span>
+        <span className="bs-reasoning-count">{steps.length} steps</span>
+        <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
+          {collapsed ? 'expand_more' : 'expand_less'}
+        </span>
+      </button>
+
+      {!collapsed && (
+        <div className="bs-reasoning-steps">
+          {steps.map((s, i) => (
+            <div key={i} className="bs-reasoning-step" style={{ animationDelay: `${i * 60}ms` }}>
+              <span className="bs-step-icon">{s.icon}</span>
+              <span className="bs-step-text">{s.text}</span>
+              {i === steps.length - 1 && (
+                <span className="bs-step-pulse" />
+              )}
+            </div>
+          ))}
+
+          {citations.length > 0 && (
+            <div className="bs-citations">
+              <div className="bs-citations-label">🔗 Sources</div>
+              <div className="bs-citations-list">
+                {citations.map((c, i) => (
+                  <a key={i} className="bs-citation-chip" href={c.url || c.uri || '#'}
+                    target="_blank" rel="noopener noreferrer" title={c.title || c.url}>
+                    {c.title || c.url || `Source ${i + 1}`}
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Feedback toast ────────────────────────────────────────────────────────────
+function FeedbackToast({ message, visible }) {
+  if (!visible) return null
+  return (
+    <div className="bs-feedback-toast">
+      {message}
     </div>
   )
 }
@@ -392,7 +450,7 @@ function Message({ msg, onScreenplay, onFeedback, onSelectOption, isLatest, stre
       )}
       <div className={`bs-bubble ${isFidato ? 'bs-bubble-fidato' : 'bs-bubble-user'}`}>
         {msg.content && (
-          <p className="bs-bubble-text">{msg.content}</p>
+          <div className="bs-bubble-text"><FormattedText text={msg.content} /></div>
         )}
         {msg.thinking && <ThinkingDots />}
 
@@ -451,6 +509,10 @@ export default function BrainstormStudio() {
   const [phase, setPhase] = useState('explore')
   const [isListening, setIsListening] = useState(false)
   const [error, setError] = useState(null)
+  const [reasoningSteps, setReasoningSteps] = useState([])
+  const [citations, setCitations] = useState([])
+  const [showReasoning, setShowReasoning] = useState(false)
+  const [feedbackToast, setFeedbackToast] = useState({ message: '', visible: false })
 
   const bottomRef = useRef(null)
   const inputRef = useRef(null)
@@ -460,10 +522,13 @@ export default function BrainstormStudio() {
   const firstName = user?.name?.split(' ')[0] || 'there'
   const brandName = activeBrand?.name || null
 
-  // Auto-scroll
+  // Auto-scroll — trigger on new messages AND during streaming token updates
+  const lastMsgContent = messages[messages.length - 1]?.content || ''
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
-  }, [messages])
+    requestAnimationFrame(() => {
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+    })
+  }, [messages.length, lastMsgContent.length, streaming])
 
   // Brand-aware greeting on mount — Fidato references the brand's DNA
   useEffect(() => {
@@ -490,7 +555,7 @@ export default function BrainstormStudio() {
     ].filter(Boolean).join(', ')
 
     const greeting = insights
-      ? `Hey ${firstName}! 👋 I'm Fidato — your brand partner for **${activeBrand.name}**. I know you’re a ${insights}. Let’s brainstorm something brilliant together. What are we building today? 🚀`
+      ? `Hey ${firstName}! 👋 I'm Fidato — your brand strategist for ${activeBrand.name}. I've studied your brand deeply — you’re a ${insights}. Let’s brainstorm something brilliant together. What are we building today? 🚀`
       : `Hey ${firstName}! 👋 Fidato here — let’s brainstorm for **${activeBrand.name}** today. What are we working on?`
 
     setMessages([{ id: 'welcome', role: 'fidato', content: greeting, timestamp: Date.now() }])
@@ -544,6 +609,9 @@ export default function BrainstormStudio() {
       .concat([{ role: 'user', content: msg }])
 
     setStreaming(true)
+    setReasoningSteps([])
+    setCitations([])
+    setShowReasoning(true)
     let thinkingShown = false
 
     try {
@@ -560,6 +628,12 @@ export default function BrainstormStudio() {
           onThinking: () => {
             updateMessage(fidId, { thinking: true })
             thinkingShown = true
+          },
+          onReasoningStep: (step, icon) => {
+            setReasoningSteps(prev => [...prev, { text: step, icon: icon || '🧠' }])
+          },
+          onCitations: (newCitations) => {
+            setCitations(prev => [...prev, ...(newCitations || [])])
           },
           onIdeas: (payload, intent) => {
             updateMessage(fidId, { ideasPayload: payload, intent, thinking: false })
@@ -585,6 +659,7 @@ export default function BrainstormStudio() {
       updateMessage(fidId, { content: "Something went wrong — try again!", thinking: false })
     } finally {
       setStreaming(false)
+      setShowReasoning(false)
       currentMsgIdRef.current = null
       inputRef.current?.focus()
     }
@@ -596,6 +671,11 @@ export default function BrainstormStudio() {
   }, [sendMessage])
 
   // ── Feedback / suggestion handler ───────────────────────────────────────────
+  const showFeedbackToast = useCallback((msg) => {
+    setFeedbackToast({ message: msg, visible: true })
+    setTimeout(() => setFeedbackToast({ message: '', visible: false }), 2500)
+  }, [])
+
   const handleFeedback = useCallback((concept, type, suggestion) => {
     if (type === 'suggestion' && suggestion) {
       sendMessage(suggestion)
@@ -608,10 +688,12 @@ export default function BrainstormStudio() {
         ideaDescription: concept.logline || concept.hook || '',
         feedback: type,
         intent: sessionState.intent,
+      }).then(() => {
+        showFeedbackToast(type === 'like' ? '👍 Feedback saved — Fidato will learn from this!' : '👎 Noted — Fidato will adjust the direction')
       }).catch(() => {})
     }
     if (type === 'dislike') sendMessage("Let's try a different direction")
-  }, [sessionState.intent, activeBrand, sendMessage])
+  }, [sessionState.intent, activeBrand, sendMessage, showFeedbackToast])
 
   // ── Voice input ─────────────────────────────────────────────────────────────
   const toggleVoice = useCallback(() => {
@@ -708,12 +790,22 @@ export default function BrainstormStudio() {
             />
           ))}
 
+          {/* Live Reasoning Panel — shows during MCoT thinking */}
+          <ReasoningPanel
+            steps={reasoningSteps}
+            citations={citations}
+            visible={showReasoning && reasoningSteps.length > 0}
+          />
+
           {error && (
             <div className="bs-error-banner">⚠️ {error}</div>
           )}
 
           <div ref={bottomRef} style={{ height: 1 }} />
         </div>
+
+        {/* Feedback toast */}
+        <FeedbackToast message={feedbackToast.message} visible={feedbackToast.visible} />
 
         {/* Input */}
         <div className="bs-input-area">

@@ -1221,7 +1221,6 @@ router.patch('/strategies/:id/status', protect, async (req, res) => {
     res.status(500).json({ success: false, error: safeErrorMessage(error) });
   }
 });
-
 // ============================================================================
 // FIDATO-CHAT  — Conversational Brainstorm Engine (SSE)
 // MCoT: Stage 1 reasons about session state, Stage 2 executes action
@@ -1240,152 +1239,519 @@ async function streamWords(res, text, delayMs = 18) {
   }
 }
 
-// ── Brand context builder ──────────────────────────────────────────────────────
+// ── Deep Brand Context Builder ─────────────────────────────────────────────────
+// Builds the richest possible brand context for AI reasoning
 function buildCtx(brand) {
   if (!brand?.dna) return brand ? `Brand: ${brand.name}.` : '';
   const d = brand.dna;
-  return [
-    `Brand: ${brand.name}`,
-    d.industry && `Industry: ${d.industry}`,
-    d.brandDescription && `Description: ${d.brandDescription}`,
-    d.targetAudience && `Audience: ${d.targetAudience}`,
-    d.voice?.personality && `Voice: ${d.voice.personality}`,
-    d.voice?.keywords?.length && `Voice keywords: ${d.voice.keywords.join(', ')}`,
-    d.contentStyle?.dos?.length && `Dos: ${d.contentStyle.dos.slice(0,3).join(', ')}`,
-    d.contentStyle?.donts?.length && `Don'ts: ${d.contentStyle.donts.slice(0,3).join(', ')}`,
-    d.country && `Country: ${d.country}`,
-    d.defaultLanguage && `Language: ${d.defaultLanguage}`,
+  const sections = [
+    `BRAND NAME: ${brand.name}`,
+    d.industry && `INDUSTRY: ${d.industry}`,
+    d.category && `CATEGORY: ${d.category}`,
+    d.brandDescription && `BRAND STORY: ${d.brandDescription}`,
+    d.targetAudience && `TARGET AUDIENCE: ${d.targetAudience}`,
+    d.voice?.personality && `BRAND VOICE: ${d.voice.personality}`,
+    d.voice?.description && `VOICE DETAIL: ${d.voice.description}`,
+    d.voice?.keywords?.length && `VOICE KEYWORDS: ${d.voice.keywords.join(', ')}`,
+    d.voice?.sampleQuote && `BRAND QUOTE EXAMPLE: "${d.voice.sampleQuote}"`,
+    d.contentStyle?.dos?.length && `BRAND DO's: ${d.contentStyle.dos.join('; ')}`,
+    d.contentStyle?.donts?.length && `BRAND DON'Ts: ${d.contentStyle.donts.join('; ')}`,
+    d.contentStyle?.keyPhrases?.length && `KEY BRAND PHRASES: ${d.contentStyle.keyPhrases.join(', ')}`,
+    d.country && `COUNTRY: ${d.country}`,
+    d.region && `REGION: ${d.region}`,
+    d.defaultLanguage && `PRIMARY LANGUAGE: ${d.defaultLanguage}`,
+    d.languageStyle && `LANGUAGE STYLE: ${d.languageStyle}`,
+    d.colors?.length && `BRAND COLORS: ${d.colors.map(c => `${c.name || ''} (${c.hex})`).join(', ')}`,
+    d.usp && `USP: ${d.usp}`,
+    d.differentiators?.length && `DIFFERENTIATORS: ${d.differentiators.join('; ')}`,
+    d.competitors?.length && `KNOWN COMPETITORS: ${d.competitors.join(', ')}`,
+    d.products?.length && `PRODUCTS/SERVICES: ${d.products.slice(0, 5).map(p => typeof p === 'string' ? p : (p.name || p.title || '')).join(', ')}`,
   ].filter(Boolean).join('\n');
+  return sections;
 }
 
-// ── MCoT Stage 1: Reason about conversation (hardened) ─────────────────────
-async function mcotReason(message, history, sessionState, brandCtx, brand) {
+// ── Fuzzy question dedup — detects if AI is repeating a similar question ─────
+function isSimilarQuestion(newQ, askedList) {
+  if (!askedList?.length) return false;
+  const normalize = s => (s || '').toLowerCase().replace(/[^a-z0-9 ]/g, '').replace(/\s+/g, ' ').trim();
+  const normNew = normalize(newQ);
+  const newWords = new Set(normNew.split(' ').filter(w => w.length > 3));
+  for (const asked of askedList) {
+    const normAsked = normalize(asked);
+    if (normNew === normAsked) return true;
+    const askedWords = new Set(normAsked.split(' ').filter(w => w.length > 3));
+    if (askedWords.size === 0 || newWords.size === 0) continue;
+    const overlap = [...newWords].filter(w => askedWords.has(w)).length;
+    const similarity = overlap / Math.min(newWords.size, askedWords.size);
+    if (similarity > 0.6) return true;
+  }
+  return false;
+}
+
+// ── Detect if a query needs web research ──────────────────────────────────────
+// ── Detect if user is making a direct request vs answering a question ──────────
+// This prevents Fidato from ignoring user questions and continuing its script
+function isUserMakingDirectRequest(message) {
+  const lowerMsg = (message || '').toLowerCase().trim();
+  
+  // Pattern 1: Direct action requests
+  const actionRequests = [
+    /(?:share|give|show|tell|provide|do|create|run|prepare|build|make|write)\s+(?:me\s+)?(?:a\s+)?(?:competitor|competitive|market|brand|swot|analysis|research|strategy|breakdown|report|insight|overview|comparison)/i,
+    /(?:competitor|competitive|market)\s+(?:analysis|research|comparison|breakdown|landscape|overview|intelligence)/i,
+    /(?:analyze|research|compare|evaluate|assess|audit)\s+(?:the\s+)?(?:competitor|market|brand|industry|competition)/i,
+  ];
+  
+  // Pattern 2: Questions about competitors/market/trends
+  const questionPatterns = [
+    /(?:how|what|who|where|why|which)\s+(?:are|is|do|does|did|would|could|can)\s+(?:they|competitor|other brand|other compan|the market|the industry|similar brand)/i,
+    /(?:how|what).*(?:doing|performing|working|trending|selling|marketing|advertising)/i,
+    /(?:what|who).*(?:competition|competitor|rival|alternative)/i,
+    /what(?:'s| is) (?:the |their |my )?(?:market|industry|trend|benchmark|best practice)/i,
+  ];
+  
+  // Pattern 3: Imperative/command-style requests (not answering a question)
+  const commandPatterns = [
+    /^(?:share|give|show|tell|provide|do|create|run|analyze|research|compare|help|suggest|recommend|explain|break down|find out|look up|search for)/i,
+    /(?:can you|could you|would you|please)\s+(?:share|give|show|tell|provide|do|create|run|analyze|research|compare|help|suggest|find)/i,
+    /(?:i want|i need|i'd like)\s+(?:to know|to see|to understand|a|the|some|competitor|market|analysis|comparison)/i,
+  ];
+
+  return [...actionRequests, ...questionPatterns, ...commandPatterns].some(rx => rx.test(lowerMsg));
+}
+
+function needsWebResearch(message, intent) {
+  const lowerMsg = (message || '').toLowerCase();
+  const webTriggers = [
+    /competitor|what.*(?:brand|compan).*doing/,
+    /market.*trend|trend.*(?:market|industry)/,
+    /industry.*(?:benchmark|data|stat)/,
+    /what.*(?:work|strategy).*(?:for|in)/,
+    /(?:best|popular|trending).*(?:campaign|strategy|approach)/,
+    /research|analyze.*market|market.*research/,
+    /(?:how|what).*(?:other|similar).*brand/,
+    /latest.*(?:news|update|launch)/,
+    /(?:average|typical).*(?:cost|price|budget|roi)/,
+  ];
+  if (intent === 'brand-strategy') return true;
+  return webTriggers.some(rx => rx.test(lowerMsg));
+}
+
+// ── Build reinforcement context from feedback ─────────────────────────────────
+function buildReinforcementContext(feedbackLog) {
+  if (!feedbackLog?.length) return '';
+  const liked = feedbackLog.filter(f => f.type === 'like');
+  const disliked = feedbackLog.filter(f => f.type === 'dislike');
+  let ctx = '';
+  if (liked.length) {
+    ctx += `\nUSER LOVED THESE CONCEPTS (generate MORE ideas like these):\n`;
+    liked.forEach(f => { ctx += `  ✅ "${f.title}" — traits: ${f.traits || 'emotional, bold'}\n`; });
+  }
+  if (disliked.length) {
+    ctx += `\nUSER REJECTED THESE CONCEPTS (generate DIFFERENT ideas, avoid similar approaches):\n`;
+    disliked.forEach(f => { ctx += `  ❌ "${f.title}" — traits: ${f.traits || 'generic, corporate'}\n`; });
+  }
+  return ctx;
+}
+
+// ── MCoT Stage 1: Agentic Brand-Strategist Reasoning ───────────────────────
+// Every question is AI-generated, contextual, and brand-aware.
+// Fidato thinks like a senior brand strategist / CMO — not a chatbot.
+// Now with: question dedup, web search grounding, reinforcement learning.
+async function mcotReason(message, history, sessionState, brandCtx, brand, sseEmit) {
   const userMessages = history.filter(m => m.role === 'user');
   const userMessageCount = userMessages.length;
+  const detectedIntent = sessionState.intent || detectIntentFromHistory(history, message);
+  const brandName = brand?.name || '';
+  const askedQuestions = sessionState.askedQuestions || [];
+  const feedbackLog = sessionState.feedbackLog || [];
 
-  // ── Deterministic override: force generate after enough turns ──────────────
-  // This fires even if AI reasoning fails, breaking any loop
-  if (userMessageCount >= 3 && !sessionState.ideasGenerated) {
-    const intent = sessionState.intent || detectIntentFromHistory(history, message);
+  // Helper to emit reasoning steps to frontend
+  const emitStep = (step, icon = '🧠') => {
+    if (sseEmit) sseEmit({ type: 'reasoning_step', step, icon });
+  };
+
+  // ── Deterministic override: force generate after enough context ────────────
+  if (userMessageCount >= 5 && !sessionState.ideasGenerated) {
     const answers = buildAnswersFromHistory(history, message, sessionState);
-    console.log(`[fidato-chat] Force-generating after ${userMessageCount} user messages. Intent: ${intent}`);
+    emitStep('Sufficient context gathered — preparing to generate', '✅');
     return {
-      intent,
+      intent: detectedIntent,
       collectedAnswers: answers,
       readyToGenerate: true,
-      action: intent === 'brand-strategy' ? 'generate_strategy' : 'generate_ideas',
-      preGenerationMessage: `Okay I’ve got the picture! Let me put together some ${intent === 'ad-film' ? 'film concepts' : intent === 'brand-strategy' ? 'a strategy' : 'ideas'} for ${brand?.name || 'you'} 🔥`,
-      fidatoResponse: `Here’s what I came up with! What do you think?`,
+      action: detectedIntent === 'brand-strategy' ? 'generate_strategy' : 'generate_ideas',
+      preGenerationMessage: `I've got a really clear picture now! Let me put together something brilliant for ${brandName || 'you'} 🔥`,
+      fidatoResponse: `Here's what I came up with — take a look and tell me what you think!`,
+      askedQuestions,
     };
   }
 
-  // ── Screenplay / refine detection (keyword-based, no AI needed) ────────────
+  // ── Post-generation actions (keyword-based, no AI needed) ─────────────────
   const lowerMsg = message.toLowerCase();
   if (sessionState.ideasGenerated) {
     if (/script|screenplay|write.*film|full.*script/.test(lowerMsg)) {
       return {
-        intent: sessionState.intent || 'ad-film',
+        intent: detectedIntent,
         collectedAnswers: sessionState.collectedAnswers || {},
         readyToGenerate: true,
         action: 'generate_screenplay',
-        preGenerationMessage: `On it! Writing the full screenplay now ✍️`,
-        fidatoResponse: `Here's your production-ready screenplay! Every scene, every shot.`,
+        preGenerationMessage: `On it! Writing the full production-ready screenplay now ✍️`,
+        fidatoResponse: `Here's your screenplay — every scene, shot direction, and music cue is mapped out.`,
+        askedQuestions,
       };
     }
-    if (/refine|change|different|improve|make it|try|maybe|how about|what if/.test(lowerMsg)) {
+    if (/refine|change|different|improve|make it|try|maybe|how about|what if|more|less|another|other/.test(lowerMsg)) {
       return {
-        intent: sessionState.intent || 'custom',
+        intent: detectedIntent,
         collectedAnswers: { ...sessionState.collectedAnswers, refinementHint: message },
         readyToGenerate: true,
         action: 'refine_ideas',
-        preGenerationMessage: `Got it! Remixing with your direction 🔄`,
-        fidatoResponse: `Here's the refined version — better?`,
+        preGenerationMessage: `Got your feedback! Remixing with that direction 🔄`,
+        fidatoResponse: `Here's the refined version — closer to what you had in mind?`,
+        askedQuestions,
       };
     }
   }
 
-  // ── Intent detection from message (keyword-based backup) ──────────────────
-  const detectedIntent = detectIntentFromHistory(history, message);
+  // ── Detect if user is making a SPECIFIC REQUEST vs answering a question ────
+  // If the user is asking for something specific (competitor analysis, market data,
+  // strategy advice, etc.), Fidato should RESPOND to that, not ignore it.
+  const isDirectRequest = isUserMakingDirectRequest(message);
+  const useWebSearch = needsWebResearch(message, detectedIntent);
+  if (isDirectRequest) console.log(`[fidato-chat] Direct request detected: "${message.slice(0, 50)}..."`);
 
-  // ── Short-circuit: turns 1 & 2 — ask sequential questions, store answer by turn ─
-  if (userMessageCount <= 2) {
-    const turnKey = userMessageCount === 1 ? 'q1_answer' : 'q2_answer';
-    const updatedAnswers = {
-      ...sessionState.collectedAnswers,
-      [turnKey]: message,
-      ...extractAnswerFromMessage(message, sessionState.collectedAnswers || {}),
-    };
-    const { question, options } = getNextSmartQuestion(userMessageCount + 1, detectedIntent, updatedAnswers, brandCtx, brand);
-    return {
-      intent: detectedIntent,
-      collectedAnswers: updatedAnswers,
-      readyToGenerate: false,
-      action: 'ask_question',
-      fidatoResponse: question,
-      questionOptions: options,
-    };
+  // ── Emit reasoning steps to frontend ──────────────────────────────────────
+  emitStep(`Analyzing ${brandName || 'brand'} DNA and context`, '🧬');
+  await new Promise(r => setTimeout(r, 200));
+
+  if (isDirectRequest) {
+    emitStep(`User is asking a specific question — prioritizing their request`, '🎯');
+    await new Promise(r => setTimeout(r, 200));
+  } else {
+    emitStep(`Reviewing conversation (${userMessageCount} turns so far)`, '🔍');
+    await new Promise(r => setTimeout(r, 200));
   }
 
-  // ── AI reasoning (only when needed, simplified prompt) ────────────────────
-  const recentHistory = history.slice(-8).map(m => `${m.role === 'fidato' ? 'F' : 'U'}: ${m.content?.slice(0, 200)}`).join('\n');
+  if (useWebSearch) {
+    emitStep('Searching the web for market intelligence...', '🌐');
+    await new Promise(r => setTimeout(r, 200));
+  }
 
-  const systemPrompt = `You are a brainstorm session AI. Analyze this conversation and return ONLY a JSON object.
+  if (!isDirectRequest) {
+    emitStep('Identifying missing strategic information', '🎯');
+    await new Promise(r => setTimeout(r, 150));
+  }
 
-BRAND: ${brandCtx?.slice(0, 200) || 'unknown'}
-INTENT SO FAR: ${sessionState.intent || detectedIntent}
-USER MESSAGES COUNT: ${userMessageCount}
+  // ── Build MCoT prompt with dedup ──────────────────────────────────────────
+  const recentHistory = history.slice(-12).map(m =>
+    `${m.role === 'fidato' ? 'FIDATO' : 'USER'}: ${(m.content || '').slice(0, 300)}`
+  ).join('\n');
 
-CONVERSATION:
-${recentHistory}
-LATEST: ${message}
+  const knownAnswers = sessionState.collectedAnswers || {};
+  const knownSummary = Object.entries(knownAnswers)
+    .filter(([, v]) => v && typeof v === 'string' && v.length > 0)
+    .map(([k, v]) => `  - ${k}: ${v.slice(0, 150)}`)
+    .join('\n');
 
-Return ONLY this JSON (no explanation, no markdown, no backticks):
-{"intent":"ad-film","collectedAnswers":{"product":"...","audience":"...","emotion":"...","objective":"..."},"action":"ask_question","fidatoResponse":"your reply here","preGenerationMessage":null}
+  const reinforcementCtx = buildReinforcementContext(feedbackLog);
 
-action must be one of: ask_question, generate_ideas, generate_screenplay, generate_strategy, refine_ideas
-Rules:
-- If you have product+audience+emotion → action=generate_ideas (or generate_strategy if brand-strategy intent)
-- If user says write/script/screenplay → action=generate_screenplay
-- Otherwise → ask_question, pick the most important missing info
-- fidatoResponse = Fidato's SHORT casual reply (1-2 sentences, no markdown, no bullets, emoji ok)`;
+  const dedupBlock = askedQuestions.length > 0
+    ? `\n═══════════════════════════════════════════════════
+QUESTIONS ALREADY ASKED (DO NOT REPEAT OR REPHRASE ANY OF THESE):
+═══════════════════════════════════════════════════
+${askedQuestions.map((q, i) => `  ${i + 1}. "${q}"`).join('\n')}
+
+⚠️ You MUST ask a DIFFERENT question about a DIFFERENT topic. If you repeat or rephrase any of the above, the system will reject your response.
+`
+    : '';
+
+  const systemPrompt = `You are FIDATO — a senior Brand Strategist and Creative Director with 15+ years experience at top agencies (Ogilvy, Wieden+Kennedy, Dentsu). You are NOT a chatbot. You are a brand expert who deeply understands this brand and thinks strategically about every question.
+
+═══════════════════════════════════════════════════
+BRAND DNA (Your deep knowledge of this brand):
+═══════════════════════════════════════════════════
+${brandCtx || 'No brand selected — ask about the brand first.'}
+
+═══════════════════════════════════════════════════
+SESSION CONTEXT:
+═══════════════════════════════════════════════════
+BRAINSTORM TYPE: ${detectedIntent}
+USER MESSAGE COUNT: ${userMessageCount}
+INFORMATION GATHERED SO FAR:
+${knownSummary || '  (Nothing yet — this is the start of the conversation)'}
+${dedupBlock}${reinforcementCtx ? `
+═══════════════════════════════════════════════════
+REINFORCEMENT LEARNING (User's Preferences):
+═══════════════════════════════════════════════════
+${reinforcementCtx}` : ''}
+
+═══════════════════════════════════════════════════
+CONVERSATION HISTORY:
+═══════════════════════════════════════════════════
+${recentHistory || '(No history yet)'}
+LATEST USER MESSAGE: "${message}"
+
+═══════════════════════════════════════════════════
+YOUR STRATEGIC FRAMEWORK — Think like a CMO:
+═══════════════════════════════════════════════════
+
+For each brainstorm type, you need SPECIFIC information before you can generate great ideas. Here's what a real strategist needs:
+
+${getStrategicFramework(detectedIntent)}
+
+═══════════════════════════════════════════════════
+CRITICAL RULE — LISTEN TO THE USER FIRST:
+═══════════════════════════════════════════════════
+
+${isDirectRequest ? `⚠️ THE USER IS MAKING A SPECIFIC REQUEST. They said: "${message}"
+You MUST respond directly to what they asked. Do NOT ignore their request and ask a scripted question.
+If they ask for competitor analysis — give them competitor analysis.
+If they ask about market trends — share market trends.
+If they ask for advice — give advice.
+Use "action": "direct_response" for this.
+Your fidatoResponse should be a detailed, substantive answer (3-8 sentences) that actually addresses their request.
+If you have web search data, include it. Be the expert they hired.` : `The user is currently in the information-gathering phase. Ask ONE smart, contextual question to advance the brief.`}
+
+═══════════════════════════════════════════════════
+YOUR TASK — Return a JSON object:
+═══════════════════════════════════════════════════
+
+STEP 1: READ the user's latest message carefully. What are they ACTUALLY asking?
+STEP 2: If they're making a specific request or asking a question → use "action": "direct_response"
+         If they're answering your previous question → decide: ask_question / generate_ideas / generate_strategy
+STEP 3: CRAFT your response to match what THEY want, not what YOUR script says.
+
+- Include a "reasoning" field explaining your strategic thought process (2-3 sentences).
+- If asking a question: Write ONE sharp, contextual question that advances the brief.
+- If responding directly: Give a substantive, expert answer that addresses their request.
+- Generate 4-6 clickable option chips SPECIFIC to this brand and context.
+
+ACTIONS AVAILABLE:
+- "ask_question" — Ask a strategic question to gather info (only use when appropriate)
+- "direct_response" — Respond directly to the user's request/question with expert insight
+- "generate_ideas" — Ready to generate campaign/film concepts
+- "generate_strategy" — Ready to generate full brand strategy
+
+RULES:
+1. 🔴 MOST IMPORTANT: If the user asks a SPECIFIC QUESTION or makes a REQUEST, ALWAYS respond with "direct_response" — NEVER ignore their message
+2. NEVER ask generic questions when you know the brand's industry from DNA
+3. ALWAYS reference specific brand details when relevant
+4. Option chips must be CONTEXTUAL — not generic categories
+5. Keep conversational responses concise (1-2 sentences). Keep direct_response answers detailed (3-8 sentences)
+6. DO NOT use markdown formatting
+7. Use emoji sparingly — max 1-2 per message
+8. Ask the MOST IMPORTANT missing question first
+9. When user gives 3+ meaningful data points, GENERATE — don't keep asking
+10. NEVER repeat or rephrase a question from the QUESTIONS ALREADY ASKED list
+11. If the user asks about competitors, market, trends, or anything specific — ANSWER IT, don't deflect
+
+Return ONLY this JSON:
+{
+  "intent": "${detectedIntent}",
+  "collectedAnswers": { "key": "extracted from this message" },
+  "action": "ask_question | direct_response | generate_ideas | generate_strategy",
+  "reasoning": "I know X and Y. The user is asking about Z, so I need to...",
+  "fidatoResponse": "Your contextual response or answer here",
+  "questionOptions": ["Follow-up 1", "Follow-up 2", "Follow-up 3", "Follow-up 4"],
+  "preGenerationMessage": null
+}`;
 
   try {
-    const result = await aiCall(systemPrompt, `Latest message: "${message}". Decide next action.`, {
-      temperature: 0.1,
-      maxTokens: 600,
-    });
+    emitStep('Crafting strategic response...', '💡');
 
-    console.log('[fidato-chat] MCoT raw result:', result?.slice(0, 300));
+    let result;
+    if (useWebSearch) {
+      try {
+        const aiRouter = getRouter();
+        const searchResult = await aiRouter.generateTextWithSearch({
+          systemPrompt,
+          userPrompt: `Analyze conversation and decide next action. Use web search to find relevant market data, competitor insights, or industry trends if applicable. Latest message: "${message}"`,
+          temperature: 0.3,
+          maxTokens: 1200,
+        });
+        result = searchResult.text;
+        if (searchResult.citations?.length > 0) {
+          emitStep(`Found ${searchResult.citations.length} web sources`, '📎');
+          if (sseEmit) sseEmit({ type: 'citations', citations: searchResult.citations });
+        }
+      } catch (searchErr) {
+        console.warn('[fidato-chat] Web search failed, falling back:', searchErr.message);
+        result = await aiCall(systemPrompt, `Analyze conversation and decide next action. Latest message: "${message}"`, {
+          temperature: 0.3, maxTokens: 1000,
+        });
+      }
+    } else {
+      result = await aiCall(systemPrompt, `Analyze conversation and decide next action. Latest message: "${message}"`, {
+        temperature: 0.3, maxTokens: 1000,
+      });
+    }
+
     const parsed = parseJSON(result);
-    console.log('[fidato-chat] MCoT parsed:', JSON.stringify(parsed)?.slice(0, 200));
 
-    if (parsed && parsed.action && parsed.fidatoResponse) {
+    if (parsed && parsed.fidatoResponse) {
+      const action = parsed.action || 'ask_question';
+      const isGenerate = action !== 'ask_question' && action !== 'general_chat' && action !== 'direct_response';
+
+      // Emit the AI's reasoning to frontend
+      if (parsed.reasoning) {
+        emitStep(parsed.reasoning, '🧠');
+        await new Promise(r => setTimeout(r, 300));
+      }
+
+      // ── DEDUP GUARD: Check if this question was already asked ─────────────
+      let finalResponse = parsed.fidatoResponse;
+      let finalOptions = parsed.questionOptions || null;
+      const updatedAskedQuestions = [...askedQuestions];
+
+      if (action === 'ask_question' && isSimilarQuestion(finalResponse, askedQuestions)) {
+        console.warn('[fidato-chat] DEDUP: AI repeated a question, forcing different question');
+        emitStep('Avoiding repeated question — finding new angle...', '🔄');
+        const retryResult = await aiCall(
+          systemPrompt + `\n\n‼️ CRITICAL: Your previous response was rejected because it repeated a question. You MUST ask about a COMPLETELY DIFFERENT TOPIC.`,
+          `Your last question was rejected as a duplicate. Ask about a DIFFERENT strategic topic. Message: "${message}"`,
+          { temperature: 0.6, maxTokens: 800 }
+        );
+        const retryParsed = parseJSON(retryResult);
+        if (retryParsed?.fidatoResponse && !isSimilarQuestion(retryParsed.fidatoResponse, askedQuestions)) {
+          finalResponse = retryParsed.fidatoResponse;
+          finalOptions = retryParsed.questionOptions || finalOptions;
+        }
+      }
+
+      if (action === 'ask_question') {
+        updatedAskedQuestions.push(finalResponse);
+      }
+
+      const mergedAnswers = {
+        ...sessionState.collectedAnswers,
+        ...(parsed.collectedAnswers || {}),
+        ...extractAnswerFromMessage(message, sessionState.collectedAnswers || {}),
+        [`turn_${userMessageCount}_answer`]: message,
+      };
+
+      if (isGenerate) {
+        emitStep('Ready to generate — building creative concepts...', '✨');
+      }
+
       return {
         intent: parsed.intent || detectedIntent,
-        collectedAnswers: { ...sessionState.collectedAnswers, ...(parsed.collectedAnswers || {}) },
-        readyToGenerate: parsed.action !== 'ask_question',
-        action: parsed.action,
-        fidatoResponse: parsed.fidatoResponse,
+        collectedAnswers: mergedAnswers,
+        readyToGenerate: isGenerate,
+        action,
+        fidatoResponse: finalResponse,
         preGenerationMessage: parsed.preGenerationMessage || null,
+        questionOptions: finalOptions,
+        askedQuestions: updatedAskedQuestions,
+        reasoning: parsed.reasoning || null,
       };
     }
 
-    // Parsed but incomplete — use what we got with smart fallback
-    console.warn('[fidato-chat] MCoT returned incomplete JSON, using smart fallback');
+    console.warn('[fidato-chat] MCoT returned incomplete JSON, using fallback reasoning');
   } catch (err) {
-    console.error('[fidato-chat] MCoT AI call failed:', err.message);
+    console.error('[fidato-chat] MCoT AI reasoning failed:', err.message);
   }
 
-  // ── Smart fallback: never loop, always advance ─────────────────────────────
-  const fallback = getNextSmartQuestion(userMessageCount, detectedIntent, sessionState.collectedAnswers || {}, brandCtx, brand);
+  // ── Deterministic fallback ─────────────────────────────────────────────────
+  const fallback = getContextualFallbackQuestion(userMessageCount, detectedIntent, sessionState.collectedAnswers || {}, brand);
+  const mergedAnswers = {
+    ...sessionState.collectedAnswers,
+    ...extractAnswerFromMessage(message, sessionState.collectedAnswers || {}),
+    [`turn_${userMessageCount}_answer`]: message,
+  };
+
   return {
     intent: detectedIntent,
-    collectedAnswers: { ...sessionState.collectedAnswers, ...extractAnswerFromMessage(message, sessionState.collectedAnswers || {}) },
+    collectedAnswers: mergedAnswers,
     readyToGenerate: false,
     action: 'ask_question',
     fidatoResponse: fallback.question,
     questionOptions: fallback.options,
+    askedQuestions: [...askedQuestions, fallback.question],
   };
+}
+
+// ── Strategic frameworks per intent ──────────────────────────────────────────
+// Guides the AI on what information a real strategist needs
+function getStrategicFramework(intent) {
+  const frameworks = {
+    'product-launch': `PRODUCT LAUNCH — A brand strategist needs:
+1. THE PRODUCT: What exactly is being launched? What category? Is it new-to-world or an extension?
+2. USP/DIFFERENTIATOR: Why should anyone care? What makes this product different from 10 alternatives?
+3. TARGET BUYER: Not demographics — the FIRST person who'll buy. Their pain point, their current solution.
+4. LAUNCH CONTEXT: When is the launch? What's the occasion/anchor? What's the budget scale?
+5. DESIRED REACTION: What should the first customer feel/do when they discover this product?
+6. COMPETITIVE LANDSCAPE: Who else is in this space? What are they doing wrong?
+Ask about the PRODUCT FIRST — you can't strategize without understanding what you're selling.`,
+
+    'ad-film': `AD FILM / BRAND FILM — A creative director needs:
+1. THE BRAND STORY: What does this brand stand for BEYOND its products? What's the emotional truth?
+2. FILM PURPOSE: Is this selling a product, building brand image, launching something, or celebrating an occasion?
+3. TARGET VIEWER: Who needs to FEEL something watching this? What's their current emotional state?
+4. EMOTIONAL HOOK: What specific emotion drives action? (goosebumps, laughter, tears, pride)
+5. TONE & STYLE: Reference films/ads they love. This determines cinematic approach.
+6. FORMAT: Duration, platform, number of script concepts needed.
+7. PRODUCTION SCALE: Budget determines guerrilla vs. cinematic approach.
+Start with WHY the film is being made, then WHO it's for, then the EMOTIONAL core.`,
+
+    'campaign': `MARKETING CAMPAIGN — A strategist needs:
+1. CAMPAIGN SUBJECT: What specific product, service, or event are we promoting?
+2. CAMPAIGN GOAL: What measurable outcome? (sales, followers, downloads, footfall)
+3. TARGET AUDIENCE: Who specifically? Their behavior, not just demographics.
+4. EMOTIONAL TRIGGER: What should people FEEL when they see this campaign?
+5. DIFFERENTIATOR: What can this brand say that competitors cannot?
+6. CHANNELS & BUDGET: Where will this run? What's the budget scale?
+Ask about the SPECIFIC thing being campaigned first — not generic brand questions.`,
+
+    'naming': `NAMING — A naming specialist needs:
+1. NAMING TARGET: What needs a name? (product, brand, campaign, collection, event)
+2. CATEGORY CONTEXT: What does it do? What space is it in?
+3. PERSONALITY: If this were a person, how would they introduce themselves?
+4. LANGUAGE TERRITORY: English, Hindi, Hinglish, regional, invented word?
+5. VIBE WORDS: 3-5 adjectives that capture the desired feeling.
+6. AVOID LIST: What should the name NOT sound like?
+Start with WHAT needs naming and the category context.`,
+
+    'brand-strategy': `BRAND STRATEGY — A CMO needs:
+1. PRIMARY OBJECTIVE: ONE specific measurable goal (e.g., 5K→50K followers, ₹5L→₹15L monthly revenue)
+2. CURRENT STATE: Where does the brand stand today? (followers, revenue, traffic, team size)
+3. TARGET AUDIENCE: Who and where do they spend attention online?
+4. BUDGET & TIMELINE: Monthly budget and strategy duration (1-month or 3-month)
+5. CHANNEL PREFERENCES: Active channels, channels to explore
+6. TEAM CAPABILITY: Solo founder or full marketing team?
+Start with the GOAL, then current reality, then constraints.`,
+
+    'festival': `FESTIVAL CAMPAIGN — A strategist needs:
+1. WHICH FESTIVAL: And what does this festival mean to YOUR specific audience?
+2. PRODUCT FIT: Why should people think of this brand during this festival?
+3. CAMPAIGN VIBE: Traditional warmth? Modern twist? Party energy? Luxury gifting?
+4. GOAL: Sales-driven or brand-love driven?
+5. OFFER/HOOK: What's the irresistible reason to act NOW?
+Start with the FESTIVAL and how the brand naturally connects to it.`,
+
+    'offer': `OFFER/PROMOTION STRATEGY — A strategist needs:
+1. WHAT'S BEING SOLD: Product, price point, margin constraints
+2. WHY NOW: What business problem does this offer solve?
+3. BUYER PSYCHOLOGY: What makes these customers finally click "buy"?
+4. COMPETITIVE CONTEXT: What are competitors offering?
+5. CONSTRAINTS: Minimum margins, shipping limits, platform restrictions
+Start with the business PROBLEM — why do you need this offer?`,
+
+    'positioning': `BRAND POSITIONING — A strategist needs:
+1. BRAND TRUTH: What does this brand do, in honest simple words?
+2. COMPETITIVE SET: Who are you REALLY competing with? (direct + indirect)
+3. UNTOLD STRENGTH: What proud truth hasn't been shouted about enough?
+4. ENEMY: What problem or wrong belief does this brand fight?
+5. DESIRED PERCEPTION: "People should choose us because we're the only ones who ___"
+Start with what the brand ACTUALLY does and who they compete with.`,
+
+    'custom': `CUSTOM BRAINSTORM — You need to understand:
+1. THE IDEA: What's on their mind? What problem are they trying to solve?
+2. AUDIENCE: Who needs to care about the outcome?
+3. SUCCESS METRIC: If this goes perfectly, what does that look like?
+4. CONSTRAINTS: Budget, time, team, approvals
+Start with understanding the CORE IDEA or problem.`,
+  };
+
+  return frameworks[intent] || frameworks.custom;
 }
 
 // ── Intent detector from keywords ──────────────────────────────────────────────
@@ -1406,273 +1772,76 @@ function detectIntentFromHistory(history, latestMessage) {
 function buildAnswersFromHistory(history, latestMessage, sessionState) {
   const base = sessionState.collectedAnswers || {};
   const allUserText = history.filter(m => m.role === 'user').map(m => m.content || '').join(' ') + ' ' + latestMessage;
-  return { ...base, context: allUserText.slice(0, 500) };
+  return { ...base, context: allUserText.slice(0, 800) };
 }
 
 // ── Extract a single answer from the latest message ───────────────────────────
 function extractAnswerFromMessage(message, existing) {
   const lowerMsg = message.toLowerCase();
   const updates = {};
-  if (!existing.emotion && /excit|happy|proud|nostalg|funny|humour|emo|feel|love|inspire|aspir|urgent|fomo/.test(lowerMsg)) {
+  if (!existing.emotion && /excit|happy|proud|nostalg|funny|humour|humor|emo|feel|love|inspire|aspir|urgent|fomo|tear|goosebump|laugh/.test(lowerMsg)) {
     updates.emotion = message;
   }
-  if (!existing.audience && /age|year|men|women|youth|teen|family|parent|professional|urban|rural|student/.test(lowerMsg)) {
+  if (!existing.audience && /age|year|men|women|youth|teen|family|parent|professional|urban|rural|student|millennial|gen.?z|boomer/.test(lowerMsg)) {
     updates.audience = message;
   }
-  if (!existing.product && /product|brand|sell|launch|drink|food|app|service|cloth/.test(lowerMsg)) {
+  if (!existing.product && /product|brand|sell|launch|drink|food|app|service|cloth|skincare|tech|fashion|jewel|snack|supplement/.test(lowerMsg)) {
     updates.product = message;
+  }
+  if (!existing.objective && /goal|objective|want|need|achiev|grow|increase|boost|reach|target|revenue|sale|follower|lead/.test(lowerMsg)) {
+    updates.objective = message;
+  }
+  if (!existing.budget && /budget|₹|lakh|crore|thousand|money|invest|spend|afford/.test(lowerMsg)) {
+    updates.budget = message;
+  }
+  if (!existing.usp && /usp|unique|different|special|only|first|better|advantage|stand.?out/.test(lowerMsg)) {
+    updates.usp = message;
   }
   return updates;
 }
 
-// ── Smart sequential questions with curated options ──────────────────────────
-// Returns { question, options } — options are clickable chips on the frontend
-function getNextSmartQuestion(turnIndex, intent, collected, brandCtx, brand) {
-  const brandName = brand?.name || '';
-  const dna = brand?.dna || {};
-  const knownAudience = dna.targetAudience || '';
-  const knownIndustry = dna.industry || dna.category || '';
-  const knownVoice = dna.voice?.personality || '';
-  // Build brand-aware preamble to make questions feel personalized
-  const forBrand = brandName ? `For ${brandName}, ` : '';
-  const iKnow = knownIndustry ? `I know you’re in ${knownIndustry}` : '';
-  const iKnowAudience = knownAudience ? `your target is ${knownAudience}` : '';
-  const contextHint = [iKnow, iKnowAudience].filter(Boolean).join(' and ');
+// ── Contextual fallback questions (AI-less, but still brand-aware) ───────────
+// Used ONLY when AI reasoning completely fails
+function getContextualFallbackQuestion(turnIndex, intent, collected, brand) {
+  const brandName = brand?.name || 'your brand';
+  const industry = brand?.dna?.industry || '';
+  const audience = brand?.dna?.targetAudience || '';
 
-  const isFilm = intent === 'ad-film';
-  const isStrategy = intent === 'brand-strategy';
-  const isNaming = intent === 'naming';
-  const isFestival = intent === 'festival';
-  const isOffer = intent === 'offer';
+  // Build contextual awareness into fallback
+  const context = industry ? ` (since ${brandName} is in ${industry})` : '';
 
-  let questionsWithOptions;
+  const fallbacksByIntent = {
+    'product-launch': [
+      { question: `Tell me about the product you're launching for ${brandName}${context}. What is it, and what makes it special?`, options: ['New product in existing category', 'Completely new category for us', 'An upgrade/premium version', 'A limited edition', 'A bundle/combo', 'Let me describe it'] },
+      { question: `Who is the day-one buyer for this product? Not your dream audience — the person who buys FIRST.`, options: ['Existing loyal customers', 'People switching from competitors', 'First-time buyers in this category', 'Early adopters who try everything new', 'Specific demographic — let me describe'] },
+      { question: `What's the biggest reason someone would NOT buy this product? Be honest — this helps me craft the right messaging.`, options: ['Price concern — seems expensive', 'Don\'t know our brand yet', 'Already using a competitor', 'Don\'t see the need', 'Availability / access', 'Quality doubt — new brand'] },
+      { question: `When does this need to launch? And what's the scale we're thinking?`, options: ['This week — urgent', 'Within 2-4 weeks', 'Next festival season', 'Next month', 'No rush — get it right'] },
+    ],
+    'ad-film': [
+      { question: `What's the purpose of this film for ${brandName}? Are we selling a specific product, building brand love, or marking an occasion?`, options: ['Launching a new product', 'Building brand awareness/love', 'Festive/occasion film', 'Sale or offer promotion', 'Brand anthem / manifesto', 'Social experiment concept'] },
+      { question: `${audience ? `I know ${brandName} targets ${audience}` : `Who is ${brandName}'s audience`} — but who specifically needs to be MOVED by this film?`, options: ['Young aspirational audience (18-28)', 'Working professionals (25-40)', 'Families and parents', 'Women specifically', 'Premium/luxury buyers', 'Mass market — everyone'] },
+      { question: `What should the viewer FEEL after watching? Not what they should think — what emotion hits them?`, options: ['Goosebumps — pride, inspiration', 'Laughter — genuine humor', 'Warmth — nostalgia, family', 'Aspiration — want to level up', 'Surprise — unexpected twist', 'Empowerment — confidence'] },
+      { question: `What's the format and how many concepts should I draft?`, options: ['30-sec sharp film — 3 concepts', '60-sec digital film — 3 concepts', '90-sec brand film — 2 concepts', 'Instagram Reel (15-30s) — 4 concepts', 'Multiple formats'] },
+    ],
+    'campaign': [
+      { question: `What specifically are we creating this campaign for${context}? A product, a sale, a brand moment?`, options: ['Specific product promotion', 'New launch announcement', 'Seasonal/festive push', 'Brand awareness', 'Sale/offer driven', 'Something else'] },
+      { question: `${audience ? `${brandName} targets ${audience}` : 'Who are we targeting'} — but what should they DO after seeing this campaign?`, options: ['Buy immediately', 'Visit our website/store', 'Follow us on social', 'Share with friends', 'Sign up / download app', 'Remember us for later'] },
+      { question: `What's the primary emotion we're going for? This drives the creative direction.`, options: ['FOMO — urgency and scarcity', 'Aspiration — I want that life', 'Trust — this brand is reliable', 'Fun — entertaining and shareable', 'Pride — identity and belonging', 'Curiosity — what is this?'] },
+    ],
+    'brand-strategy': [
+      { question: `What's THE ONE goal this strategy needs to achieve for ${brandName}? Be specific — numbers help.`, options: ['Grow revenue by 30%+ in 3 months', 'Get to 10K+ engaged followers', '200+ qualified leads per month', 'Launch in new market/city', 'Build brand from zero awareness', 'Improve customer retention'] },
+      { question: `Where does ${brandName} stand today? Give me the real numbers — followers, traffic, revenue, team size.`, options: ['Just starting — minimal presence', 'Some traction — 1-5K followers', 'Growing — 5-25K followers', 'Established — 25K+ followers', 'Strong offline, weak online', 'Let me share details'] },
+      { question: `What's the monthly marketing budget we're designing around?`, options: ['Under ₹1L — bootstrapped', '₹1-5L — moderate', '₹5-20L — serious investment', '₹20L-1Cr — aggressive growth', '₹1Cr+ — enterprise', 'Flexible — recommend for me'] },
+    ],
+  };
 
-  if (isFilm) {
-    questionsWithOptions = [
-      {
-        question: `${forBrand}what product or brand category is this film for? Pick one or describe it — the more specific the better.${contextHint ? ` (I know ${contextHint})` : ''}`,
-        options: [
-          '🛍️ FMCG / Daily use product',
-          '👗 Fashion or Lifestyle brand',
-          '📱 Tech app or digital service',
-          '🏠 Real estate or finance',
-          '🍔 Food & Beverage / QSR',
-          '💊 Health, pharma or wellness',
-        ],
-      },
-      {
-        question: `${contextHint ? `Given ${contextHint}, who` : 'Who'}’s the ideal viewer for this film? Picture one real person watching it on their phone.`,
-        options: [
-          '👩 Urban millennial woman (25-35), metro city',
-          '👨‍💻 Young professional just starting his career',
-          '👨‍👩‍👧 Middle-class family in tier-2 India',
-          '🎓 Gen Z student who’s brand-conscious',
-          '👩‍💼 Established professional, 35-50, premium buyer',
-        ],
-      },
-      {
-        question: `What should someone feel in the first 5 seconds — be bold here, this drives the whole film.`,
-        options: [
-          '😭 Deeply emotional — goosebumps, tears',
-          '😂 Fun and laugh-out-loud humorous',
-          '🔥 Aspirational — makes you want to level up',
-          '🥺 Nostalgic — warm, familiar, takes you back',
-          '⚡ Urgent and exciting — act now energy',
-          '😮 Surprising — unexpected twist',
-        ],
-      },
-      {
-        question: `How long and how many script concepts do you want me to write?`,
-        options: [
-          '⏱️ 30-second film — 2 concepts',
-          '⏱️ 60-second film — 3 concepts',
-          '⏱️ 90-second brand film — 2 concepts',
-          '📱 Instagram Reel format (15-30s) — 3 concepts',
-          '🎬 Multiple formats — 30s + 60s + Reel',
-        ],
-      },
-    ];
-  } else if (isStrategy) {
-    questionsWithOptions = [
-      {
-        question: `What's the #1 business goal for this strategy? Be specific about what success looks like.`,
-        options: [
-          '📈 Grow monthly revenue by 30%+ in 3 months',
-          '🌍 Launch in a new city or market',
-          '🔁 Increase repeat purchases and retention',
-          '🧲 Build brand awareness from scratch',
-          '📲 Grow social media to 10K+ engaged followers',
-          '🤝 Generate B2B leads and partnerships',
-        ],
-      },
-      {
-        question: `Who's the primary audience? Where do they spend their attention online?`,
-        options: [
-          '🏙️ Urban professionals (25-40), Instagram & LinkedIn heavy',
-          '🎓 College students & young adults, YouTube & Reels all day',
-          '👨‍👩‍👧 Tier-2/3 India households, WhatsApp & Facebook first',
-          '💪 Health & wellness enthusiasts, Instagram & communities',
-          '🧳 Working parents (30-45), OTT & news apps',
-        ],
-      },
-      {
-        question: `What's the monthly budget range we're designing this strategy around?`,
-        options: [
-          '💸 Bootstrapped — under ₹1L/month',
-          '💰 ₹1L – ₹5L/month',
-          '💼 ₹5L – ₹20L/month',
-          '🚀 ₹20L – ₹1Cr/month',
-          '🏢 ₹1Cr+ — enterprise scale',
-        ],
-      },
-      {
-        question: `Any channels you're already active on? And what's the strategy horizon?`,
-        options: [
-          '📸 Instagram + Reels are our main thing — 1 month plan',
-          '📺 YouTube + Google Ads focus — 3 month plan',
-          '📱 WhatsApp marketing + D2C website — 1 month',
-          '🛒 Amazon / Marketplace ads + social — 3 months',
-          '🌐 Full omnichannel — social + search + offline — 6 months',
-        ],
-      },
-    ];
-  } else if (isNaming) {
-    questionsWithOptions = [
-      {
-        question: `What are we naming here? Give me the context.`,
-        options: [
-          '🏷️ A new product launching soon',
-          '🏢 The brand itself needs a name',
-          '📣 A campaign or marketing initiative',
-          '🚀 A new business or startup',
-          '🎪 An event, series or content IP',
-        ],
-      },
-      {
-        question: `What feeling or idea should the name instantly evoke?`,
-        options: [
-          '✨ Premium & aspirational — feels expensive',
-          '😄 Playful & fun — easy to remember, makes you smile',
-          '🌿 Natural, honest & trustworthy',
-          '🇮🇳 Rooted in Indian culture — feels desi and proud',
-          '⚡ Bold and powerful — disruptive, no-nonsense',
-          '💡 Clever & smart — intellectual, witty',
-        ],
-      },
-      {
-        question: `Any language preference for the name?`,
-        options: [
-          '🇬🇧 English only — global and clean',
-          '🇮🇳 Hindi or Sanskrit — rooted and cultural',
-          '🌏 English + Hindi blend (Hinglish) — modern India feel',
-          '🗣️ Regional language (Tamil/Marathi/Bengali etc.)',
-          '🌍 No preference — surprise me with the best option',
-        ],
-      },
-    ];
-  } else if (isFestival) {
-    questionsWithOptions = [
-      {
-        question: `Which festival or occasion is this campaign for?`,
-        options: [
-          '🪔 Diwali — the biggest one',
-          '🎊 New Year / New Year Eve',
-          '🎅 Christmas & winter holidays',
-          '🌙 Eid / Ramadan',
-          '🌸 Holi',
-          '💘 Valentine’s Day',
-        ],
-      },
-      {
-        question: `What's the campaign goal for this festival?`,
-        options: [
-          '🛒 Drive sales and conversions — discount-led',
-          '❤️ Build emotional brand connect — storytelling',
-          '🎁 Gift guide / gifting push',
-          '📲 Go viral — shareable, meme-able content',
-          '🤝 Community and togetherness angle',
-        ],
-      },
-    ];
-  } else if (isOffer) {
-    questionsWithOptions = [
-      {
-        question: `What type of offer are we designing?`,
-        options: [
-          '🏷️ Flat discount (% off or ₹ off)',
-          '🎁 Buy X get Y free',
-          '📦 Bundle offer — more for less',
-          '⚡ Flash sale — limited time urgency',
-          '🔄 Loyalty / referral reward',
-          '🎯 First-time buyer special',
-        ],
-      },
-      {
-        question: `What's the primary objective of this offer?`,
-        options: [
-          '🛒 Clear inventory / move stock fast',
-          '👋 Acquire new customers',
-          '🔁 Bring back lapsed customers',
-          '📈 Increase average order value',
-          '📲 Drive app downloads or sign-ups',
-        ],
-      },
-    ];
-  } else {
-    // Generic campaign / custom
-    questionsWithOptions = [
-      {
-        question: `What's the product, service or brand we're creating this campaign for?`,
-        options: [
-          '👗 Fashion / clothing / accessories',
-          '🍕 Food, beverage or restaurant',
-          '📱 App, SaaS or tech product',
-          '💄 Beauty, skincare or personal care',
-          '🏋️ Health, fitness or wellness',
-          '🏠 Home, decor or lifestyle',
-        ],
-      },
-      {
-        question: `Who are we making this campaign for? Pick the audience that fits best.`,
-        options: [
-          '👩 Urban women (22-35), fashion & lifestyle forward',
-          '🧔 Urban men (22-35), aspirational & practical',
-          '👨‍👩‍👧 Families — parents making household decisions',
-          '🎓 Students & Gen Z (16-24), trend & value driven',
-          '👔 Working professionals (28-45), quality seekers',
-          '🌾 Tier-2/3 India — value and trust driven',
-        ],
-      },
-      {
-        question: `What should people think, feel or do after experiencing this campaign?`,
-        options: [
-          '🛒 Buy immediately — create urgency and desire',
-          '❤️ Fall in love with the brand — emotional connect',
-          '📤 Share with friends — make it go viral',
-          '💭 Remember the brand next time they shop',
-          '🔥 Feel excited and FOMO — limited time energy',
-          '🤝 Trust the brand — credibility and reliability',
-        ],
-      },
-      {
-        question: `Any constraints I should design around? Or full creative freedom?`,
-        options: [
-          '🆓 Full creative freedom — go all out',
-          '💰 Tight budget — needs to be low-cost to execute',
-          '📱 Digital only — Instagram, YouTube, WhatsApp',
-          '🕐 Need this in 2 weeks — quick execution',
-          '🌐 Must work across online + offline',
-          '📊 Performance-focused — must be measurable',
-        ],
-      },
-    ];
-  }
+  const fallbacks = fallbacksByIntent[intent] || fallbacksByIntent.campaign || [
+    { question: `Tell me more about what you're looking to brainstorm for ${brandName}. The more context you give me, the sharper my ideas will be.`, options: ['Product campaign', 'Brand awareness', 'Sales and offers', 'Content strategy', 'Social media growth', 'Something specific — let me explain'] },
+  ];
 
-  // Use turn index directly — turn 1 → Q[0], turn 2 → Q[1], always advances
-  const idx = Math.min(Math.max(0, turnIndex - 1), questionsWithOptions.length - 1);
-  return questionsWithOptions[idx]; // returns { question, options }
+  const idx = Math.min(Math.max(0, turnIndex), fallbacks.length - 1);
+  return fallbacks[idx];
 }
-
 
 // ── Inline idea generation (mirrors /generate route logic) ─────────────────────
 async function generateIdeasInline(intent, answers, brand) {
@@ -1755,12 +1924,16 @@ async function generateIdeasInline(intent, answers, brand) {
   }
 
   const systemPrompt = `You are an elite creative director and brand strategist. Generate BOLD, SPECIFIC, CULTURALLY RELEVANT ideas. Be concise — quality over quantity. Keep each field SHORT.
-${isAdFilm ? `Generate exactly ${scriptCount} distinct film concepts with very different emotional angles. Think like an award-winning director.` : 'Generate 3 campaign concepts with sharp tactical hooks.'}
-Respond in STRICT JSON (keep string values SHORT — max 2 sentences each):
+${isAdFilm ? `Generate exactly ${scriptCount} distinct film concepts with very different emotional angles. Think like an award-winning director.` : `Generate EXACTLY 3 campaign concepts with sharp tactical hooks. You MUST return 3 concepts, not fewer.`}
+IMPORTANT RULES:
+- Each concept MUST include a "scores" object with ALL score keys filled with realistic values (5-10 scale). NEVER use 0. Rate honestly.
+- Keep string values SHORT — max 2 sentences each.
+- Return VALID JSON only. No markdown, no backticks, no explanation.
+Respond in this EXACT JSON format:
 ${outputFormat}`;
 
   const actResult = await aiCall(systemPrompt, `Intent: ${intent}\n${brandContext}\n\nBrief:\n${answersText}`, {
-    temperature: 0.85, maxTokens: 4000,
+    temperature: 0.85, maxTokens: 6000,
   });
   try {
     return parseJSON(actResult) || {};
@@ -1835,8 +2008,11 @@ router.post('/fidato-chat', protect, requireStudio('brainstormStudio'), async (r
   try {
     const brandCtx = buildCtx(brand);
 
+    // SSE emitter for reasoning steps
+    const sseEmit = (data) => sseEvent(res, data);
+
     // ── STAGE 1: MCoT Reasoning ─────────────────────────────────────────────
-    const reasoning = await mcotReason(message, history, sessionState, brandCtx, brand);
+    const reasoning = await mcotReason(message, history, sessionState, brandCtx, brand, sseEmit);
     const {
       action = 'ask_question',
       fidatoResponse = "Tell me more!",
@@ -1844,20 +2020,25 @@ router.post('/fidato-chat', protect, requireStudio('brainstormStudio'), async (r
       collectedAnswers = {},
       intent = sessionState.intent || 'custom',
       questionOptions = null,
+      askedQuestions = sessionState.askedQuestions || [],
+      reasoning: reasoningText = null,
     } = reasoning;
 
     const newSessionState = {
       ...sessionState,
       intent,
       collectedAnswers: { ...sessionState.collectedAnswers, ...collectedAnswers },
+      askedQuestions,
+      feedbackLog: sessionState.feedbackLog || [],
     };
+
+    // Signal end of reasoning phase
+    sseEvent(res, { type: 'reasoning_done' });
 
     // ── STAGE 2: Execute Action ─────────────────────────────────────────────
 
     if (action === 'ask_question' || action === 'general_chat') {
-      // ── Just stream Fidato's conversational response ──
       await streamWords(res, fidatoResponse);
-      // Pass questionOptions from reasoning so the frontend can render chips
       sseEvent(res, {
         type: 'done',
         sessionState: newSessionState,
@@ -1865,13 +2046,23 @@ router.post('/fidato-chat', protect, requireStudio('brainstormStudio'), async (r
       });
 
     } else if (action === 'generate_ideas') {
-      // ── Stream "thinking" → generate ideas → stream follow-up ──
       const preMsg = preGenerationMessage || "Okay, I have enough to work with! Give me a moment to cook up some ideas 🔥";
       await streamWords(res, preMsg);
       sseEvent(res, { type: 'thinking' });
 
-      const ideas = await generateIdeasInline(intent, newSessionState.collectedAnswers, brand);
+      // Emit generation reasoning steps
+      sseEmit({ type: 'reasoning_step', step: 'Building creative strategy framework...', icon: '🏗️' });
+      await new Promise(r => setTimeout(r, 400));
+      sseEmit({ type: 'reasoning_step', step: 'Generating campaign concepts with scoring...', icon: '✨' });
 
+      // Inject reinforcement context into generation
+      const reinforcedAnswers = { ...newSessionState.collectedAnswers };
+      const reinforcement = buildReinforcementContext(sessionState.feedbackLog || []);
+      if (reinforcement) reinforcedAnswers._reinforcement = reinforcement;
+
+      const ideas = await generateIdeasInline(intent, reinforcedAnswers, brand);
+
+      sseEmit({ type: 'reasoning_step', step: `Generated ${(ideas.campaignConcepts || ideas.filmConcepts || []).length} concepts`, icon: '🎯' });
       sseEvent(res, { type: 'ideas', payload: ideas, intent });
 
       const postMsg = fidatoResponse || "Here's what I came up with! What do you think? Want me to refine any of these, or should I write a full screenplay for one?";
@@ -1883,9 +2074,7 @@ router.post('/fidato-chat', protect, requireStudio('brainstormStudio'), async (r
       });
 
     } else if (action === 'generate_screenplay') {
-      // ── Find the right film concept to script ──
       const concepts = sessionState.lastIdeas?.filmConcepts || [];
-      // Try to find the concept the user mentioned, or use first
       let targetConcept = concepts[0];
       if (concepts.length > 1 && message) {
         const lowerMsg = message.toLowerCase();
@@ -1907,6 +2096,8 @@ router.post('/fidato-chat', protect, requireStudio('brainstormStudio'), async (r
       await streamWords(res, preGenerationMessage || `Writing the full screenplay for "${targetConcept.title}"... this is going to be 🔥`);
       sseEvent(res, { type: 'thinking' });
 
+      sseEmit({ type: 'reasoning_step', step: `Scripting "${targetConcept.title}" — mapping scenes, dialogue, camera...`, icon: '🎬' });
+
       const screenplay = await generateScreenplayInline(targetConcept, brand);
       sseEvent(res, { type: 'screenplay', payload: screenplay, conceptTitle: targetConcept.title });
 
@@ -1918,9 +2109,14 @@ router.post('/fidato-chat', protect, requireStudio('brainstormStudio'), async (r
       });
 
     } else if (action === 'generate_strategy') {
-      // ── Full brand strategy generation ──
       await streamWords(res, preGenerationMessage || "Alright, building your complete brand strategy! This one takes a moment ✍️");
       sseEvent(res, { type: 'thinking' });
+
+      sseEmit({ type: 'reasoning_step', step: 'Researching market landscape...', icon: '🌐' });
+      await new Promise(r => setTimeout(r, 300));
+      sseEmit({ type: 'reasoning_step', step: 'Allocating budget across channels...', icon: '📊' });
+      await new Promise(r => setTimeout(r, 300));
+      sseEmit({ type: 'reasoning_step', step: 'Calculating target KPIs...', icon: '🎯' });
 
       const strategy = await generateStrategyInline(newSessionState.collectedAnswers, brand);
       sseEvent(res, { type: 'strategy', payload: strategy });
@@ -1933,7 +2129,6 @@ router.post('/fidato-chat', protect, requireStudio('brainstormStudio'), async (r
       });
 
     } else if (action === 'refine_ideas') {
-      // ── Refine existing ideas with user feedback ──
       const currentIdeas = sessionState.lastIdeas;
       if (!currentIdeas) {
         await streamWords(res, "Let me generate some ideas first, then we can refine them together!");
@@ -1944,13 +2139,28 @@ router.post('/fidato-chat', protect, requireStudio('brainstormStudio'), async (r
       await streamWords(res, preGenerationMessage || "Got it! Let me remix these with your feedback 🔄");
       sseEvent(res, { type: 'thinking' });
 
-      const refined = await generateIdeasInline(intent, { ...newSessionState.collectedAnswers, refinementHint: message }, brand);
+      sseEmit({ type: 'reasoning_step', step: 'Applying your feedback to reshape concepts...', icon: '🔄' });
+
+      // Inject reinforcement from feedback into refinement
+      const reinforcement = buildReinforcementContext(sessionState.feedbackLog || []);
+      const refinedAnswers = { ...newSessionState.collectedAnswers, refinementHint: message };
+      if (reinforcement) refinedAnswers._reinforcement = reinforcement;
+
+      const refined = await generateIdeasInline(intent, refinedAnswers, brand);
       sseEvent(res, { type: 'ideas', payload: refined, intent });
 
       await streamWords(res, fidatoResponse || "Here's the refined version! Better?");
       sseEvent(res, {
         type: 'done',
         sessionState: { ...newSessionState, ideasGenerated: true, lastIdeas: refined },
+      });
+    } else if (action === 'direct_response') {
+      // User made a specific request — stream the full response directly
+      await streamWords(res, fidatoResponse);
+      sseEvent(res, {
+        type: 'done',
+        sessionState: newSessionState,
+        questionOptions: reasoning.questionOptions || null,
       });
     }
 

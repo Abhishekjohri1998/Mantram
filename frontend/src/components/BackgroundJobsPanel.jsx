@@ -96,7 +96,7 @@ export default function BackgroundJobsPanel() {
     const panelRef = useRef(null);
     const seenCompletedRef = useRef(new Set());
 
-    // ── Auto-toast on job completion ──
+    // ── Auto-toast on job completion & auto-cleanup ──
     useEffect(() => {
         const newlyDone = [...completedJobs, ...failedJobs].filter(job => {
             if (seenCompletedRef.current.has(job.jobId)) return false;
@@ -109,14 +109,20 @@ export default function BackgroundJobsPanel() {
                 seenCompletedRef.current.add(job.jobId);
                 toastQueue.add(job.jobId);
                 setToasts(prev => [...prev, { job, id: Date.now() + Math.random() }]);
-                // Auto-dismiss toast after 6 seconds
+                // Auto-dismiss toast after 6 seconds, then auto-remove from list
                 setTimeout(() => {
                     setToasts(prev => prev.filter(t => t.job.jobId !== job.jobId));
                     toastQueue.delete(job.jobId);
+                    // Auto-dismiss so badge hides — completed jobs already viewed
+                    dismissJob(job.jobId);
                 }, 6000);
+                // Auto-remove failed jobs entirely after 15 seconds
+                if (job.status === 'failed') {
+                    setTimeout(() => removeJob(job.jobId), 15000);
+                }
             });
         }
-    }, [completedJobs, failedJobs]);
+    }, [completedJobs, failedJobs, dismissJob, removeJob]);
 
     // ── Close panel on outside click ──
     useEffect(() => {
@@ -129,8 +135,12 @@ export default function BackgroundJobsPanel() {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [panelOpen]);
 
-    // Don't render anything if no jobs at all
-    if (jobs.length === 0 && toasts.length === 0) return null;
+    // Only show badge when there's something actionable:
+    // - Active jobs (pending/processing)
+    // - Undismissed completed jobs
+    // - Active toasts
+    const hasActionableJobs = pendingCount > 0 || completedJobs.length > 0;
+    if (!hasActionableJobs && toasts.length === 0) return null;
 
     const allJobs = [...jobs].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 

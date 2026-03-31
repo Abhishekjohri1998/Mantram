@@ -149,6 +149,26 @@ class ModelRouter {
         }
     }
 
+    /**
+     * Generate text with Google Search Grounding (Gemini only).
+     * Provides real-time web access for strategy/research queries.
+     * Falls back to regular generateText if search grounding fails.
+     */
+    async generateTextWithSearch(params) {
+        try {
+            const gemini = this.providers.gemini;
+            if (!gemini?.isAvailable()) throw new Error('Gemini not available for search');
+            const result = await gemini.generateTextWithSearch(params);
+            this._logUsage('search', 'gemini', result.tokensUsed);
+            return result;
+        } catch (error) {
+            console.warn('⚠️ Search-grounded generation failed, falling back to regular:', error.message);
+            // Fallback to regular text generation
+            const result = await this.generateText(params);
+            return { ...result, citations: [], searchQueries: [], grounded: false };
+        }
+    }
+
     async analyzeText(params, preferences = {}) {
         const provider = this.getTextProvider(preferences);
         try {

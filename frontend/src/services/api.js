@@ -641,7 +641,7 @@ export const brainstormStudio = {
     updateStrategyStatus: (id, data) => apiFetch(`/brainstorm-studio/strategies/${id}/status`, { method: 'PATCH', body: JSON.stringify(data) }),
 
     // ── Fidato Chat: streaming SSE (POST with ReadableStream) ──
-    fidatoChat: async (payload, { onToken, onThinking, onIdeas, onScreenplay, onStrategy, onDone, onError } = {}) => {
+    fidatoChat: async (payload, { onToken, onThinking, onIdeas, onScreenplay, onStrategy, onDone, onError, onReasoningStep, onCitations } = {}) => {
         const token = localStorage.getItem('mantram_token') || '';
         const response = await fetch(`${API_BASE}/brainstorm-studio/fidato-chat`, {
             method: 'POST',
@@ -673,6 +673,8 @@ export const brainstormStudio = {
                     const evt = JSON.parse(raw);
                     if (evt.type === 'token') onToken?.(evt.text);
                     else if (evt.type === 'thinking') onThinking?.();
+                    else if (evt.type === 'reasoning_step') onReasoningStep?.(evt.step, evt.icon);
+                    else if (evt.type === 'citations') onCitations?.(evt.citations);
                     else if (evt.type === 'ideas') onIdeas?.(evt.payload, evt.intent);
                     else if (evt.type === 'screenplay') onScreenplay?.(evt.payload, evt.conceptTitle);
                     else if (evt.type === 'strategy') onStrategy?.(evt.payload);

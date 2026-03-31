@@ -85,6 +85,75 @@ export class GeminiProvider extends BaseProvider {
         };
     }
 
+    /**
+     * Generate text with Google Search Grounding — gives the model real-time web access.
+     * Uses Gemini's built-in `google_search` tool (free, no extra API key).
+     * Returns text + grounding citations (URLs, titles, snippets).
+     */
+    async generateTextWithSearch({ systemPrompt, userPrompt, temperature = 0.7, maxTokens = 4096, model }) {
+        const modelId = model || this.config.defaultModel || 'gemini-2.5-flash';
+        const url = `${this.baseUrl}/models/${modelId}:generateContent?key=${this.apiKey}`;
+
+        const startTime = Date.now();
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [
+                    { role: 'user', parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }] },
+                ],
+                tools: [{ google_search: {} }],
+                generationConfig: {
+                    temperature,
+                    maxOutputTokens: maxTokens,
+                },
+            }),
+        });
+
+        if (!response.ok) {
+            const errData = await response.json().catch(() => ({}));
+            throw new Error(`Gemini Search API Error [${response.status}]: ${errData.error?.message || response.statusText}`);
+        }
+
+        const data = await response.json();
+        if (data.error) throw new Error(`Gemini Search Error: ${data.error.message}`);
+
+        // Extract text from all parts
+        const parts = data.candidates?.[0]?.content?.parts || [];
+        const textParts = parts.filter(p => p.text).map(p => p.text);
+        const text = textParts.join('\n');
+
+        // Extract grounding metadata (citations, search queries, sources)
+        const groundingMeta = data.candidates?.[0]?.groundingMetadata || {};
+        const searchQueries = groundingMeta.searchEntryPoint?.renderedContent ? [groundingMeta.searchEntryPoint] : [];
+        const groundingChunks = groundingMeta.groundingChunks || [];
+        const groundingSupports = groundingMeta.groundingSupports || [];
+
+        // Build clean citation list
+        const citations = groundingChunks
+            .filter(chunk => chunk.web)
+            .map(chunk => ({
+                url: chunk.web.uri,
+                title: chunk.web.title || new URL(chunk.web.uri).hostname,
+            }));
+
+        // Deduplicate citations by URL
+        const uniqueCitations = [...new Map(citations.map(c => [c.url, c])).values()];
+
+        const tokensUsed = data.usageMetadata?.totalTokenCount || 0;
+
+        return {
+            text,
+            citations: uniqueCitations,
+            searchQueries: groundingMeta.webSearchQueries || [],
+            tokensUsed,
+            model: modelId,
+            provider: 'gemini',
+            generationTime: Date.now() - startTime,
+            grounded: uniqueCitations.length > 0,
+        };
+    }
+
     async analyzeText({ text, task, model }) {
         const prompt = `You are a brand analysis AI. Task: ${task}\n\nAnalyze the following text and return structured JSON:\n\n${text}`;
         const result = await this.generateText({
