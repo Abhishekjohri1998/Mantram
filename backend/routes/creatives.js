@@ -55,7 +55,7 @@ async function runCreativeJobAsync(jobId, userId, payload, authToken) {
                 'X-Job-Id': jobId,               // Job ID for logging
                 'X-Skip-Credits': 'true',         // Credits already deducted
             },
-            body: JSON.stringify({ brandId, type, prompt, options }),
+            body: JSON.stringify({ brandId, type, prompt, options, jobId }),
             signal: AbortSignal.timeout(300000), // 5 min max
         });
 
@@ -1229,9 +1229,26 @@ router.delete('/jobs/:jobId', protect, async (req, res) => {
 
 router.post('/generate', protect, requireStudio('creativeStudio'), requireCredits('creative'), async (req, res) => {
     try {
-        const { brandId, type, prompt, options } = req.body;
-        const progressId = options?.progressId || null;
+        const { brandId, type, prompt, options, jobId: bodyJobId } = req.body;
+        const jobId = bodyJobId || req.headers['x-job-id'];
+        const progressId = options?.progressId || jobId || null;
         if (progressId) startProgress(progressId);
+
+        // Helper to sync progress to memory AND DB (real-time agents)
+        const agentStep = async (step) => {
+            if (progressId) addStep(progressId, step);
+            if (jobId) {
+                try {
+                    await GenerationJob.findOneAndUpdate(
+                        { jobId },
+                        { $push: { steps: { ...step, ts: new Date() } } }
+                    );
+                } catch (e) {
+                    console.warn(`[Sync-Step] Failed to update job ${jobId}:`, e.message);
+                }
+            }
+        };
+
         if (!brandId || !prompt) {
             return res.status(400).json({ success: false, error: 'brandId and prompt are required' });
         }
@@ -1476,7 +1493,7 @@ router.post('/generate', protect, requireStudio('creativeStudio'), requireCredit
                         headline: options.customHeadline || null,
                         ctaText: options.customCtaText || null,
                     } : null,
-                    onProgress: progressId ? (step) => addStep(progressId, step) : undefined,
+                    onProgress: progressId ? (step) => agentStep(step) : undefined,
                 });
 
                 // Build final prompt — include copy suppression ONLY when no copywriter text is requested
@@ -1569,7 +1586,7 @@ ${metaSuppression}`;
                 const isProductBrand = pipelineResult.brandIntel?.brandType === 'product';
                 let injectedProductImg = false;
 
-                if (progressId) addStep(progressId, { agent: 'image-inject', message: 'Loading product & brand images...', status: 'working' });
+                if (progressId) await agentStep({ agent: 'image-inject', message: 'Loading product & brand images...', status: 'working' });
 
                 // ── PARALLEL IMAGE FETCH: Resolve all images at once ──
                 const imgFetchStart = Date.now();
@@ -1687,8 +1704,8 @@ The output must fill the entire canvas edge-to-edge. Do NOT render any color pal
             // Multi-image call — lower temperature (0.2) for higher quality
             console.log(`🎨 Creative Studio: generating with ${imageParts.filter(p => p.inlineData).length} reference image(s) + ${imageParts.filter(p => p.text).length} labels, aspect: ${geminiAspectRatio}, model: ${selectedImageModel}`);
             if (progressId) {
-                addStep(progressId, { agent: 'image-inject', message: `${imageParts.filter(p => p.inlineData).length} reference images loaded`, status: 'done' });
-                addStep(progressId, { agent: 'generating', message: 'Generating image with AI...', status: 'working' });
+                await agentStep({ agent: 'image-inject', message: `${imageParts.filter(p => p.inlineData).length} reference images loaded`, status: 'done' });
+                await agentStep({ agent: 'generating', message: 'Generating image with AI...', status: 'working' });
             }
             const genResult = await routedImageGenerate(fullPrompt, imageParts, 0.2, geminiAspectRatio, geminiImageSize, selectedImageModel, refImageUrls);
 
@@ -1718,7 +1735,7 @@ The output must fill the entire canvas edge-to-edge. Do NOT render any color pal
         } else {
             // Text-only generation — route to selected model
             console.log(`🎨 Creative Studio: generating from text prompt, aspect: ${geminiAspectRatio}, model: ${selectedImageModel}`);
-            if (progressId) addStep(progressId, { agent: 'generating', message: 'Generating image with AI...', status: 'working' });
+            if (progressId) await agentStep({ agent: 'generating', message: 'Generating image with AI...', status: 'working' });
             const genResult = await routedImageGenerate(fullPrompt, [], 0.3, geminiAspectRatio, geminiImageSize, selectedImageModel, refImageUrls);
 
             // Handle model busy
@@ -1794,14 +1811,29 @@ The output must fill the entire canvas edge-to-edge. Do NOT render any color pal
             ...(agenticMeta?.copy ? { copy: agenticMeta.copy } : {}),
         });
 
+        // ── SYNC: Update Job immediately — user sees image NOW in poller ──
+        if (jobId) {
+            await GenerationJob.findOneAndUpdate(
+                { jobId },
+                { 
+                    status: 'completed', 
+                    completedAt: new Date(), 
+                    creativeId: creative._id,
+                    imageUrl: creative.imageUrl,
+                    result: { creative, warnings: result.warnings || [] }
+                }
+            ).catch(() => {});
+            console.log(`[Sync-Job] ${jobId}: Image posted to job immediately`);
+        }
+
         // Increment usage counter (non-blocking)
         req.user.updateOne({ $inc: { 'usage.creativesGenerated': 1 } }).catch(() => {});
 
         // ── RESPOND IMMEDIATELY — user sees image in ~18-22s ──
         res.json({ success: true, creative, warnings: result.warnings || [] });
         if (progressId) {
-            addStep(progressId, { agent: 'generating', message: 'Image created successfully!', status: 'done' });
-            addStep(progressId, { agent: 'complete', message: 'Creative ready!', status: 'done' });
+            await agentStep({ agent: 'generating', message: 'Image created successfully!', status: 'done' });
+            await agentStep({ agent: 'complete', message: 'Creative ready!', status: 'done' });
             endProgress(progressId);
         }
 
