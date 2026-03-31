@@ -1,7 +1,6 @@
 import { NavLink } from 'react-router-dom'
-import { useState, useEffect } from 'react'
+import { useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
-import { credits as creditsAPI, auth as authAPI } from '../services/api'
 
 const navItems = [
     { icon: 'dashboard', label: 'Dashboard', to: '/dashboard' },
@@ -38,20 +37,7 @@ function filterNavByAccess(items, studioAccess, isSuperAdmin) {
 
 export default function Sidebar({ mobileOpen, onClose }) {
     const { user } = useAuth()
-    const [creditBalance, setCreditBalance] = useState(null)
 
-    // Fetch credit balance
-    useEffect(() => {
-        async function fetchCredits() {
-            try {
-                const data = await creditsAPI.balance()
-                setCreditBalance(data)
-            } catch { /* ignore */ }
-        }
-        if (user) fetchCredits()
-        const interval = setInterval(fetchCredits, 2 * 60 * 1000)
-        return () => clearInterval(interval)
-    }, [user])
 
     // Close sidebar on route change (mobile)
     const handleNavClick = () => {
@@ -157,22 +143,7 @@ export default function Sidebar({ mobileOpen, onClose }) {
                 )}
             </nav>
 
-            {/* Credits Display */}
-            {creditBalance && !creditBalance.unlimited && (
-                <div className="px-4 pb-2">
-                    <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
-                        <div className="flex items-center justify-between mb-1.5">
-                            <span className="text-sm text-slate-500 font-bold uppercase">Credits</span>
-                            <span className="text-base font-bold text-white">{creditBalance.remaining}/{creditBalance.total}</span>
-                        </div>
-                        <div className="w-full h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
-                            <div className={`h-full rounded-full transition-all ${creditBalance.remaining / creditBalance.total > 0.5 ? 'bg-emerald-500' :
-                                creditBalance.remaining / creditBalance.total > 0.2 ? 'bg-amber-500' : 'bg-rose-500'
-                                }`} style={{ width: `${Math.min(100, (creditBalance.remaining / creditBalance.total) * 100)}%` }} />
-                        </div>
-                    </div>
-                </div>
-            )}
+
 
             {/* New Project CTA */}
             <div className="p-4">
