@@ -676,7 +676,7 @@ export const brainstormStudio = {
                     else if (evt.type === 'ideas') onIdeas?.(evt.payload, evt.intent);
                     else if (evt.type === 'screenplay') onScreenplay?.(evt.payload, evt.conceptTitle);
                     else if (evt.type === 'strategy') onStrategy?.(evt.payload);
-                    else if (evt.type === 'done') onDone?.(evt.sessionState);
+                    else if (evt.type === 'done') onDone?.(evt.sessionState, evt.questionOptions || null);
                     else if (evt.type === 'error') onError?.(evt.message);
                 } catch { /* ignore malformed SSE */ }
             }

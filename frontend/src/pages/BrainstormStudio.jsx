@@ -374,8 +374,16 @@ function IdeasBlock({ payload, intent, onScreenplay, onFeedback }) {
 }
 
 // ── Single message bubble ─────────────────────────────────────────────────────
-function Message({ msg, onScreenplay, onFeedback }) {
+function Message({ msg, onScreenplay, onFeedback, onSelectOption, isLatest, streaming }) {
   const isFidato = msg.role === 'fidato'
+  const showOptions = isFidato
+    && msg.questionOptions?.length > 0
+    && isLatest
+    && !streaming
+    && !msg.ideasPayload
+    && !msg.screenplayPayload
+    && !msg.strategyPayload
+
   return (
     <div className={`bs-msg-wrap ${isFidato ? 'bs-msg-fidato' : 'bs-msg-user'}`}>
       {isFidato && (
@@ -386,6 +394,26 @@ function Message({ msg, onScreenplay, onFeedback }) {
           <p className="bs-bubble-text">{msg.content}</p>
         )}
         {msg.thinking && <ThinkingDots />}
+
+        {/* Clickable chips — pick one or type your own */}
+        {showOptions && (
+          <div className="bs-q-options">
+            <div className="bs-q-options-hint">Pick one or type your own ↓</div>
+            <div className="bs-q-options-grid">
+              {msg.questionOptions.map((opt, i) => (
+                <button
+                  key={i}
+                  className="bs-q-option"
+                  onClick={() => onSelectOption?.(opt)}
+                  style={{ animationDelay: `${i * 55}ms` }}
+                >
+                  {opt}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {msg.ideasPayload && (
           <IdeasBlock
             payload={msg.ideasPayload}
@@ -404,6 +432,7 @@ function Message({ msg, onScreenplay, onFeedback }) {
     </div>
   )
 }
+
 
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function BrainstormStudio() {
@@ -517,9 +546,9 @@ export default function BrainstormStudio() {
           onStrategy: (payload) => {
             updateMessage(fidId, { strategyPayload: payload, thinking: false })
           },
-          onDone: (newState) => {
+          onDone: (newState, questionOptions) => {
             if (newState) setSessionState(newState)
-            updateMessage(fidId, { thinking: false })
+            updateMessage(fidId, { thinking: false, questionOptions: questionOptions || null })
           },
           onError: (errMsg) => {
             setError(errMsg)
@@ -643,12 +672,15 @@ export default function BrainstormStudio() {
             </div>
           )}
 
-          {messages.map(msg => (
+          {messages.map((msg, idx) => (
             <Message
               key={msg.id}
               msg={msg}
               onScreenplay={handleScreenplayRequest}
               onFeedback={handleFeedback}
+              onSelectOption={sendMessage}
+              isLatest={idx === messages.length - 1}
+              streaming={streaming}
             />
           ))}
 

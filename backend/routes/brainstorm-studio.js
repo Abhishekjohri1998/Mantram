@@ -1309,21 +1309,20 @@ async function mcotReason(message, history, sessionState, brandCtx) {
 
   // ── Short-circuit: turns 1 & 2 — ask sequential questions, store answer by turn ─
   if (userMessageCount <= 2) {
-    // Store the user's answer keyed by turn number so we always advance
     const turnKey = userMessageCount === 1 ? 'q1_answer' : 'q2_answer';
     const updatedAnswers = {
       ...sessionState.collectedAnswers,
       [turnKey]: message,
-      // Also try keyword-based extraction as bonus
       ...extractAnswerFromMessage(message, sessionState.collectedAnswers || {}),
     };
-    const nextQ = getNextSmartQuestion(userMessageCount + 1, detectedIntent, updatedAnswers, brandCtx);
+    const { question, options } = getNextSmartQuestion(userMessageCount + 1, detectedIntent, updatedAnswers, brandCtx);
     return {
       intent: detectedIntent,
       collectedAnswers: updatedAnswers,
       readyToGenerate: false,
       action: 'ask_question',
-      fidatoResponse: nextQ,
+      fidatoResponse: question,
+      questionOptions: options,
     };
   }
 
@@ -1378,13 +1377,14 @@ Rules:
   }
 
   // ── Smart fallback: never loop, always advance ─────────────────────────────
-  const fallbackQ = getNextSmartQuestion(userMessageCount, detectedIntent, sessionState.collectedAnswers || {}, brandCtx);
+  const fallback = getNextSmartQuestion(userMessageCount, detectedIntent, sessionState.collectedAnswers || {}, brandCtx);
   return {
     intent: detectedIntent,
     collectedAnswers: { ...sessionState.collectedAnswers, ...extractAnswerFromMessage(message, sessionState.collectedAnswers || {}) },
     readyToGenerate: false,
     action: 'ask_question',
-    fidatoResponse: fallbackQ,
+    fidatoResponse: fallback.question,
+    questionOptions: fallback.options,
   };
 }
 
@@ -1425,45 +1425,241 @@ function extractAnswerFromMessage(message, existing) {
   return updates;
 }
 
-// ── Smart sequential questions — advances by turn index, NEVER repeats ─────────
+// ── Smart sequential questions with curated options ──────────────────────────
+// Returns { question, options } — options are clickable chips on the frontend
 function getNextSmartQuestion(turnIndex, intent, collected, brandCtx) {
   const isFilm = intent === 'ad-film';
   const isStrategy = intent === 'brand-strategy';
   const isNaming = intent === 'naming';
+  const isFestival = intent === 'festival';
+  const isOffer = intent === 'offer';
 
-  let questions;
+  let questionsWithOptions;
+
   if (isFilm) {
-    questions = [
-      `What product or brand is this film for? Tell me about it — be as specific as you like.`,
-      `Who's the ideal viewer? Picture one real person who sees this ad.`,
-      `What should they feel in the first 5 seconds — excited, emotional, intrigued?`,
-      `Any reference ads you love? And how long should the film be — 30s, 60s?`,
+    questionsWithOptions = [
+      {
+        question: `What product or brand is this film for? Pick a category or describe it yourself.`,
+        options: [
+          '🛍️ FMCG / Daily use product',
+          '👗 Fashion or Lifestyle brand',
+          '📱 Tech app or digital service',
+          '🏠 Real estate or finance',
+          '🍔 Food & Beverage / QSR',
+          '💊 Health, pharma or wellness',
+        ],
+      },
+      {
+        question: `Who's the ideal viewer? Picture one real person watching this ad on their phone.`,
+        options: [
+          '👩 Urban millennial woman (25-35), metro city',
+          '👨‍💻 Young professional just starting his career',
+          '👨‍👩‍👧 Middle-class family in tier-2 India',
+          '🎓 Gen Z student who’s brand-conscious',
+          '👩‍💼 Established professional, 35-50, premium buyer',
+        ],
+      },
+      {
+        question: `What should someone feel in the first 5 seconds — be bold here, this drives the whole film.`,
+        options: [
+          '😭 Deeply emotional — goosebumps, tears',
+          '😂 Fun and laugh-out-loud humorous',
+          '🔥 Aspirational — makes you want to level up',
+          '🥺 Nostalgic — warm, familiar, takes you back',
+          '⚡ Urgent and exciting — act now energy',
+          '😮 Surprising — unexpected twist',
+        ],
+      },
+      {
+        question: `How long and how many script concepts do you want me to write?`,
+        options: [
+          '⏱️ 30-second film — 2 concepts',
+          '⏱️ 60-second film — 3 concepts',
+          '⏱️ 90-second brand film — 2 concepts',
+          '📱 Instagram Reel format (15-30s) — 3 concepts',
+          '🎬 Multiple formats — 30s + 60s + Reel',
+        ],
+      },
     ];
   } else if (isStrategy) {
-    questions = [
-      `What's the brand and business goal for this strategy? E.g. grow sales by X%, enter a new market.`,
-      `Who's the primary target audience and where do they hang out online?`,
-      `What's the rough monthly marketing budget we're working with?`,
-      `Any specific channels you already use — Instagram, Google, WhatsApp? And what's the timeline?`,
+    questionsWithOptions = [
+      {
+        question: `What's the #1 business goal for this strategy? Be specific about what success looks like.`,
+        options: [
+          '📈 Grow monthly revenue by 30%+ in 3 months',
+          '🌍 Launch in a new city or market',
+          '🔁 Increase repeat purchases and retention',
+          '🧲 Build brand awareness from scratch',
+          '📲 Grow social media to 10K+ engaged followers',
+          '🤝 Generate B2B leads and partnerships',
+        ],
+      },
+      {
+        question: `Who's the primary audience? Where do they spend their attention online?`,
+        options: [
+          '🏙️ Urban professionals (25-40), Instagram & LinkedIn heavy',
+          '🎓 College students & young adults, YouTube & Reels all day',
+          '👨‍👩‍👧 Tier-2/3 India households, WhatsApp & Facebook first',
+          '💪 Health & wellness enthusiasts, Instagram & communities',
+          '🧳 Working parents (30-45), OTT & news apps',
+        ],
+      },
+      {
+        question: `What's the monthly budget range we're designing this strategy around?`,
+        options: [
+          '💸 Bootstrapped — under ₹1L/month',
+          '💰 ₹1L – ₹5L/month',
+          '💼 ₹5L – ₹20L/month',
+          '🚀 ₹20L – ₹1Cr/month',
+          '🏢 ₹1Cr+ — enterprise scale',
+        ],
+      },
+      {
+        question: `Any channels you're already active on? And what's the strategy horizon?`,
+        options: [
+          '📸 Instagram + Reels are our main thing — 1 month plan',
+          '📺 YouTube + Google Ads focus — 3 month plan',
+          '📱 WhatsApp marketing + D2C website — 1 month',
+          '🛒 Amazon / Marketplace ads + social — 3 months',
+          '🌐 Full omnichannel — social + search + offline — 6 months',
+        ],
+      },
     ];
   } else if (isNaming) {
-    questions = [
-      `What are we naming — a product, a brand, a campaign, or something else?`,
-      `What feeling or idea should the name evoke? Premium? Fun? Trustworthy? Cultural?`,
-      `Any language preference — English, Hindi, regional? Or a mix?`,
+    questionsWithOptions = [
+      {
+        question: `What are we naming here? Give me the context.`,
+        options: [
+          '🏷️ A new product launching soon',
+          '🏢 The brand itself needs a name',
+          '📣 A campaign or marketing initiative',
+          '🚀 A new business or startup',
+          '🎪 An event, series or content IP',
+        ],
+      },
+      {
+        question: `What feeling or idea should the name instantly evoke?`,
+        options: [
+          '✨ Premium & aspirational — feels expensive',
+          '😄 Playful & fun — easy to remember, makes you smile',
+          '🌿 Natural, honest & trustworthy',
+          '🇮🇳 Rooted in Indian culture — feels desi and proud',
+          '⚡ Bold and powerful — disruptive, no-nonsense',
+          '💡 Clever & smart — intellectual, witty',
+        ],
+      },
+      {
+        question: `Any language preference for the name?`,
+        options: [
+          '🇬🇧 English only — global and clean',
+          '🇮🇳 Hindi or Sanskrit — rooted and cultural',
+          '🌏 English + Hindi blend (Hinglish) — modern India feel',
+          '🗣️ Regional language (Tamil/Marathi/Bengali etc.)',
+          '🌍 No preference — surprise me with the best option',
+        ],
+      },
+    ];
+  } else if (isFestival) {
+    questionsWithOptions = [
+      {
+        question: `Which festival or occasion is this campaign for?`,
+        options: [
+          '🪔 Diwali — the biggest one',
+          '🎊 New Year / New Year Eve',
+          '🎅 Christmas & winter holidays',
+          '🌙 Eid / Ramadan',
+          '🌸 Holi',
+          '💘 Valentine’s Day',
+        ],
+      },
+      {
+        question: `What's the campaign goal for this festival?`,
+        options: [
+          '🛒 Drive sales and conversions — discount-led',
+          '❤️ Build emotional brand connect — storytelling',
+          '🎁 Gift guide / gifting push',
+          '📲 Go viral — shareable, meme-able content',
+          '🤝 Community and togetherness angle',
+        ],
+      },
+    ];
+  } else if (isOffer) {
+    questionsWithOptions = [
+      {
+        question: `What type of offer are we designing?`,
+        options: [
+          '🏷️ Flat discount (% off or ₹ off)',
+          '🎁 Buy X get Y free',
+          '📦 Bundle offer — more for less',
+          '⚡ Flash sale — limited time urgency',
+          '🔄 Loyalty / referral reward',
+          '🎯 First-time buyer special',
+        ],
+      },
+      {
+        question: `What's the primary objective of this offer?`,
+        options: [
+          '🛒 Clear inventory / move stock fast',
+          '👋 Acquire new customers',
+          '🔁 Bring back lapsed customers',
+          '📈 Increase average order value',
+          '📲 Drive app downloads or sign-ups',
+        ],
+      },
     ];
   } else {
-    questions = [
-      `What's the product or campaign we're brainstorming for? Give me the quick pitch.`,
-      `Who's the target audience? Describe them in one sentence.`,
-      `What should people think, feel, or do after seeing this? Buy? Share? Feel inspired?`,
-      `Any budget, timeline, or platform constraints I should keep in mind?`,
+    // Generic campaign / custom
+    questionsWithOptions = [
+      {
+        question: `What's the product, service or brand we're creating this campaign for?`,
+        options: [
+          '👗 Fashion / clothing / accessories',
+          '🍕 Food, beverage or restaurant',
+          '📱 App, SaaS or tech product',
+          '💄 Beauty, skincare or personal care',
+          '🏋️ Health, fitness or wellness',
+          '🏠 Home, decor or lifestyle',
+        ],
+      },
+      {
+        question: `Who are we making this campaign for? Pick the audience that fits best.`,
+        options: [
+          '👩 Urban women (22-35), fashion & lifestyle forward',
+          '🧔 Urban men (22-35), aspirational & practical',
+          '👨‍👩‍👧 Families — parents making household decisions',
+          '🎓 Students & Gen Z (16-24), trend & value driven',
+          '👔 Working professionals (28-45), quality seekers',
+          '🌾 Tier-2/3 India — value and trust driven',
+        ],
+      },
+      {
+        question: `What should people think, feel or do after experiencing this campaign?`,
+        options: [
+          '🛒 Buy immediately — create urgency and desire',
+          '❤️ Fall in love with the brand — emotional connect',
+          '📤 Share with friends — make it go viral',
+          '💭 Remember the brand next time they shop',
+          '🔥 Feel excited and FOMO — limited time energy',
+          '🤝 Trust the brand — credibility and reliability',
+        ],
+      },
+      {
+        question: `Any constraints I should design around? Or full creative freedom?`,
+        options: [
+          '🆓 Full creative freedom — go all out',
+          '💰 Tight budget — needs to be low-cost to execute',
+          '📱 Digital only — Instagram, YouTube, WhatsApp',
+          '🕐 Need this in 2 weeks — quick execution',
+          '🌐 Must work across online + offline',
+          '📊 Performance-focused — must be measurable',
+        ],
+      },
     ];
   }
 
   // Use turn index directly — turn 1 → Q[0], turn 2 → Q[1], always advances
-  const idx = Math.min(Math.max(0, turnIndex - 1), questions.length - 1);
-  return questions[idx];
+  const idx = Math.min(Math.max(0, turnIndex - 1), questionsWithOptions.length - 1);
+  return questionsWithOptions[idx]; // returns { question, options }
 }
 
 
@@ -1624,7 +1820,7 @@ router.post('/fidato-chat', protect, requireStudio('brainstormStudio'), async (r
       preGenerationMessage,
       collectedAnswers = {},
       intent = sessionState.intent || 'custom',
-      questionId,
+      questionOptions = null,
     } = reasoning;
 
     const newSessionState = {
@@ -1638,7 +1834,12 @@ router.post('/fidato-chat', protect, requireStudio('brainstormStudio'), async (r
     if (action === 'ask_question' || action === 'general_chat') {
       // ── Just stream Fidato's conversational response ──
       await streamWords(res, fidatoResponse);
-      sseEvent(res, { type: 'done', sessionState: newSessionState });
+      // Pass questionOptions from reasoning so the frontend can render chips
+      sseEvent(res, {
+        type: 'done',
+        sessionState: newSessionState,
+        questionOptions: reasoning.questionOptions || null,
+      });
 
     } else if (action === 'generate_ideas') {
       // ── Stream "thinking" → generate ideas → stream follow-up ──

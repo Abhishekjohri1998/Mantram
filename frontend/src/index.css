@@ -1875,3 +1875,52 @@
 .bs-send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .bs-send-btn.loading { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.1); }
 
+
+/* ── Question option chips ─────────────────────────────────────────────────── */
+.bs-q-options {
+  margin-top: 0.875rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+.bs-q-options-hint {
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: rgba(255,255,255,0.22);
+  margin-bottom: 0.6rem;
+}
+.bs-q-options-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.bs-q-option {
+  text-align: left;
+  padding: 0.55rem 0.875rem;
+  background: rgba(139,92,246,0.06);
+  border: 1px solid rgba(139,92,246,0.18);
+  border-radius: 0.6rem;
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: rgba(255,255,255,0.72);
+  transition: all 0.18s ease;
+  animation: bsOptIn 0.3s ease forwards;
+  opacity: 0;
+  transform: translateX(-6px);
+  line-height: 1.4;
+}
+.bs-q-option:hover {
+  background: rgba(139,92,246,0.2);
+  border-color: rgba(139,92,246,0.5);
+  color: #fff;
+  transform: translateX(2px);
+  box-shadow: 0 2px 8px rgba(139,92,246,0.2);
+}
+.bs-q-option:active {
+  transform: scale(0.98);
+}
+@keyframes bsOptIn {
+  to { opacity: 1; transform: translateX(0); }
+}
