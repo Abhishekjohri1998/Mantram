@@ -329,7 +329,7 @@ export default function CreativeStudio() {
     const [selectedProduct, setSelectedProduct] = useState(null)
     const [showProductPicker, setShowProductPicker] = useState(false)
     const [productsList, setProductsList] = useState([])
-    const [generating, setGenerating] = useState(false)
+    const [activeGenerations, setActiveGenerations] = useState([]) // Array of in-progress jobs, max 3
     const [pipelineSteps, setPipelineSteps] = useState([]) // Real-time agentic pipeline progress
     const [autoGenerate, setAutoGenerate] = useState(false)
     const [enhancing, setEnhancing] = useState(false)
@@ -884,17 +884,17 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
             psAbortRef.current?.abort()
             campAbortRef.current?.abort()
             activeBrandIdRef.current = activeBrand?._id
-            if (generating || enhancing || templateGenerating) {
-                setGenerating(false); setEnhancing(false); setTemplateGenerating(false)
+            if (activeGenerations.length > 0 || enhancing || templateGenerating) {
+                setActiveGenerations([]); setEnhancing(false); setTemplateGenerating(false)
             }
         }
-    }, [activeBrand?._id, generating, enhancing, templateGenerating])
+    }, [activeBrand?._id, activeGenerations.length, enhancing, templateGenerating])
     useEffect(() => {
-        if (autoGenerate && activeBrand && prompt.trim() && !generating) {
+        if (autoGenerate && activeBrand && prompt.trim() && activeGenerations.length === 0) {
             setAutoGenerate(false)
             handleGenerate()
         }
-    }, [autoGenerate, activeBrand, prompt, generating, handleGenerate]) // eslint-disable-line react-hooks/exhaustive-deps
+    }, [autoGenerate, activeBrand, prompt, activeGenerations.length, handleGenerate]) // eslint-disable-line react-hooks/exhaustive-deps
 
     useEffect(() => {
         if (activeBrand?._id) {
@@ -1146,7 +1146,10 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
 
     async function handleGenerate() {
         if (!prompt.trim() || !activeBrand) return
-        setGenerating(true)
+        if (activeGenerations.length >= 3) return // Max 3 concurrent
+
+        const jobId = `job_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
+        setActiveGenerations(prev => [...prev, { jobId, prompt: prompt.substring(0, 60), startedAt: Date.now() }])
         setPipelineSteps([])
         setError('')
         setFeedbackState(null)
@@ -1305,7 +1308,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
             }
         } finally {
             if (progressInterval) clearInterval(progressInterval)
-            setGenerating(false)
+            setActiveGenerations(prev => prev.filter(j => j.jobId !== jobId))
         }
     }
 
@@ -1899,7 +1902,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
             {/* ── Cross-Tab Generation Indicator ── */}
             {(() => {
                 const bgTasks = [];
-                if (studioMode !== 'create' && generating) bgTasks.push({ label: 'AI Create', mode: 'create', icon: 'auto_awesome' })
+                if (studioMode !== 'create' && activeGenerations.length > 0) bgTasks.push({ label: 'AI Create', mode: 'create', icon: 'auto_awesome' })
                 if (studioMode !== 'photoshoot' && photoshootGenerating) bgTasks.push({ label: 'Photoshoot', mode: 'photoshoot', icon: 'photo_camera' })
                 if (studioMode !== 'campaigns' && campGenerating) bgTasks.push({ label: 'Campaign', mode: 'campaigns', icon: 'campaign' })
                 if (bgTasks.length === 0) return null
@@ -2218,7 +2221,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 placeholder={activeBrand
                                     ? `Describe your visual for ${activeBrand.name}...`
                                     : "Create a brand first to start generating visuals"}
-                                disabled={!activeBrand || generating}
+                                disabled={!activeBrand || activeGenerations.length >= 3}
                                 className="input-glass w-full resize-none py-3.5 px-4 pr-14 pb-12 disabled:opacity-30 text-white text-sm leading-relaxed rounded-2xl overflow-hidden"
                                 rows={4}
                                 style={{ minHeight: '120px', maxHeight: '400px', overflowY: 'auto' }}
@@ -2376,10 +2379,11 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             {/* Generate + action icons row */}
                             <div className="flex items-center gap-2">
                                 <CreditTooltipWrapper action="creative">
-                                    <button onClick={handleGenerate} disabled={!prompt.trim() || !activeBrand || generating}
+                                    <button onClick={handleGenerate} disabled={!prompt.trim() || !activeBrand || activeGenerations.length >= 3}
                                         className="btn-primary flex-1 py-3 px-5 rounded-xl disabled:opacity-30 justify-center text-sm font-bold cursor-pointer">
-                                        {generating ? (
-                                            <><span className="material-symbols-outlined animate-spin text-sm">progress_activity</span> Generating...</>
+                                        {activeGenerations.length > 0 ? (
+                                            <><span className="material-symbols-outlined animate-spin text-sm">progress_activity</span>
+                                            {activeGenerations.length >= 3 ? 'Queue Full (3/3)' : `Generating ${activeGenerations.length}/3...`}</>
                                         ) : (
                                             <><span className="material-symbols-outlined text-sm">auto_awesome</span> Generate <CreditBadge action="creative" /></>
                                         )}
@@ -2679,7 +2683,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                         )}
 
                         {/* ── Current Result (newest generation, highlighted) ── */}
-                        {result && !generating && (
+                        {result && activeGenerations.length === 0 && (
                             <div className="generation-card generation-card--new mb-5">
                                 {/* Prompt text */}
                                 <p className="text-xs text-slate-400 mb-2.5 line-clamp-2 leading-relaxed">
@@ -2893,15 +2897,18 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                         )}
 
 
-                        {/* ── Generating Indicator ── */}
-                        <GlobalLoader 
-                            isActive={generating} 
-                            title="Creating your visual..." 
-                            pipelineSteps={pipelineSteps}
-                            currentStage={`${prompt.substring(0, 50)}${prompt.length > 50 ? '...' : ''}`}
-                            icon="photo_camera"
-                            estimatedDuration={60}
-                        />
+                        {/* ── Generating Indicators (one per active job) ── */}
+                        {activeGenerations.map((job, idx) => (
+                            <GlobalLoader
+                                key={job.jobId}
+                                isActive={true}
+                                title={activeGenerations.length > 1 ? `Creating visual ${idx + 1}/${activeGenerations.length}...` : 'Creating your visual...'}
+                                pipelineSteps={idx === 0 ? pipelineSteps : []}
+                                currentStage={`${job.prompt}${job.prompt.length >= 60 ? '...' : ''}`}
+                                icon="photo_camera"
+                                estimatedDuration={60}
+                            />
+                        ))}
 
                         {/* ── Session Generation Gallery (persistent + viewMode-aware) ── */}
                         {generationHistory.length > 0 && (
@@ -3479,7 +3486,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                         })()}
 
                         {/* ── Empty State with Inline Suggestions ── */}
-                        {!result && !generating && bankImages.filter(img => img.source === 'ai-generated' || img.category === 'generated' || img.type === 'creative').length === 0 && (
+                        {!result && activeGenerations.length === 0 && bankImages.filter(img => img.source === 'ai-generated' || img.category === 'generated' || img.type === 'creative').length === 0 && (
                             <div className="flex flex-col items-center justify-center py-12 px-4">
                                 <div className="w-16 h-16 rounded-2xl bg-white/[0.03] border border-white/[0.06] flex items-center justify-center mb-4">
                                     <span className="material-symbols-outlined text-3xl text-slate-600">palette</span>
