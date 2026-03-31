@@ -590,7 +590,7 @@ router.get('/google', (req, res) => {
         `&prompt=select_account`;
 
     // Ensure popup can communicate back
-    res.setHeader('Cross-Origin-Opener-Policy', 'unsafe-none');
+    res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
     res.json({ success: true, authUrl });
 });
 
@@ -600,7 +600,7 @@ router.get('/google', (req, res) => {
  */
 router.get('/google/callback', async (req, res) => {
     // Ensure popup can communicate back
-    res.setHeader('Cross-Origin-Opener-Policy', 'unsafe-none');
+    res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
     try {
         const { code, error: authError } = req.query;
 
