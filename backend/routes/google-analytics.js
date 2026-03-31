@@ -131,9 +131,6 @@ router.get('/connect', protect, (req, res) => {
         state,
     }).toString();
 
-    if (flow === 'redirect') {
-        return res.redirect(authUrl);
-    }
     res.json({ success: true, authUrl });
 });
 
