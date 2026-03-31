@@ -93,15 +93,30 @@ export const PROVIDER_PRICING = {
                 costPerSecFast: 0.08, costPerSecQuality: 0.15, unit: 'USD/sec',
                 pricingUrl: 'https://fal.ai/pricing',
             },
+        },
+    },
+    'piapi': {
+        provider: 'PiAPI (Video)', icon: '⚡',
+        models: {
             'seedance-1.0': {
                 name: 'Seedance 1.0 Lite', type: 'video',
                 costPerSecFast: 0.05, costPerSecQuality: 0.08, unit: 'USD/sec',
-                pricingUrl: 'https://fal.ai/pricing',
+                pricingUrl: 'https://piapi.ai/pricing',
             },
             'seedance-2.0': {
                 name: 'Seedance 2.0 Pro', type: 'video',
                 costPerSecFast: 0.08, costPerSecQuality: 0.15, unit: 'USD/sec',
-                pricingUrl: 'https://fal.ai/pricing',
+                pricingUrl: 'https://piapi.ai/pricing',
+            },
+        },
+    },
+    'muapi': {
+        provider: 'MuAPI (Video)', icon: 'Ⓜ️',
+        models: {
+            'seedance-2.0': {
+                name: 'Seedance 2.0 Pro', type: 'video',
+                costPerSecFast: 0.08, costPerSecQuality: 0.15, unit: 'USD/sec',
+                pricingUrl: 'https://muapi.ai/pricing',
             },
         },
     },
