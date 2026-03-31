@@ -1970,22 +1970,24 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             </div>
                         )}
 
-                        {/* ── Format Selector (always visible) ── */}
+                        {/* ── Format Selector ── */}
                         <div className="mb-3">
-                            <div className="flex items-center justify-between mb-1.5">
-                                <span className="text-[10px] text-slate-500 uppercase tracking-wider font-bold">Format</span>
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Format</span>
                                 {selectedTypeInfo && (
-                                    <span className="text-[9px] text-slate-600">{selectedTypeInfo.size} · {selectedTypeInfo.aspectRatio}</span>
+                                    <span className="text-[9px] text-slate-600 font-mono bg-white/[0.04] px-1.5 py-0.5 rounded">{selectedTypeInfo.size} · {selectedTypeInfo.aspectRatio}</span>
                                 )}
                             </div>
-                            <div className="flex flex-wrap gap-1">
+                            <div className="grid grid-cols-2 gap-1">
                                 {creativeTypes.map(ct => (
                                     <button key={ct.id} onClick={() => setSelectedType(ct.id)}
-                                        className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1 ${selectedType === ct.id
-                                            ? 'bg-primary/20 text-primary border border-primary/30 shadow-sm shadow-primary/10'
-                                            : 'bg-white/[0.04] text-slate-500 hover:text-white border border-transparent hover:border-white/[0.08]'}`}>
+                                        className={`px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                                            selectedType === ct.id
+                                            ? 'bg-primary/15 text-primary border border-primary/30'
+                                            : 'bg-white/[0.03] text-slate-500 hover:text-slate-300 border border-white/[0.05] hover:border-white/[0.1] hover:bg-white/[0.05]'
+                                        }`}>
                                         <span className="material-symbols-outlined text-xs">{ct.icon}</span>
-                                        {ct.label}
+                                        <span className="truncate">{ct.label}</span>
                                     </button>
                                 ))}
                             </div>
@@ -2016,9 +2018,13 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             )}
                         </div>
 
-                        {/* ── Compact References Row ── */}
-                        <div className="flex items-center gap-2 mb-3">
-                            <span className="text-[10px] text-slate-500 uppercase tracking-wider font-bold">Refs</span>
+                        {/* ── References Row ── */}
+                        <div className="mb-3">
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">References</span>
+                                <span className="text-[9px] text-slate-600">Style guide for the image</span>
+                            </div>
+                            <div className="flex items-center gap-2">
 
                             {/* Style Ref */}
                             {referenceImages.style ? (
@@ -2081,12 +2087,14 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     <span className="text-[7px] text-slate-600 group-hover:text-cyan-400 font-bold leading-none">Upload</span>
                                 </button>
                             )}
+                            </div>
                         </div>
                         {characters.length > 0 && (
                             <p className="text-[9px] text-violet-400/50 mb-2 -mt-1 flex items-center gap-1">
                                 <span className="material-symbols-outlined text-[10px]">info</span>
                                 Type <span className="font-bold text-violet-400">@name</span> in prompt to tag characters
                             </p>
+
                         )}
 
                         {/* ── Add Text to Image Toggle ── */}
