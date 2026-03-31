@@ -1307,12 +1307,20 @@ async function mcotReason(message, history, sessionState, brandCtx) {
   // ── Intent detection from message (keyword-based backup) ──────────────────
   const detectedIntent = detectIntentFromHistory(history, message);
 
-  // ── Short-circuit: if only 1st or 2nd message, ask ONE smart question ─────
+  // ── Short-circuit: turns 1 & 2 — ask sequential questions, store answer by turn ─
   if (userMessageCount <= 2) {
-    const nextQ = getNextSmartQuestion(userMessageCount, detectedIntent, sessionState.collectedAnswers || {}, brandCtx);
+    // Store the user's answer keyed by turn number so we always advance
+    const turnKey = userMessageCount === 1 ? 'q1_answer' : 'q2_answer';
+    const updatedAnswers = {
+      ...sessionState.collectedAnswers,
+      [turnKey]: message,
+      // Also try keyword-based extraction as bonus
+      ...extractAnswerFromMessage(message, sessionState.collectedAnswers || {}),
+    };
+    const nextQ = getNextSmartQuestion(userMessageCount + 1, detectedIntent, updatedAnswers, brandCtx);
     return {
       intent: detectedIntent,
-      collectedAnswers: { ...sessionState.collectedAnswers, ...extractAnswerFromMessage(message, sessionState.collectedAnswers || {}) },
+      collectedAnswers: updatedAnswers,
       readyToGenerate: false,
       action: 'ask_question',
       fidatoResponse: nextQ,
@@ -1417,24 +1425,45 @@ function extractAnswerFromMessage(message, existing) {
   return updates;
 }
 
-// ── Smart sequential questions — never repeat ─────────────────────────────────
+// ── Smart sequential questions — advances by turn index, NEVER repeats ─────────
 function getNextSmartQuestion(turnIndex, intent, collected, brandCtx) {
   const isFilm = intent === 'ad-film';
-  const questions = isFilm ? [
-    collected.product ? null : `What product or brand is this film for? Tell me about it briefly.`,
-    collected.audience ? null : `Who's your ideal viewer for this film? Like, picture one specific person.`,
-    collected.emotion ? null : `What should someone feel in the first 5 seconds of watching? Excited? Emotional? Curious?`,
-    `What format are you thinking — 30 seconds, 60 seconds? And how many script concepts do you want?`,
-  ] : [
-    collected.product ? null : `What are we brainstorming for? Give me the quick pitch.`,
-    collected.audience ? null : `Who's the target? Describe your ideal customer in one sentence.`,
-    collected.emotion ? null : `What should people feel or do after seeing this? Buy immediately? Share it? Feel inspired?`,
-    `Any budget or timeline to keep in mind? Or should I just go full creative?`,
-  ];
+  const isStrategy = intent === 'brand-strategy';
+  const isNaming = intent === 'naming';
 
-  // find the first unanswered question
-  const nextQ = questions.find(q => q !== null);
-  return nextQ || `Got it! Give me one more detail — anything specific you want to make sure I include?`;
+  let questions;
+  if (isFilm) {
+    questions = [
+      `What product or brand is this film for? Tell me about it — be as specific as you like.`,
+      `Who's the ideal viewer? Picture one real person who sees this ad.`,
+      `What should they feel in the first 5 seconds — excited, emotional, intrigued?`,
+      `Any reference ads you love? And how long should the film be — 30s, 60s?`,
+    ];
+  } else if (isStrategy) {
+    questions = [
+      `What's the brand and business goal for this strategy? E.g. grow sales by X%, enter a new market.`,
+      `Who's the primary target audience and where do they hang out online?`,
+      `What's the rough monthly marketing budget we're working with?`,
+      `Any specific channels you already use — Instagram, Google, WhatsApp? And what's the timeline?`,
+    ];
+  } else if (isNaming) {
+    questions = [
+      `What are we naming — a product, a brand, a campaign, or something else?`,
+      `What feeling or idea should the name evoke? Premium? Fun? Trustworthy? Cultural?`,
+      `Any language preference — English, Hindi, regional? Or a mix?`,
+    ];
+  } else {
+    questions = [
+      `What's the product or campaign we're brainstorming for? Give me the quick pitch.`,
+      `Who's the target audience? Describe them in one sentence.`,
+      `What should people think, feel, or do after seeing this? Buy? Share? Feel inspired?`,
+      `Any budget, timeline, or platform constraints I should keep in mind?`,
+    ];
+  }
+
+  // Use turn index directly — turn 1 → Q[0], turn 2 → Q[1], always advances
+  const idx = Math.min(Math.max(0, turnIndex - 1), questions.length - 1);
+  return questions[idx];
 }
 
 
