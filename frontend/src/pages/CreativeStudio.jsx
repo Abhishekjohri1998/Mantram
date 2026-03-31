@@ -809,7 +809,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
             const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/creatives/suggest-copy`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                body: JSON.stringify({ brief: briefText.trim(), brandId: activeBrand?._id, format: format || 'instagram-post' }),
+                body: JSON.stringify({ brief: briefText.trim(), brandId: activeBrand?._id, format: selectedType || 'instagram-post' }),
             });
             const data = await res.json();
             if (data.success && data.copy?.headline) {
@@ -823,7 +823,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
         } finally {
             setCopyLoading(false);
         }
-    }, [activeBrand?._id, format]);
+    }, [activeBrand?._id, selectedType]);
 
     // Trigger suggestion immediately when toggle is switched ON
     useEffect(() => {
