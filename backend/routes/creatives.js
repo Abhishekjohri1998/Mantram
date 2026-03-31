@@ -1186,14 +1186,19 @@ router.post('/generate', protect, requireStudio('creativeStudio'), requireCredit
                     onProgress: progressId ? (step) => addStep(progressId, step) : undefined,
                 });
 
-                // Use agent-crafted prompt + append safety instructions
+                // Build final prompt — include copy suppression ONLY when no copywriter text is requested
                 const agentPrompt = pipelineResult.finalPrompt;
-                const negativeInstructions = pipelineResult.engineeredPrompt?.negativePrompt || '';
                 const styleModifiers = pipelineResult.engineeredPrompt?.styleModifiers || '';
+                const hasCopyText = options?.generateCopy === true && pipelineResult.copy?.headline;
+                const metaSuppression = hasCopyText
+                    ? `The output must fill the entire canvas edge-to-edge. Do NOT render any color palettes, color swatches, hex codes, dimension labels, brand guidelines, layout grids, frames, borders, or mockup presentations anywhere on the image.`
+                    : `The output must fill the entire canvas edge-to-edge. Do NOT render any color palettes, color swatches, hex codes, dimension labels, brand guidelines, metadata text, frames, borders, or mockup presentations anywhere on the image. The entire image must be pure visual content only.`;
 
                 fullPrompt = `${agentPrompt}${textOverlayPart}${refPart}
 ${styleModifiers ? styleModifiers + '.' : ''}
-The output must fill the entire canvas edge-to-edge. Do NOT render any color palettes, color swatches, hex codes, dimension labels, brand guidelines, metadata text, frames, borders, or mockup presentations anywhere on the image. The entire image must be pure visual content only.`;
+${metaSuppression}`;
+
+
 
                 console.log(`🤖 Agentic prompt crafted in ${pipelineResult.pipelineTimeMs}ms — Art Direction: ${pipelineResult.artDirection?.visualStyle || 'N/A'}`);
 

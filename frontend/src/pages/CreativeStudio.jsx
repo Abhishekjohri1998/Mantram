@@ -2648,7 +2648,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                         )}
 
                         {/* ── AI Copy Card ── */}
-                        {result?.copy?.caption && (
+                        {result?.copy?.headline && (
                             <div className="studio-card p-0 mb-5 overflow-hidden border border-violet-500/20 animate-in fade-in slide-in-from-bottom-3 duration-500" style={{ animationDelay: '200ms' }}>
                                 {/* Header */}
                                 <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-violet-500/10 to-fuchsia-500/10 border-b border-white/[0.06]">
