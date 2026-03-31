@@ -608,6 +608,59 @@ async function routedImageGenerate(promptText, imageParts = [], temperature = 0.
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+// POST /api/creatives/suggest-copy — Fast agentic copy suggestion
+// Reads brief + brand context → returns headline, subtext, CTA in ~1-2s
+// Used to pre-fill "Add Text to Image" fields BEFORE full image generation
+// No credits consumed — it's a preview/suggestion call
+// ══════════════════════════════════════════════════════════════════════════════
+router.post('/suggest-copy', protect, async (req, res) => {
+    try {
+        const { brief, brandId, format } = req.body;
+        if (!brief?.trim()) return res.status(400).json({ success: false, error: 'Brief is required' });
+
+        // Load brand context (same as pipeline)
+        const { buildBrandContext } = await import('../agents/shared/agentUtils.js');
+        const Brand = (await import('../models/Brand.js')).default;
+        const brand = brandId ? await Brand.findById(brandId).lean() : null;
+        const products = brand?._id ? (await (await import('../models/Product.js')).default.find({ brand: brand._id }).limit(5).lean()) : [];
+        const brandContext = brand ? buildBrandContext(brand, products) : '<brand_bible>No brand data. Use professional style.</brand_bible>';
+
+        // Import and call copywriter with the brief directly
+        const { COPYWRITER_PROMPT } = await import('../agents/creativeStudio/prompts.js');
+        const { callAgent } = await import('../agents/shared/agentUtils.js');
+
+        const formatLabel = format || 'instagram-post';
+
+        const userPrompt = [
+            `CREATIVE BRIEF: ${brief.trim()}`,
+            `FORMAT: ${formatLabel}`,
+            `TASK: Based on this brief, generate short visual copy that will be printed ON the image.`,
+            `Write a headline (2-6 words max), optional subtext (1 line max 8 words), and optional CTA button text (2-4 words).`,
+            `Match the tone, energy, and style of the brief. Think: what would a top creative director write on this ad's typography?`,
+        ].join('\n');
+
+        const result = await callAgent(COPYWRITER_PROMPT(brandContext), userPrompt, 0.7, 1024);
+
+        if (result.error) {
+            return res.json({ success: false, error: 'Copy generation failed', raw: result.raw });
+        }
+
+        return res.json({
+            success: true,
+            copy: {
+                headline: result.headline || '',
+                subtext: result.subtext || null,
+                ctaText: result.ctaText || null,
+                designRationale: result.designRationale || '',
+            },
+        });
+    } catch (err) {
+        console.error('suggest-copy error:', err.message);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
 // POST /api/creatives/enhance-prompt — AI-powered AGENTIC prompt enhancement
 // Intelligently matches products, injects format-specific creative direction, and builds
 // a detailed prompt that combines the user's theme with real brand/product data.

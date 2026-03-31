@@ -697,8 +697,12 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
     const [showAdvanced, setShowAdvanced] = useState(false)
     const [agenticQuality, setAgenticQuality] = useState('fast') // 'fast' | 'quality'
     const [generateCopy, setGenerateCopy] = useState(false) // Opt-in: render text on image
-    const [customHeadline, setCustomHeadline] = useState('') // User-specified headline (blank = AI generates)
-    const [customCtaText, setCustomCtaText] = useState('')  // User-specified CTA (blank = AI generates)
+    const [customHeadline, setCustomHeadline] = useState('')  // Headline (pre-filled by AI, editable by user)
+    const [customCtaText, setCustomCtaText] = useState('')    // CTA text (pre-filled by AI, editable by user)
+    const [copyLoading, setCopyLoading] = useState(false)     // AI is suggesting copy
+    const [copyIsAiSuggested, setCopyIsAiSuggested] = useState(false) // True when fields come from AI
+    const [copyRationale, setCopyRationale] = useState('')    // AI's reasoning for the copy choice
+    const suggestCopyTimerRef = useRef(null)
     const [copiedField, setCopiedField] = useState(null) // Track which copy field was just copied
     const [activeQuickTemplate, setActiveQuickTemplate] = useState(null)
     const [showQuickStart, setShowQuickStart] = useState(true)
@@ -795,6 +799,56 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
         return ref.current.signal
     }
 
+    // ── Agentic copy suggestion — runs when toggle is ON or brief changes ──
+    const suggestCopy = useCallback(async (briefText) => {
+        if (!briefText?.trim() || briefText.trim().length < 5) return;
+        setCopyLoading(true);
+        setCopyIsAiSuggested(false);
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/creatives/suggest-copy`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ brief: briefText.trim(), brandId: activeBrand?._id, format: format || 'instagram-post' }),
+            });
+            const data = await res.json();
+            if (data.success && data.copy?.headline) {
+                setCustomHeadline(data.copy.headline);
+                setCustomCtaText(data.copy.ctaText || '');
+                setCopyRationale(data.copy.designRationale || '');
+                setCopyIsAiSuggested(true);
+            }
+        } catch (err) {
+            console.warn('Copy suggestion failed:', err.message);
+        } finally {
+            setCopyLoading(false);
+        }
+    }, [activeBrand?._id, format]);
+
+    // Trigger suggestion immediately when toggle is switched ON
+    useEffect(() => {
+        if (generateCopy && prompt?.trim().length > 5) {
+            suggestCopy(prompt);
+        }
+        if (!generateCopy) {
+            setCustomHeadline('');
+            setCustomCtaText('');
+            setCopyRationale('');
+            setCopyIsAiSuggested(false);
+            if (suggestCopyTimerRef.current) clearTimeout(suggestCopyTimerRef.current);
+        }
+    }, [generateCopy]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Debounced re-suggestion when brief changes (500ms after user stops typing)
+    useEffect(() => {
+        if (!generateCopy || !prompt?.trim()) return;
+        if (suggestCopyTimerRef.current) clearTimeout(suggestCopyTimerRef.current);
+        suggestCopyTimerRef.current = setTimeout(() => {
+            suggestCopy(prompt);
+        }, 800);
+        return () => clearTimeout(suggestCopyTimerRef.current);
+    }, [prompt, generateCopy]); // eslint-disable-line react-hooks/exhaustive-deps
+
     // ── Effects ──
     useEffect(() => {
         return () => {
@@ -803,6 +857,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
             campAbortRef.current?.abort()
         }
     }, [])
+
 
     useEffect(() => {
         if (!activeBrand?._id) { setBrandImages([]); return }
@@ -2033,6 +2088,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
 
                         {/* ── Add Text to Image Toggle ── */}
                         <div className={`rounded-xl mb-3 border transition-all overflow-hidden ${generateCopy ? 'bg-violet-500/10 border-violet-500/30' : 'bg-white/[0.03] border-white/[0.06]'}`}>
+                            {/* Toggle header row */}
                             <div className="flex items-center justify-between px-3 py-2">
                                 <div className="flex items-center gap-2.5">
                                     <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${generateCopy ? 'bg-violet-500/20' : 'bg-white/[0.06]'}`}>
@@ -2040,56 +2096,100 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     </div>
                                     <div>
                                         <p className="text-xs font-bold text-white leading-tight">Add Text to Image</p>
-                                        <p className="text-[10px] text-slate-500 leading-tight">{generateCopy ? (customHeadline ? `"${customHeadline}"` : 'AI will generate headline + CTA') : 'Enable to render text on the image'}</p>
+                                        <p className="text-[10px] text-slate-500 leading-tight">
+                                            {!generateCopy && 'AI generates headline + CTA printed on the image'}
+                                            {generateCopy && copyLoading && 'Reading brief...'}
+                                            {generateCopy && !copyLoading && customHeadline && `"${customHeadline}"`}
+                                            {generateCopy && !copyLoading && !customHeadline && 'Type your brief first'}
+                                        </p>
                                     </div>
                                 </div>
-                                <button onClick={() => { setGenerateCopy(!generateCopy); if (generateCopy) { setCustomHeadline(''); setCustomCtaText(''); } }}
+                                <button onClick={() => setGenerateCopy(!generateCopy)}
                                     className={`w-9 h-5 rounded-full transition-all cursor-pointer flex-shrink-0 ${generateCopy ? 'bg-violet-500' : 'bg-white/[0.1]'}`}>
                                     <div className={`w-3.5 h-3.5 rounded-full bg-white shadow transition-transform ${generateCopy ? 'translate-x-4.5' : 'translate-x-0.5'}`} />
                                 </button>
                             </div>
 
-                            {/* ── Custom copy inputs (visible when toggle is ON) ── */}
+                            {/* ── Expanded panel when toggle is ON ── */}
                             {generateCopy && (
-                                <div className="px-3 pb-3 space-y-2 border-t border-white/[0.06] pt-2.5">
-                                    <p className="text-[10px] text-slate-500 mb-1.5">Leave blank — AI writes it. Or type your own:</p>
+                                <div className="px-3 pb-3 border-t border-violet-500/10 pt-2.5 space-y-2">
+
+                                    {/* Status row */}
+                                    <div className="flex items-center justify-between">
+                                        {copyLoading ? (
+                                            <span className="flex items-center gap-1.5 text-[10px] text-violet-400 animate-pulse">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-bounce" style={{ animationDelay: '0ms' }} />
+                                                <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-bounce" style={{ animationDelay: '150ms' }} />
+                                                <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+                                                Agent is reading your brief...
+                                            </span>
+                                        ) : copyIsAiSuggested ? (
+                                            <span className="flex items-center gap-1 text-[10px] text-violet-300">
+                                                <span className="material-symbols-outlined text-[9px]">auto_awesome</span>
+                                                AI suggested — edit freely
+                                            </span>
+                                        ) : (
+                                            <span className="text-[10px] text-slate-600">Type your brief to generate copy</span>
+                                        )}
+                                        {!copyLoading && prompt?.trim().length > 5 && (
+                                            <button onClick={() => suggestCopy(prompt)}
+                                                className="flex items-center gap-0.5 text-[10px] text-slate-600 hover:text-violet-400 transition-colors cursor-pointer">
+                                                <span className="material-symbols-outlined text-[10px]">refresh</span>
+                                                Regenerate
+                                            </button>
+                                        )}
+                                    </div>
 
                                     {/* Headline input */}
                                     <div className="relative">
-                                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 material-symbols-outlined text-xs text-slate-500">format_size</span>
+                                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 material-symbols-outlined text-xs text-slate-500 pointer-events-none">format_size</span>
                                         <input
                                             type="text"
                                             value={customHeadline}
-                                            onChange={e => setCustomHeadline(e.target.value)}
+                                            onChange={e => { setCustomHeadline(e.target.value); setCopyIsAiSuggested(false); }}
                                             maxLength={40}
-                                            placeholder="Headline (e.g. Own Your Rhythm)"
-                                            className="w-full pl-7 pr-3 py-1.5 text-xs bg-white/[0.05] border border-white/[0.08] rounded-lg text-white placeholder-slate-600 focus:outline-none focus:border-violet-500/50 focus:bg-violet-500/5 transition-all"
+                                            placeholder={copyLoading ? 'AI is writing...' : 'Headline (AI will generate from brief)'}
+                                            disabled={copyLoading}
+                                            className={`w-full pl-7 pr-8 py-1.5 text-xs rounded-lg text-white placeholder-slate-600 focus:outline-none transition-all ${
+                                                copyLoading ? 'bg-violet-500/5 border border-violet-500/10 opacity-50 cursor-wait' :
+                                                copyIsAiSuggested && customHeadline ? 'bg-violet-500/10 border border-violet-500/30 focus:border-violet-400' :
+                                                'bg-white/[0.05] border border-white/[0.08] focus:border-violet-500/50 focus:bg-violet-500/5'
+                                            }`}
                                         />
-                                        {customHeadline && <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] text-slate-600">{customHeadline.length}/40</span>}
+                                        {customHeadline && !copyLoading && (
+                                            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] text-slate-600">{customHeadline.length}/40</span>
+                                        )}
                                     </div>
 
                                     {/* CTA input */}
                                     <div className="relative">
-                                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 material-symbols-outlined text-xs text-slate-500">ads_click</span>
+                                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 material-symbols-outlined text-xs text-slate-500 pointer-events-none">ads_click</span>
                                         <input
                                             type="text"
                                             value={customCtaText}
-                                            onChange={e => setCustomCtaText(e.target.value)}
+                                            onChange={e => { setCustomCtaText(e.target.value); setCopyIsAiSuggested(false); }}
                                             maxLength={20}
-                                            placeholder="CTA button (e.g. Shop Now)"
-                                            className="w-full pl-7 pr-3 py-1.5 text-xs bg-white/[0.05] border border-white/[0.08] rounded-lg text-white placeholder-slate-600 focus:outline-none focus:border-violet-500/50 focus:bg-violet-500/5 transition-all"
+                                            placeholder={copyLoading ? 'AI is writing...' : 'CTA button (e.g. Shop Now)'}
+                                            disabled={copyLoading}
+                                            className={`w-full pl-7 pr-3 py-1.5 text-xs rounded-lg text-white placeholder-slate-600 focus:outline-none transition-all ${
+                                                copyLoading ? 'bg-violet-500/5 border border-violet-500/10 opacity-50 cursor-wait' :
+                                                copyIsAiSuggested && customCtaText ? 'bg-violet-500/10 border border-violet-500/30 focus:border-violet-400' :
+                                                'bg-white/[0.05] border border-white/[0.08] focus:border-violet-500/50 focus:bg-violet-500/5'
+                                            }`}
                                         />
                                     </div>
 
-                                    {(customHeadline || customCtaText) && (
-                                        <button onClick={() => { setCustomHeadline(''); setCustomCtaText(''); }}
-                                            className="text-[10px] text-slate-600 hover:text-slate-400 transition-colors cursor-pointer">
-                                            ✕ Clear — let AI decide
-                                        </button>
+                                    {/* Rationale */}
+                                    {copyRationale && !copyLoading && (
+                                        <p className="text-[9px] text-slate-600 italic flex items-start gap-1 pt-0.5">
+                                            <span className="material-symbols-outlined text-[9px] mt-[1px] flex-shrink-0">lightbulb</span>
+                                            {copyRationale}
+                                        </p>
                                     )}
                                 </div>
                             )}
                         </div>
+
 
                         {/* ── Prompt Area ── */}
                         <div className="relative mb-3">
