@@ -10,8 +10,9 @@
  *   const { jobs, addJob, removeJob, pendingCount, completedCount } = useBackgroundJobs()
  */
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, createContext, useContext } from 'react';
 import { creatives as creativesAPI } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 const STORAGE_KEY = 'mantram_bg_jobs';
 const POLL_INTERVAL_MS = 5000; // Poll every 5 seconds
@@ -50,6 +51,7 @@ export function useBackgroundJobs() {
     const [jobs, setJobs] = useState(() => readStoredJobs());
     const intervalRef = useRef(null);
     const mountedRef = useRef(true);
+    const { user } = useAuth(); // Guard: only reconcile when logged in
 
     // Sync state -> localStorage on every change
     useEffect(() => {
@@ -162,8 +164,10 @@ export function useBackgroundJobs() {
         };
     }, [jobs, pollJobs]);
 
-    // On first mount, also load recent jobs from server to reconnect after page refresh
+    // On first mount (logged-in only), load recent jobs from server to reconnect
     useEffect(() => {
+        if (!user?._id) return; // Don't fire for anonymous / logged-out users
+
         const reconcileFromServer = async () => {
             try {
                 const data = await creativesAPI.listJobs();
@@ -209,7 +213,7 @@ export function useBackgroundJobs() {
         };
 
         reconcileFromServer();
-    }, []);
+    }, [user?._id]); // Only re-run if the logged-in user changes
 
     // ── Derived state ─────────────────────────────────────────────────────────
     const jobList = Object.values(jobs);
@@ -232,13 +236,12 @@ export function useBackgroundJobs() {
     };
 }
 
-// Singleton context so any component can access jobs without prop drilling
-import { createContext, useContext } from 'react';
-
+// ── Context for global access without prop drilling ───────────────────────────
 export const BackgroundJobsContext = createContext(null);
 
 export function useJobs() {
     const ctx = useContext(BackgroundJobsContext);
-    if (!ctx) throw new Error('useJobs must be used inside BackgroundJobsProvider');
+    if (!ctx) throw new Error('useJobs must be used inside BackgroundJobsContext.Provider');
     return ctx;
 }
+

@@ -88,8 +88,8 @@ export default function BackgroundJobsPanel() {
         totalActiveOrNew,
         dismissJob,
         removeJob,
-        cancelJob,
     } = useJobs();
+
 
     const [panelOpen, setPanelOpen] = useState(false);
     const [toasts, setToasts] = useState([]); // [{ job }]

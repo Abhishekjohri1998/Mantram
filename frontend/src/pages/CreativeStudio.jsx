@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef, useCallback, Fragment } from 'react'
-import { useJobs } from '../hooks/useBackgroundJobs'
 import SEOHead from '../components/SEOHead'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import DashboardLayout from '../components/DashboardLayout'

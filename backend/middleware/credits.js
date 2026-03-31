@@ -139,6 +139,15 @@ export const requireCredits = (actionOrCost = 1) => {
         try {
             const user = req.user;
 
+            // ── Background Job Bypass ──
+            // When runCreativeJobAsync calls /generate internally, credits are
+            // already deducted at POST /jobs time. Skip re-deduction.
+            if (req.headers['x-skip-credits'] === 'true' && req.headers['x-job-id']) {
+                console.log(`⚡ [CREDITS] Skipping deduction for internal job call ${req.headers['x-job-id']}`);
+                req.creditsDeducted = 0; // Signal to handler: already deducted
+                return next();
+            }
+
             // Resolve cost
             let cost;
             const actionName = typeof actionOrCost === 'string' ? actionOrCost : null;

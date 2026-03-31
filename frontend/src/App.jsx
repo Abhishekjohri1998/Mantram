@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { lazy, Suspense, useState, useEffect } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { AuthProvider } from './context/AuthContext'
 import { BrandProvider } from './context/BrandContext'
 import { CreditProvider } from './context/CreditContext'
@@ -10,8 +10,7 @@ import PlanGatedRoute from './components/PlanGatedRoute'
 import AgentFidatoPanel from './components/AgentFidatoPanel'
 import NexusBar from './components/NexusBar'
 import BackgroundJobsPanel from './components/BackgroundJobsPanel'
-import { BackgroundJobsContext } from './hooks/useBackgroundJobs'
-import { useBackgroundJobs } from './hooks/useBackgroundJobs'
+import { BackgroundJobsContext, useBackgroundJobs } from './hooks/useBackgroundJobs'
 
 // ── Static Imports (Critical/Fast) ──
 import Auth from './pages/Auth'
