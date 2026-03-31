@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { auth as authAPI } from '../services/api.js'
+import { auth as authAPI, API_BASE } from '../services/api.js'
 import SEOHead from '../components/SEOHead'
 
 const PLAN_LABELS = {
@@ -42,6 +42,30 @@ export default function Auth() {
             setForm(prev => ({ ...prev, email: emailParam }))
         }
     }, [isSignupPath, modeParam, emailParam])
+
+    // Handle Google Redirect Callback
+    useEffect(() => {
+        const token = searchParams.get('token');
+        const userData = searchParams.get('user');
+        const loginError = searchParams.get('error');
+
+        if (loginError) {
+            setError(decodeURIComponent(loginError));
+            // Cleanup URL
+            const newParams = new URLSearchParams(searchParams);
+            newParams.delete('error');
+            navigate(`${window.location.pathname}${newParams.toString() ? '?' + newParams.toString() : ''}`, { replace: true });
+        } else if (token && userData) {
+            try {
+                const user = JSON.parse(decodeURIComponent(userData));
+                loginWithToken(token, user);
+                // Redirection to dashboard is handled by the "isAuthenticated" useEffect below
+            } catch (e) {
+                console.error('Failed to parse user data from redirect:', e);
+                setError('Authentication failed. Please try again.');
+            }
+        }
+    }, [searchParams, loginWithToken, navigate]);
 
     // If already authenticated, redirect immediately
     useEffect(() => {
@@ -137,78 +161,12 @@ export default function Auth() {
         }
     }
 
-    const handleGoogleLogin = async () => {
-        try {
-            setError('');
-            setIsSocialLoading(true);
-
-            // 1. Get the auth URL from backend
-            const { authUrl } = await authAPI.google();
-
-            // 2. Open popup
-            const width = 500;
-            const height = 600;
-            const left = window.screen.width / 2 - width / 2;
-            const top = window.screen.height / 2 - height / 2;
-
-            const popup = window.open(
-                authUrl,
-                'google-auth',
-                `width=${width},height=${height},left=${left},top=${top}`
-            );
-
-            if (!popup) {
-                throw new Error('Popup blocked! Please allow popups for this site.');
-            }
-
-            // 3. Listen for message from popup
-            const handleMessage = (event) => {
-                // Allow messages from same site (including api subdomain)
-                const isSameSite = event.origin === window.location.origin ||
-                    event.origin.includes('mantram.ai') ||
-                    event.origin.includes('localhost');
-
-                if (!isSameSite) return;
-
-                if (event.data.type === 'GOOGLE_AUTH_SUCCESS') {
-                    const { token, user, error: authError } = event.data;
-
-                    if (authError) {
-                        setError(authError);
-                        setIsSocialLoading(false);
-                    } else if (token && user) {
-                        if (pollingRef.current) clearInterval(pollingRef.current);
-                        loginWithToken(token, user);
-                    }
-                    window.removeEventListener('message', handleMessage);
-                }
-            };
-
-            window.addEventListener('message', handleMessage);
-
-            // 4. Poll for popup closure
-            pollingRef.current = setInterval(() => {
-                if (!popup) {
-                    clearInterval(pollingRef.current);
-                    return;
-                }
-                try {
-                    // Accessing .closed can trigger a console error if the popup is on a strict origin
-                    // even inside a try-catch. We'll just ignore it if it fails.
-                    if (popup.closed) {
-                        clearInterval(pollingRef.current);
-                        setTimeout(() => setIsSocialLoading(false), 500);
-                    }
-                } catch (e) {
-                    // cross-origin access to .closed is sometimes blocked by COOP
-                }
-            }, 500);
-
-        } catch (err) {
-            console.error('Google login error:', err);
-            setError(err.message || 'Failed to initiate Google login');
-            setIsSocialLoading(false);
-        }
+    const handleGoogleLogin = () => {
+        setError('');
+        setIsSocialLoading(true);
+        // Redirect to backend with flow=redirect
+        // This avoids COOP/popup issues in modern browsers
+        window.location.href = `${API_BASE}/auth/google?flow=redirect`;
     };
 
     return (
