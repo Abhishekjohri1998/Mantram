@@ -89,6 +89,8 @@ export default function SuperAdminDashboard() {
     const [calcMargin, setCalcMargin] = useState(60)
     const [calcExRate, setCalcExRate] = useState(85)
     const [policySection, setPolicySection] = useState('calculator')
+    const [monitorSubTab, setMonitorSubTab] = useState('providers')
+    const [monitorTypeFilter, setMonitorTypeFilter] = useState('all')
     // Impersonation search
     const [impersonateSearch, setImpersonateSearch] = useState('')
     const [impersonateResults, setImpersonateResults] = useState([])
@@ -3434,7 +3436,7 @@ export default function SuperAdminDashboard() {
                         {policySection === 'monitor' && (
                             <div className="space-y-6">
                                 {/* Controls */}
-                                <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-3 flex-wrap">
                                     <button onClick={handlePricingCheck} disabled={monitorChecking}
                                         className="px-5 py-2.5 rounded-xl bg-amber-500 text-slate-950 text-xs font-black uppercase tracking-wider hover:bg-amber-400 transition-all shadow-lg shadow-amber-500/20 disabled:opacity-50 cursor-pointer flex items-center gap-2">
                                         {monitorChecking ? <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span> : <span className="material-symbols-outlined text-sm">radar</span>}
@@ -3444,11 +3446,6 @@ export default function SuperAdminDashboard() {
                                         <span className="text-xs text-slate-500">
                                             Last checked: {new Date(monitorData.lastCheck).toLocaleString('en-IN')}
                                         </span>
-                                     )}
-                                    {monitorData?.alertCount > 0 && (
-                                        <button onClick={handleDismissAlerts} className="px-3 py-1.5 rounded-lg bg-rose-500/10 text-rose-400 text-[10px] font-bold border border-rose-500/20 hover:bg-rose-500/20 transition-all cursor-pointer">
-                                            Dismiss {monitorData.alertCount} alerts
-                                        </button>
                                     )}
                                 </div>
 
@@ -3466,83 +3463,211 @@ export default function SuperAdminDashboard() {
                                                   <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                                                 </span>
                                             </h4>
-                                            <p className="text-xs text-slate-400">The system runs scheduled LLM scrapers on provider docs to extract live generation costs.</p>
+                                            <p className="text-xs text-slate-400">Scrapes provider docs via LLM to extract live generation costs across all APIs.</p>
                                         </div>
                                     </div>
-                                    <div className="flex flex-col md:items-end p-3 rounded-lg bg-white/[0.02] border border-white/[0.05]">
-                                        <p className="text-[10px] text-slate-500 uppercase font-black tracking-wider w-full mb-1">Auto-Margin Guardrails</p>
-                                        <p className="text-xs font-bold text-emerald-400 flex items-center gap-1"><span className="material-symbols-outlined text-[14px]">shield</span> ENABLED (≥50%)</p>
+                                    <div className="flex gap-3">
+                                        <div className="flex flex-col items-center p-2.5 rounded-lg bg-white/[0.02] border border-white/[0.05] min-w-[80px]">
+                                            <p className="text-[9px] text-slate-500 uppercase font-black tracking-wider">Providers</p>
+                                            <p className="text-lg font-black text-white">{monitorData?.providers ? Object.keys(monitorData.providers).length : '—'}</p>
+                                        </div>
+                                        <div className="flex flex-col items-center p-2.5 rounded-lg bg-white/[0.02] border border-white/[0.05] min-w-[80px]">
+                                            <p className="text-[9px] text-slate-500 uppercase font-black tracking-wider">Models</p>
+                                            <p className="text-lg font-black text-white">{monitorData?.providers ? Object.values(monitorData.providers).reduce((sum, p) => sum + Object.keys(p.models).length, 0) : '—'}</p>
+                                        </div>
+                                        <div className="flex flex-col items-center p-2.5 rounded-lg bg-white/[0.02] border border-white/[0.05] min-w-[80px]">
+                                            <p className="text-[9px] text-slate-500 uppercase font-black tracking-wider">Margin</p>
+                                            <p className="text-xs font-bold text-emerald-400 flex items-center gap-0.5"><span className="material-symbols-outlined text-[12px]">shield</span>≥50%</p>
+                                        </div>
                                     </div>
                                 </div>
 
-                                {/* Alerts */}
-                                {monitorData?.alerts?.length > 0 && (
-                                    <div className="bg-rose-500/5 border border-rose-500/20 rounded-2xl p-5">
-                                        <h4 className="text-sm font-black text-rose-400 uppercase tracking-wider mb-3 flex items-center gap-2">
-                                            <span className="material-symbols-outlined text-rose-400">emergency</span>
-                                            Price Change Alerts ({monitorData.alerts.length})
-                                        </h4>
-                                        <div className="space-y-2">
-                                            {monitorData.alerts.slice(0, 10).map((a, i) => (
-                                                <div key={i} className="flex items-center gap-3 bg-rose-500/5 rounded-lg p-3">
-                                                    <span className={`material-symbols-outlined text-base ${a.type === 'price_increase' ? 'text-rose-400' : a.type === 'price_decrease' ? 'text-emerald-400' : 'text-amber-400'}`}>
-                                                        {a.type === 'price_increase' ? 'trending_up' : a.type === 'price_decrease' ? 'trending_down' : 'new_releases'}
-                                                    </span>
-                                                    <div className="flex-1">
-                                                        <span className="text-xs font-bold text-white">{a.model}: </span>
-                                                        <span className="text-xs text-slate-400">{a.details}</span>
+                                {/* Monitor Sub-Navigation */}
+                                <div className="flex gap-2">
+                                    {[{ id: 'providers', label: 'All Providers', icon: 'dns' },
+                                      { id: 'comparison', label: 'Cost Comparison', icon: 'compare_arrows' },
+                                      { id: 'alerts', label: `Alerts ${monitorData?.alertCount > 0 ? `(${monitorData.alertCount})` : ''}`, icon: 'notifications' }].map(s => (
+                                        <button key={s.id} onClick={() => setMonitorSubTab(s.id)}
+                                            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                                                (monitorSubTab || 'providers') === s.id ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : 'bg-white/[0.04] text-slate-500 border border-white/[0.08] hover:text-white'}`}>
+                                            <span className="material-symbols-outlined text-sm">{s.icon}</span>
+                                            {s.label}
+                                        </button>
+                                    ))}
+                                </div>
+
+                                {/* ── TAB: ALL PROVIDERS ── */}
+                                {(monitorSubTab || 'providers') === 'providers' && monitorData?.providers && (
+                                    <div className="space-y-4">
+                                        <div className="flex gap-2 flex-wrap">
+                                            {['all', 'text', 'image', 'video', 'voice'].map(t => (
+                                                <button key={t} onClick={() => setMonitorTypeFilter(t)} className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                                                    (monitorTypeFilter || 'all') === t ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : 'bg-white/[0.03] text-slate-500 border border-white/[0.06] hover:text-white'}`}>
+                                                    {t === 'all' ? '📊 All' : t === 'text' ? '💬 Text' : t === 'image' ? '🖼️ Image' : t === 'video' ? '🎥 Video' : '🎙️ Voice'}
+                                                </button>
+                                            ))}
+                                        </div>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                            {Object.entries(monitorData.providers)
+                                                .filter(([, provider]) => {
+                                                    if ((monitorTypeFilter || 'all') === 'all') return true;
+                                                    return Object.values(provider.models).some(m => m.type === (monitorTypeFilter || 'all'));
+                                                })
+                                                .map(([providerId, provider]) => (
+                                                <div key={providerId} className="glass-panel rounded-2xl p-5 border border-white/[0.06] hover:border-amber-500/20 transition-all">
+                                                    <div className="flex items-center justify-between mb-4">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-xl">{provider.icon}</span>
+                                                            <h5 className="text-sm font-black text-white">{provider.provider}</h5>
+                                                        </div>
+                                                        <span className="text-[9px] bg-white/[0.06] text-slate-400 px-2 py-0.5 rounded-full font-bold">{Object.keys(provider.models).length} models</span>
                                                     </div>
-                                                    <span className="text-[9px] text-slate-600">{a.detectedAt ? new Date(a.detectedAt).toLocaleDateString('en-IN') : ''}</span>
+                                                    <div className="space-y-2.5">
+                                                        {Object.entries(provider.models)
+                                                            .filter(([, model]) => (monitorTypeFilter || 'all') === 'all' || model.type === (monitorTypeFilter || 'all'))
+                                                            .map(([modelId, model]) => (
+                                                            <div key={modelId} className="bg-white/[0.02] rounded-xl p-3 border border-white/[0.04] hover:border-white/[0.1] transition-all">
+                                                                <div className="flex items-center justify-between mb-1.5">
+                                                                    <p className="text-xs font-bold text-white">{model.name}</p>
+                                                                    <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${
+                                                                        model.type === 'text' ? 'bg-blue-500/10 text-blue-400' :
+                                                                        model.type === 'image' ? 'bg-emerald-500/10 text-emerald-400' :
+                                                                        model.type === 'video' ? 'bg-amber-500/10 text-amber-400' :
+                                                                        'bg-pink-500/10 text-pink-400'}`}>{model.type}</span>
+                                                                </div>
+                                                                <div className="flex flex-wrap gap-1.5 text-[10px]">
+                                                                    {model.inputPer1M !== undefined && <span className="px-2 py-0.5 rounded bg-blue-500/10 text-blue-400">In: ${model.inputPer1M}/1M</span>}
+                                                                    {model.outputPer1M !== undefined && <span className="px-2 py-0.5 rounded bg-violet-500/10 text-violet-400">Out: ${model.outputPer1M}/1M</span>}
+                                                                    {model.flatCostUSD !== undefined && <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400">${model.flatCostUSD}/{model.type === 'video' ? 'gen' : 'image'}</span>}
+                                                                    {model.costPerSecFast !== undefined && <span className="px-2 py-0.5 rounded bg-amber-500/10 text-amber-400">Fast: ${model.costPerSecFast}/s</span>}
+                                                                    {model.costPerSecQuality !== undefined && <span className="px-2 py-0.5 rounded bg-rose-500/10 text-rose-400">Quality: ${model.costPerSecQuality}/s</span>}
+                                                                    {model.costPerMinute !== undefined && <span className="px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-400">${model.costPerMinute}/min</span>}
+                                                                    {model.costPerSecond !== undefined && <span className="px-2 py-0.5 rounded bg-pink-500/10 text-pink-400">${model.costPerSecond}/sec</span>}
+                                                                </div>
+                                                                <p className="text-[9px] text-slate-600 mt-1.5 flex items-center gap-1">
+                                                                    <span className="text-[8px] font-mono text-slate-700">{modelId}</span>
+                                                                    <span className="text-slate-700">·</span>
+                                                                    <a href={model.pricingUrl} target="_blank" rel="noopener" className="hover:text-amber-400 transition-colors">Pricing →</a>
+                                                                </p>
+                                                            </div>
+                                                        ))}
+                                                    </div>
                                                 </div>
                                             ))}
                                         </div>
                                     </div>
                                 )}
 
-                                {/* Provider Grid */}
-                                {monitorData?.providers && (
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                        {Object.entries(monitorData.providers).map(([providerId, provider]) => (
-                                            <div key={providerId} className="glass-panel rounded-2xl p-5 border border-white/[0.06]">
-                                                <div className="flex items-center gap-2 mb-4">
-                                                    <span className="text-xl">{provider.icon}</span>
-                                                    <h5 className="text-sm font-black text-white">{provider.provider}</h5>
-                                                </div>
-                                                <div className="space-y-3">
-                                                    {Object.entries(provider.models).map(([modelId, model]) => (
-                                                        <div key={modelId} className="bg-white/[0.02] rounded-lg p-3">
-                                                            <p className="text-xs font-bold text-white mb-1">{model.name}</p>
-                                                            <div className="flex flex-wrap gap-2 text-[10px]">
-                                                                {model.inputPer1M !== undefined && (
-                                                                    <span className="px-2 py-0.5 rounded bg-blue-500/10 text-blue-400">In: ${model.inputPer1M}/1M</span>
-                                                                )}
-                                                                {model.outputPer1M !== undefined && (
-                                                                    <span className="px-2 py-0.5 rounded bg-violet-500/10 text-violet-400">Out: ${model.outputPer1M}/1M</span>
-                                                                )}
-                                                                {model.flatCostUSD !== undefined && (
-                                                                    <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400">${model.flatCostUSD}/image</span>
-                                                                )}
-                                                                {model.costPerSecFast !== undefined && (
-                                                                    <span className="px-2 py-0.5 rounded bg-amber-500/10 text-amber-400">Fast: ${model.costPerSecFast}/s</span>
-                                                                )}
-                                                                {model.costPerSecQuality !== undefined && (
-                                                                    <span className="px-2 py-0.5 rounded bg-rose-500/10 text-rose-400">Qual: ${model.costPerSecQuality}/s</span>
-                                                                )}
-                                                                {model.costPerMinute !== undefined && (
-                                                                    <span className="px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-400">${model.costPerMinute}/min</span>
-                                                                )}
-                                                                {model.costPerSecond !== undefined && (
-                                                                    <span className="px-2 py-0.5 rounded bg-pink-500/10 text-pink-400">${model.costPerSecond}/sec</span>
+                                {/* ── TAB: COST COMPARISON ── */}
+                                {(monitorSubTab || 'providers') === 'comparison' && (
+                                    <div className="space-y-6">
+                                        <div className="glass-panel rounded-2xl p-5 border border-amber-500/10">
+                                            <h4 className="text-sm font-black text-amber-400 uppercase tracking-wider mb-1 flex items-center gap-2">
+                                                <span className="material-symbols-outlined text-amber-400">compare_arrows</span>
+                                                Cross-Provider Cost Comparison
+                                            </h4>
+                                            <p className="text-xs text-slate-500 mb-4">Models available on multiple providers are grouped together. The cheapest option is highlighted in green.</p>
+                                            <div className="flex gap-2 mb-5">
+                                                {['all', 'text', 'image', 'video', 'voice'].map(t => (
+                                                    <button key={t} onClick={() => setMonitorTypeFilter(t)} className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                                                        (monitorTypeFilter || 'all') === t ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : 'bg-white/[0.03] text-slate-500 border border-white/[0.06] hover:text-white'}`}>
+                                                        {t === 'all' ? '📊 All' : t === 'text' ? '💬 Text' : t === 'image' ? '🖼️ Image' : t === 'video' ? '🎥 Video' : '🎙️ Voice'}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                            <div className="space-y-3">
+                                                {(monitorData?.comparison || [])
+                                                    .filter(c => (monitorTypeFilter || 'all') === 'all' || c.type === (monitorTypeFilter || 'all'))
+                                                    .map((comp, idx) => (
+                                                    <div key={idx} className={`rounded-xl border transition-all ${comp.providerCount > 1 ? 'border-amber-500/15 bg-amber-500/[0.02]' : 'border-white/[0.06] bg-white/[0.01]'}`}>
+                                                        <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.04]">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${
+                                                                    comp.type === 'text' ? 'bg-blue-500/10 text-blue-400' :
+                                                                    comp.type === 'image' ? 'bg-emerald-500/10 text-emerald-400' :
+                                                                    comp.type === 'video' ? 'bg-amber-500/10 text-amber-400' :
+                                                                    'bg-pink-500/10 text-pink-400'}`}>{comp.type}</span>
+                                                                <p className="text-sm font-bold text-white">{comp.modelName}</p>
+                                                                {comp.providerCount > 1 && (
+                                                                    <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400 font-bold">{comp.providerCount} providers</span>
                                                                 )}
                                                             </div>
-                                                            <p className="text-[9px] text-slate-600 mt-1.5">
-                                                                <a href={model.pricingUrl} target="_blank" rel="noopener" className="hover:text-amber-400 transition-colors">View pricing →</a>
-                                                            </p>
+                                                            {comp.providerCount > 1 && (
+                                                                <span className="text-[10px] font-bold text-emerald-400 flex items-center gap-1">
+                                                                    <span className="material-symbols-outlined text-[12px]">emoji_events</span>
+                                                                    Best: {comp.cheapestProvider}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <div className="divide-y divide-white/[0.03]">
+                                                            {comp.providers.map((p, pi) => (
+                                                                <div key={pi} className={`flex items-center justify-between px-4 py-2.5 ${p.cheapest && comp.providerCount > 1 ? 'bg-emerald-500/[0.04]' : ''}`}>
+                                                                    <div className="flex items-center gap-2.5 min-w-[180px]">
+                                                                        <span className="text-sm">{p.icon}</span>
+                                                                        <div>
+                                                                            <p className={`text-xs font-bold ${p.cheapest && comp.providerCount > 1 ? 'text-emerald-400' : 'text-white'}`}>{p.providerName}</p>
+                                                                            <p className="text-[8px] font-mono text-slate-600">{p.modelId}</p>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="flex items-center gap-3">
+                                                                        <span className={`text-xs font-bold ${p.cheapest && comp.providerCount > 1 ? 'text-emerald-400' : p.rank === comp.providerCount && comp.providerCount > 1 ? 'text-rose-400' : 'text-slate-300'}`}>
+                                                                            {p.costLabel}
+                                                                        </span>
+                                                                        {p.cheapest && comp.providerCount > 1 && (
+                                                                            <span className="text-[8px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-black uppercase">Cheapest</span>
+                                                                        )}
+                                                                        {!p.cheapest && comp.providerCount > 1 && (
+                                                                            <span className="text-[8px] px-1.5 py-0.5 rounded bg-white/[0.04] text-slate-500 font-bold">
+                                                                                +{((p.costUSD / comp.providers[0].costUSD - 1) * 100).toFixed(0)}%
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* ── TAB: ALERTS ── */}
+                                {(monitorSubTab || 'providers') === 'alerts' && (
+                                    <div className="space-y-4">
+                                        {monitorData?.alerts?.length > 0 ? (
+                                            <div className="bg-rose-500/5 border border-rose-500/20 rounded-2xl p-5">
+                                                <div className="flex items-center justify-between mb-3">
+                                                    <h4 className="text-sm font-black text-rose-400 uppercase tracking-wider flex items-center gap-2">
+                                                        <span className="material-symbols-outlined text-rose-400">emergency</span>
+                                                        Price Change Alerts ({monitorData.alerts.length})
+                                                    </h4>
+                                                    <button onClick={handleDismissAlerts} className="px-3 py-1.5 rounded-lg bg-rose-500/10 text-rose-400 text-[10px] font-bold border border-rose-500/20 hover:bg-rose-500/20 transition-all cursor-pointer">
+                                                        Dismiss All
+                                                    </button>
+                                                </div>
+                                                <div className="space-y-2">
+                                                    {monitorData.alerts.map((a, i) => (
+                                                        <div key={i} className="flex items-center gap-2 py-2 px-3 bg-white/[0.02] rounded-lg border border-white/[0.04]">
+                                                            <span className={`material-symbols-outlined text-sm ${a.direction === 'up' ? 'text-rose-400' : 'text-emerald-400'}`}>
+                                                                {a.direction === 'up' ? 'trending_up' : 'trending_down'}
+                                                            </span>
+                                                            <div className="flex-1">
+                                                                <span className="text-xs font-bold text-white">{a.model}: </span>
+                                                                <span className="text-xs text-slate-400">{a.details}</span>
+                                                            </div>
+                                                            <span className="text-[9px] text-slate-600">{a.detectedAt ? new Date(a.detectedAt).toLocaleDateString('en-IN') : ''}</span>
                                                         </div>
                                                     ))}
                                                 </div>
                                             </div>
-                                        ))}
+                                        ) : (
+                                            <div className="glass-panel rounded-2xl p-8 border border-white/[0.06] text-center">
+                                                <span className="material-symbols-outlined text-4xl text-emerald-400 mb-2 block">check_circle</span>
+                                                <p className="text-sm font-bold text-white mb-1">No Price Alerts</p>
+                                                <p className="text-xs text-slate-500">All provider costs are stable. The oracle will alert you when prices change.</p>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
                             </div>

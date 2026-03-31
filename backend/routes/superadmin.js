@@ -2476,7 +2476,7 @@ router.get('/pricing-policy', async (req, res) => {
     }
 });
 
-// GET /superadmin/pricing-monitor — Provider baselines + alerts
+// GET /superadmin/pricing-monitor — Provider baselines + alerts + comparison
 router.get('/pricing-monitor', async (req, res) => {
     try {
         const baselines = await getSetting('pricing_baselines', null);
@@ -2497,9 +2497,100 @@ router.get('/pricing-monitor', async (req, res) => {
             }
         }
 
+        // ── Build cross-provider comparison matrix ──
+        // Groups models by canonical capability name, showing all providers that offer it
+        const comparisonMap = {}; // { canonicalName: { type, providers: [{ providerId, providerName, icon, modelId, cost, costLabel, pricingUrl }] } }
+
+        for (const [providerId, provider] of Object.entries(liveProviders)) {
+            for (const [modelId, model] of Object.entries(provider.models)) {
+                // Derive canonical name for grouping (strip "via LZ", provider suffixes, etc.)
+                let canonical = model.name
+                    .replace(/\s*\(via LZ\)\s*/gi, '')
+                    .replace(/\s*\(via fal\.ai\)\s*/gi, '')
+                    .replace(/\s*\(PiAPI\)\s*/gi, '')
+                    .replace(/\s*\(ByteDance\)\s*/gi, '')
+                    .replace(/\s*\(Tencent\)\s*/gi, '')
+                    .trim();
+
+                // Normalize known duplicates
+                const normalizations = {
+                    'Veo 3.1 Fast': 'Veo 3.1 Fast',
+                    'Veo 3.1': 'Veo 3.1',
+                    'Seedance 2.0 Pro': 'Seedance 2.0',
+                    'Seedance 2.0': 'Seedance 2.0',
+                    'Seedance 1.0 Lite': 'Seedance 1.0',
+                    'Sora 2': 'Sora 2',
+                    'Ideogram v3': 'Ideogram v3',
+                    'Seedream 5': 'Seedream 5',
+                    'NanoBanana 2': 'NanoBanana 2',
+                    'NanoBanana Pro': 'NanoBanana Pro',
+                    'Flux Kontext Pro': 'Flux Kontext Pro',
+                };
+                canonical = normalizations[canonical] || canonical;
+
+                // Calculate a single comparable cost in USD cents
+                let costUSD = null;
+                let costLabel = '';
+                if (model.type === 'text') {
+                    costUSD = model.inputPer1M ?? null;
+                    costLabel = `$${model.inputPer1M}/1M in · $${model.outputPer1M}/1M out`;
+                } else if (model.type === 'image') {
+                    costUSD = model.flatCostUSD ?? null;
+                    costLabel = `$${model.flatCostUSD}/image`;
+                } else if (model.type === 'video') {
+                    costUSD = model.costPerSecFast ?? model.flatCostUSD ?? null;
+                    if (model.costPerSecFast != null) {
+                        costLabel = `$${model.costPerSecFast}/sec (fast)`;
+                        if (model.costPerSecQuality) costLabel += ` · $${model.costPerSecQuality}/sec (quality)`;
+                    } else if (model.flatCostUSD != null) {
+                        costLabel = `$${model.flatCostUSD}/gen`;
+                    }
+                } else if (model.type === 'voice') {
+                    costUSD = model.costPerMinute ?? model.costPerSecond ?? null;
+                    costLabel = model.costPerMinute != null ? `$${model.costPerMinute}/min` : `$${model.costPerSecond}/sec`;
+                }
+
+                if (!comparisonMap[canonical]) {
+                    comparisonMap[canonical] = { type: model.type, providers: [] };
+                }
+
+                comparisonMap[canonical].providers.push({
+                    providerId,
+                    providerName: provider.provider,
+                    icon: provider.icon,
+                    modelId,
+                    costUSD: costUSD ?? 999,
+                    costLabel,
+                    pricingUrl: model.pricingUrl || '',
+                    unit: model.unit || '',
+                });
+            }
+        }
+
+        // Sort providers by cost (cheapest first) and mark the cheapest
+        const comparison = [];
+        for (const [name, data] of Object.entries(comparisonMap)) {
+            data.providers.sort((a, b) => a.costUSD - b.costUSD);
+            data.providers.forEach((p, i) => { p.cheapest = i === 0; p.rank = i + 1; });
+            comparison.push({
+                modelName: name,
+                type: data.type,
+                providerCount: data.providers.length,
+                cheapestProvider: data.providers[0]?.providerName || 'N/A',
+                cheapestCost: data.providers[0]?.costLabel || 'N/A',
+                providers: data.providers,
+            });
+        }
+        // Group comparison by type
+        comparison.sort((a, b) => {
+            const order = { text: 0, image: 1, video: 2, voice: 3 };
+            return (order[a.type] ?? 9) - (order[b.type] ?? 9) || a.modelName.localeCompare(b.modelName);
+        });
+
         res.json({
             success: true,
             providers: liveProviders,
+            comparison,
             baselines,
             lastCheck,
             alerts: alerts.slice(0, 50),
