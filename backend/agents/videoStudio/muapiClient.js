@@ -174,14 +174,15 @@ export async function submitMuApiVideoGeneration({
         body: JSON.stringify(payload),
     });
 
-    if (!data?.id) {
+    if (!data?.id && !data?.request_id) {
         throw new Error(`MuAPI did not return a request ID. Response: ${JSON.stringify(data).substring(0, 200)}`);
     }
 
-    console.log(`✅ [MuAPI] Task submitted: ${data.id} (status: ${data.status})`);
+    const taskId = data?.id || data?.request_id;
+    console.log(`✅ [MuAPI] Task submitted: ${taskId} (status: ${data.status})`);
 
     return {
-        taskId: data.id,
+        taskId,
         provider: 'muapi',
         _muApiPayload: payload, // Store for auto-retry
     };
@@ -287,14 +288,15 @@ export async function resubmitMuApiTask(payload) {
         body: JSON.stringify(payload),
     });
 
-    if (!data?.id) {
+    if (!data?.id && !data?.request_id) {
         throw new Error(`MuAPI resubmit failed — no request ID returned`);
     }
 
-    console.log(`✅ [MuAPI] Resubmitted: ${data.id}`);
+    const taskId = data?.id || data?.request_id;
+    console.log(`✅ [MuAPI] Resubmitted: ${taskId}`);
 
     return {
-        taskId: data.id,
+        taskId,
         provider: 'muapi',
     };
 }
