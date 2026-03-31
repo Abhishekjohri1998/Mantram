@@ -1258,79 +1258,185 @@ function buildCtx(brand) {
   ].filter(Boolean).join('\n');
 }
 
-// ── MCoT Stage 1: Reason about conversation ────────────────────────────────────
+// ── MCoT Stage 1: Reason about conversation (hardened) ─────────────────────
 async function mcotReason(message, history, sessionState, brandCtx) {
-  const historyText = history.slice(-10)
-    .map(m => `${m.role === 'fidato' ? 'FIDATO' : 'USER'}: ${m.content}`)
-    .join('\n');
+  const userMessages = history.filter(m => m.role === 'user');
+  const userMessageCount = userMessages.length;
 
-  const userMessageCount = history.filter(m => m.role === 'user').length;
-  const forceGenerate = userMessageCount >= 4 && !sessionState.ideasGenerated;
-
-  const systemPrompt = `You are Fidato's internal reasoning engine for a brainstorming session on Mantram AI.
-Analyze the conversation and return a strict JSON decision. Think carefully.
-
-BRAND:
-${brandCtx || 'No brand loaded yet'}
-
-CURRENT SESSION STATE:
-- Intent: ${sessionState.intent || 'not determined yet'}
-- Info collected: ${JSON.stringify(sessionState.collectedAnswers || {})}
-- Ideas generated: ${sessionState.ideasGenerated || false}
-- Screenplay generated: ${sessionState.screenplayGenerated || false}
-- User messages so far: ${userMessageCount}
-${forceGenerate ? '\n⚠ FORCE GENERATE: User has answered 4+ questions. Generate ideas NOW even if some info is missing.' : ''}
-
-Return STRICT JSON — no explanation, no markdown:
-{
-  "intent": "ad-film|campaign|festival|product-launch|naming|offer|positioning|trend-hijack|brand-strategy|custom",
-  "collectedAnswers": {
-    "product": "...",
-    "audience": "...",
-    "emotion": "...",
-    "objective": "...",
-    "duration": "...",
-    "reference": "...",
-    "budget": "..."
-  },
-  "readyToGenerate": false,
-  "action": "ask_question|generate_ideas|generate_screenplay|generate_strategy|refine_ideas|general_chat",
-  "fidatoResponse": "Fidato's actual reply — short, warm, conversational. No markdown, no asterisks, no bullet points. 1-3 sentences max. Like texting a smart friend.",
-  "preGenerationMessage": "What Fidato says just before generating — excited, brief. e.g. 'Okay I have everything I need! Give me a second to cook up something 🔥'",
-  "questionId": "product|audience|emotion|objective|duration|budget|reference|null"
-}
-
-RULES:
-- readyToGenerate = true when you have: intent + at least 3 of (product/what, audience/who, emotion/feel)
-- ${forceGenerate ? 'readyToGenerate MUST be true now. action MUST be generate_ideas or generate_strategy.' : 'Ask ONE question at a time. Max 4-5 questions before generating.'}
-- fidatoResponse = what Fidato says (her ACTUAL words, not a description of what she says)
-- For generate_screenplay: only when user explicitly says "write screenplay", "write script", "give me the script"
-- For refine_ideas: when ideas are already generated AND user asks to change/improve them
-- For generate_strategy: when intent = brand-strategy
-- For general_chat: when ideasGenerated=true and user is discussing ideas, NOT asking for screenplay
-- Keep responses casual and short. Fidato is energetic, real, not formal.`;
-
-  const userPrompt = `CONVERSATION:
-${historyText}
-
-LATEST USER MESSAGE: ${message}
-
-Decide what Fidato should do next.`;
-
-  try {
-    const result = await aiCall(systemPrompt, userPrompt, { temperature: 0.2, maxTokens: 900 });
-    return parseJSON(result) || {};
-  } catch {
+  // ── Deterministic override: force generate after enough turns ──────────────
+  // This fires even if AI reasoning fails, breaking any loop
+  if (userMessageCount >= 3 && !sessionState.ideasGenerated) {
+    const intent = sessionState.intent || detectIntentFromHistory(history, message);
+    const answers = buildAnswersFromHistory(history, message, sessionState);
+    console.log(`[fidato-chat] Force-generating after ${userMessageCount} user messages. Intent: ${intent}`);
     return {
-      intent: sessionState.intent || 'custom',
-      collectedAnswers: sessionState.collectedAnswers || {},
-      readyToGenerate: false,
-      action: 'ask_question',
-      fidatoResponse: "Hmm, let me think... tell me more about what you're working on!",
-      questionId: 'product',
+      intent,
+      collectedAnswers: answers,
+      readyToGenerate: true,
+      action: intent === 'brand-strategy' ? 'generate_strategy' : 'generate_ideas',
+      preGenerationMessage: `Okay I've got the picture! Let me put together some ${intent === 'ad-film' ? 'film concepts' : intent === 'brand-strategy' ? 'a strategy' : 'ideas'} for you 🔥`,
+      fidatoResponse: `Here's what I came up with! What do you think?`,
     };
   }
+
+  // ── Screenplay / refine detection (keyword-based, no AI needed) ────────────
+  const lowerMsg = message.toLowerCase();
+  if (sessionState.ideasGenerated) {
+    if (/script|screenplay|write.*film|full.*script/.test(lowerMsg)) {
+      return {
+        intent: sessionState.intent || 'ad-film',
+        collectedAnswers: sessionState.collectedAnswers || {},
+        readyToGenerate: true,
+        action: 'generate_screenplay',
+        preGenerationMessage: `On it! Writing the full screenplay now ✍️`,
+        fidatoResponse: `Here's your production-ready screenplay! Every scene, every shot.`,
+      };
+    }
+    if (/refine|change|different|improve|make it|try|maybe|how about|what if/.test(lowerMsg)) {
+      return {
+        intent: sessionState.intent || 'custom',
+        collectedAnswers: { ...sessionState.collectedAnswers, refinementHint: message },
+        readyToGenerate: true,
+        action: 'refine_ideas',
+        preGenerationMessage: `Got it! Remixing with your direction 🔄`,
+        fidatoResponse: `Here's the refined version — better?`,
+      };
+    }
+  }
+
+  // ── Intent detection from message (keyword-based backup) ──────────────────
+  const detectedIntent = detectIntentFromHistory(history, message);
+
+  // ── Short-circuit: if only 1st or 2nd message, ask ONE smart question ─────
+  if (userMessageCount <= 2) {
+    const nextQ = getNextSmartQuestion(userMessageCount, detectedIntent, sessionState.collectedAnswers || {}, brandCtx);
+    return {
+      intent: detectedIntent,
+      collectedAnswers: { ...sessionState.collectedAnswers, ...extractAnswerFromMessage(message, sessionState.collectedAnswers || {}) },
+      readyToGenerate: false,
+      action: 'ask_question',
+      fidatoResponse: nextQ,
+    };
+  }
+
+  // ── AI reasoning (only when needed, simplified prompt) ────────────────────
+  const recentHistory = history.slice(-8).map(m => `${m.role === 'fidato' ? 'F' : 'U'}: ${m.content?.slice(0, 200)}`).join('\n');
+
+  const systemPrompt = `You are a brainstorm session AI. Analyze this conversation and return ONLY a JSON object.
+
+BRAND: ${brandCtx?.slice(0, 200) || 'unknown'}
+INTENT SO FAR: ${sessionState.intent || detectedIntent}
+USER MESSAGES COUNT: ${userMessageCount}
+
+CONVERSATION:
+${recentHistory}
+LATEST: ${message}
+
+Return ONLY this JSON (no explanation, no markdown, no backticks):
+{"intent":"ad-film","collectedAnswers":{"product":"...","audience":"...","emotion":"...","objective":"..."},"action":"ask_question","fidatoResponse":"your reply here","preGenerationMessage":null}
+
+action must be one of: ask_question, generate_ideas, generate_screenplay, generate_strategy, refine_ideas
+Rules:
+- If you have product+audience+emotion → action=generate_ideas (or generate_strategy if brand-strategy intent)
+- If user says write/script/screenplay → action=generate_screenplay
+- Otherwise → ask_question, pick the most important missing info
+- fidatoResponse = Fidato's SHORT casual reply (1-2 sentences, no markdown, no bullets, emoji ok)`;
+
+  try {
+    const result = await aiCall(systemPrompt, `Latest message: "${message}". Decide next action.`, {
+      temperature: 0.1,
+      maxTokens: 600,
+    });
+
+    console.log('[fidato-chat] MCoT raw result:', result?.slice(0, 300));
+    const parsed = parseJSON(result);
+    console.log('[fidato-chat] MCoT parsed:', JSON.stringify(parsed)?.slice(0, 200));
+
+    if (parsed && parsed.action && parsed.fidatoResponse) {
+      return {
+        intent: parsed.intent || detectedIntent,
+        collectedAnswers: { ...sessionState.collectedAnswers, ...(parsed.collectedAnswers || {}) },
+        readyToGenerate: parsed.action !== 'ask_question',
+        action: parsed.action,
+        fidatoResponse: parsed.fidatoResponse,
+        preGenerationMessage: parsed.preGenerationMessage || null,
+      };
+    }
+
+    // Parsed but incomplete — use what we got with smart fallback
+    console.warn('[fidato-chat] MCoT returned incomplete JSON, using smart fallback');
+  } catch (err) {
+    console.error('[fidato-chat] MCoT AI call failed:', err.message);
+  }
+
+  // ── Smart fallback: never loop, always advance ─────────────────────────────
+  const fallbackQ = getNextSmartQuestion(userMessageCount, detectedIntent, sessionState.collectedAnswers || {}, brandCtx);
+  return {
+    intent: detectedIntent,
+    collectedAnswers: { ...sessionState.collectedAnswers, ...extractAnswerFromMessage(message, sessionState.collectedAnswers || {}) },
+    readyToGenerate: false,
+    action: 'ask_question',
+    fidatoResponse: fallbackQ,
+  };
 }
+
+// ── Intent detector from keywords ──────────────────────────────────────────────
+function detectIntentFromHistory(history, latestMessage) {
+  const allText = [...history.map(m => m.content || ''), latestMessage].join(' ').toLowerCase();
+  if (/ad.?film|brand.?film|tvc|script|commercial|short.?film|reel.*story/.test(allText)) return 'ad-film';
+  if (/campaign|marketing|launch.?campaign|social.?media.?campaign/.test(allText)) return 'campaign';
+  if (/product.?launch|launch|new.?product/.test(allText)) return 'product-launch';
+  if (/naming|name|rename|brand.?name|product.?name/.test(allText)) return 'naming';
+  if (/brand.?strategy|strategy|1.?month|3.?month|marketing.?plan/.test(allText)) return 'brand-strategy';
+  if (/festival|diwali|holi|navratri|christmas|eid|occasion/.test(allText)) return 'festival';
+  if (/offer|discount|promotion|deal/.test(allText)) return 'offer';
+  if (/position|differentiat|market.?fit/.test(allText)) return 'positioning';
+  return 'campaign';
+}
+
+// ── Extract answers already visible in the messages ───────────────────────────
+function buildAnswersFromHistory(history, latestMessage, sessionState) {
+  const base = sessionState.collectedAnswers || {};
+  const allUserText = history.filter(m => m.role === 'user').map(m => m.content || '').join(' ') + ' ' + latestMessage;
+  return { ...base, context: allUserText.slice(0, 500) };
+}
+
+// ── Extract a single answer from the latest message ───────────────────────────
+function extractAnswerFromMessage(message, existing) {
+  const lowerMsg = message.toLowerCase();
+  const updates = {};
+  if (!existing.emotion && /excit|happy|proud|nostalg|funny|humour|emo|feel|love|inspire|aspir|urgent|fomo/.test(lowerMsg)) {
+    updates.emotion = message;
+  }
+  if (!existing.audience && /age|year|men|women|youth|teen|family|parent|professional|urban|rural|student/.test(lowerMsg)) {
+    updates.audience = message;
+  }
+  if (!existing.product && /product|brand|sell|launch|drink|food|app|service|cloth/.test(lowerMsg)) {
+    updates.product = message;
+  }
+  return updates;
+}
+
+// ── Smart sequential questions — never repeat ─────────────────────────────────
+function getNextSmartQuestion(turnIndex, intent, collected, brandCtx) {
+  const isFilm = intent === 'ad-film';
+  const questions = isFilm ? [
+    collected.product ? null : `What product or brand is this film for? Tell me about it briefly.`,
+    collected.audience ? null : `Who's your ideal viewer for this film? Like, picture one specific person.`,
+    collected.emotion ? null : `What should someone feel in the first 5 seconds of watching? Excited? Emotional? Curious?`,
+    `What format are you thinking — 30 seconds, 60 seconds? And how many script concepts do you want?`,
+  ] : [
+    collected.product ? null : `What are we brainstorming for? Give me the quick pitch.`,
+    collected.audience ? null : `Who's the target? Describe your ideal customer in one sentence.`,
+    collected.emotion ? null : `What should people feel or do after seeing this? Buy immediately? Share it? Feel inspired?`,
+    `Any budget or timeline to keep in mind? Or should I just go full creative?`,
+  ];
+
+  // find the first unanswered question
+  const nextQ = questions.find(q => q !== null);
+  return nextQ || `Got it! Give me one more detail — anything specific you want to make sure I include?`;
+}
+
 
 // ── Inline idea generation (mirrors /generate route logic) ─────────────────────
 async function generateIdeasInline(intent, answers, brand) {
