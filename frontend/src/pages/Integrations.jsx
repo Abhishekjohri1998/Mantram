@@ -11,7 +11,7 @@ import SEOHead from '../components/SEOHead'
 import { useAuth } from '../context/AuthContext'
 import { useBrand } from '../context/BrandContext'
 import { useShopify } from '../context/ShopifyContext'
-import { social, shopify as shopifyAPI, googleAnalytics as gaAPI, apiFetch } from '../services/api'
+import { social, shopify as shopifyAPI, googleAnalytics as gaAPI, apiFetch, API_BASE } from '../services/api'
 
 const SOCIAL_PLATFORMS = [
     { id: 'instagram', name: 'Instagram', icon: '📷', color: '#E1306C', desc: 'Share photos, reels & stories' },
@@ -132,14 +132,30 @@ export default function Integrations() {
         }
     }, [])
 
+    // Handle redirect callbacks (GA, etc.)
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search)
+        const gaStatus = params.get('ga')
+        const gaMsg = params.get('msg')
+        
+        if (gaStatus === 'success') {
+            const email = params.get('email')
+            setGaConnected(true)
+            if (email) setGaEmail(decodeURIComponent(email))
+            loadAllStatuses()
+            // Clean URL
+            navigate('/integrations', { replace: true })
+        } else if (gaStatus === 'error') {
+            alert(`Google Analytics Connection Failed: ${decodeURIComponent(gaMsg || 'Unknown error')}`)
+            navigate('/integrations', { replace: true })
+        }
+    }, [navigate, loadAllStatuses])
+
     // ── Google Analytics Actions ──
-    const connectGA = async () => {
+    const connectGA = () => {
         setGaLoading(true)
-        try {
-            const d = await gaAPI.connect(brandId)
-            if (d.authUrl) window.open(d.authUrl, '_blank', 'width=600,height=700')
-        } catch (e) { alert(`Connection failed: ${e.message}`) }
-        finally { setGaLoading(false) }
+        // Redirect to backend with flow=redirect to avoid COOP/Popup issues
+        window.location.href = `${API_BASE}/google-analytics/connect?flow=redirect&brandId=${brandId || ''}`
     }
     const disconnectGA = async () => {
         if (!confirm('Disconnect Google Analytics for this brand?')) return

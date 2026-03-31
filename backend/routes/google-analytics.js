@@ -113,11 +113,13 @@ async function googleAPIFetch(url, accessToken, options = {}) {
 
 // GET /api/google-analytics/connect — Start OAuth
 router.get('/connect', protect, (req, res) => {
+    const flow = req.query.flow || 'popup';
     // BUG-26 FIX: Cryptographically sign the state param
     const state = encodeState({
         userId: req.user._id,
         brandId: req.query.brandId || '',
         ts: Date.now(),
+        flow
     });
     const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` + new URLSearchParams({
         client_id: config.google.clientId,
@@ -128,6 +130,10 @@ router.get('/connect', protect, (req, res) => {
         prompt: 'consent',
         state,
     }).toString();
+
+    if (flow === 'redirect') {
+        return res.redirect(authUrl);
+    }
     res.json({ success: true, authUrl });
 });
 
@@ -138,11 +144,16 @@ router.get('/callback', async (req, res) => {
         if (!code) return res.status(400).send('Missing authorization code');
 
         // BUG-26 FIX: Decode and verify state signature
-        const { userId, brandId } = decodeState(state);
+        const { userId, brandId, flow } = decodeState(state);
         const tokens = await getTokensFromCode(code);
 
         if (tokens.error) {
-            return res.status(400).send(`OAuth error: ${tokens.error_description || tokens.error}`);
+            const errorMsg = tokens.error_description || tokens.error;
+            if (flow === 'redirect') {
+                const frontendUrl = config.frontendUrl[0] || 'https://mantram.ai';
+                return res.redirect(`${frontendUrl}/integrations?ga=error&msg=${encodeURIComponent(errorMsg)}`);
+            }
+            return res.status(400).send(`OAuth error: ${errorMsg}`);
         }
 
         // Get user email from Google
@@ -168,7 +179,13 @@ router.get('/callback', async (req, res) => {
             { upsert: true, returnDocument: 'after' }
         );
 
-        // Close popup and notify parent
+        // Redirect and notify
+        if (flow === 'redirect') {
+            const frontendUrl = config.frontendUrl[0] || 'https://mantram.ai';
+            return res.redirect(`${frontendUrl}/integrations?ga=success&email=${encodeURIComponent(userInfo.email || '')}`);
+        }
+
+        // Close popup and notify parent (legacy fallback)
         res.send(`<html><body><script>
             window.opener?.postMessage({ type: 'GOOGLE_ANALYTICS_CONNECTED', email: '${userInfo.email || ''}' }, '*');
             window.close();
