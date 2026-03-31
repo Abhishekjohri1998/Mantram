@@ -2027,15 +2027,15 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             </p>
                         )}
 
-                        {/* ── Copywriter Agent Toggle ── */}
+                        {/* ── Add Text to Image Toggle ── */}
                         <div className={`flex items-center justify-between px-3 py-2 rounded-xl mb-3 border transition-all ${generateCopy ? 'bg-violet-500/10 border-violet-500/30' : 'bg-white/[0.03] border-white/[0.06]'}`}>
                             <div className="flex items-center gap-2.5">
                                 <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${generateCopy ? 'bg-violet-500/20' : 'bg-white/[0.06]'}`}>
-                                    <span className={`material-symbols-outlined text-sm ${generateCopy ? 'text-violet-400' : 'text-slate-500'}`}>edit_note</span>
+                                    <span className={`material-symbols-outlined text-sm ${generateCopy ? 'text-violet-400' : 'text-slate-500'}`}>title</span>
                                 </div>
                                 <div>
-                                    <p className="text-xs font-bold text-white leading-tight">Copywriter Agent</p>
-                                    <p className="text-[10px] text-slate-500 leading-tight">{generateCopy ? 'AI writes headline, caption, CTA & hashtags' : 'Image only — enable for marketing copy'}</p>
+                                    <p className="text-xs font-bold text-white leading-tight">Add Text to Image</p>
+                                    <p className="text-[10px] text-slate-500 leading-tight">{generateCopy ? 'AI writes headline + CTA text printed ON the image' : 'Enable to render marketing text on the generated image'}</p>
                                 </div>
                             </div>
                             <button onClick={() => setGenerateCopy(!generateCopy)}
@@ -2295,8 +2295,8 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             {/* ✍️ Generate Copy status — toggle is now above prompt area */}
                             {generateCopy && (
                                 <div className="flex items-center gap-2 pb-3 border-b border-white/[0.05]">
-                                    <span className="material-symbols-outlined text-sm text-violet-400">check_circle</span>
-                                    <p className="text-xs text-violet-400 font-medium">Copywriter Agent active — will generate headline, caption, CTA & hashtags</p>
+                                    <span className="material-symbols-outlined text-sm text-violet-400">title</span>
+                                    <p className="text-xs text-violet-400 font-medium">Add Text to Image active — AI will render headline + CTA text on the generated image</p>
                                 </div>
                             )}
 
@@ -2647,105 +2647,104 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             </div>
                         )}
 
-                        {/* ── AI Copy Card ── */}
+                        {/* ── Text on Image Card ── */}
                         {result?.copy?.headline && (
                             <div className="studio-card p-0 mb-5 overflow-hidden border border-violet-500/20 animate-in fade-in slide-in-from-bottom-3 duration-500" style={{ animationDelay: '200ms' }}>
                                 {/* Header */}
                                 <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-violet-500/10 to-fuchsia-500/10 border-b border-white/[0.06]">
                                     <div className="flex items-center gap-2">
-                                        <span className="material-symbols-outlined text-sm text-violet-400">edit_note</span>
-                                        <h4 className="text-xs font-bold text-white">AI Copy</h4>
-                                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-300 border border-violet-500/30">AGENTIC</span>
+                                        <span className="material-symbols-outlined text-sm text-violet-400">title</span>
+                                        <h4 className="text-xs font-bold text-white">Text on Image</h4>
+                                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-300 border border-violet-500/30">RENDERED ON IMAGE</span>
                                     </div>
                                     <button onClick={() => {
-                                        const c = result.copy
-                                        const full = [c.headline, '', c.caption, '', c.cta, '', (c.hashtags || []).map(h => h.startsWith('#') ? h : `#${h}`).join(' ')].join('\n')
-                                        navigator.clipboard.writeText(full)
-                                        setCopiedField('all')
-                                        setTimeout(() => setCopiedField(null), 2000)
+                                        const c = result.copy;
+                                        const full = [c.headline, c.subtext, c.ctaText].filter(Boolean).join('\n');
+                                        navigator.clipboard.writeText(full);
+                                        setCopiedField('all');
+                                        setTimeout(() => setCopiedField(null), 2000);
                                     }} className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${copiedField === 'all' ? 'bg-emerald-500/20 text-emerald-400' : 'text-slate-400 hover:text-white hover:bg-white/[0.06]'}`}>
                                         <span className="material-symbols-outlined text-xs">{copiedField === 'all' ? 'check' : 'content_copy'}</span>
                                         {copiedField === 'all' ? 'Copied!' : 'Copy All'}
                                     </button>
                                 </div>
 
-                                {/* Copy Content */}
+                                {/* Visual preview mockup */}
+                                <div className="mx-4 mt-4 rounded-xl bg-gradient-to-br from-slate-900/80 to-slate-800/60 border border-white/[0.06] p-4 text-center space-y-1.5">
+                                    <p className="text-lg font-black text-white leading-tight tracking-tight">{result.copy.headline}</p>
+                                    {result.copy.subtext && (
+                                        <p className="text-xs text-slate-300 font-medium">{result.copy.subtext}</p>
+                                    )}
+                                    {result.copy.ctaText && (
+                                        <div className="pt-1">
+                                            <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white text-[10px] font-bold">
+                                                {result.copy.ctaText}
+                                                <span className="material-symbols-outlined text-[10px]">arrow_forward</span>
+                                            </span>
+                                        </div>
+                                    )}
+                                    {result.copy.textStyle && (
+                                        <p className="text-[9px] text-slate-600 italic pt-1">Style: {result.copy.textStyle}</p>
+                                    )}
+                                </div>
+
+                                {/* Copy fields */}
                                 <div className="p-4 space-y-3">
                                     {/* Headline */}
-                                    {result.copy.headline && (
-                                        <div className="group">
-                                            <div className="flex items-center justify-between mb-1">
-                                                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Headline</p>
-                                                <button onClick={() => { navigator.clipboard.writeText(result.copy.headline); setCopiedField('headline'); setTimeout(() => setCopiedField(null), 1500) }}
-                                                    className={`opacity-0 group-hover:opacity-100 transition-all text-[10px] px-1.5 py-0.5 rounded cursor-pointer ${copiedField === 'headline' ? 'text-emerald-400' : 'text-slate-500 hover:text-white'}`}>
-                                                    {copiedField === 'headline' ? '✓' : 'Copy'}
-                                                </button>
-                                            </div>
-                                            <p className="text-sm font-bold text-white leading-snug">{result.copy.headline}</p>
+                                    <div className="group flex items-center justify-between">
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-0.5">Headline</p>
+                                            <p className="text-sm font-bold text-white">{result.copy.headline}</p>
                                         </div>
-                                    )}
-
-                                    {/* Caption */}
-                                    <div className="group">
-                                        <div className="flex items-center justify-between mb-1">
-                                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Caption</p>
-                                            <button onClick={() => { navigator.clipboard.writeText(result.copy.caption); setCopiedField('caption'); setTimeout(() => setCopiedField(null), 1500) }}
-                                                className={`opacity-0 group-hover:opacity-100 transition-all text-[10px] px-1.5 py-0.5 rounded cursor-pointer ${copiedField === 'caption' ? 'text-emerald-400' : 'text-slate-500 hover:text-white'}`}>
-                                                {copiedField === 'caption' ? '✓' : 'Copy'}
-                                            </button>
-                                        </div>
-                                        <p className="text-xs text-slate-300 leading-relaxed whitespace-pre-wrap">{result.copy.caption}</p>
+                                        <button onClick={() => { navigator.clipboard.writeText(result.copy.headline); setCopiedField('headline'); setTimeout(() => setCopiedField(null), 1500); }}
+                                            className={`ml-3 opacity-0 group-hover:opacity-100 transition-all text-[10px] px-1.5 py-0.5 rounded cursor-pointer ${copiedField === 'headline' ? 'text-emerald-400' : 'text-slate-500 hover:text-white'}`}>
+                                            {copiedField === 'headline' ? '✓' : 'Copy'}
+                                        </button>
                                     </div>
 
+                                    {/* Subtext */}
+                                    {result.copy.subtext && (
+                                        <div className="group flex items-center justify-between">
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-0.5">Subtext</p>
+                                                <p className="text-xs text-slate-300">{result.copy.subtext}</p>
+                                            </div>
+                                            <button onClick={() => { navigator.clipboard.writeText(result.copy.subtext); setCopiedField('subtext'); setTimeout(() => setCopiedField(null), 1500); }}
+                                                className={`ml-3 opacity-0 group-hover:opacity-100 transition-all text-[10px] px-1.5 py-0.5 rounded cursor-pointer ${copiedField === 'subtext' ? 'text-emerald-400' : 'text-slate-500 hover:text-white'}`}>
+                                                {copiedField === 'subtext' ? '✓' : 'Copy'}
+                                            </button>
+                                        </div>
+                                    )}
+
                                     {/* CTA */}
-                                    {result.copy.cta && (
-                                        <div className="group">
-                                            <div className="flex items-center justify-between mb-1">
-                                                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Call to Action</p>
-                                                <button onClick={() => { navigator.clipboard.writeText(result.copy.cta); setCopiedField('cta'); setTimeout(() => setCopiedField(null), 1500) }}
-                                                    className={`opacity-0 group-hover:opacity-100 transition-all text-[10px] px-1.5 py-0.5 rounded cursor-pointer ${copiedField === 'cta' ? 'text-emerald-400' : 'text-slate-500 hover:text-white'}`}>
-                                                    {copiedField === 'cta' ? '✓' : 'Copy'}
-                                                </button>
+                                    {result.copy.ctaText && (
+                                        <div className="group flex items-center justify-between">
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-0.5">CTA Button Text</p>
+                                                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-gradient-to-r from-violet-500/20 to-fuchsia-500/20 border border-violet-500/30">
+                                                    <span className="text-xs font-bold text-violet-300">{result.copy.ctaText}</span>
+                                                </div>
                                             </div>
-                                            <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-violet-500/20 to-fuchsia-500/20 border border-violet-500/30">
-                                                <span className="text-xs font-bold text-violet-300">{result.copy.cta}</span>
-                                                <span className="material-symbols-outlined text-xs text-violet-400">arrow_forward</span>
-                                            </div>
+                                            <button onClick={() => { navigator.clipboard.writeText(result.copy.ctaText); setCopiedField('cta'); setTimeout(() => setCopiedField(null), 1500); }}
+                                                className={`ml-3 opacity-0 group-hover:opacity-100 transition-all text-[10px] px-1.5 py-0.5 rounded cursor-pointer ${copiedField === 'cta' ? 'text-emerald-400' : 'text-slate-500 hover:text-white'}`}>
+                                                {copiedField === 'cta' ? '✓' : 'Copy'}
+                                            </button>
                                         </div>
                                     )}
 
-                                    {/* Hashtags */}
-                                    {result.copy.hashtags?.length > 0 && (
-                                        <div className="group">
-                                            <div className="flex items-center justify-between mb-1.5">
-                                                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Hashtags</p>
-                                                <button onClick={() => { navigator.clipboard.writeText(result.copy.hashtags.map(h => h.startsWith('#') ? h : `#${h}`).join(' ')); setCopiedField('hashtags'); setTimeout(() => setCopiedField(null), 1500) }}
-                                                    className={`opacity-0 group-hover:opacity-100 transition-all text-[10px] px-1.5 py-0.5 rounded cursor-pointer ${copiedField === 'hashtags' ? 'text-emerald-400' : 'text-slate-500 hover:text-white'}`}>
-                                                    {copiedField === 'hashtags' ? '✓' : 'Copy'}
-                                                </button>
-                                            </div>
-                                            <div className="flex flex-wrap gap-1">
-                                                {result.copy.hashtags.map((tag, i) => (
-                                                    <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-white/[0.04] text-blue-400 border border-blue-500/10">
-                                                        {tag.startsWith('#') ? tag : `#${tag}`}
-                                                    </span>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* Copy Notes (collapsible) */}
-                                    {result.copy.copyNotes && (
+                                    {/* Design rationale */}
+                                    {result.copy.designRationale && (
                                         <div className="pt-2 border-t border-white/[0.04]">
                                             <p className="text-[10px] text-slate-600 italic">
                                                 <span className="material-symbols-outlined text-[10px] align-middle mr-1">lightbulb</span>
-                                                {result.copy.copyNotes}
+                                                {result.copy.designRationale}
                                             </p>
                                         </div>
                                     )}
                                 </div>
                             </div>
                         )}
+
 
                         {/* ── Generating Indicator ── */}
                         <GlobalLoader 

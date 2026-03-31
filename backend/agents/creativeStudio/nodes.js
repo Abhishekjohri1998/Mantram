@@ -772,18 +772,17 @@ export async function copywriterNode(state) {
 
     const result = await callAgent(COPYWRITER_PROMPT(brandContext), userPrompt, 0.75, 8192);
     console.log(`✍️  Copywriter result keys: ${Object.keys(result || {}).join(', ')}`);
-    console.log(`✍️  Copywriter done in ${Date.now() - startMs}ms — headline: "${result.headline || '?'}" | caption: "${(result.caption || '').substring(0, 60)}..."${result.error ? ` [PARSE ERROR: ${result.error}] RAW: ${result.raw?.substring(0, 200)}` : ''}`);
-    if (result.cta) console.log(`✍️  Copywriter CTA: "${result.cta}"`);
+    console.log(`✍️  Copywriter done in ${Date.now() - startMs}ms — headline: "${result.headline || '?'}" | subtext: "${result.subtext || 'none'}" | cta: "${result.ctaText || 'none'}"${result.error ? ` [PARSE ERROR: ${result.error}] RAW: ${result.raw?.substring(0, 200)}` : ''}`);
+    if (result.ctaText) console.log(`✍️  Copywriter CTA: "${result.ctaText}"`);
 
     return {
         ...state,
         copy: {
             headline: result.headline || '',
-            caption: result.caption || '',
-            cta: result.cta || '',
-            hashtags: result.hashtags || [],
-            altText: result.altText || '',
-            copyNotes: result.copyNotes || '',
+            subtext: result.subtext || null,
+            ctaText: result.ctaText || null,
+            textStyle: result.textStyle || '',
+            designRationale: result.designRationale || '',
         },
         status: 'copywriting',
     };
@@ -1112,14 +1111,31 @@ export async function runCreativePipeline(params) {
  * Instructs the AI model to render the headline and CTA as bold, readable text on the image.
  */
 function buildCopyInjection(copy) {
-    if (!copy) return '';
+    if (!copy?.headline) return '';
+
     const parts = [];
-    if (copy.headline) {
-        parts.push(`TEXT ON IMAGE — HEADLINE: Display the text "${copy.headline}" prominently in large, bold, high-contrast typography. This must be clearly readable and be the primary text element on the image.`);
+
+    // Primary headline — the dominant, LARGE text on the image
+    parts.push(`TEXT ON IMAGE — HEADLINE (PRIMARY TEXT): Render the text "${copy.headline}" as LARGE, BOLD, DOMINANT typography. This must be the most visually prominent text element on the image — the viewer reads this first.`);
+
+    // Supporting subtext — smaller, below headline
+    if (copy.subtext) {
+        parts.push(`TEXT ON IMAGE — SUBTEXT: Below the headline, render "${copy.subtext}" in smaller complementary typography. It should support the headline without competing with it.`);
     }
-    if (copy.cta) {
-        parts.push(`TEXT ON IMAGE — CTA BUTTON: Include a call-to-action button or badge with the text "${copy.cta}" in a contrasting color. Position it at the bottom or lower-third of the image.`);
+
+    // CTA button / badge
+    if (copy.ctaText) {
+        parts.push(`TEXT ON IMAGE — CTA BUTTON: Include a button, badge or pill element with the text "${copy.ctaText}" in a high-contrast accent color. Position at bottom-third of the image.`);
     }
-    if (parts.length === 0) return '';
-    return `MARKETING COPY TO RENDER ON THE IMAGE:\n${parts.join('\n')}\nIMPORTANT: These text elements must be rendered as actual readable text ON the image, not as decoration. Use clean, modern typography that matches the brand style.`;
+
+    // Typography style instruction
+    if (copy.textStyle) {
+        parts.push(`TYPOGRAPHY STYLE: ${copy.textStyle}`);
+    }
+
+    return `
+═══ CRITICAL TEXT RENDERING INSTRUCTIONS ═══
+${parts.join('\n')}
+IMPORTANT: These text elements MUST be physically rendered as real, readable typography ON the image — not as decoration, not as a pattern. Use clean, legible fonts. The HEADLINE must be clearly readable at thumbnail size. Do NOT skip or omit any text element listed above.
+═══════════════════════════════════════════`;
 }

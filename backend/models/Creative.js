@@ -20,14 +20,14 @@ const creativeSchema = new mongoose.Schema({
         fonts: [String],
     },
 
-    // AI-generated marketing copy (optional — generated when "Add Copy" is enabled)
+    // AI-generated ON-IMAGE visual copy (generated when "Add Text to Image" is enabled)
+    // These are text elements RENDERED ON THE IMAGE — not social captions
     copy: {
-        headline: { type: String, default: '' },
-        caption: { type: String, default: '' },
-        cta: { type: String, default: '' },
-        hashtags: [String],
-        altText: { type: String, default: '' },
-        copyNotes: { type: String, default: '' },
+        headline: { type: String, default: '' },        // BIG text on image (2-6 words)
+        subtext: { type: String, default: '' },          // Supporting line below headline
+        ctaText: { type: String, default: '' },          // CTA button/badge text on image
+        textStyle: { type: String, default: '' },        // Typography style guidance
+        designRationale: { type: String, default: '' },  // Why this copy works
     },
 
     // AI metadata
