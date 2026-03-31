@@ -696,7 +696,9 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
     const [viewMode, setViewMode] = useState('list')
     const [showAdvanced, setShowAdvanced] = useState(false)
     const [agenticQuality, setAgenticQuality] = useState('fast') // 'fast' | 'quality'
-    const [generateCopy, setGenerateCopy] = useState(false) // Opt-in: generate marketing copy alongside image
+    const [generateCopy, setGenerateCopy] = useState(false) // Opt-in: render text on image
+    const [customHeadline, setCustomHeadline] = useState('') // User-specified headline (blank = AI generates)
+    const [customCtaText, setCustomCtaText] = useState('')  // User-specified CTA (blank = AI generates)
     const [copiedField, setCopiedField] = useState(null) // Track which copy field was just copied
     const [activeQuickTemplate, setActiveQuickTemplate] = useState(null)
     const [showQuickStart, setShowQuickStart] = useState(true)
@@ -1114,6 +1116,8 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
                 imageModel,
                 agenticQuality,
                 generateCopy,
+                customHeadline: customHeadline.trim() || null,
+                customCtaText: customCtaText.trim() || null,
                 progressId, // Pass to backend for progress tracking
             }
             if (designBaseImage) {
@@ -2028,20 +2032,63 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                         )}
 
                         {/* ── Add Text to Image Toggle ── */}
-                        <div className={`flex items-center justify-between px-3 py-2 rounded-xl mb-3 border transition-all ${generateCopy ? 'bg-violet-500/10 border-violet-500/30' : 'bg-white/[0.03] border-white/[0.06]'}`}>
-                            <div className="flex items-center gap-2.5">
-                                <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${generateCopy ? 'bg-violet-500/20' : 'bg-white/[0.06]'}`}>
-                                    <span className={`material-symbols-outlined text-sm ${generateCopy ? 'text-violet-400' : 'text-slate-500'}`}>title</span>
+                        <div className={`rounded-xl mb-3 border transition-all overflow-hidden ${generateCopy ? 'bg-violet-500/10 border-violet-500/30' : 'bg-white/[0.03] border-white/[0.06]'}`}>
+                            <div className="flex items-center justify-between px-3 py-2">
+                                <div className="flex items-center gap-2.5">
+                                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${generateCopy ? 'bg-violet-500/20' : 'bg-white/[0.06]'}`}>
+                                        <span className={`material-symbols-outlined text-sm ${generateCopy ? 'text-violet-400' : 'text-slate-500'}`}>title</span>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs font-bold text-white leading-tight">Add Text to Image</p>
+                                        <p className="text-[10px] text-slate-500 leading-tight">{generateCopy ? (customHeadline ? `"${customHeadline}"` : 'AI will generate headline + CTA') : 'Enable to render text on the image'}</p>
+                                    </div>
                                 </div>
-                                <div>
-                                    <p className="text-xs font-bold text-white leading-tight">Add Text to Image</p>
-                                    <p className="text-[10px] text-slate-500 leading-tight">{generateCopy ? 'AI writes headline + CTA text printed ON the image' : 'Enable to render marketing text on the generated image'}</p>
-                                </div>
+                                <button onClick={() => { setGenerateCopy(!generateCopy); if (generateCopy) { setCustomHeadline(''); setCustomCtaText(''); } }}
+                                    className={`w-9 h-5 rounded-full transition-all cursor-pointer flex-shrink-0 ${generateCopy ? 'bg-violet-500' : 'bg-white/[0.1]'}`}>
+                                    <div className={`w-3.5 h-3.5 rounded-full bg-white shadow transition-transform ${generateCopy ? 'translate-x-4.5' : 'translate-x-0.5'}`} />
+                                </button>
                             </div>
-                            <button onClick={() => setGenerateCopy(!generateCopy)}
-                                className={`w-9 h-5 rounded-full transition-all cursor-pointer ${generateCopy ? 'bg-violet-500' : 'bg-white/[0.1]'}`}>
-                                <div className={`w-3.5 h-3.5 rounded-full bg-white shadow transition-transform ${generateCopy ? 'translate-x-4.5' : 'translate-x-0.5'}`} />
-                            </button>
+
+                            {/* ── Custom copy inputs (visible when toggle is ON) ── */}
+                            {generateCopy && (
+                                <div className="px-3 pb-3 space-y-2 border-t border-white/[0.06] pt-2.5">
+                                    <p className="text-[10px] text-slate-500 mb-1.5">Leave blank — AI writes it. Or type your own:</p>
+
+                                    {/* Headline input */}
+                                    <div className="relative">
+                                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 material-symbols-outlined text-xs text-slate-500">format_size</span>
+                                        <input
+                                            type="text"
+                                            value={customHeadline}
+                                            onChange={e => setCustomHeadline(e.target.value)}
+                                            maxLength={40}
+                                            placeholder="Headline (e.g. Own Your Rhythm)"
+                                            className="w-full pl-7 pr-3 py-1.5 text-xs bg-white/[0.05] border border-white/[0.08] rounded-lg text-white placeholder-slate-600 focus:outline-none focus:border-violet-500/50 focus:bg-violet-500/5 transition-all"
+                                        />
+                                        {customHeadline && <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] text-slate-600">{customHeadline.length}/40</span>}
+                                    </div>
+
+                                    {/* CTA input */}
+                                    <div className="relative">
+                                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 material-symbols-outlined text-xs text-slate-500">ads_click</span>
+                                        <input
+                                            type="text"
+                                            value={customCtaText}
+                                            onChange={e => setCustomCtaText(e.target.value)}
+                                            maxLength={20}
+                                            placeholder="CTA button (e.g. Shop Now)"
+                                            className="w-full pl-7 pr-3 py-1.5 text-xs bg-white/[0.05] border border-white/[0.08] rounded-lg text-white placeholder-slate-600 focus:outline-none focus:border-violet-500/50 focus:bg-violet-500/5 transition-all"
+                                        />
+                                    </div>
+
+                                    {(customHeadline || customCtaText) && (
+                                        <button onClick={() => { setCustomHeadline(''); setCustomCtaText(''); }}
+                                            className="text-[10px] text-slate-600 hover:text-slate-400 transition-colors cursor-pointer">
+                                            ✕ Clear — let AI decide
+                                        </button>
+                                    )}
+                                </div>
+                            )}
                         </div>
 
                         {/* ── Prompt Area ── */}

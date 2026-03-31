@@ -941,9 +941,10 @@ export async function postGenerationCriticNode(state) {
  * @returns {object} { finalPrompt, artDirection, engineeredPrompt, styleCritique, brandIntel, copy? }
  */
 export async function runCreativePipeline(params) {
-    const { brandId, brief, format, aspectRatio, style, imageModel, mode = 'fast', generateCopy = false, onProgress } = params;
+    const { brandId, brief, format, aspectRatio, style, imageModel, mode = 'fast', generateCopy = false, customCopy = null, onProgress } = params;
     const pipelineStart = Date.now();
-    console.log(`\n══════════ AGENTIC CREATIVE PIPELINE (${mode.toUpperCase()}${generateCopy ? ' + COPY' : ''}) ══════════`);
+    const hasCustomCopy = customCopy?.headline || customCopy?.ctaText;
+    console.log(`\n══════════ AGENTIC CREATIVE PIPELINE (${mode.toUpperCase()}${generateCopy ? ' + COPY' : ''}${hasCustomCopy ? ' [CUSTOM TEXT]' : ''}) ══════════`);
 
     const emit = (agent, message, status = 'working', detail = '') => {
         if (onProgress) onProgress({ agent, message, status, detail });
@@ -1012,22 +1013,37 @@ export async function runCreativePipeline(params) {
 
         // ── Run copywriter BEFORE finalizing prompt (so copy goes INTO the image) ──
         if (generateCopy) {
-            emit('copywriter', 'Copywriter crafting brand copy...', 'working');
-            try {
-                const copyState = await copywriterNode(state);
-                copyResult = copyState.copy || null;
-                if (copyResult) {
-                    emit('copywriter', `Copy ready: "${copyResult.headline || ''}"`, 'done');
-                    // ── INJECT copy text into the image prompt ──
-                    const copyInjection = buildCopyInjection(copyResult);
-                    if (copyInjection) {
-                        state.finalPrompt = state.finalPrompt + '\n\n' + copyInjection;
-                        console.log(`✍️  Copy injected into image prompt: "${copyResult.headline}" | CTA: "${copyResult.cta}"`);
+            if (hasCustomCopy) {
+                // User provided their own text — use it directly, skip AI copywriter
+                copyResult = {
+                    headline: customCopy.headline || '',
+                    subtext: null,
+                    ctaText: customCopy.ctaText || null,
+                    textStyle: 'bold, high-contrast typography matching brand style',
+                    designRationale: 'User-specified custom copy',
+                };
+                emit('copywriter', `Custom text: "${copyResult.headline}"`, 'done');
+                console.log(`✍️  Using custom copy: "${copyResult.headline}" | CTA: "${copyResult.ctaText || 'none'}"`);
+            } else {
+                emit('copywriter', 'Copywriter crafting brand copy...', 'working');
+                try {
+                    const copyState = await copywriterNode(state);
+                    copyResult = copyState.copy || null;
+                    if (copyResult) {
+                        emit('copywriter', `Copy ready: "${copyResult.headline || ''}"`, 'done');
                     }
+                } catch (err) {
+                    console.warn('✍️  Copywriter failed (non-critical):', err.message);
+                    emit('copywriter', 'Copy generation skipped', 'done');
                 }
-            } catch (err) {
-                console.warn('✍️  Copywriter failed (non-critical):', err.message);
-                emit('copywriter', 'Copy generation skipped', 'done');
+            }
+            // ── INJECT copy text into the image prompt ──
+            if (copyResult) {
+                const copyInjection = buildCopyInjection(copyResult);
+                if (copyInjection) {
+                    state.finalPrompt = state.finalPrompt + '\n\n' + copyInjection;
+                    console.log(`✍️  Copy injected into image prompt: "${copyResult.headline}" | CTA: "${copyResult.ctaText}"`);
+                }
             }
         }
     } else {
@@ -1040,16 +1056,29 @@ export async function runCreativePipeline(params) {
 
         // ── Run copywriter BEFORE prompt engineering (so copy informs the prompt) ──
         if (generateCopy) {
-            emit('copywriter', 'Copywriter crafting brand copy...', 'working');
-            try {
-                const copyState = await copywriterNode(state);
-                copyResult = copyState.copy || null;
-                if (copyResult) {
-                    emit('copywriter', `Copy ready: "${copyResult.headline || ''}"`, 'done');
+            if (hasCustomCopy) {
+                // User provided their own text — use it directly, skip AI copywriter
+                copyResult = {
+                    headline: customCopy.headline || '',
+                    subtext: null,
+                    ctaText: customCopy.ctaText || null,
+                    textStyle: 'bold, high-contrast typography matching brand style',
+                    designRationale: 'User-specified custom copy',
+                };
+                emit('copywriter', `Custom text: "${copyResult.headline}"`, 'done');
+                console.log(`✍️  Using custom copy (quality mode): "${copyResult.headline}" | CTA: "${copyResult.ctaText || 'none'}"`);
+            } else {
+                emit('copywriter', 'Copywriter crafting brand copy...', 'working');
+                try {
+                    const copyState = await copywriterNode(state);
+                    copyResult = copyState.copy || null;
+                    if (copyResult) {
+                        emit('copywriter', `Copy ready: "${copyResult.headline || ''}"`, 'done');
+                    }
+                } catch (err) {
+                    console.warn('✍️  Copywriter failed (non-critical):', err.message);
+                    emit('copywriter', 'Copy generation skipped', 'done');
                 }
-            } catch (err) {
-                console.warn('✍️  Copywriter failed (non-critical):', err.message);
-                emit('copywriter', 'Copy generation skipped', 'done');
             }
         }
 

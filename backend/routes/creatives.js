@@ -1183,6 +1183,10 @@ router.post('/generate', protect, requireStudio('creativeStudio'), requireCredit
                     imageModel: options?.imageModel || 'nanobanana-2',
                     mode: agenticQuality,
                     generateCopy: options?.generateCopy === true,
+                    customCopy: (options?.customHeadline || options?.customCtaText) ? {
+                        headline: options.customHeadline || null,
+                        ctaText: options.customCtaText || null,
+                    } : null,
                     onProgress: progressId ? (step) => addStep(progressId, step) : undefined,
                 });
 
