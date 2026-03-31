@@ -10,14 +10,14 @@ const navItems = [
     { icon: 'auto_fix_high', label: 'Creative Studio', to: '/creative-studio', studioKey: 'creativeStudio' },
     { icon: 'draw', label: 'AI Canvas', to: '/ai-canvas', studioKey: 'creativeStudio' },
     { icon: 'movie', label: 'Video Studio', to: '/video-studio', studioKey: 'videoStudio' },
-    { icon: 'share', label: 'Social Media Studio', to: '/social-media-studio', studioKey: 'socialMediaStudio' },
-    { icon: 'forum', label: 'Conversation Studio', to: '/conversations', studioKey: 'conversationStudio' },
+    { icon: 'share', label: 'Social Media Studio', to: '/social-media-studio', studioKey: 'socialMediaStudio', superAdminOnly: true },
+    { icon: 'forum', label: 'Conversation Studio', to: '/conversations', studioKey: 'conversationStudio', superAdminOnly: true },
     { icon: 'travel_explore', label: 'SEO Studio', to: '/seo-studio', studioKey: 'seoStudio' },
     { icon: 'monitoring', label: 'Performance Studio', to: '/performance-marketing', studioKey: 'adStudio' },
-    { icon: 'filter_alt', label: 'Funnel Studio', to: '/funnel-studio', studioKey: 'funnelStudio' },
-    { icon: 'storefront', label: 'D2C Studio', to: '/d2c-analytics', studioKey: 'd2cAnalytics' },
-    { icon: 'loyalty', label: 'Retention Studio', to: '/retention-studio', studioKey: 'retentionStudio' },
-    { icon: 'auto_awesome', label: 'Skills Hub', to: '/skills', studioKey: 'skillsHub' },
+    { icon: 'filter_alt', label: 'Funnel Studio', to: '/funnel-studio', studioKey: 'funnelStudio', superAdminOnly: true },
+    { icon: 'storefront', label: 'D2C Studio', to: '/d2c-analytics', studioKey: 'd2cAnalytics', superAdminOnly: true },
+    { icon: 'loyalty', label: 'Retention Studio', to: '/retention-studio', studioKey: 'retentionStudio', superAdminOnly: true },
+    { icon: 'auto_awesome', label: 'Skills Hub', to: '/skills', studioKey: 'skillsHub', superAdminOnly: true },
 ]
 
 const bottomItems = [
@@ -26,10 +26,11 @@ const bottomItems = [
     { icon: 'settings', label: 'Settings', to: '/settings' },
 ]
 
-// Filter nav items based on studio access
-function filterNavByAccess(items, studioAccess) {
-    if (!studioAccess) return items; // fallback: show all
+// Filter nav items based on studio access and role
+function filterNavByAccess(items, studioAccess, isSuperAdmin) {
     return items.filter(item => {
+        if (item.superAdminOnly && !isSuperAdmin) return false;
+        if (!studioAccess) return true; // fallback: show all permitted
         if (!item.studioKey) return true; // non-studio items always visible
         return studioAccess[item.studioKey] !== false;
     });
@@ -99,7 +100,7 @@ export default function Sidebar({ mobileOpen, onClose }) {
             {/* Main Nav */}
             <nav className="flex-1 px-3 space-y-0.5 overflow-y-auto">
                 <p className="px-3 pt-4 pb-2 text-xs text-slate-600 uppercase tracking-widest font-bold">Create</p>
-                {filterNavByAccess(navItems, user?.studioAccess).map((item) => (
+                {filterNavByAccess(navItems, user?.studioAccess, isSuperAdmin).map((item) => (
                     <NavLink
                         key={item.label}
                         to={item.to}
