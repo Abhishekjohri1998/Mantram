@@ -8,9 +8,11 @@
  * Each node: (state) → updatedState
  */
 
-import { callAgent } from '../shared/agentUtils.js';
+import { callAgent, callMultimodalAgent } from '../shared/agentUtils.js';
 import { loadBrandContext } from '../shared/agentUtils.js';
 import { gatherIntelligence } from './tools.js';
+import Brand from '../../models/Brand.js';
+import Product from '../../models/Product.js';
 import {
     RESEARCH_PROMPT,
     WRITER_PROMPT,
@@ -24,6 +26,7 @@ import {
     YOUTUBE_WRITER_PROMPT,
     YOUTUBE_SEO_PROMPT,
     BLOG_STRUCTURED_PROMPT,
+    CONTENT_VISUAL_GROUNDING_PROMPT,
 } from './prompts.js';
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -112,6 +115,11 @@ Avg Bounce Rate: ${state.intelligence.ga4.data?.avgBounceRate || 0}%
 Top Pages: ${(state.intelligence.ga4.data?.pages || []).slice(0, 3).map(p => `${p.contentTitle || p.path} (${p.pageViews} views)`).join(', ')}`
         : '';
 
+    // MCoT Visual Grounding context (from contentVisualGroundingNode)
+    const visualGroundingContext = state.visualGrounding && !state.visualGrounding.error
+        ? `\n\nMCoT BRAND VISUAL INTELLIGENCE (from analyzing actual brand/product images):\nProduct Description: ${state.visualGrounding.productTraits || ''}\nBrand Mood: ${state.visualGrounding.brandMood || ''}\nColor Language: ${state.visualGrounding.colorNarrative || ''}\nKey Materials: ${state.visualGrounding.keyMaterials || ''}\nVisual Hooks: ${(state.visualGrounding.visualHooks || []).join(', ')}\nLifestyle Context: ${state.visualGrounding.lifestyleContext || ''}\nAvoid These Phrases: ${(state.visualGrounding.avoidPhrases || []).join(', ')}\nCopywriting Guidance: ${state.visualGrounding.copywritingGuidance || ''}\n\n⚠️ USE THIS VISUAL INTELLIGENCE: Write copy that is grounded in these real observations. Do not invent product features, colors, or materials that contradict this visual analysis.`
+        : '';
+
     const userPrompt = [
         `WRITE CONTENT FOR: ${state.brief}`,
         `TYPE: ${state.contentType || 'social'}`,
@@ -132,8 +140,10 @@ Top Pages: ${(state.intelligence.ga4.data?.pages || []).slice(0, 3).map(p => `${
         competitorInsights,
         performanceContext,
         ga4Context,
+        visualGroundingContext,
         rewriteNote,
     ].filter(Boolean).join('\n');
+
 
     const result = await callAgent(WRITER_PROMPT(brandContext), userPrompt, 0.7);
 
@@ -606,4 +616,78 @@ export async function blogWriterNode(state) {
         blogData,
         status: 'blog_written',
     };
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// MCoT: CONTENT VISUAL GROUNDING NODE (Phase 4)
+// Analyzes brand/product images BEFORE content writing to produce
+// copywriting-specific visual context that grounds the Writer Agent.
+// Fully non-blocking — if images unavailable, returns empty context.
+// ══════════════════════════════════════════════════════════════════════════════
+export async function contentVisualGroundingNode(state) {
+    if (!state.brandId) {
+        console.log('🖼️ Content MCoT: No brandId — skipping visual grounding');
+        return state;
+    }
+
+    console.log('🧠 Content MCoT: Visual grounding — fetching brand/product images...');
+    try {
+        const brand = await Brand.findById(state.brandId).lean();
+        if (!brand) return state;
+
+        // Collect image URLs: logo, brand DNA images, product images
+        const imageUrls = [];
+        const dna = brand.dna || {};
+
+        // Brand logo
+        if (dna.logo?.url) imageUrls.push(dna.logo.url);
+
+        // Brand DNA visual images (website screenshots, brand photos)
+        const dnaImages = dna.images || dna.brandImages || [];
+        dnaImages.slice(0, 2).forEach(img => {
+            const url = typeof img === 'string' ? img : img?.url;
+            if (url) imageUrls.push(url);
+        });
+
+        // Product images (top 2 products)
+        if (imageUrls.length < 4) {
+            const products = await Product.find({ brand: state.brandId })
+                .sort({ createdAt: -1 })
+                .limit(3)
+                .lean();
+            for (const product of products) {
+                const imgUrl = product.images?.[0]?.url || product.imageUrl;
+                if (imgUrl) imageUrls.push(imgUrl);
+                if (imageUrls.length >= 5) break;
+            }
+        }
+
+        if (imageUrls.length === 0) {
+            console.log('🖼️ Content MCoT: No brand images found — skipping');
+            return state;
+        }
+
+        console.log(`🧠 Content MCoT: Analyzing ${imageUrls.length} brand images...`);
+
+        const grounding = await callMultimodalAgent(
+            CONTENT_VISUAL_GROUNDING_PROMPT,
+            `Analyze these brand/product images for ${brand.name} (${dna.industry || 'consumer brand'}). Extract copywriting guidance.`,
+            imageUrls,
+            { temperature: 0.3, maxTokens: 1024 }
+        );
+
+        if (grounding && !grounding.error && !grounding.skipped) {
+            console.log(`🧠 Content MCoT: Visual grounding complete — mood: ${grounding.brandMood || '(parsed)'}`);
+            return {
+                ...state,
+                visualGrounding: grounding,
+            };
+        } else {
+            console.warn('🖼️ Content MCoT: Grounding returned no usable data — continuing without it');
+        }
+    } catch (err) {
+        console.warn('🖼️ Content MCoT: Visual grounding failed (non-critical):', err.message);
+    }
+
+    return state;
 }

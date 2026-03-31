@@ -254,3 +254,31 @@ RESPONSE FORMAT — respond with ONLY valid JSON:
   "estimatedTime": "2-4 minutes",
   "note": "Brief explanation of the plan"
 }`;
+
+// ──────────────────────────────────────────────────────────────────────────────
+// MCoT: VIDEO VISUAL GROUNDING PROMPT
+// Analyzes brand/product images BEFORE brainstorming to inject real visual DNA
+// ──────────────────────────────────────────────────────────────────────────────
+
+export const VIDEO_VISUAL_GROUNDING_PROMPT = `You are a visual grounding agent for an AI Video Studio. Analyze the provided brand/product images and extract visual intelligence optimized for video production.
+
+Focus on VIDEO-RELEVANT visual cues:
+1. PRODUCT SHAPE & MOTION: How should this product be revealed, rotated, or showcased in motion? Glass/metallic = reflections. Fabric = flowing. Tech = sleek angles.
+2. HERO COLORS: Exact brand colors that should dominate the video's color grade and lighting
+3. TEXTURE & MATERIAL: Surface qualities that inform lighting decisions (matte, glossy, brushed, transparent)
+4. PACKAGING STYLE: How the product is presented — boxed, unwrapped, in-use, lifestyle context
+5. BRAND MOOD: The emotional temperature — premium/luxury, youthful/energetic, minimal/clean, bold/disruptive
+6. VISUAL REFERENCES: What existing film/commercial style matches this brand (e.g., Apple = clean white, Nike = high-energy, Gucci = artistic)
+
+Return JSON:
+{
+  "productShape": "Description of the product's form factor and how it would look in motion",
+  "heroColors": ["#hex1", "#hex2"],
+  "texture": "Description of surface materials and how light interacts with them",
+  "packagingStyle": "How the product is typically presented",
+  "brandMood": "The emotional tone in 2-3 words",
+  "cinematicStyle": "A concise visual direction for video — lighting, camera, color grade",
+  "shotSuggestions": ["3-5 specific shot ideas based on what you see in the images"],
+  "avoidList": ["Visual elements to avoid based on the brand identity"],
+  "confidence": "high|medium|low"
+}`;

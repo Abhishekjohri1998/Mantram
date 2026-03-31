@@ -707,6 +707,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
     const [showCharTags, setShowCharTags] = useState(false)
     const [charTagFilter, setCharTagFilter] = useState('')
     const [zoomImage, setZoomImage] = useState(null)
+    const [expandedReasoning, setExpandedReasoning] = useState(null) // MCoT Thinking Mode: which creative ID's reasoning is shown
 
     // ── Refs ──
     const psMaskCanvasRef = useRef(null)
@@ -2904,6 +2905,89 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                                     <span className="material-symbols-outlined text-sm">open_in_full</span>
                                                                 </button>
                                                             </div>
+
+                                                            {/* ── MCoT Thinking Mode Toggle (Session) ── */}
+                                                            {group.items[0]?.aiMeta?.mcotReasoning && (
+                                                                <button
+                                                                    onClick={() => setExpandedReasoning(expandedReasoning === (group.items[0]._id || `g${gIdx}`) ? null : (group.items[0]._id || `g${gIdx}`))}
+                                                                    className={`flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer border ${
+                                                                        expandedReasoning === (group.items[0]._id || `g${gIdx}`)
+                                                                            ? 'bg-violet-500/15 text-violet-300 border-violet-500/30'
+                                                                            : 'bg-white/[0.02] text-slate-500 hover:text-violet-400 border-white/[0.06] hover:border-violet-500/20'
+                                                                    }`}
+                                                                >
+                                                                    <span className="material-symbols-outlined text-xs" style={{ fontSize: '12px' }}>psychology</span>
+                                                                    {expandedReasoning === (group.items[0]._id || `g${gIdx}`) ? 'Hide Reasoning' : 'Thinking Mode'}
+                                                                    <span className="material-symbols-outlined text-xs" style={{ fontSize: '10px', transition: 'transform 0.2s', transform: expandedReasoning === (group.items[0]._id || `g${gIdx}`) ? 'rotate(180deg)' : 'rotate(0deg)' }}>expand_more</span>
+                                                                </button>
+                                                            )}
+
+                                                            {/* ── MCoT Reasoning Chain (Session) ── */}
+                                                            {expandedReasoning === (group.items[0]._id || `g${gIdx}`) && group.items[0]?.aiMeta?.mcotReasoning && (() => {
+                                                                const r = group.items[0].aiMeta.mcotReasoning;
+                                                                return (
+                                                                    <div className="mt-2 rounded-xl border border-violet-500/15 bg-gradient-to-b from-violet-950/20 to-black/30 overflow-hidden animate-fade-in">
+                                                                        <div className="px-3 py-2 bg-violet-500/[0.06] border-b border-violet-500/10 flex items-center gap-2">
+                                                                            <span className="material-symbols-outlined text-violet-400" style={{ fontSize: '14px' }}>neurology</span>
+                                                                            <span className="text-[10px] font-bold text-violet-300 uppercase tracking-wider">MCoT Reasoning Chain</span>
+                                                                            {group.items[0].aiMeta?.pipelineTimeMs && (
+                                                                                <span className="text-[9px] text-violet-500 ml-auto">{(group.items[0].aiMeta.pipelineTimeMs / 1000).toFixed(1)}s</span>
+                                                                            )}
+                                                                        </div>
+                                                                        <div className="p-3 space-y-2.5">
+                                                                            {r.brandInsight?.name && (
+                                                                                <div className="flex gap-2">
+                                                                                    <div className="w-5 h-5 rounded-md bg-blue-500/15 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                                                                        <span className="material-symbols-outlined text-blue-400" style={{ fontSize: '11px' }}>corporate_fare</span>
+                                                                                    </div>
+                                                                                    <div className="flex-1 min-w-0">
+                                                                                        <p className="text-[9px] font-bold text-blue-400 uppercase tracking-wider mb-0.5">Brand Intel</p>
+                                                                                        <p className="text-[10px] text-slate-300"><span className="text-white font-semibold">{r.brandInsight.name}</span>{r.brandInsight.industry && <span className="text-slate-500"> · {r.brandInsight.industry}</span>}</p>
+                                                                                    </div>
+                                                                                </div>
+                                                                            )}
+                                                                            {r.visualGrounding && (
+                                                                                <div className="flex gap-2">
+                                                                                    <div className="w-5 h-5 rounded-md bg-emerald-500/15 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                                                                        <span className="material-symbols-outlined text-emerald-400" style={{ fontSize: '11px' }}>visibility</span>
+                                                                                    </div>
+                                                                                    <div className="flex-1 min-w-0">
+                                                                                        <p className="text-[9px] font-bold text-emerald-400 uppercase tracking-wider mb-0.5">Visual Grounding {r.visualGrounding.confidence && <span className={`ml-1 px-1 py-0.5 rounded text-[8px] font-bold ${r.visualGrounding.confidence === 'high' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-yellow-500/20 text-yellow-300'}`}>{r.visualGrounding.confidence}</span>}</p>
+                                                                                        {r.visualGrounding.productAnalysis && <p className="text-[10px] text-slate-300 leading-relaxed">{r.visualGrounding.productAnalysis}</p>}
+                                                                                    </div>
+                                                                                </div>
+                                                                            )}
+                                                                            {r.artDirection && (
+                                                                                <div className="flex gap-2">
+                                                                                    <div className="w-5 h-5 rounded-md bg-pink-500/15 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                                                                        <span className="material-symbols-outlined text-pink-400" style={{ fontSize: '11px' }}>palette</span>
+                                                                                    </div>
+                                                                                    <div className="flex-1 min-w-0">
+                                                                                        <p className="text-[9px] font-bold text-pink-400 uppercase tracking-wider mb-0.5">Art Direction</p>
+                                                                                        <p className="text-[10px] text-slate-300">{r.artDirection.mood && <span>Mood: {r.artDirection.mood} · </span>}{r.artDirection.visualStyle && <span>Style: {r.artDirection.visualStyle}</span>}</p>
+                                                                                    </div>
+                                                                                </div>
+                                                                            )}
+                                                                            {r.styleCritique && (
+                                                                                <div className="flex gap-2">
+                                                                                    <div className="w-5 h-5 rounded-md bg-cyan-500/15 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                                                                        <span className="material-symbols-outlined text-cyan-400" style={{ fontSize: '11px' }}>verified</span>
+                                                                                    </div>
+                                                                                    <div className="flex-1 min-w-0">
+                                                                                        <p className="text-[9px] font-bold text-cyan-400 uppercase tracking-wider mb-0.5">Brand Alignment</p>
+                                                                                        <div className="flex items-center gap-2">
+                                                                                            <div className="flex-1 h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
+                                                                                                <div className="h-full rounded-full" style={{ width: `${r.styleCritique.brandAlignmentScore || 0}%`, background: (r.styleCritique.brandAlignmentScore || 0) >= 80 ? '#34d399' : '#fbbf24' }} />
+                                                                                            </div>
+                                                                                            <span className="text-[10px] font-bold text-white">{r.styleCritique.brandAlignmentScore || 0}%</span>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            })()}
                                                         </div>
                                                     </div>
                                                 </div>
@@ -2916,7 +3000,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
 
                         {/* ── Generation History (from Image Bank) ── */}
                         {(() => {
-                            const allGenerated = bankImages.filter(img => img.source === 'ai-generated' || img.category === 'generated' || img.type === 'creative');
+                            const allGenerated = bankImages.filter(img => img.source === 'ai-generated' || img.category === 'generated' || img.type !== 'uploaded');
                             const filtered = galleryFilter === 'All' ? allGenerated : allGenerated.filter(img => {
                                 const tags = (img.tags || []).map(t => t.toLowerCase());
                                 const title = (img.title || '').toLowerCase();
@@ -2965,6 +3049,15 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                 </div>
                                                 {/* Time ago badge */}
                                                 <span className="absolute top-1.5 right-1.5 text-[8px] text-white/60 bg-black/50 px-1.5 py-0.5 rounded-md opacity-0 group-hover:opacity-100 transition-all">{getTimeAgo(img.createdAt)}</span>
+                                                {/* MCoT badge */}
+                                                {img.aiMeta?.mcotReasoning && (
+                                                    <button onClick={(e) => { e.stopPropagation(); setViewMode('list'); setExpandedReasoning(img._id); }}
+                                                        className="absolute top-1.5 left-1.5 text-[8px] text-violet-300 bg-violet-900/60 backdrop-blur-sm px-1.5 py-0.5 rounded-md opacity-0 group-hover:opacity-100 transition-all flex items-center gap-0.5 hover:bg-violet-700/60 cursor-pointer border border-violet-500/20"
+                                                        title="View MCoT Reasoning">
+                                                        <span className="material-symbols-outlined" style={{ fontSize: '10px' }}>psychology</span>
+                                                        MCoT
+                                                    </button>
+                                                )}
                                             </div>
                                         ))}
                                     </div>
@@ -3042,6 +3135,197 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                 <span className="material-symbols-outlined text-sm">open_in_full</span>
                                             </button>
                                         </div>
+
+                                        {/* ── MCoT Thinking Mode Toggle ── */}
+                                        {img.aiMeta?.mcotReasoning && (
+                                            <button
+                                                onClick={() => setExpandedReasoning(expandedReasoning === img._id ? null : img._id)}
+                                                className={`flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer border ${
+                                                    expandedReasoning === img._id
+                                                        ? 'bg-violet-500/15 text-violet-300 border-violet-500/30'
+                                                        : 'bg-white/[0.02] text-slate-500 hover:text-violet-400 border-white/[0.06] hover:border-violet-500/20'
+                                                }`}
+                                            >
+                                                <span className="material-symbols-outlined text-xs" style={{ fontSize: '12px' }}>psychology</span>
+                                                {expandedReasoning === img._id ? 'Hide Reasoning' : 'Thinking Mode'}
+                                                <span className="material-symbols-outlined text-xs" style={{ fontSize: '10px', transition: 'transform 0.2s', transform: expandedReasoning === img._id ? 'rotate(180deg)' : 'rotate(0deg)' }}>expand_more</span>
+                                            </button>
+                                        )}
+
+                                        {/* ── MCoT Reasoning Chain Panel ── */}
+                                        {expandedReasoning === img._id && img.aiMeta?.mcotReasoning && (() => {
+                                            const r = img.aiMeta.mcotReasoning
+                                            return (
+                                                <div className="mt-2 rounded-xl border border-violet-500/15 bg-gradient-to-b from-violet-950/20 to-black/30 overflow-hidden animate-fade-in">
+                                                    {/* Header */}
+                                                    <div className="px-3 py-2 bg-violet-500/[0.06] border-b border-violet-500/10 flex items-center gap-2">
+                                                        <span className="material-symbols-outlined text-violet-400" style={{ fontSize: '14px' }}>neurology</span>
+                                                        <span className="text-[10px] font-bold text-violet-300 uppercase tracking-wider">MCoT Reasoning Chain</span>
+                                                        {img.aiMeta?.pipelineTimeMs && (
+                                                            <span className="text-[9px] text-violet-500 ml-auto">{(img.aiMeta.pipelineTimeMs / 1000).toFixed(1)}s</span>
+                                                        )}
+                                                    </div>
+
+                                                    <div className="p-3 space-y-2.5">
+                                                        {/* Step 1: Brand Intelligence */}
+                                                        {r.brandInsight?.name && (
+                                                            <div className="flex gap-2">
+                                                                <div className="w-5 h-5 rounded-md bg-blue-500/15 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                                                    <span className="material-symbols-outlined text-blue-400" style={{ fontSize: '11px' }}>corporate_fare</span>
+                                                                </div>
+                                                                <div className="flex-1 min-w-0">
+                                                                    <p className="text-[9px] font-bold text-blue-400 uppercase tracking-wider mb-0.5">Brand Intel</p>
+                                                                    <p className="text-[10px] text-slate-300 leading-relaxed">
+                                                                        <span className="text-white font-semibold">{r.brandInsight.name}</span>
+                                                                        {r.brandInsight.industry && <span className="text-slate-500"> · {r.brandInsight.industry}</span>}
+                                                                        {r.brandInsight.brandType && <span className="text-slate-500"> · {r.brandInsight.brandType}</span>}
+                                                                    </p>
+                                                                    {r.brandInsight.targetAudience && (
+                                                                        <p className="text-[9px] text-slate-500 mt-0.5">🎯 {r.brandInsight.targetAudience}</p>
+                                                                    )}
+                                                                    {r.brandInsight.colors?.length > 0 && (
+                                                                        <div className="flex gap-1 mt-1">
+                                                                            {r.brandInsight.colors.map((c, i) => (
+                                                                                <span key={i} className="text-[8px] px-1.5 py-0.5 rounded bg-white/[0.05] text-slate-400">{c}</span>
+                                                                            ))}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        )}
+
+                                                        {/* Step 2: Product Match */}
+                                                        {r.matchedProduct?.title && (
+                                                            <div className="flex gap-2">
+                                                                <div className="w-5 h-5 rounded-md bg-amber-500/15 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                                                    <span className="material-symbols-outlined text-amber-400" style={{ fontSize: '11px' }}>inventory_2</span>
+                                                                </div>
+                                                                <div className="flex-1 min-w-0">
+                                                                    <p className="text-[9px] font-bold text-amber-400 uppercase tracking-wider mb-0.5">Matched Product</p>
+                                                                    <p className="text-[10px] text-slate-300">
+                                                                        <span className="text-white font-semibold">{r.matchedProduct.title}</span>
+                                                                        {r.matchedProduct.category && <span className="text-slate-500"> · {r.matchedProduct.category}</span>}
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+                                                        )}
+
+                                                        {/* Step 3: Visual Grounding (MCoT Stage 1) */}
+                                                        {r.visualGrounding && (
+                                                            <div className="flex gap-2">
+                                                                <div className="w-5 h-5 rounded-md bg-emerald-500/15 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                                                    <span className="material-symbols-outlined text-emerald-400" style={{ fontSize: '11px' }}>visibility</span>
+                                                                </div>
+                                                                <div className="flex-1 min-w-0">
+                                                                    <p className="text-[9px] font-bold text-emerald-400 uppercase tracking-wider mb-0.5">
+                                                                        Visual Grounding
+                                                                        {r.visualGrounding.confidence && (
+                                                                            <span className={`ml-1.5 px-1 py-0.5 rounded text-[8px] font-bold ${
+                                                                                r.visualGrounding.confidence === 'high' ? 'bg-emerald-500/20 text-emerald-300' :
+                                                                                r.visualGrounding.confidence === 'medium' ? 'bg-yellow-500/20 text-yellow-300' :
+                                                                                'bg-red-500/20 text-red-300'}`}
+                                                                            >{r.visualGrounding.confidence}</span>
+                                                                        )}
+                                                                    </p>
+                                                                    {r.visualGrounding.productAnalysis && (
+                                                                        <p className="text-[10px] text-slate-300 leading-relaxed">{r.visualGrounding.productAnalysis}</p>
+                                                                    )}
+                                                                    {r.visualGrounding.colorPalette?.length > 0 && (
+                                                                        <div className="flex gap-1 mt-1 flex-wrap">
+                                                                            <span className="text-[8px] text-slate-500">Colors:</span>
+                                                                            {r.visualGrounding.colorPalette.map((c, i) => (
+                                                                                <span key={i} className="text-[8px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-300/70">{c}</span>
+                                                                            ))}
+                                                                        </div>
+                                                                    )}
+                                                                    {r.visualGrounding.materialFinish && (
+                                                                        <p className="text-[9px] text-slate-500 mt-0.5">🔩 {r.visualGrounding.materialFinish}</p>
+                                                                    )}
+                                                                    {r.visualGrounding.avoidList?.length > 0 && (
+                                                                        <p className="text-[9px] text-rose-400/60 mt-0.5">⚠️ Avoid: {r.visualGrounding.avoidList.join(', ')}</p>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        )}
+
+                                                        {/* Step 4: Art Direction */}
+                                                        {r.artDirection && (
+                                                            <div className="flex gap-2">
+                                                                <div className="w-5 h-5 rounded-md bg-pink-500/15 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                                                    <span className="material-symbols-outlined text-pink-400" style={{ fontSize: '11px' }}>palette</span>
+                                                                </div>
+                                                                <div className="flex-1 min-w-0">
+                                                                    <p className="text-[9px] font-bold text-pink-400 uppercase tracking-wider mb-0.5">Art Direction</p>
+                                                                    <p className="text-[10px] text-slate-300 leading-relaxed">
+                                                                        {r.artDirection.mood && <span><span className="text-white font-semibold">Mood:</span> {r.artDirection.mood} · </span>}
+                                                                        {r.artDirection.visualStyle && <span><span className="text-white font-semibold">Style:</span> {r.artDirection.visualStyle}</span>}
+                                                                    </p>
+                                                                    {r.artDirection.lighting && (
+                                                                        <p className="text-[9px] text-slate-500 mt-0.5">💡 {r.artDirection.lighting}</p>
+                                                                    )}
+                                                                    {r.artDirection.composition && (
+                                                                        <p className="text-[9px] text-slate-500 mt-0.5">📐 {r.artDirection.composition}</p>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        )}
+
+                                                        {/* Step 5: Style Critique */}
+                                                        {r.styleCritique && (
+                                                            <div className="flex gap-2">
+                                                                <div className="w-5 h-5 rounded-md bg-cyan-500/15 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                                                    <span className="material-symbols-outlined text-cyan-400" style={{ fontSize: '11px' }}>verified</span>
+                                                                </div>
+                                                                <div className="flex-1 min-w-0">
+                                                                    <p className="text-[9px] font-bold text-cyan-400 uppercase tracking-wider mb-0.5">Brand Alignment</p>
+                                                                    <div className="flex items-center gap-2">
+                                                                        <div className="flex-1 h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
+                                                                            <div className="h-full rounded-full transition-all"
+                                                                                style={{
+                                                                                    width: `${r.styleCritique.brandAlignmentScore || 0}%`,
+                                                                                    background: (r.styleCritique.brandAlignmentScore || 0) >= 80 ? '#34d399' : (r.styleCritique.brandAlignmentScore || 0) >= 60 ? '#fbbf24' : '#f87171',
+                                                                                }}
+                                                                            />
+                                                                        </div>
+                                                                        <span className="text-[10px] font-bold text-white">{r.styleCritique.brandAlignmentScore || 0}%</span>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        )}
+
+                                                        {/* Post-Gen Critique Score (if available — populated async) */}
+                                                        {img.aiMeta?.mcotScore && (
+                                                            <div className="flex gap-2">
+                                                                <div className="w-5 h-5 rounded-md bg-violet-500/15 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                                                    <span className="material-symbols-outlined text-violet-400" style={{ fontSize: '11px' }}>auto_awesome</span>
+                                                                </div>
+                                                                <div className="flex-1 min-w-0">
+                                                                    <p className="text-[9px] font-bold text-violet-400 uppercase tracking-wider mb-0.5">Quality Score</p>
+                                                                    <div className="flex items-center gap-2">
+                                                                        <div className="flex-1 h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
+                                                                            <div className="h-full rounded-full transition-all"
+                                                                                style={{
+                                                                                    width: `${img.aiMeta.mcotScore}%`,
+                                                                                    background: img.aiMeta.mcotScore >= 75 ? '#a78bfa' : img.aiMeta.mcotScore >= 50 ? '#fbbf24' : '#f87171',
+                                                                                }}
+                                                                            />
+                                                                        </div>
+                                                                        <span className="text-[10px] font-bold text-white">{img.aiMeta.mcotScore}/100</span>
+                                                                    </div>
+                                                                    {img.aiMeta.mcotCritique?.verdict && (
+                                                                        <span className={`inline-block mt-1 text-[8px] font-bold px-1.5 py-0.5 rounded ${
+                                                                            img.aiMeta.mcotCritique.verdict === 'approved' ? 'bg-emerald-500/15 text-emerald-300' :
+                                                                            img.aiMeta.mcotCritique.verdict === 'improve' ? 'bg-amber-500/15 text-amber-300' :
+                                                                            'bg-rose-500/15 text-rose-300'
+                                                                        }`}>{img.aiMeta.mcotCritique.verdict.toUpperCase()}</span>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            )
+                                        })()}
                                     </div>
                                     ))}
                                 </div>

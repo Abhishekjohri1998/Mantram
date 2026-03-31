@@ -7,7 +7,7 @@
  * Each node: (state) → updatedState
  */
 
-import { callAgent, loadBrandContext } from '../shared/agentUtils.js';
+import { callAgent, callMultimodalAgent, loadBrandContext } from '../shared/agentUtils.js';
 import Brand from '../../models/Brand.js';
 import Product from '../../models/Product.js';
 import {
@@ -17,6 +17,8 @@ import {
     STYLE_CRITIC_PROMPT,
     VARIATION_PROMPT,
     COPYWRITER_PROMPT,
+    VISUAL_GROUNDING_PROMPT,
+    POST_GENERATION_CRITIC_PROMPT,
 } from './prompts.js';
 
 
@@ -712,8 +714,9 @@ export async function copywriterNode(state) {
         intel.usps?.length > 0 ? `BRAND USPs: ${intel.usps.join(', ')}` : '',
     ].filter(Boolean).join('\n');
 
-    const result = await callAgent(COPYWRITER_PROMPT(brandContext), userPrompt, 0.75, 2048);
-    console.log(`✍️  Copywriter done in ${Date.now() - startMs}ms — headline: "${result.headline || '?'}"`);
+    const result = await callAgent(COPYWRITER_PROMPT(brandContext), userPrompt, 0.75, 8192);
+    console.log(`✍️  Copywriter done in ${Date.now() - startMs}ms — headline: "${result.headline || '?'}"${result.error ? ` [PARSE ERROR: ${result.error}]` : ''}`);
+    if (result.cta) console.log(`✍️  Copywriter CTA: "${result.cta}"`);
 
     return {
         ...state,
@@ -726,6 +729,139 @@ export async function copywriterNode(state) {
             copyNotes: result.copyNotes || '',
         },
         status: 'copywriting',
+    };
+}
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// MCoT NODE: VISUAL GROUNDING — Analyze product/brand images BEFORE generation
+// Stage 1: The AI "sees" real images and produces a detailed visual rationale
+// that prevents product hallucination in downstream prompt engineering
+// ══════════════════════════════════════════════════════════════════════════════
+export async function visualGroundingNode(state) {
+    console.log('🧠 MCoT: Visual Grounding — analyzing product/brand images...');
+    const startMs = Date.now();
+
+    // Collect all available images for analysis
+    const mp = state.matchedProduct;
+    const intel = state.brandIntel || {};
+    const imagesToAnalyze = [];
+
+    // Priority 1: Matched product images (most important for anti-hallucination)
+    if (mp?.images?.length > 0) {
+        imagesToAnalyze.push(...mp.images.slice(0, 3));
+    }
+
+    // Priority 2: Brand DNA images (for style grounding)
+    if (intel.matchedDnaImages?.length > 0 && imagesToAnalyze.length < 4) {
+        const remaining = 4 - imagesToAnalyze.length;
+        imagesToAnalyze.push(...intel.matchedDnaImages.slice(0, remaining));
+    }
+
+    // Priority 3: General brand images (fallback for brand aesthetic)
+    if (intel.brandImages?.length > 0 && imagesToAnalyze.length < 3) {
+        const remaining = 3 - imagesToAnalyze.length;
+        const nonDuplicates = intel.brandImages.filter(url => !imagesToAnalyze.includes(url));
+        imagesToAnalyze.push(...nonDuplicates.slice(0, remaining));
+    }
+
+    // Skip MCoT if no images available — fall through gracefully
+    if (imagesToAnalyze.length === 0) {
+        console.log('🧠 MCoT: No images available for visual grounding — skipping');
+        return { ...state, visualGrounding: null, status: 'visual-grounding-skipped' };
+    }
+
+    // Build context prompt
+    const userPrompt = [
+        `CREATIVE BRIEF: ${state.brief}`,
+        mp ? `TARGET PRODUCT: "${mp.title}"${mp.description ? ` — ${mp.description}` : ''}` : '',
+        mp?.category ? `PRODUCT CATEGORY: ${mp.category}` : '',
+        `BRAND: ${intel.name || 'Unknown'}`,
+        intel.industry ? `INDUSTRY: ${intel.industry}` : '',
+        `\nAnalyze the ${imagesToAnalyze.length} provided image(s) and produce your visual rationale.`,
+        `These images show ${mp ? `the product "${mp.title}"` : 'the brand\'s visual identity'}.`,
+    ].filter(Boolean).join('\n');
+
+    const result = await callMultimodalAgent(
+        VISUAL_GROUNDING_PROMPT,
+        userPrompt,
+        imagesToAnalyze,
+        { temperature: 0.2, maxTokens: 4096 }
+    );
+
+    // Handle MCoT failure gracefully — never block the pipeline
+    if (result.error || result.skipped) {
+        console.warn(`🧠 MCoT: Visual grounding failed (non-blocking): ${result.error}`);
+        return { ...state, visualGrounding: null, status: 'visual-grounding-skipped' };
+    }
+
+    console.log(`🧠 MCoT: Visual grounding complete in ${Date.now() - startMs}ms — confidence: ${result.confidence || 'unknown'}`);
+    console.log(`🧠 MCoT: Product analysis: ${(result.productAnalysis || '').substring(0, 120)}...`);
+
+    return {
+        ...state,
+        visualGrounding: result,
+        status: 'visual-grounding',
+    };
+}
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// MCoT NODE: POST-GENERATION CRITIC — Analyze the generated image quality
+// Stage 2: Verifies the output matches the brief and product accuracy
+// Returns a verdict (approved/improve/reject) with an optional improved prompt
+// ══════════════════════════════════════════════════════════════════════════════
+export async function postGenerationCriticNode(state) {
+    console.log('🔎 MCoT: Post-Generation Critic — analyzing generated image...');
+    const startMs = Date.now();
+
+    const imageUrl = state.generatedImageUrl;
+    if (!imageUrl) {
+        console.warn('🔎 MCoT: No generated image URL provided — skipping critic');
+        return { ...state, postGenCritique: null };
+    }
+
+    const intel = state.brandIntel || {};
+    const mp = state.matchedProduct;
+    const vg = state.visualGrounding;
+
+    // Build comprehensive context for the critic
+    const userPrompt = [
+        `ORIGINAL CREATIVE BRIEF: ${state.brief}`,
+        `GENERATED WITH PROMPT: ${(state.finalPrompt || '').substring(0, 500)}`,
+        `TARGET FORMAT: ${state.format || 'instagram-post'}`,
+        `BRAND: ${intel.name || 'Unknown'}${intel.industry ? ` (${intel.industry})` : ''}`,
+        mp ? `EXPECTED PRODUCT: "${mp.title}"${mp.category ? ` [${mp.category}]` : ''}` : 'No specific product expected',
+        mp?.description ? `PRODUCT DESCRIPTION: ${mp.description}` : '',
+        // Inject visual grounding rationale for comparison
+        vg?.productAnalysis ? `\nVISUAL GROUNDING REFERENCE (from real product photos):\n${vg.productAnalysis}` : '',
+        vg?.colorPalette?.length > 0 ? `EXPECTED COLORS: ${vg.colorPalette.join(', ')}` : '',
+        `\nAnalyze the generated image (provided) against these requirements. Score it honestly.`,
+    ].filter(Boolean).join('\n');
+
+    const result = await callMultimodalAgent(
+        POST_GENERATION_CRITIC_PROMPT,
+        userPrompt,
+        [imageUrl], // Send the generated image for visual analysis
+        { temperature: 0.2, maxTokens: 4096 }
+    );
+
+    // Handle failure gracefully
+    if (result.error || result.skipped) {
+        console.warn(`🔎 MCoT: Post-gen critic failed (non-blocking): ${result.error}`);
+        return { ...state, postGenCritique: null };
+    }
+
+    const score = result.overallScore || 0;
+    const verdict = result.verdict || 'approved';
+    console.log(`🔎 MCoT: Critique complete in ${Date.now() - startMs}ms — score: ${score}/100, verdict: ${verdict}`);
+    if (result.issues?.length > 0) {
+        console.log(`🔎 MCoT: Issues found: ${result.issues.join('; ')}`);
+    }
+
+    return {
+        ...state,
+        postGenCritique: result,
     };
 }
 
@@ -776,6 +912,17 @@ export async function runCreativePipeline(params) {
     const productName = state.matchedProduct?.title || '';
     emit('brand-intel', productName ? `Matched product: ${productName}` : 'Brand context loaded', 'done', productName ? `Using "${productName}" as hero product` : '');
 
+    // ── MCoT: Visual Grounding — analyze product/brand images before generation ──
+    // This is the key MCoT Stage 1: AI "sees" real images and produces a visual rationale
+    // that prevents product hallucination in downstream prompt engineering
+    emit('visual-grounding', 'Analyzing product visuals (MCoT)...', 'working');
+    state = await visualGroundingNode(state);
+    if (state.visualGrounding) {
+        emit('visual-grounding', `Visual analysis: ${state.visualGrounding.confidence || 'done'}`, 'done', state.visualGrounding.productAnalysis?.substring(0, 60) || '');
+    } else {
+        emit('visual-grounding', 'No product images — skipped', 'done');
+    }
+
     // ── Copywriter result — runs BEFORE image prompt is finalized ──
     // When generateCopy is ON, the copywriter generates headline/CTA first,
     // then those texts are INJECTED into the image prompt so the AI model
@@ -791,6 +938,21 @@ export async function runCreativePipeline(params) {
         state = await fastCreativeDirectorNode(state);
         emit('art-director', `Direction: ${state.artDirection?.mood || 'defined'}`, 'done', state.artDirection?.visualStyle || '');
         state.finalPrompt = state.engineeredPrompt?.primaryPrompt || brief;
+
+        // ── MCoT: Inject visual grounding rationale into the prompt ──
+        if (state.visualGrounding?.generationGuidance) {
+            const vg = state.visualGrounding;
+            const groundingInjection = [
+                `\nVISUAL GROUNDING (from real product/brand photos):`,
+                vg.productAnalysis ? `Product: ${vg.productAnalysis}` : '',
+                vg.colorPalette?.length > 0 ? `Accurate colors: ${vg.colorPalette.join(', ')}` : '',
+                vg.materialFinish ? `Material: ${vg.materialFinish}` : '',
+                vg.generationGuidance ? `CRITICAL: ${vg.generationGuidance}` : '',
+                vg.avoidList?.length > 0 ? `DO NOT: ${vg.avoidList.join('; ')}` : '',
+            ].filter(Boolean).join('\n');
+            state.finalPrompt = state.finalPrompt + '\n' + groundingInjection;
+            console.log(`🧠 MCoT: Visual grounding rationale injected into prompt`);
+        }
 
         // ── Run copywriter BEFORE finalizing prompt (so copy goes INTO the image) ──
         if (generateCopy) {
@@ -845,6 +1007,21 @@ export async function runCreativePipeline(params) {
 
         state.finalPrompt = state.styleCritique?.improvedPrompt || state.engineeredPrompt?.primaryPrompt || brief;
 
+        // ── MCoT: Inject visual grounding rationale into the prompt (Quality Mode) ──
+        if (state.visualGrounding?.generationGuidance) {
+            const vg = state.visualGrounding;
+            const groundingInjection = [
+                `\nVISUAL GROUNDING (from real product/brand photos):`,
+                vg.productAnalysis ? `Product: ${vg.productAnalysis}` : '',
+                vg.colorPalette?.length > 0 ? `Accurate colors: ${vg.colorPalette.join(', ')}` : '',
+                vg.materialFinish ? `Material: ${vg.materialFinish}` : '',
+                vg.generationGuidance ? `CRITICAL: ${vg.generationGuidance}` : '',
+                vg.avoidList?.length > 0 ? `DO NOT: ${vg.avoidList.join('; ')}` : '',
+            ].filter(Boolean).join('\n');
+            state.finalPrompt = state.finalPrompt + '\n' + groundingInjection;
+            console.log(`🧠 MCoT: Visual grounding rationale injected into prompt (quality mode)`);
+        }
+
         // ── INJECT copy text into the final image prompt ──
         if (copyResult) {
             const copyInjection = buildCopyInjection(copyResult);
@@ -865,6 +1042,7 @@ export async function runCreativePipeline(params) {
         styleCritique: state.styleCritique || null,
         brandIntel: state.brandIntel,
         matchedProduct: state.matchedProduct || null,
+        visualGrounding: state.visualGrounding || null,
         copy: copyResult || null,
         pipelineTimeMs: totalMs,
         mode,

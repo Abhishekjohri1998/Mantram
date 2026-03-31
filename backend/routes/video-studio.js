@@ -36,6 +36,7 @@ import {
     enhancePromptNode,
     durationPlannerNode,
     advancedGenerateNode,
+    videoVisualGroundingNode,
 } from '../agents/videoStudio/nodes.js';
 import { estimateCost, getModelsInfo, MODEL_CAPABILITIES } from '../agents/videoStudio/falClient.js';
 import { submitPiApiImageToVideo, submitPiApiVideoExtend } from '../agents/videoStudio/piApiClient.js';
@@ -1289,13 +1290,32 @@ router.post('/start', protect, requireCredits('videoBrainstorm'), async (req, re
 
         console.log(`🎬 Video Studio: Created project ${project._id}`);
 
-        // Run brainstorm node
+        // Run MCoT visual grounding BEFORE brainstorm (non-blocking)
+        let visualGrounding = null;
+        if (brandId) {
+            try {
+                console.log(`🧠 MCoT Video: Running visual grounding before brainstorm...`);
+                const groundingState = await videoVisualGroundingNode({
+                    brandId,
+                    brief: brief || '',
+                });
+                visualGrounding = groundingState.visualGrounding;
+                if (visualGrounding) {
+                    console.log(`🧠 MCoT Video: Visual grounding complete — mood: ${visualGrounding.brandMood || 'n/a'}`);
+                }
+            } catch (groundErr) {
+                console.warn('🧠 MCoT Video: Visual grounding failed (non-blocking):', groundErr.message);
+            }
+        }
+
+        // Run brainstorm node (with visual grounding injected)
         const state = await runStep(project._id, 'brainstorm', brainstormNode, {
             userId: req.user._id.toString(),
             brandId: brandId || null,
             brief: brief || '',
             inputImages: images || [],
             videoType: videoType || 'ad-film',
+            visualGrounding,
         });
 
         // Get style preferences if available
@@ -2600,6 +2620,20 @@ router.post('/:id/select', protect, async (req, res) => {
             return res.status(400).json({ success: false, error: 'Concepts missing. Please regenerate brainstorm.' });
         }
 
+        // Re-run MCoT visual grounding for script director (non-blocking)
+        let visualGrounding = null;
+        if (project.brand) {
+            try {
+                const groundingState = await videoVisualGroundingNode({
+                    brandId: project.brand.toString(),
+                    brief: project.input?.brief || '',
+                });
+                visualGrounding = groundingState.visualGrounding;
+            } catch (groundErr) {
+                console.warn('🧠 MCoT Video Select: Visual grounding skipped:', groundErr.message);
+            }
+        }
+
         const state = await runStep(project._id, 'script', scriptDirectorNode, {
             userId: req.user._id.toString(),
             brandId: project.brand?.toString(),
@@ -2608,6 +2642,7 @@ router.post('/:id/select', protect, async (req, res) => {
             videoType: project.input?.videoType || 'ad-film',
             concepts: project.concepts,
             selectedConceptIndex: conceptIndex,
+            visualGrounding,
         });
 
         res.json({

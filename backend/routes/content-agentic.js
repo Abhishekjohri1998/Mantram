@@ -29,6 +29,7 @@ import {
     youtubeWriterNode,
     youtubeSeoNode,
     blogWriterNode,
+    contentVisualGroundingNode,
 } from '../agents/contentStudio/nodes.js';
 
 const router = Router();
@@ -143,10 +144,20 @@ router.post('/start', protect, requireCredits('content'), async (req, res) => {
 
         state = await researchNode(state);
 
+        // Step 1.5: MCoT Visual Grounding (non-blocking — runs concurrently with research results)
+        // Analyzes brand/product images to produce copywriting context for the Writer Agent
+        if (brandId) {
+            try {
+                state = await contentVisualGroundingNode(state);
+            } catch (gErr) {
+                console.warn('[Content MCoT] Visual grounding failed (non-critical):', gErr.message);
+            }
+        }
+
         // Step 2: Content Strategist (turns research into strategic plan)
         state = await contentStrategistNode(state);
 
-        // Step 3: Writer (auto-chains from strategy, enriched with real data)
+        // Step 3: Writer (auto-chains from strategy, enriched with real data + visual grounding)
         state = await writerNode(state);
 
         // Save initial content

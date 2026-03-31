@@ -23,6 +23,7 @@ import {
     EDITOR_PROMPT,
     PROMPT_ENHANCER_PROMPT,
     DURATION_PLANNER_PROMPT,
+    VIDEO_VISUAL_GROUNDING_PROMPT,
 } from './prompts.js';
 import { estimateCost, submitVideoGeneration, getGenerationStatus, getGrokGenerationStatus, MODEL_CAPABILITIES } from './falClient.js';
 import { getKieGenerationStatus } from './kieClient.js';
@@ -30,12 +31,34 @@ import { getPiApiGenerationStatus, resubmitPiApiTask, uploadImageToHostedUrl } f
 import { getMuApiGenerationStatus, resubmitMuApiTask } from './muapiClient.js';
 
 import { getPastProjects } from './selfLearning.js';
+import { callMultimodalAgent } from '../shared/agentUtils.js';
+import Product from '../../models/Product.js';
 
 // ── Helper: Parse JSON from any AI response ──
 function parseAgentJSON(text) {
     try {
-        const jsonMatch = text.match(/\{[\s\S]*\}/);
-        if (jsonMatch) return JSON.parse(jsonMatch[0]);
+        let cleaned = text;
+        // Strip <think>...</think> tags (Gemini 2.5 Flash reasoning)
+        cleaned = cleaned.replace(/<think>[\s\S]*?<\/think>/gi, '');
+        const lastThinkIdx = cleaned.lastIndexOf('<think>');
+        if (lastThinkIdx !== -1) {
+            const before = cleaned.substring(0, lastThinkIdx).trim();
+            cleaned = before.length > 0 ? before : '';
+        }
+        // Strip markdown code fences
+        cleaned = cleaned.replace(/```(?:json)?\s*\n?/gi, '');
+        cleaned = cleaned.trim();
+        
+        if (cleaned.startsWith('{')) {
+            try { return JSON.parse(cleaned); } catch (_) { /* try next */ }
+        }
+        const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+            try { return JSON.parse(jsonMatch[0]); } catch (_) { /* try next */ }
+            // Fix trailing commas + unquoted keys
+            const fixed = jsonMatch[0].replace(/,\s*([\]}])/g, '$1').replace(/([{,]\s*)(\w+)\s*:/g, '$1"$2":');
+            try { return JSON.parse(fixed); } catch (_) { /* give up */ }
+        }
     } catch (e) {
         console.warn('Agent JSON parse failed, raw response:', text.substring(0, 200));
     }
@@ -77,6 +100,57 @@ async function loadContext(brandId, userId) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+// NODE 0 (MCoT): VIDEO VISUAL GROUNDING — Analyze brand images before brainstorm
+// ══════════════════════════════════════════════════════════════════════════════
+export async function videoVisualGroundingNode(state) {
+    console.log('🧠 MCoT Node: Video Visual Grounding — analyzing brand images...');
+
+    if (!state.brandId) {
+        console.log('🧠 MCoT: No brandId, skipping visual grounding');
+        return { ...state, visualGrounding: null };
+    }
+
+    try {
+        // Load brand + product images
+        const brand = await Brand.findById(state.brandId).select('dna name logo').lean();
+        const products = await Product.find({ brand: state.brandId, status: 'active' })
+            .select('images title')
+            .limit(5)
+            .lean();
+
+        const brandImages = [
+            ...(brand?.logo?.url ? [brand.logo.url] : []),
+            ...(brand?.dna?.brandImages || []).filter(i => i.url).map(i => i.url).slice(0, 3),
+            ...products.flatMap(p => (p.images || []).filter(i => i.url).map(i => i.url)).slice(0, 3),
+        ].filter(Boolean).slice(0, 5);
+
+        if (brandImages.length === 0) {
+            console.log('🧠 MCoT: No brand images found, skipping visual grounding');
+            return { ...state, visualGrounding: null };
+        }
+
+        console.log(`🧠 MCoT: Analyzing ${brandImages.length} brand images for video context...`);
+        const grounding = await callMultimodalAgent(
+            VIDEO_VISUAL_GROUNDING_PROMPT,
+            `Analyze these ${brandImages.length} images from brand "${brand?.name || 'unknown'}" and extract visual DNA for video production. The user's brief: "${state.brief || 'Create a professional video'}".`,
+            brandImages,
+            { temperature: 0.2, maxTokens: 4096 }
+        );
+
+        if (grounding && !grounding.error && !grounding.skipped) {
+            console.log(`🧠 MCoT: Visual grounding complete — mood: ${grounding.brandMood || 'unknown'}, colors: ${(grounding.heroColors || []).join(', ')}`);
+            return { ...state, visualGrounding: grounding };
+        }
+
+        console.warn('🧠 MCoT: Visual grounding returned empty/error result (non-blocking)');
+        return { ...state, visualGrounding: null };
+    } catch (err) {
+        console.warn('🧠 MCoT: Visual grounding failed (non-blocking):', err.message);
+        return { ...state, visualGrounding: null };
+    }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 // NODE 1: BRAINSTORM — Generate 3-5 video concepts
 // ══════════════════════════════════════════════════════════════════════════════
 export async function brainstormNode(state) {
@@ -97,10 +171,27 @@ export async function brainstormNode(state) {
         imageContext = `\nREFERENCE IMAGES PROVIDED (${state.inputImages.length}):\n${imageDescs}\n\nIMPORTANT: Incorporate the visual style, subjects, and mood from these images into your video concepts. The concepts should align with what's shown in the images.`;
     }
 
+    // Build visual grounding context (from MCoT pre-analysis)
+    let groundingContext = '';
+    if (state.visualGrounding) {
+        const vg = state.visualGrounding;
+        groundingContext = [
+            '\nVISUAL GROUNDING (from real brand/product image analysis):',
+            vg.productShape ? `Product: ${vg.productShape}` : '',
+            vg.heroColors?.length ? `Hero Colors: ${vg.heroColors.join(', ')}` : '',
+            vg.texture ? `Materials: ${vg.texture}` : '',
+            vg.brandMood ? `Brand Mood: ${vg.brandMood}` : '',
+            vg.cinematicStyle ? `Cinematic Direction: ${vg.cinematicStyle}` : '',
+            vg.shotSuggestions?.length ? `Shot Ideas: ${vg.shotSuggestions.join('; ')}` : '',
+            vg.avoidList?.length ? `Avoid: ${vg.avoidList.join('; ')}` : '',
+        ].filter(Boolean).join('\n');
+    }
+
     const userPrompt = [
         `VIDEO BRIEF: ${state.brief || 'Create a professional video ad'}`,
         `VIDEO TYPE: ${state.videoType || 'ad-film'}`,
         imageContext,
+        groundingContext,
     ].filter(Boolean).join('\n');
 
     const result = await callAgent(
@@ -139,6 +230,19 @@ export async function scriptDirectorNode(state) {
         imageContext = `\nREFERENCE IMAGES: ${imageDescs}\nUse these images as visual reference — incorporate their subjects, style, colors, and composition into the shots and backend prompt. The first shot should match the first reference image closely.`;
     }
 
+    // Build visual grounding context for script
+    let groundingContext = '';
+    if (state.visualGrounding) {
+        const vg = state.visualGrounding;
+        groundingContext = [
+            '\nVISUAL GROUNDING (from MCoT brand image analysis — use these real details):',
+            vg.productShape ? `Product Look: ${vg.productShape}` : '',
+            vg.heroColors?.length ? `Hero Colors: ${vg.heroColors.join(', ')} — use in color grading direction` : '',
+            vg.texture ? `Materials/Textures: ${vg.texture} — inform lighting choices` : '',
+            vg.cinematicStyle ? `Cinematic Style: ${vg.cinematicStyle}` : '',
+        ].filter(Boolean).join('\n');
+    }
+
     const userPrompt = [
         `SELECTED CONCEPT:`,
         `Title: ${selectedConcept.title}`,
@@ -151,6 +255,7 @@ export async function scriptDirectorNode(state) {
         '',
         state.brief ? `ORIGINAL BRIEF: ${state.brief}` : '',
         imageContext,
+        groundingContext,
     ].filter(Boolean).join('\n');
 
     const result = await callAgent(

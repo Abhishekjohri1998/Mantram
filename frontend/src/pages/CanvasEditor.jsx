@@ -3050,6 +3050,7 @@ function CanvasEditorInner() {
                 prompt: genEnhance ? `Professional high-quality ${genPrompt}` : genPrompt,
                 size: `${w}x${h}`,
                 referenceImages,
+                brandId: activeBrand?._id || undefined,
             })
             if (data.error) throw new Error(data.error)
             // Add to canvas
@@ -3275,7 +3276,7 @@ function CanvasEditorInner() {
                     const brandName = activeBrand?.name || 'Brand'
                     setFidatoMessages(prev => [...prev, { role: 'assistant', content: `🎨 Generating: "${args.prompt?.substring(0, 50)}..."` }])
                     try {
-                        const data = await canvasAssets.aiGenerate({ prompt: args.prompt, size: args.size || '1024x1024' })
+                        const data = await canvasAssets.aiGenerate({ prompt: args.prompt, size: args.size || '1024x1024', brandId: activeBrand?._id || undefined })
                         if (data.imageUrl) {
                             await addImageUrlToCanvas(data.imageUrl, 'AI Generated')
                             if (args.position) {

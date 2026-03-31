@@ -15,7 +15,7 @@ import { overlayLogo, fetchImageBuffer } from '../utils/logoOverlay.js';
 import { GoogleGenAI } from '@google/genai';
 import { safeErrorMessage } from '../utils/safeError.js';
 import { getRouter } from '../ai/router.js';
-import { runCreativePipeline } from '../agents/creativeStudio/nodes.js';
+import { runCreativePipeline, postGenerationCriticNode } from '../agents/creativeStudio/nodes.js';
 import { startProgress, addStep, getProgress, endProgress } from '../utils/progressStore.js';
 import { laozhangImageGenerate, laozhangMultimodalImageGenerate, isLaozhangAvailable } from '../agents/videoStudio/laozhangClient.js';
 
@@ -1204,11 +1204,62 @@ The output must fill the entire canvas edge-to-edge. Do NOT render any color pal
                     pipelineTimeMs: pipelineResult.pipelineTimeMs,
                     artDirection: pipelineResult.artDirection?.visualStyle || '',
                     brandAlignmentScore: pipelineResult.styleCritique?.brandAlignmentScore || 85,
+                    // ── MCoT Reasoning Chain (for Thinking Mode UI) ──
+                    mcotReasoning: {
+                        brandInsight: {
+                            name: pipelineResult.brandIntel?.name || '',
+                            industry: pipelineResult.brandIntel?.industry || '',
+                            personality: pipelineResult.brandIntel?.personality || '',
+                            targetAudience: pipelineResult.brandIntel?.targetAudience || '',
+                            brandType: pipelineResult.brandIntel?.brandType || '',
+                            colors: (pipelineResult.brandIntel?.colors || []).slice(0, 5),
+                        },
+                        artDirection: pipelineResult.artDirection ? {
+                            mood: pipelineResult.artDirection.mood || '',
+                            visualStyle: pipelineResult.artDirection.visualStyle || '',
+                            colorPalette: pipelineResult.artDirection.colorPalette || '',
+                            lighting: pipelineResult.artDirection.lighting || '',
+                            composition: pipelineResult.artDirection.composition || '',
+                        } : null,
+                        visualGrounding: pipelineResult.visualGrounding ? {
+                            productAnalysis: pipelineResult.visualGrounding.productAnalysis || '',
+                            keyVisualFeatures: pipelineResult.visualGrounding.keyVisualFeatures || [],
+                            colorPalette: pipelineResult.visualGrounding.colorPalette || [],
+                            materialFinish: pipelineResult.visualGrounding.materialFinish || '',
+                            generationGuidance: pipelineResult.visualGrounding.generationGuidance || '',
+                            avoidList: pipelineResult.visualGrounding.avoidList || [],
+                            confidence: pipelineResult.visualGrounding.confidence || '',
+                        } : null,
+                        styleCritique: pipelineResult.styleCritique ? {
+                            brandAlignmentScore: pipelineResult.styleCritique.brandAlignmentScore || 0,
+                            improvements: pipelineResult.styleCritique.improvements || [],
+                        } : null,
+                        matchedProduct: pipelineResult.matchedProduct ? {
+                            title: pipelineResult.matchedProduct.title || '',
+                            category: pipelineResult.matchedProduct.category || '',
+                        } : null,
+                    },
                 };
 
                 // Store copy result from pipeline (if copywriter was enabled)
                 if (pipelineResult.copy) {
                     agenticMeta.copy = pipelineResult.copy;
+                }
+
+                // Store MCoT visual grounding for post-gen critic
+                if (pipelineResult.visualGrounding) {
+                    agenticMeta.visualGrounding = pipelineResult.visualGrounding;
+                    agenticMeta.mcotEnabled = true;
+                    // Store lightweight brand/product context for critic (not full objects)
+                    agenticMeta.brandIntel = {
+                        name: pipelineResult.brandIntel?.name || '',
+                        industry: pipelineResult.brandIntel?.industry || '',
+                    };
+                    agenticMeta.matchedProduct = pipelineResult.matchedProduct ? {
+                        title: pipelineResult.matchedProduct.title,
+                        category: pipelineResult.matchedProduct.category || '',
+                        description: (pipelineResult.matchedProduct.description || '').substring(0, 200),
+                    } : null;
                 }
 
                 // ── ANTI-HALLUCINATION: Auto-inject real product images as reference ──
@@ -1413,6 +1464,10 @@ The output must fill the entire canvas edge-to-edge. Do NOT render any color pal
         // ══════════════════════════════════════════════════════════════════
         if (agenticMeta && result?.aiMeta) {
             result.aiMeta = { ...result.aiMeta, ...agenticMeta };
+            // Store visual grounding data for post-gen critic
+            if (agenticMeta.visualGrounding) {
+                result.aiMeta.visualGrounding = agenticMeta.visualGrounding;
+            }
         }
 
         // ══════════════════════════════════════════════════════════════════
@@ -1518,6 +1573,132 @@ The output must fill the entire canvas edge-to-edge. Do NOT render any color pal
                 }
             } catch (bgErr) {
                 console.error('[BG] Post-processing error:', bgErr.message);
+            }
+
+            // ═══════════════════════════════════════════════════════════════
+            // MCoT: POST-GENERATION CRITIC (background, non-blocking)
+            // Analyzes the generated image against the brief for quality scoring
+            // Stores critique data in the creative's aiMeta for learning
+            // ═══════════════════════════════════════════════════════════════
+            if (agenticMeta?.mcotEnabled) {
+                try {
+                    console.log(`🔎 MCoT: Running post-generation critic on creative ${creative._id}...`);
+                    const criticState = await postGenerationCriticNode({
+                        generatedImageUrl: rawImageUrl,
+                        brief: prompt,
+                        finalPrompt: fullPrompt,
+                        format: type || 'instagram-post',
+                        brandIntel: agenticMeta.brandIntel || {},
+                        matchedProduct: agenticMeta.matchedProduct || null,
+                        visualGrounding: agenticMeta.visualGrounding || null,
+                    });
+
+                    if (criticState.postGenCritique) {
+                        const critique = criticState.postGenCritique;
+                        await Creative.updateOne(
+                            { _id: creative._id },
+                            {
+                                $set: {
+                                    'aiMeta.mcotCritique': {
+                                        overallScore: critique.overallScore,
+                                        briefAlignmentScore: critique.briefAlignmentScore,
+                                        productAccuracyScore: critique.productAccuracyScore,
+                                        visualQualityScore: critique.visualQualityScore,
+                                        brandConsistencyScore: critique.brandConsistencyScore,
+                                        verdict: critique.verdict,
+                                        issues: critique.issues || [],
+                                        strengths: critique.strengths || [],
+                                        critiqueNotes: critique.critiqueNotes || '',
+                                    },
+                                    'aiMeta.mcotScore': critique.overallScore,
+                                },
+                            }
+                        );
+                        console.log(`🔎 MCoT: Critic stored — score: ${critique.overallScore}/100, verdict: ${critique.verdict}`);
+
+                        // ─── MCoT AUTO-RETRY on 'reject' verdict (score < 40) ───
+                        // When the critic is confident the image fails the brief, 
+                        // silently re-generate with the critic's improved prompt and 
+                        // replace the stored image. Max 1 retry. Non-blocking.
+                        if (critique.verdict === 'reject' && (critique.overallScore || 0) < 40 && critique.improvedPrompt) {
+                            console.log(`🔄 MCoT Auto-Retry: verdict=reject, score=${critique.overallScore} — re-generating with improved prompt...`);
+                            try {
+                                const retryPrompt = critique.improvedPrompt;
+                                const retryResult = await routedImageGenerate(
+                                    retryPrompt,
+                                    [], // text-only retry — no reference images needed
+                                    0.3,
+                                    geminiAspectRatio,
+                                    geminiImageSize,
+                                    selectedImageModel,
+                                    []
+                                );
+
+                                if (retryResult?.imageUrl && !retryResult.modelBusy) {
+                                    let retryUrl = retryResult.imageUrl;
+                                    const retryTs = Date.now();
+
+                                    // Upload retry image to S3
+                                    if (retryUrl.startsWith('data:image/')) {
+                                        try {
+                                            retryUrl = await uploadToS3(retryUrl, `creatives/${brandId}/${retryTs}-retry.png`);
+                                            console.log(`[MCoT-Retry] S3 upload complete: ${retryUrl}`);
+                                        } catch (s3E) {
+                                            console.warn('[MCoT-Retry] S3 upload failed:', s3E.message);
+                                        }
+                                    }
+
+                                    // Apply logo overlay if original requested it
+                                    if (options?.addLogo && retryUrl) {
+                                        try {
+                                            const retryBrand = await Brand.findById(brandId).lean();
+                                            const logoUrl = retryBrand?.dna?.logo?.url;
+                                            if (logoUrl) {
+                                                const [imgBuf, logoBuf] = await Promise.all([
+                                                    fetchImageBuffer(retryUrl),
+                                                    fetchImageBuffer(logoUrl),
+                                                ]);
+                                                if (imgBuf && logoBuf) {
+                                                    const composited = await overlayLogo(imgBuf, logoBuf, options.logoPosition || 'bottom-right', options.logoSize || 'medium');
+                                                    const b64 = `data:image/png;base64,${composited.toString('base64')}`;
+                                                    try {
+                                                        retryUrl = await uploadToS3(b64, `creatives/${brandId}/${retryTs}-retry-logo.png`);
+                                                        console.log(`[MCoT-Retry] Logo overlay applied: ${retryUrl}`);
+                                                    } catch (s3Le) {
+                                                        console.warn('[MCoT-Retry] Logo S3 failed:', s3Le.message);
+                                                    }
+                                                }
+                                            }
+                                        } catch (logoE) {
+                                            console.warn('[MCoT-Retry] Logo overlay failed:', logoE.message);
+                                        }
+                                    }
+
+                                    // Replace the creative's image with the improved version
+                                    await Creative.updateOne(
+                                        { _id: creative._id },
+                                        {
+                                            $set: {
+                                                imageUrl: retryUrl,
+                                                thumbnailUrl: retryUrl,
+                                                'aiMeta.mcotRetried': true,
+                                                'aiMeta.mcotRetryPrompt': retryPrompt.substring(0, 500),
+                                                'aiMeta.processingStatus': 'ready',
+                                            },
+                                        }
+                                    );
+                                    console.log(`🔄 MCoT Auto-Retry: SUCCESS — creative ${creative._id} replaced with improved image`);
+                                } else {
+                                    console.warn('[MCoT-Retry] Re-generation returned no image or model busy — keeping original');
+                                }
+                            } catch (retryErr) {
+                                console.warn('[MCoT-Retry] Auto-retry failed (non-critical):', retryErr.message);
+                            }
+                        }
+                    }
+                } catch (criticErr) {
+                    console.warn('[BG-MCoT] Post-gen critic failed (non-critical):', criticErr.message);
+                }
             }
         })();
 
@@ -1667,7 +1848,8 @@ router.get('/image-bank', protect, async (req, res) => {
             {
                 $project: {
                     type: 1, title: 1, prompt: 1, createdAt: 1, brand: 1,
-                    tags: 1, status: 1,
+                    tags: 1, status: 1, model: 1, aspectRatio: 1, copy: 1,
+                    aiMeta: 1, // Include for MCoT Thinking Mode UI
                     imageUrlPrefix: { $substrBytes: [{ $ifNull: ['$imageUrl', ''] }, 0, 500] },
                     thumbnailUrl: { $substrBytes: [{ $ifNull: ['$thumbnailUrl', ''] }, 0, 500] },
                 }

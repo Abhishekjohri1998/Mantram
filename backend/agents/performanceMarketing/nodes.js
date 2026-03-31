@@ -9,7 +9,9 @@ import Brand from '../../models/Brand.js';
 import AdCampaign from '../../models/AdCampaign.js';
 import AdLearning from '../../models/AdLearning.js';
 import Integration from '../../models/Integration.js';
+import Product from '../../models/Product.js';
 import { getRouter } from '../../ai/router.js';
+import { callMultimodalAgent } from '../shared/agentUtils.js';
 import {
     COMPETITOR_RESEARCH_PROMPT,
     STRATEGY_PROMPT,
@@ -18,6 +20,8 @@ import {
     AB_TEST_PROMPT,
     PERFORMANCE_ANALYST_PROMPT,
     REPORT_GENERATOR_PROMPT,
+    PM_VISUAL_GROUNDING_PROMPT,
+    PM_COMPETITOR_AD_ANALYSIS_PROMPT,
 } from './prompts.js';
 import { INDUSTRY_BENCHMARKS, detectIndustry } from './benchmarkEngine.js';
 import { getKeywordTrends, getRelatedQueries } from './webIntelligence.js';
@@ -51,8 +55,27 @@ async function callAgent(systemPrompt, userPrompt, temperature = 0.7) {
 
     const text = result.text || '';
     try {
-        const jsonMatch = text.match(/\{[\s\S]*\}/);
-        if (jsonMatch) return JSON.parse(jsonMatch[0]);
+        let cleaned = text;
+        // Strip <think>...</think> tags (Gemini 2.5 Flash reasoning)
+        cleaned = cleaned.replace(/<think>[\s\S]*?<\/think>/gi, '');
+        const lastThinkIdx = cleaned.lastIndexOf('<think>');
+        if (lastThinkIdx !== -1) {
+            const before = cleaned.substring(0, lastThinkIdx).trim();
+            cleaned = before.length > 0 ? before : '';
+        }
+        // Strip markdown code fences
+        cleaned = cleaned.replace(/```(?:json)?\s*\n?/gi, '');
+        cleaned = cleaned.trim();
+        
+        if (cleaned.startsWith('{')) {
+            try { return JSON.parse(cleaned); } catch (_) { /* try next */ }
+        }
+        const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+            try { return JSON.parse(jsonMatch[0]); } catch (_) { /* try next */ }
+            const fixed = jsonMatch[0].replace(/,\s*([\]}])/g, '$1').replace(/([{,]\s*)(\w+)\s*:/g, '$1"$2":');
+            try { return JSON.parse(fixed); } catch (_) { /* give up */ }
+        }
     } catch (e) {
         console.warn('PM Agent JSON parse failed, raw:', text.substring(0, 300));
     }
@@ -744,4 +767,125 @@ export async function reportGeneratorNode(state) {
         title: result.title || state.title,
         status: 'complete',
     };
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// MCoT: PM VISUAL GROUNDING NODE (Phase 4)
+// Analyzes brand/product images to produce ad-creative-specific context
+// that grounds the Ad Creator Node in visually accurate product detail.
+// Non-blocking — skips gracefully if no images available.
+// ══════════════════════════════════════════════════════════════════════════════
+export async function pmVisualGroundingNode(state) {
+    if (!state.brandId) {
+        console.log('🖼️ PM MCoT: No brandId — skipping visual grounding');
+        return state;
+    }
+
+    console.log('🧠 PM MCoT: Visual grounding — fetching brand/product images...');
+    try {
+        const brand = await Brand.findById(state.brandId).lean();
+        if (!brand) return state;
+
+        const imageUrls = [];
+        const dna = brand.dna || {};
+
+        // Brand logo
+        if (dna.logo?.url) imageUrls.push(dna.logo.url);
+
+        // Brand DNA visual images
+        const dnaImages = dna.images || dna.brandImages || [];
+        dnaImages.slice(0, 2).forEach(img => {
+            const url = typeof img === 'string' ? img : img?.url;
+            if (url) imageUrls.push(url);
+        });
+
+        // Product images (top 2 products)
+        if (imageUrls.length < 4) {
+            const products = await Product.find({ brand: state.brandId })
+                .sort({ createdAt: -1 })
+                .limit(3)
+                .lean();
+            for (const product of products) {
+                const imgUrl = product.images?.[0]?.url || product.imageUrl;
+                if (imgUrl) imageUrls.push(imgUrl);
+                if (imageUrls.length >= 5) break;
+            }
+        }
+
+        if (imageUrls.length === 0) {
+            console.log('🖼️ PM MCoT: No brand images found — skipping');
+            return state;
+        }
+
+        console.log(`🧠 PM MCoT: Analyzing ${imageUrls.length} brand images for ad creative grounding...`);
+
+        const grounding = await callMultimodalAgent(
+            PM_VISUAL_GROUNDING_PROMPT,
+            `Analyze these brand/product images for ${brand.name} (${dna.industry || 'consumer brand'}). Extract ad creative guidance for performance marketing.`,
+            imageUrls,
+            { temperature: 0.3, maxTokens: 1024 }
+        );
+
+        if (grounding && !grounding.error && !grounding.skipped) {
+            console.log(`🧠 PM MCoT: Visual grounding complete — DNA: ${grounding.brandVisualDNA || '(parsed)'}`);
+            return {
+                ...state,
+                pmVisualGrounding: grounding,
+            };
+        } else {
+            console.warn('🖼️ PM MCoT: Grounding returned no usable data — continuing without it');
+        }
+    } catch (err) {
+        console.warn('🖼️ PM MCoT: Visual grounding failed (non-critical):', err.message);
+    }
+
+    return state;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// MCoT: PM COMPETITOR AD ANALYSIS NODE (Phase 4)
+// Analyzes competitor ad creative images to extract winning patterns,
+// emotional triggers, CTA formulas, and exploitable gaps.
+// Runs in the /research background pipeline. Non-blocking.
+// ══════════════════════════════════════════════════════════════════════════════
+export async function pmCompetitorAdAnalysisNode(state) {
+    // Require competitor ad image URLs in state (from externalAds or scraping)
+    const competitorAdImages = (state.externalAds || [])
+        .flatMap(ad => [
+            ad.imageUrl,
+            ad.creativeUrl,
+            ad.thumbnailUrl,
+            ...(ad.imageUrls || []),
+        ])
+        .filter(url => url && typeof url === 'string' && (url.startsWith('http') || url.startsWith('data:')));
+
+    if (competitorAdImages.length === 0) {
+        console.log('🖼️ PM MCoT Competitor: No competitor ad images available — skipping visual analysis');
+        return state;
+    }
+
+    console.log(`🧠 PM MCoT: Analyzing ${competitorAdImages.length} competitor ad creatives...`);
+    try {
+        const brandName = state.brandName || 'this brand';
+        const analysis = await callMultimodalAgent(
+            PM_COMPETITOR_AD_ANALYSIS_PROMPT,
+            `Analyze these competitor ad creatives for the ${brandName} competitive landscape. Extract patterns, gaps, and differentiators.`,
+            competitorAdImages.slice(0, 5), // Max 5 competitor ads
+            { temperature: 0.3, maxTokens: 1024 }
+        );
+
+        if (analysis && !analysis.error && !analysis.skipped) {
+            console.log(`🧠 PM MCoT Competitor: Analysis complete — differentiator: ${(analysis.recommendedDifferentiator || '').substring(0, 60)}`);
+            return {
+                ...state,
+                pmCompetitorAdAnalysis: analysis,
+            };
+        } else {
+            console.warn('🖼️ PM MCoT: Competitor analysis returned no usable data — continuing');
+        }
+    } catch (err) {
+        console.warn('🖼️ PM MCoT: Competitor ad analysis failed (non-critical):', err.message);
+    }
+
+    return state;
 }

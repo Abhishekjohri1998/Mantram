@@ -97,8 +97,27 @@ async function callAgent(systemPrompt, userPrompt, temperature = 0.7) {
 
     const text = result.text || '';
     try {
-        const jsonMatch = text.match(/\{[\s\S]*\}/);
-        if (jsonMatch) return JSON.parse(jsonMatch[0]);
+        let cleaned = text;
+        // Strip <think>...</think> tags (Gemini 2.5 Flash reasoning)
+        cleaned = cleaned.replace(/<think>[\s\S]*?<\/think>/gi, '');
+        const lastThinkIdx = cleaned.lastIndexOf('<think>');
+        if (lastThinkIdx !== -1) {
+            const before = cleaned.substring(0, lastThinkIdx).trim();
+            cleaned = before.length > 0 ? before : '';
+        }
+        // Strip markdown code fences
+        cleaned = cleaned.replace(/```(?:json)?\s*\n?/gi, '');
+        cleaned = cleaned.trim();
+        
+        if (cleaned.startsWith('{')) {
+            try { return JSON.parse(cleaned); } catch (_) { /* try next */ }
+        }
+        const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+            try { return JSON.parse(jsonMatch[0]); } catch (_) { /* try next */ }
+            const fixed = jsonMatch[0].replace(/,\s*([\]}])/g, '$1').replace(/([{,]\s*)(\w+)\s*:/g, '$1"$2":');
+            try { return JSON.parse(fixed); } catch (_) { /* give up */ }
+        }
     } catch (e) {
         console.warn('[Retention] AI JSON parse failed:', text.substring(0, 300));
     }

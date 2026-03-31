@@ -27,8 +27,64 @@ export async function callAgent(systemPrompt, userPrompt, temperature = 0.7, max
 
     const text = result.text || '';
     try {
-        const jsonMatch = text.match(/\{[\s\S]*\}/);
-        if (jsonMatch) return JSON.parse(jsonMatch[0]);
+        let cleaned = text;
+        
+        // Debug: log raw response length
+        console.log(`🔍 callAgent raw response: ${text.length} chars, starts with: "${text.substring(0, 50)}..."`);
+        
+        // Strip <think>...</think> tags (Gemini 2.5 Flash reasoning)
+        // MUST strip closed tags first, then handle unclosed at end
+        cleaned = cleaned.replace(/<think>[\s\S]*?<\/think>/gi, '');
+        
+        // Only strip unclosed <think> if it appears AFTER any JSON content
+        // Check if there's still an unclosed <think> tag
+        const lastThinkIdx = cleaned.lastIndexOf('<think>');
+        if (lastThinkIdx !== -1) {
+            // Only strip from <think> onward if there's no JSON before it
+            const beforeThink = cleaned.substring(0, lastThinkIdx).trim();
+            if (beforeThink.length > 0) {
+                cleaned = beforeThink; // Keep content before <think>
+            } else {
+                cleaned = cleaned.substring(lastThinkIdx); // <think> is at start, strip everything
+                cleaned = cleaned.replace(/<think>[\s\S]*/gi, '');
+            }
+        }
+        
+        // Strip markdown code fences: ```json ... ``` or ``` ... ```
+        cleaned = cleaned.replace(/```(?:json)?\s*\n?/gi, '');
+        
+        cleaned = cleaned.trim();
+        
+        console.log(`🔍 callAgent cleaned: ${cleaned.length} chars, starts with: "${cleaned.substring(0, 80)}..."`);
+        
+        // Strategy 1: Full text as JSON
+        if (cleaned.startsWith('{')) {
+            try { return JSON.parse(cleaned); } catch (e) { 
+                console.log(`🔍 Strategy 1 failed: ${e.message.substring(0, 100)}`);
+            }
+        }
+        
+        // Strategy 2: Extract JSON with regex
+        const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+            console.log(`🔍 Strategy 2 match: ${jsonMatch[0].length} chars`);
+            try { return JSON.parse(jsonMatch[0]); } catch (e) { 
+                console.log(`🔍 Strategy 2 failed: ${e.message.substring(0, 100)}`);
+            }
+        }
+        
+        // Strategy 3: Fix trailing commas + unquoted keys
+        if (jsonMatch) {
+            const fixedJson = jsonMatch[0]
+                .replace(/,\s*([\]}])/g, '$1')
+                .replace(/([{,]\s*)(\w+)\s*:/g, '$1"$2":');
+            try { return JSON.parse(fixedJson); } catch (e) { 
+                console.log(`🔍 Strategy 3 failed: ${e.message.substring(0, 100)}`);
+                console.log(`🔍 Raw text sample (first 300): ${text.substring(0, 300)}`);
+            }
+        } else {
+            console.log(`🔍 No JSON object found in cleaned text. Cleaned sample: ${cleaned.substring(0, 300)}`);
+        }
     } catch (e) {
         console.warn('Agent JSON parse failed, raw:', text.substring(0, 200));
     }
@@ -189,6 +245,104 @@ export function buildBrandContext(brand, products = []) {
 
     return `<brand_bible>\n${parts.join('\n')}\n</brand_bible>`;
 }
+
+/**
+ * MCoT: Multimodal Chain-of-Thought — Call AI with text + images for visual reasoning.
+ * 
+ * This enables two-stage reasoning:
+ *   Stage 1: Analyze images → produce visual rationale (grounding)
+ *   Stage 2: Use the rationale to inform downstream creative decisions
+ * 
+ * Uses Gemini's native vision capability (images[] param in generateText).
+ * Falls back to text-only if image fetching fails.
+ * 
+ * @param {string} systemPrompt - System instruction for the reasoning task
+ * @param {string} userPrompt - The user's input text (brief, question, etc.)
+ * @param {string[]} imageUrls - Array of image URLs (HTTP or data: URIs) to analyze
+ * @param {object} options - { temperature, maxTokens, returnRaw }
+ * @returns {object} Parsed JSON response from the model
+ */
+export async function callMultimodalAgent(systemPrompt, userPrompt, imageUrls = [], options = {}) {
+    const { temperature = 0.3, maxTokens = 2048, returnRaw = false } = options;
+    const router = getRouter();
+    const startMs = Date.now();
+
+    // Filter valid image URLs — skip empties, nulls, broken refs
+    const validImages = (imageUrls || []).filter(url => 
+        url && typeof url === 'string' && (url.startsWith('http') || url.startsWith('data:'))
+    ).slice(0, 5); // Max 5 images to avoid context overflow
+
+    console.log(`🧠 MCoT: Multimodal Agent — ${validImages.length} images, prompt: ${userPrompt.substring(0, 80)}...`);
+
+    try {
+        const result = await router.generateText({
+            systemPrompt,
+            userPrompt,
+            temperature,
+            maxTokens,
+            images: validImages, // Gemini provider natively handles URL→base64 conversion
+        });
+
+        const text = result.text || '';
+        console.log(`🧠 MCoT: Multimodal response received in ${Date.now() - startMs}ms (${text.length} chars)`);
+
+        if (returnRaw) return text;
+
+        // Parse JSON from response — handle all common LLM output quirks
+        try {
+            let cleaned = text;
+            
+            // Strip <think>...</think> tags (Gemini 2.5 Flash reasoning)
+            // Handle both closed and unclosed <think> blocks
+            cleaned = cleaned.replace(/<think>[\s\S]*?<\/think>/gi, '');
+            // Handle unclosed <think> safely — preserve content before it
+            const lastThinkIdx = cleaned.lastIndexOf('<think>');
+            if (lastThinkIdx !== -1) {
+                const before = cleaned.substring(0, lastThinkIdx).trim();
+                if (before.length > 0) {
+                    cleaned = before;
+                } else {
+                    cleaned = cleaned.substring(lastThinkIdx).replace(/<think>[\s\S]*/gi, '');
+                }
+            }
+            
+            // Strip markdown code fences: ```json ... ``` or ``` ... ```
+            cleaned = cleaned.replace(/```(?:json)?\s*\n?/gi, '');
+            
+            cleaned = cleaned.trim();
+            
+            // Strategy 1: Try parsing the full cleaned text as JSON
+            if (cleaned.startsWith('{')) {
+                try { return JSON.parse(cleaned); } catch (_) { /* try next */ }
+            }
+            
+            // Strategy 2: Extract JSON object with regex
+            const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+                try { return JSON.parse(jsonMatch[0]); } catch (_) { /* try next */ }
+            }
+            
+            // Strategy 3: Try to fix common JSON issues (trailing commas, missing quotes)
+            if (jsonMatch) {
+                const fixedJson = jsonMatch[0]
+                    .replace(/,\s*([\]}])/g, '$1')  // Remove trailing commas
+                    .replace(/([{,]\s*)(\w+)\s*:/g, '$1"$2":');  // Quote unquoted keys
+                try { return JSON.parse(fixedJson); } catch (_) { /* give up */ }
+            }
+            
+            console.warn('🧠 MCoT: Could not parse JSON from response. Raw text (first 300 chars):', cleaned.substring(0, 300));
+        } catch (parseErr) {
+            console.warn('🧠 MCoT: JSON parse exception:', parseErr.message, 'Raw text:', text.substring(0, 200));
+        }
+
+        return { rawText: text, error: 'Failed to parse multimodal agent response' };
+    } catch (err) {
+        console.error(`🧠 MCoT: Multimodal agent call failed (${Date.now() - startMs}ms):`, err.message);
+        // Return a graceful error — downstream nodes should handle this and skip MCoT
+        return { error: err.message, skipped: true };
+    }
+}
+
 
 /**
  * Build style memory from past projects

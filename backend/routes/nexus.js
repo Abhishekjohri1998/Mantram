@@ -20,11 +20,35 @@ import { Router } from 'express';
 import { protect } from '../middleware/auth.js';
 import { getRouter } from '../ai/router.js';
 import { getSmartRouter } from '../ai/smartRouter.js';
-import { loadBrandContext } from '../agents/shared/agentUtils.js';
+import { loadBrandContext, callMultimodalAgent } from '../agents/shared/agentUtils.js';
 import User from '../models/User.js';
 import { safeErrorMessage } from '../utils/safeError.js';
 
 const router = Router();
+
+// ============================================================================
+// MCoT: VISUAL ANALYSIS PROMPT — for rich image understanding in chat
+// ============================================================================
+const FIDATO_VISUAL_ANALYSIS_PROMPT = `You are an expert visual analyst for a Brand AI platform. Analyze the provided image(s) and extract structured intelligence.
+
+For EACH image, identify:
+1. PRODUCT DETAILS: If a product is shown — name/type, key features, materials, colors, packaging style
+2. BRAND ELEMENTS: Logos, brand colors, typography, taglines visible
+3. VISUAL STYLE: Photography style, lighting, composition, mood, color palette
+4. CONTEXT: Setting, target audience cues, lifestyle positioning, competitive positioning
+5. MARKETING ANGLE: What story does this image tell? What emotion does it evoke?
+
+Return JSON:
+{
+  "imageType": "product|brand-asset|competitor|creative|screenshot|other",
+  "productAnalysis": "Detailed product description if applicable",
+  "brandElements": ["list of brand elements detected"],
+  "visualStyle": "Description of visual/photography style",
+  "colorPalette": ["#hex1", "#hex2"],
+  "mood": "The emotional tone of the image",
+  "marketingInsight": "What a brand strategist would say about this image",
+  "suggestedActions": ["What the user could do with this — e.g., 'Create a social post featuring this product', 'Analyze competitor positioning'"]
+}`;
 
 // ============================================================================
 // CONSTANTS
@@ -466,7 +490,7 @@ router.post('/chat', protect, async (req, res) => {
         const now = new Date();
         const dateStr = now.toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
-        const systemPrompt = `${NEXUS_SYSTEM_PROMPT}
+        let systemPrompt = `${NEXUS_SYSTEM_PROMPT}
 
 Today's date: ${dateStr}
 User's plan: ${req.user.plan || 'starter'}
@@ -476,7 +500,41 @@ ${brandContext ? `## Active Brand Context\n${brandContext}` : '(No brand selecte
 
         let rawReply;
 
-        // Indian languages → Sarvam AI
+        // ── MCoT: Visual Analysis (when images shared) — runs FIRST to enrich systemPrompt ──
+        let mcotAnalysis = null;
+        if (images && images.length > 0) {
+            try {
+                console.log(`🧠 MCoT Nexus: Analyzing ${images.length} shared image(s)...`);
+                const mcotResult = await callMultimodalAgent(
+                    FIDATO_VISUAL_ANALYSIS_PROMPT,
+                    `The user said: "${message}"\nAnalyze the ${images.length} image(s) they shared and provide structured visual intelligence.`,
+                    images,
+                    { temperature: 0.2, maxTokens: 4096 }
+                );
+                if (mcotResult && !mcotResult.error && !mcotResult.skipped) {
+                    mcotAnalysis = mcotResult;
+                    // Inject visual context into the system prompt for richer responses
+                    const visualContext = [
+                        `\n## Visual Context from Shared Image (MCoT Analysis)`,
+                        mcotResult.productAnalysis ? `Product: ${mcotResult.productAnalysis}` : '',
+                        mcotResult.visualStyle ? `Visual Style: ${mcotResult.visualStyle}` : '',
+                        mcotResult.mood ? `Mood: ${mcotResult.mood}` : '',
+                        mcotResult.marketingInsight ? `Marketing Insight: ${mcotResult.marketingInsight}` : '',
+                        mcotResult.colorPalette?.length ? `Colors: ${mcotResult.colorPalette.join(', ')}` : '',
+                        mcotResult.suggestedActions?.length ? `Suggested Actions: ${mcotResult.suggestedActions.join('; ')}` : '',
+                    ].filter(Boolean).join('\n');
+                    // Append to system prompt so all downstream LLM calls benefit
+                    systemPrompt += visualContext;
+                    console.log(`🧠 MCoT Nexus: Visual analysis complete — type: ${mcotResult.imageType || 'unknown'}`);
+                } else {
+                    console.warn('🧠 MCoT Nexus: Visual analysis skipped/failed (non-blocking)');
+                }
+            } catch (mcotErr) {
+                console.warn('🧠 MCoT Nexus: Visual analysis error (non-blocking):', mcotErr.message);
+            }
+        }
+
+        // Indian languages → Sarvam AI (now with MCoT-enriched systemPrompt)
         if (isIndian) {
             console.log(`🇮🇳 Nexus → Sarvam AI (${language})`);
             const smartRouter = getSmartRouter();
@@ -614,6 +672,7 @@ ${brandContext ? `## Active Brand Context\n${brandContext}` : '(No brand selecte
             language,
             name: 'Fidato',
             tts: ttsData,
+            mcotAnalysis: mcotAnalysis || undefined,
         });
 
     } catch (error) {
@@ -690,13 +749,43 @@ router.post('/stream', protect, async (req, res) => {
         const now = new Date();
         const dateStr = now.toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
-        const systemPrompt = `${NEXUS_SYSTEM_PROMPT}
+        let streamSystemPrompt = `${NEXUS_SYSTEM_PROMPT}
 
 Today's date: ${dateStr}
 User's plan: ${req.user.plan || 'starter'}
 Language: ${language}
 
 ${brandContext ? `## Active Brand Context\n${brandContext}` : '(No brand selected)'}${webSearchResults}`;
+
+        // ── MCoT: Visual Analysis for stream (when images shared) ──
+        let streamMcotAnalysis = null;
+        if (images && images.length > 0) {
+            try {
+                console.log(`🧠 MCoT Nexus Stream: Analyzing ${images.length} shared image(s)...`);
+                sendSSE('status', { status: 'analyzing', message: '🧠 Analyzing image...' });
+                const mcotResult = await callMultimodalAgent(
+                    FIDATO_VISUAL_ANALYSIS_PROMPT,
+                    `The user said: "${message}"\nAnalyze the ${images.length} image(s) they shared.`,
+                    images,
+                    { temperature: 0.2, maxTokens: 4096 }
+                );
+                if (mcotResult && !mcotResult.error && !mcotResult.skipped) {
+                    streamMcotAnalysis = mcotResult;
+                    const visualContext = [
+                        `\n## Visual Context from Shared Image (MCoT Analysis)`,
+                        mcotResult.productAnalysis ? `Product: ${mcotResult.productAnalysis}` : '',
+                        mcotResult.visualStyle ? `Visual Style: ${mcotResult.visualStyle}` : '',
+                        mcotResult.mood ? `Mood: ${mcotResult.mood}` : '',
+                        mcotResult.marketingInsight ? `Marketing Insight: ${mcotResult.marketingInsight}` : '',
+                        mcotResult.colorPalette?.length ? `Colors: ${mcotResult.colorPalette.join(', ')}` : '',
+                    ].filter(Boolean).join('\n');
+                    streamSystemPrompt += visualContext;
+                    console.log(`🧠 MCoT Nexus Stream: Visual analysis complete — type: ${mcotResult.imageType || 'unknown'}`);
+                }
+            } catch (mcotErr) {
+                console.warn('🧠 MCoT Nexus Stream: Visual analysis error (non-blocking):', mcotErr.message);
+            }
+        }
 
         let fullReply = '';
 
@@ -711,7 +800,7 @@ ${brandContext ? `## Active Brand Context\n${brandContext}` : '(No brand selecte
                 const ai = getRouter();
                 const userPrompt = history.map(m => `${m.role === 'user' ? 'User' : 'Fidato'}: ${m.content}`).join('\n') + '\n\nRespond as Fidato.';
                 const result = await ai.generateText(
-                    { systemPrompt, userPrompt, images, maxTokens: 2000, temperature: 0.8 },
+                    { systemPrompt: streamSystemPrompt, userPrompt, images, maxTokens: 2000, temperature: 0.8 },
                     { provider: 'gemini' } // Force Gemini for vision
                 );
                 fullReply = result.text || result.content || '';
@@ -722,9 +811,11 @@ ${brandContext ? `## Active Brand Context\n${brandContext}` : '(No brand selecte
         }
         // OTHERWISE, use Grok as usual
         else if (!isIndian && grokKey) {
+            // Use the MCoT-enriched system prompt
+            const grokSystemPrompt = streamSystemPrompt;
             try {
                 const grokMessages = [
-                    { role: 'system', content: systemPrompt },
+                    { role: 'system', content: grokSystemPrompt },
                     ...history.map((m, idx) => {
                         const isLast = idx === history.length - 1;
                         if (isLast && m.role === 'user' && images?.length) {
@@ -800,7 +891,7 @@ ${brandContext ? `## Active Brand Context\n${brandContext}` : '(No brand selecte
             const userPrompt = history.map(m => `${m.role === 'user' ? 'User' : 'Fidato'}: ${m.content}`).join('\n') + '\n\nRespond as Fidato.';
             try {
                 const result = await smartRouter.generateText(
-                    { systemPrompt, userPrompt, temperature: 0.7, maxTokens: 2000 },
+                    { systemPrompt: streamSystemPrompt, userPrompt, temperature: 0.7, maxTokens: 2000 },
                     { language, taskType: 'social' }
                 );
                 fullReply = result.text || '';
@@ -813,7 +904,7 @@ ${brandContext ? `## Active Brand Context\n${brandContext}` : '(No brand selecte
         if (!streamed && !fullReply) {
             const ai = getRouter();
             const userPrompt = history.map(m => `${m.role === 'user' ? 'User' : 'Fidato'}: ${m.content}`).join('\n') + '\n\nRespond as Fidato.';
-            const result = await ai.generateText({ systemPrompt, userPrompt, maxTokens: 2000, temperature: 0.7 });
+            const result = await ai.generateText({ systemPrompt: streamSystemPrompt, userPrompt, maxTokens: 2000, temperature: 0.7 });
             fullReply = result.text || result.content || 'hmm something glitched 😊';
         }
 
@@ -862,6 +953,7 @@ ${brandContext ? `## Active Brand Context\n${brandContext}` : '(No brand selecte
             reply: fullReply,
             language,
             voiceReady: voiceMode, // tells frontend to call /tts
+            mcotAnalysis: streamMcotAnalysis || undefined,
         });
 
     } catch (error) {

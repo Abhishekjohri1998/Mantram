@@ -5,7 +5,31 @@ import { requireCredits } from '../middleware/credits.js'
 import { URL } from 'url'
 import { safeErrorMessage } from '../utils/safeError.js';
 import { uploadToS3 } from '../utils/s3.js';
+import { callMultimodalAgent, loadBrandContext } from '../agents/shared/agentUtils.js';
+import Brand from '../models/Brand.js';
+import Product from '../models/Product.js';
 const router = express.Router()
+
+// ============================================================================
+// MCoT: CANVAS VISUAL GROUNDING PROMPT
+// ============================================================================
+const CANVAS_VISUAL_GROUNDING_PROMPT = `You are a visual grounding agent for an AI creative canvas. Analyze the provided brand/product images and extract a concise visual DNA for image generation.
+
+Extract:
+1. DOMINANT COLORS: Exact hex codes of the brand's primary and secondary colors
+2. PRODUCT FEATURES: Shape, materials, textures, distinctive visual elements
+3. BRAND STYLE: Photography style (flat lay, lifestyle, studio, etc.), lighting preferences
+4. TYPOGRAPHY CUES: If any text/fonts visible, describe the typographic personality
+5. VISUAL PERSONALITY: 3-5 adjectives that capture the brand's visual identity
+
+Return JSON:
+{
+  "dominantColors": ["#hex1", "#hex2", "#hex3"],
+  "productDescription": "Brief description of the product's physical appearance",
+  "brandStyle": "Photography/visual style in 1-2 sentences",
+  "visualPersonality": ["modern", "premium", "bold"],
+  "promptInjection": "A concise 2-3 sentence visual direction that can be appended to any image generation prompt to ensure brand consistency. Include color palette, style, and mood."
+}`;
 
 // ══════════════════════════════════════════════════════════════════════
 // ── AI CANVAS ENDPOINTS ──
@@ -206,11 +230,46 @@ Return ONLY valid JSON (no markdown, no backticks). Only include elements you ca
 // POST /api/canvas-assets/ai-generate — Generate image from text prompt (+ optional reference images)
 router.post('/ai-generate', protect, requireCredits('canvasGenerate'), async (req, res) => {
     try {
-        const { prompt, size = '1024x1024', referenceImages = [] } = req.body
+        const { prompt, size = '1024x1024', referenceImages = [], brandId } = req.body
         if (!prompt) return res.status(400).json({ error: 'Prompt is required' })
 
         const imageKey = process.env.GEMINI_IMAGE_API_KEY || process.env.GEMINI_API_KEY
         if (!imageKey) return res.status(400).json({ error: 'GEMINI_API_KEY not configured' })
+
+        // ── MCoT: Visual Grounding (if brand context available) ──
+        let mcotGrounding = null;
+        let brandVisualInjection = '';
+        if (brandId) {
+            try {
+                console.log(`🧠 MCoT Canvas: Loading brand context for ${brandId}...`);
+                const brand = await Brand.findById(brandId).select('dna name logo').lean();
+                const products = await Product.find({ brand: brandId, status: 'active' }).select('images title').limit(5).lean();
+                
+                // Collect brand/product images for visual analysis
+                const brandImages = [
+                    ...(brand?.logo?.url ? [brand.logo.url] : []),
+                    ...(brand?.dna?.brandImages || []).filter(i => i.url).map(i => i.url).slice(0, 3),
+                    ...products.flatMap(p => (p.images || []).filter(i => i.url).map(i => i.url)).slice(0, 3),
+                ].filter(Boolean).slice(0, 5);
+
+                if (brandImages.length > 0) {
+                    console.log(`🧠 MCoT Canvas: Analyzing ${brandImages.length} brand images...`);
+                    const grounding = await callMultimodalAgent(
+                        CANVAS_VISUAL_GROUNDING_PROMPT,
+                        `Analyze these ${brandImages.length} images from brand "${brand?.name || 'unknown'}" and extract visual DNA for image generation.`,
+                        brandImages,
+                        { temperature: 0.2, maxTokens: 2048 }
+                    );
+                    if (grounding && !grounding.error && !grounding.skipped) {
+                        mcotGrounding = grounding;
+                        brandVisualInjection = grounding.promptInjection || '';
+                        console.log(`🧠 MCoT Canvas: Visual grounding complete — colors: ${(grounding.dominantColors || []).join(', ')}`);
+                    }
+                }
+            } catch (mcotErr) {
+                console.warn('🧠 MCoT Canvas: Visual grounding failed (non-blocking):', mcotErr.message);
+            }
+        }
 
         const baseUrl = 'https://generativelanguage.googleapis.com/v1beta'
         const models = ['gemini-3.1-flash-image-preview', 'gemini-2.5-flash-image']
@@ -249,6 +308,7 @@ CREATIVE ANALYSIS PROCESS:
 3. SYNTHESIZE: Merge the best creative elements into a cohesive new vision
 
 I have provided ${refCount} reference image(s). Study them deeply. Now create a NEW masterpiece based on this instruction: ${prompt}
+${brandVisualInjection ? `\nBRAND VISUAL DIRECTION: ${brandVisualInjection}` : ''}
 
 CREATIVE PRINCIPLES TO APPLY:
 - Color Harmony: Use complementary/analogous color schemes from the references
@@ -262,6 +322,7 @@ The output must be a stunning, gallery-quality image that feels like it was craf
             : `You are an elite creative director and visual artist. Generate a stunning, gallery-quality image with these principles:
 
 INSTRUCTION: ${prompt}
+${brandVisualInjection ? `\nBRAND VISUAL DIRECTION: ${brandVisualInjection}` : ''}
 
 CREATIVE PRINCIPLES:
 - Color Harmony: Use a sophisticated, harmonious color palette
@@ -306,7 +367,7 @@ Make it look like it was produced by a world-class creative studio.`
         const s3Key = `canvas/${req.user._id}/${Date.now()}.png`;
         let s3Url = null; try { s3Url = await uploadToS3(imageUrl, s3Key, 'image/png'); } catch (e) { console.error('S3 Upload Error:', e.message); }
         
-        res.json({ imageUrl: s3Url || imageUrl, model: 'NanoBanana 2', source: s3Url ? 's3' : 'base64', refsUsed: refCount })
+        res.json({ imageUrl: s3Url || imageUrl, model: 'NanoBanana 2', source: s3Url ? 's3' : 'base64', refsUsed: refCount, mcotGrounding: mcotGrounding || undefined })
     } catch (err) {
         console.error('AI generate error:', err.message)
         res.status(500).json({ error: safeErrorMessage(err) })

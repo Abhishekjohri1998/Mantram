@@ -23,6 +23,8 @@ import {
     abTestDesignerNode,
     performanceAnalystNode,
     reportGeneratorNode,
+    pmVisualGroundingNode,
+    pmCompetitorAdAnalysisNode,
 } from '../agents/performanceMarketing/nodes.js';
 import { runCompetitorResearch } from '../agents/performanceMarketing/competitorResearch.js';
 import { getHistoricalContext, extractLearningsFromReport } from '../agents/performanceMarketing/historicalLearning.js';
@@ -115,6 +117,43 @@ router.post('/research', protect, async (req, res) => {
         } catch (err) {
             console.warn('Learning extraction failed:', err.message);
         }
+
+        // 5. MCoT: Brand visual grounding + Competitor ad analysis (non-blocking background)
+        // These run asynchronously after response is sent — they update the report's state
+        // with richer creative context for downstream ad generation.
+        ;(async () => {
+            try {
+                // 5a. Brand visual grounding — analyze brand/product images for ad creative context
+                const groundedState = await pmVisualGroundingNode({
+                    ...finalState,
+                    brandId: effectiveBrandId,
+                    brandName: report.title || '',
+                });
+
+                // 5b. Competitor ad visual analysis — analyze any competitor ad images found
+                const competitorAnalyzedState = await pmCompetitorAdAnalysisNode(groundedState);
+
+                // Persist MCoT context to the report — stored inside aiAnalysis (Mixed field)
+                // AdReport has no aiMeta field; aiAnalysis is the correct Mixed-type store
+                if (groundedState.pmVisualGrounding || competitorAnalyzedState.pmCompetitorAdAnalysis) {
+                    await AdReport.updateOne(
+                        { _id: report._id },
+                        {
+                            $set: {
+                                'aiAnalysis.mcot': {
+                                    pmVisualGrounding: groundedState.pmVisualGrounding || null,
+                                    pmCompetitorAdAnalysis: competitorAnalyzedState.pmCompetitorAdAnalysis || null,
+                                    analyzedAt: new Date().toISOString(),
+                                },
+                            },
+                        }
+                    );
+                    console.log(`🧠 PM MCoT: Background nodes complete for report ${report._id}`);
+                }
+            } catch (mcotErr) {
+                console.warn('[BG-PM-MCoT] Background MCoT nodes failed (non-critical):', mcotErr.message);
+            }
+        })();
 
         res.json({
             success: true,
