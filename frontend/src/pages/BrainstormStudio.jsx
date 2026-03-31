@@ -376,13 +376,14 @@ function IdeasBlock({ payload, intent, onScreenplay, onFeedback }) {
 // ── Single message bubble ─────────────────────────────────────────────────────
 function Message({ msg, onScreenplay, onFeedback, onSelectOption, isLatest, streaming }) {
   const isFidato = msg.role === 'fidato'
+  // Chips show when: it's a Fidato message, is the last one, has options, and no generated content yet
   const showOptions = isFidato
     && msg.questionOptions?.length > 0
     && isLatest
-    && !streaming
     && !msg.ideasPayload
     && !msg.screenplayPayload
     && !msg.strategyPayload
+    && !msg.thinking
 
   return (
     <div className={`bs-msg-wrap ${isFidato ? 'bs-msg-fidato' : 'bs-msg-user'}`}>
@@ -464,13 +465,36 @@ export default function BrainstormStudio() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
   }, [messages])
 
-  // Greeting on mount
+  // Brand-aware greeting on mount — Fidato references the brand's DNA
   useEffect(() => {
-    const greeting = brandName
-      ? `Hey ${firstName}! 👋 Fidato here — let's brainstorm for ${brandName} today. What are we working on?`
-      : `Hey ${firstName}! 👋 I'm Fidato — your AI brainstorming partner. Select a brand from the top bar and let's get to work. What do you want to create today?`
+    if (!activeBrand) {
+      setMessages([{
+        id: 'welcome',
+        role: 'fidato',
+        content: `Hey ${firstName}! 👋 I'm Fidato — your AI brand strategist. Select a brand from the top bar and let's start brainstorming. What do you want to create today?`,
+        timestamp: Date.now(),
+      }])
+      return
+    }
+    const dna = activeBrand.dna || {}
+    const industry = dna.industry || dna.category || ''
+    const audience = dna.targetAudience || ''
+    const voice = dna.voice?.personality || ''
+    const country = dna.country || 'India'
+    // Build a brand insight line so user feels Fidato truly knows the brand
+    const insights = [
+      industry && `${industry} brand`,
+      country && `based in ${country}`,
+      audience && `targeting ${audience}`,
+      voice && `known for ${voice} voice`,
+    ].filter(Boolean).join(', ')
+
+    const greeting = insights
+      ? `Hey ${firstName}! 👋 I'm Fidato — your brand partner for **${activeBrand.name}**. I know you’re a ${insights}. Let’s brainstorm something brilliant together. What are we building today? 🚀`
+      : `Hey ${firstName}! 👋 Fidato here — let’s brainstorm for **${activeBrand.name}** today. What are we working on?`
+
     setMessages([{ id: 'welcome', role: 'fidato', content: greeting, timestamp: Date.now() }])
-  }, [firstName, brandName])
+  }, [firstName, activeBrand])
 
   // Phase sync
   useEffect(() => {

@@ -1259,7 +1259,7 @@ function buildCtx(brand) {
 }
 
 // ── MCoT Stage 1: Reason about conversation (hardened) ─────────────────────
-async function mcotReason(message, history, sessionState, brandCtx) {
+async function mcotReason(message, history, sessionState, brandCtx, brand) {
   const userMessages = history.filter(m => m.role === 'user');
   const userMessageCount = userMessages.length;
 
@@ -1274,8 +1274,8 @@ async function mcotReason(message, history, sessionState, brandCtx) {
       collectedAnswers: answers,
       readyToGenerate: true,
       action: intent === 'brand-strategy' ? 'generate_strategy' : 'generate_ideas',
-      preGenerationMessage: `Okay I've got the picture! Let me put together some ${intent === 'ad-film' ? 'film concepts' : intent === 'brand-strategy' ? 'a strategy' : 'ideas'} for you 🔥`,
-      fidatoResponse: `Here's what I came up with! What do you think?`,
+      preGenerationMessage: `Okay I’ve got the picture! Let me put together some ${intent === 'ad-film' ? 'film concepts' : intent === 'brand-strategy' ? 'a strategy' : 'ideas'} for ${brand?.name || 'you'} 🔥`,
+      fidatoResponse: `Here’s what I came up with! What do you think?`,
     };
   }
 
@@ -1315,7 +1315,7 @@ async function mcotReason(message, history, sessionState, brandCtx) {
       [turnKey]: message,
       ...extractAnswerFromMessage(message, sessionState.collectedAnswers || {}),
     };
-    const { question, options } = getNextSmartQuestion(userMessageCount + 1, detectedIntent, updatedAnswers, brandCtx);
+    const { question, options } = getNextSmartQuestion(userMessageCount + 1, detectedIntent, updatedAnswers, brandCtx, brand);
     return {
       intent: detectedIntent,
       collectedAnswers: updatedAnswers,
@@ -1377,7 +1377,7 @@ Rules:
   }
 
   // ── Smart fallback: never loop, always advance ─────────────────────────────
-  const fallback = getNextSmartQuestion(userMessageCount, detectedIntent, sessionState.collectedAnswers || {}, brandCtx);
+  const fallback = getNextSmartQuestion(userMessageCount, detectedIntent, sessionState.collectedAnswers || {}, brandCtx, brand);
   return {
     intent: detectedIntent,
     collectedAnswers: { ...sessionState.collectedAnswers, ...extractAnswerFromMessage(message, sessionState.collectedAnswers || {}) },
@@ -1427,7 +1427,18 @@ function extractAnswerFromMessage(message, existing) {
 
 // ── Smart sequential questions with curated options ──────────────────────────
 // Returns { question, options } — options are clickable chips on the frontend
-function getNextSmartQuestion(turnIndex, intent, collected, brandCtx) {
+function getNextSmartQuestion(turnIndex, intent, collected, brandCtx, brand) {
+  const brandName = brand?.name || '';
+  const dna = brand?.dna || {};
+  const knownAudience = dna.targetAudience || '';
+  const knownIndustry = dna.industry || dna.category || '';
+  const knownVoice = dna.voice?.personality || '';
+  // Build brand-aware preamble to make questions feel personalized
+  const forBrand = brandName ? `For ${brandName}, ` : '';
+  const iKnow = knownIndustry ? `I know you’re in ${knownIndustry}` : '';
+  const iKnowAudience = knownAudience ? `your target is ${knownAudience}` : '';
+  const contextHint = [iKnow, iKnowAudience].filter(Boolean).join(' and ');
+
   const isFilm = intent === 'ad-film';
   const isStrategy = intent === 'brand-strategy';
   const isNaming = intent === 'naming';
@@ -1439,7 +1450,7 @@ function getNextSmartQuestion(turnIndex, intent, collected, brandCtx) {
   if (isFilm) {
     questionsWithOptions = [
       {
-        question: `What product or brand is this film for? Pick a category or describe it yourself.`,
+        question: `${forBrand}what product or brand category is this film for? Pick one or describe it — the more specific the better.${contextHint ? ` (I know ${contextHint})` : ''}`,
         options: [
           '🛍️ FMCG / Daily use product',
           '👗 Fashion or Lifestyle brand',
@@ -1450,7 +1461,7 @@ function getNextSmartQuestion(turnIndex, intent, collected, brandCtx) {
         ],
       },
       {
-        question: `Who's the ideal viewer? Picture one real person watching this ad on their phone.`,
+        question: `${contextHint ? `Given ${contextHint}, who` : 'Who'}’s the ideal viewer for this film? Picture one real person watching it on their phone.`,
         options: [
           '👩 Urban millennial woman (25-35), metro city',
           '👨‍💻 Young professional just starting his career',
@@ -1743,15 +1754,27 @@ async function generateIdeasInline(intent, answers, brand) {
 }`;
   }
 
-  const systemPrompt = `You are an elite creative team brainstorming for a brand. Generate BOLD, SPECIFIC, CULTURALLY RELEVANT ideas. Not generic.
-${isAdFilm ? `Generate exactly ${scriptCount} distinct film concepts with different emotional approaches. Think like a film director.` : 'Generate 3 campaign concepts with tactical execution details.'}
-Respond in STRICT JSON:
+  const systemPrompt = `You are an elite creative director and brand strategist. Generate BOLD, SPECIFIC, CULTURALLY RELEVANT ideas. Be concise — quality over quantity. Keep each field SHORT.
+${isAdFilm ? `Generate exactly ${scriptCount} distinct film concepts with very different emotional angles. Think like an award-winning director.` : 'Generate 3 campaign concepts with sharp tactical hooks.'}
+Respond in STRICT JSON (keep string values SHORT — max 2 sentences each):
 ${outputFormat}`;
 
   const actResult = await aiCall(systemPrompt, `Intent: ${intent}\n${brandContext}\n\nBrief:\n${answersText}`, {
-    temperature: 0.85, maxTokens: 6000,
+    temperature: 0.85, maxTokens: 4000,
   });
-  return parseJSON(actResult) || {};
+  try {
+    return parseJSON(actResult) || {};
+  } catch (err) {
+    console.error('[generateIdeasInline] JSON parse failed, attempting partial recovery:', err.message);
+    // Try to at least extract filmConcepts or campaignConcepts arrays
+    const partial = {};
+    const filmMatch = actResult.match(/"filmConcepts"\s*:\s*(\[.*?\])(?=\s*[,}])/s);
+    const campMatch = actResult.match(/"campaignConcepts"\s*:\s*(\[.*?\])(?=\s*[,}])/s);
+    if (filmMatch) { try { partial.filmConcepts = JSON.parse(filmMatch[1]); } catch {} }
+    if (campMatch) { try { partial.campaignConcepts = JSON.parse(campMatch[1]); } catch {} }
+    if (partial.filmConcepts || partial.campaignConcepts) return partial;
+    return {};
+  }
 }
 
 // ── Inline screenplay generation ───────────────────────────────────────────────
@@ -1773,8 +1796,8 @@ Respond in JSON:
 
   const userPrompt = `Film: ${filmConcept.title}\nLogline: ${filmConcept.logline || ''}\nSynopsis: ${filmConcept.synopsis || ''}\nFormat: ${filmConcept.format || '60 sec'}\nVisual Style: ${filmConcept.visualStyle || ''}\nEmotion: ${filmConcept.emotion || ''}\n${brandContext}`;
 
-  const result = await aiCall(systemPrompt, userPrompt, { temperature: 0.7, maxTokens: 6000 });
-  return parseJSON(result) || {};
+  const result = await aiCall(systemPrompt, userPrompt, { temperature: 0.7, maxTokens: 4000 });
+  try { return parseJSON(result) || {}; } catch { return {}; }
 }
 
 // ── Inline strategy generation ─────────────────────────────────────────────────
@@ -1790,9 +1813,9 @@ async function generateStrategyInline(answers, brand) {
 Respond in JSON with these keys: title, executive_summary, objective, duration, budget_total, target_kpis (array of {metric, current, target, achievability, rationale}), channel_strategy (array of {channel, budget_pct, budget_amount, why, expected_output, tactics}), content_plan ({weekly_cadence, content_types, pillar_themes}), quick_wins (array of {action, effort, impact, timeline}), risk_factors (array), channel_synergy (string explaining how channels reinforce each other)`;
 
   const result = await aiCall(systemPrompt, `${brandContext}\n\nBrief:\n${answersText}`, {
-    temperature: 0.6, maxTokens: 6000,
+    temperature: 0.6, maxTokens: 4000,
   });
-  return parseJSON(result) || {};
+  try { return parseJSON(result) || {}; } catch { return {}; }
 }
 
 // ── POST /api/brainstorm-studio/fidato-chat — Main conversational SSE endpoint ──
@@ -1813,7 +1836,7 @@ router.post('/fidato-chat', protect, requireStudio('brainstormStudio'), async (r
     const brandCtx = buildCtx(brand);
 
     // ── STAGE 1: MCoT Reasoning ─────────────────────────────────────────────
-    const reasoning = await mcotReason(message, history, sessionState, brandCtx);
+    const reasoning = await mcotReason(message, history, sessionState, brandCtx, brand);
     const {
       action = 'ask_question',
       fidatoResponse = "Tell me more!",
