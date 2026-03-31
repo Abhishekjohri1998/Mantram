@@ -694,25 +694,72 @@ export async function copywriterNode(state) {
     };
     const platformLabel = platformMap[formatKey] || formatKey;
 
+    // ── Pull full art direction context (art director has already expanded the brief) ──
+    const artDir = state.artDirection || {};
+    const vg = state.visualGrounding || null; // MCoT visual grounding
+    const ep = state.engineeredPrompt || null; // engineered prompt from fast director
+
+    // Build a rich expanded brief from all upstream agent outputs
+    const expandedBriefParts = [
+        `ORIGINAL USER BRIEF: ${state.brief}`,
+    ];
+
+    // Fast director's engineeringNotes explains the creative interpretation — most valuable context
+    if (ep?.engineeringNotes) {
+        expandedBriefParts.push(`CREATIVE INTERPRETATION (Art Director's reasoning): ${ep.engineeringNotes}`);
+    }
+    // Art director's creativeDirection (from quality mode)
+    if (artDir.creativeDirection) {
+        expandedBriefParts.push(`CREATIVE DIRECTION: ${artDir.creativeDirection}`);
+    }
+    // The image being generated — gives the copywriter a sense of what the visual looks like
+    if (ep?.primaryPrompt) {
+        expandedBriefParts.push(`VISUAL BEING GENERATED: ${ep.primaryPrompt.substring(0, 300)}`);
+    }
+    // Product integration level — tells copywriter how prominently product features
+    if (artDir.productIntegration) {
+        expandedBriefParts.push(`PRODUCT INTEGRATION LEVEL: ${artDir.productIntegration} (hero = write around the product; supporting = weave in naturally; ambient/none = focus on brand mood)`);
+    }
+    // scrollStopFactor from full art director
+    if (artDir.scrollStopFactor) {
+        expandedBriefParts.push(`SCROLL-STOP FACTOR: ${artDir.scrollStopFactor}`);
+    }
+    // Visual grounding gives real product facts the copywriter should reference
+    if (vg?.productAnalysis) {
+        expandedBriefParts.push(`PRODUCT VISUAL FACTS (from real product photos): ${vg.productAnalysis}`);
+    }
+
     const userPrompt = [
-        `CREATIVE BRIEF: ${state.brief}`,
+        expandedBriefParts.join('\n'),
+        '',
         `PLATFORM: ${platformLabel}`,
-        `VISUAL MOOD: ${state.artDirection?.mood || 'professional'}`,
-        `VISUAL STYLE: ${state.artDirection?.visualStyle || 'modern'}`,
-        state.artDirection?.suggestedHeadline ? `VISUAL HEADLINE ON IMAGE: "${state.artDirection.suggestedHeadline}" — your caption should COMPLEMENT this, not repeat it` : '',
-        // Brand personality for copy tone
+        `FORMAT: ${state.format || 'instagram-post'}`,
+        '',
+        '--- ART DIRECTION (what the image will look like) ---',
+        `VISUAL MOOD: ${artDir.mood || 'professional'}`,
+        `VISUAL STYLE: ${artDir.visualStyle || 'modern'}`,
+        artDir.colorStrategy ? `COLOR STRATEGY: ${artDir.colorStrategy}` : '',
+        artDir.composition ? `COMPOSITION: ${artDir.composition}` : '',
+        artDir.suggestedHeadline ? `VISUAL HEADLINE ALREADY ON IMAGE: "${artDir.suggestedHeadline}" — your caption MUST complement this without repeating it verbatim` : '',
+        '',
+        '--- BRAND INTELLIGENCE ---',
         intel.personality ? `BRAND VOICE: ${intel.personality}` : '',
-        intel.tagline ? `BRAND TAGLINE: ${intel.tagline}` : '',
+        intel.tagline ? `BRAND TAGLINE (use sparingly — never just repeat it): ${intel.tagline}` : '',
         intel.values?.length > 0 ? `BRAND VALUES: ${intel.values.join(', ')}` : '',
-        intel.contentDos?.length > 0 ? `CONTENT DOS: ${intel.contentDos.join('; ')}` : '',
-        intel.contentDonts?.length > 0 ? `CONTENT DON'TS: ${intel.contentDonts.join('; ')}` : '',
-        // Product context
-        mp ? `FEATURED PRODUCT: "${mp.title}"${mp.description ? ` — ${mp.description}` : ''}` : '',
-        mp?.features?.length > 0 ? `PRODUCT USPs: ${mp.features.slice(0, 4).join(', ')}` : '',
-        // Target audience
         intel.targetAudience ? `TARGET AUDIENCE: ${intel.targetAudience}` : '',
         intel.usps?.length > 0 ? `BRAND USPs: ${intel.usps.join(', ')}` : '',
+        intel.contentDos?.length > 0 ? `CONTENT DOS: ${intel.contentDos.join('; ')}` : '',
+        intel.contentDonts?.length > 0 ? `CONTENT DON'TS: ${intel.contentDonts.join('; ')}` : '',
+        '',
+        '--- PRODUCT CONTEXT ---',
+        mp ? `FEATURED PRODUCT: "${mp.title}"${mp.description ? ` — ${mp.description.substring(0, 200)}` : ''}` : 'No specific product — write brand-level copy.',
+        mp?.features?.length > 0 ? `PRODUCT USPs: ${mp.features.slice(0, 5).join(', ')}` : '',
+        mp?.price?.amount ? `PRICE POINT: ${mp.price.currency || '₹'}${mp.price.amount.toLocaleString()}${mp.price.mrp && mp.price.mrp > mp.price.amount ? ` (MRP: ${mp.price.currency || '₹'}${mp.price.mrp.toLocaleString()} — ${Math.round((1 - mp.price.amount / mp.price.mrp) * 100)}% off)` : ''}` : '',
+        vg?.keyVisualFeatures?.length > 0 ? `KEY VISUAL FEATURES (verified from product photos): ${vg.keyVisualFeatures.join(', ')}` : '',
     ].filter(Boolean).join('\n');
+
+
+
 
     const result = await callAgent(COPYWRITER_PROMPT(brandContext), userPrompt, 0.75, 8192);
     console.log(`✍️  Copywriter done in ${Date.now() - startMs}ms — headline: "${result.headline || '?'}"${result.error ? ` [PARSE ERROR: ${result.error}]` : ''}`);
