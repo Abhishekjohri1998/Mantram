@@ -6,6 +6,42 @@ dotenv.config();
 
 const PACKAGES = [
     {
+        name: 'Free',
+        slug: 'free',
+        tagline: 'Get started for free',
+        description: 'Explore AI-powered marketing with 50 free credits every month. No credit card required.',
+        tier: 0,
+        studios: {
+            contentStudio: true,
+            creativeStudio: true,
+            seoStudio: false,
+            brainstormStudio: true,
+            videoStudio: false,
+            socialMediaStudio: true,
+            conversationStudio: false,
+            adStudio: false,
+            funnelStudio: false,
+            d2cAnalytics: false,
+            skillsHub: false,
+        },
+        credits: { monthly: 50, rollover: false, bonusOnSignup: 0 },
+        pricing: { monthly: 0, quarterly: 0, yearly: 0, currency: 'INR' },
+        limits: { maxBrands: 1, maxTeamMembers: 0, maxProducts: 10, maxScheduledPosts: 3, socialIntegrations: 1 },
+        badge: 'FREE',
+        color: '#94a3b8',
+        icon: 'person',
+        isDefault: true,
+        watermarkEnabled: true,
+        displayOrder: 0,
+        features: [
+            { name: '50 Credits / month', included: true },
+            { name: '1 Brand Profile', included: true },
+            { name: 'Content & Brainstorm Studio', included: true },
+            { name: 'Creative Studio (with watermark)', included: true },
+            { name: 'Community Support', included: true },
+        ]
+    },
+    {
         name: 'Starter',
         slug: 'starter',
         tagline: 'Get started with AI marketing',
@@ -13,7 +49,7 @@ const PACKAGES = [
         tier: 1,
         studios: {
             contentStudio: true,
-            creativeStudio: false,
+            creativeStudio: true,
             seoStudio: false,
             brainstormStudio: true,
             videoStudio: false,
@@ -25,7 +61,8 @@ const PACKAGES = [
         badge: '',
         color: '#64748b',
         icon: 'rocket_launch',
-        isDefault: true,
+        isDefault: false,
+        watermarkEnabled: true,
         displayOrder: 1,
         features: [
             { name: '1 Brand Profile', included: true },

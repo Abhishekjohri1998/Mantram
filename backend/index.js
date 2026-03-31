@@ -181,6 +181,11 @@ connectDB().then(() => {
     import('./services/funnelScheduler.js').then(({ startFunnelScheduler }) => {
         startFunnelScheduler();
     }).catch(err => console.error('❌ Failed to load funnelScheduler.js:', err));
+    // Start subscription manager (hourly checks)
+    import('./agents/subscriptionManager.js').then(({ startSubscriptionManager }) => {
+        startSubscriptionManager();
+    }).catch(err => console.error('❌ Failed to load subscriptionManager.js:', err));
+
 }).catch(err => {
     console.error('❌ Critical failure during background agent initialization:', err.message);
 });

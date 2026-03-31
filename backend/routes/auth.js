@@ -6,6 +6,7 @@ import Brand from '../models/Brand.js';
 import Waitlist from '../models/Waitlist.js';
 
 import SubscriptionPackage from '../models/SubscriptionPackage.js';
+import Subscription from '../models/Subscription.js';
 import { protect, generateToken } from '../middleware/auth.js';
 import config from '../config/env.js';
 import { safeErrorMessage } from '../utils/safeError.js';
@@ -27,6 +28,45 @@ function requireDB(req, res) {
         return false;
     }
     return true;
+}
+
+// Helper: create and assign default "Free" subscription
+async function assignDefaultSubscription(user) {
+    try {
+        const freePackage = await SubscriptionPackage.findOne({ slug: 'free' });
+        if (!freePackage) {
+            console.warn('⚠️ Free subscription package not found in DB. Skipping auto-assignment.');
+            return;
+        }
+
+        const endDate = new Date();
+        endDate.setMonth(endDate.getMonth() + 1);
+
+        const subscription = await Subscription.create({
+            user: user._id,
+            plan: 'free',
+            billingCycle: 'monthly',
+            credits: { total: freePackage.credits?.monthly || 50, used: 0 },
+            price: 0,
+            startDate: new Date(),
+            endDate,
+            renewalDate: endDate,
+            status: 'active',
+            autoRenew: true,
+        });
+
+        await User.findByIdAndUpdate(user._id, {
+            plan: 'free',
+            activeSubscription: subscription._id,
+            'credits.total': freePackage.credits?.monthly || 50,
+            'credits.resetDate': endDate,
+        });
+        
+        console.log(`✨ Assigned Free subscription to user: ${user.email}`);
+        return subscription;
+    } catch (err) {
+        console.error('❌ Failed to assign default subscription:', err.message);
+    }
 }
 
 // POST /api/auth/register
@@ -127,6 +167,9 @@ router.post('/register', async (req, res) => {
                 console.error('⚠️ Failed to auto-create initial brand:', brandErr.message);
             }
         }
+
+        // --- NEW: Assign Free Subscription ---
+        await assignDefaultSubscription(user);
 
 
         
@@ -547,7 +590,7 @@ router.get('/google', (req, res) => {
         `&prompt=select_account`;
 
     // Ensure popup can communicate back
-    res.setHeader('Cross-Origin-Opener-Policy', 'unsafe-none');
+    res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
     res.json({ success: true, authUrl });
 });
 
@@ -557,7 +600,7 @@ router.get('/google', (req, res) => {
  */
 router.get('/google/callback', async (req, res) => {
     // Ensure popup can communicate back
-    res.setHeader('Cross-Origin-Opener-Policy', 'unsafe-none');
+    res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
     try {
         const { code, error: authError } = req.query;
 
@@ -630,6 +673,10 @@ router.get('/google/callback', async (req, res) => {
             });
             // Update waitlist status if exists
             await Waitlist.findOneAndUpdate({ email: profileData.email.toLowerCase() }, { status: 'registered' });
+            
+            // --- NEW: Assign Free Subscription for Google Signup ---
+            await assignDefaultSubscription(user);
+            
             console.log(`✨ New user signed up via Google: ${user.email}`);
         } else {
             console.log(`👋 [GOOGLE AUTH] User found: ${user.email}`);
