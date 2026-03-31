@@ -359,8 +359,8 @@ export default function CreativeStudio() {
             icon: 'south',
             emoji: '🐛',
             color: '#f97316',
-            description: 'Camera flat on ground, subject towers above, sky background',
-            injection: 'Extreme worm\'s-eye view shot from ground level, camera flat on the floor looking straight up, subject towers dramatically above, sky fills the background, ultra-wide 14mm lens, strong perspective distortion making figure monumental, extreme forced perspective, dynamic upward composition, shot on wide-angle lens',
+            description: 'Camera flat on ground, subject towers above, open sky fills the frame',
+            injection: 'SHOT TYPE: extreme worm\'s-eye view. Camera is placed flat on the ground pointing straight up. The subject stands directly over the camera lens, legs straddling it, body filling the full vertical frame from bottom to top. The product or hand is thrust downward toward the lens and appears enormous in the near foreground — 3× to 5× larger than life. The subject\'s face looks down at the camera with confidence. Open blue sky, clouds, or clean studio ceiling fills the top 60% of the frame behind them. Ultra-wide 14mm lens, strong forced perspective, feet and legs massive at bottom, torso receding, face small at top. Shot style: Maxi / Pepsi commercial worm\'s-eye street photography.',
         },
         {
             id: 'high-action',
@@ -368,8 +368,8 @@ export default function CreativeStudio() {
             icon: 'bolt',
             emoji: '⚡',
             color: '#ef4444',
-            description: 'Mid-air jump, motion blur background, product thrust forward',
-            injection: 'Dynamic parkour action shot, subject caught mid-jump frozen in motion, product or hand thrust aggressively toward camera in sharp focus while background has radial motion blur, low angle looking up, shot at 1/2000s shutter speed freeze, shallow depth of field on subject, cinematic wide-angle 24mm lens, incredible kineticism and energy',
+            description: 'Mid-air jump, product thrust toward lens, motion-blurred background',
+            injection: 'SHOT TYPE: low-angle action freeze shot. Camera is positioned at waist height or below, angled upward. Subject is caught mid-jump or mid-leap, body airborne, at least one foot off or near the ground. The product (can, bottle, sneaker, or box) is gripped in one hand and thrust aggressively toward the camera — it appears massive and sharp in the foreground while the subject\'s body is in focus behind it. Background is a real urban street or concrete wall with horizontal motion blur streaks from passing cars or environmental movement. Sky fills the top of frame. 1/2000s freeze shutter. 24mm wide-angle. Shot style: Red Bull / Nike action advertising.',
         },
         {
             id: 'fisheye-lean',
@@ -377,8 +377,8 @@ export default function CreativeStudio() {
             icon: 'lens',
             emoji: '🐟',
             color: '#8b5cf6',
-            description: 'Extreme fisheye, ground level, environment bends around subject',
-            injection: 'Extreme fisheye lens (8mm) shot from near-ground level, environment curves dramatically around subject, skyscrapers or buildings bent at extreme angles in background, subject crouched low fills the frame, ground level perspective, all surroundings distorted and curving outward, powerful distortion makes environment feel massive',
+            description: 'Extreme fisheye, ground level, buildings bow outward around the subject',
+            injection: 'SHOT TYPE: extreme ground-level fisheye distortion shot. Camera is placed at or below ankle height with a super-wide 8mm fisheye lens. Subject crouches or squats low to the ground, filling the center frame. Their sneakers, feet, or lower body are enormous and occupying the bottom third of the frame. Surrounding skyscrapers, buildings, or walls bow dramatically outward in a barrel-distortion curve — bending away from the center like the frame is wrapping around the subject. The ground curves downward at the edges. Everything except the subject is distorted. Sky at top. Shot style: Supreme / streetwear fisheye skate photography, girl-in-city crouch pose.',
         },
         {
             id: 'fashion-low',
@@ -386,8 +386,8 @@ export default function CreativeStudio() {
             icon: 'camera_enhance',
             emoji: '👟',
             color: '#06b6d4',
-            description: 'Ultra-wide low angle, product/shoe in huge foreground, dynamic diagonal',
-            injection: 'Ultra-wide angle fashion editorial shot, camera positioned extremely low (ground level), one element — a shoe sole, product, or hand — massively in sharp foreground focus while subject leans toward camera above, dynamic diagonal composition, deep perspective compression, fashion magazine aesthetic, deep studio lighting with high contrast, ultra-wide 14mm lens, sole or product in extreme close foreground',
+            description: 'Ground-level, sole/product massive in foreground, model crouches over the lens',
+            injection: 'SHOT TYPE: ultra-low ground editorial shot. Camera is positioned at floor level, lens pointing upward at roughly 45 degrees. Subject crouches or leans dramatically toward the camera, one leg extended toward the lens so the shoe sole or sneaker sole fills the extreme bottom foreground in sharp focus — appearing as large as the subject\'s entire torso. The model\'s face is visible above, looking down into the lens with editorial attitude. Studio background with strong directional rim lighting. The sole detail, tread, and texture are razor-sharp in macro foreground while the body is also in focus. Shot style: Midjourney sneaker editorial — sole-forward crouch shot, fashion magazine.',
         },
         {
             id: 'dutch-tilt',
@@ -395,8 +395,8 @@ export default function CreativeStudio() {
             icon: 'rotate_90_degrees_cw',
             emoji: '↗️',
             color: '#ec4899',
-            description: 'Camera tilted 25°, visual tension, cinematic urgency',
-            injection: 'Dutch angle camera tilt approximately 25 degrees, creating cinematic tension and visual urgency, off-kilter composition that feels dramatic and disorienting, the horizon line is diagonal, subject positioned in powerful diagonal, cinematic anamorphic lens, editorial fashion photography, creates psychological unease and dynamic energy',
+            description: 'Camera tilted 20–30°, horizon diagonal, cinematic psychological tension',
+            injection: 'SHOT TYPE: Dutch angle / canted camera shot. The entire frame is rotated approximately 25 degrees clockwise or counter-clockwise. The horizon line is a strong diagonal. Subject is positioned off-center in the frame, their body aligned with the tilt so they appear to defy gravity. Strong negative space on one side. The product is held prominently. Background shows a cityscape, hallway, or editorial studio that also participates in the tilt creating visual disorientation. Anamorphic lens with slight oval bokeh. Shot style: cinematic editorial, fashion campaign, psychological tension photography — Vogue editorial.',
         },
         {
             id: 'overhead-flatlay',
@@ -404,8 +404,8 @@ export default function CreativeStudio() {
             icon: 'arrow_downward',
             emoji: '⬇️',
             color: '#22c55e',
-            description: 'Dead overhead flat lay, styled arrangement, dramatic shadows',
-            injection: 'Perfect dead-overhead bird\'s-eye flat lay, camera directly above pointing straight down, product beautifully styled and arranged on surface, dramatic single-source lighting casting crisp geometric shadows, precise styling with negative space, architectural top-down composition, medium format overhead photography, clean editorial aesthetic',
+            description: 'Dead overhead flat lay — product styled on surface with dramatic shadows',
+            injection: 'SHOT TYPE: dead-overhead flat lay. Camera is mounted directly above, pointing straight down at 90 degrees to the surface. The product is the hero — beautifully styled and placed on a clean surface (marble, concrete, white seamless, or textured paper). Supporting props are arranged symmetrically or artistically around the product. A single strong light source from one side casts crisp, long geometric shadows that become a design element. The product label or face is perfectly oriented toward the viewer. Top-down. Nothing in the frame except product, surface, and intentional props. Shot style: commercial product flat lay, Kinfolk magazine, Apple product photography.',
         },
         {
             id: 'dramatic-close',
@@ -413,8 +413,8 @@ export default function CreativeStudio() {
             icon: 'search',
             emoji: '🔍',
             color: '#eab308',
-            description: 'Macro close-up, texture as hero, creamy bokeh surround',
-            injection: 'Extreme macro close-up shot, subject or product fills the entire frame, exquisite texture detail revealed, shot on 105mm macro lens, razor-thin depth of field with buttery smooth bokeh in background, the material texture becomes the visual story, studio lighting that rakes across the surface to reveal every detail, commercial product photography style',
+            description: 'Macro close-up, product texture as hero, silky bokeh surrounds it',
+            injection: 'SHOT TYPE: extreme macro close-up. Camera is at macro range — lens nearly touching the product or face. Subject or product fills and overflows the entire frame — we see nothing but texture, material, and surface detail. The label, fabric weave, skin pore, condensation droplet, or material finish becomes the visual universe. Shot on 105mm macro lens, f/2.8, razor-thin depth of field — only a 2mm slice is perfectly sharp while everything behind and in front dissolves into smooth creamy bokeh. Studio lighting rakes at a low angle to reveal every micro-texture as relief. Shot style: watch advertisement close-up, perfume flask, sneaker material close.',
         },
         {
             id: 'cinematic-wide',
@@ -422,8 +422,8 @@ export default function CreativeStudio() {
             icon: 'panorama_wide_angle',
             emoji: '🎬',
             color: '#3b82f6',
-            description: 'Epic wide establishing, subject in vast environment, atmospheric depth',
-            injection: 'Cinematic ultra-wide establishing shot, subject is a small but powerful presence in a vast impressive environment, anamorphic widescreen 2.39:1 crop, deep atmospheric haze and depth layers, cinematic color grade, shot on anamorphic 35mm lens with beautiful lens flare, sweeping environmental grandeur, the environment tells as much story as the subject, Hollywood blockbuster camera work',
+            description: 'Epic 2.39:1 anamorphic wide, subject small in vast landscape, cinematic haze',
+            injection: 'SHOT TYPE: anamorphic cinematic wide shot. Ultra-wide establishing frame in 2.39:1 letterbox widescreen ratio. The subject and product are positioned confidently in the lower third of the frame — intentionally small relative to the sweeping landscape, architecture, or environment around them. The scene has multiple depth layers: sharp foreground element, subject in mid-ground, atmospheric haze or fog in the distance. Anamorphic lens flare visible on light sources. Golden hour or dramatic mixed light. Cinematic color grade — teal shadows, warm highlights. Shot style: Denis Villeneuve / Christopher Nolan commercial — the environment is as important as the subject.',
         },
         {
             id: 'freeze-motion',
@@ -431,8 +431,8 @@ export default function CreativeStudio() {
             icon: 'shutter_speed',
             emoji: '❄️',
             color: '#67e8f9',
-            description: 'Ultra-fast shutter freeze, mid-action, sharp against blurred world',
-            injection: 'Ultra-high speed freeze frame photography, 1/8000s shutter speed capturing impossible mid-action moment — liquid splash suspended, fabric rippling, hair fanning out, or object thrown — every detail sharp and suspended in time while the world blurs, white or dramatic studio background, strobe frozen motion photography, incredible frozen physics',
+            description: 'Ultra-fast shutter: liquid splash, fabric fan, or flying product — all suspended',
+            injection: 'SHOT TYPE: high-speed strobe freeze. Camera set to 1/8000s shutter speed or strobe-frozen at that equivalent. A physically impossible moment is captured: liquid bursting outward from a shaken bottle, fabric billowing and suspended mid-flow, the product thrown into the air with trajectory particles around it, or water droplets exploding upward from a surface hit. Every droplet, thread, and particle is individually sharp and frozen — arrested mid-physics. Background is a clean studio or gradient. The product is at the center of the explosive energy. Shot style: Milk splash advertisement, Absolut Vodka frozen moment, fashion water spray editorial.',
         },
         {
             id: 'shoulder-candid',
@@ -440,8 +440,8 @@ export default function CreativeStudio() {
             icon: 'photo_camera_back',
             emoji: '📸',
             color: '#a3e635',
-            description: 'Film grain, voyeuristic, authentic street photography energy',
-            injection: 'Authentic street documentary photography style, candid unposed energy, slight film grain, 35mm film aesthetic with natural imperfections, the subject is caught mid-moment in their own world, available light from environment, slightly off-center composition that feels real and accidental, VSCO film preset aesthetic, raw and truthful, shot on Leica or Canon AE-1',
+            description: 'Handheld 35mm film, authentic unposed street energy, real-life moment',
+            injection: 'SHOT TYPE: candid street documentary. Handheld camera with natural shake, shot on 35mm film equivalent (Kodak Portra 400 or Fuji 400H color science). The subject is NOT posed — they are caught mid-laugh, mid-walk, mid-sip, or mid-conversation, fully immersed in their own world. The product appears naturally in the scene (in their hand, on a table, in a bag). Composition is slightly off-center, breathing room on one side. Natural available light — golden hour sunlight, neon bounce, or soft overcast. Film grain at ISO 1600 visible. Slight vignette. No studio feel whatsoever. Shot style: Leica street photography, Tyler Mitchell, Nan Goldin — real moment, real life.',
         },
         {
             id: 'birds-eye-social',
@@ -449,8 +449,8 @@ export default function CreativeStudio() {
             icon: 'north',
             emoji: '🦅',
             color: '#f59e0b',
-            description: 'High angle bird\'s-eye, subject looks small and powerful below',
-            injection: 'High bird\'s-eye view shot from far above, camera looking straight down at subject who is positioned below with strong graphic lines (sidewalk, road, tiles) creating geometric patterns, the human or product appears small and intentional within the larger visual pattern, dramatic aerial perspective, the ground geometry creates abstract graphic composition',
+            description: "Directly overhead, subject looks tiny within bold graphic ground geometry",
+            injection: "SHOT TYPE: high aerial bird's-eye view. Camera is positioned directly above, 10–30 feet high, pointing straight down. The subject lies, sits, or stands on a graphic surface — bold geometric tiles, painted road markings, a colorful rug, or a patterned floor. The geometric ground pattern creates a strong graphic composition that the subject is deliberately placed within — like a human element in an abstract diagram. The subject and product are seen from directly above, face visible looking up at the camera (if portrait) or artfully arranged (if flatlay). Negative space is used intentionally. Shot style: aerial fashion Instagram, Cosmo flat lay, Alex Prager overhead.",
         },
         {
             id: 'over-shoulder',
@@ -458,10 +458,12 @@ export default function CreativeStudio() {
             icon: 'switch_camera',
             emoji: '👁️',
             color: '#d946ef',
-            description: 'POV over-shoulder, immersive first-person energy',
-            injection: 'Over-the-shoulder immersive POV perspective shot, camera positioned just behind and slightly above the subject\'s shoulder, we see what the character sees or we see them reaching toward the product from behind, intimate and immersive first-person narrative, slightly angled 85mm lens, creates feeling of being in the scene, editorial storytelling composition',
+            description: "Camera behind subject's shoulder \u2014 immersive POV, we see what they see",
+            injection: "SHOT TYPE: over-the-shoulder POV shot. Camera is positioned just behind and above the subject's right or left shoulder — we see the back of their head, neck, and one shoulder blurred in the immediate foreground. The subject is reaching toward the product, looking at it, interacting with it — and we are right behind them, inhabiting their perspective. The product is in sharp focus in the mid-ground. If another person is present, we see their face reacting to our subject. 85mm lens, shallow depth of field, shoulder is soft bokeh at screen edge. Intimate, cinematic, first-person narrative. Shot style: fashion film, perfume campaign — immersive editorial storytelling.",
         },
     ];
+
+
 
 
     const IMAGE_MODELS = [
