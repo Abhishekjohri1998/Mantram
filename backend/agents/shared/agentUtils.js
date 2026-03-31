@@ -85,6 +85,35 @@ export async function callAgent(systemPrompt, userPrompt, temperature = 0.7, max
         } else {
             console.log(`🔍 No JSON object found in cleaned text. Cleaned sample: ${cleaned.substring(0, 300)}`);
         }
+
+        // Strategy 4: Field-by-field regex extraction (last resort for copywriter / long JSON with unescaped chars)
+        // Handles cases where string values contain apostrophes, quotes, or newlines that break JSON.parse
+        const fieldExtract = (jsonMatch?.[0] || cleaned);
+        if (fieldExtract) {
+            try {
+                const obj = {};
+                // Extract string fields: "key": "value" — handles values with embedded quotes
+                const stringPairs = fieldExtract.matchAll(/"(\w+)"\s*:\s*"([\s\S]*?)(?<!\\)"(?=\s*[,}\n])/g);
+                for (const [, key, val] of stringPairs) {
+                    if (!obj[key]) obj[key] = val.replace(/\\n/g, '\n').replace(/\\"/g, '"');
+                }
+                // Extract array fields: "key": [...]
+                const arrayPairs = fieldExtract.matchAll(/"(\w+)"\s*:\s*\[([\s\S]*?)\]/g);
+                for (const [, key, val] of arrayPairs) {
+                    if (!obj[key]) {
+                        const items = val.match(/"([^"]+)"/g)?.map(s => s.replace(/"/g, '')) || [];
+                        obj[key] = items;
+                    }
+                }
+                if (Object.keys(obj).length > 0) {
+                    console.log(`🔍 Strategy 4 success: extracted keys: ${Object.keys(obj).join(', ')}`);
+                    return obj;
+                }
+            } catch (e4) {
+                console.log(`🔍 Strategy 4 failed: ${e4.message.substring(0, 100)}`);
+            }
+        }
+
     } catch (e) {
         console.warn('Agent JSON parse failed, raw:', text.substring(0, 200));
     }

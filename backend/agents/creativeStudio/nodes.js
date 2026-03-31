@@ -527,9 +527,13 @@ export async function fastCreativeDirectorNode(state) {
     return {
         ...state,
         artDirection: {
+            // Core art direction fields (same as full artDirectorNode)
             mood: result.mood,
             visualStyle: result.visualStyle,
             suggestedHeadline: result.suggestedHeadline,
+            productIntegration: result.productIntegration, // hero | supporting | ambient | none
+            negativePrompt: result.negativePrompt,
+            engineeringNotes: result.engineeringNotes, // Art director's creative reasoning
         },
         engineeredPrompt: {
             primaryPrompt: result.primaryPrompt,
@@ -761,8 +765,14 @@ export async function copywriterNode(state) {
 
 
 
+    // ── DEBUG: Log exactly what we're sending to the copywriter ──
+    console.log('✍️  COPYWRITER DEBUG — userPrompt length:', userPrompt.length);
+    console.log('✍️  COPYWRITER userPrompt:\n', userPrompt.substring(0, 800));
+    console.log('✍️  COPYWRITER brandContext length:', brandContext?.length || 0);
+
     const result = await callAgent(COPYWRITER_PROMPT(brandContext), userPrompt, 0.75, 8192);
-    console.log(`✍️  Copywriter done in ${Date.now() - startMs}ms — headline: "${result.headline || '?'}"${result.error ? ` [PARSE ERROR: ${result.error}]` : ''}`);
+    console.log(`✍️  Copywriter result keys: ${Object.keys(result || {}).join(', ')}`);
+    console.log(`✍️  Copywriter done in ${Date.now() - startMs}ms — headline: "${result.headline || '?'}" | caption: "${(result.caption || '').substring(0, 60)}..."${result.error ? ` [PARSE ERROR: ${result.error}] RAW: ${result.raw?.substring(0, 200)}` : ''}`);
     if (result.cta) console.log(`✍️  Copywriter CTA: "${result.cta}"`);
 
     return {
