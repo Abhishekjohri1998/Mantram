@@ -2483,9 +2483,23 @@ router.get('/pricing-monitor', async (req, res) => {
         const lastCheck = await getSetting('pricing_last_check', null);
         const alerts = await getSetting('pricing_alerts', []);
 
+        // Reconstruct live providers from flat baseline map, fallback to static if not yet scraped
+        let liveProviders = JSON.parse(JSON.stringify(PROVIDER_PRICING));
+        if (baselines) {
+            for (const [key, modelData] of Object.entries(baselines)) {
+                const parts = key.split('::');
+                if (parts.length === 2 && liveProviders[parts[0]] && liveProviders[parts[0]].models[parts[1]]) {
+                    liveProviders[parts[0]].models[parts[1]] = {
+                        ...liveProviders[parts[0]].models[parts[1]],
+                        ...modelData
+                    };
+                }
+            }
+        }
+
         res.json({
             success: true,
-            providers: PROVIDER_PRICING,
+            providers: liveProviders,
             baselines,
             lastCheck,
             alerts: alerts.slice(0, 50),

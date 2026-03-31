@@ -358,8 +358,8 @@ export const getCreditBalance = (user) => {
 export const CREDIT_COSTS = DEFAULT_CREDIT_COSTS;
 
 // Per-model cost estimates (USD cents per 1K tokens for text; flat USD cents per call for image/video/voice)
-const MODEL_COSTS = {
-    // ── Text models (per 1K tokens) ──
+let MODEL_COSTS = {
+    // 💬 Text models (per 1K tokens) 💬
     'gpt-4o-mini': { input: 0.015, output: 0.06 },
     'gpt-4o': { input: 0.25, output: 1.0 },
     'grok-3-mini-fast': { input: 0.03, output: 0.10 },
@@ -402,6 +402,30 @@ const MODEL_COSTS = {
 };
 
 // Exported for pricing calculator
+export async function syncLiveModelPricing() {
+    const baselines = await getSetting('pricing_baselines', null);
+    if (!baselines) return;
+    
+    for (const [key, model] of Object.entries(baselines)) {
+        if (model.type === 'text') {
+            const id = model.modelId;
+            // baseline is per 1M. MODEL_COSTS is per 1K. So divide by 1000.
+            MODEL_COSTS[id] = {
+                input: (model.inputPer1M || 0) / 1000,
+                output: (model.outputPer1M || 0) / 1000,
+                ...(MODEL_COSTS[id] || {}) // merge base
+            };
+            MODEL_COSTS[id].input = (model.inputPer1M || 0) / 1000;
+            MODEL_COSTS[id].output = (model.outputPer1M || 0) / 1000;
+        } else if (model.type === 'image') {
+            MODEL_COSTS[model.modelId] = { flatCost: model.flatCostUSD || 0.04 };
+        }
+    }
+}
+
+// Try initializing once at boot
+syncLiveModelPricing().catch(() => {});
+
 export { MODEL_COSTS };
 
 /**

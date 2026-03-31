@@ -3438,18 +3438,41 @@ export default function SuperAdminDashboard() {
                                     <button onClick={handlePricingCheck} disabled={monitorChecking}
                                         className="px-5 py-2.5 rounded-xl bg-amber-500 text-slate-950 text-xs font-black uppercase tracking-wider hover:bg-amber-400 transition-all shadow-lg shadow-amber-500/20 disabled:opacity-50 cursor-pointer flex items-center gap-2">
                                         {monitorChecking ? <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span> : <span className="material-symbols-outlined text-sm">radar</span>}
-                                        {monitorChecking ? 'Checking...' : 'Check Now'}
+                                        {monitorChecking ? 'Scraping Models...' : 'Check Now'}
                                     </button>
                                     {monitorData?.lastCheck && (
                                         <span className="text-xs text-slate-500">
                                             Last checked: {new Date(monitorData.lastCheck).toLocaleString('en-IN')}
                                         </span>
-                                    )}
+                                     )}
                                     {monitorData?.alertCount > 0 && (
                                         <button onClick={handleDismissAlerts} className="px-3 py-1.5 rounded-lg bg-rose-500/10 text-rose-400 text-[10px] font-bold border border-rose-500/20 hover:bg-rose-500/20 transition-all cursor-pointer">
                                             Dismiss {monitorData.alertCount} alerts
                                         </button>
                                     )}
+                                </div>
+
+                                {/* Oracle Banner */}
+                                <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                    <div className="flex items-start md:items-center gap-3">
+                                        <div className="p-2 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                                            <span className="material-symbols-outlined text-xl">smart_toy</span>
+                                        </div>
+                                        <div>
+                                            <h4 className="text-sm font-black text-emerald-400 uppercase tracking-wider mb-0.5 flex items-center gap-2">
+                                                Live AI Pricing Oracle Active
+                                                <span className="relative flex h-2 w-2">
+                                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                                                </span>
+                                            </h4>
+                                            <p className="text-xs text-slate-400">The system runs scheduled LLM scrapers on provider docs to extract live generation costs.</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex flex-col md:items-end p-3 rounded-lg bg-white/[0.02] border border-white/[0.05]">
+                                        <p className="text-[10px] text-slate-500 uppercase font-black tracking-wider w-full mb-1">Auto-Margin Guardrails</p>
+                                        <p className="text-xs font-bold text-emerald-400 flex items-center gap-1"><span className="material-symbols-outlined text-[14px]">shield</span> ENABLED (≥50%)</p>
+                                    </div>
                                 </div>
 
                                 {/* Alerts */}

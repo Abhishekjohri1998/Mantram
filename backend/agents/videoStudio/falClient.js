@@ -122,8 +122,33 @@ export const MODEL_CAPABILITIES = {
     },
 };
 
+let LIVE_COST_PER_SECOND = {};
+
+/**
+ * Periodically pulls live pricing baselines from DB so estimateCost() remains synchronous
+ * but uses live scraped data. Handled automatically via pricingMonitor or server init.
+ */
+export async function syncLiveVideoPricing() {
+    const baselines = await getSetting('pricing_baselines', null);
+    if (!baselines) return;
+    
+    for (const [key, model] of Object.entries(baselines)) {
+        if (model.type === 'video' || model.type === 'image') { // Some providers mix them
+            const id = model.modelId;
+            LIVE_COST_PER_SECOND[id] = {
+                fast: model.costPerSecFast || model.costPerSecond || 0.08,
+                quality: model.costPerSecQuality || model.costPerSecond || 0.15
+            };
+        }
+    }
+}
+
+// Ensure it attempts to load once on boot
+syncLiveVideoPricing().catch(() => {});
+
 export function estimateCost(model = 'kling-3.0', durationSeconds = 5, resolution = '1080p', mode = 'fast') {
-    const costPerSec = COST_PER_SECOND[model]?.[mode] || 0.07;
+    const liveCost = LIVE_COST_PER_SECOND[model]?.[mode];
+    const costPerSec = liveCost || (COST_PER_SECOND[model]?.[mode]) || 0.07;
     const resMult = resolution === '720p' ? 0.7 : 1.0;
     const usd = Number((costPerSec * durationSeconds * resMult).toFixed(2));
     const inr = Number((usd * 85).toFixed(0));
