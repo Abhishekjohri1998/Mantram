@@ -436,6 +436,7 @@ router.post('/ai-photoshoot', optionalAuth, async (req, res) => {
             styleRef, characterRef,
             cameraAngle, lens, lightingStyle, lightDirection, surface, modelPresence, mood,
             imageModel,
+            cameraShot,  // Dynamic camera shot preset injection from UI
             // Legacy params (backward compat)
             scene, keywords } = req.body;
         if (!image) return res.status(400).json({ success: false, error: 'Product image is required' });
@@ -590,7 +591,12 @@ ${brief ? brief + '.' : ''}${brandColors ? ` Color palette: ${brandColors}.` : '
 Bold, ${moodPhrase} visual suitable for advertising and social media. ${ratioPhrase}`;
         }
 
-        console.log(`📸 AI Photo Studio: angle=${cameraAngle} lens=${lens} light=${lightingStyle}/${lightDirection} surface=${surface} model=${modelPresence} mood=${mood?.join(',')} fidelity=${fidelity} ratio=${aspectRatio}`);
+        // If a dynamic camera shot preset was selected, override/append camera direction
+        if (cameraShot) {
+            photoshootPrompt += `\n\nCAMERA OVERRIDE — HIGHEST PRIORITY: ${cameraShot}. This supersedes any other angle instructions. Execute this camera technique precisely.`;
+        }
+
+        console.log(`📸 AI Photo Studio: angle=${cameraAngle} lens=${lens} light=${lightingStyle}/${lightDirection} surface=${surface} model=${modelPresence} mood=${mood?.join(',')} fidelity=${fidelity} ratio=${aspectRatio} shot=${cameraShot ? 'PRESET' : 'manual'}`);
 
         // ── Model selection & routing ─────────────────────────────────────
         const PHOTOSHOOT_MODELS = {

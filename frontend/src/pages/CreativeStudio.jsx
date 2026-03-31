@@ -348,8 +348,122 @@ export default function CreativeStudio() {
     const [showModelMenu, setShowModelMenu] = useState(false)
     const [showBusyModal, setShowBusyModal] = useState(false)
     const [busyModelInfo, setBusyModelInfo] = useState(null)
+    const [selectedShot, setSelectedShot] = useState(null)      // Camera shot preset for AI Create
+    const [psSelectedShot, setPsSelectedShot] = useState(null)  // Camera shot preset for Photo Studio
 
-    // ── Image Model Definitions ──
+    // ── Camera Shot Presets ── (professional directive injected into prompt)
+    const CAMERA_SHOT_PRESETS = [
+        {
+            id: 'worms-eye-hero',
+            label: "Worm's Eye",
+            icon: 'south',
+            emoji: '🐛',
+            color: '#f97316',
+            description: 'Camera flat on ground, subject towers above, sky background',
+            injection: 'Extreme worm\'s-eye view shot from ground level, camera flat on the floor looking straight up, subject towers dramatically above, sky fills the background, ultra-wide 14mm lens, strong perspective distortion making figure monumental, extreme forced perspective, dynamic upward composition, shot on wide-angle lens',
+        },
+        {
+            id: 'high-action',
+            label: 'High Action',
+            icon: 'bolt',
+            emoji: '⚡',
+            color: '#ef4444',
+            description: 'Mid-air jump, motion blur background, product thrust forward',
+            injection: 'Dynamic parkour action shot, subject caught mid-jump frozen in motion, product or hand thrust aggressively toward camera in sharp focus while background has radial motion blur, low angle looking up, shot at 1/2000s shutter speed freeze, shallow depth of field on subject, cinematic wide-angle 24mm lens, incredible kineticism and energy',
+        },
+        {
+            id: 'fisheye-lean',
+            label: 'Fisheye Flex',
+            icon: 'lens',
+            emoji: '🐟',
+            color: '#8b5cf6',
+            description: 'Extreme fisheye, ground level, environment bends around subject',
+            injection: 'Extreme fisheye lens (8mm) shot from near-ground level, environment curves dramatically around subject, skyscrapers or buildings bent at extreme angles in background, subject crouched low fills the frame, ground level perspective, all surroundings distorted and curving outward, powerful distortion makes environment feel massive',
+        },
+        {
+            id: 'fashion-low',
+            label: 'Low Editorial',
+            icon: 'camera_enhance',
+            emoji: '👟',
+            color: '#06b6d4',
+            description: 'Ultra-wide low angle, product/shoe in huge foreground, dynamic diagonal',
+            injection: 'Ultra-wide angle fashion editorial shot, camera positioned extremely low (ground level), one element — a shoe sole, product, or hand — massively in sharp foreground focus while subject leans toward camera above, dynamic diagonal composition, deep perspective compression, fashion magazine aesthetic, deep studio lighting with high contrast, ultra-wide 14mm lens, sole or product in extreme close foreground',
+        },
+        {
+            id: 'dutch-tilt',
+            label: 'Dutch Tilt',
+            icon: 'rotate_90_degrees_cw',
+            emoji: '↗️',
+            color: '#ec4899',
+            description: 'Camera tilted 25°, visual tension, cinematic urgency',
+            injection: 'Dutch angle camera tilt approximately 25 degrees, creating cinematic tension and visual urgency, off-kilter composition that feels dramatic and disorienting, the horizon line is diagonal, subject positioned in powerful diagonal, cinematic anamorphic lens, editorial fashion photography, creates psychological unease and dynamic energy',
+        },
+        {
+            id: 'overhead-flatlay',
+            label: 'Overhead',
+            icon: 'arrow_downward',
+            emoji: '⬇️',
+            color: '#22c55e',
+            description: 'Dead overhead flat lay, styled arrangement, dramatic shadows',
+            injection: 'Perfect dead-overhead bird\'s-eye flat lay, camera directly above pointing straight down, product beautifully styled and arranged on surface, dramatic single-source lighting casting crisp geometric shadows, precise styling with negative space, architectural top-down composition, medium format overhead photography, clean editorial aesthetic',
+        },
+        {
+            id: 'dramatic-close',
+            label: 'Extreme Close',
+            icon: 'search',
+            emoji: '🔍',
+            color: '#eab308',
+            description: 'Macro close-up, texture as hero, creamy bokeh surround',
+            injection: 'Extreme macro close-up shot, subject or product fills the entire frame, exquisite texture detail revealed, shot on 105mm macro lens, razor-thin depth of field with buttery smooth bokeh in background, the material texture becomes the visual story, studio lighting that rakes across the surface to reveal every detail, commercial product photography style',
+        },
+        {
+            id: 'cinematic-wide',
+            label: 'Cinematic Wide',
+            icon: 'panorama_wide_angle',
+            emoji: '🎬',
+            color: '#3b82f6',
+            description: 'Epic wide establishing, subject in vast environment, atmospheric depth',
+            injection: 'Cinematic ultra-wide establishing shot, subject is a small but powerful presence in a vast impressive environment, anamorphic widescreen 2.39:1 crop, deep atmospheric haze and depth layers, cinematic color grade, shot on anamorphic 35mm lens with beautiful lens flare, sweeping environmental grandeur, the environment tells as much story as the subject, Hollywood blockbuster camera work',
+        },
+        {
+            id: 'freeze-motion',
+            label: 'Freeze Frame',
+            icon: 'shutter_speed',
+            emoji: '❄️',
+            color: '#67e8f9',
+            description: 'Ultra-fast shutter freeze, mid-action, sharp against blurred world',
+            injection: 'Ultra-high speed freeze frame photography, 1/8000s shutter speed capturing impossible mid-action moment — liquid splash suspended, fabric rippling, hair fanning out, or object thrown — every detail sharp and suspended in time while the world blurs, white or dramatic studio background, strobe frozen motion photography, incredible frozen physics',
+        },
+        {
+            id: 'shoulder-candid',
+            label: 'Street Candid',
+            icon: 'photo_camera_back',
+            emoji: '📸',
+            color: '#a3e635',
+            description: 'Film grain, voyeuristic, authentic street photography energy',
+            injection: 'Authentic street documentary photography style, candid unposed energy, slight film grain, 35mm film aesthetic with natural imperfections, the subject is caught mid-moment in their own world, available light from environment, slightly off-center composition that feels real and accidental, VSCO film preset aesthetic, raw and truthful, shot on Leica or Canon AE-1',
+        },
+        {
+            id: 'birds-eye-social',
+            label: "Bird's Eye",
+            icon: 'north',
+            emoji: '🦅',
+            color: '#f59e0b',
+            description: 'High angle bird\'s-eye, subject looks small and powerful below',
+            injection: 'High bird\'s-eye view shot from far above, camera looking straight down at subject who is positioned below with strong graphic lines (sidewalk, road, tiles) creating geometric patterns, the human or product appears small and intentional within the larger visual pattern, dramatic aerial perspective, the ground geometry creates abstract graphic composition',
+        },
+        {
+            id: 'over-shoulder',
+            label: 'Over Shoulder',
+            icon: 'switch_camera',
+            emoji: '👁️',
+            color: '#d946ef',
+            description: 'POV over-shoulder, immersive first-person energy',
+            injection: 'Over-the-shoulder immersive POV perspective shot, camera positioned just behind and slightly above the subject\'s shoulder, we see what the character sees or we see them reaching toward the product from behind, intimate and immersive first-person narrative, slightly angled 85mm lens, creates feeling of being in the scene, editorial storytelling composition',
+        },
+    ];
+
+
     const IMAGE_MODELS = [
         { id: 'nanobanana-2', name: 'NanoBanana 2', icon: 'auto_awesome', desc: 'Default • Fast • Best with references', provider: 'LaoZhang', badge: '⚡', color: '#a855f7' },
         { id: 'nanobanana-pro', name: 'NanoBanana Pro', icon: 'diamond', desc: 'Premium quality • Better details', provider: 'LaoZhang', badge: '💎', color: '#ec4899' },
@@ -1162,6 +1276,11 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
 
         try {
             let fullPrompt = prompt
+            // Inject camera shot preset if selected
+            if (selectedShot) {
+                const shot = CAMERA_SHOT_PRESETS.find(s => s.id === selectedShot)
+                if (shot) fullPrompt += `. CAMERA & SHOT: ${shot.injection}`
+            }
             const options = {
                 style,
                 textOverlay,
@@ -2097,7 +2216,60 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
 
                         )}
 
+                        {/* ── Camera Shot Presets ── */}
+                        <div className="mb-3">
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="text-[10px] text-slate-500 uppercase tracking-widest font-bold flex items-center gap-1">
+                                    <span className="material-symbols-outlined text-[11px]">movie</span>
+                                    Camera Shot
+                                </span>
+                                {selectedShot && (
+                                    <button onClick={() => setSelectedShot(null)}
+                                        className="text-[9px] text-slate-500 hover:text-rose-400 transition-colors cursor-pointer flex items-center gap-0.5">
+                                        <span className="material-symbols-outlined text-[10px]">close</span> Clear
+                                    </button>
+                                )}
+                            </div>
+                            <div className="grid grid-cols-3 gap-1">
+                                {CAMERA_SHOT_PRESETS.map(shot => (
+                                    <button key={shot.id}
+                                        onClick={() => setSelectedShot(prev => prev === shot.id ? null : shot.id)}
+                                        title={shot.description}
+                                        className={`relative px-2 py-2 rounded-lg text-[10px] font-semibold transition-all cursor-pointer flex flex-col items-center gap-0.5 group ${
+                                            selectedShot === shot.id
+                                            ? 'border text-white shadow-lg'
+                                            : 'bg-white/[0.03] text-slate-500 hover:text-slate-300 border border-white/[0.05] hover:border-white/[0.1] hover:bg-white/[0.05]'
+                                        }`}
+                                        style={selectedShot === shot.id ? {
+                                            backgroundColor: `${shot.color}18`,
+                                            borderColor: `${shot.color}50`,
+                                            color: shot.color,
+                                        } : {}}
+                                    >
+                                        <span className="text-base leading-none">{shot.emoji}</span>
+                                        <span className="leading-tight text-center">{shot.label}</span>
+                                        {selectedShot === shot.id && (
+                                            <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full flex items-center justify-center"
+                                                style={{ backgroundColor: shot.color }}>
+                                                <span className="material-symbols-outlined text-white" style={{ fontSize: '8px' }}>check</span>
+                                            </span>
+                                        )}
+                                    </button>
+                                ))}
+                            </div>
+                            {selectedShot && (() => {
+                                const s = CAMERA_SHOT_PRESETS.find(x => x.id === selectedShot)
+                                return s ? (
+                                    <p className="text-[9px] mt-1.5 flex items-center gap-1" style={{ color: s.color }}>
+                                        <span className="material-symbols-outlined" style={{ fontSize: '10px' }}>info</span>
+                                        {s.description}
+                                    </p>
+                                ) : null
+                            })()}
+                        </div>
+
                         {/* ── Add Text to Image Toggle ── */}
+
                         <div className={`rounded-xl mb-3 border transition-all overflow-hidden ${generateCopy ? 'bg-violet-500/10 border-violet-500/30' : 'bg-white/[0.03] border-white/[0.06]'}`}>
                             {/* Toggle header row */}
                             <div className="flex items-center justify-between px-3 py-2">
@@ -4103,7 +4275,54 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             </p>
                         </div>
 
+                        {/* ── Camera Shot Preset (Photo Studio) ── */}
+                        <div className="mb-3">
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="text-[10px] text-slate-500 uppercase tracking-widest font-bold flex items-center gap-1">
+                                    <span className="material-symbols-outlined text-[11px]">movie</span>
+                                    Camera Shot
+                                </span>
+                                {psSelectedShot && (
+                                    <button onClick={() => setPsSelectedShot(null)}
+                                        className="text-[9px] text-slate-500 hover:text-rose-400 transition-colors cursor-pointer flex items-center gap-0.5">
+                                        <span className="material-symbols-outlined text-[10px]">close</span> Clear
+                                    </button>
+                                )}
+                            </div>
+                            <div className="grid grid-cols-4 gap-1">
+                                {CAMERA_SHOT_PRESETS.map(shot => (
+                                    <button key={shot.id}
+                                        onClick={() => setPsSelectedShot(prev => prev === shot.id ? null : shot.id)}
+                                        title={shot.description}
+                                        className={`relative px-1.5 py-2 rounded-lg text-[9px] font-semibold transition-all cursor-pointer flex flex-col items-center gap-0.5 ${
+                                            psSelectedShot === shot.id
+                                            ? 'border text-white shadow-lg'
+                                            : 'bg-white/[0.03] text-slate-500 hover:text-slate-300 border border-white/[0.05] hover:border-white/[0.1] hover:bg-white/[0.05]'
+                                        }`}
+                                        style={psSelectedShot === shot.id ? {
+                                            backgroundColor: `${shot.color}18`,
+                                            borderColor: `${shot.color}50`,
+                                            color: shot.color,
+                                        } : {}}
+                                    >
+                                        <span className="text-sm leading-none">{shot.emoji}</span>
+                                        <span className="leading-tight text-center">{shot.label}</span>
+                                    </button>
+                                ))}
+                            </div>
+                            {psSelectedShot && (() => {
+                                const s = CAMERA_SHOT_PRESETS.find(x => x.id === psSelectedShot)
+                                return s ? (
+                                    <p className="text-[9px] mt-1.5 flex items-center gap-1" style={{ color: s.color }}>
+                                        <span className="material-symbols-outlined" style={{ fontSize: '10px' }}>info</span>
+                                        {s.description}
+                                    </p>
+                                ) : null
+                            })()}
+                        </div>
+
                         {/* ── Extra Notes ── */}
+
                         <div className="relative">
                             <textarea value={photoshootBrief}
                                 onChange={e => setPhotoshootBrief(e.target.value)}
@@ -4208,6 +4427,11 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                             surface,
                                             modelPresence,
                                             mood,
+                                            // Camera shot preset injection
+                                            cameraShot: psSelectedShot ? (() => {
+                                                const s = CAMERA_SHOT_PRESETS.find(x => x.id === psSelectedShot)
+                                                return s ? s.injection : null
+                                            })() : null,
                                         })
 
                                         if (data.success) {
