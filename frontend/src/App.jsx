@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useState, useEffect } from 'react'
 import { AuthProvider } from './context/AuthContext'
 import { BrandProvider } from './context/BrandContext'
 import { CreditProvider } from './context/CreditContext'
@@ -9,6 +9,9 @@ import ProtectedRoute from './components/ProtectedRoute'
 import PlanGatedRoute from './components/PlanGatedRoute'
 import AgentFidatoPanel from './components/AgentFidatoPanel'
 import NexusBar from './components/NexusBar'
+import BackgroundJobsPanel from './components/BackgroundJobsPanel'
+import { BackgroundJobsContext } from './hooks/useBackgroundJobs'
+import { useBackgroundJobs } from './hooks/useBackgroundJobs'
 
 // ── Static Imports (Critical/Fast) ──
 import Auth from './pages/Auth'
@@ -66,6 +69,30 @@ function LoadingSpinner() {
   )
 }
 
+
+// Inner wrapper that provides the BackgroundJobs context after BrowserRouter
+function AppInner() {
+  const backgroundJobs = useBackgroundJobs();
+
+  // Expose addJob globally so deep components (e.g. CreativeStudio) can register jobs
+  // without prop drilling through many layers
+  useEffect(() => {
+    window.__bgJobs__ = {
+      addJob: backgroundJobs.addJob,
+      dismissJob: backgroundJobs.dismissJob,
+      removeJob: backgroundJobs.removeJob,
+    };
+    return () => { window.__bgJobs__ = null; };
+  }, [backgroundJobs.addJob, backgroundJobs.dismissJob, backgroundJobs.removeJob]);
+
+  return (
+    <BackgroundJobsContext.Provider value={backgroundJobs}>
+      <AgentFidatoPanel studio="global" panelOnly />
+      <NexusBar />
+      <BackgroundJobsPanel />
+    </BackgroundJobsContext.Provider>
+  );
+}
 
 function App() {
   return (
@@ -126,9 +153,8 @@ function App() {
                   </Routes>
                 </Suspense>
 
-                {/* Global Fidato Assistant — Stays mounted across all routes */}
-                <AgentFidatoPanel studio="global" panelOnly />
-                <NexusBar />
+                {/* Global Background Jobs Panel + Fidato — mounted across all routes */}
+                <AppInner />
               </UIProvider>
             </CreditProvider>
           </BrandProvider>

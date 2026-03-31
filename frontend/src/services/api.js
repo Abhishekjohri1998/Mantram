@@ -194,6 +194,13 @@ export const creatives = {
     agenticRegenerate: (id, data) => apiFetch(`/creatives/agentic/${id}/regenerate`, { method: 'POST', body: JSON.stringify(data) }),
     // Image upscaling (2K Sharp / 4K Fal.ai ESRGAN)
     upscale: (data) => apiFetch('/creatives/upscale', { method: 'POST', body: JSON.stringify(data), timeout: 60000 }),
+    // ── Background Generation Jobs ──
+    // Returns jobId in ~100ms; pipeline runs server-side regardless of tab state
+    createJob: (data) => apiFetch('/creatives/jobs', { method: 'POST', body: JSON.stringify(data) }),
+    pollJob: (jobId) => apiFetch(`/creatives/jobs/${jobId}`),
+    listJobs: () => apiFetch('/creatives/jobs'),
+    cancelJob: (jobId) => apiFetch(`/creatives/jobs/${jobId}`, { method: 'DELETE' }),
+    suggestCopy: (data) => apiFetch('/creatives/suggest-copy', { method: 'POST', body: JSON.stringify(data) }),
 };
 
 // ============ Agent API ============

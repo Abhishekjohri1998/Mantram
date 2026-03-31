@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, Fragment } from 'react'
+import { useJobs } from '../hooks/useBackgroundJobs'
 import SEOHead from '../components/SEOHead'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import DashboardLayout from '../components/DashboardLayout'
@@ -1257,22 +1258,17 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
         }
     }
 
-
     async function handleGenerate() {
         if (!prompt.trim() || !activeBrand) return
         if (activeGenerations.length >= 3) return // Max 3 concurrent
 
-        const jobId = `job_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
-        setActiveGenerations(prev => [...prev, { jobId, prompt: prompt.substring(0, 60), startedAt: Date.now() }])
+        const localJobId = `job_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
+        setActiveGenerations(prev => [...prev, { jobId: localJobId, prompt: prompt.substring(0, 60), startedAt: Date.now() }])
         setPipelineSteps([])
         setError('')
         setFeedbackState(null)
         setFeedbackToast('')
         setShowQuickStart(false)
-
-        // Generate unique progress ID for real-time tracking
-        const progressId = `p_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
-        let progressInterval = null
 
         try {
             let fullPrompt = prompt
@@ -1295,10 +1291,8 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
                 generateCopy,
                 customHeadline: customHeadline.trim() || null,
                 customCtaText: customCtaText.trim() || null,
-                progressId, // Pass to backend for progress tracking
             }
             if (designBaseImage) {
-                // Use template inpainting mode — preserves layout, characters, products from the original image
                 options.templateInpainting = true
                 options.templateRefImageUrl = designBaseImage
                 if (!fullPrompt.toLowerCase().includes('edit') && !fullPrompt.toLowerCase().includes('change') && !fullPrompt.toLowerCase().includes('modify')) {
@@ -1317,85 +1311,77 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
                 }
             }
 
-            console.log('🎨 Creative Studio — generating with:', {
-                type: selectedType,
-                aspectRatio,
-                style,
-                hasStyleRef: !!referenceImages.style,
-                charactersCount: characters.length,
-                characterNames: characters.map(c => c.name),
-                hasUploadRef: !!referenceImages.upload,
-                hasBaseImage: !!designBaseImage,
-                hasProductImage: !!options.productImageUrl,
-                textOverlay: textOverlay || '(none)',
-                addLogo,
-                progressId,
-            })
-
-            setAiWarnings([])
-
-            // Start polling for pipeline progress
-            progressInterval = setInterval(async () => {
-                try {
-                    const progress = await creativesAPI.pollProgress(progressId)
-                    if (progress?.steps?.length > 0) {
-                        setPipelineSteps(progress.steps)
-                    }
-                } catch { /* ignore polling errors */ }
-            }, 3000)
-
-            // Create abort controller with 2-minute timeout
-            const controller = new AbortController()
-            const signal = controller.signal
-            const timeoutId = setTimeout(() => {
-                controller.abort()
-            }, 120_000) // 2 minute hard timeout
-
-            const data = await creativesAPI.generate({
+            // ── BACKGROUND JOB MODE ──
+            // Fire the job API — returns jobId in ~100ms, pipeline runs server-side.
+            // User can navigate away freely; the global BackgroundJobsPanel polls for results.
+            const jobData = await creativesAPI.createJob({
                 brandId: activeBrand._id,
                 type: selectedType,
                 prompt: fullPrompt,
                 options,
-            }, { signal })
-            clearTimeout(timeoutId)
+            })
 
-            // Stop polling
-            if (progressInterval) clearInterval(progressInterval)
+            if (jobData?.success && jobData?.jobId) {
+                // Register with global job tracker (persists to localStorage)
+                try {
+                    const { addJob } = window.__bgJobs__ || {}
+                    if (addJob) {
+                        addJob(jobData.jobId, {
+                            prompt: fullPrompt,
+                            format: selectedType,
+                            brandId: activeBrand._id,
+                        })
+                    }
+                } catch { /* context not available */ }
 
-            // Handle model busy notification
-            if (data.modelBusy) {
-                const busyModel = IMAGE_MODELS.find(m => m.id === data.busyModel) || { name: data.busyModel }
-                setBusyModelInfo({ ...busyModel, errorMessage: data.errorMessage, errorType: data.errorType })
-                setShowBusyModal(true)
+                // Show optimistic queued state
+                setFeedbackToast('✅ Generation queued! You can navigate to other pages — your image will be ready when done.')
+                setPipelineSteps([{ agent: 'queued', message: 'Image generation queued. Processing in background...', status: 'working' }])
+
+                // Poll this specific job locally too (so the current page updates)
+                const pollLocalJob = async () => {
+                    let attempts = 0
+                    const maxAttempts = 90 // 90 × 5s = 7.5min max
+                    const localPollInterval = setInterval(async () => {
+                        attempts++
+                        if (attempts > maxAttempts) {
+                            clearInterval(localPollInterval)
+                            return
+                        }
+                        try {
+                            const pollData = await creativesAPI.pollJob(jobData.jobId)
+                            if (!pollData?.success) return
+                            const job = pollData.job
+                            if (job.status === 'completed' && job.result?.creative) {
+                                clearInterval(localPollInterval)
+                                const creative = job.result.creative
+                                setResult(creative)
+                                if (creative?.imageUrl) {
+                                    setGenerationHistory(prev => [{ ...creative, _prompt: prompt, _timestamp: Date.now() }, ...prev])
+                                }
+                                if (job.warnings?.length > 0) setAiWarnings(job.warnings)
+                                setFeedbackToast('')
+                                setPipelineSteps([{ agent: 'complete', message: 'Image created successfully!', status: 'done' }])
+                                setActiveGenerations(prev => prev.filter(j => j.jobId !== localJobId))
+                            } else if (job.status === 'failed') {
+                                clearInterval(localPollInterval)
+                                setError({ message: job.errorMessage || 'Generation failed.', isRetryable: true })
+                                setActiveGenerations(prev => prev.filter(j => j.jobId !== localJobId))
+                            } else if (job.status === 'processing') {
+                                setPipelineSteps([{ agent: 'processing', message: 'AI agents are working on your creative...', status: 'working' }])
+                            }
+                        } catch { /* ignore polling errors */ }
+                    }, 5000)
+                }
+                pollLocalJob()
+                // Don't remove from activeGenerations here — the poll interval will do it
                 return
-            }
-
-            let creative = data.creative
-            if (data.warnings?.length > 0) {
-                setAiWarnings(data.warnings)
-            }
-
-            setResult(creative)
-            // Accumulate into in-session gallery
-            if (creative?.imageUrl) {
-                setGenerationHistory(prev => [{ ...creative, _prompt: prompt, _timestamp: Date.now() }, ...prev])
             }
         } catch (e) {
-            if (e.name === 'AbortError') {
-                // Check if it was our timeout abort (not user cancel)
-                setError({
-                    message: '⏱️ Image generation timed out. The AI model server may be overloaded. Please try again or switch to a different image model.',
-                    isProviderError: true,
-                    provider: 'Timeout',
-                    isRetryable: true,
-                })
-                return
-            }
             console.error('❌ Generation error:', e)
             
             const errMsg = (e.message || '').toLowerCase()
             
-            // Detect model busy / server overloaded
             if (errMsg.includes('busy') || errMsg.includes('high demand') || errMsg.includes('overloaded') || errMsg.includes('503') || errMsg.includes('429') || errMsg.includes('rate limit')) {
                 setError({
                     message: '🔄 AI model servers are currently experiencing high demand. Please try again in a few seconds, or switch to a different image model.',
@@ -1410,13 +1396,6 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
                     provider: 'Network',
                     isRetryable: true,
                 })
-            } else if (errMsg.includes('no image') || errMsg.includes('produced no image')) {
-                setError({
-                    message: '🎨 AI couldn\'t generate an image for this prompt. Try rephrasing your brief or using a different style.',
-                    isProviderError: true,
-                    provider: 'Image Model',
-                    isRetryable: true,
-                })
             } else {
                 setError({
                     message: e.message || 'Something went wrong. Please try again.',
@@ -1426,8 +1405,16 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
                 })
             }
         } finally {
-            if (progressInterval) clearInterval(progressInterval)
-            setActiveGenerations(prev => prev.filter(j => j.jobId !== jobId))
+            // Only remove from activeGenerations if we're not in job-polling mode
+            // (job-polling mode removes it when done)
+            setActiveGenerations(prev => {
+                const still = prev.find(j => j.jobId === localJobId)
+                // If it's been there more than 2s and we haven't started polling, remove it
+                if (still && (Date.now() - still.startedAt) > 2000) {
+                    return prev.filter(j => j.jobId !== localJobId)
+                }
+                return prev
+            })
         }
     }
 
