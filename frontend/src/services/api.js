@@ -762,7 +762,7 @@ export const skills = {
 
 // ============ Google Analytics + Search Console API (brand-aware) ============
 export const googleAnalytics = {
-    connect: (brandId) => apiFetch(`/google-analytics/connect${brandId ? `?brandId=${brandId}` : ''}`),
+    connect: (brandId, flow = 'popup') => apiFetch(`/google-analytics/connect?flow=${flow}${brandId ? `&brandId=${brandId}` : ''}`),
     status: (brandId) => apiFetch(`/google-analytics/status${brandId ? `?brandId=${brandId}` : ''}`),
     disconnect: (brandId) => apiFetch('/google-analytics/disconnect', { method: 'POST', body: JSON.stringify({ brandId: brandId || undefined }) }),
     properties: (brandId) => apiFetch(`/google-analytics/properties${brandId ? `?brandId=${brandId}` : ''}`),

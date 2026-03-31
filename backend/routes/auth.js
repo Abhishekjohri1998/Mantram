@@ -582,15 +582,24 @@ router.get('/google', (req, res) => {
         'openid',
     ].join(' ');
 
+    const flow = req.query.flow || 'popup';
+    const state = Buffer.from(JSON.stringify({ flow })).toString('base64');
+    
     const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
         `client_id=${clientId}` +
         `&redirect_uri=${encodeURIComponent(redirectUri)}` +
         `&response_type=code` +
         `&scope=${encodeURIComponent(scopes)}` +
+        `&state=${state}` +
         `&prompt=select_account`;
 
-    // Ensure popup can communicate back
+    // Ensure popup can communicate back (for popup flow)
     res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
+
+    if (flow === 'redirect') {
+        return res.redirect(authUrl);
+    }
+    
     res.json({ success: true, authUrl });
 });
 
@@ -602,12 +611,31 @@ router.get('/google/callback', async (req, res) => {
     // Ensure popup can communicate back
     res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
     try {
-        const { code, error: authError } = req.query;
+        const { code, state, error: authError } = req.query;
+
+        // Parse flow from state
+        let flow = 'popup';
+        try {
+            if (state) {
+                const decoded = JSON.parse(Buffer.from(state, 'base64').toString());
+                flow = decoded.flow || 'popup';
+            }
+        } catch (e) {
+            console.warn('⚠️ Failed to parse OAuth state:', e.message);
+        }
 
         if (authError) {
+            if (flow === 'redirect') {
+                const frontendUrl = config.frontendUrl[0] || 'https://mantram.ai';
+                return res.redirect(`${frontendUrl}/auth?error=${encodeURIComponent('Google authorization was cancelled.')}`);
+            }
             return res.send(closeAuthPopupScript('Google authorization was cancelled.'));
         }
         if (!code) {
+            if (flow === 'redirect') {
+                const frontendUrl = config.frontendUrl[0] || 'https://mantram.ai';
+                return res.redirect(`${frontendUrl}/auth?error=${encodeURIComponent('Missing authorization code.')}`);
+            }
             return res.send(closeAuthPopupScript('Missing authorization code.'));
         }
 
@@ -636,7 +664,12 @@ router.get('/google/callback', async (req, res) => {
                 sentClientId: clientId ? `${clientId.substring(0, 10)}...` : 'MISSING',
                 sentRedirectUri: redirectUri
             });
-            return res.send(closeAuthPopupScript(`Auth failed: ${tokenData.error_description || tokenData.error} (Check server logs for details)`));
+            const errorMsg = `Auth failed: ${tokenData.error_description || tokenData.error}`;
+            if (flow === 'redirect') {
+                const frontendUrl = config.frontendUrl[0] || 'https://mantram.ai';
+                return res.redirect(`${frontendUrl}/auth?error=${encodeURIComponent(errorMsg)}`);
+            }
+            return res.send(closeAuthPopupScript(`${errorMsg} (Check server logs for details)`));
         }
 
         const { access_token } = tokenData;
@@ -728,6 +761,15 @@ router.get('/google/callback', async (req, res) => {
             planDetails: await SubscriptionPackage.findOne({ slug: user.plan || 'starter' }).lean(),
             brandCount
         };
+
+        if (flow === 'redirect') {
+            const frontendUrl = config.frontendUrl[0] || 'https://mantram.ai';
+            const redirectParams = new URLSearchParams({
+                token,
+                user: JSON.stringify(userData)
+            });
+            return res.redirect(`${frontendUrl}/auth?${redirectParams.toString()}`);
+        }
 
         res.send(closeAuthPopupScript(null, token, userData));
 
