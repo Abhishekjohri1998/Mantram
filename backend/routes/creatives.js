@@ -24,6 +24,184 @@ import { laozhangImageGenerate, laozhangMultimodalImageGenerate, isLaozhangAvail
 const router = Router();
 
 // ══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * runCreativeJobAsync — fires the creative pipeline detached from the HTTP request.
+ * Makes an internal server-side fetch to the existing /generate endpoint so all
+ * pipeline logic (agents, MCoT, logo overlay, S3, etc.) is fully reused.
+ */
+async function runCreativeJobAsync(jobId, userId, payload, authToken) {
+    try {
+        await GenerationJob.findOneAndUpdate(
+            { jobId },
+            { status: 'processing', startedAt: new Date() }
+        );
+
+        const { brandId, type, prompt, options, creditsDeducted } = payload;
+
+        // Determine the internal API base URL
+        const port = process.env.PORT || 3001;
+        const internalBase = `http://localhost:${port}/api`;
+
+        // Make an internal server-to-server call to the existing generate endpoint.
+        // We pass the user's auth token so the protect middleware authenticates correctly.
+        // We also skip credit deduction by adding a special bypass header (credits were
+        // already deducted when POST /jobs was called).
+        const resp = await fetch(`${internalBase}/creatives/generate`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`,
+                'X-Job-Id': jobId,               // Job ID for logging
+                'X-Skip-Credits': 'true',         // Credits already deducted
+            },
+            body: JSON.stringify({ brandId, type, prompt, options }),
+            signal: AbortSignal.timeout(300000), // 5 min max
+        });
+
+        const data = await resp.json();
+
+        if (data?.success && data?.creative) {
+            await GenerationJob.findOneAndUpdate(
+                { jobId },
+                {
+                    status: 'completed',
+                    completedAt: new Date(),
+                    creativeId: data.creative._id,
+                    imageUrl: data.creative.imageUrl || data.creative.thumbnailUrl,
+                    result: {
+                        creative: data.creative,
+                        warnings: data.warnings || [],
+                    },
+                }
+            );
+            console.log(`✅ JOB ${jobId}: completed — creative ${data.creative._id}`);
+        } else {
+            const errMsg = data?.error || 'Pipeline returned no creative';
+            await GenerationJob.findOneAndUpdate(
+                { jobId },
+                { status: 'failed', completedAt: new Date(), errorMessage: errMsg }
+            );
+            if (creditsDeducted > 0) {
+                await refundCredits(userId, creditsDeducted, 'creative',
+                    `Refund: Background Job ${jobId} Failed — ${errMsg}`, 'creative');
+            }
+            console.warn(`❌ JOB ${jobId}: failed — ${errMsg}`);
+        }
+    } catch (err) {
+        console.error(`❌ JOB ${jobId}: exception — ${err.message}`);
+        try {
+            await GenerationJob.findOneAndUpdate(
+                { jobId },
+                { status: 'failed', completedAt: new Date(), errorMessage: err.message }
+            );
+            if (payload.creditsDeducted > 0) {
+                await refundCredits(userId, payload.creditsDeducted, 'creative',
+                    `Refund: Background Job ${jobId} Exception`, 'creative');
+            }
+        } catch (updateErr) {
+            console.error(`Failed to update job ${jobId} on error:`, updateErr.message);
+        }
+    }
+}
+
+// ── POST /api/creatives/jobs — Create a background generation job ──────────────
+// Returns jobId in ~50ms. Pipeline runs async. Frontend polls for result.
+router.post('/jobs', protect, requireStudio('creativeStudio'), requireCredits('creative'), async (req, res) => {
+    try {
+        const { brandId, type, prompt, options } = req.body;
+        if (!brandId || !prompt) {
+            return res.status(400).json({ success: false, error: 'brandId and prompt are required' });
+        }
+
+        const jobId = randomUUID();
+
+        await GenerationJob.create({
+            jobId,
+            user: req.user._id,
+            brand: brandId,
+            type: 'ai-create',
+            status: 'pending',
+            prompt,
+            format: type,
+            options,
+            creditsDeducted: req.creditsDeducted || 0,
+        });
+
+        // Return immediately — pipeline fires in background
+        res.json({ success: true, jobId, message: 'Generation queued. You can navigate freely.' });
+
+        // Extract auth token from the original request to pass to the internal fetch
+        const authToken = (req.headers.authorization || '').replace('Bearer ', '');
+
+        // Fire and forget — completely detached from HTTP response
+        runCreativeJobAsync(jobId, req.user._id, {
+            brandId, type, prompt, options,
+            creditsDeducted: req.creditsDeducted || 0,
+        }, authToken).catch(err => console.error(`Background job ${jobId} unhandled error:`, err.message));
+
+    } catch (error) {
+        console.error('Create job error:', error.message);
+        // Refund if job creation failed after credit deduction
+        if (req.creditsDeducted > 0) {
+            await refundCredits(req.user._id, req.creditsDeducted, 'creative', 'Refund: Job creation failed', 'creative');
+        }
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// ── GET /api/creatives/jobs — List recent jobs for the current user ────────────
+// Used on page load to reconnect to any in-progress or completed jobs.
+router.get('/jobs', protect, async (req, res) => {
+    try {
+        const since = new Date(Date.now() - 24 * 60 * 60 * 1000); // last 24h
+        const jobs = await GenerationJob.find(
+            { user: req.user._id, createdAt: { $gte: since } },
+            { jobId: 1, status: 1, type: 1, prompt: 1, format: 1, imageUrl: 1, errorMessage: 1,
+              creativeId: 1, createdAt: 1, startedAt: 1, completedAt: 1, steps: { $slice: -5 } }
+        )
+            .sort({ createdAt: -1 })
+            .limit(20)
+            .lean();
+        res.json({ success: true, jobs });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// ── GET /api/creatives/jobs/:jobId — Poll a specific job ──────────────────────
+router.get('/jobs/:jobId', protect, async (req, res) => {
+    try {
+        const job = await GenerationJob.findOne(
+            { jobId: req.params.jobId, user: req.user._id },
+            { jobId: 1, status: 1, type: 1, prompt: 1, format: 1, imageUrl: 1, errorMessage: 1,
+              creativeId: 1, result: 1, warnings: 1, createdAt: 1, startedAt: 1, completedAt: 1, steps: 1 }
+        ).lean();
+        if (!job) return res.status(404).json({ success: false, error: 'Job not found' });
+        res.json({ success: true, job });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// ── DELETE /api/creatives/jobs/:jobId — Cancel a pending/processing job ───────
+router.delete('/jobs/:jobId', protect, async (req, res) => {
+    try {
+        const job = await GenerationJob.findOneAndUpdate(
+            { jobId: req.params.jobId, user: req.user._id, status: { $in: ['pending', 'processing'] } },
+            { status: 'cancelled', completedAt: new Date() }
+        );
+        if (!job) return res.status(404).json({ success: false, error: 'Job not found or already finished' });
+        // Note: we can't actually cancel the in-flight pipeline, but marking cancelled
+        // means the frontend won't poll it anymore. Credits are NOT refunded for in-flight jobs.
+        res.json({ success: true, message: 'Job marked as cancelled' });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+
+// ══════════════════════════════════════════════════════════════════════════════
 // GET /api/creatives/progress/:id — Poll real-time pipeline progress
 // Lightweight endpoint — no auth required (progress IDs are UUIDs, unguessable)
 // ══════════════════════════════════════════════════════════════════════════════
@@ -960,8 +1138,8 @@ No markdown, no explanation.`;
                             contents: [{ parts: [{ text: userPrompt }] }],
                             generationConfig: {
                                 temperature: 0.8,
+                                response_mime_type: 'application/json',
                                 maxOutputTokens: 2048,
-                                thinkingConfig: { thinkingBudget: 0 },
                             },
                         }),
                     }
@@ -973,154 +1151,25 @@ No markdown, no explanation.`;
             }
         }
 
-        // NO OpenAI fallback — strict model enforcement
-
-        // Parse JSON array from response
-        const jsonMatch = result.match(/\[[\s\S]*\]/);
-        if (jsonMatch) {
-            try {
-                const copies = JSON.parse(jsonMatch[0]);
-                return res.json({ success: true, copies: Array.isArray(copies) ? copies.slice(0, copyCount) : [] });
-            } catch { /* fall through */ }
+        if (!result) {
+            return res.status(500).json({ success: false, error: 'Failed to generate campaign copy' });
         }
 
-        // Return raw result so frontend can parse
-        res.json({ success: true, copies: [], raw: result });
-    } catch (error) {
-        console.error('Campaign copy error:', error);
-        res.status(500).json({ success: false, error: safeErrorMessage(error) });
-    }
-});
-
-
-// ══════════════════════════════════════════════════════════════════════════════
-// BACKGROUND JOB SYSTEM — Persistent generation that survives tab switches,
-// page refreshes, and browser closes. The pipeline runs fully server-side
-// and results are polled from any page.
-// ══════════════════════════════════════════════════════════════════════════════
-
-/**
- * runCreativeJobAsync — fires the creative pipeline detached from the HTTP request.
- * Makes an internal server-side fetch to the existing /generate endpoint so all
- * pipeline logic (agents, MCoT, logo overlay, S3, etc.) is fully reused.
- */
-async function runCreativeJobAsync(jobId, userId, payload, authToken) {
-    try {
-        await GenerationJob.findOneAndUpdate(
-            { jobId },
-            { status: 'processing', startedAt: new Date() }
-        );
-
-        const { brandId, type, prompt, options, creditsDeducted } = payload;
-
-        // Determine the internal API base URL
-        const port = process.env.PORT || 3001;
-        const internalBase = `http://localhost:${port}/api`;
-
-        // Make an internal server-to-server call to the existing generate endpoint.
-        // We pass the user's auth token so the protect middleware authenticates correctly.
-        // We also skip credit deduction by adding a special bypass header (credits were
-        // already deducted when POST /jobs was called).
-        const resp = await fetch(`${internalBase}/creatives/generate`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${authToken}`,
-                'X-Job-Id': jobId,               // Job ID for logging
-                'X-Skip-Credits': 'true',         // Credits already deducted
-            },
-            body: JSON.stringify({ brandId, type, prompt, options }),
-            signal: AbortSignal.timeout(300000), // 5 min max
-        });
-
-        const data = await resp.json();
-
-        if (data?.success && data?.creative) {
-            await GenerationJob.findOneAndUpdate(
-                { jobId },
-                {
-                    status: 'completed',
-                    completedAt: new Date(),
-                    creativeId: data.creative._id,
-                    imageUrl: data.creative.imageUrl || data.creative.thumbnailUrl,
-                    result: {
-                        creative: data.creative,
-                        warnings: data.warnings || [],
-                    },
-                }
-            );
-            console.log(`✅ JOB ${jobId}: completed — creative ${data.creative._id}`);
-        } else {
-            const errMsg = data?.error || 'Pipeline returned no creative';
-            await GenerationJob.findOneAndUpdate(
-                { jobId },
-                { status: 'failed', completedAt: new Date(), errorMessage: errMsg }
-            );
-            if (creditsDeducted > 0) {
-                await refundCredits(userId, creditsDeducted, 'creative',
-                    `Refund: Background Job ${jobId} Failed — ${errMsg}`, 'creative');
-            }
-            console.warn(`❌ JOB ${jobId}: failed — ${errMsg}`);
+        // Clean up JSON response
+        let jsonStr = result.trim();
+        if (jsonStr.includes('```')) {
+            jsonStr = jsonStr.replace(/```json|```/g, '').trim();
         }
-    } catch (err) {
-        console.error(`❌ JOB ${jobId}: exception — ${err.message}`);
+
         try {
-            await GenerationJob.findOneAndUpdate(
-                { jobId },
-                { status: 'failed', completedAt: new Date(), errorMessage: err.message }
-            );
-            if (payload.creditsDeducted > 0) {
-                await refundCredits(userId, payload.creditsDeducted, 'creative',
-                    `Refund: Background Job ${jobId} Exception`, 'creative');
-            }
-        } catch (updateErr) {
-            console.error(`Failed to update job ${jobId} on error:`, updateErr.message);
+            const variations = JSON.parse(jsonStr);
+            res.json({ success: true, variations });
+        } catch (parseErr) {
+            console.error('Campaign copy JSON parse error:', parseErr, 'Raw:', result);
+            res.status(500).json({ success: false, error: 'AI generated invalid JSON format' });
         }
-    }
-}
-
-
-// ── POST /api/creatives/jobs — Create a background generation job ──────────────
-// Returns jobId in ~50ms. Pipeline runs async. Frontend polls for result.
-router.post('/jobs', protect, requireStudio('creativeStudio'), requireCredits('creative'), async (req, res) => {
-    try {
-        const { brandId, type, prompt, options } = req.body;
-        if (!brandId || !prompt) {
-            return res.status(400).json({ success: false, error: 'brandId and prompt are required' });
-        }
-
-        const jobId = randomUUID();
-
-        await GenerationJob.create({
-            jobId,
-            user: req.user._id,
-            brand: brandId,
-            type: 'ai-create',
-            status: 'pending',
-            prompt,
-            format: type,
-            options,
-            creditsDeducted: req.creditsDeducted || 0,
-        });
-
-        // Return immediately — pipeline fires in background
-        res.json({ success: true, jobId, message: 'Generation queued. You can navigate freely.' });
-
-        // Extract auth token from the original request to pass to the internal fetch
-        const authToken = (req.headers.authorization || '').replace('Bearer ', '');
-
-        // Fire and forget — completely detached from HTTP response
-        runCreativeJobAsync(jobId, req.user._id, {
-            brandId, type, prompt, options,
-            creditsDeducted: req.creditsDeducted || 0,
-        }, authToken).catch(err => console.error(`Background job ${jobId} unhandled error:`, err.message));
-
     } catch (error) {
-        console.error('Create job error:', error.message);
-        // Refund if job creation failed after credit deduction
-        if (req.creditsDeducted > 0) {
-            await refundCredits(req.user._id, req.creditsDeducted, 'creative', 'Refund: Job creation failed', 'creative');
-        }
+        console.error('generate-campaign-copy error:', error);
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
