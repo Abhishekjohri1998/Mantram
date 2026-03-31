@@ -20,6 +20,24 @@ const INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
 // ── Known provider pricing (updated manually when providers announce changes) ──
 // These are the "ground truth" costs we compare against our stored baselines.
 export const PROVIDER_PRICING = {
+    // ═══════════════════════════════════════════════════════════════════
+    //  TEXT LLM PROVIDERS
+    // ═══════════════════════════════════════════════════════════════════
+    'openai': {
+        provider: 'OpenAI', icon: '🟢',
+        models: {
+            'gpt-4o': {
+                name: 'GPT-4o', type: 'text',
+                inputPer1M: 2.50, outputPer1M: 10.00, unit: 'USD/1M tokens',
+                pricingUrl: 'https://platform.openai.com/docs/pricing',
+            },
+            'gpt-4o-mini': {
+                name: 'GPT-4o Mini', type: 'text',
+                inputPer1M: 0.15, outputPer1M: 0.60, unit: 'USD/1M tokens',
+                pricingUrl: 'https://platform.openai.com/docs/pricing',
+            },
+        },
+    },
     'anthropic': {
         provider: 'Anthropic', icon: '🟠',
         models: {
@@ -43,8 +61,34 @@ export const PROVIDER_PRICING = {
                 inputPer1M: 1.25, outputPer1M: 5.00, unit: 'USD/1M tokens',
                 pricingUrl: 'https://ai.google.dev/pricing',
             },
+            'gemini-1.5-flash-latest': {
+                name: 'Gemini 1.5 Flash', type: 'text',
+                inputPer1M: 0.075, outputPer1M: 0.30, unit: 'USD/1M tokens',
+                pricingUrl: 'https://ai.google.dev/pricing',
+            },
+            'gemini-1.5-pro-latest': {
+                name: 'Gemini 1.5 Pro', type: 'text',
+                inputPer1M: 1.25, outputPer1M: 5.00, unit: 'USD/1M tokens',
+                pricingUrl: 'https://ai.google.dev/pricing',
+            },
+            // ── Gemini Image Models ──
             'gemini-3.1-flash-image-preview': {
                 name: 'Gemini Image Gen', type: 'image',
+                flatCostUSD: 0.04, unit: 'USD/image',
+                pricingUrl: 'https://ai.google.dev/pricing',
+            },
+            'gemini-2.5-flash-image': {
+                name: 'Gemini 2.5 Flash Image', type: 'image',
+                flatCostUSD: 0.04, unit: 'USD/image',
+                pricingUrl: 'https://ai.google.dev/pricing',
+            },
+            'gemini-3-pro-image-preview': {
+                name: 'Gemini 3 Pro Image (NanoBanana Pro)', type: 'image',
+                flatCostUSD: 0.06, unit: 'USD/image',
+                pricingUrl: 'https://ai.google.dev/pricing',
+            },
+            'imagen-3.0-generate-001': {
+                name: 'Imagen 3', type: 'image',
                 flatCostUSD: 0.04, unit: 'USD/image',
                 pricingUrl: 'https://ai.google.dev/pricing',
             },
@@ -58,11 +102,34 @@ export const PROVIDER_PRICING = {
                 inputPer1M: 0.30, outputPer1M: 1.00, unit: 'USD/1M tokens',
                 pricingUrl: 'https://docs.x.ai/docs/models',
             },
+            'grok-3-mini': {
+                name: 'Grok 3 Mini', type: 'text',
+                inputPer1M: 0.30, outputPer1M: 1.00, unit: 'USD/1M tokens',
+                pricingUrl: 'https://docs.x.ai/docs/models',
+            },
+            'grok-imagine-image': {
+                name: 'Grok Imagen (Image)', type: 'image',
+                flatCostUSD: 0.07, unit: 'USD/image',
+                pricingUrl: 'https://docs.x.ai/docs/models',
+            },
+            'grok-imagine': {
+                name: 'Grok Imagine (Video)', type: 'video',
+                costPerSecFast: 0.08, costPerSecQuality: 0.08, unit: 'USD/sec',
+                pricingUrl: 'https://docs.x.ai/docs/models',
+            },
         },
     },
+    // ═══════════════════════════════════════════════════════════════════
+    //  VOICE / TTS / STT
+    // ═══════════════════════════════════════════════════════════════════
     'sarvam': {
         provider: 'Sarvam AI', icon: '🟢',
         models: {
+            'sarvam-m': {
+                name: 'Sarvam-M (Text LLM)', type: 'text',
+                inputPer1M: 0.20, outputPer1M: 0.80, unit: 'USD/1M tokens',
+                pricingUrl: 'https://www.sarvam.ai/pricing',
+            },
             'sarvam-stt-saaras-v3': {
                 name: 'Saaras STT v3', type: 'voice',
                 costPerMinute: 0.018, unit: 'USD/min (₹1.5/min)',
@@ -75,8 +142,21 @@ export const PROVIDER_PRICING = {
             },
         },
     },
+    'minimax': {
+        provider: 'MiniMax (via fal.ai)', icon: '🔊',
+        models: {
+            'minimax-speech-02-hd': {
+                name: 'Speech-02 HD', type: 'voice',
+                costPerSecond: 0.01, unit: 'USD/sec',
+                pricingUrl: 'https://fal.ai/pricing',
+            },
+        },
+    },
+    // ═══════════════════════════════════════════════════════════════════
+    //  VIDEO PROVIDERS
+    // ═══════════════════════════════════════════════════════════════════
     'fal': {
-        provider: 'fal.ai (Video)', icon: '🎥',
+        provider: 'fal.ai (Video + Image)', icon: '🎥',
         models: {
             'kling-3.0': {
                 name: 'Kling 3.0', type: 'video',
@@ -85,12 +165,38 @@ export const PROVIDER_PRICING = {
             },
             'veo-3.1': {
                 name: 'Veo 3.1', type: 'video',
-                costPerSecFast: 0.15, costPerSecQuality: 0.40, unit: 'USD/sec',
+                costPerSecFast: 0.10, costPerSecQuality: 0.25, unit: 'USD/sec',
                 pricingUrl: 'https://fal.ai/pricing',
             },
             'veo-3.1-fast': {
                 name: 'Veo 3.1 Fast', type: 'video',
-                costPerSecFast: 0.08, costPerSecQuality: 0.15, unit: 'USD/sec',
+                costPerSecFast: 0.06, costPerSecQuality: 0.10, unit: 'USD/sec',
+                pricingUrl: 'https://fal.ai/pricing',
+            },
+            'hunyuan': {
+                name: 'HunyuanVideo (Tencent)', type: 'video',
+                costPerSecFast: 0.03, costPerSecQuality: 0.05, unit: 'USD/sec',
+                pricingUrl: 'https://fal.ai/pricing',
+            },
+            // ── fal.ai Image Models ──
+            'fal-ai/flux-pro/v1.1': {
+                name: 'Flux Pro v1.1', type: 'image',
+                flatCostUSD: 0.05, unit: 'USD/image',
+                pricingUrl: 'https://fal.ai/pricing',
+            },
+            'fal-ai/flux-pro/v2': {
+                name: 'Flux 2 Pro', type: 'image',
+                flatCostUSD: 0.08, unit: 'USD/image',
+                pricingUrl: 'https://fal.ai/pricing',
+            },
+            'fal-ai/bytedance/seedream/v3/text-to-image': {
+                name: 'Seedream 5 (ByteDance)', type: 'image',
+                flatCostUSD: 0.05, unit: 'USD/image',
+                pricingUrl: 'https://fal.ai/pricing',
+            },
+            'fal-ai/ideogram/v3': {
+                name: 'Ideogram v3', type: 'image',
+                flatCostUSD: 0.06, unit: 'USD/image',
                 pricingUrl: 'https://fal.ai/pricing',
             },
         },
@@ -108,6 +214,11 @@ export const PROVIDER_PRICING = {
                 costPerSecFast: 0.08, costPerSecQuality: 0.15, unit: 'USD/sec',
                 pricingUrl: 'https://piapi.ai/pricing',
             },
+            'piapi-wan': {
+                name: 'Wan (PiAPI)', type: 'video',
+                flatCostUSD: 0.08, unit: 'USD/gen',
+                pricingUrl: 'https://piapi.ai/pricing',
+            },
         },
     },
     'muapi': {
@@ -120,23 +231,71 @@ export const PROVIDER_PRICING = {
             },
         },
     },
-    'minimax': {
-        provider: 'MiniMax', icon: '🔊',
+    // ═══════════════════════════════════════════════════════════════════
+    //  LAOZHANG GATEWAY (Unified Proxy — Video + Image)
+    // ═══════════════════════════════════════════════════════════════════
+    'laozhang': {
+        provider: 'LaoZhang AI Gateway', icon: '🐉',
         models: {
-            'minimax-speech-02-hd': {
-                name: 'Speech-02 HD', type: 'voice',
-                costPerSecond: 0.01, unit: 'USD/sec',
-                pricingUrl: 'https://www.minimax.io/platform/pricing',
+            // ── LaoZhang Video Models ──
+            'laozhang-veo': {
+                name: 'Veo 3.1 (via LZ)', type: 'video',
+                costPerSecFast: 0.10, costPerSecQuality: 0.25, unit: 'USD/sec',
+                flatCostUSD: 0.05, pricingUrl: 'https://api.laozhang.ai',
+            },
+            'laozhang-veo-fast': {
+                name: 'Veo 3.1 Fast (via LZ)', type: 'video',
+                costPerSecFast: 0.06, costPerSecQuality: 0.10, unit: 'USD/sec',
+                flatCostUSD: 0.03, pricingUrl: 'https://api.laozhang.ai',
+            },
+            'laozhang-seedance': {
+                name: 'Seedance 2.0 (via LZ)', type: 'video',
+                costPerSecFast: 0.05, costPerSecQuality: 0.10, unit: 'USD/sec',
+                flatCostUSD: 0.04, pricingUrl: 'https://api.laozhang.ai',
+            },
+            'laozhang-sora-2': {
+                name: 'Sora 2 (via LZ)', type: 'video',
+                costPerSecFast: 0.10, costPerSecQuality: 0.15, unit: 'USD/sec',
+                flatCostUSD: 0.08, pricingUrl: 'https://api.laozhang.ai',
+            },
+            // ── LaoZhang Image Models ──
+            'laozhang-nanobanana2': {
+                name: 'NanoBanana 2 (via LZ)', type: 'image',
+                flatCostUSD: 0.01, unit: 'USD/image',
+                pricingUrl: 'https://api.laozhang.ai',
+            },
+            'laozhang-nanobanana-pro': {
+                name: 'NanoBanana Pro (via LZ)', type: 'image',
+                flatCostUSD: 0.03, unit: 'USD/image',
+                pricingUrl: 'https://api.laozhang.ai',
+            },
+            'laozhang-ideogram': {
+                name: 'Ideogram v3 (via LZ)', type: 'image',
+                flatCostUSD: 0.02, unit: 'USD/image',
+                pricingUrl: 'https://api.laozhang.ai',
+            },
+            'laozhang-flux': {
+                name: 'Flux Kontext Pro (via LZ)', type: 'image',
+                flatCostUSD: 0.02, unit: 'USD/image',
+                pricingUrl: 'https://api.laozhang.ai',
+            },
+            'laozhang-seedream': {
+                name: 'Seedream 5 (via LZ)', type: 'image',
+                flatCostUSD: 0.02, unit: 'USD/image',
+                pricingUrl: 'https://api.laozhang.ai',
             },
         },
     },
-    'grok-video': {
-        provider: 'xAI (Grok Video)', icon: '🤖',
+    // ═══════════════════════════════════════════════════════════════════
+    //  SORA 2 (via LaoZhang — separate for clarity)
+    // ═══════════════════════════════════════════════════════════════════
+    'sora': {
+        provider: 'OpenAI Sora 2 (via LZ)', icon: '🎞️',
         models: {
-            'grok-imagine': {
-                name: 'Grok Imagine Video', type: 'video',
-                costPerSecFast: 0.08, costPerSecQuality: 0.08, unit: 'USD/sec',
-                pricingUrl: 'https://docs.x.ai/docs/models',
+            'sora-2': {
+                name: 'Sora 2', type: 'video',
+                costPerSecFast: 0.10, costPerSecQuality: 0.15, unit: 'USD/sec',
+                pricingUrl: 'https://openai.com/sora',
             },
         },
     },
