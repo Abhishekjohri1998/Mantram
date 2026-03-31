@@ -363,14 +363,20 @@ export default function CreditsPage() {
                                     </div>
                                 ) : (
                                     <>
-                                        <div className="flex flex-wrap items-baseline gap-x-4 gap-y-2">
+                                         <div className="flex flex-wrap items-baseline gap-x-4 gap-y-2">
                                             <div className="flex items-baseline gap-2">
                                                 <span className={`text-4xl font-black text-${creditColor}-400`}>{balance?.remaining || 0}</span>
                                                 <span className="text-lg text-slate-600 font-medium">/ {balance?.total || 0}</span>
-                                                <span className="text-sm text-slate-600">Total Credits</span>
+                                                <span className="text-sm text-slate-600">Monthly Credits</span>
                                             </div>
+                                            {subStatus?.plan && (
+                                                <div className="px-3 py-1 rounded-lg bg-primary/10 border border-primary/20 flex items-center gap-2">
+                                                    <span className="material-symbols-outlined text-xs text-primary">verified</span>
+                                                    <span className="text-xs font-black text-primary uppercase tracking-wider">{subStatus.plan} Plan</span>
+                                                </div>
+                                            )}
                                             {balance?.bonus > 0 && (
-                                                <div className="px-2 py-0.5 rounded-md bg-amber-400/10 border border-amber-400/20">
+                                                <div className="px-2 py-1 rounded-lg bg-amber-400/10 border border-amber-400/20">
                                                     <span className="text-xs font-bold text-amber-400">+{balance.bonus} Bonus</span>
                                                 </div>
                                             )}
@@ -381,8 +387,14 @@ export default function CreditsPage() {
                                                 style={{ width: `${creditPercent}%` }}
                                             />
                                         </div>
-                                        <p className="mt-1 text-xs text-slate-600">
-                                            {balance?.bonusUsed || 0} / {balance?.bonus || 0} bonus used • {balance?.used || 0} used this cycle
+                                        <p className="mt-2 text-xs text-slate-500 font-medium">
+                                            {subStatus?.daysRemaining !== undefined && (
+                                                <span className="mr-3">
+                                                    <span className="material-symbols-outlined text-[10px] align-middle mr-1">history</span>
+                                                    Resets in <strong>{subStatus.daysRemaining} days</strong> ({new Date(subStatus.endDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })})
+                                                </span>
+                                            )}
+                                            <span>{balance?.used || 0} used this cycle</span>
                                         </p>
                                     </>
                                 )}

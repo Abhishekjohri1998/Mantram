@@ -10,6 +10,31 @@
  */
 
 import { getSetting } from '../models/SystemSettings.js';
+import SubscriptionPackage from '../models/SubscriptionPackage.js';
+
+// Internal cache for subscription packages to avoid DB hits on every request
+let cachedPackages = null;
+let lastPackageFetch = 0;
+const PACKAGE_CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+
+async function getAllPackages() {
+    const now = Date.now();
+    if (cachedPackages && (now - lastPackageFetch) < PACKAGE_CACHE_TTL) {
+        return cachedPackages;
+    }
+    try {
+        const pkgs = await SubscriptionPackage.find({ isActive: true });
+        cachedPackages = {};
+        pkgs.forEach(p => {
+            cachedPackages[p.slug] = p;
+        });
+        lastPackageFetch = now;
+        return cachedPackages;
+    } catch (err) {
+        console.error('Failed to fetch packages for studio access check:', err.message);
+        return cachedPackages || {};
+    }
+}
 
 /**
  * Complete list of studio keys — single source of truth.
@@ -84,21 +109,33 @@ export async function getPortalVisibility() {
 /**
  * Check if a user can access a specific studio.
  */
-export function canAccessStudio(portalVisibility, user, studioKey) {
+export async function canAccessStudio(portalVisibility, user, studioKey) {
     if (user?.role === 'superadmin') return true;
 
     const status = portalVisibility[studioKey] || 'public';
 
     if (status === 'hidden') return false;
 
-    // User-level override (explicit grant or revoke)
+    // User-level explicit override (highest priority for individuals)
     const override = user?.studioAccess?.[studioKey];
     if (override === true) return true;
     if (override === false) return false;
 
+    // Plan-level restriction (for 'public' and 'private' studios)
+    const pkgs = await getAllPackages();
+    const userPlan = user?.plan || 'free';
+    const pkg = pkgs[userPlan];
+
+    if (pkg && pkg.studios) {
+        // If the plan explicitly disables this studio, deny access
+        if (pkg.studios[studioKey] === false) {
+            return false;
+        }
+    }
+
     if (status === 'private') return false;
 
-    // public → everyone
+    // public → everyone (who passed plan check)
     return true;
 }
 
@@ -111,7 +148,7 @@ export async function resolveStudioAccess(user) {
     const access = {};
 
     for (const key of STUDIO_KEYS) {
-        access[key] = canAccessStudio(portalVisibility, user, key);
+        access[key] = await canAccessStudio(portalVisibility, user, key);
     }
 
     return { access, portalVisibility };

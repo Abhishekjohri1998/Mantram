@@ -150,11 +150,24 @@ export default function Sidebar({ mobileOpen, onClose }) {
                 <NavLink
                     to="/onboarding"
                     onClick={handleNavClick}
-                    className="w-full py-3 px-4 bg-primary text-white text-sm font-bold rounded-xl hover:bg-primary-light transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary/20 cursor-pointer"
+                    className="w-full py-3 px-4 bg-primary text-white text-sm font-bold rounded-xl hover:bg-primary-light transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary/20 cursor-pointer mb-3"
                 >
                     <span className="material-symbols-outlined text-sm">add</span>
                     New Brand
                 </NavLink>
+
+                {/* Plan Indicator */}
+                {!isSuperAdmin && (
+                    <div className="px-4 py-3 rounded-xl bg-white/[0.03] border border-white/[0.06] flex items-center justify-between group hover:bg-white/[0.05] transition-all">
+                        <div className="min-w-0 flex-1">
+                            <p className="text-[10px] text-slate-600 uppercase font-black tracking-widest leading-none mb-1">Your Plan</p>
+                            <p className="text-xs font-bold text-slate-300 truncate capitalize">{user?.plan || 'Free'} Tier</p>
+                        </div>
+                        <NavLink to="/credits" className="px-2 py-1 bg-primary/10 text-primary hover:bg-primary/20 rounded-lg text-[10px] font-black uppercase transition-all whitespace-nowrap">
+                            Upgrade
+                        </NavLink>
+                    </div>
+                )}
             </div>
         </>
     )
