@@ -489,6 +489,7 @@ export default function CreativeStudio() {
     const [animateVideoUrl, setAnimateVideoUrl] = useState(null)
     const [animateError, setAnimateError] = useState(null)
     const animatePollRef = useRef(null)
+    const animateImageRef = useRef(null) // Stores the image URL being animated (avoids stale closure)
 
     // Synced with backend MODEL_CAPABILITIES (falClient.js) + xAI/fal.ai/PiAPI API docs
     const ANIMATE_MODELS = {
@@ -500,8 +501,12 @@ export default function CreativeStudio() {
     }
 
     // ── Animate: AI Prompt Suggestion ──
-    const handleAnimateClick = async () => {
-        if (!result?.imageUrl) {
+    // Accepts an optional imageItem so gallery buttons can pass the specific
+    // image directly instead of relying on the async setResult + stale closure.
+    const handleAnimateClick = async (imageItem) => {
+        const target = imageItem || result
+        const imageUrl = target?.imageUrl
+        if (!imageUrl) {
             setError({
                 message: 'No image to animate. Generate an image first.',
                 isProviderError: false
@@ -509,7 +514,7 @@ export default function CreativeStudio() {
             setTimeout(() => setError(null), 4000)
             return
         }
-        if (!result.imageUrl.startsWith('http')) {
+        if (!imageUrl.startsWith('http')) {
             setError({
                 message: 'Cannot animate — image needs to be uploaded first. Try regenerating.',
                 isProviderError: false
@@ -517,6 +522,10 @@ export default function CreativeStudio() {
             setTimeout(() => setError(null), 4000)
             return
         }
+        // Store in ref so handleAnimateGenerate always has the correct URL
+        animateImageRef.current = imageUrl
+        // Also sync result state for the modal preview
+        if (imageItem) setResult(imageItem)
         setAnimateModalOpen(true)
         setAnimateError('')
         setAnimateVideoUrl(null)
@@ -532,8 +541,9 @@ export default function CreativeStudio() {
 
             // Include the original image prompt context so AI can create a
             // contextually relevant animation prompt (not just visual analysis)
-            const originalContext = prompt?.trim()
-                ? `\n\nORIGINAL IMAGE PROMPT (use this for context about what was intended): "${prompt.trim()}"`
+            const itemPrompt = target?._prompt || target?.prompt || prompt
+            const originalContext = itemPrompt?.trim()
+                ? `\n\nORIGINAL IMAGE PROMPT (use this for context about what was intended): "${itemPrompt.trim()}"`
                 : ''
 
             // Ask AI to describe optimal animation
@@ -546,7 +556,7 @@ ${originalContext}
 
 Be specific and cinematic. Do NOT describe the image — describe the MOTION only. Output ONLY the prompt, nothing else.`,
                 activeBrand?._id,
-                { images: [result.imageUrl] }
+                { images: [imageUrl] }
             )
             const suggestedPrompt = (data.response || data.text || data.reply || '').replace(/^["']|["']$/g, '').trim()
             if (suggestedPrompt) setAnimatePrompt(suggestedPrompt)
@@ -560,7 +570,8 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
 
     // ── Animate: Generate Video ──
     const handleAnimateGenerate = async () => {
-        if (!result?.imageUrl || !animatePrompt.trim()) return
+        const imageUrl = animateImageRef.current || result?.imageUrl
+        if (!imageUrl || !animatePrompt.trim()) return
         setAnimateGenerating(true)
         setAnimateError('')
         setAnimateVideoUrl(null)
@@ -571,7 +582,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
             if (animateModel === 'seedance-2.0') {
                 // Seedance uses dedicated I2V endpoint
                 const data = await videoStudioAPI.advancedI2V({
-                    imageUrl: result.imageUrl,
+                    imageUrl,
                     prompt: animatePrompt.trim(),
                     duration: animateDuration,
                     aspectRatio: animateAspectRatio,
@@ -588,7 +599,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
                     duration: animateDuration,
                     resolution: '1080p',
                     aspectRatio: animateAspectRatio,
-                    firstImageUrl: result.imageUrl,
+                    firstImageUrl: imageUrl,
                     generateAudio: true,
                     qualityMode: 'fast',
                     brandId: activeBrand?._id || null,
@@ -3108,7 +3119,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                             className="p-1 rounded-md bg-white/10 text-white hover:bg-primary/40 transition-all" title="Edit">
                                                             <span className="material-symbols-outlined text-xs">edit</span>
                                                         </button>
-                                                        <button onClick={(e) => { e.stopPropagation(); setResult(item); setAnimateModalOpen(false); setTimeout(() => handleAnimateClick(), 100); }}
+                                                        <button onClick={(e) => { e.stopPropagation(); handleAnimateClick(item); }}
                                                             className="p-1 rounded-md bg-white/10 text-white hover:bg-pink-500/40 transition-all" title="Animate">
                                                             <span className="material-symbols-outlined text-xs">movie</span>
                                                         </button>
@@ -3204,7 +3215,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                                     <span className="material-symbols-outlined text-xs">content_copy</span>
                                                                     Copy
                                                                 </button>
-                                                                <button onClick={() => { setResult(group.items[0]); setTimeout(() => handleAnimateClick(), 100); }}
+                                                                <button onClick={() => handleAnimateClick(group.items[0])}
                                                                     className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold text-pink-400 bg-pink-500/10 hover:bg-pink-500/20 cursor-pointer transition-all" title="Animate this image">
                                                                     <span className="material-symbols-outlined text-xs">movie</span>
                                                                     Animate
@@ -3434,7 +3445,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                 <span className="material-symbols-outlined text-xs">content_copy</span>
                                                 Copy
                                             </button>
-                                            <button onClick={() => { setResult(img); setTimeout(() => handleAnimateClick(), 100); }}
+                                            <button onClick={() => handleAnimateClick(img)}
                                                 className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold text-pink-400 bg-pink-500/10 hover:bg-pink-500/20 cursor-pointer transition-all" title="Animate this image">
                                                 <span className="material-symbols-outlined text-xs">movie</span>
                                                 Animate
