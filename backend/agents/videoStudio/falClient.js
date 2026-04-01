@@ -407,43 +407,67 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
         // Fall through to fal.ai (handled at the bottom)
     }
 
-    // ── Seedance 2.0: Dynamic (MuAPI default, PiAPI fallback) ──
+    // ── Seedance 2.0: Dynamic (MuAPI default, Cascading fallback) ──
     if (model === 'seedance-2.0') {
         const provider = activeProvider || 'muapi';
         console.log(`🎬 [Seedance 2.0] Routing to ${provider} (${activeProvider ? 'SuperAdmin' : 'default'})...`);
 
-        if (provider === 'muapi') {
-            const muApiKey = process.env.MUAPI_API_KEY;
-            if (!muApiKey) {
-                throw new Error('Seedance 2.0 (MuAPI) requires MUAPI_API_KEY. Add it to .env or switch provider in SuperAdmin.');
+        try {
+            if (provider === 'muapi') {
+                const muApiKey = process.env.MUAPI_API_KEY;
+                if (!muApiKey) throw new Error('MUAPI_API_KEY missing');
+                const result = await submitMuApiVideoGeneration({
+                    prompt, imageUrl: s3ImageUrl, duration,
+                    aspectRatio: aspectRatio || '16:9', qualityMode: mode || 'fast',
+                    generateAudio, referenceImages: s3ReferenceImages,
+                });
+                return {
+                    requestId: result.taskId, endpoint: `muapi-seedance-2.0`,
+                    statusUrl: null, resultUrl: null, provider: 'muapi',
+                    _muApiPayload: result._muApiPayload,
+                };
+            } else if (provider === 'piapi') {
+                const piApiKey = process.env.PIAPI_API_KEY;
+                if (!piApiKey) throw new Error('PIAPI_API_KEY missing');
+                const result = await submitPiApiVideoGeneration({
+                    prompt, imageUrl: s3ImageUrl, duration,
+                    aspectRatio: aspectRatio || '16:9', generateAudio,
+                    referenceImages: s3ReferenceImages, qualityMode: mode || 'fast',
+                });
+                return {
+                    requestId: result.taskId, endpoint: `piapi-seedance-2.0`,
+                    statusUrl: null, resultUrl: null, provider: 'piapi',
+                    _piApiPayload: result._payload,
+                };
+            } else if (provider === 'laozhang' && isLaozhangAvailable()) {
+                const lzResult = await submitLaozhangVideoGeneration({
+                    model: 'seedance-2.0', prompt, imageUrl: s3ImageUrl,
+                    duration: duration || 5, aspectRatio: aspectRatio || '16:9',
+                    generateAudio: generateAudio !== false,
+                });
+                if (lzResult?.videoUrl) {
+                    return {
+                        requestId: `lz-${Date.now()}`, endpoint: `laozhang-seedance-2.0`,
+                        statusUrl: null, resultUrl: null, provider: 'laozhang',
+                        _laozhangVideoUrl: lzResult.videoUrl,
+                    };
+                }
             }
-            const result = await submitMuApiVideoGeneration({
+            throw new Error(`Preferred provider ${provider} failed or unconfigured`);
+        } catch (err) {
+            console.warn(`⚠️ [Seedance 2.0] Provider ${provider} failed: ${err.message}. Triggering cascade fallback...`);
+            const cascade = await trySeedanceCascade({
                 prompt, imageUrl: s3ImageUrl, duration,
-                aspectRatio: aspectRatio || '16:9', qualityMode: mode || 'fast',
-                generateAudio, referenceImages: s3ReferenceImages,
+                aspectRatio: aspectRatio || '16:9', generateAudio, mode,
             });
             return {
-                requestId: result.taskId, endpoint: `muapi-seedance-2.0`,
-                statusUrl: null, resultUrl: null, provider: 'muapi',
-                _muApiPayload: result._muApiPayload,
-            };
-        } else if (provider === 'piapi') {
-            const piApiKey = process.env.PIAPI_API_KEY;
-            if (!piApiKey) {
-                throw new Error('Seedance 2.0 (PiAPI) requires PIAPI_API_KEY. Add it to .env or switch provider in SuperAdmin.');
-            }
-            const result = await submitPiApiVideoGeneration({
-                prompt, imageUrl: s3ImageUrl, duration,
-                aspectRatio: aspectRatio || '16:9', generateAudio,
-                referenceImages: s3ReferenceImages, qualityMode: mode || 'fast',
-            });
-            return {
-                requestId: result.taskId, endpoint: `piapi-seedance-2.0`,
-                statusUrl: null, resultUrl: null, provider: 'piapi',
-                _piApiPayload: result._payload,
+                requestId: cascade.taskId || `lz-${Date.now()}`,
+                endpoint: `${cascade.provider}-seedance-2.0-cascade`,
+                statusUrl: null, resultUrl: null, provider: cascade.provider,
+                _piApiPayload: cascade._piApiPayload,
+                _laozhangVideoUrl: cascade.videoUrl,
             };
         }
-        throw new Error(`Unknown provider '${provider}' for Seedance 2.0. Configure in SuperAdmin.`);
     }
 
     // ── fal.ai models (Kling, Veo 3.1 standard, Seedance 1.0) ──

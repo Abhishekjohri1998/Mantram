@@ -38,7 +38,7 @@ import {
     advancedGenerateNode,
     videoVisualGroundingNode,
 } from '../agents/videoStudio/nodes.js';
-import { estimateCost, getModelsInfo, MODEL_CAPABILITIES } from '../agents/videoStudio/falClient.js';
+import { estimateCost, getModelsInfo, MODEL_CAPABILITIES, submitVideoGeneration } from '../agents/videoStudio/falClient.js';
 import { submitPiApiImageToVideo, submitPiApiVideoExtend } from '../agents/videoStudio/piApiClient.js';
 import { listAvatars, listVoices, generateUGCVideo, generatePhotoAvatarVideo, getHeyGenVideoStatus, generateVideoWithAudio, uploadAssetToHeyGen, createPhotoAvatar, getPhotoAvatarStatus, checkPhotoGenStatus, generateVideoAgent, generatePlacementPoses, generatePlacementVideo, registerWebhook, generateLooks, addMotion, listAvatarGroups, listAvatarLooks } from '../agents/videoStudio/heygenClient.js';
 import { generateUGCScript, UGC_STYLES } from '../agents/videoStudio/ugcScriptGenerator.js';
@@ -82,26 +82,31 @@ router.post('/advanced/image-to-video', protect, requireCredits('videoGenerate')
             },
         });
 
-        // Submit to PiAPI
-        const result = await submitPiApiImageToVideo({
-            imageUrl,
+        // Submit to dynamic routing engine (MuAPI/LaoZhang/PiAPI) instead of hardcoded PiAPI
+        const result = await submitVideoGeneration({
+            model: 'seedance-2.0',
             prompt: prompt || 'Animate this image with natural cinematic motion',
+            imageUrl,
             duration: duration || 5,
             aspectRatio: aspectRatio || '16:9',
-            qualityMode: qualityMode || 'fast',
+            mode: qualityMode || 'fast',
             referenceImages: referenceImages || [],
+            generateAudio: true,
         });
 
         // Update project with generation details
         await VideoProject.findByIdAndUpdate(project._id, {
             generation: {
-                falRequestId: result.taskId,
-                falEndpoint: 'piapi-seedance-2.0-i2v',
-                provider: 'piapi',
-                _piApiPayload: result._payload,
-                videoUrl: '',
-                progress: 5,
+                falRequestId: result.requestId,
+                falEndpoint: result.endpoint || 'seedance-2.0-i2v',
+                provider: result.provider || 'piapi',
+                _piApiPayload: result._piApiPayload || null,
+                _muApiPayload: result._muApiPayload || null,
+                _laozhangVideoUrl: result._laozhangVideoUrl || null,
+                videoUrl: result._laozhangVideoUrl || '',
+                progress: result._laozhangVideoUrl ? 100 : 5,
                 startedAt: new Date(),
+                ...(result._laozhangVideoUrl ? { completedAt: new Date() } : {}),
             },
             backendPrompt: prompt || '',
         });
