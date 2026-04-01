@@ -8,8 +8,11 @@ jobs:
     name: 🔙 Revert Backend to Previous Release
     runs-on: ubuntu-latest
     steps:
+      - name: ⬇️ Checkout Code
+        uses: actions/checkout@v4
+
       - name: ⚙️ Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v5.0.0
         with:
           aws-access-key-id: ${{ secrets.MEDIA_AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.MEDIA_AWS_SECRET_ACCESS_KEY }}
@@ -21,15 +24,43 @@ jobs:
 
       - name: 🔓 Whitelist Runner IP (Port 22)
         run: |
+          RUNNER_IP="${{ steps.ip.outputs.ipv4 }}"
+          SG_ID="${{ secrets.AWS_SECURITY_GROUP_ID }}"
+
+          if [ -z "$SG_ID" ]; then
+            echo "❌ ERROR: AWS_SECURITY_GROUP_ID secret is missing!"
+            exit 1
+          fi
+
+          if [ -z "$RUNNER_IP" ]; then
+            echo "❌ ERROR: Could not determine Runner IP!"
+            exit 1
+          fi
+
+          echo "🌐 Runner IP: $RUNNER_IP"
+          echo "🛡️ SG ID: $SG_ID"
+
           aws ec2 authorize-security-group-ingress \
-            --group-id ${{ secrets.AWS_SECURITY_GROUP_ID }} \
+            --group-id "$SG_ID" \
             --protocol tcp \
             --port 22 \
-            --cidr ${{ steps.ip.outputs.ipv4 }}/32 || echo "Rule already exists"
+            --cidr "$RUNNER_IP/32" || echo "✅ Rule may already exist, continuing..."
+
+          echo "⏳ Waiting 10s for SG rule to propagate..."
           sleep 10
 
+          echo "🔍 Verifying SSH connectivity..."
+          for i in {1..5}; do
+            if nc -zv ${{ secrets.EC2_HOST }} 22 -w 5 2>/dev/null; then
+              echo "✅ Port 22 is reachable"
+              break
+            fi
+            echo "Attempt $i failed, retrying in 5s..."
+            sleep 5
+          done
+
       - name: ⚙️ Rollback via SSH
-        uses: appleboy/ssh-action@v1.2.5
+        uses: appleboy/ssh-action@v1.2.3
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}

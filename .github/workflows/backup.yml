@@ -15,16 +15,15 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Sync Master Branch
         run: |
           git config user.name "GitHub Action [Backup]"
           git config user.email "action@github.com"
           
-          # Mirror main to master
-          git checkout master || git checkout -b master
-          git reset --hard origin/main
+          # Force update master branch to match origin/main
+          git fetch origin main
+          git branch -f master origin/main
           git push origin master --force
 
       - name: Create Daily Tag
