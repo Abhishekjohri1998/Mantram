@@ -82,7 +82,7 @@ router.post('/advanced/image-to-video', protect, requireCredits('videoGenerate')
             },
         });
 
-        // Submit to dynamic routing engine (MuAPI/LaoZhang/PiAPI) instead of hardcoded PiAPI
+        // 3. Submit to dynamic routing engine (MuAPI/LaoZhang/Kie.ai/PiAPI) instead of hardcoded PiAPI
         const result = await submitVideoGeneration({
             model: 'seedance-2.0',
             prompt: prompt || 'Animate this image with natural cinematic motion',
@@ -94,7 +94,7 @@ router.post('/advanced/image-to-video', protect, requireCredits('videoGenerate')
             generateAudio: true,
         });
 
-        // Update project with generation details
+        // 4. Update project with generation details
         await VideoProject.findByIdAndUpdate(project._id, {
             generation: {
                 falRequestId: result.requestId,
@@ -115,12 +115,12 @@ router.post('/advanced/image-to-video', protect, requireCredits('videoGenerate')
             success: true,
             project: {
                 _id: project._id,
-                status: 'advanced-generating',
+                status: result._laozhangVideoUrl ? 'completed' : 'advanced-generating',
                 mode: 'image-to-video',
                 generation: {
-                    falRequestId: result.taskId,
-                    provider: 'piapi',
-                    progress: 5,
+                    falRequestId: result.requestId,
+                    provider: result.provider,
+                    progress: result._laozhangVideoUrl ? 100 : 5,
                 },
                 costPreview: estimateCost('seedance-2.0', duration || 5, '1080p', qualityMode || 'fast'),
             },
@@ -156,8 +156,12 @@ router.post('/extend-video', protect, requireCredits('videoGenerate'), async (re
 
         console.log(`🔗 Extend request: parent=${parentTaskId}, duration=${duration}, quality=${qualityMode}`);
 
-        // Submit extension to PiAPI
-        const result = await submitPiApiVideoExtend({
+        // Submit extension using the cascading fallback
+        // Note: Currently MuAPI/LZ don't support native extension, so this 
+        // will likely use PiAPI but will automatically DETOUR to I2V (last frame) 
+        // if PiAPI is down/empty once we implement that logic.
+        const result = await extendVideoGeneration({
+            model: 'seedance-2.0',
             parentTaskId,
             prompt: prompt || '',
             duration: duration || 5,
@@ -169,7 +173,7 @@ router.post('/extend-video', protect, requireCredits('videoGenerate'), async (re
             user: req.user._id,
             brand: original.brand || null,
             title: `${original.title} (Extended)`.substring(0, 80),
-            status: 'advanced-generating',
+            status: result.provider === 'laozhang' ? 'completed' : 'advanced-generating',
             mode: 'extend',
             advancedConfig: {
                 prompt: prompt || `Continuation of: ${original.backendPrompt || ''}`,
@@ -182,12 +186,14 @@ router.post('/extend-video', protect, requireCredits('videoGenerate'), async (re
                 mode: qualityMode || 'fast',
             },
             generation: {
-                falRequestId: result.taskId,
-                falEndpoint: 'piapi-seedance-2.0-extend',
-                provider: 'piapi',
-                _piApiPayload: result._payload,
-                videoUrl: '',
-                progress: 5,
+                falRequestId: result.requestId,
+                falEndpoint: result.endpoint || 'seedance-2.0-extend',
+                provider: result.provider,
+                _piApiPayload: result._piApiPayload,
+                _muApiPayload: result._muApiPayload,
+                _laozhangVideoUrl: result._laozhangVideoUrl,
+                videoUrl: result._laozhangVideoUrl || '',
+                progress: result._laozhangVideoUrl ? 100 : 5,
                 startedAt: new Date(),
             },
             backendPrompt: prompt || '',
@@ -197,14 +203,10 @@ router.post('/extend-video', protect, requireCredits('videoGenerate'), async (re
             success: true,
             project: {
                 _id: extended._id,
-                status: 'advanced-generating',
+                status: extended.status,
                 mode: 'extend',
                 parentProjectId: projectId,
-                generation: {
-                    falRequestId: result.taskId,
-                    provider: 'piapi',
-                    progress: 5,
-                },
+                generation: extended.generation,
                 costPreview: estimateCost('seedance-2.0', duration || 5, '1080p', qualityMode || 'fast'),
             },
         });

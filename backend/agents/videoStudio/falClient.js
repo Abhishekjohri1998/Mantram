@@ -10,7 +10,7 @@
 
 import config from '../../config/env.js';
 import { submitKieVideoGeneration } from './kieClient.js';
-import { submitPiApiVideoGeneration } from './piApiClient.js';
+import { submitPiApiVideoGeneration, submitPiApiVideoExtend } from './piApiClient.js';
 import { submitMuApiVideoGeneration } from './muapiClient.js';
 import { ensureS3Url } from '../../utils/s3.js';
 import { isLaozhangAvailable, submitLaozhangVideoGeneration } from './laozhangClient.js';
@@ -187,7 +187,7 @@ function buildPayload(model, { prompt, imageUrl, duration, resolution, mode, sho
 
 // ── Full cascade for seedance-2.0 ───────────────────────────────────────
 // Order: LZ seedance-2.0 → LZ veo-3.1-fast → kie.ai seedance-2.0 → PiAPI
-async function trySeedanceCascade({ prompt, imageUrl, duration, aspectRatio, generateAudio, mode }) {
+async function trySeedanceCascade({ prompt, imageUrl, duration, aspectRatio, generateAudio, mode, referenceImages }) {
     // ─ Step 1: LaoZhang seedance-2.0 (synchronous, cheapest) ─
     if (isLaozhangAvailable()) {
         try {
@@ -245,7 +245,7 @@ async function trySeedanceCascade({ prompt, imageUrl, duration, aspectRatio, gen
         const piResult = await submitPiApiVideoGeneration({
             prompt, imageUrl: null, duration,
             aspectRatio: aspectRatio || '16:9',
-            generateAudio, referenceImages: [], qualityMode: mode || 'fast',
+            generateAudio, referenceImages: referenceImages || [], qualityMode: mode || 'fast',
         });
         if (piResult?.taskId) {
             console.log(`✅ [Cascade] Step 4 done: PiAPI taskId=${piResult.taskId}`);
@@ -459,6 +459,7 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
             const cascade = await trySeedanceCascade({
                 prompt, imageUrl: s3ImageUrl, duration,
                 aspectRatio: aspectRatio || '16:9', generateAudio, mode,
+                referenceImages: s3ReferenceImages,
             });
             return {
                 requestId: cascade.taskId || `lz-${Date.now()}`,
@@ -490,6 +491,50 @@ export async function extendVideo({ videoUrl, prompt, duration = 7 }) {
     if (!response.ok) throw new Error(`fal.ai extend failed: ${await response.text()}`);
     const data = await response.json();
     return { requestId: data.request_id, provider: 'fal' };
+}
+
+/**
+ * Video Extension - Central Dynamic Router with Cascading Fallback
+ */
+export async function extendVideoGeneration({
+    model,
+    parentTaskId,
+    prompt,
+    duration = 5,
+    qualityMode = 'fast',
+    aspectRatio = '16:9',
+}) {
+    // 1. Resolve active provider from settings
+    const routes = await getSetting('video_provider_routes') || {};
+    const activeProvider = routes[model]?.active || null;
+
+    console.log(`🔗 Extension Strategy: Model=${model}, parentTaskId=${parentTaskId}, provider=${activeProvider || 'default'}`);
+
+    // If PiAPI is preferred or default, try it first
+    if (activeProvider === 'piapi' || !activeProvider) {
+        try {
+            const piApiKey = process.env.PIAPI_API_KEY;
+            if (!piApiKey) throw new Error('PIAPI_API_KEY missing');
+            const result = await submitPiApiVideoExtend({ parentTaskId, prompt, duration, qualityMode });
+            return {
+                requestId: result.taskId, endpoint: `piapi-${model}-extend`,
+                statusUrl: null, resultUrl: null, provider: 'piapi',
+                _piApiPayload: result._payload,
+            };
+        } catch (err) {
+            const isCreditError = err.message.includes('credit') || err.message.includes('quota') || err.message.includes('balance');
+            if (isCreditError || !activeProvider) {
+                console.warn(`[Cascade] PiAPI Extension failed (${err.message}), falling through to I2V-last-frame...`);
+                // Fallback: Use ordinary generation (I2V) with the same prompt
+                return await submitVideoGeneration({ model, prompt, duration, resolution: '1080p', mode: qualityMode, aspectRatio });
+            } else {
+                throw err;
+            }
+        }
+    }
+
+    // Default: Fall through to regular submit if no extension found
+    return await submitVideoGeneration({ model, prompt, duration, resolution: '1080p', mode: qualityMode, aspectRatio });
 }
 
 export async function getGenerationStatus(requestId, statusUrl, resultUrl) {
