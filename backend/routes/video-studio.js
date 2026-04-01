@@ -99,7 +99,7 @@ router.post('/advanced/image-to-video', protect, requireCredits('videoGenerate')
             generation: {
                 falRequestId: result.requestId,
                 falEndpoint: result.endpoint || 'seedance-2.0-i2v',
-                provider: result.provider || 'piapi',
+                provider: result.provider,
                 _piApiPayload: result._piApiPayload || null,
                 _muApiPayload: result._muApiPayload || null,
                 _laozhangVideoUrl: result._laozhangVideoUrl || null,
@@ -152,7 +152,9 @@ router.post('/extend-video', protect, requireCredits('videoGenerate'), async (re
 
         const parentTaskId = original.generation?.falRequestId;
         if (!parentTaskId) return res.status(400).json({ success: false, error: 'No task ID found on original video — cannot extend' });
-        if (original.generation?.provider !== 'piapi') return res.status(400).json({ success: false, error: 'Video Extend is only available for Seedance 2.0 videos' });
+        if (original.routing?.selectedModel !== 'seedance-2.0' && original.mode !== 'image-to-video') {
+            console.warn(`⚠️ Attempted extension on non-seedance model: ${original.routing?.selectedModel}`);
+        }
 
         console.log(`🔗 Extend request: parent=${parentTaskId}, duration=${duration}, quality=${qualityMode}`);
 

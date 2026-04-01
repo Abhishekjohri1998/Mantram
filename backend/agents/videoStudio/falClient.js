@@ -1,11 +1,5 @@
 /**
  * Video Generation Client — Multi-provider SDK wrapper + cost calculator
- *
- * seedance-2.0 cascade order:
- *   1. LaoZhang seedance-2.0  (cheapest, synchronous)
- *   2. LaoZhang veo-3.1-fast  (reliable fallback, synchronous)
- *   3. kie.ai   seedance-2.0  (async/polling, returns taskId, always works)
- *   4. PiAPI    seedance-2.0  (last resort, requires credits)
  */
 
 import config from '../../config/env.js';
@@ -126,14 +120,13 @@ let LIVE_COST_PER_SECOND = {};
 
 /**
  * Periodically pulls live pricing baselines from DB so estimateCost() remains synchronous
- * but uses live scraped data. Handled automatically via pricingMonitor or server init.
  */
 export async function syncLiveVideoPricing() {
     const baselines = await getSetting('pricing_baselines', null);
     if (!baselines) return;
     
     for (const [key, model] of Object.entries(baselines)) {
-        if (model.type === 'video' || model.type === 'image') { // Some providers mix them
+        if (model.type === 'video' || model.type === 'image') {
             const id = model.modelId;
             LIVE_COST_PER_SECOND[id] = {
                 fast: model.costPerSecFast || model.costPerSecond || 0.08,
@@ -185,8 +178,9 @@ function buildPayload(model, { prompt, imageUrl, duration, resolution, mode, sho
     throw new Error(`Unknown fal.ai model: ${model}`);
 }
 
-// ── Full cascade for seedance-2.0 ───────────────────────────────────────
-// Order: LZ seedance-2.0 → LZ veo-3.1-fast → kie.ai seedance-2.0 → PiAPI
+/**
+ * Robust cascading poll for seedance-2.0
+ */
 async function trySeedanceCascade({ prompt, imageUrl, duration, aspectRatio, generateAudio, mode, referenceImages }) {
     // ─ Step 1: LaoZhang seedance-2.0 (synchronous, cheapest) ─
     if (isLaozhangAvailable()) {
@@ -205,7 +199,6 @@ async function trySeedanceCascade({ prompt, imageUrl, duration, aspectRatio, gen
         }
 
         // ─ Step 2: LaoZhang veo-3.1-fast (synchronous, reliable) ─
-        console.log(`🔁 [Cascade] Step 2: LaoZhang veo-3.1-fast...`);
         try {
             const r = await submitLaozhangVideoGeneration({
                 model: 'veo-3.1-fast', prompt, imageUrl: null,
@@ -221,8 +214,7 @@ async function trySeedanceCascade({ prompt, imageUrl, duration, aspectRatio, gen
         }
     }
 
-    // ─ Step 3: kie.ai seedance-2.0 (async/polling — always reliable) ─
-    console.log(`🔁 [Cascade] Step 3: kie.ai seedance-2.0 (async)...`);
+    // ─ Step 3: kie.ai seedance-2.0 (async/polling) ─
     try {
         const kieResult = await submitKieVideoGeneration({
             model: 'seedance-2.0', prompt,
@@ -231,8 +223,7 @@ async function trySeedanceCascade({ prompt, imageUrl, duration, aspectRatio, gen
             aspectRatio: aspectRatio || '16:9',
         });
         if (kieResult?.taskId) {
-            console.log(`✅ [Cascade] Step 3 done: kie.ai taskId=${kieResult.taskId}`);
-            // Return as kie async job — status polling will handle completion
+            console.log(`✅ [Cascade] Step 3 done: kie.ai`);
             return { taskId: kieResult.taskId, provider: 'kie', async: true };
         }
     } catch (e) {
@@ -240,7 +231,6 @@ async function trySeedanceCascade({ prompt, imageUrl, duration, aspectRatio, gen
     }
 
     // ─ Step 4: PiAPI (last resort) ─
-    console.log(`🎮 [Cascade] Step 4: PiAPI last resort...`);
     try {
         const piResult = await submitPiApiVideoGeneration({
             prompt, imageUrl: null, duration,
@@ -248,18 +238,17 @@ async function trySeedanceCascade({ prompt, imageUrl, duration, aspectRatio, gen
             generateAudio, referenceImages: referenceImages || [], qualityMode: mode || 'fast',
         });
         if (piResult?.taskId) {
-            console.log(`✅ [Cascade] Step 4 done: PiAPI taskId=${piResult.taskId}`);
+            console.log(`✅ [Cascade] Step 4 done: PiAPI`);
             return { taskId: piResult.taskId, provider: 'piapi', async: true, _piApiPayload: piResult._payload };
         }
     } catch (piErr) {
-        if (piErr.message.startsWith('PiAPI_INSUFFICIENT_CREDITS')) {
-            console.error(`🚫 [Cascade] Step 4 PiAPI: insufficient credits`);
-            throw new Error('All video providers failed: LaoZhang channels are temporarily down and PiAPI has insufficient credits. Please try again in a few minutes.');
+        if (piErr.message.includes('PiAPI_INSUFFICIENT_CREDITS')) {
+            throw new Error('All video providers exhausted: The primary provider (MuAPI) and all fallbacks (LaoZhang, Kie.ai, PiAPI) are currently unavailable or out of credits. Please try again in 30 minutes.');
         }
         throw piErr;
     }
 
-    throw new Error('All video providers exhausted without a result.');
+    throw new Error('All video providers exhausted.');
 }
 
 export async function submitVideoGeneration({ model, prompt, imageUrl, duration, resolution, mode, shots, generateAudio, aspectRatio, referenceImages }) {
@@ -270,12 +259,6 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
         ...(referenceImages || []).map(img => ensureS3Url(img, 'video-studio/references'))
     ]);
 
-    // ══════════════════════════════════════════════════════════════════
-    // DYNAMIC PROVIDER ROUTING — SuperAdmin-controlled via SystemSettings
-    // Reads 'video_provider_routes' from DB for each model.
-    // Default providers (no DB entry): defined in comments below.
-    // Falls through to direct provider on failure.
-    // ══════════════════════════════════════════════════════════════════
     let activeProvider = null;
     try {
         const providerRoutes = await getSetting('video_provider_routes', {});
@@ -284,138 +267,13 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
         console.warn('⚠️ Could not read video_provider_routes from DB:', e.message);
     }
 
-    // ── Provider routing map: model → activeProvider → handler ──
-    // If no activeProvider in DB, use the default provider for each model
-
-    // ── Sora 2: LaoZhang ONLY ──
-    if (model === 'sora-2') {
-        const provider = activeProvider || 'laozhang';
-        if (provider === 'laozhang' && isLaozhangAvailable()) {
-            console.log(`🎬 [Sora 2] Using LaoZhang (${activeProvider ? 'SuperAdmin' : 'default'})...`);
-            const lzResult = await submitLaozhangVideoGeneration({
-                model, prompt, imageUrl: s3ImageUrl, duration: duration || 5,
-                aspectRatio: aspectRatio || '16:9', generateAudio: generateAudio !== false,
-            });
-            if (lzResult?.videoUrl) {
-                return {
-                    requestId: `lz-${Date.now()}`, endpoint: `laozhang-sora-2`,
-                    statusUrl: null, resultUrl: null, provider: 'laozhang',
-                    _laozhangVideoUrl: lzResult.videoUrl,
-                };
-            }
-        }
-        throw new Error('Sora 2 generation failed — LaoZhang is the only provider.');
-    }
-
-    // ── Veo 3.1: LaoZhang (default) or fal.ai ──
-    if (model === 'veo-3.1') {
-        const provider = activeProvider || 'laozhang';
-        // Try LaoZhang first if selected
-        if (provider === 'laozhang' && isLaozhangAvailable()) {
-            try {
-                console.log(`🎬 [Veo 3.1] Using LaoZhang (${activeProvider ? 'SuperAdmin' : 'default'})...`);
-                const lzResult = await submitLaozhangVideoGeneration({
-                    model, prompt, imageUrl: s3ImageUrl, duration: duration || 5,
-                    aspectRatio: aspectRatio || '16:9', generateAudio: generateAudio !== false,
-                });
-                if (lzResult?.videoUrl) {
-                    return {
-                        requestId: `lz-${Date.now()}`, endpoint: `laozhang-veo-3.1`,
-                        statusUrl: null, resultUrl: null, provider: 'laozhang',
-                        _laozhangVideoUrl: lzResult.videoUrl,
-                    };
-                }
-            } catch (lzErr) {
-                if (provider === 'laozhang' && activeProvider) throw lzErr; // Admin explicitly chose LZ, don't fallback
-                console.warn(`⚠️ [LaoZhang] Veo 3.1 failed, falling through to fal.ai...`);
-            }
-        }
-        // Fall through to fal.ai (handled at the bottom)
-    }
-
-    // ── Veo 3.1 Fast: LaoZhang (default) or kie.ai ──
-    if (model === 'veo-3.1-fast') {
-        const provider = activeProvider || 'laozhang';
-        // Try LaoZhang first if selected
-        if (provider === 'laozhang' && isLaozhangAvailable()) {
-            try {
-                console.log(`🎬 [Veo 3.1 Fast] Using LaoZhang (${activeProvider ? 'SuperAdmin' : 'default'})...`);
-                const lzResult = await submitLaozhangVideoGeneration({
-                    model, prompt, imageUrl: s3ImageUrl, duration: duration || 5,
-                    aspectRatio: aspectRatio || '16:9', generateAudio: generateAudio !== false,
-                });
-                if (lzResult?.videoUrl) {
-                    return {
-                        requestId: `lz-${Date.now()}`, endpoint: `laozhang-veo-3.1-fast`,
-                        statusUrl: null, resultUrl: null, provider: 'laozhang',
-                        _laozhangVideoUrl: lzResult.videoUrl,
-                    };
-                }
-            } catch (lzErr) {
-                if (provider === 'laozhang' && activeProvider) throw lzErr;
-                console.warn(`⚠️ [LaoZhang] Veo 3.1 Fast failed, falling through to kie.ai...`);
-            }
-        }
-        // Use kie.ai
-        if (provider === 'kie' || !activeProvider) {
-            console.log(`🎬 [Veo 3.1 Fast] Using kie.ai...`);
-            const result = await submitKieVideoGeneration({
-                model, prompt, imageUrl: s3ImageUrl, duration,
-                aspectRatio: aspectRatio || '16:9',
-            });
-            return {
-                requestId: result.taskId, endpoint: `kie-${model}`,
-                statusUrl: null, resultUrl: null, provider: 'kie',
-            };
-        }
-    }
-
-    // ── Grok Imagine: xAI native ──
-    if (model === 'grok-imagine') {
-        console.log(`🎬 [Grok Imagine] Using xAI native API...`);
-        const result = await submitGrokVideoGeneration({
-            prompt, imageUrl: s3ImageUrl, duration, resolution, aspectRatio,
-        });
-        return {
-            requestId: result.requestId, endpoint: 'grok-imagine-video',
-            statusUrl: null, resultUrl: null, provider: 'grok',
-        };
-    }
-
-    // ── Kling 3.0: fal.ai (default) or LaoZhang ──
-    if (model === 'kling-3.0') {
-        const provider = activeProvider || 'fal';
-        if (provider === 'laozhang' && isLaozhangAvailable()) {
-            try {
-                console.log(`🎬 [Kling 3.0] Using LaoZhang (SuperAdmin)...`);
-                const lzResult = await submitLaozhangVideoGeneration({
-                    model, prompt, imageUrl: s3ImageUrl, duration: duration || 5,
-                    aspectRatio: aspectRatio || '16:9', generateAudio: generateAudio !== false,
-                });
-                if (lzResult?.videoUrl) {
-                    return {
-                        requestId: `lz-${Date.now()}`, endpoint: `laozhang-kling-3.0`,
-                        statusUrl: null, resultUrl: null, provider: 'laozhang',
-                        _laozhangVideoUrl: lzResult.videoUrl,
-                    };
-                }
-            } catch (lzErr) {
-                if (activeProvider) throw lzErr;
-                console.warn(`⚠️ [LaoZhang] Kling 3.0 failed, falling through to fal.ai...`);
-            }
-        }
-        // Fall through to fal.ai (handled at the bottom)
-    }
-
-    // ── Seedance 2.0: Dynamic (MuAPI default, Cascading fallback) ──
+    // ── Seedance 2.0 Routing Logic ──
     if (model === 'seedance-2.0') {
         const provider = activeProvider || 'muapi';
-        console.log(`🎬 [Seedance 2.0] Routing to ${provider} (${activeProvider ? 'SuperAdmin' : 'default'})...`);
+        console.log(`🎬 [Seedance 2.0] Active Provider: ${provider}`);
 
         try {
             if (provider === 'muapi') {
-                const muApiKey = process.env.MUAPI_API_KEY;
-                if (!muApiKey) throw new Error('MUAPI_API_KEY missing');
                 const result = await submitMuApiVideoGeneration({
                     prompt, imageUrl: s3ImageUrl, duration,
                     aspectRatio: aspectRatio || '16:9', qualityMode: mode || 'fast',
@@ -427,8 +285,6 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
                     _muApiPayload: result._muApiPayload,
                 };
             } else if (provider === 'piapi') {
-                const piApiKey = process.env.PIAPI_API_KEY;
-                if (!piApiKey) throw new Error('PIAPI_API_KEY missing');
                 const result = await submitPiApiVideoGeneration({
                     prompt, imageUrl: s3ImageUrl, duration,
                     aspectRatio: aspectRatio || '16:9', generateAudio,
@@ -447,15 +303,18 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
                 });
                 if (lzResult?.videoUrl) {
                     return {
-                        requestId: `lz-${Date.now()}`, endpoint: `laozhang-seedance-2.0`,
+                        requestId: `lz-${Date.now()}`, endpoint: `laozhang-sedance-2.0`,
                         statusUrl: null, resultUrl: null, provider: 'laozhang',
                         _laozhangVideoUrl: lzResult.videoUrl,
                     };
                 }
             }
-            throw new Error(`Preferred provider ${provider} failed or unconfigured`);
+            throw new Error(`Provider ${provider} unconfigured or failed.`);
         } catch (err) {
-            console.warn(`⚠️ [Seedance 2.0] Provider ${provider} failed: ${err.message}. Triggering cascade fallback...`);
+            // Log exactly why the preferred provider failed
+            console.warn(`⚠️ [Seedance 2.0] Primary Provider (${provider}) failed: ${err.message}. Cascading...`);
+            
+            // If the failure was a credit error on MuAPI, we DEFINITELY cascade
             const cascade = await trySeedanceCascade({
                 prompt, imageUrl: s3ImageUrl, duration,
                 aspectRatio: aspectRatio || '16:9', generateAudio, mode,
@@ -463,7 +322,7 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
             });
             return {
                 requestId: cascade.taskId || `lz-${Date.now()}`,
-                endpoint: `${cascade.provider}-seedance-2.0-cascade`,
+                endpoint: `${cascade.provider}-cascade`,
                 statusUrl: null, resultUrl: null, provider: cascade.provider,
                 _piApiPayload: cascade._piApiPayload,
                 _laozhangVideoUrl: cascade.videoUrl,
@@ -471,69 +330,41 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
         }
     }
 
-    // ── fal.ai models (Kling, Veo 3.1 standard, Seedance 1.0) ──
+    // ── All other models (Kling, Veo, Grok, etc.) ──
     const apiKey = getApiKey();
     const endpoints = MODEL_ENDPOINTS[model];
     if (!endpoints) throw new Error(`Unknown video model: ${model}`);
     const endpoint = s3ImageUrl ? endpoints.imageToVideo : endpoints.textToVideo;
     const payload = buildPayload(model, { prompt, imageUrl: s3ImageUrl, duration, resolution, mode, shots, generateAudio });
     if (s3ImageUrl) payload.image_url = s3ImageUrl;
+
     const response = await fetch(`${FAL_BASE_URL}/${endpoint}`, { method: 'POST', headers: { 'Authorization': `Key ${apiKey}`, 'Content-Type': 'application/json' }, body: JSON.stringify(payload), signal: AbortSignal.timeout(35000) });
-    if (!response.ok) throw new Error(`fal.ai failed (${response.status}): ${await response.text()}`);
+    if (!response.ok) throw new Error(`fal.ai failed (${response.status})`);
     const data = await response.json();
-    console.log(`✅ fal.ai queued: ${data.request_id}`);
     return { requestId: data.request_id, endpoint, statusUrl: data.status_url, resultUrl: data.response_url, provider: 'fal' };
 }
 
 export async function extendVideo({ videoUrl, prompt, duration = 7 }) {
     const apiKey = getApiKey();
     const response = await fetch(`${FAL_BASE_URL}/${MODEL_ENDPOINTS['veo-3.1'].extendVideo}`, { method: 'POST', headers: { 'Authorization': `Key ${apiKey}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ video_url: videoUrl, prompt, duration: String(duration), generate_audio: true, auto_fix: true }) });
-    if (!response.ok) throw new Error(`fal.ai extend failed: ${await response.text()}`);
+    if (!response.ok) throw new Error(`fal.ai extend failed`);
     const data = await response.json();
     return { requestId: data.request_id, provider: 'fal' };
 }
 
-/**
- * Video Extension - Central Dynamic Router with Cascading Fallback
- */
-export async function extendVideoGeneration({
-    model,
-    parentTaskId,
-    prompt,
-    duration = 5,
-    qualityMode = 'fast',
-    aspectRatio = '16:9',
-}) {
-    // 1. Resolve active provider from settings
+export async function extendVideoGeneration({ model, parentTaskId, prompt, duration = 5, qualityMode = 'fast', aspectRatio = '16:9' }) {
     const routes = await getSetting('video_provider_routes') || {};
     const activeProvider = routes[model]?.active || null;
 
-    console.log(`🔗 Extension Strategy: Model=${model}, parentTaskId=${parentTaskId}, provider=${activeProvider || 'default'}`);
-
-    // If PiAPI is preferred or default, try it first
     if (activeProvider === 'piapi' || !activeProvider) {
         try {
-            const piApiKey = process.env.PIAPI_API_KEY;
-            if (!piApiKey) throw new Error('PIAPI_API_KEY missing');
             const result = await submitPiApiVideoExtend({ parentTaskId, prompt, duration, qualityMode });
-            return {
-                requestId: result.taskId, endpoint: `piapi-${model}-extend`,
-                statusUrl: null, resultUrl: null, provider: 'piapi',
-                _piApiPayload: result._payload,
-            };
+            return { requestId: result.taskId, provider: 'piapi', _piApiPayload: result._payload };
         } catch (err) {
-            const isCreditError = err.message.includes('credit') || err.message.includes('quota') || err.message.includes('balance');
-            if (isCreditError || !activeProvider) {
-                console.warn(`[Cascade] PiAPI Extension failed (${err.message}), falling through to I2V-last-frame...`);
-                // Fallback: Use ordinary generation (I2V) with the same prompt
-                return await submitVideoGeneration({ model, prompt, duration, resolution: '1080p', mode: qualityMode, aspectRatio });
-            } else {
-                throw err;
-            }
+            console.warn(`[Extend] PiAPI failed, falling back to I2V-last-frame...`);
+            return await submitVideoGeneration({ model, prompt, duration, resolution: '1080p', mode: qualityMode, aspectRatio });
         }
     }
-
-    // Default: Fall through to regular submit if no extension found
     return await submitVideoGeneration({ model, prompt, duration, resolution: '1080p', mode: qualityMode, aspectRatio });
 }
 
@@ -545,30 +376,12 @@ export async function getGenerationStatus(requestId, statusUrl, resultUrl) {
     if (!response.ok) return { status: 'IN_PROGRESS', progress: 30 };
     const data = await response.json();
     if (data.status === 'COMPLETED') return await fetchFalResult(apiKey, resultUrl);
-    if (data.status === 'FAILED') {
-        try { const r = await fetchFalResult(apiKey, resultUrl); if (r.videoUrl) return r; } catch (_) {}
-        return { status: 'FAILED', progress: 0, error: 'fal.ai generation failed' };
-    }
-    return { status: data.status || 'IN_PROGRESS', progress: data.status === 'IN_QUEUE' ? 10 : 50 };
-}
-
-export async function getGrokGenerationStatus(requestId) {
-    const apiKey = getGrokApiKey();
-    const response = await fetch(`${GROK_BASE_URL}/videos/${requestId}`, { headers: { 'Authorization': `Bearer ${apiKey}` } });
-    if (!response.ok) return { status: 'FAILED', progress: 0, error: `Grok status check failed: ${response.status}` };
-    const data = await response.json();
-    if (data.status === 'done') return { status: 'COMPLETED', progress: 100, videoUrl: data.video?.url || '', thumbnailUrl: '', audioUrl: '', duration: data.video?.duration || 0 };
-    if (data.status === 'expired') return { status: 'FAILED', progress: 0, error: 'Grok request expired.' };
-    return { status: 'IN_PROGRESS', progress: 40 };
+    return { status: data.status || 'IN_PROGRESS', progress: 50 };
 }
 
 async function fetchFalResult(apiKey, resultUrl) {
     const res = await fetch(resultUrl, { headers: { 'Authorization': `Key ${apiKey}` } });
     const data = await res.json();
-    const videoUrl = data.video?.url || data.video?.file_url || data.video_url || data.data?.video_url || data.data?.video?.url || data.output?.url || data.output?.video_url || data.output?.video?.url || data.videos?.[0]?.url || data.videos?.[0]?.file_url || data.result?.[0]?.url || data.result?.url || data.url || '';
-    return { status: 'COMPLETED', progress: 100, videoUrl, thumbnailUrl: data.thumbnail?.url || data.thumbnail_url || '', audioUrl: data.audio?.url || data.audio_url || '' };
-}
-
-export function getModelsInfo() {
-    return Object.keys(MODEL_CAPABILITIES).map(id => ({ ...MODEL_CAPABILITIES[id], available: true }));
+    const videoUrl = data.video?.url || data.output?.url || '';
+    return { status: 'COMPLETED', progress: 100, videoUrl };
 }
