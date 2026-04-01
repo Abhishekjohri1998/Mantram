@@ -22,11 +22,16 @@ const MODEL_ENDPOINTS = {
     'hunyuan':     { textToVideo: 'fal-ai/hunyuan-video/video-to-video', imageToVideo: 'fal-ai/hunyuan-video/image-to-video' },
 };
 
-const MODEL_AVAILABLE = {
+export const MODEL_AVAILABLE = {
     'kling-3.0': true, 'veo-3.1': true, 'veo-3.1-fast': true,
     'seedance-1.0': true, 'seedance-2.0': true, 'grok-imagine': true,
     'hunyuan': true, 'sora-2': true,
 };
+
+export function getModelsInfo() {
+    return Object.values(MODEL_CAPABILITIES);
+}
+
 
 export const COST_PER_SECOND = {
     'kling-3.0':   { fast: 0.07, quality: 0.12 },

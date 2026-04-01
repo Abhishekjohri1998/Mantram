@@ -411,6 +411,11 @@ export async function checkPricingChanges() {
                 if (extractedCost) {
                     const key = `${providerId}::${m.id}`;
                     const target = currentLiveCosts[key];
+                    if (!target) {
+                        console.warn(`📊 [Pricing Monitor] Skipping ${key} — not found in baselines.`);
+                        continue;
+                    }
+
                     
                     // Fields to update
                     const fields = ['inputPer1M', 'outputPer1M', 'flatCostUSD', 'costPerSecFast', 'costPerSecQuality', 'costPerMinute', 'costPerSecond'];
