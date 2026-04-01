@@ -14,7 +14,6 @@ import { requireCredits, refundCredits } from '../middleware/credits.js';
 import { addWatermark } from '../utils/watermark.js';
 import { getSetting } from '../models/SystemSettings.js';
 
-import GenerationJob from '../models/GenerationJob.js';
 import { uploadToS3 } from '../utils/s3.js';
 import { overlayLogo, fetchImageBuffer } from '../utils/logoOverlay.js';
 import { GoogleGenAI } from '@google/genai';
