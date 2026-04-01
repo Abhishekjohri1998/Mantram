@@ -151,7 +151,7 @@ export function estimateCost(model = 'kling-3.0', durationSeconds = 5, resolutio
     const costPerSec = liveCost || (COST_PER_SECOND[model]?.[mode]) || 0.07;
     const resMult = resolution === '720p' ? 0.7 : 1.0;
     const usd = Number((costPerSec * durationSeconds * resMult).toFixed(2));
-    const inr = Number((usd * 85).toFixed(0));
+    const inr = Number((usd * 93.21).toFixed(0));
     const credits = Math.max(Math.ceil(usd * 70), 5);
     return { usd, inr, credits, model, resolution, mode, durationSeconds, maxDuration: DURATION_LIMITS[model]?.max || 15 };
 }

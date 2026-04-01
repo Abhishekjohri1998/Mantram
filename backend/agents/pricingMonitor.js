@@ -499,7 +499,7 @@ export function simulateImpact(modelId, newCostMultiplier = 1.0) {
     const currentCost = modelCost.flatCost || ((modelCost.input + modelCost.output) / 2) || 0;
     const newCost = currentCost * newCostMultiplier;
     const creditPriceINR = 5; // Floor price
-    const exchangeRate = 85;
+    const exchangeRate = 93.21;
 
     return {
         modelId,
