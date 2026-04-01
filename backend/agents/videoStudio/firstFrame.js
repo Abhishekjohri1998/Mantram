@@ -8,7 +8,14 @@
 
 const GEMINI_MODELS = ['gemini-3.1-flash-image-preview', 'gemini-2.5-flash-image', 'gemini-3-pro-image-preview', 'gemini-2.0-flash'];
 
+import { Agent } from 'undici';
 import { ensureS3Url } from '../../utils/s3.js';
+
+// Reusable Keep-Alive dispatcher to eliminate heavy TLS handshake latency on repeated calls
+export const keepAliveAgent = new Agent({
+    keepAliveTimeout: 60000,
+    connections: 100
+});
 
 /**
  * Generate an image using Gemini's native image generation
@@ -30,16 +37,31 @@ export async function geminiImageGenerate(prompt, imageParts = [], temperature =
 
     for (const modelId of GEMINI_MODELS) {
         try {
-            console.log(`🖼️ Trying Gemini model: ${modelId}`);
+            console.log(`🖼️ Trying Gemini model: ${modelId} with 20s fast-fail timeout`);
             const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${imageKey}`;
-            const resp = await fetch(url, {
+            
+            // Fast-Fail if model hangs indefinitely (20 seconds max)
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 20000);
+
+            let fetchOptions = {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     contents: [{ parts }],
                     generationConfig: { responseModalities: ['TEXT', 'IMAGE'], temperature },
                 }),
-            });
+                signal: controller.signal
+            };
+            
+            // Apply Keep-Alive dispatcher if using native Node 18+ undici fetch
+            if (global.fetch && typeof keepAliveAgent !== 'undefined') {
+                fetchOptions.dispatcher = keepAliveAgent;
+            }
+
+            const resp = await fetch(url, fetchOptions);
+            clearTimeout(timeoutId);
+
             const data = await resp.json();
             if (data.error) {
                 console.error(`❌ Model ${modelId}:`, data.error.message);
@@ -60,7 +82,11 @@ export async function geminiImageGenerate(prompt, imageParts = [], temperature =
                 console.warn(`⚠️ Model ${modelId} returned no image in response parts`);
             }
         } catch (e) {
-            console.error(`❌ Model ${modelId} error:`, e.message);
+            if (e.name === 'AbortError') {
+                console.error(`⏱️ Model ${modelId} timed out after 20s — fast-failing to fallback...`);
+            } else {
+                console.error(`❌ Model ${modelId} error:`, e.message);
+            }
             continue;
         }
     }

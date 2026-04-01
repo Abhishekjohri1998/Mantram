@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { randomUUID } from 'crypto';
+import { Agent } from 'undici';
 import GenerationJob from '../models/GenerationJob.js';
 import { Router } from 'express';
 import Creative from '../models/Creative.js';
@@ -12,6 +13,12 @@ import { requireCredits, refundCredits } from '../middleware/credits.js';
 // orchestrator import removed — no fallback routing
 import { addWatermark } from '../utils/watermark.js';
 import { getSetting } from '../models/SystemSettings.js';
+
+// Reusable Keep-Alive dispatcher to eliminate heavy TLS handshake latency on repeated calls
+const keepAliveAgent = new Agent({
+    keepAliveTimeout: 60000,
+    connections: 100
+});
 import { uploadToS3 } from '../utils/s3.js';
 import { overlayLogo, fetchImageBuffer } from '../utils/logoOverlay.js';
 import { GoogleGenAI } from '@google/genai';
@@ -570,7 +577,7 @@ async function geminiImageGenerate(promptText, imageParts = [], temperature = 0.
     try {
         console.log(`🎨 Using: ${selectedModelId}...`);
         const url = `${baseUrl}/models/${selectedModelId}:generateContent?key=${imageKey}`;
-        const resp = await fetch(url, {
+        const fetchOptions = {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -580,7 +587,14 @@ async function geminiImageGenerate(promptText, imageParts = [], temperature = 0.
                     temperature,
                 },
             }),
-        });
+        };
+
+        // Apply Keep-Alive dispatcher if using native Node 18+ undici fetch
+        if (typeof global.fetch !== 'undefined' && keepAliveAgent) {
+            fetchOptions.dispatcher = keepAliveAgent;
+        }
+
+        const resp = await fetch(url, fetchOptions);
 
         const data = await resp.json();
         if (data.error) {
