@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 import { randomUUID } from 'crypto';
-import { Agent } from 'undici';
+import { keepAliveAgent } from '../utils/network.js';
 import GenerationJob from '../models/GenerationJob.js';
 import { Router } from 'express';
 import Creative from '../models/Creative.js';
@@ -14,11 +14,7 @@ import { requireCredits, refundCredits } from '../middleware/credits.js';
 import { addWatermark } from '../utils/watermark.js';
 import { getSetting } from '../models/SystemSettings.js';
 
-// Reusable Keep-Alive dispatcher to eliminate heavy TLS handshake latency on repeated calls
-const keepAliveAgent = new Agent({
-    keepAliveTimeout: 60000,
-    connections: 100
-});
+import GenerationJob from '../models/GenerationJob.js';
 import { uploadToS3 } from '../utils/s3.js';
 import { overlayLogo, fetchImageBuffer } from '../utils/logoOverlay.js';
 import { GoogleGenAI } from '@google/genai';
@@ -64,6 +60,7 @@ async function runCreativeJobAsync(jobId, userId, payload, authToken) {
             },
             body: JSON.stringify({ brandId, type, prompt, options, jobId }),
             signal: AbortSignal.timeout(300000), // 5 min max
+            dispatcher: keepAliveAgent
         });
 
         const data = await resp.json();
@@ -413,6 +410,7 @@ async function falImageGenerate(promptText, endpoint, aspectRatio = '1:1') {
             sync_mode: true, // Wait for result (up to 60s)
         }),
         signal: AbortSignal.timeout(90000),
+        dispatcher: keepAliveAgent
     });
 
     if (!submitResp.ok) {
@@ -453,6 +451,7 @@ async function falImageGenerate(promptText, endpoint, aspectRatio = '1:1') {
             try {
                 const pollResp = await fetch(resultUrl, {
                     headers: { 'Authorization': `Key ${falKey}` },
+                    dispatcher: keepAliveAgent
                 });
                 if (pollResp.status === 200) {
                     const pollData = await pollResp.json();
@@ -500,6 +499,7 @@ async function grokImageGenerate(promptText, aspectRatio = '1:1') {
             n: 1,
         }),
         signal: AbortSignal.timeout(90000),
+        dispatcher: keepAliveAgent
     });
 
     if (!response.ok) {

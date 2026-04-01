@@ -13,6 +13,7 @@
 
 import config from '../../config/env.js';
 import { ensureS3Url } from '../../utils/s3.js';
+import { keepAliveAgent } from '../../utils/network.js';
 
 const HEYGEN_BASE_URL = 'https://api.heygen.com';
 
@@ -43,6 +44,7 @@ async function heygenFetch(path, opts = {}) {
             ...opts.headers,
         },
         signal: opts.signal || AbortSignal.timeout(30000),
+        dispatcher: keepAliveAgent
     });
 
     const rawText = await response.text();
@@ -198,6 +200,7 @@ export async function uploadAssetToHeyGen(buffer, filename = 'avatar.png', conte
         },
         body: formData,
         signal: AbortSignal.timeout(60000), // 60s for uploads
+        dispatcher: keepAliveAgent
     });
 
     const rawText = await response.text();

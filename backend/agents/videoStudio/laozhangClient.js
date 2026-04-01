@@ -1,30 +1,4 @@
-/**
- * Lao Zhang API Client — Unified AI Gateway
- *
- * CONFIRMED via live testing (March 2026):
- *   Video: Uses /v1/chat/completions — returns video URL in markdown format
- *   Image: Uses /v1/images/generations — returns b64_json
- *   Models endpoint: /v1/models (432 models available)
- *
- * Available VIDEO models (confirmed working March 30, 2026):
- *   - veo-3.1, veo-3.1-fast ✅ CONFIRMED WORKING (fast, ~30-60s)
- *   - kling-3.0 ✅ CONFIRMED WORKING
- *   - sora_video2 ⚠️ HANGS — takes >5min, avoid as cascade target
- *   - seedance-2.0 ⚠️ INTERMITTENT — billing channel issues, may 503
- *
- *   NOT available on LZ:
- *   - seedance-1.0 ❌ 503 "no available channel"
- *
- * Available IMAGE models (confirmed):
- *   - gemini-3.1-flash-image-preview ✅ tested
- *   - flux-kontext-pro, flux-kontext-max
- *
- * Response format: [download video](https://r2cdn.copilotbase.com/r2cdn2/xxx.mp4)
- *
- * API Base: https://api.laozhang.ai/v1
- */
-
-import fetch from 'node-fetch';
+import { keepAliveAgent } from '../../utils/network.js';
 
 const LAOZHANG_BASE_URL = process.env.LAOZHANG_BASE_URL || 'https://api.laozhang.ai/v1';
 
@@ -120,6 +94,7 @@ export async function submitLaozhangVideoGeneration({
                 messages: [{ role: 'user', content: messageContent }],
             }),
             signal: AbortSignal.timeout(timeoutMs),
+            dispatcher: keepAliveAgent
         });
     } catch (fetchErr) {
         // AbortError = timeout
@@ -202,6 +177,7 @@ export async function laozhangImageGenerate(prompt, { model = 'gemini-3.1-flash-
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
         body: JSON.stringify({ model, prompt, n: 1, size, response_format: 'url' }),
         signal: AbortSignal.timeout(90000),
+        dispatcher: keepAliveAgent
     });
 
     if (!response.ok) {
@@ -244,6 +220,7 @@ export async function laozhangMultimodalImageGenerate(prompt, imageUrls = [], { 
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
         body: JSON.stringify({ model, messages: [{ role: 'user', content: contentParts }] }),
         signal: AbortSignal.timeout(90000),
+        dispatcher: keepAliveAgent
     });
 
     if (!response.ok) {

@@ -1,11 +1,5 @@
 import { BaseProvider } from './base.js';
-import { Agent } from 'undici';
-
-// Reusable Keep-Alive dispatcher to eliminate heavy TLS handshake latency on repeated calls
-const keepAliveAgent = new Agent({
-    keepAliveTimeout: 60000,
-    connections: 100
-});
+import { keepAliveAgent } from '../../utils/network.js';
 
 /**
  * Google Gemini Provider
@@ -42,7 +36,7 @@ export class GeminiProvider extends BaseProvider {
                 } else if (img.startsWith('http')) {
                     try {
                         console.log(`📥 Fetching image URL for Gemini Vision: ${img.substring(0, 100)}...`);
-                        const r = await fetch(img);
+                        const r = await fetch(img, { dispatcher: keepAliveAgent });
                         const arr = await r.arrayBuffer();
                         b64Data = Buffer.from(arr).toString('base64');
                         mimeType = r.headers.get('content-type') || 'image/jpeg';
@@ -68,6 +62,7 @@ export class GeminiProvider extends BaseProvider {
                     maxOutputTokens: maxTokens,
                 },
             }),
+            dispatcher: keepAliveAgent
         });
         if (!response.ok) {
             const data = await response.json().catch(() => ({}));
@@ -115,6 +110,7 @@ export class GeminiProvider extends BaseProvider {
                     maxOutputTokens: maxTokens,
                 },
             }),
+            dispatcher: keepAliveAgent
         });
 
         if (!response.ok) {

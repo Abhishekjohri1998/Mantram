@@ -2,6 +2,7 @@ import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { Upload } from "@aws-sdk/lib-storage";
 import config from "../config/env.js";
 import crypto from "crypto";
+import { keepAliveAgent } from "./network.js";
 
 const s3Client = new S3Client({
     region: config.aws.region,
@@ -70,6 +71,7 @@ export const mirrorUrlToS3 = async (url, targetKey, defaultMimeType = "image/png
         const response = await fetch(url, {
             headers: { 'User-Agent': 'Mozilla/5.0' },
             redirect: 'follow',
+            dispatcher: keepAliveAgent
         });
         if (!response.ok) {
             console.warn(`⚠️ Failed to download for mirroring (${response.status}): ${url}`);

@@ -1,5 +1,6 @@
 import sharp from 'sharp';
 import { getSetting } from '../models/SystemSettings.js';
+import { keepAliveAgent } from './network.js';
 
 /**
  * Get watermark configuration (logo, position, opacity) from SystemSettings.
@@ -92,7 +93,7 @@ export async function addWatermark(base64DataUrl, options = {}) {
         // Try logo image first
         if (options.logoUrl) {
             try {
-                const resp = await fetch(options.logoUrl);
+                const resp = await fetch(options.logoUrl, { dispatcher: keepAliveAgent });
                 if (resp.ok) {
                     const logoBuffer = Buffer.from(await resp.arrayBuffer());
                     // Scale logo to ~12% of image width
