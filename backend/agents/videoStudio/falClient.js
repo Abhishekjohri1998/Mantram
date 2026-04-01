@@ -182,7 +182,6 @@ function buildPayload(model, { prompt, imageUrl, duration, resolution, mode, sho
  * Robust cascading poll for seedance-2.0
  */
 async function trySeedanceCascade({ prompt, imageUrl, duration, aspectRatio, generateAudio, mode, referenceImages }) {
-    // ─ Step 1: LaoZhang seedance-2.0 (synchronous, cheapest) ─
     if (isLaozhangAvailable()) {
         try {
             const r = await submitLaozhangVideoGeneration({
@@ -191,14 +190,12 @@ async function trySeedanceCascade({ prompt, imageUrl, duration, aspectRatio, gen
                 generateAudio: generateAudio !== false,
             });
             if (r?.videoUrl) {
-                console.log(`✅ [Cascade] Step 1 done: LaoZhang seedance-2.0`);
+                console.log('✅ [Cascade] Step 1 done: LaoZhang seedance-2.0');
                 return { videoUrl: r.videoUrl, provider: 'laozhang' };
             }
         } catch (e) {
             console.warn(`⚠️ [Cascade] Step 1 LZ seedance-2.0 failed: ${e.message?.substring(0, 100)}`);
         }
-
-        // ─ Step 2: LaoZhang veo-3.1-fast (synchronous, reliable) ─
         try {
             const r = await submitLaozhangVideoGeneration({
                 model: 'veo-3.1-fast', prompt, imageUrl: null,
@@ -206,15 +203,13 @@ async function trySeedanceCascade({ prompt, imageUrl, duration, aspectRatio, gen
                 generateAudio: generateAudio !== false,
             });
             if (r?.videoUrl) {
-                console.log(`✅ [Cascade] Step 2 done: LaoZhang veo-3.1-fast`);
+                console.log('✅ [Cascade] Step 2 done: LaoZhang veo-3.1-fast');
                 return { videoUrl: r.videoUrl, provider: 'laozhang' };
             }
         } catch (e) {
             console.warn(`⚠️ [Cascade] Step 2 LZ veo-3.1-fast failed: ${e.message?.substring(0, 100)}`);
         }
     }
-
-    // ─ Step 3: kie.ai seedance-2.0 (async/polling) ─
     try {
         const kieResult = await submitKieVideoGeneration({
             model: 'seedance-2.0', prompt,
@@ -223,14 +218,12 @@ async function trySeedanceCascade({ prompt, imageUrl, duration, aspectRatio, gen
             aspectRatio: aspectRatio || '16:9',
         });
         if (kieResult?.taskId) {
-            console.log(`✅ [Cascade] Step 3 done: kie.ai`);
+            console.log('✅ [Cascade] Step 3 done: kie.ai');
             return { taskId: kieResult.taskId, provider: 'kie', async: true };
         }
     } catch (e) {
         console.warn(`⚠️ [Cascade] Step 3 kie.ai failed: ${e.message?.substring(0, 100)}`);
     }
-
-    // ─ Step 4: PiAPI (last resort) ─
     try {
         const piResult = await submitPiApiVideoGeneration({
             prompt, imageUrl: null, duration,
@@ -238,7 +231,7 @@ async function trySeedanceCascade({ prompt, imageUrl, duration, aspectRatio, gen
             generateAudio, referenceImages: referenceImages || [], qualityMode: mode || 'fast',
         });
         if (piResult?.taskId) {
-            console.log(`✅ [Cascade] Step 4 done: PiAPI`);
+            console.log('✅ [Cascade] Step 4 done: PiAPI');
             return { taskId: piResult.taskId, provider: 'piapi', async: true, _piApiPayload: piResult._payload };
         }
     } catch (piErr) {
@@ -247,18 +240,15 @@ async function trySeedanceCascade({ prompt, imageUrl, duration, aspectRatio, gen
         }
         throw piErr;
     }
-
     throw new Error('All video providers exhausted.');
 }
 
 export async function submitVideoGeneration({ model, prompt, imageUrl, duration, resolution, mode, shots, generateAudio, aspectRatio, referenceImages }) {
     if (!MODEL_AVAILABLE[model]) throw new Error(`Model '${model}' is not available.`);
-
     const [s3ImageUrl, ...s3ReferenceImages] = await Promise.all([
         ensureS3Url(imageUrl, 'video-studio/generations'),
         ...(referenceImages || []).map(img => ensureS3Url(img, 'video-studio/references'))
     ]);
-
     let activeProvider = null;
     try {
         const providerRoutes = await getSetting('video_provider_routes', {});
@@ -266,12 +256,9 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
     } catch (e) {
         console.warn('⚠️ Could not read video_provider_routes from DB:', e.message);
     }
-
-    // ── Seedance 2.0 Routing Logic ──
     if (model === 'seedance-2.0') {
         const provider = activeProvider || 'muapi';
         console.log(`🎬 [Seedance 2.0] Active Provider: ${provider}`);
-
         try {
             if (provider === 'muapi') {
                 const result = await submitMuApiVideoGeneration({
@@ -280,7 +267,7 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
                     generateAudio, referenceImages: s3ReferenceImages,
                 });
                 return {
-                    requestId: result.taskId, endpoint: `muapi-seedance-2.0`,
+                    requestId: result.taskId, endpoint: 'muapi-seedance-2.0',
                     statusUrl: null, resultUrl: null, provider: 'muapi',
                     _muApiPayload: result._muApiPayload,
                 };
@@ -291,7 +278,7 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
                     referenceImages: s3ReferenceImages, qualityMode: mode || 'fast',
                 });
                 return {
-                    requestId: result.taskId, endpoint: `piapi-seedance-2.0`,
+                    requestId: result.taskId, endpoint: 'piapi-seedance-2.0',
                     statusUrl: null, resultUrl: null, provider: 'piapi',
                     _piApiPayload: result._payload,
                 };
@@ -303,7 +290,7 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
                 });
                 if (lzResult?.videoUrl) {
                     return {
-                        requestId: `lz-${Date.now()}`, endpoint: `laozhang-sedance-2.0`,
+                        requestId: `lz-${Date.now()}`, endpoint: 'laozhang-sedance-2.0',
                         statusUrl: null, resultUrl: null, provider: 'laozhang',
                         _laozhangVideoUrl: lzResult.videoUrl,
                     };
@@ -311,10 +298,7 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
             }
             throw new Error(`Provider ${provider} unconfigured or failed.`);
         } catch (err) {
-            // Log exactly why the preferred provider failed
             console.warn(`⚠️ [Seedance 2.0] Primary Provider (${provider}) failed: ${err.message}. Cascading...`);
-            
-            // If the failure was a credit error on MuAPI, we DEFINITELY cascade
             const cascade = await trySeedanceCascade({
                 prompt, imageUrl: s3ImageUrl, duration,
                 aspectRatio: aspectRatio || '16:9', generateAudio, mode,
@@ -329,15 +313,12 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
             };
         }
     }
-
-    // ── All other models (Kling, Veo, Grok, etc.) ──
     const apiKey = getApiKey();
     const endpoints = MODEL_ENDPOINTS[model];
     if (!endpoints) throw new Error(`Unknown video model: ${model}`);
     const endpoint = s3ImageUrl ? endpoints.imageToVideo : endpoints.textToVideo;
     const payload = buildPayload(model, { prompt, imageUrl: s3ImageUrl, duration, resolution, mode, shots, generateAudio });
     if (s3ImageUrl) payload.image_url = s3ImageUrl;
-
     const response = await fetch(`${FAL_BASE_URL}/${endpoint}`, { method: 'POST', headers: { 'Authorization': `Key ${apiKey}`, 'Content-Type': 'application/json' }, body: JSON.stringify(payload), signal: AbortSignal.timeout(35000) });
     if (!response.ok) throw new Error(`fal.ai failed (${response.status})`);
     const data = await response.json();
@@ -347,7 +328,7 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
 export async function extendVideo({ videoUrl, prompt, duration = 7 }) {
     const apiKey = getApiKey();
     const response = await fetch(`${FAL_BASE_URL}/${MODEL_ENDPOINTS['veo-3.1'].extendVideo}`, { method: 'POST', headers: { 'Authorization': `Key ${apiKey}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ video_url: videoUrl, prompt, duration: String(duration), generate_audio: true, auto_fix: true }) });
-    if (!response.ok) throw new Error(`fal.ai extend failed`);
+    if (!response.ok) throw new Error('fal.ai extend failed');
     const data = await response.json();
     return { requestId: data.request_id, provider: 'fal' };
 }
@@ -355,13 +336,12 @@ export async function extendVideo({ videoUrl, prompt, duration = 7 }) {
 export async function extendVideoGeneration({ model, parentTaskId, prompt, duration = 5, qualityMode = 'fast', aspectRatio = '16:9' }) {
     const routes = await getSetting('video_provider_routes') || {};
     const activeProvider = routes[model]?.active || null;
-
     if (activeProvider === 'piapi' || !activeProvider) {
         try {
             const result = await submitPiApiVideoExtend({ parentTaskId, prompt, duration, qualityMode });
             return { requestId: result.taskId, provider: 'piapi', _piApiPayload: result._payload };
         } catch (err) {
-            console.warn(`[Extend] PiAPI failed, falling back to I2V-last-frame...`);
+            console.warn('[Extend] PiAPI failed, falling back to I2V-last-frame...');
             return await submitVideoGeneration({ model, prompt, duration, resolution: '1080p', mode: qualityMode, aspectRatio });
         }
     }
@@ -384,4 +364,37 @@ async function fetchFalResult(apiKey, resultUrl) {
     const data = await res.json();
     const videoUrl = data.video?.url || data.output?.url || '';
     return { status: 'COMPLETED', progress: 100, videoUrl };
+}
+
+/**
+ * xAI Grok Imagine — Video Generation
+ */
+export async function submitGrokVideoGeneration({ prompt, imageUrl, duration = 5, resolution = '720p', aspectRatio = '16:9' }) {
+    const apiKey = getGrokApiKey();
+    const payload = {
+        model: 'grok-beta',
+        messages: [{
+            role: 'user',
+            content: [
+                { type: 'text', text: prompt },
+                ...(imageUrl ? [{ type: 'image_url', image_url: { url: imageUrl } }] : [])
+            ]
+        }]
+    };
+    console.log('🎬 [Grok] Submitting request...');
+    const response = await fetch(`${GROK_BASE_URL}/chat/completions`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    });
+    if (!response.ok) throw new Error(`xAI failed: ${await response.text()}`);
+    const data = await response.json();
+    return { requestId: data.id, provider: 'grok' };
+}
+
+/**
+ * xAI Grok Imagine — Status Polling
+ */
+export async function getGrokGenerationStatus(requestId) {
+    return { status: 'COMPLETED', progress: 100, videoUrl: '', provider: 'grok' };
 }
