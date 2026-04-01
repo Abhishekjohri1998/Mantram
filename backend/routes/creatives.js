@@ -1380,7 +1380,7 @@ router.post('/generate', protect, requireStudio('creativeStudio'), requireCredit
         // Build image parts — MINIMAL labels, images first
         if (styleRef) {
             imageParts.push({ inlineData: { mimeType: styleRef.part.mimeType, data: styleRef.part.data } });
-            referenceInstructions.push('Match the visual style, colors, and mood of the provided style reference image.');
+            referenceInstructions.push('STYLE REFERENCE: Carefully study this reference image and replicate ALL of the following from it — (1) the overall visual aesthetic, color palette, and color grading/tone, (2) the composition layout and spatial arrangement of elements, (3) the pose, body position, and angle of any person/model, (4) the placement and positioning of the product or hero element, (5) the camera angle and framing, (6) the lighting style and mood/atmosphere. The generated image must feel like it belongs in the same series or campaign as this reference.');
             if (refs.style?.startsWith('http')) refImageUrls.push(refs.style);
         }
 

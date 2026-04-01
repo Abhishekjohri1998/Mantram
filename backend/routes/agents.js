@@ -803,7 +803,7 @@ Bold, ${moodPhrase} visual suitable for advertising and social media. ${ratioPhr
                                 const stylePart = await fetchImagePart(styleRef, 'style');
                                 if (stylePart) {
                                     parts.push(stylePart);
-                                    parts.push({ text: 'This is a style reference image. Match its visual look, color palette, and mood.' });
+                                    parts.push({ text: 'STYLE REFERENCE IMAGE — replicate ALL of the following from this reference: (1) color palette, color grading and tone, (2) composition layout and spatial arrangement, (3) pose and body position of any person/model, (4) product placement and positioning, (5) camera angle and framing, (6) lighting style and mood. The output must feel like it belongs in the same series as this reference.' });
                                 }
                             }
                             // Add character reference image

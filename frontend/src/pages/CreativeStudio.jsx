@@ -1246,7 +1246,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
         try {
             // Build description of reference images for the enhancer
             const refDescs = []
-            if (referenceImages.style) refDescs.push('A style reference image is attached — match its visual aesthetic, color palette, and mood')
+            if (referenceImages.style) refDescs.push('A style reference image is attached — replicate its visual aesthetic, color palette, composition layout, subject pose/position, product placement, camera angle, and overall mood')
             if (characters.length > 0) refDescs.push(`${characters.length} character reference image(s) are attached: ${characters.map(c => c.name).join(', ')} — include these characters in the design`)
             if (referenceImages.upload) refDescs.push('A general reference image is attached — use it as contextual inspiration')
 
