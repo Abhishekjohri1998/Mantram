@@ -3514,8 +3514,13 @@ router.post('/generate-first-frame', protect, async (req, res) => {
             res.status(500).json({ success: false, error: 'Failed to generate first frame image' });
         }
     } catch (err) {
-        console.error('Generate first frame error:', err);
-        res.status(500).json({ success: false, error: safeErrorMessage(err) });
+        console.error('❌ Generate first frame error:', err.message);
+        res.status(500).json({ 
+            success: false, 
+            error: err.message.includes('Gemini image generation failed') 
+                ? 'Gemini image generation failed — no image returned from any model' 
+                : safeErrorMessage(err) 
+        });
     }
 });
 
