@@ -6,7 +6,7 @@
  * images were served from S3.
  */
 import sharp from 'sharp';
-import { keepAliveAgent } from './network.js';
+
 
 /**
  * Overlay a logo onto an image buffer.
@@ -87,7 +87,7 @@ export async function fetchImageBuffer(urlOrBase64) {
 
     // HTTP URL
     if (urlOrBase64.startsWith('http')) {
-        const resp = await fetch(urlOrBase64, { dispatcher: keepAliveAgent });
+        const resp = await fetch(urlOrBase64);
         if (!resp.ok) throw new Error(`Failed to fetch image: ${resp.status}`);
         return Buffer.from(await resp.arrayBuffer());
     }

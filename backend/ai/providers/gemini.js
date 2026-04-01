@@ -1,5 +1,5 @@
 import { BaseProvider } from './base.js';
-import { keepAliveAgent } from '../../utils/network.js';
+
 
 /**
  * Google Gemini Provider
@@ -36,7 +36,7 @@ export class GeminiProvider extends BaseProvider {
                 } else if (img.startsWith('http')) {
                     try {
                         console.log(`📥 Fetching image URL for Gemini Vision: ${img.substring(0, 100)}...`);
-                        const r = await fetch(img, { dispatcher: keepAliveAgent });
+                        const r = await fetch(img);
                         const arr = await r.arrayBuffer();
                         b64Data = Buffer.from(arr).toString('base64');
                         mimeType = r.headers.get('content-type') || 'image/jpeg';
@@ -62,7 +62,6 @@ export class GeminiProvider extends BaseProvider {
                     maxOutputTokens: maxTokens,
                 },
             }),
-            dispatcher: keepAliveAgent
         });
         if (!response.ok) {
             const data = await response.json().catch(() => ({}));
@@ -110,7 +109,6 @@ export class GeminiProvider extends BaseProvider {
                     maxOutputTokens: maxTokens,
                 },
             }),
-            dispatcher: keepAliveAgent
         });
 
         if (!response.ok) {
@@ -213,7 +211,6 @@ export class GeminiProvider extends BaseProvider {
                             temperature: 0.4,
                         },
                     }),
-                    dispatcher: typeof global.fetch !== 'undefined' ? keepAliveAgent : undefined
                 });
 
                 const data = await response.json();
@@ -261,8 +258,7 @@ export class GeminiProvider extends BaseProvider {
                         instances: [{ prompt }],
                         parameters: { sampleCount: 1, aspectRatio: '1:1' }
                     }),
-                    dispatcher: typeof global.fetch !== 'undefined' ? keepAliveAgent : undefined
-                });
+                 });
 
                 const data = await response.json();
                 if (data.error) throw new Error(data.error.message);

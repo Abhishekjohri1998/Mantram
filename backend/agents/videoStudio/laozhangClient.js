@@ -1,4 +1,4 @@
-import { keepAliveAgent } from '../../utils/network.js';
+
 
 const LAOZHANG_BASE_URL = process.env.LAOZHANG_BASE_URL || 'https://api.laozhang.ai/v1';
 
@@ -94,7 +94,6 @@ export async function submitLaozhangVideoGeneration({
                 messages: [{ role: 'user', content: messageContent }],
             }),
             signal: AbortSignal.timeout(timeoutMs),
-            dispatcher: keepAliveAgent
         });
     } catch (fetchErr) {
         // AbortError = timeout
@@ -177,7 +176,6 @@ export async function laozhangImageGenerate(prompt, { model = 'gemini-3.1-flash-
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
         body: JSON.stringify({ model, prompt, n: 1, size, response_format: 'url' }),
         signal: AbortSignal.timeout(90000),
-        dispatcher: keepAliveAgent
     });
 
     if (!response.ok) {
@@ -220,7 +218,6 @@ export async function laozhangMultimodalImageGenerate(prompt, imageUrls = [], { 
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
         body: JSON.stringify({ model, messages: [{ role: 'user', content: contentParts }] }),
         signal: AbortSignal.timeout(90000),
-        dispatcher: keepAliveAgent
     });
 
     if (!response.ok) {
