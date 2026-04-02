@@ -111,9 +111,6 @@ export async function submitMuApiVideoGeneration({
 }) {
     if (!prompt?.trim()) throw new Error('Prompt is required for MuAPI Seedance 2.0');
 
-    const isI2V = !!imageUrl;
-    const endpoint = isI2V ? '/seedance-v2.0-i2v' : '/seedance-v2.0-t2v';
-
     const payload = {
         prompt: prompt.trim(),
         duration: mapDuration(duration),
@@ -122,24 +119,38 @@ export async function submitMuApiVideoGeneration({
         remove_watermark: true,
     };
 
-    if (isI2V || referenceImages?.length > 0) {
-        // Build images_list: first image is the primary I2V source, followed by reference images
-        const imagesList = [];
-        if (isI2V && imageUrl) imagesList.push(imageUrl);
-        
-        if (referenceImages?.length > 0) {
-            // Filter out nulls/empty and limit to MuAPI's max (8 total including primary)
-            const refs = referenceImages.filter(Boolean).slice(0, isI2V ? 7 : 8);
-            imagesList.push(...refs);
+    // 🔎 Indexing Logic:
+    // If Start Frame exists, it's @image1.
+    // Reference images follow, e.g., @image2, @image3.
+    // If no Start Frame, Reference 1 is @image1.
+    const imagesList = [];
+    if (imageUrl) imagesList.push(imageUrl);
+    if (referenceImages?.length > 0) {
+        imagesList.push(...referenceImages.filter(Boolean).slice(0, 8 - imagesList.length));
+    }
+
+    const hasImages = imagesList.length > 0;
+    const endpoint = hasImages ? '/seedance-v2.0-i2v' : '/seedance-v2.0-t2v';
+
+    if (hasImages) {
+        payload.images_list = imagesList;
+        console.log(`📸 [MuAPI] Final images_list (${imagesList.length} total):`, imagesList.map(u => u.substring(0, 60)));
+
+        // Prompt Auto-Tagging:
+        // Ensure the model actually looks at the reference images if not tagged
+        let finalPrompt = prompt.trim();
+        const untaggedIndices = [];
+        for (let i = 1; i <= imagesList.length; i++) {
+            if (!finalPrompt.includes(`@image${i}`)) untaggedIndices.push(`@image${i}`);
         }
-        
-        if (imagesList.length > 0) {
-            payload.images_list = imagesList;
-            console.log(`📸 [MuAPI] Added ${imagesList.length} image(s) to images_list (isI2V=${isI2V})`);
+        if (untaggedIndices.length > 0) {
+            finalPrompt += ` (Visual reference: ${untaggedIndices.join(', ')})`;
+            payload.prompt = finalPrompt;
+            console.log(`📝 [MuAPI] Auto-tagged prompt: ${finalPrompt}`);
         }
     }
 
-    console.log(`🎬 [MuAPI] Submitting ${isI2V ? 'I2V' : 'T2V'} to ${endpoint} | Payload keys: ${Object.keys(payload).join(', ')}`);
+    console.log(`🎬 [MuAPI] Submitting to ${endpoint} | Payload keys: ${Object.keys(payload).join(', ')}`);
 
     const data = await muapiFetch(endpoint, {
         method: 'POST',
