@@ -304,7 +304,8 @@ export default function AdvancedMode({ activeBrand, initialData }) {
         const r = new FileReader()
         r.onload = async () => {
             const id = `r${Date.now()}`
-            setRefImages(prev => [...prev, { id, url: r.result, label: `@image${prev.length + 1}`, uploading: true }])
+            // Label is handled dynamically in rendering/autocomplete
+            setRefImages(prev => [...prev, { id, url: r.result, uploading: true }])
             const hostedUrl = await uploadImage(r.result)
             setRefImages(prev => prev.map(img => img.id === id ? { ...img, url: hostedUrl, uploading: false } : img))
         }
@@ -324,7 +325,10 @@ export default function AdvancedMode({ activeBrand, initialData }) {
         setPrompt(val)
         const cursorPos = e.target.selectionStart
         const textBeforeCursor = val.substring(0, cursorPos)
-        const allAssets = [...refImages.map((r, i) => ({ tag: `@image${i + 1}`, type: 'image', src: r })),
+        const offset = firstFrame ? 1 : 0
+        const allAssets = [
+            ...(firstFrame ? [{ tag: '@image1', type: 'image', src: firstFrame }] : []),
+            ...refImages.map((r, i) => ({ tag: `@image${i + 1 + offset}`, type: 'image', src: r })),
             ...(refVideo ? [{ tag: '@video1', type: 'video', src: refVideo }] : []),
             ...(refAudio ? [{ tag: '@audio1', type: 'audio', src: refAudio }] : []),
         ]
@@ -348,8 +352,10 @@ export default function AdvancedMode({ activeBrand, initialData }) {
     }
 
     // Build autocomplete items
+    const imgOffset = firstFrame ? 1 : 0
     const acItems = [
-        ...refImages.map((r, i) => ({ tag: `@image${i + 1}`, type: 'image', thumb: r.url, label: `image${i + 1}` })),
+        ...(firstFrame ? [{ tag: '@image1', type: 'image', thumb: firstFrame.url, label: 'image1' }] : []),
+        ...refImages.map((r, i) => ({ tag: `@image${i + 1 + imgOffset}`, type: 'image', thumb: r.url, label: `image${i + 1 + imgOffset}` })),
         ...(refVideo ? [{ tag: '@video1', type: 'video', msIcon: 'video_file', label: 'video1' }] : []),
         ...(refAudio ? [{ tag: '@audio1', type: 'audio', msIcon: 'audio_file', label: 'audio1' }] : []),
     ]
@@ -466,10 +472,14 @@ export default function AdvancedMode({ activeBrand, initialData }) {
     }, [])
 
     // ── All asset tags for the tags row ──
+    const tagOffset = firstFrame ? 1 : 0
     const allTags = [
-        ...(firstFrame ? [{ id: 'ff', label: 'Start Frame', type: 'frame', thumb: firstFrame.url, uploading: firstFrame.uploading }] : []),
+        ...(firstFrame ? [{ id: 'ff', label: '@image1', type: 'frame', thumb: firstFrame.url, uploading: firstFrame.uploading, linked: prompt.includes('@image1') }] : []),
         ...(lastFrame ? [{ id: 'lf', label: 'End Frame', type: 'frame', thumb: lastFrame.url, uploading: lastFrame.uploading }] : []),
-        ...refImages.map((r, i) => ({ id: r.id, label: `@image${i + 1}`, type: 'image', thumb: r.url, uploading: r.uploading, linked: prompt.includes(`@image${i + 1}`) })),
+        ...refImages.map((r, i) => {
+            const label = `@image${i + 1 + tagOffset}`
+            return { id: r.id, label, type: 'image', thumb: r.url, uploading: r.uploading, linked: prompt.includes(label) }
+        }),
         ...(refVideo ? [{ id: 'rv', label: '@video1', type: 'video', name: refVideo.name, linked: prompt.includes('@video1') }] : []),
         ...(refAudio ? [{ id: 'ra', label: '@audio1', type: 'audio', name: refAudio.name, linked: prompt.includes('@audio1') }] : []),
     ]
