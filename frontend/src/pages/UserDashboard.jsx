@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, memo } from 'react'
+
 import SEOHead from '../components/SEOHead'
 import { useNavigate } from 'react-router-dom'
 import DashboardLayout from '../components/DashboardLayout'
@@ -40,8 +41,20 @@ function useTypewriter(text, speed = 40) {
     return { displayed, done }
 }
 
+const TypingGreeting = memo(({ text, speed = 40 }) => {
+    const { displayed, done } = useTypewriter(text, speed)
+    return (
+        <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-white tracking-tight truncate">
+            {displayed}
+            {!done && <span className="inline-block w-1.5 h-6 sm:h-8 bg-violet-500 ml-1 rounded-full animate-[cursor-blink_1s_step-end_infinite]" />}
+        </h1>
+    )
+})
+TypingGreeting.displayName = 'TypingGreeting'
+
+
 // ── Apple-Watch Health Ring ──
-function HealthRing({ score, radius, strokeWidth, color, label, delay = 0, loading = false }) {
+const HealthRing = memo(({ score, radius, strokeWidth, color, label, delay = 0, loading = false }) => {
     const circumference = 2 * Math.PI * radius
     const [animated, setAnimated] = useState(0)
     useEffect(() => {
@@ -67,7 +80,9 @@ function HealthRing({ score, radius, strokeWidth, color, label, delay = 0, loadi
                 style={{ transition: 'stroke-dashoffset 1.5s cubic-bezier(0.4,0,0.2,1)', filter: `drop-shadow(0 0 6px ${color}40)` }} />
         </g>
     )
-}
+})
+HealthRing.displayName = 'HealthRing'
+
 
 // ── Skeleton UI Helper ──
 function Skeleton({ className, circle = false }) {
@@ -172,7 +187,7 @@ function SkeletonBrands() {
 }
 
 // ── Ticker Item ──
-function TickerItem({ icon, value, label, color }) {
+const TickerItem = memo(({ icon, value, label, color }) => {
     return (
         <div className="flex items-center gap-1.5 sm:gap-2.5 px-3 sm:px-5 py-2 sm:py-2.5 shrink-0">
             <span className="material-symbols-outlined text-base sm:text-lg" style={{ color }}>{icon}</span>
@@ -180,7 +195,124 @@ function TickerItem({ icon, value, label, color }) {
             <span className="text-[10px] sm:text-xs md:text-sm text-slate-500 whitespace-nowrap uppercase tracking-tight">{label}</span>
         </div>
     )
-}
+})
+TickerItem.displayName = 'TickerItem'
+
+const AnalyticsSection = memo(({ radar, radarHover, setRadarHover }) => {
+    if (!radar) return null;
+    return (
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 lg:gap-8 items-start">
+            {/* Animated ATS Radar */}
+            <div className="xl:col-span-5 flex flex-col gap-4">
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest border-l-2 border-rose-500 pl-2">Realtime Traffic</p>
+                <div className="flex flex-col sm:flex-row items-center gap-6 sm:gap-8">
+                    <div className="relative shrink-0 w-full max-w-[160px] sm:max-w-[180px] aspect-square">
+                        <svg viewBox="0 0 150 150" className="absolute inset-0 w-full h-full">
+                            <circle cx="75" cy="75" r="68" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="1" />
+                            <circle cx="75" cy="75" r="52" fill="none" stroke="rgba(255,255,255,0.04)" strokeWidth="1" />
+                            <circle cx="75" cy="75" r="36" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="1" />
+                            <circle cx="75" cy="75" r="20" fill="none" stroke="rgba(255,255,255,0.04)" strokeWidth="1" />
+                            <line x1="75" y1="5" x2="75" y2="145" stroke="rgba(255,255,255,0.03)" strokeWidth="0.5" />
+                            <line x1="5" y1="75" x2="145" y2="75" stroke="rgba(255,255,255,0.03)" strokeWidth="0.5" />
+                            <circle cx="75" cy="75" r="68" fill="none" stroke="rgba(244,63,94,0.1)" strokeWidth="1.5" />
+                        </svg>
+                        <svg viewBox="0 0 150 150" className="absolute inset-0 w-full h-full radar-sweep-arm">
+                            <defs>
+                                <linearGradient id="sweepGrad" gradientTransform="rotate(90)">
+                                    <stop offset="0%" stopColor="rgba(244,63,94,0.2)" />
+                                    <stop offset="100%" stopColor="rgba(244,63,94,0)" />
+                                </linearGradient>
+                            </defs>
+                            <path d="M75,75 L75,7 A68,68 0 0,1 139,55 Z" fill="url(#sweepGrad)" />
+                            <line x1="75" y1="75" x2="75" y2="7" stroke="rgba(244,63,94,0.6)" strokeWidth="1.5" />
+                        </svg>
+                        <svg viewBox="0 0 150 150" className="absolute inset-0 w-full h-full">
+                            {radar.sources?.map((src, i) => {
+                                const angle = (i / (radar.sources.length)) * 2 * Math.PI - Math.PI / 2
+                                const dist = 20 + (src.value / 100) * 48
+                                const cx = 75 + Math.cos(angle) * dist
+                                const cy = 75 + Math.sin(angle) * dist
+                                return (
+                                    <g key={i}>
+                                        <circle cx={cx} cy={cy} r={Math.max(3, src.value / 8)} fill={src.color} className="radar-blip"
+                                            style={{ animationDelay: `${i * 400}ms` }} opacity="0.9" />
+                                        <circle cx={cx} cy={cy} r={Math.max(5, src.value / 5)} fill="none" stroke={src.color} strokeWidth="0.5" className="radar-blip"
+                                            style={{ animationDelay: `${i * 400 + 200}ms` }} opacity="0.4" />
+                                    </g>
+                                )
+                            })}
+                            <circle cx="75" cy="75" r="3" fill="#f43f94" />
+                        </svg>
+                    </div>
+                    <div className="flex flex-col gap-2 flex-1 min-w-0">
+                        {radar.sources?.slice(0, 4).map((s, i) => (
+                            <div key={i} className="flex items-center gap-2 cursor-default group/src"
+                                onMouseEnter={() => setRadarHover(`src-${i}`)} onMouseLeave={() => setRadarHover(null)}>
+                                <div className="size-1.5 rounded-full shrink-0 group-hover/src:scale-125 transition-transform" style={{ background: s.color, boxShadow: radarHover === `src-${i}` ? `0 0 8px ${s.color}` : 'none' }} />
+                                <span className={`text-[10px] font-bold truncate transition-colors ${radarHover === `src-${i}` ? 'text-white' : 'text-slate-400'}`}>{s.name}</span>
+                                <span className="text-[10px] font-black text-white ml-auto">{s.value}%</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+
+            {/* Location Bars */}
+            <div className="xl:col-span-3">
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest border-l-2 border-indigo-500 pl-2 mb-4">Top Geos</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-1 gap-3 sm:gap-4">
+                    {radar.locations?.slice(0, 5).map((loc, i) => (
+                        <div key={i} className="group/loc">
+                            <div className="flex justify-between mb-1.5">
+                                <span className="text-[10px] font-bold text-slate-400 group-hover/loc:text-white transition-colors truncate w-20">{loc.name}</span>
+                                <span className="text-[10px] font-black text-white">{loc.value}%</span>
+                            </div>
+                            <div className="h-1 rounded-full bg-white/[0.04] overflow-hidden">
+                                <div className="h-full rounded-full transition-all duration-700 shadow-[0_0_8px_rgba(99,102,241,0.3)]"
+                                    style={{ width: `${loc.value}%`, background: `linear-gradient(90deg, #8b5cf6, #06b6d4)` }} />
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            {/* Audience Split */}
+            <div className="xl:col-span-4 flex flex-col gap-5">
+                <div>
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest border-l-2 border-emerald-500 pl-2 mb-4">Audience Split</p>
+                    <div className="flex h-2.5 rounded-full overflow-hidden gap-0.5 bg-white/[0.02]">
+                        {radar.gender?.map((g, i) => (
+                            <div key={i} className="h-full transition-all duration-500 hover:brightness-125" title={`${g.name}: ${g.value}%`}
+                                style={{ width: `${g.value}%`, background: g.color, borderRadius: i === 0 ? '9999px 0 0 9999px' : i === radar.gender.length - 1 ? '0 9999px 9999px 0' : '0' }} />
+                        ))}
+                    </div>
+                    <div className="flex justify-between mt-3 flex-wrap gap-x-4 gap-y-1">
+                        {radar.gender?.map((g, i) => (
+                            <div key={i} className="flex items-center gap-2">
+                                <div className="size-1.5 rounded-full" style={{ background: g.color }} />
+                                <span className="text-[10px] font-bold text-slate-500">{g.name}</span>
+                                <span className="text-[10px] font-black text-white">{g.value}%</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                    {radar.devices?.map((d, i) => (
+                        <div key={i} className="p-2 sm:p-3 rounded-xl bg-white/[0.02] border border-white/[0.04] text-center hover:bg-white/5 transition-all group/dev">
+                            <span className="material-symbols-outlined text-base group-hover/dev:scale-110 transition-transform block mb-1" style={{ color: d.color }}>
+                                {d.name === 'Mobile' ? 'smartphone' : d.name === 'Desktop' ? 'computer' : 'tablet'}
+                            </span>
+                            <p className="text-[10px] font-black text-white">{d.value}%</p>
+                            <p className="text-[8px] font-bold text-slate-500 uppercase tracking-tighter">{d.name}</p>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </div>
+    )
+})
+AnalyticsSection.displayName = 'AnalyticsSection'
+
 
 // ═════════════════════════════════════════════════════════════════════
 // MAIN DASHBOARD
@@ -218,8 +350,8 @@ export default function UserDashboard() {
 
     const country = activeBrand?.dna?.country || activeBrand?.country || 'India'
     const upcoming = useMemo(() => getUpcomingEvents(country, 14), [country])
-    const greetingText = `${getGreeting()}, ${user?.name?.split(' ')[0] || 'Creator'}`
-    const { displayed: typedGreeting, done: greetingDone } = useTypewriter(greetingText)
+    const greetingText = useMemo(() => `${getGreeting()}, ${user?.name?.split(' ')[0] || 'Creator'}`, [user?.name])
+
 
     // ── Loaders ──
     const loadSummary = useCallback(async () => {
@@ -311,17 +443,34 @@ export default function UserDashboard() {
     }, [activeBrand?._id])
 
     useEffect(() => {
-        loadSummary(); loadTrends(); loadAnalytics()
-        setLoadingD2C(true)
-        shopifyAnalytics.snapshot()
-            .then(d => setD2cSnapshot(d))
-            .catch(err => {
-                setError({ message: err.message, isProviderError: err.isProviderError, provider: err.provider })
-            })
-            .finally(() => setLoadingD2C(false))
-        const interval = setInterval(() => { loadTrends(); loadSummary(); loadAnalytics() }, 30 * 60 * 1000)
+        const loadInitial = async () => {
+            // Tier 1: Summary (Hero + Daily Insight)
+            await loadSummary()
+            
+            // Tier 2: Real-time Analytics & Shopify
+            loadAnalytics()
+            setLoadingD2C(true)
+            shopifyAnalytics.snapshot()
+                .then(d => setD2cSnapshot(d))
+                .catch(err => setError({ message: err.message, isProviderError: err.isProviderError, provider: err.provider }))
+                .finally(() => setLoadingD2C(false))
+
+            // Tier 3: General Trends (last priority)
+            setTimeout(() => loadTrends(), 1000)
+        }
+
+        loadInitial()
+
+        // Background refresh every 60 minutes instead of 30
+        const interval = setInterval(() => { 
+            loadSummary()
+            loadAnalytics()
+            setTimeout(() => loadTrends(), 5000)
+        }, 60 * 60 * 1000)
+        
         return () => clearInterval(interval)
     }, [loadSummary, loadTrends, loadAnalytics])
+
 
     // Redirect to onboarding if no brands found (and not loading)
     useEffect(() => {
@@ -452,11 +601,9 @@ export default function UserDashboard() {
                     <div className="min-w-0">
                         <p className="text-slate-400 text-sm sm:text-base font-medium mb-1">{getDateString()}</p>
                         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-                            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-white tracking-tight truncate">
-                                {typedGreeting}
-                                {!greetingDone && <span className="inline-block w-1.5 h-6 sm:h-8 bg-violet-500 ml-1 rounded-full animate-[cursor-blink_1s_step-end_infinite]" />}
-                            </h1>
+                            <TypingGreeting text={greetingText} />
                             <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 shrink-0">
+
                                 <span className={`size-2 rounded-full bg-emerald-400 animate-pulse`} />
                                 <span className="text-[10px] sm:text-xs font-bold text-emerald-400 uppercase tracking-wider">AI Active</span>
                             </div>
@@ -997,120 +1144,7 @@ export default function UserDashboard() {
                                 )}
                             </div>
 
-                            {/* Charts Row */}
-                            <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 lg:gap-8 items-start">
-                                {/* Animated ATS Radar */}
-                                <div className="xl:col-span-5 flex flex-col gap-4">
-                                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest border-l-2 border-rose-500 pl-2">Realtime Traffic</p>
-                                    <div className="flex flex-col sm:flex-row items-center gap-6 sm:gap-8">
-                                        <div className="relative shrink-0 w-full max-w-[160px] sm:max-w-[180px] aspect-square">
-                                            <svg viewBox="0 0 150 150" className="absolute inset-0 w-full h-full">
-                                                {/* Background rings */}
-                                                <circle cx="75" cy="75" r="68" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="1" />
-                                                <circle cx="75" cy="75" r="52" fill="none" stroke="rgba(255,255,255,0.04)" strokeWidth="1" />
-                                                <circle cx="75" cy="75" r="36" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="1" />
-                                                <circle cx="75" cy="75" r="20" fill="none" stroke="rgba(255,255,255,0.04)" strokeWidth="1" />
-                                                {/* Crosshairs */}
-                                                <line x1="75" y1="5" x2="75" y2="145" stroke="rgba(255,255,255,0.03)" strokeWidth="0.5" />
-                                                <line x1="5" y1="75" x2="145" y2="75" stroke="rgba(255,255,255,0.03)" strokeWidth="0.5" />
-                                                {/* Outer glow ring */}
-                                                <circle cx="75" cy="75" r="68" fill="none" stroke="rgba(244,63,94,0.1)" strokeWidth="1.5" />
-                                            </svg>
-                                            {/* Sweep arm */}
-                                            <svg viewBox="0 0 150 150" className="absolute inset-0 w-full h-full radar-sweep-arm">
-                                                <defs>
-                                                    <linearGradient id="sweepGrad" gradientTransform="rotate(90)">
-                                                        <stop offset="0%" stopColor="rgba(244,63,94,0.2)" />
-                                                        <stop offset="100%" stopColor="rgba(244,63,94,0)" />
-                                                    </linearGradient>
-                                                </defs>
-                                                <path d="M75,75 L75,7 A68,68 0 0,1 139,55 Z" fill="url(#sweepGrad)" />
-                                                <line x1="75" y1="75" x2="75" y2="7" stroke="rgba(244,63,94,0.6)" strokeWidth="1.5" />
-                                            </svg>
-                                            {/* Blips */}
-                                            <svg viewBox="0 0 150 150" className="absolute inset-0 w-full h-full">
-                                                {radar.sources?.map((src, i) => {
-                                                    const angle = (i / (radar.sources.length)) * 2 * Math.PI - Math.PI / 2
-                                                    const dist = 20 + (src.value / 100) * 48
-                                                    const cx = 75 + Math.cos(angle) * dist
-                                                    const cy = 75 + Math.sin(angle) * dist
-                                                    return (
-                                                        <g key={i}>
-                                                            <circle cx={cx} cy={cy} r={Math.max(3, src.value / 8)} fill={src.color} className="radar-blip"
-                                                                style={{ animationDelay: `${i * 400}ms` }} opacity="0.9" />
-                                                            <circle cx={cx} cy={cy} r={Math.max(5, src.value / 5)} fill="none" stroke={src.color} strokeWidth="0.5" className="radar-blip"
-                                                                style={{ animationDelay: `${i * 400 + 200}ms` }} opacity="0.4" />
-                                                        </g>
-                                                    )
-                                                })}
-                                                <circle cx="75" cy="75" r="3" fill="#f43f94" />
-                                            </svg>
-                                        </div>
-                                        <div className="flex flex-col gap-2 flex-1 min-w-0">
-                                            {radar.sources?.slice(0, 4).map((s, i) => (
-                                                <div key={i} className="flex items-center gap-2 cursor-default group/src"
-                                                    onMouseEnter={() => setRadarHover(`src-${i}`)} onMouseLeave={() => setRadarHover(null)}>
-                                                    <div className="size-1.5 rounded-full shrink-0 group-hover/src:scale-125 transition-transform" style={{ background: s.color, boxShadow: radarHover === `src-${i}` ? `0 0 8px ${s.color}` : 'none' }} />
-                                                    <span className={`text-[10px] font-bold truncate transition-colors ${radarHover === `src-${i}` ? 'text-white' : 'text-slate-400'}`}>{s.name}</span>
-                                                    <span className="text-[10px] font-black text-white ml-auto">{s.value}%</span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Location Bars */}
-                                <div className="xl:col-span-3">
-                                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest border-l-2 border-indigo-500 pl-2 mb-4">Top Geos</p>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-1 gap-3 sm:gap-4">
-                                        {radar.locations?.slice(0, 5).map((loc, i) => (
-                                            <div key={i} className="group/loc">
-                                                <div className="flex justify-between mb-1.5">
-                                                    <span className="text-[10px] font-bold text-slate-400 group-hover/loc:text-white transition-colors truncate w-20">{loc.name}</span>
-                                                    <span className="text-[10px] font-black text-white">{loc.value}%</span>
-                                                </div>
-                                                <div className="h-1 rounded-full bg-white/[0.04] overflow-hidden">
-                                                    <div className="h-full rounded-full transition-all duration-700 shadow-[0_0_8px_rgba(99,102,241,0.3)]"
-                                                        style={{ width: `${loc.value}%`, background: `linear-gradient(90deg, #8b5cf6, #06b6d4)` }} />
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                {/* Audience Split */}
-                                <div className="xl:col-span-4 flex flex-col gap-5">
-                                    <div>
-                                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest border-l-2 border-emerald-500 pl-2 mb-4">Audience Split</p>
-                                        <div className="flex h-2.5 rounded-full overflow-hidden gap-0.5 bg-white/[0.02]">
-                                            {radar.gender?.map((g, i) => (
-                                                <div key={i} className="h-full transition-all duration-500 hover:brightness-125" title={`${g.name}: ${g.value}%`}
-                                                    style={{ width: `${g.value}%`, background: g.color, borderRadius: i === 0 ? '9999px 0 0 9999px' : i === radar.gender.length - 1 ? '0 9999px 9999px 0' : '0' }} />
-                                            ))}
-                                        </div>
-                                        <div className="flex justify-between mt-3 flex-wrap gap-x-4 gap-y-1">
-                                            {radar.gender?.map((g, i) => (
-                                                <div key={i} className="flex items-center gap-2">
-                                                    <div className="size-1.5 rounded-full" style={{ background: g.color }} />
-                                                    <span className="text-[10px] font-bold text-slate-500">{g.name}</span>
-                                                    <span className="text-[10px] font-black text-white">{g.value}%</span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                    <div className="grid grid-cols-3 gap-2">
-                                        {radar.devices?.map((d, i) => (
-                                            <div key={i} className="p-2 sm:p-3 rounded-xl bg-white/[0.02] border border-white/[0.04] text-center hover:bg-white/5 transition-all group/dev">
-                                                <span className="material-symbols-outlined text-base group-hover/dev:scale-110 transition-transform block mb-1" style={{ color: d.color }}>
-                                                    {d.name === 'Mobile' ? 'smartphone' : d.name === 'Desktop' ? 'computer' : 'tablet'}
-                                                </span>
-                                                <p className="text-[10px] font-black text-white">{d.value}%</p>
-                                                <p className="text-[8px] font-bold text-slate-500 uppercase tracking-tighter">{d.name}</p>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
+                            <AnalyticsSection radar={radar} radarHover={radarHover} setRadarHover={setRadarHover} />
 
                             {/* CTA hint */}
                             <div className="mt-4 pt-3 border-t border-white/[0.04] flex items-center justify-center gap-2 text-sm text-slate-500 group-hover:text-primary transition-colors">
@@ -1119,6 +1153,8 @@ export default function UserDashboard() {
                             </div>
                         </div>
                     )}
+
+
 
                     {/* ── 5. INTELLIGENCE HUB (TABBED) ── */}
                     <div className="glass-panel rounded-2xl border border-white/[0.06] overflow-hidden anim-slide-up" style={{ animationDelay: '350ms' }}>

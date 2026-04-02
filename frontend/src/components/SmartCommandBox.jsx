@@ -42,15 +42,19 @@ export default function SmartCommandBox({ variant = 'dashboard', className = '' 
         }
     }, [])
 
-    // Auto-scroll chat (locally scoped to container)
     useEffect(() => {
         if (scrollContainerRef.current) {
-            scrollContainerRef.current.scrollTo({
-                top: scrollContainerRef.current.scrollHeight,
-                behavior: 'smooth'
+            requestAnimationFrame(() => {
+                if (scrollContainerRef.current) {
+                    scrollContainerRef.current.scrollTo({
+                        top: scrollContainerRef.current.scrollHeight,
+                        behavior: 'smooth'
+                    })
+                }
             })
         }
     }, [history, loading])
+
 
     // ===== Voice Recording =====
     const startRecording = useCallback(async () => {

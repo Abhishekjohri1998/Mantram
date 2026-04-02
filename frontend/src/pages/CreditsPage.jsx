@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from 'react'
 import DashboardLayout from '../components/DashboardLayout'
 import SEOHead from '../components/SEOHead'
 import { credits as creditsAPI, payments as paymentsAPI, rewards as rewardsAPI } from '../services/api'
+import { useRazorpay } from '../hooks/useRazorpay'
+
 
 const ACTION_ICONS = {
     content: 'edit_note', contentRefine: 'auto_fix',
@@ -85,6 +87,8 @@ export default function CreditsPage() {
     // Checkout Modal state
     const [showCheckout, setShowCheckout] = useState(false)
     const [checkoutItem, setCheckoutItem] = useState(null) // { type: 'topup' | 'subscription', ...item }
+    const { loadRazorpay } = useRazorpay()
+
 
 
     useEffect(() => { loadSummary(); loadUsage(); loadStoreVisibility(); loadSubStatus() }, [])
@@ -197,9 +201,11 @@ export default function CreditsPage() {
                 prefill: { name: summary?.userName, email: summary?.userEmail },
                 theme: { color: '#2b4bee' }
             }
-            const rzp = new window.Razorpay(options)
+            const Razorpay = await loadRazorpay()
+            const rzp = new Razorpay(options)
             rzp.open()
         } catch (e) { alert('Failed to initialize payment: ' + e.message) }
+
     }
 
     const handleCancelSubscription = async () => {
@@ -262,9 +268,11 @@ export default function CreditsPage() {
                 prefill: { name: summary?.userName, email: summary?.userEmail },
                 theme: { color: '#f59e0b' }
             }
-            const rzp = new window.Razorpay(options)
+            const Razorpay = await loadRazorpay()
+            const rzp = new Razorpay(options)
             rzp.open()
         } catch (e) { alert('Failed to initialize top-up: ' + e.message) }
+
     }
 
     const handleClaimMilestone = async (id) => {
