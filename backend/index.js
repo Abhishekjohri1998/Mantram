@@ -292,6 +292,19 @@ app.use('/api/retention-studio', retentionStudioRoutes);
 app.use((err, req, res, next) => {
     console.error('Server Error:', err.stack);
     
+    // Ensure CORS headers are present even on errors
+    const origin = req.headers.origin;
+    if (origin && !res.getHeader('Access-Control-Allow-Origin')) {
+        const isAllowed = HARDCODED_ORIGINS.some(o => o.toLowerCase() === origin.toLowerCase()) || 
+                         origin.toLowerCase().includes('mantram.ai') ||
+                         origin.toLowerCase().includes('localhost');
+        
+        if (isAllowed) {
+            res.setHeader('Access-Control-Allow-Origin', origin);
+            res.setHeader('Access-Control-Allow-Credentials', 'true');
+        }
+    }
+    
     const response = {
         success: false,
         error: config.nodeEnv === 'development' ? err.message : 'Server Error',

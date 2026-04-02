@@ -29,7 +29,8 @@ export function safeErrorMessage(error, fallback = 'Internal server error') {
         return error.message;
     }
 
-    const msg = error?.message || '';
+    // Cast to string safely to avoid .toLowerCase() crashes on objects
+    const msg = String(error?.message || error || '');
 
     // Always show real error in development
     if (nodeEnv === 'development') {
