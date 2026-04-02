@@ -109,7 +109,11 @@ export function BrandProvider({ children }) {
                 // On initial load, restore last active page for this brand
                 if (!initializedRef.current) {
                     const session = restoreSession(brandToActivate._id);
-                    if (session.lastActivePage && session.lastActivePage !== window.location.pathname) {
+                    const currentPath = window.location.pathname;
+                    if (session.lastActivePage && 
+                        session.lastActivePage !== currentPath && 
+                        !currentPath.startsWith('/onboarding') && 
+                        !currentPath.startsWith('/auth')) {
                         console.log(`🔁 Resuming brand "${brandToActivate.name}" at: ${session.lastActivePage}`);
                         navigate(session.lastActivePage, { replace: true });
                     }

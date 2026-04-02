@@ -65,41 +65,46 @@ const HARDCODED_ORIGINS = [
 
 const app = express();
 
+// ── CORS CONFIGURATION ────────────────────────────────────────
+const corsOptions = {
+    origin: (origin, callback) => {
+        if (!origin) return callback(null, true);
+        const cleanOrigin = origin.toLowerCase().replace(/\/$/, '');
+        const envOrigins = (config.frontendUrl || []).map(u => u.toLowerCase().replace(/\/$/, ''));
+        const allowedOrigins = [...new Set([...HARDCODED_ORIGINS.map(u => u.toLowerCase()), ...envOrigins])];
+        
+        if (allowedOrigins.includes(cleanOrigin) || cleanOrigin.endsWith('mantram.ai') || cleanOrigin.includes('mantram.ai')) {
+            return callback(null, true);
+        }
+        console.error(`❌ CORS Rejected: "${origin}" not in allowed list.`);
+        return callback(null, false);
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin', 'Cache-Control', 'Pragma'],
+    optionsSuccessStatus: 200,
+};
+
+app.use(cors(corsOptions));
+
 // Trust proxy for rate limiting behind Nginx
 app.set('trust proxy', 1);
 
-// ── ABSOLUTE TOP-LEVEL DIAGNOSTICS ────────────────────────────
+// ── TOP-LEVEL DIAGNOSTICS & LOGGING ───────────────────────────
 app.use((req, res, next) => {
-    const origin = req.headers.origin || 'none';
     const path = req.path.toLowerCase();
-    
-    // Detect bot scans and common vulnerabilities
     req.isBotScan = [
         '.php', '.xml', 'wp-admin', 'vendor', 'phpunit', '.env', '.git', 
         'boaform', 'shell', 'cgi-bin', 'autodiscover', 'config', 'admin'
     ].some(p => path.includes(p.toLowerCase()));
 
-    if (!req.isBotScan && path !== '/api/health' && path !== '/health' && path !== '/favicon.ico' && path !== '/robots.txt') {
-        console.log(`[INCOMING] ${req.method} ${req.path} | Origin: ${origin} | User-Agent: ${req.headers['user-agent']}`);
+    if (!req.isBotScan && !['/api/health', '/health', '/favicon.ico', '/robots.txt'].includes(path)) {
+        console.log(`[INCOMING] ${req.method} ${req.path} | Origin: ${req.headers.origin || 'none'}`);
     }
-    
-    // Immediate CORS Force for mantram.ai
-    if (origin && (origin.toLowerCase().endsWith('mantram.ai') || origin.toLowerCase().includes('mantram.ai'))) {
-        res.setHeader('Access-Control-Allow-Origin', origin);
-        res.setHeader('Access-Control-Allow-Credentials', 'true');
-        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin, Cache-Control, Pragma');
-    }
-    
-    // Immediate OPTIONS Intercept
-    if (req.method === 'OPTIONS') {
-        return res.status(200).end();
-    }
-    
-    // Start time for AI budgeting
     req.startTime = Date.now();
     next();
 });
+
 
 // Alias for health checks
 // ── HEALTH & LOG HYGIENE ──────────────────────────────────────
@@ -192,32 +197,8 @@ connectDB().then(() => {
     console.error('❌ Critical failure during background agent initialization:', err.message);
 });
 
-const corsOptions = {
-    origin: (origin, callback) => {
-        if (!origin) return callback(null, true);
-
-        const cleanOrigin = origin.toLowerCase().replace(/\/$/, '');
-        const envOrigins = (config.frontendUrl || []).map(u => u.toLowerCase().replace(/\/$/, ''));
-        const allowedOrigins = [...new Set([...HARDCODED_ORIGINS.map(u => u.toLowerCase()), ...envOrigins])];
-
-        const isAllowed = allowedOrigins.includes(cleanOrigin);
-        const isMantram = cleanOrigin.endsWith('mantram.ai') || cleanOrigin.includes('mantram.ai');
-
-        if (isAllowed || isMantram) {
-            return callback(null, true);
-        }
-
-        console.error(`❌ CORS Rejected: "${origin}" not in allowed list.`);
-        return callback(null, false);
-    },
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
-    optionsSuccessStatus: 200,
-};
-
 // Use the standard CORS package as a fallback but our brute-force above should catch most
-app.use(cors(corsOptions));
+
 
 // Special middleware for Shopify Webhooks
 app.use('/api/shopify/webhooks', express.raw({ type: '*/*', limit: '50mb' }), (req, res, next) => {

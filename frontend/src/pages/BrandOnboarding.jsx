@@ -1244,20 +1244,13 @@ export default function BrandOnboarding() {
     const [loadingCount, setLoadingCount] = useState(true)
     const scanUrlParam = searchParams.get('scanUrl') || ''
 
-    // Safety Guard: If user already has brands, redirect to dashboard
-    // This ensures invited members or existing owners don't stay on onboarding.
+    // Safety Guard: Allow users to stay on onboarding if they explicitly nav here
+    // ProtectedRoute.jsx handles forcing 0-brand users to onboarding.
     useEffect(() => {
-        if (!authLoading && user) {
-            const hasBrands = (user.brandCount ?? 0) > 0;
-            if (hasBrands) {
-                navigate('/dashboard', { replace: true });
-            } else {
-                setLoadingCount(false);
-            }
-        } else if (!authLoading && !isAuthenticated) {
+        if (!authLoading) {
             setLoadingCount(false);
         }
-    }, [user, authLoading, isAuthenticated, navigate]);
+    }, [authLoading]);
 
     // Brand limits are removed for all users
     const maxBrands = Infinity
