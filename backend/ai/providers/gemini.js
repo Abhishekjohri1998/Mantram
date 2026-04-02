@@ -49,12 +49,29 @@ export class GeminiProvider extends BaseProvider {
                 
                 // Add images for Vertex SDK
                 for (const img of images) {
+                    let mimeType = 'image/jpeg';
+                    let b64Data = '';
+                    
                     if (img.startsWith('data:')) {
                         const match = img.match(/^data:([\w/+]+);base64,(.+)$/);
-                        if (match) parts.push({ inlineData: { mimeType: match[1], data: match[2] } });
+                        if (match) {
+                            mimeType = match[1];
+                            b64Data = match[2];
+                        }
                     } else if (img.startsWith('http')) {
-                        // SDK doesn't fetch URLs automatically, we let the existing logic handle it if needed
-                        // But for simplicity in Vertex branch, we only support base64 here
+                        try {
+                            console.log(`📥 [Vertex] Fetching image URL: ${img.substring(0, 100)}...`);
+                            const r = await fetch(img);
+                            const arr = await r.arrayBuffer();
+                            b64Data = Buffer.from(arr).toString('base64');
+                            mimeType = r.headers.get('content-type') || 'image/jpeg';
+                        } catch (e) {
+                            console.warn('⚠️ [Vertex] Failed to fetch image URL:', e.message);
+                        }
+                    }
+                    
+                    if (b64Data) {
+                        parts.push({ inlineData: { mimeType, data: b64Data } });
                     }
                 }
 
@@ -250,9 +267,27 @@ export class GeminiProvider extends BaseProvider {
                 const vModel = this.vertexAi.getGenerativeModel({ model: modelId });
                 const parts = [];
                 
+                // Process imageParts (usually contains prompt text + base64/URLs)
                 for (const ip of imageParts) {
-                    if (ip.inlineData) parts.push({ inlineData: ip.inlineData });
-                    if (ip.text) parts.push({ text: ip.text });
+                    if (ip.inlineData) {
+                        parts.push({ inlineData: ip.inlineData });
+                    } else if (ip.text) {
+                        parts.push({ text: ip.text });
+                    } else if (ip.imageUrl) {
+                        // Handle raw URL in imageParts
+                        try {
+                            const r = await fetch(ip.imageUrl);
+                            const arr = await r.arrayBuffer();
+                            parts.push({ 
+                                inlineData: { 
+                                    mimeType: r.headers.get('content-type') || 'image/jpeg',
+                                    data: Buffer.from(arr).toString('base64')
+                                } 
+                            });
+                        } catch (e) {
+                            console.warn('⚠️ [Vertex Image] Failed to fetch part URL:', e.message);
+                        }
+                    }
                 }
                 
                 const arInstruction = aspectRatio !== '1:1' ? `\n\n[ASPECT RATIO: ${aspectRatio}]` : '';

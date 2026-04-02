@@ -66,14 +66,21 @@ const HARDCODED_ORIGINS = [
 const app = express();
 
 // ── CORS CONFIGURATION ────────────────────────────────────────
+const isOriginAllowed = (origin) => {
+    if (!origin) return true;
+    const cleanOrigin = origin.toLowerCase().replace(/\/$/, '');
+    const envOrigins = (config.frontendUrl || []).map(u => u.toLowerCase().replace(/\/$/, ''));
+    const allowedOrigins = [...new Set([...HARDCODED_ORIGINS.map(u => u.toLowerCase()), ...envOrigins])];
+    
+    return allowedOrigins.includes(cleanOrigin) || 
+           cleanOrigin.endsWith('mantram.ai') || 
+           cleanOrigin.includes('localhost') ||
+           /\.mantram\.ai$/.test(cleanOrigin); 
+};
+
 const corsOptions = {
     origin: (origin, callback) => {
-        if (!origin) return callback(null, true);
-        const cleanOrigin = origin.toLowerCase().replace(/\/$/, '');
-        const envOrigins = (config.frontendUrl || []).map(u => u.toLowerCase().replace(/\/$/, ''));
-        const allowedOrigins = [...new Set([...HARDCODED_ORIGINS.map(u => u.toLowerCase()), ...envOrigins])];
-        
-        if (allowedOrigins.includes(cleanOrigin) || cleanOrigin.endsWith('mantram.ai') || cleanOrigin.includes('mantram.ai')) {
+        if (isOriginAllowed(origin)) {
             return callback(null, true);
         }
         console.error(`❌ CORS Rejected: "${origin}" not in allowed list.`);
@@ -83,6 +90,7 @@ const corsOptions = {
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin', 'Cache-Control', 'Pragma'],
     optionsSuccessStatus: 200,
+    maxAge: 86400, // Cache preflight for 24h
 };
 
 app.use(cors(corsOptions));
@@ -294,18 +302,11 @@ app.use((err, req, res, next) => {
     
     // Ensure CORS headers are present even on errors
     const origin = req.headers.origin;
-    if (origin) {
-        const cleanOrigin = origin.toLowerCase().replace(/\/$/, '');
-        const isAllowed = HARDCODED_ORIGINS.some(o => o.toLowerCase().replace(/\/$/, '') === cleanOrigin) || 
-                         cleanOrigin.endsWith('mantram.ai') ||
-                         cleanOrigin.includes('localhost');
-        
-        if (isAllowed) {
-            res.setHeader('Access-Control-Allow-Origin', origin);
-            res.setHeader('Access-Control-Allow-Credentials', 'true');
-            res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-            res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin, Cache-Control, Pragma');
-        }
+    if (origin && isOriginAllowed(origin)) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+        res.setHeader('Access-Control-Allow-Credentials', 'true');
+        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin, Cache-Control, Pragma');
     }
 
     
