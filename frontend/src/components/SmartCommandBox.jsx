@@ -20,6 +20,7 @@ export default function SmartCommandBox({ variant = 'dashboard', className = '' 
     const [recordingTime, setRecordingTime] = useState(0)
     const [audioLevel, setAudioLevel] = useState(0)
     const [attachedImages, setAttachedImages] = useState([]) // Array of { file, preview, base64 }
+    const [generatingImage, setGeneratingImage] = useState(null)
     const inputRef = useRef(null)
     const fileInputRef = useRef(null)
     const chatEndRef = useRef(null)
