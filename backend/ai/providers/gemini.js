@@ -1,4 +1,5 @@
 import { BaseProvider } from './base.js';
+import { VertexAI } from '@google-cloud/vertexai';
 
 
 /**
@@ -11,12 +12,75 @@ export class GeminiProvider extends BaseProvider {
         super(config);
         this.name = 'gemini';
         this.baseUrl = 'https://generativelanguage.googleapis.com/v1beta';
+        
         // Dedicated image generation key (billed) — falls back to main key
         this.imageApiKey = config.imageApiKey || this.apiKey;
+
+        // ── GCP VERTEX AI INTEGRATION (BILLED) ───────────────────────
+        // If credentials and project are provided, initialize the Vertex SDK
+        // This directs traffic to your Google Cloud Project billing credits.
+        const gcpProject = config.gcpProjectId || process.env.GCP_PROJECT_ID;
+        const gcpCreds = config.googleApplicationCredentials || process.env.GOOGLE_APPLICATION_CREDENTIALS;
+
+        if (gcpProject && gcpCreds) {
+            try {
+                this.vertexAi = new VertexAI({
+                    project: gcpProject,
+                    location: config.gcpLocation || process.env.GCP_LOCATION || 'us-central1'
+                });
+                console.log(`🚀 [Gemini] Vertex AI initialized (Billed Project: ${gcpProject})`);
+            } catch (err) {
+                console.error(`❌ [Gemini] Failed to initialize Vertex AI:`, err.message);
+                // Fallback to API Key is handled implicitly by check in generate methods
+            }
+        }
     }
 
     async generateText({ systemPrompt, userPrompt, temperature = 0.7, maxTokens = 2048, model, images = [] }) {
         const modelId = model || this.config.defaultModel || 'gemini-2.5-flash';
+
+        // --- BRANCH: VERTEX AI SDK (BILLED CREDITS) ---
+        if (this.vertexAi) {
+            try {
+                const startTime = Date.now();
+                const vModel = this.vertexAi.getGenerativeModel({ model: modelId });
+                
+                const parts = [{ text: `${systemPrompt}\n\n${userPrompt}` }];
+                
+                // Add images for Vertex SDK
+                for (const img of images) {
+                    if (img.startsWith('data:')) {
+                        const match = img.match(/^data:([\w/+]+);base64,(.+)$/);
+                        if (match) parts.push({ inlineData: { mimeType: match[1], data: match[2] } });
+                    } else if (img.startsWith('http')) {
+                        // SDK doesn't fetch URLs automatically, we let the existing logic handle it if needed
+                        // But for simplicity in Vertex branch, we only support base64 here
+                    }
+                }
+
+                const result = await vModel.generateContent({
+                    contents: [{ role: 'user', parts }],
+                    generationConfig: { temperature, maxOutputTokens: maxTokens }
+                });
+
+                const response = result.response;
+                const text = response.candidates[0].content.parts[0].text;
+                const tokensUsed = response.usageMetadata?.totalTokenCount || 0;
+
+                return {
+                    text,
+                    tokensUsed,
+                    model: modelId,
+                    provider: 'gemini',
+                    generationTime: Date.now() - startTime,
+                };
+            } catch (err) {
+                console.warn(`⚠️ Vertex AI failed, falling back to API Key:`, err.message);
+                // Fall through to legacy API Key logic
+            }
+        }
+
+        // --- BRANCH: REST API (API KEY) ---
         const url = `${this.baseUrl}/models/${modelId}:generateContent?key=${this.apiKey}`;
         
         const parts = [{ text: `${systemPrompt}\n\n${userPrompt}` }];
@@ -178,26 +242,69 @@ export class GeminiProvider extends BaseProvider {
      */
     async generateImage({ prompt, aspectRatio = '1:1', model, imageParts = [] }) {
         const startTime = Date.now();
-        const imageKey = this.imageApiKey;
         const modelId = model || this.config.defaultImageModel || 'gemini-3.1-flash-image-preview';
 
+        // --- BRANCH: VERTEX AI SDK (BILLED CREDITS) ---
+        if (this.vertexAi) {
+            try {
+                const vModel = this.vertexAi.getGenerativeModel({ model: modelId });
+                const parts = [];
+                
+                for (const ip of imageParts) {
+                    if (ip.inlineData) parts.push({ inlineData: ip.inlineData });
+                    if (ip.text) parts.push({ text: ip.text });
+                }
+                
+                const arInstruction = aspectRatio !== '1:1' ? `\n\n[ASPECT RATIO: ${aspectRatio}]` : '';
+                parts.push({ text: prompt + arInstruction });
+
+                const result = await vModel.generateContent({
+                    contents: [{ role: 'user', parts }],
+                    generationConfig: {
+                        responseModalities: ['TEXT', 'IMAGE'],
+                        temperature: 0.4,
+                    }
+                });
+
+                const resParts = result.response.candidates[0].content.parts || [];
+                let imageUrl = null;
+                for (const part of resParts) {
+                    if (part.inlineData?.mimeType?.startsWith('image/')) {
+                        imageUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+                        break;
+                    }
+                }
+
+                if (imageUrl) {
+                    return {
+                        imageUrl,
+                        model: modelId,
+                        provider: 'gemini',
+                        generationTime: Date.now() - startTime,
+                    };
+                }
+            } catch (err) {
+                console.warn(`⚠️ Vertex AI Image generation failed, falling back to API Key:`, err.message);
+            }
+        }
+
+        // --- BRANCH: REST API (API KEY) ---
+        const imageKey = this.imageApiKey;
         console.log(`\n══════ GEMINI IMAGE GENERATION (${modelId}) ══════`);
         console.log(`📐 Aspect Ratio: ${aspectRatio}`);
         console.log(`📝 Prompt: ${prompt.substring(0, 100)}...`);
 
         try {
-            // Modern models (Flash 2.5, Flash 3.1 Preview, etc.) use generateContent
+            // Modern models (Flash 2.0/1.5/3.1, etc.) use generateContent
             if (modelId.includes('flash') || modelId.includes('pro') || modelId.includes('preview')) {
                 const url = `${this.baseUrl}/models/${modelId}:generateContent?key=${imageKey}`;
                 
-                // Build content parts
                 const parts = [];
                 for (const ip of imageParts) {
                     if (ip.inlineData) parts.push({ inlineData: ip.inlineData });
                     if (ip.text) parts.push({ text: ip.text });
                 }
                 
-                // Append aspect ratio instruction to prompt if needed
                 const arInstruction = aspectRatio !== '1:1' ? `\n\n[ASPECT RATIO: ${aspectRatio}]` : '';
                 parts.push({ text: prompt + arInstruction });
 
@@ -218,12 +325,7 @@ export class GeminiProvider extends BaseProvider {
                 if (data.error) {
                     const errMsg = data.error.message || JSON.stringify(data.error);
                     const lowerMsg = String(errMsg).toLowerCase();
-                    const isBusy = lowerMsg.includes('high demand') || 
-                                   lowerMsg.includes('busy') || 
-                                   response.status === 503 || 
-                                   response.status === 429;
-                    
-                    if (isBusy) {
+                    if (lowerMsg.includes('high demand') || lowerMsg.includes('busy') || response.status === 503 || response.status === 429) {
                         throw new Error(`BUSY: ${errMsg}`);
                     }
                     throw new Error(`Gemini Image Error: ${errMsg}`);
@@ -248,7 +350,6 @@ export class GeminiProvider extends BaseProvider {
                 }
                 throw new Error('Gemini returned no image in response');
             } 
-            
             // Legacy Imagen models use predict endpoint
             else {
                 const url = `${this.baseUrl}/models/${modelId}:predict?key=${imageKey}`;

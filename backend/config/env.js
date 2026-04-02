@@ -35,6 +35,10 @@ export default {
             gemini: {
                 apiKey: process.env.GEMINI_API_KEY,
                 imageApiKey: process.env.GEMINI_IMAGE_API_KEY || process.env.GEMINI_API_KEY,
+                // GCP Vertex AI (Billed)
+                gcpProjectId: process.env.GCP_PROJECT_ID,
+                gcpLocation: process.env.GCP_LOCATION || 'us-central1',
+                googleApplicationCredentials: process.env.GOOGLE_APPLICATION_CREDENTIALS,
             },
             openai: { apiKey: process.env.OPENAI_API_KEY },
             anthropic: { apiKey: process.env.ANTHROPIC_API_KEY },

@@ -11,6 +11,7 @@
         "@aws-sdk/client-s3": "^3.1004.0",
         "@aws-sdk/lib-storage": "^3.1004.0",
         "@ffmpeg-installer/ffmpeg": "^1.1.0",
+        "@google-cloud/vertexai": "^1.10.4",
         "@google/genai": "^1.44.0",
         "axios": "^1.13.6",
         "bcryptjs": "^3.0.3",
@@ -31,6 +32,7 @@
         "jsonwebtoken": "^9.0.3",
         "mongoose": "^9.2.2",
         "multer": "^2.0.2",
+        "node-fetch": "^3.3.2",
         "nodemailer": "^8.0.1",
         "pdf-parse": "^2.4.5",
         "playwright": "^1.58.2",
@@ -38,7 +40,6 @@
         "razorpay": "^2.9.6",
         "rss-parser": "^3.13.0",
         "sharp": "^0.34.5",
-        "stripe": "^20.4.1",
-        "node-fetch": "^3.3.2"
+        "stripe": "^20.4.1"
     }
 }
