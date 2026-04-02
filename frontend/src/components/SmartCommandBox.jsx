@@ -19,9 +19,9 @@ export default function SmartCommandBox({ variant = 'dashboard', className = '' 
     const [transcribing, setTranscribing] = useState(false)
     const [recordingTime, setRecordingTime] = useState(0)
     const [audioLevel, setAudioLevel] = useState(0)
-    const [generatingImage, setGeneratingImage] = useState(null) // index of message being generated
-
+    const [attachedImages, setAttachedImages] = useState([]) // Array of { file, preview, base64 }
     const inputRef = useRef(null)
+    const fileInputRef = useRef(null)
     const chatEndRef = useRef(null)
     const scrollContainerRef = useRef(null)
     const mediaRecorderRef = useRef(null)
@@ -269,7 +269,9 @@ export default function SmartCommandBox({ variant = 'dashboard', className = '' 
                 history: newHistory.slice(-10),
                 brandId: activeBrand?._id || null,
                 brand: activeBrand ? { name: activeBrand.name, dna: activeBrand.dna, knowledge: activeBrand.knowledge } : null,
+                referenceImages: attachedImages.map(img => img.base64),
             })
+            setAttachedImages([]) // Clear attachments on send
 
             if (data.success) {
                 if (data.type === 'navigate' && (data.data?.path || data.path)) {
@@ -302,6 +304,35 @@ export default function SmartCommandBox({ variant = 'dashboard', className = '' 
 
     const clearChat = () => { setHistory([]); setExpanded(false); setInput('') }
     const formatTime = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
+
+    // ===== Attachment Handlers =====
+    const handleFileSelect = (e) => {
+        const files = Array.from(e.target.files)
+        if (!files.length) return
+
+        files.forEach(file => {
+            if (attachedImages.length >= 5) return // Max 5 images
+            const reader = new FileReader()
+            reader.onloadend = () => {
+                setAttachedImages(prev => [...prev, {
+                    file,
+                    preview: URL.createObjectURL(file),
+                    base64: reader.result
+                }])
+            }
+            reader.readAsDataURL(file)
+        })
+        e.target.value = null // Reset input
+    }
+
+    const removeAttachment = (idx) => {
+        setAttachedImages(prev => {
+            const newAtt = [...prev]
+            URL.revokeObjectURL(newAtt[idx].preview)
+            newAtt.splice(idx, 1)
+            return newAtt
+        })
+    }
 
     const placeholders = variant === 'brainstorm'
         ? ["Tell me what you want to create...", "Try: 'Diwali campaign ideas'", "Try: 'Name my new product'"]
@@ -500,6 +531,47 @@ export default function SmartCommandBox({ variant = 'dashboard', className = '' 
                                             </div>
                                         )}
 
+                                        {/* ── VIDEO RESULT ── */}
+                                        {msg.intent === 'video' && msg.data?.prompt && (
+                                            <div className="mb-3 space-y-3">
+                                                {/* Video player if generated */}
+                                                {(msg.generatedVideo || msg.data?.videoUrl) && (
+                                                    <div className="rounded-xl overflow-hidden border border-white/10 shadow-lg bg-black/20 aspect-video">
+                                                        <video 
+                                                            src={msg.generatedVideo || msg.data.videoUrl} 
+                                                            controls 
+                                                            className="size-full object-contain"
+                                                        />
+                                                    </div>
+                                                )}
+
+                                                {/* Prompt details */}
+                                                <div className="p-3.5 rounded-xl bg-blue-500/[0.06] border border-blue-500/15 space-y-2">
+                                                    <div className="flex items-start gap-2">
+                                                        <span className="material-symbols-outlined text-blue-400 text-xs mt-0.5">movie</span>
+                                                        <div>
+                                                            <span className="text-[10px] font-bold text-blue-400/70 uppercase tracking-wider">Video Prompt</span>
+                                                            <p className="text-sm text-white font-medium">{msg.data.prompt}</p>
+                                                        </div>
+                                                    </div>
+                                                    {msg.data.duration && (
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="material-symbols-outlined text-blue-400 text-xs">timer</span>
+                                                            <span className="text-xs text-slate-300">Duration: {msg.data.duration}s</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* Action buttons */}
+                                                <div className="flex flex-wrap gap-2">
+                                                    <button onClick={() => navigate(`/creative-studio?prompt=${encodeURIComponent(msg.data.prompt)}&video=true`)}
+                                                        className="flex items-center gap-1.5 text-[11px] px-4 py-2 rounded-lg bg-blue-500 text-white font-bold hover:bg-blue-600 cursor-pointer transition-all shadow-lg shadow-blue-500/20">
+                                                        <span className="material-symbols-outlined text-xs">palette</span> Open in Creative Studio
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
+
                                         {/* ── NAVIGATION ── */}
                                         {msg.type === 'navigate' && msg.path && (
                                             <button onClick={() => navigate(msg.path)}
@@ -572,6 +644,22 @@ export default function SmartCommandBox({ variant = 'dashboard', className = '' 
                             </div>
                         )}
 
+                        {/* Attachment Previews */}
+                        {attachedImages.length > 0 && (
+                            <div className="flex flex-wrap gap-2 px-3 pb-2 animate-fade-in">
+                                {attachedImages.map((img, idx) => (
+                                    <div key={idx} className="relative group size-14 rounded-lg overflow-hidden border border-white/20 shadow-lg">
+                                        <img src={img.preview} alt="Attachment" className="size-full object-cover" />
+                                        <button 
+                                            onClick={() => removeAttachment(idx)}
+                                            className="absolute top-0.5 right-0.5 size-5 rounded-full bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                                            <span className="material-symbols-outlined text-[12px]">close</span>
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
                         <input
                             ref={inputRef}
                             type="text"
@@ -584,6 +672,25 @@ export default function SmartCommandBox({ variant = 'dashboard', className = '' 
                             className={`flex-1 bg-transparent text-white text-sm placeholder-slate-500 outline-none ${expanded ? 'px-3 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.08] focus:border-primary/30' : ''
                                 }`}
                         />
+
+                        {/* Hidden File Input */}
+                        <input 
+                            ref={fileInputRef}
+                            type="file"
+                            multiple
+                            accept="image/*"
+                            className="hidden"
+                            onChange={handleFileSelect}
+                        />
+
+                        {/* Attach Image Button */}
+                        <button 
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={loading || recording || attachedImages.length >= 5}
+                            className="flex-shrink-0 p-2.5 rounded-xl bg-white/[0.04] text-slate-400 border border-white/[0.08] hover:bg-primary/10 hover:text-primary hover:border-primary/20 transition-all cursor-pointer disabled:opacity-50"
+                            title="Attach images (@image1, @image2...)">
+                            <span className="material-symbols-outlined text-lg">image</span>
+                        </button>
 
                         {/* Mic */}
                         <button onClick={recording ? stopRecording : startRecording} disabled={loading || transcribing}

@@ -835,18 +835,19 @@ Bold, ${moodPhrase} visual suitable for advertising and social media. ${ratioPhr
 
                 if (data.error) {
                     const errMsg = data.error.message || JSON.stringify(data.error);
+                    const lowerMsg = String(errMsg).toLowerCase();
                     console.error(`Model ${selectedModelId} error:`, errMsg);
                     // Return descriptive error instead of generic 500
-                    if (errMsg.toLowerCase().includes('high demand') || errMsg.toLowerCase().includes('busy') || response.status === 503 || response.status === 429) {
+                    if (lowerMsg.includes('high demand') || lowerMsg.includes('busy') || response.status === 503 || response.status === 429) {
                         return res.status(200).json({ success: false, modelBusy: true, error: `${modelCfg.name} is currently busy with high demand. Please try again or switch to a different model.` });
                     }
-                    if (errMsg.toLowerCase().includes('safety') || errMsg.toLowerCase().includes('blocked') || errMsg.toLowerCase().includes('harmful')) {
+                    if (lowerMsg.includes('safety') || lowerMsg.includes('blocked') || lowerMsg.includes('harmful')) {
                         return res.status(200).json({ success: false, error: `Content policy: ${errMsg.substring(0, 200)}. Try adjusting your photoshoot description.` });
                     }
-                    if (errMsg.toLowerCase().includes('too long') || errMsg.toLowerCase().includes('token')) {
+                    if (lowerMsg.includes('too long') || lowerMsg.includes('token')) {
                         return res.status(200).json({ success: false, error: `Prompt too long. Please shorten your description and try again.` });
                     }
-                    if (errMsg.toLowerCase().includes('no longer available') || errMsg.toLowerCase().includes('not found')) {
+                    if (lowerMsg.includes('no longer available') || lowerMsg.includes('not found')) {
                         return res.status(200).json({ success: false, error: `${modelCfg.name} model is temporarily unavailable. Please switch to a different model.` });
                     }
                     throw new Error(errMsg);

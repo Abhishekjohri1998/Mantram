@@ -600,6 +600,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
                     resolution: '1080p',
                     aspectRatio: animateAspectRatio,
                     firstImageUrl: imageUrl,
+                    referenceImages: imageUrl ? [imageUrl] : [], // Pass as @image1
                     generateAudio: true,
                     qualityMode: 'fast',
                     brandId: activeBrand?._id || null,

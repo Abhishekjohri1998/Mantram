@@ -593,11 +593,10 @@ async function geminiImageGenerate(promptText, imageParts = [], temperature = 0.
 
         const data = await resp.json();
         if (data.error) {
-            const errMsg = data.error.message || JSON.stringify(data.error);
-            console.warn(`⚠️ ${selectedModelId}: ${errMsg}`);
+            const lowerMsg = String(errMsg).toLowerCase();
 
             // Check for busy/overload — return modelBusy flag for frontend notification
-            if (errMsg.toLowerCase().includes('high demand') || errMsg.toLowerCase().includes('busy') || resp.status === 503 || resp.status === 429) {
+            if (lowerMsg.includes('high demand') || lowerMsg.includes('busy') || resp.status === 503 || resp.status === 429) {
                 console.log(`🔴 ${selectedModelId} is BUSY — returning modelBusy flag`);
                 return { imageUrl: null, model: selectedModelId, textResponse: '', warnings: [], modelBusy: true };
             }

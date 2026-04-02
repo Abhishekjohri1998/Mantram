@@ -52,16 +52,18 @@ async function muapiFetch(path, options = {}, retries = 3) {
                 const errorText = await response.text().catch(() => '');
                 let errorData;
                 try { errorData = JSON.parse(errorText); } catch { errorData = { detail: errorText }; }
-                const errMsg = errorData?.detail || errorData?.error || errorText.substring(0, 200);
+                const rawMsg = errorData?.detail || errorData?.error || errorText.substring(0, 200);
+                const errMsg = typeof rawMsg === 'string' ? rawMsg : JSON.stringify(rawMsg);
+                const lowerMsg = errMsg.toLowerCase();
                 
                 // Don't retry on 4xx (client errors — bad params, auth, etc.)
                 if (response.status >= 400 && response.status < 500) {
                     // Check for insufficient credits/quota
                     if (response.status === 402 || 
-                        errMsg.toLowerCase().includes('insufficient') || 
-                        errMsg.toLowerCase().includes('quota') || 
-                        errMsg.toLowerCase().includes('balance') ||
-                        errMsg.toLowerCase().includes('credits')) {
+                        lowerMsg.includes('insufficient') || 
+                        lowerMsg.includes('quota') || 
+                        lowerMsg.includes('balance') ||
+                        lowerMsg.includes('credits')) {
                         throw new Error(`MuAPI_INSUFFICIENT_CREDITS: ${errMsg}`);
                     }
                     throw new Error(`MuAPI ${response.status}: ${errMsg}`);

@@ -217,8 +217,9 @@ export class GeminiProvider extends BaseProvider {
                 
                 if (data.error) {
                     const errMsg = data.error.message || JSON.stringify(data.error);
-                    const isBusy = errMsg.toLowerCase().includes('high demand') || 
-                                   errMsg.toLowerCase().includes('busy') || 
+                    const lowerMsg = String(errMsg).toLowerCase();
+                    const isBusy = lowerMsg.includes('high demand') || 
+                                   lowerMsg.includes('busy') || 
                                    response.status === 503 || 
                                    response.status === 429;
                     

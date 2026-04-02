@@ -323,8 +323,22 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
     if (!endpoints) throw new Error(`Unknown video model: ${model}`);
     const endpoint = s3ImageUrl ? endpoints.imageToVideo : endpoints.textToVideo;
     const payload = buildPayload(model, { prompt, imageUrl: s3ImageUrl, duration, resolution, mode, shots, generateAudio });
+    
+    // Pass primary image for I2V
     if (s3ImageUrl) payload.image_url = s3ImageUrl;
-    const response = await fetch(`${FAL_BASE_URL}/${endpoint}`, { method: 'POST', headers: { 'Authorization': `Key ${apiKey}`, 'Content-Type': 'application/json' }, body: JSON.stringify(payload), signal: AbortSignal.timeout(35000) });
+    
+    // Pass reference images for multi-ref models (e.g. Kling, Veo)
+    // Ensures @image1, @image2, etc. in prompt work as expected
+    if (s3ReferenceImages?.length > 0) {
+        payload.images = s3ReferenceImages;
+    }
+
+    const response = await fetch(`${FAL_BASE_URL}/${endpoint}`, { 
+        method: 'POST', 
+        headers: { 'Authorization': `Key ${apiKey}`, 'Content-Type': 'application/json' }, 
+        body: JSON.stringify(payload), 
+        signal: AbortSignal.timeout(35000) 
+    });
     if (!response.ok) throw new Error(`fal.ai failed (${response.status})`);
     const data = await response.json();
     return { requestId: data.request_id, endpoint, statusUrl: data.status_url, resultUrl: data.response_url, provider: 'fal' };
