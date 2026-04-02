@@ -122,15 +122,24 @@ export async function submitMuApiVideoGeneration({
         remove_watermark: true,
     };
 
-    if (isI2V) {
-        const imagesList = [imageUrl];
+    if (isI2V || referenceImages?.length > 0) {
+        // Build images_list: first image is the primary I2V source, followed by reference images
+        const imagesList = [];
+        if (isI2V && imageUrl) imagesList.push(imageUrl);
+        
         if (referenceImages?.length > 0) {
-            imagesList.push(...referenceImages.slice(0, 8));
+            // Filter out nulls/empty and limit to MuAPI's max (8 total including primary)
+            const refs = referenceImages.filter(Boolean).slice(0, isI2V ? 7 : 8);
+            imagesList.push(...refs);
         }
-        payload.images_list = imagesList;
+        
+        if (imagesList.length > 0) {
+            payload.images_list = imagesList;
+            console.log(`📸 [MuAPI] Added ${imagesList.length} image(s) to images_list (isI2V=${isI2V})`);
+        }
     }
 
-    console.log(`🎬 [MuAPI] Submitting ${isI2V ? 'I2V' : 'T2V'} to ${endpoint}`);
+    console.log(`🎬 [MuAPI] Submitting ${isI2V ? 'I2V' : 'T2V'} to ${endpoint} | Payload keys: ${Object.keys(payload).join(', ')}`);
 
     const data = await muapiFetch(endpoint, {
         method: 'POST',

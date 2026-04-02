@@ -62,24 +62,35 @@ export async function submitLaozhangVideoGeneration({
     duration = 5,
     aspectRatio = '16:9',
     generateAudio = true,
+    referenceImages = [],
 }) {
     const apiKey = getApiKey();
     const lzModel = LZ_VIDEO_MODELS[model] || model;
     const timeoutMs = MODEL_TIMEOUTS[lzModel] || MODEL_TIMEOUTS.default;
 
-    let messageContent;
-    if (imageUrl && imageUrl.startsWith('http')) {
-        messageContent = [
-            { type: 'image_url', image_url: { url: imageUrl } },
-            { type: 'text', text: prompt },
-        ];
+    console.log(`🎬 [LaoZhang] Video generation: ${lzModel} | ${duration}s | ${aspectRatio} | timeout=${timeoutMs/1000}s | refs=${(referenceImages || []).length}`);
+    console.log(`   📝 prompt: ${prompt?.substring(0, 120)}...`);
+    if (imageUrl) console.log(`   🖼️  image: ${imageUrl.substring(0, 80)}...`);
+    if (referenceImages?.length > 0) console.log(`   📸 referenceImages: ${referenceImages.length} attached`);
+
+    // Build message content for multimodal models
+    // Seedance 2.0 and Veo often support multiple image inputs
+    if ((imageUrl && imageUrl.startsWith('http')) || referenceImages?.length > 0) {
+        messageContent = [];
+        if (imageUrl && imageUrl.startsWith('http')) {
+            messageContent.push({ type: 'image_url', image_url: { url: imageUrl } });
+        }
+        if (referenceImages?.length > 0) {
+            referenceImages.forEach(url => {
+                if (url && url.startsWith('http')) {
+                    messageContent.push({ type: 'image_url', image_url: { url } });
+                }
+            });
+        }
+        messageContent.push({ type: 'text', text: prompt });
     } else {
         messageContent = prompt;
     }
-
-    console.log(`🎬 [LaoZhang] Video generation: ${lzModel} | ${duration}s | ${aspectRatio} | timeout=${timeoutMs/1000}s`);
-    console.log(`   📝 prompt: ${prompt?.substring(0, 120)}...`);
-    if (imageUrl) console.log(`   🖼️  image: ${imageUrl.substring(0, 80)}...`);
 
     let response;
     try {

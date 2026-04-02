@@ -193,6 +193,7 @@ async function trySeedanceCascade({ prompt, imageUrl, duration, aspectRatio, gen
                 model: 'seedance-2.0', prompt, imageUrl,
                 duration: duration || 5, aspectRatio: aspectRatio || '16:9',
                 generateAudio: generateAudio !== false,
+                referenceImages: referenceImages || [],
             });
             if (r?.videoUrl) {
                 console.log('✅ [Cascade] Step 1 done: LaoZhang seedance-2.0');
@@ -206,6 +207,7 @@ async function trySeedanceCascade({ prompt, imageUrl, duration, aspectRatio, gen
                 model: 'veo-3.1-fast', prompt, imageUrl: null,
                 duration: Math.min(duration || 5, 8), aspectRatio: aspectRatio || '16:9',
                 generateAudio: generateAudio !== false,
+                referenceImages: referenceImages || [],
             });
             if (r?.videoUrl) {
                 console.log('✅ [Cascade] Step 2 done: LaoZhang veo-3.1-fast');
@@ -292,6 +294,7 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
                     model: 'seedance-2.0', prompt, imageUrl: s3ImageUrl,
                     duration: duration || 5, aspectRatio: aspectRatio || '16:9',
                     generateAudio: generateAudio !== false,
+                    referenceImages: s3ReferenceImages,
                 });
                 if (lzResult?.videoUrl) {
                     return {
