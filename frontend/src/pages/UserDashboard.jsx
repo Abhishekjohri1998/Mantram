@@ -456,8 +456,8 @@ export default function UserDashboard() {
                     creativesAPI.list(params).catch(() => ({ creatives: [], total: 0 })),
                 ])
                 setRecentContent(c.content || [])
-                setStats({ content: c.total || 0, creatives: cr.total || 0 })
             } catch (err) {
+
                 console.warn(err)
                 setError({ message: err.message, isProviderError: err.isProviderError, provider: err.provider })
             }

@@ -522,8 +522,9 @@ router.get('/hero', protect, async (req, res) => {
             dailyInsight: dailyInsight.status === 'fulfilled' ? dailyInsight.value : null,
             healthScores,
             activity: activityData,
-            streak: streakResult?.status === 'fulfilled' ? streakResult.value : 0,
+            streak: streak.status === 'fulfilled' ? streak.value : 0,
         });
+
     } catch (error) {
         console.error('Dash Hero error:', error);
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
