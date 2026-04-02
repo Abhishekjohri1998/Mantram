@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { agentCommand, creatives as creativesAPI } from '../services/api'
+import { agentCommand, creatives as creativesAPI, voice } from '../services/api'
 import { useBrand } from '../context/BrandContext'
 import { stripMarkdown } from '../utils/stripMarkdown'
 
@@ -16,7 +16,9 @@ export default function SmartCommandBox({ variant = 'dashboard', className = '' 
     const [loading, setLoading] = useState(false)
     const [expanded, setExpanded] = useState(false)
     const [recording, setRecording] = useState(false)
+    const [transcribing, setTranscribing] = useState(false)
     const [recordingTime, setRecordingTime] = useState(0)
+    const [audioLevel, setAudioLevel] = useState(0)
     const [generatingImage, setGeneratingImage] = useState(null) // index of message being generated
 
     const inputRef = useRef(null)
@@ -24,6 +26,19 @@ export default function SmartCommandBox({ variant = 'dashboard', className = '' 
     const mediaRecorderRef = useRef(null)
     const chunksRef = useRef([])
     const timerRef = useRef(null)
+    const audioContextRef = useRef(null)
+    const silenceCheckRef = useRef(null)
+    const streamRef = useRef(null)
+
+    // Clean up on unmount
+    useEffect(() => {
+        return () => {
+            if (mediaRecorderRef.current?.state === 'recording') mediaRecorderRef.current.stop()
+            if (silenceCheckRef.current) clearInterval(silenceCheckRef.current)
+            if (timerRef.current) clearInterval(timerRef.current)
+            if (audioContextRef.current) audioContextRef.current.close().catch(() => {})
+        }
+    }, [])
 
     // Auto-scroll chat
     useEffect(() => {
@@ -32,48 +47,99 @@ export default function SmartCommandBox({ variant = 'dashboard', className = '' 
 
     // ===== Voice Recording =====
     const startRecording = useCallback(async () => {
+        if (loading || recording) return
+
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-            const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' })
+            streamRef.current = stream
+
+            // Robust MIME type detection
+            const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+                ? 'audio/webm;codecs=opus'
+                : MediaRecorder.isTypeSupported('audio/webm')
+                    ? 'audio/webm'
+                    : 'audio/mp4'
+
+            const mediaRecorder = new MediaRecorder(stream, { mimeType })
             mediaRecorderRef.current = mediaRecorder
             chunksRef.current = []
+
+            // Set up silence detection (VAD)
+            try {
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)()
+                const source = audioCtx.createMediaStreamSource(stream)
+                const analyser = audioCtx.createAnalyser()
+                analyser.fftSize = 512
+                analyser.smoothingTimeConstant = 0.8
+                source.connect(analyser)
+                audioContextRef.current = audioCtx
+
+                let silentFrames = 0
+                const SILENCE_THRESHOLD = 15
+                const SILENCE_FRAMES_NEEDED = 35 // ~2 seconds
+
+                silenceCheckRef.current = setInterval(() => {
+                    const dataArray = new Uint8Array(analyser.frequencyBinCount)
+                    analyser.getByteFrequencyData(dataArray)
+                    const avg = dataArray.reduce((a, b) => a + b, 0) / dataArray.length
+                    setAudioLevel(avg)
+
+                    if (avg < SILENCE_THRESHOLD) {
+                        silentFrames++
+                        if (silentFrames >= SILENCE_FRAMES_NEEDED && chunksRef.current.length > 0) {
+                            stopRecording()
+                        }
+                    } else {
+                        silentFrames = 0
+                    }
+                }, 60)
+            } catch (e) {
+                console.warn('Silence detection unavailable:', e.message)
+            }
 
             mediaRecorder.ondataavailable = (e) => {
                 if (e.data.size > 0) chunksRef.current.push(e.data)
             }
 
             mediaRecorder.onstop = async () => {
-                stream.getTracks().forEach(t => t.stop())
-                clearInterval(timerRef.current)
+                // Cleanup
+                if (silenceCheckRef.current) clearInterval(silenceCheckRef.current)
+                if (audioContextRef.current) {
+                    audioContextRef.current.close().catch(() => { })
+                    audioContextRef.current = null
+                }
+                if (timerRef.current) clearInterval(timerRef.current)
+                
+                // Stop all tracks
+                streamRef.current?.getTracks().forEach(t => t.stop())
                 setRecordingTime(0)
 
-                const audioBlob = new Blob(chunksRef.current, { type: 'audio/webm' })
-                if (audioBlob.size < 100) return
+                const audioBlob = new Blob(chunksRef.current, { type: mimeType })
+                if (audioBlob.size < 1000) return // Ignore tiny clicks
 
                 setLoading(true)
                 const formData = new FormData()
                 formData.append('audio', audioBlob, 'recording.webm')
-                formData.append('language', 'unknown') // auto-detect: Sarvam for Hindi, Whisper for English
+                formData.append('language', 'unknown')
 
                 try {
-                    const token = localStorage.getItem('mantram_token')
-                    const resp = await fetch('/api/voice/transcribe', {
-                        method: 'POST',
-                        headers: token ? { Authorization: `Bearer ${token}` } : {},
-                        body: formData,
-                    })
-                    const data = await resp.json()
+                    setTranscribing(true)
+                    // Use integrated voice service instead of raw fetch
+                    const data = await voice.transcribe(formData)
+                    
                     if (data.success && data.text) {
                         setInput(data.text)
-                        // Reset loading before calling handleSend — handleSend checks `loading` and aborts if true
                         setLoading(false)
+                        setTranscribing(false)
                         handleSend(data.text)
                     } else {
                         setLoading(false)
+                        setTranscribing(false)
                     }
                 } catch (err) {
                     console.error('Transcription error:', err)
                     setLoading(false)
+                    setTranscribing(false)
                 }
             }
 
@@ -81,15 +147,23 @@ export default function SmartCommandBox({ variant = 'dashboard', className = '' 
             setRecording(true)
             setRecordingTime(0)
             timerRef.current = setInterval(() => setRecordingTime(t => t + 1), 1000)
+
+            // Safety: max 30 seconds
+            setTimeout(() => {
+                if (mediaRecorder.state === 'recording') stopRecording()
+            }, 30000)
+
         } catch (err) {
             console.error('Mic access denied:', err)
         }
-    }, [])
+    }, [loading, recording])
 
     const stopRecording = useCallback(() => {
-        if (mediaRecorderRef.current?.state === 'recording') mediaRecorderRef.current.stop()
-        setRecording(false)
-        clearInterval(timerRef.current)
+        if (silenceCheckRef.current) clearInterval(silenceCheckRef.current)
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+            mediaRecorderRef.current.stop()
+            setRecording(false)
+        }
     }, [])
 
     // ===== Generate Image inline =====
@@ -504,18 +578,30 @@ export default function SmartCommandBox({ variant = 'dashboard', className = '' 
                         />
 
                         {/* Mic */}
-                        <button onClick={recording ? stopRecording : startRecording} disabled={loading}
-                            className={`flex-shrink-0 p-2.5 rounded-xl transition-all cursor-pointer ${recording
-                                ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30 animate-pulse'
-                                : 'bg-white/[0.04] text-slate-400 border border-white/[0.08] hover:bg-primary/10 hover:text-primary hover:border-primary/20'
+                        <button onClick={recording ? stopRecording : startRecording} disabled={loading || transcribing}
+                            className={`flex-shrink-0 p-2.5 rounded-xl transition-all cursor-pointer relative overflow-hidden ${recording
+                                ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                                : transcribing
+                                    ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                                    : 'bg-white/[0.04] text-slate-400 border border-white/[0.08] hover:bg-primary/10 hover:text-primary hover:border-primary/20'
                                 }`}
-                            title={recording ? `Recording... ${formatTime(recordingTime)}` : 'Speak your request'}>
+                            title={recording ? `Recording... ${formatTime(recordingTime)}` : transcribing ? 'Transcribing...' : 'Speak your request'}>
+                            {/* Pulse animation when recording */}
+                            {recording && (
+                                <>
+                                    <span className="absolute inset-0 rounded-xl bg-rose-500/20 animate-ping" style={{ animationDuration: '1.5s' }} />
+                                    <span className="absolute inset-0 rounded-xl bg-rose-500/10 animate-pulse" />
+                                </>
+                            )}
+                            
                             {recording ? (
-                                <div className="flex items-center gap-1.5">
+                                <div className="flex items-center gap-1.5 relative z-10">
                                     <span className="material-symbols-outlined text-sm">stop_circle</span>
-                                    <span className="text-xs font-bold">{formatTime(recordingTime)}</span>
+                                    <span className="text-xs font-bold font-mono">{formatTime(recordingTime)}</span>
                                 </div>
-                            ) : <span className="material-symbols-outlined text-sm">mic</span>}
+                            ) : transcribing ? (
+                                <span className="material-symbols-outlined text-sm animate-spin relative z-10">progress_activity</span>
+                            ) : <span className="material-symbols-outlined text-sm relative z-10">mic</span>}
                         </button>
 
                         {/* Send */}
