@@ -23,6 +23,7 @@ export default function SmartCommandBox({ variant = 'dashboard', className = '' 
 
     const inputRef = useRef(null)
     const chatEndRef = useRef(null)
+    const scrollContainerRef = useRef(null)
     const mediaRecorderRef = useRef(null)
     const chunksRef = useRef([])
     const timerRef = useRef(null)
@@ -40,9 +41,14 @@ export default function SmartCommandBox({ variant = 'dashboard', className = '' 
         }
     }, [])
 
-    // Auto-scroll chat
+    // Auto-scroll chat (locally scoped to container)
     useEffect(() => {
-        chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+        if (scrollContainerRef.current) {
+            scrollContainerRef.current.scrollTo({
+                top: scrollContainerRef.current.scrollHeight,
+                behavior: 'smooth'
+            })
+        }
     }, [history, loading])
 
     // ===== Voice Recording =====
@@ -335,7 +341,9 @@ export default function SmartCommandBox({ variant = 'dashboard', className = '' 
 
                 {/* Chat History */}
                 {expanded && history.length > 0 && (
-                    <div className="max-h-[500px] overflow-y-auto px-5 py-4 space-y-4 scroll-smooth"
+                    <div 
+                        ref={scrollContainerRef}
+                        className="max-h-[500px] overflow-y-auto px-5 py-4 space-y-4 scroll-smooth"
                         style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.1) transparent' }}>
                         {history.map((msg, i) => (
                             <div key={i} className={`flex items-start gap-3 animate-fade-in ${msg.role === 'user' ? 'justify-end' : ''}`}
