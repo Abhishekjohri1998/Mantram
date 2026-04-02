@@ -2,7 +2,8 @@ import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
-import { VertexAI } from '@google-cloud/vertexai';
+import { GoogleGenAI } from '@google/genai';
+
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -45,22 +46,25 @@ async function verify() {
     }
 
     try {
-        console.log('\n⏳ Connecting to Vertex AI...');
-        const vertexAi = new VertexAI({ project: projectId, location: location });
+        console.log('\n⏳ Connecting to Google Gen AI (Vertex Mode)...');
+        const ai = new GoogleGenAI({ 
+            vertexai: true,
+            project: projectId, 
+            location: location 
+        });
         
-        // Use gemini-2.0-flash-001 as in the user's manual test
-        const modelId = 'gemini-2.0-flash-001'; 
-        const generativeModel = vertexAi.getGenerativeModel({ model: modelId });
+        // Use gemini-2.0-flash
+        const modelId = 'gemini-2.0-flash'; 
 
         console.log(`🤖 Testing generation with: ${modelId}...`);
         
         const startTime = Date.now();
-        const request = {
+        const result = await ai.models.generateContent({
+            model: modelId,
             contents: [{ role: 'user', parts: [{ text: 'Please respond with exactly "✅ Vertex AI is Active"' }] }],
-        };
+        });
 
-        const result = await generativeModel.generateContent(request);
-        const text = result.response.candidates[0].content.parts[0].text;
+        const text = result.text;
         
         console.log('────────────────────────────────────────');
         console.log(`✨ SERVER RESPONSE: ${text}`);

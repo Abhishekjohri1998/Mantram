@@ -1,4 +1,4 @@
-import { VertexAI } from '@google-cloud/vertexai';
+import { GoogleGenAI } from '@google/genai';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -23,17 +23,24 @@ async function verifyVertex() {
     console.log('----------------------------------------------------');
 
     try {
-        const vertexAi = new VertexAI({ project, location });
+        const ai = new GoogleGenAI({ 
+            vertexai: true,
+            project, 
+            location 
+        });
         
         // Use Gemini 2.0 Flash for a fast test
-        const model = vertexAi.getGenerativeModel({ model: 'gemini-2.0-flash-001' });
+        const modelId = 'gemini-2.0-flash';
         
-        console.log('📡 Sending test request to Google Cloud...');
+        console.log('📡 Sending test request to Google Cloud (Gen AI SDK)...');
         const startTime = Date.now();
-        const result = await model.generateContent('Say "Vertex AI is Active"');
+        const result = await ai.models.generateContent({
+            model: modelId,
+            contents: 'Say "Vertex AI is Active"'
+        });
         const duration = Date.now() - startTime;
         
-        const responseText = result.response.candidates[0].content.parts[0].text;
+        const responseText = result.text;
         
         console.log('----------------------------------------------------');
         console.log(`✅ Authentication Successful!`);

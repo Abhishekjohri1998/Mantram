@@ -1,5 +1,6 @@
 import { BaseProvider } from './base.js';
-import { VertexAI } from '@google-cloud/vertexai';
+import { GoogleGenAI } from '@google/genai';
+
 
 
 /**
@@ -24,10 +25,12 @@ export class GeminiProvider extends BaseProvider {
 
         if (gcpProject && gcpCreds) {
             try {
-                this.vertexAi = new VertexAI({
+                this.vertexAi = new GoogleGenAI({
+                    vertexai: true,
                     project: gcpProject,
                     location: config.gcpLocation || process.env.GCP_LOCATION || 'us-central1'
                 });
+
                 console.log(`🚀 [Gemini] Vertex AI initialized (Billed Project: ${gcpProject})`);
             } catch (err) {
                 console.error(`❌ [Gemini] Failed to initialize Vertex AI:`, err.message);
@@ -43,11 +46,9 @@ export class GeminiProvider extends BaseProvider {
         if (this.vertexAi) {
             try {
                 const startTime = Date.now();
-                const vModel = this.vertexAi.getGenerativeModel({ model: modelId });
-                
                 const parts = [{ text: `${systemPrompt}\n\n${userPrompt}` }];
                 
-                // Add images for Vertex SDK
+                // Add images for GenAI SDK
                 for (const img of images) {
                     let mimeType = 'image/jpeg';
                     let b64Data = '';
@@ -75,14 +76,15 @@ export class GeminiProvider extends BaseProvider {
                     }
                 }
 
-                const result = await vModel.generateContent({
+                const result = await this.vertexAi.models.generateContent({
+                    model: modelId,
                     contents: [{ role: 'user', parts }],
                     generationConfig: { temperature, maxOutputTokens: maxTokens }
                 });
 
-                const response = result.response;
-                const text = response.candidates[0].content.parts[0].text;
-                const tokensUsed = response.usageMetadata?.totalTokenCount || 0;
+                const text = result.text;
+                const tokensUsed = result.usageMetadata?.totalTokenCount || 0;
+
 
                 return {
                     text,
@@ -259,12 +261,12 @@ export class GeminiProvider extends BaseProvider {
      */
     async generateImage({ prompt, aspectRatio = '1:1', model, imageParts = [] }) {
         const startTime = Date.now();
-        const modelId = model || this.config.defaultImageModel || 'gemini-3.1-flash-image-preview';
+        const modelId = model || this.config.defaultImageModel || 'gemini-2.0-flash';
+
 
         // --- BRANCH: VERTEX AI SDK (BILLED CREDITS) ---
         if (this.vertexAi) {
             try {
-                const vModel = this.vertexAi.getGenerativeModel({ model: modelId });
                 const parts = [];
                 
                 // Process imageParts (usually contains prompt text + base64/URLs)
@@ -293,7 +295,8 @@ export class GeminiProvider extends BaseProvider {
                 const arInstruction = aspectRatio !== '1:1' ? `\n\n[ASPECT RATIO: ${aspectRatio}]` : '';
                 parts.push({ text: prompt + arInstruction });
 
-                const result = await vModel.generateContent({
+                const result = await this.vertexAi.models.generateContent({
+                    model: modelId,
                     contents: [{ role: 'user', parts }],
                     generationConfig: {
                         responseModalities: ['TEXT', 'IMAGE'],
@@ -301,14 +304,16 @@ export class GeminiProvider extends BaseProvider {
                     }
                 });
 
-                const resParts = result.response.candidates[0].content.parts || [];
                 let imageUrl = null;
-                for (const part of resParts) {
-                    if (part.inlineData?.mimeType?.startsWith('image/')) {
-                        imageUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-                        break;
+                if (result.parts) {
+                    for (const part of result.parts) {
+                        if (part.inlineData?.mimeType?.startsWith('image/')) {
+                            imageUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+                            break;
+                        }
                     }
                 }
+
 
                 if (imageUrl) {
                     return {
