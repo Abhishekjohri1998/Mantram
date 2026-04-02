@@ -501,6 +501,101 @@ All percentage arrays must sum to 100. Make data realistic for the industry.`,
 // GET /api/dashboard-summary
 // ── ═══════════════════════════════════════════════════════════════════════════
 
+// ── 1. Hero Data (Fast: Streak, Health, Activity, Daily Insight)
+router.get('/hero', protect, async (req, res) => {
+    try {
+        const { brandId } = req.query;
+        const userId = req.user._id;
+        let brand = brandId ? await Brand.findById(brandId).lean() : null;
+
+        const [dailyInsight, activity, streak] = await Promise.allSettled([
+            generateDailyInsight(brand),
+            getStudioActivity(userId, brandId),
+            computeStreak(userId),
+        ]);
+
+        const activityData = activity.status === 'fulfilled' ? activity.value : { content: { thisWeek: 0, total: 0 }, creatives: { thisWeek: 0, total: 0 } };
+        const healthScores = computeBrandHealth(brand, activityData);
+
+        res.json({
+            success: true,
+            dailyInsight: dailyInsight.status === 'fulfilled' ? dailyInsight.value : null,
+            healthScores,
+            activity: activityData,
+            streak: streakResult?.status === 'fulfilled' ? streakResult.value : 0,
+        });
+    } catch (error) {
+        console.error('Dash Hero error:', error);
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// ── 2. Intelligence Hub (Heavy: News, Trends, Suggestions)
+router.get('/intelligence', protect, async (req, res) => {
+    try {
+        const { brandId } = req.query;
+        let brand = brandId ? await Brand.findById(brandId).lean() : null;
+        const industry = brand?.dna?.industry || 'general';
+
+        // Set a 25s timeout for AI operations to prevent 502s from Nginx (usually 30s-60s)
+        const ac = new AbortController();
+        const timeout = setTimeout(() => ac.abort(), 25000);
+
+        try {
+            const [
+                grokTopicsResult,
+                grokSeoResult,
+                grokContentResult,
+                businessNewsResult,
+                didYouKnowResult,
+            ] = await Promise.allSettled([
+                isGrokAvailable() ? getTrendingTopics(industry) : Promise.resolve({ trends: [] }),
+                isGrokAvailable() ? getTrendingSEOKeywords(industry, brand?.website) : Promise.resolve({ risingKeywords: [] }),
+                (isGrokAvailable() && brand) ? getContentSuggestions(brand) : Promise.resolve({ suggestions: [] }),
+                generateBusinessNews(brand),
+                generateDidYouKnow(brand),
+            ]);
+
+            res.json({
+                success: true,
+                grokTrends: grokTopicsResult.status === 'fulfilled' ? (grokTopicsResult.value?.trends || []) : [],
+                grokSeo: grokSeoResult.status === 'fulfilled' ? grokSeoResult.value : null,
+                grokContent: grokContentResult.status === 'fulfilled' ? (grokContentResult.value?.suggestions || []) : [],
+                businessNews: businessNewsResult.status === 'fulfilled' ? businessNewsResult.value : [],
+                didYouKnow: didYouKnowResult.status === 'fulfilled' ? didYouKnowResult.value : [],
+                grokAvailable: isGrokAvailable(),
+            });
+        } finally {
+            clearTimeout(timeout);
+        }
+    } catch (error) {
+        if (error.name === 'AbortError') {
+            return res.status(504).json({ success: false, error: 'Intelligence generation timed out. Try again.' });
+        }
+        console.error('Dash Intelligence error:', error);
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// ── 3. Strikes Radar (Heavy: Audience Analytics)
+router.get('/radar', protect, async (req, res) => {
+    try {
+        const { brandId } = req.query;
+        let brand = brandId ? await Brand.findById(brandId).lean() : null;
+
+        const radarResult = await generateStrikesRadar(brand);
+
+        res.json({
+            success: true,
+            strikesRadar: radarResult,
+        });
+    } catch (error) {
+        console.error('Dash Radar error:', error);
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// Backward compatibility (Deprecated: Slow)
 router.get('/', protect, async (req, res) => {
     try {
         purgeOldCacheEntries();
@@ -508,22 +603,13 @@ router.get('/', protect, async (req, res) => {
         const userId = req.user._id;
 
         let brand = null;
-        if (brandId) {
-            brand = await Brand.findById(brandId).lean();
-        }
+        if (brandId) brand = await Brand.findById(brandId).lean();
 
-        // Parallel data fetching
         const industry = brand?.dna?.industry || 'general';
         const [
-            dailyInsight,
-            activity,
-            grokTopicsResult,
-            grokSeoResult,
-            grokContentResult,
-            businessNewsResult,
-            didYouKnowResult,
-            streakResult,
-            radarResult,
+            dailyInsight, activity, grokTopicsResult, grokSeoResult,
+            grokContentResult, businessNewsResult, didYouKnowResult,
+            streakResult, radarResult,
         ] = await Promise.allSettled([
             generateDailyInsight(brand),
             getStudioActivity(userId, brandId),
@@ -536,14 +622,11 @@ router.get('/', protect, async (req, res) => {
             generateStrikesRadar(brand),
         ]);
 
-        const activityData = activity.status === 'fulfilled' ? activity.value : { content: { thisWeek: 0, total: 0 }, creatives: { thisWeek: 0, total: 0 } };
-        const healthScores = computeBrandHealth(brand, activityData);
-
         res.json({
             success: true,
             dailyInsight: dailyInsight.status === 'fulfilled' ? dailyInsight.value : null,
-            healthScores,
-            activity: activityData,
+            healthScores: computeBrandHealth(brand, activity.status === 'fulfilled' ? activity.value : { content: { thisWeek: 0, total: 0 }, creatives: { thisWeek: 0, total: 0 } }),
+            activity: activity.status === 'fulfilled' ? activity.value : { content: { thisWeek: 0, total: 0 }, creatives: { thisWeek: 0, total: 0 } },
             grokTrends: grokTopicsResult.status === 'fulfilled' ? (grokTopicsResult.value?.trends || []) : [],
             grokSeo: grokSeoResult.status === 'fulfilled' ? grokSeoResult.value : null,
             grokContent: grokContentResult.status === 'fulfilled' ? (grokContentResult.value?.suggestions || []) : [],
@@ -552,13 +635,12 @@ router.get('/', protect, async (req, res) => {
             streak: streakResult.status === 'fulfilled' ? streakResult.value : 0,
             strikesRadar: radarResult.status === 'fulfilled' ? radarResult.value : null,
             grokAvailable: isGrokAvailable(),
-            timestamp: new Date(),
         });
     } catch (error) {
-        console.error('Dashboard summary error:', error);
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
+
 
 // ── ═══════════════════════════════════════════════════════════════════════════
 // POST /api/dashboard-summary/strategy — AI Strategy from radar data

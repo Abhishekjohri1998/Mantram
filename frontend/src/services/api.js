@@ -263,7 +263,11 @@ export const trends = {
 // ============ Dashboard Summary API ============
 export const dashboardSummary = {
     get: (brandId) => apiFetch(`/dashboard-summary${brandId ? `?brandId=${brandId}` : ''}`),
+    getHero: (brandId) => apiFetch(`/dashboard-summary/hero${brandId ? `?brandId=${brandId}` : ''}`),
+    getIntelligence: (brandId) => apiFetch(`/dashboard-summary/intelligence${brandId ? `?brandId=${brandId}` : ''}`),
+    getRadar: (brandId) => apiFetch(`/dashboard-summary/radar${brandId ? `?brandId=${brandId}` : ''}`),
 };
+
 
 // ============ D2C Shopify Analytics API ============
 export const shopifyAnalytics = {

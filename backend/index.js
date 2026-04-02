@@ -294,16 +294,20 @@ app.use((err, req, res, next) => {
     
     // Ensure CORS headers are present even on errors
     const origin = req.headers.origin;
-    if (origin && !res.getHeader('Access-Control-Allow-Origin')) {
-        const isAllowed = HARDCODED_ORIGINS.some(o => o.toLowerCase() === origin.toLowerCase()) || 
-                         origin.toLowerCase().includes('mantram.ai') ||
-                         origin.toLowerCase().includes('localhost');
+    if (origin) {
+        const cleanOrigin = origin.toLowerCase().replace(/\/$/, '');
+        const isAllowed = HARDCODED_ORIGINS.some(o => o.toLowerCase().replace(/\/$/, '') === cleanOrigin) || 
+                         cleanOrigin.endsWith('mantram.ai') ||
+                         cleanOrigin.includes('localhost');
         
         if (isAllowed) {
             res.setHeader('Access-Control-Allow-Origin', origin);
             res.setHeader('Access-Control-Allow-Credentials', 'true');
+            res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+            res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin, Cache-Control, Pragma');
         }
     }
+
     
     const response = {
         success: false,

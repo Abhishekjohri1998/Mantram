@@ -95,7 +95,7 @@ function Skeleton({ className, circle = false }) {
 
 function SkeletonHero() {
     return (
-        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between mb-6 gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between mb-6 gap-4 min-h-[80px]">
             <div className="flex-1 space-y-3">
                 <Skeleton className="h-4 w-32" />
                 <Skeleton className="h-10 w-64" />
@@ -107,7 +107,7 @@ function SkeletonHero() {
 
 function SkeletonStats({ count = 4 }) {
     return (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6 min-h-[90px]">
             {[...Array(count)].map((_, i) => (
                 <div key={i} className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.04]">
                     <Skeleton className="h-3 w-16 mb-3" />
@@ -120,7 +120,7 @@ function SkeletonStats({ count = 4 }) {
 
 function SkeletonRings() {
     return (
-        <div className="flex flex-col sm:flex-row items-center gap-8 p-6 glass-panel rounded-2xl border border-white/[0.06]">
+        <div className="flex flex-col sm:flex-row items-center gap-8 p-6 glass-panel rounded-2xl border border-white/[0.06] min-h-[180px]">
             <Skeleton className="size-32 rounded-full shrink-0" />
             <div className="grid grid-cols-2 gap-3 flex-1 w-full">
                 {[1, 2, 3, 4].map(i => (
@@ -139,7 +139,7 @@ function SkeletonRings() {
 
 function SkeletonHub() {
     return (
-        <div className="space-y-4">
+        <div className="space-y-4 min-h-[300px]">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {[1, 2, 3, 4].map(i => (
                     <div key={i} className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.04] space-y-3">
@@ -155,6 +155,7 @@ function SkeletonHub() {
         </div>
     )
 }
+
 
 function SkeletonPulse() {
     return (
@@ -189,13 +190,15 @@ function SkeletonBrands() {
 // ── Ticker Item ──
 const TickerItem = memo(({ icon, value, label, color }) => {
     return (
-        <div className="flex items-center gap-1.5 sm:gap-2.5 px-3 sm:px-5 py-2 sm:py-2.5 shrink-0">
+        <div className="flex items-center gap-1.5 sm:gap-2.5 px-3 sm:px-5 py-2 sm:py-2.5 shrink-0" 
+             style={{ transform: 'translate3d(0,0,0)', willChange: 'transform' }}>
             <span className="material-symbols-outlined text-base sm:text-lg" style={{ color }}>{icon}</span>
             <span className="text-base sm:text-lg font-extrabold text-white">{value}</span>
             <span className="text-[10px] sm:text-xs md:text-sm text-slate-500 whitespace-nowrap uppercase tracking-tight">{label}</span>
         </div>
     )
 })
+
 TickerItem.displayName = 'TickerItem'
 
 const AnalyticsSection = memo(({ radar, radarHover, setRadarHover }) => {
@@ -322,16 +325,21 @@ export default function UserDashboard() {
     const { user } = useAuth()
     const { brands, activeBrand, selectBrand, loading: brandsLoading } = useBrand()
 
-    const [summary, setSummary] = useState(null)
-    const [loadingSummary, setLoadingSummary] = useState(true)
-    const [trendingTopics, setTrendingTopics] = useState([])
+    const [heroData, setHeroData] = useState(null)
+    const [loadingHero, setLoadingHero] = useState(true)
+    const [intelData, setIntelData] = useState(null)
+    const [loadingIntelHub, setLoadingIntelHub] = useState(true)
+    const [radarData, setRadarData] = useState(null)
+    const [loadingRadar, setLoadingRadar] = useState(true)
+
     const [trendsLoading, setTrendsLoading] = useState(false)
+    const [trendingTopics, setTrendingTopics] = useState([])
     const [recentContent, setRecentContent] = useState([])
-    const [stats, setStats] = useState({ content: 0, creatives: 0 })
     const [activeTab, setActiveTab] = useState('trends')
     const [radarHover, setRadarHover] = useState(null)
     const [d2cSnapshot, setD2cSnapshot] = useState(null)
     const [error, setError] = useState(null)
+
 
     // ── Analytics state (Funnel + Performance + ROAS) ──
     const [funnelData, setFunnelData] = useState(null)
@@ -355,13 +363,25 @@ export default function UserDashboard() {
 
     // ── Loaders ──
     const loadSummary = useCallback(async () => {
-        setLoadingSummary(true)
-        try { setSummary(await dashboardSummary.get(activeBrand?._id)) }
-        catch (err) {
-            console.warn('Dashboard summary error:', err.message)
-            setError({ message: err.message, isProviderError: err.isProviderError, provider: err.provider })
-        }
-        finally { setLoadingSummary(false) }
+        const brandId = activeBrand?._id
+        
+        // Tier 1: Hero Data (Immediate)
+        setLoadingHero(true)
+        dashboardSummary.getHero(brandId)
+            .then(data => { setHeroData(data); setLoadingHero(false); })
+            .catch(err => { console.warn('Hero data error:', err.message); setLoadingHero(false); })
+
+        // Tier 2: Intelligence & Radar (Deferred/Parallel)
+        setLoadingIntelHub(true)
+        dashboardSummary.getIntelligence(brandId)
+            .then(data => { setIntelData(data); setLoadingIntelHub(false); })
+            .catch(err => { console.warn('Intelligence error:', err.message); setLoadingIntelHub(false); })
+
+        setLoadingRadar(true)
+        dashboardSummary.getRadar(brandId)
+            .then(data => { setRadarData(data); setLoadingRadar(false); })
+            .catch(err => { console.warn('Radar error:', err.message); setLoadingRadar(false); })
+
     }, [activeBrand?._id])
 
     const loadTrends = useCallback(async () => {
@@ -375,6 +395,7 @@ export default function UserDashboard() {
         }
         finally { setTrendsLoading(false) }
     }, [activeBrand?._id])
+
 
     // ── Analytics loader (Funnel + Performance + ROAS) ──
     const loadAnalytics = useCallback(async () => {
@@ -417,11 +438,13 @@ export default function UserDashboard() {
 
     // Clear stale data and re-fetch when brand changes
     useEffect(() => {
-        setSummary(null)
+        setHeroData(null)
+        setIntelData(null)
+        setRadarData(null)
         setTrendingTopics([])
         setRecentContent([])
-        setStats({ content: 0, creatives: 0 })
     }, [activeBrand?._id])
+
 
     useEffect(() => {
         async function fetchBasicData() {
@@ -515,16 +538,17 @@ export default function UserDashboard() {
         } catch { /* silent */ }
     }
 
-    const insight = summary?.dailyInsight
-    const health = summary?.healthScores || {}
-    const grokTrends = summary?.grokTrends || []
-    const grokSeo = summary?.grokSeo || {}
-    const grokContent = summary?.grokContent || []
-    const businessNews = summary?.businessNews || []
-    const didYouKnow = summary?.didYouKnow || []
-    const activity = summary?.activity || { content: {}, creatives: {} }
-    const streak = summary?.streak || 0
-    const radar = summary?.strikesRadar || null
+    const insight = heroData?.dailyInsight
+    const health = heroData?.healthScores || {}
+    const grokTrends = intelData?.grokTrends || []
+    const grokSeo = intelData?.grokSeo || {}
+    const grokContent = intelData?.grokContent || []
+    const businessNews = intelData?.businessNews || []
+    const didYouKnow = intelData?.didYouKnow || []
+    const activity = heroData?.activity || { content: {}, creatives: {} }
+    const streak = heroData?.streak || 0
+    const radar = radarData?.strikesRadar || null
+
 
     const studios = [
         { icon: 'psychology', label: 'Brainstorm', path: '/brainstorm', color: '#8b5cf6', bg: 'from-violet-500/15 to-purple-500/5' },
@@ -594,9 +618,10 @@ export default function UserDashboard() {
 
             {/* 1. HERO GREETING + STREAK                                      */}
             {/* ═══════════════════════════════════════════════════════════════ */}
-            {loadingSummary ? (
+            {loadingHero ? (
                 <SkeletonHero />
             ) : (
+
                 <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between mb-5 sm:mb-6 gap-3 anim-slide-up">
                     <div className="min-w-0">
                         <p className="text-slate-400 text-sm sm:text-base font-medium mb-1">{getDateString()}</p>
@@ -629,8 +654,9 @@ export default function UserDashboard() {
             {/* ═══════════════════════════════════════════════════════════════ */}
             {/* 2. MISSION CONTROL — DAILY AI INSIGHT                          */}
             {/* ═══════════════════════════════════════════════════════════════ */}
-            {loadingSummary ? (
+            {loadingHero ? (
                 <div className="mb-6 anim-slide-up" style={{ animationDelay: '100ms' }}>
+
                     <div className="glass-panel p-6 rounded-2xl border-2 border-white/[0.04] space-y-4">
                         <Skeleton className="h-4 w-32" />
                         <div className="flex gap-4">
@@ -691,11 +717,12 @@ export default function UserDashboard() {
             <div className="mb-6 rounded-xl bg-white/[0.02] border border-white/[0.06] overflow-hidden anim-slide-up" style={{ animationDelay: '200ms' }}>
                 <div className="flex overflow-hidden">
                     <div className="flex ticker-track">
-                        {(loadingSummary || loadingD2C) ? (
+                        {(loadingHero || loadingD2C) ? (
                             <div className="flex gap-12 px-6 py-3.5">
                                 {[1, 2, 3, 4, 5, 6].map(i => <Skeleton key={i} className="h-6 w-36" />)}
                             </div>
                         ) : [0, 1].map(dup => (
+
                             <div key={dup} className="flex">
                                 <TickerItem icon="payments" value={`₹${(d2cSnapshot?.weeklyRevenue || 0).toLocaleString()}`} label="D2C Revenue" color="#34d399" />
                                 <div className="w-px bg-white/[0.06] my-2" />
@@ -724,10 +751,11 @@ export default function UserDashboard() {
                 <div className="col-span-1 lg:col-span-8 space-y-6">
 
                     {/* ── 4. BRAND HEALTH RINGS ── */}
-                    {loadingSummary ? (
+                    {loadingHero ? (
                         <SkeletonRings />
                     ) : (
                         <div className="glass-panel rounded-2xl p-4 sm:p-5 lg:p-6 border border-white/[0.06] anim-slide-up" style={{ animationDelay: '250ms' }}>
+
                             <div className="flex items-center gap-2 mb-4">
                                 <span className="material-symbols-outlined text-emerald-400">monitoring</span>
                                 <span className="text-base sm:text-lg font-bold text-white">Brand Health</span>
@@ -1101,8 +1129,9 @@ export default function UserDashboard() {
                     )}
 
                     {/* ── 4c. STRIKES RADAR ── */}
-                    {radar && (
+                    {(radar || loadingRadar) && (
                         <div className="glass-panel rounded-2xl p-4 sm:p-5 lg:p-6 border border-white/[0.06] anim-slide-up cursor-pointer group hover:bg-white/[0.02] transition-all"
+
                             style={{ animationDelay: '300ms' }}
                             onClick={() => navigate('/d2c-analytics')}>
                             <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
@@ -1119,14 +1148,15 @@ export default function UserDashboard() {
 
                             {/* Key Metrics Bar */}
                             <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-4 mb-5">
-                                {loadingAnalytics ? (
+                                {loadingRadar ? (
                                     [1, 2, 3, 4].map(i => (
                                         <div key={i} className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.04] flex flex-col gap-2">
                                             <Skeleton className="h-3 w-16" />
                                             <Skeleton className="h-5 w-20" />
                                         </div>
                                     ))
-                                ) : (
+                                ) : radar ? (
+
                                     [
                                         { label: 'Total Visitors', value: radar.totalVisitors?.toLocaleString(), icon: 'group', color: '#8b5cf6' },
                                         { label: 'Weekly Growth', value: `${radar.weeklyGrowth > 0 ? '+' : ''}${radar.weeklyGrowth}%`, icon: 'trending_up', color: '#34d399' },
@@ -1141,10 +1171,17 @@ export default function UserDashboard() {
                                             <p className="text-base sm:text-xl font-extrabold text-white">{m.value}</p>
                                         </div>
                                     ))
-                                )}
+                                ) : null}
                             </div>
 
-                            <AnalyticsSection radar={radar} radarHover={radarHover} setRadarHover={setRadarHover} />
+                            {loadingRadar ? (
+                                <div className="flex items-center justify-center py-12">
+                                    <span className="material-symbols-outlined animate-spin text-3xl text-rose-400">progress_activity</span>
+                                </div>
+                            ) : radar && (
+                                <AnalyticsSection radar={radar} radarHover={radarHover} setRadarHover={setRadarHover} />
+                            )}
+
 
                             {/* CTA hint */}
                             <div className="mt-4 pt-3 border-t border-white/[0.04] flex items-center justify-center gap-2 text-sm text-slate-500 group-hover:text-primary transition-colors">
@@ -1169,7 +1206,8 @@ export default function UserDashboard() {
                             ))}
                             <button onClick={() => { loadSummary(); loadTrends() }}
                                 className="px-5 text-slate-500 hover:text-white cursor-pointer transition-colors border-l border-white/[0.06] shrink-0">
-                                <span className={`material-symbols-outlined text-lg ${loadingSummary ? 'animate-spin' : ''}`}>refresh</span>
+                                <span className={`material-symbols-outlined text-lg ${loadingHero || loadingIntelHub || loadingRadar ? 'animate-spin' : ''}`}>refresh</span>
+
                             </button>
                         </div>
 
@@ -1177,9 +1215,10 @@ export default function UserDashboard() {
                             {/* ── TRENDS TAB ── */}
                             {activeTab === 'trends' && (
                                 <div className="space-y-4">
-                                    {loadingIntel ? (
+                                    {loadingIntelHub ? (
                                         <SkeletonHub />
                                     ) : (
+
                                         <>
                                             {/* Grok AI Topics */}
                                             {grokTrends.length > 0 && (
@@ -1250,8 +1289,9 @@ export default function UserDashboard() {
                             {/* ── NEWS TAB ── */}
                             {activeTab === 'news' && (
                                 <div className="space-y-3">
-                                    {loadingIntel ? (
+                                    {loadingIntelHub ? (
                                         [1, 2, 3].map(i => (
+
                                             <div key={i} className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.04] space-y-3">
                                                 <div className="flex gap-3">
                                                     <Skeleton className="size-8 rounded-lg shrink-0" />
@@ -1289,8 +1329,9 @@ export default function UserDashboard() {
                              {/* ── TRIVIA TAB ── */}
                              {activeTab === 'trivia' && (
                                  <div className="space-y-3">
-                                     {loadingIntel ? (
+                                     {loadingIntelHub ? (
                                          [1, 2, 3, 4].map(i => (
+
                                              <div key={i} className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.04] space-y-3">
                                                  <div className="flex items-start gap-3">
                                                      <Skeleton className="size-8 rounded-full shrink-0" />
@@ -1337,7 +1378,8 @@ export default function UserDashboard() {
                     {/* ── 6. GROK CONTENT IDEAS ── */}
                     {grokContent.length > 0 && (
                         <div className="glass-panel rounded-2xl p-4 sm:p-5 lg:p-6 border border-cyan-500/15 anim-slide-up" style={{ animationDelay: '450ms' }}>
-                            <h3 className="text-base sm:text-lg font-bold text-white flex items-center gap-2 mb-5">
+                            <h3 className="text-base sm:text-lg font-bold text-white flex items-center gap-2 mb-5 min-h-[28px]">
+
                                 <span className="material-symbols-outlined text-cyan-400 shrink-0">tips_and_updates</span>
                                 <span className="truncate">Content Ideas for You</span>
                                 <span className="px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-400 text-[10px] font-black uppercase tracking-widest shrink-0">AI Powered</span>
