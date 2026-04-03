@@ -72,7 +72,7 @@ async function callAgent(systemPrompt, userPrompt, temperature = 0.7) {
         systemPrompt,
         userPrompt,
         temperature,
-        maxTokens: 4096,
+        maxTokens: 8192,
     }); // Router auto-selects; video-studio.js handles claude fallback separately
     return parseAgentJSON(result.text || '');
 }
@@ -643,13 +643,12 @@ export async function enhancePromptNode(state) {
     // Load brand context — CRITICAL: without this, enhanced prompts lose brand DNA
     const { brandContext, styleMemory } = await loadContext(state.brandId, state.userId);
 
-    const userPrompt = `Enhance this video generation prompt:\n\n"${state.prompt}"\n\nModel being used: ${state.model || 'general'}\nDesired duration: ${state.duration || 5}s\nAspect ratio: ${state.aspectRatio || '16:9'}`;
+    const userPromptFinal = `Enhance this video generation prompt:\n\n"${state.prompt}"\n\nModel being used: ${state.model || 'general'}\nDesired duration: ${state.duration || 5}s\nAspect ratio: ${state.aspectRatio || '16:9'}\n\nCRITICAL DIRECTIVE: Generate a minimum of 5,000 words. Expand every detail obsessively.`;
 
-    const result = await callFastAgent(
+    const result = await callAgent(
         PROMPT_ENHANCER_PROMPT(brandContext, styleMemory),
-        userPrompt,
-        0.5,
-        4096
+        userPromptFinal,
+        0.8 // Higher temperature for more creative expansion
     );
 
     return {
