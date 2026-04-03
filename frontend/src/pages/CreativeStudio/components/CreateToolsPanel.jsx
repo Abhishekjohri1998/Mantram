@@ -2,8 +2,7 @@ import { memo, useState } from 'react'
 import PromptArea from './PromptArea'
 import { IMAGE_MODELS, CAMERA_SHOT_PRESETS, creativeTypes, styles, ASPECT_RATIOS, templateCategories } from '../constants'
 import VoiceInput from '../../../components/VoiceInput'
-import CreditTooltipWrapper from '../../../components/CreditTooltipWrapper'
-import CreditBadge from '../../../components/CreditBadge'
+import { CreditBadge, CreditTooltipWrapper } from '../../../components/CreditBadge'
 
 const CreateToolsPanel = memo(({ 
     activeBrand, fromContent, setFromContent, designBaseImage, setDesignBaseImage,

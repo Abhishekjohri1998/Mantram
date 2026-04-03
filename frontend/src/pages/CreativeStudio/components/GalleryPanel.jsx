@@ -1,7 +1,7 @@
 import { memo, useRef } from 'react'
 import GlobalLoader from '../../../components/GlobalLoader'
 import { templateCategories } from '../constants'
-import CreditBadge from '../../../components/CreditBadge'
+import { CreditBadge } from '../../../components/CreditBadge'
 
 const GalleryPanel = memo(({
     galleryFilter, setGalleryFilter, viewMode, setViewMode,
