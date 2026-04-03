@@ -88,6 +88,7 @@ router.post(['/advanced/i2v', '/advanced/image-to-video'], protect, requireCredi
                 firstImageUrl: imageUrl,
                 aspectRatio: aspectRatio || '16:9',
                 duration: duration || 5,
+                referenceImages: (referenceImages || []).filter(Boolean).map(url => ({ url })),
             },
             routing: {
                 selectedModel: 'seedance-2.0',
@@ -281,7 +282,7 @@ router.post('/advanced/generate', protect, requireCredits('videoGenerate'), asyn
                 prompt: prompt.trim(),
                 firstImageUrl: (firstImageUrl && !firstImageUrl.startsWith('data:')) ? firstImageUrl : '',
                 lastImageUrl: (lastImageUrl && !lastImageUrl.startsWith('data:')) ? lastImageUrl : '',
-                referenceImages: (referenceImages || []).filter(Boolean),
+                referenceImages: (referenceImages || []).filter(Boolean).map(url => ({ url })),
                 aspectRatio: aspectRatio || '16:9',
                 duration: duration || 5,
                 generateAudio: generateAudio !== false,
