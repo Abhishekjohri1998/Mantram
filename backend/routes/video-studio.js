@@ -50,9 +50,9 @@ import { safeErrorMessage } from '../utils/safeError.js';
 const router = Router();
 
 // ══════════════════════════════════════════════════════════════════════════════
-// POST /api/video-studio/advanced/image-to-video — Seedance I2V (Advanced Mode)
+// POST /api/video-studio/advanced/i2v — Alias for /advanced/image-to-video
 // ══════════════════════════════════════════════════════════════════════════════
-router.post('/advanced/image-to-video', protect, requireCredits('videoGenerate'), async (req, res) => {
+router.post(['/advanced/i2v', '/advanced/image-to-video'], protect, requireCredits('videoGenerate'), async (req, res) => {
     try {
         const { imageUrl, prompt, duration, aspectRatio, qualityMode, brandId, referenceImages } = req.body;
 
