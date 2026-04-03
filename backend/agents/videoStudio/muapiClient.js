@@ -136,9 +136,16 @@ export async function submitMuApiVideoGeneration({
         payload.images_list = imagesList;
         console.log(`📸 [MuAPI] Final images_list (${imagesList.length} total):`, imagesList.map(u => u.substring(0, 60)));
 
-        // Prompt Auto-Tagging:
-        // Ensure the model actually looks at the reference images if not tagged
+        // Prompt Auto-Tagging & Hard Length Guard (4,000 chars)
+        // MuAPI strictly rejects anything over 4,000 characters.
         let finalPrompt = prompt.trim();
+        if (finalPrompt.length > 4000) {
+            console.warn(`🛑 MuAPI prompt exceeds 4,000 chars (${finalPrompt.length}). Truncating for technical compatibility.`);
+            finalPrompt = finalPrompt.substring(0, 4000);
+            const lastPeriod = finalPrompt.lastIndexOf('.');
+            if (lastPeriod > 3500) finalPrompt = finalPrompt.substring(0, lastPeriod + 1);
+        }
+        
         const untaggedIndices = [];
         for (let i = 1; i <= imagesList.length; i++) {
             if (!finalPrompt.includes(`@image${i}`)) untaggedIndices.push(`@image${i}`);

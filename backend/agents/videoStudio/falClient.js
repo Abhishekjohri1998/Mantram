@@ -14,12 +14,12 @@ const FAL_BASE_URL = 'https://queue.fal.run';
 const GROK_BASE_URL = 'https://api.x.ai/v1';
 
 const MODEL_ENDPOINTS = {
-    'kling-3.0':   { textToVideo: 'fal-ai/kling-video/v3/standard/text-to-video', imageToVideo: 'fal-ai/kling-video/v3/standard/image-to-video' },
-    'veo-3.1':     { textToVideo: 'fal-ai/veo3', imageToVideo: 'fal-ai/veo3/image-to-video', extendVideo: 'fal-ai/veo3.1/extend-video' },
-    'veo-3.1-fast':{ textToVideo: 'fal-ai/veo3/fast', imageToVideo: 'fal-ai/veo3/fast/image-to-video', extendVideo: 'fal-ai/veo3.1/fast/extend-video' },
-    'seedance-1.0':{ textToVideo: 'fal-ai/bytedance/seedance/v1/lite/text-to-video', imageToVideo: 'fal-ai/bytedance/seedance/v1/lite/image-to-video' },
-    'seedance-2.0':{ textToVideo: 'fal-ai/bytedance/seedance/v2/pro/text-to-video', imageToVideo: 'fal-ai/bytedance/seedance/v2/pro/image-to-video' },
-    'hunyuan':     { textToVideo: 'fal-ai/hunyuan-video/video-to-video', imageToVideo: 'fal-ai/hunyuan-video/image-to-video' },
+    'kling-3.0': { textToVideo: 'fal-ai/kling-video/v3/standard/text-to-video', imageToVideo: 'fal-ai/kling-video/v3/standard/image-to-video' },
+    'veo-3.1': { textToVideo: 'fal-ai/veo3', imageToVideo: 'fal-ai/veo3/image-to-video', extendVideo: 'fal-ai/veo3.1/extend-video' },
+    'veo-3.1-fast': { textToVideo: 'fal-ai/veo3/fast', imageToVideo: 'fal-ai/veo3/fast/image-to-video', extendVideo: 'fal-ai/veo3.1/fast/extend-video' },
+    'seedance-1.0': { textToVideo: 'fal-ai/bytedance/seedance/v1/lite/text-to-video', imageToVideo: 'fal-ai/bytedance/seedance/v1/lite/image-to-video' },
+    'seedance-2.0': { textToVideo: 'fal-ai/bytedance/seedance/v2/pro/text-to-video', imageToVideo: 'fal-ai/bytedance/seedance/v2/pro/image-to-video' },
+    'hunyuan': { textToVideo: 'fal-ai/hunyuan-video/video-to-video', imageToVideo: 'fal-ai/hunyuan-video/image-to-video' },
 };
 
 export const MODEL_AVAILABLE = {
@@ -34,25 +34,25 @@ export function getModelsInfo() {
 
 
 export const COST_PER_SECOND = {
-    'kling-3.0':   { fast: 0.07, quality: 0.12 },
-    'veo-3.1':     { fast: 0.10, quality: 0.25 },
-    'veo-3.1-fast':{ fast: 0.06, quality: 0.10 },
-    'seedance-1.0':{ fast: 0.05, quality: 0.08 },
-    'seedance-2.0':{ fast: 0.05, quality: 0.10 },
-    'grok-imagine':{ fast: 0.08, quality: 0.08 },
-    'hunyuan':     { fast: 0.03, quality: 0.05 },
-    'sora-2':      { fast: 0.10, quality: 0.15 },
+    'kling-3.0': { fast: 0.07, quality: 0.12 },
+    'veo-3.1': { fast: 0.10, quality: 0.25 },
+    'veo-3.1-fast': { fast: 0.06, quality: 0.10 },
+    'seedance-1.0': { fast: 0.05, quality: 0.08 },
+    'seedance-2.0': { fast: 0.05, quality: 0.10 },
+    'grok-imagine': { fast: 0.08, quality: 0.08 },
+    'hunyuan': { fast: 0.03, quality: 0.05 },
+    'sora-2': { fast: 0.10, quality: 0.15 },
 };
 
 const DURATION_LIMITS = {
-    'kling-3.0':   { min: 3, max: 15 },
-    'veo-3.1':     { min: 5, max: 8  },
-    'veo-3.1-fast':{ min: 5, max: 8  },
-    'seedance-1.0':{ min: 5, max: 10 },
-    'seedance-2.0':{ min: 5, max: 15 },
-    'grok-imagine':{ min: 1, max: 15 },
-    'hunyuan':     { min: 3, max: 10 },
-    'sora-2':      { min: 5, max: 15 },
+    'kling-3.0': { min: 3, max: 15 },
+    'veo-3.1': { min: 5, max: 8 },
+    'veo-3.1-fast': { min: 5, max: 8 },
+    'seedance-1.0': { min: 5, max: 10 },
+    'seedance-2.0': { min: 5, max: 15 },
+    'grok-imagine': { min: 1, max: 15 },
+    'hunyuan': { min: 3, max: 10 },
+    'sora-2': { min: 5, max: 15 },
 };
 
 export const MODEL_CAPABILITIES = {
@@ -64,7 +64,7 @@ export const MODEL_CAPABILITIES = {
         resolutions: ['720p', '1080p', '4k'], aspectRatios: ['16:9', '9:16', '1:1'],
         features: { firstFrame: true, lastFrame: true, referenceImages: false, extendVideo: false, multiShot: true, nativeAudio: true, voiceIds: true, cameraControl: false },
         maxReferenceImages: 0, costPerSecond: COST_PER_SECOND['kling-3.0'], recommended: true,
-        maxPromptLength: 2500, // Kling 3.0 supports approx 2k-3k chars
+        maxPromptLength: 200000, // Kling 3.0 supports approx 2k-3k chars
     },
     'veo-3.1': {
         id: 'veo-3.1', name: 'Google Veo 3.1', icon: '🎬', provider: 'fal',
@@ -74,7 +74,7 @@ export const MODEL_CAPABILITIES = {
         resolutions: ['720p', '1080p', '4k'], aspectRatios: ['16:9', '9:16'],
         features: { firstFrame: true, lastFrame: true, referenceImages: true, extendVideo: true, multiShot: false, nativeAudio: true, voiceIds: false, cameraControl: false },
         maxReferenceImages: 3, costPerSecond: COST_PER_SECOND['veo-3.1'], recommended: false,
-        maxPromptLength: 2000, // Veo usually limited to ~2k
+        maxPromptLength: 200000, // Veo usually limited to ~2k
     },
     'veo-3.1-fast': {
         id: 'veo-3.1-fast', name: 'Veo 3.1 Fast', icon: '⚡', provider: 'kie',
@@ -93,7 +93,7 @@ export const MODEL_CAPABILITIES = {
         resolutions: ['720p', '1080p'], aspectRatios: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'],
         features: { firstFrame: true, lastFrame: false, referenceImages: true, extendVideo: true, multiShot: true, nativeAudio: true, voiceIds: false, cameraControl: true },
         maxReferenceImages: 3, costPerSecond: COST_PER_SECOND['seedance-2.0'], recommended: false,
-        maxPromptLength: 4000, // HARD LIMIT from MuAPI/Seedance
+        maxPromptLength: 200000, // HARD LIMIT from MuAPI/Seedance
     },
     'grok-imagine': {
         id: 'grok-imagine', name: 'Grok Imagine', icon: '🤖', provider: 'grok',
@@ -112,7 +112,7 @@ export const MODEL_CAPABILITIES = {
         resolutions: ['480p', '720p', '1080p'], aspectRatios: ['16:9', '9:16', '1:1'],
         features: { firstFrame: true, lastFrame: false, referenceImages: false, extendVideo: false, multiShot: false, nativeAudio: false, voiceIds: false, cameraControl: false },
         maxReferenceImages: 0, costPerSecond: COST_PER_SECOND['hunyuan'], recommended: false,
-        maxPromptLength: 1000, // Hunyuan is very sensitive to length
+        maxPromptLength: 200000, // Hunyuan is very sensitive to length
     },
     'sora-2': {
         id: 'sora-2', name: 'Sora 2', icon: '🎞️', provider: 'laozhang',
@@ -133,7 +133,7 @@ let LIVE_COST_PER_SECOND = {};
 export async function syncLiveVideoPricing() {
     const baselines = await getSetting('pricing_baselines', null);
     if (!baselines) return;
-    
+
     for (const [key, model] of Object.entries(baselines)) {
         if (model.type === 'video' || model.type === 'image') {
             const id = model.modelId;
@@ -146,7 +146,7 @@ export async function syncLiveVideoPricing() {
 }
 
 // Ensure it attempts to load once on boot
-syncLiveVideoPricing().catch(() => {});
+syncLiveVideoPricing().catch(() => { });
 
 export function estimateCost(model = 'kling-3.0', durationSeconds = 5, resolution = '1080p', mode = 'fast') {
     const liveCost = LIVE_COST_PER_SECOND[model]?.[mode];
@@ -166,11 +166,11 @@ function truncatePrompt(prompt, modelId) {
     if (!prompt) return '';
     const model = MODEL_CAPABILITIES[modelId];
     const limit = model?.maxPromptLength || 2000;
-    
+
     if (prompt.length <= limit) return prompt;
-    
+
     console.log(`⚠️ Truncating prompt for ${modelId} from ${prompt.length} to ${limit} characters...`);
-    
+
     // We keep the first (limit) characters.
     // Try to end at a sentence/period for a cleaner cut.
     let truncated = prompt.substring(0, limit);
@@ -178,7 +178,7 @@ function truncatePrompt(prompt, modelId) {
     if (lastPeriod > limit * 0.8) {
         truncated = truncated.substring(0, lastPeriod + 1);
     }
-    
+
     return truncated;
 }
 
@@ -358,21 +358,21 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
     if (!endpoints) throw new Error(`Unknown video model: ${model}`);
     const endpoint = s3ImageUrl ? endpoints.imageToVideo : endpoints.textToVideo;
     const payload = buildPayload(model, { prompt: safePrompt, imageUrl: s3ImageUrl, duration, resolution, mode, shots, generateAudio });
-    
+
     // Pass primary image for I2V
     if (s3ImageUrl) payload.image_url = s3ImageUrl;
-    
+
     // Pass reference images for multi-ref models (e.g. Kling, Veo)
     // Ensures @image1, @image2, etc. in prompt work as expected
     if (s3ReferenceImages?.length > 0) {
         payload.images = s3ReferenceImages;
     }
 
-    const response = await fetch(`${FAL_BASE_URL}/${endpoint}`, { 
-        method: 'POST', 
-        headers: { 'Authorization': `Key ${apiKey}`, 'Content-Type': 'application/json' }, 
-        body: JSON.stringify(payload), 
-        signal: AbortSignal.timeout(35000) 
+    const response = await fetch(`${FAL_BASE_URL}/${endpoint}`, {
+        method: 'POST',
+        headers: { 'Authorization': `Key ${apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(35000)
     });
     if (!response.ok) throw new Error(`fal.ai failed (${response.status})`);
     const data = await response.json();
