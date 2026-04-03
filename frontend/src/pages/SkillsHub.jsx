@@ -1,8 +1,27 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import SEOHead from '../components/SEOHead'
 import { useBrand } from '../context/BrandContext'
 import DashboardLayout from '../components/DashboardLayout'
-import { skills as skillsAPI } from '../services/api'
+import { skills as skillsAPI, creatives as creativesAPI } from '../services/api'
+
+// ── Size Presets ──
+const SIZE_PRESETS = [
+    { label: 'Instagram Post', value: '1080x1080', icon: 'photo_camera', w: 1080, h: 1080 },
+    { label: 'Instagram Story', value: '1080x1920', icon: 'smartphone', w: 1080, h: 1920 },
+    { label: 'Facebook Post', value: '1200x630', icon: 'share', w: 1200, h: 630 },
+    { label: 'YouTube Thumbnail', value: '1280x720', icon: 'smart_display', w: 1280, h: 720 },
+    { label: 'Twitter/X Post', value: '1200x675', icon: 'tag', w: 1200, h: 675 },
+    { label: 'LinkedIn Post', value: '1200x627', icon: 'work', w: 1200, h: 627 },
+    { label: 'Film Poster (2:3)', value: '2000x3000', icon: 'movie', w: 2000, h: 3000 },
+    { label: 'Film Poster (27×40)', value: '2700x4000', icon: 'theaters', w: 2700, h: 4000 },
+    { label: 'A4 Portrait', value: '2480x3508', icon: 'description', w: 2480, h: 3508 },
+    { label: 'A4 Landscape', value: '3508x2480', icon: 'landscape', w: 3508, h: 2480 },
+    { label: 'HD (16:9)', value: '1920x1080', icon: 'monitor', w: 1920, h: 1080 },
+    { label: '4K', value: '3840x2160', icon: 'monitor', w: 3840, h: 2160 },
+    { label: 'Square Banner', value: '1200x1200', icon: 'crop_square', w: 1200, h: 1200 },
+    { label: 'Web Banner', value: '1920x600', icon: 'web', w: 1920, h: 600 },
+    { label: 'Custom', value: 'custom', icon: 'tune', w: null, h: null },
+];
 
 // ── Constants ──
 const CATEGORIES = [
@@ -167,7 +186,7 @@ export default function SkillsHub() {
     const { activeBrand } = useBrand()
 
     // View management
-    const [view, setView] = useState('browse')     // browse | run | build | manage
+    const [view, setView] = useState('browse')     // browse | run | build | history | help
     const [selectedSkill, setSelectedSkill] = useState(null)
     const [activeCategory, setActiveCategory] = useState('all')
 
@@ -189,9 +208,28 @@ export default function SkillsHub() {
     const [generating, setGenerating] = useState(false)
     const [enhancingInstructions, setEnhancingInstructions] = useState(false)
 
-    // Load skills
+    // Active skills state (Model A)
+    const [activeSkillIds, setActiveSkillIds] = useState(new Set())
+    const [activeSkillsMax, setActiveSkillsMax] = useState(5)
+    const [togglingSkill, setTogglingSkill] = useState(null)
+
+    // Image library state (for image_library field type)
+    const [libraryImages, setLibraryImages] = useState([])
+    const [libraryLoading, setLibraryLoading] = useState(false)
+    const [libraryOpen, setLibraryOpen] = useState(null) // field name of the open picker
+    const fileInputRefs = useRef({})
+
+    // Execution history state (Model B)
+    const [executions, setExecutions] = useState([])
+    const [executionsTotal, setExecutionsTotal] = useState(0)
+    const [loadingHistory, setLoadingHistory] = useState(false)
+    const [routing, setRouting] = useState(null) // executionId being routed
+    const [routeSuccess, setRouteSuccess] = useState(null)
+
+    // Load skills + active skills
     useEffect(() => {
         loadSkills()
+        loadActiveSkills()
     }, [])
 
     const loadSkills = async () => {
@@ -201,6 +239,84 @@ export default function SkillsHub() {
             if (data.success) setSkillsList(data.skills || [])
         } catch (e) { setError({ message: e.message, isProviderError: e.isProviderError, provider: e.provider }) }
         finally { setLoading(false) }
+    }
+
+    const loadActiveSkills = async () => {
+        try {
+            const data = await skillsAPI.getActive()
+            if (data.success) {
+                setActiveSkillIds(new Set((data.skills || []).map(s => s._id)))
+                setActiveSkillsMax(data.max || 5)
+            }
+        } catch { /* silent */ }
+    }
+
+    const toggleSkillActive = async (skillId, e) => {
+        e?.stopPropagation()
+        setTogglingSkill(skillId)
+        try {
+            const isActive = activeSkillIds.has(skillId)
+            const data = isActive
+                ? await skillsAPI.deactivate(skillId)
+                : await skillsAPI.activate(skillId)
+            if (data.success) {
+                const next = new Set(activeSkillIds)
+                isActive ? next.delete(skillId) : next.add(skillId)
+                setActiveSkillIds(next)
+            } else {
+                setError({ message: data.error || 'Failed to toggle skill', isProviderError: false })
+            }
+        } catch (e) { setError({ message: e.message, isProviderError: false }) }
+        finally { setTogglingSkill(null) }
+    }
+
+    const loadExecutionHistory = async () => {
+        setLoadingHistory(true)
+        try {
+            const data = await skillsAPI.listExecutions({ brandId: activeBrand?._id, limit: 20 })
+            if (data.success) {
+                setExecutions(data.executions || [])
+                setExecutionsTotal(data.total || 0)
+            }
+        } catch { /* silent */ }
+        finally { setLoadingHistory(false) }
+    }
+
+    const routeToContentStudio = async (executionId) => {
+        setRouting(executionId)
+        setRouteSuccess(null)
+        try {
+            const data = await skillsAPI.routeExecution(executionId, { destination: 'content_studio' })
+            if (data.success) {
+                setRouteSuccess({ executionId, message: data.message, itemCount: data.itemCount })
+            } else {
+                setError({ message: data.error || 'Routing failed', isProviderError: false })
+            }
+        } catch (e) { setError({ message: e.message, isProviderError: false }) }
+        finally { setRouting(null) }
+    }
+
+    // ── Load creative library for image_library fields ──
+    const loadLibraryImages = useCallback(async () => {
+        if (libraryImages.length > 0) return // already loaded
+        setLibraryLoading(true)
+        try {
+            const data = await creativesAPI.list({ brandId: activeBrand?._id, limit: 50 })
+            if (data.success || data.creatives) {
+                setLibraryImages((data.creatives || []).filter(c => c.imageUrl))
+            }
+        } catch { /* silent */ }
+        finally { setLibraryLoading(false) }
+    }, [activeBrand?._id, libraryImages.length])
+
+    // ── Handle image file upload + convert to base64 ──
+    const handleImageUpload = (fieldName, file) => {
+        if (!file) return
+        const reader = new FileReader()
+        reader.onload = (e) => {
+            setInputs(prev => ({ ...prev, [fieldName]: e.target.result }))
+        }
+        reader.readAsDataURL(file)
     }
 
     const filtered = activeCategory === 'all' ? skillsList : skillsList.filter(s => s.category === activeCategory)
@@ -298,7 +414,8 @@ export default function SkillsHub() {
         finally { setGenerating(false) }
     }
 
-    const goHome = () => { setView('browse'); setSelectedSkill(null); setResult(null); setError('') }
+    const goHome = () => { setView('browse'); setSelectedSkill(null); setResult(null); setError(''); setRouteSuccess(null) }
+    const openHistory = () => { setView('history'); loadExecutionHistory() }
 
     // ── Enhance instructions with AI ──
     const enhanceInstructions = async () => {
@@ -343,24 +460,54 @@ export default function SkillsHub() {
                 {view === 'browse' && (
                     <div className="animate-fade-in">
                         {/* Header Bar */}
-                        <div className="glass-panel rounded-2xl p-5 mb-6 flex items-center justify-between">
-                            <div>
-                                <h2 className="text-lg font-black text-white flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-primary text-xl">auto_awesome</span>
-                                    AI Skills Library
-                                </h2>
-                                <p className="text-xs text-slate-500 mt-0.5">{skillsList.length} skills available • Click to run, clone to customize</p>
+                        <div className="glass-panel rounded-2xl p-5 mb-6">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <h2 className="text-lg font-black text-white flex items-center gap-2">
+                                        <span className="material-symbols-outlined text-primary text-xl">auto_awesome</span>
+                                        AI Skills Library
+                                    </h2>
+                                    <p className="text-xs text-slate-500 mt-0.5">{skillsList.length} skills available • Click to run, ⚡ to activate as persistent instruction</p>
+                                </div>
+                                <div className="flex gap-2">
+                                    <button onClick={openHistory}
+                                        className="px-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.06] text-slate-400 text-xs font-bold hover:bg-white/[0.08] cursor-pointer transition-all flex items-center gap-2">
+                                        <span className="material-symbols-outlined text-sm">history</span> History
+                                    </button>
+                                    <button onClick={() => setView('help')}
+                                        className="px-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.06] text-slate-400 text-xs font-bold hover:bg-white/[0.08] cursor-pointer transition-all flex items-center gap-2">
+                                        <span className="material-symbols-outlined text-sm">menu_book</span> Guide
+                                    </button>
+                                    <button onClick={() => setView('build')}
+                                        className="px-4 py-2.5 rounded-xl bg-primary/10 text-primary text-xs font-bold hover:bg-primary/20 cursor-pointer transition-all flex items-center gap-2">
+                                        <span className="material-symbols-outlined text-sm">add</span> Create Skill
+                                    </button>
+                                </div>
                             </div>
-                            <div className="flex gap-2">
-                                <button onClick={() => setView('help')}
-                                    className="px-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.06] text-slate-400 text-xs font-bold hover:bg-white/[0.08] cursor-pointer transition-all flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-sm">menu_book</span> How It Works
-                                </button>
-                                <button onClick={() => setView('build')}
-                                    className="px-4 py-2.5 rounded-xl bg-primary/10 text-primary text-xs font-bold hover:bg-primary/20 cursor-pointer transition-all flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-sm">add</span> Create Skill
-                                </button>
-                            </div>
+
+                            {/* Active Skills Banner */}
+                            {activeSkillIds.size > 0 && (
+                                <div className="mt-4 p-3 rounded-xl bg-violet-500/5 border border-violet-500/15">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <span className="material-symbols-outlined text-violet-400 text-sm">bolt</span>
+                                        <span className="text-xs font-bold text-violet-300">{activeSkillIds.size}/{activeSkillsMax} Active Skills</span>
+                                        <span className="text-[10px] text-slate-500">— Instructions injected into every Fidato conversation</span>
+                                    </div>
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {skillsList.filter(s => activeSkillIds.has(s._id)).map(s => {
+                                            const c = getColors(s.color)
+                                            return (
+                                                <button key={s._id} onClick={(e) => toggleSkillActive(s._id, e)}
+                                                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg ${c.bg} ${c.text} text-[11px] font-bold hover:opacity-80 cursor-pointer transition-all group`}>
+                                                    <span className="material-symbols-outlined text-xs">{s.icon}</span>
+                                                    {s.name}
+                                                    <span className="material-symbols-outlined text-xs opacity-0 group-hover:opacity-100 transition-opacity">close</span>
+                                                </button>
+                                            )
+                                        })}
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         {/* Category Tabs */}
@@ -412,9 +559,23 @@ export default function SkillsHub() {
                                                     <span className={`text-[10px] px-2 py-0.5 rounded-full ${c.bg} ${c.text} font-bold uppercase`}>{skill.category}</span>
                                                     {skill.isPrebuilt && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary font-bold">BUILT-IN</span>}
                                                 </div>
-                                                <div className="flex items-center gap-2 text-[10px] text-slate-600">
-                                                    {skill.usageCount > 0 && <span className="flex items-center gap-0.5"><span className="material-symbols-outlined text-xs">play_arrow</span>{skill.usageCount}</span>}
-                                                    {skill.avgRating > 0 && <span className="flex items-center gap-0.5"><span className="material-symbols-outlined text-xs text-amber-400">star</span>{skill.avgRating.toFixed(1)}</span>}
+                                                <div className="flex items-center gap-2">
+                                                    {skill.usageCount > 0 && <span className="flex items-center gap-0.5 text-[10px] text-slate-600"><span className="material-symbols-outlined text-xs">play_arrow</span>{skill.usageCount}</span>}
+                                                    {skill.avgRating > 0 && <span className="flex items-center gap-0.5 text-[10px] text-slate-600"><span className="material-symbols-outlined text-xs text-amber-400">star</span>{skill.avgRating.toFixed(1)}</span>}
+                                                    {/* Activate Toggle */}
+                                                    <button
+                                                        onClick={(e) => toggleSkillActive(skill._id, e)}
+                                                        disabled={togglingSkill === skill._id}
+                                                        title={activeSkillIds.has(skill._id) ? 'Deactivate (remove from persistent instructions)' : 'Activate (inject into Fidato as persistent instruction)'}
+                                                        className={`size-7 rounded-lg flex items-center justify-center transition-all cursor-pointer ${
+                                                            activeSkillIds.has(skill._id)
+                                                                ? 'bg-violet-500/20 text-violet-400 ring-1 ring-violet-500/30'
+                                                                : 'bg-white/[0.04] text-slate-600 hover:text-violet-400 hover:bg-violet-500/10'
+                                                        }`}>
+                                                        {togglingSkill === skill._id
+                                                            ? <span className="material-symbols-outlined text-xs animate-spin">progress_activity</span>
+                                                            : <span className="material-symbols-outlined text-xs">bolt</span>}
+                                                    </button>
                                                 </div>
                                             </div>
                                         </div>
@@ -486,16 +647,175 @@ export default function SkillsHub() {
                                                 <label className="text-xs text-slate-400 font-bold mb-1.5 block">
                                                     {field.label} {field.required && <span className="text-rose-400">*</span>}
                                                 </label>
+
+                                                {/* ── Textarea ── */}
                                                 {field.type === 'textarea' ? (
                                                     <textarea value={inputs[field.name] || ''} onChange={e => setInputs({ ...inputs, [field.name]: e.target.value })}
                                                         placeholder={field.placeholder} rows={3}
                                                         className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-sm text-white focus:border-primary focus:outline-none resize-none" />
+
+                                                /* ── Select ── */
                                                 ) : field.type === 'select' ? (
                                                     <select value={inputs[field.name] || ''} onChange={e => setInputs({ ...inputs, [field.name]: e.target.value })}
                                                         className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-sm text-white focus:border-primary focus:outline-none cursor-pointer">
                                                         <option value="">{field.placeholder || 'Select...'}</option>
                                                         {field.options?.map((opt, j) => <option key={j} value={opt}>{opt}</option>)}
                                                     </select>
+
+                                                /* ── Image Upload ── */
+                                                ) : field.type === 'image_upload' ? (
+                                                    <div>
+                                                        {inputs[field.name] ? (
+                                                            <div className="relative group">
+                                                                <img src={inputs[field.name]} alt={field.label}
+                                                                    className="w-full max-h-48 object-contain rounded-xl border border-white/10 bg-white/[0.02]" />
+                                                                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl flex items-center justify-center gap-3">
+                                                                    <button onClick={() => setInputs({ ...inputs, [field.name]: '' })}
+                                                                        className="px-3 py-1.5 rounded-lg bg-rose-500/20 text-rose-400 text-xs font-bold cursor-pointer hover:bg-rose-500/30 transition-all">
+                                                                        Remove
+                                                                    </button>
+                                                                    <button onClick={() => fileInputRefs.current[field.name]?.click()}
+                                                                        className="px-3 py-1.5 rounded-lg bg-white/10 text-white text-xs font-bold cursor-pointer hover:bg-white/20 transition-all">
+                                                                        Replace
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        ) : (
+                                                            <div
+                                                                onClick={() => fileInputRefs.current[field.name]?.click()}
+                                                                onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('border-primary', 'bg-primary/5') }}
+                                                                onDragLeave={(e) => { e.currentTarget.classList.remove('border-primary', 'bg-primary/5') }}
+                                                                onDrop={(e) => { e.preventDefault(); e.currentTarget.classList.remove('border-primary', 'bg-primary/5'); handleImageUpload(field.name, e.dataTransfer.files[0]) }}
+                                                                className="w-full py-8 rounded-xl border-2 border-dashed border-white/10 bg-white/[0.02] flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-primary/40 hover:bg-primary/5 transition-all">
+                                                                <span className="material-symbols-outlined text-3xl text-slate-500">cloud_upload</span>
+                                                                <p className="text-xs text-slate-400 font-medium">Click or drag & drop image</p>
+                                                                <p className="text-[10px] text-slate-600">PNG, JPG, WEBP up to 10MB</p>
+                                                            </div>
+                                                        )}
+                                                        <input
+                                                            ref={el => fileInputRefs.current[field.name] = el}
+                                                            type="file" accept="image/*" className="hidden"
+                                                            onChange={(e) => handleImageUpload(field.name, e.target.files[0])} />
+                                                    </div>
+
+                                                /* ── Image Library (pick from Creative Studio) ── */
+                                                ) : field.type === 'image_library' ? (
+                                                    <div>
+                                                        {inputs[field.name] ? (
+                                                            <div className="relative group">
+                                                                <img src={inputs[field.name]} alt={field.label}
+                                                                    className="w-full max-h-48 object-contain rounded-xl border border-white/10 bg-white/[0.02]" />
+                                                                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl flex items-center justify-center gap-3">
+                                                                    <button onClick={() => setInputs({ ...inputs, [field.name]: '' })}
+                                                                        className="px-3 py-1.5 rounded-lg bg-rose-500/20 text-rose-400 text-xs font-bold cursor-pointer hover:bg-rose-500/30 transition-all">
+                                                                        Remove
+                                                                    </button>
+                                                                    <button onClick={() => { setLibraryOpen(field.name); loadLibraryImages() }}
+                                                                        className="px-3 py-1.5 rounded-lg bg-white/10 text-white text-xs font-bold cursor-pointer hover:bg-white/20 transition-all">
+                                                                        Change
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        ) : (
+                                                            <button onClick={() => { setLibraryOpen(field.name); loadLibraryImages() }}
+                                                                className="w-full py-6 rounded-xl border-2 border-dashed border-white/10 bg-white/[0.02] flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-violet-500/40 hover:bg-violet-500/5 transition-all">
+                                                                <span className="material-symbols-outlined text-3xl text-violet-400">photo_library</span>
+                                                                <p className="text-xs text-slate-400 font-medium">Select from Creative Library</p>
+                                                                <p className="text-[10px] text-slate-600">Choose from your generated images</p>
+                                                            </button>
+                                                        )}
+
+                                                        {/* ── Library Picker Modal ── */}
+                                                        {libraryOpen === field.name && (
+                                                            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={() => setLibraryOpen(null)}>
+                                                                <div className="bg-[#0c0e1a] rounded-2xl border border-white/10 w-full max-w-2xl max-h-[80vh] overflow-hidden" onClick={e => e.stopPropagation()}>
+                                                                    <div className="flex items-center justify-between p-5 border-b border-white/[0.06]">
+                                                                        <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                                                                            <span className="material-symbols-outlined text-violet-400 text-lg">photo_library</span>
+                                                                            Select Image — {field.label}
+                                                                        </h3>
+                                                                        <button onClick={() => setLibraryOpen(null)} className="text-slate-500 hover:text-white cursor-pointer transition-all">
+                                                                            <span className="material-symbols-outlined">close</span>
+                                                                        </button>
+                                                                    </div>
+                                                                    <div className="p-5 overflow-y-auto max-h-[60vh]">
+                                                                        {libraryLoading ? (
+                                                                            <div className="flex items-center justify-center py-12">
+                                                                                <span className="material-symbols-outlined text-primary animate-spin text-3xl">progress_activity</span>
+                                                                            </div>
+                                                                        ) : libraryImages.length === 0 ? (
+                                                                            <div className="text-center py-12">
+                                                                                <span className="material-symbols-outlined text-slate-600 text-4xl block mb-2">image_not_supported</span>
+                                                                                <p className="text-sm text-slate-400">No images in library yet.</p>
+                                                                                <p className="text-xs text-slate-600 mt-1">Generate images in Creative Studio first.</p>
+                                                                            </div>
+                                                                        ) : (
+                                                                            <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+                                                                                {libraryImages.map((img) => (
+                                                                                    <button key={img._id}
+                                                                                        onClick={() => { setInputs(prev => ({ ...prev, [field.name]: img.imageUrl })); setLibraryOpen(null) }}
+                                                                                        className={`group relative rounded-xl overflow-hidden border-2 transition-all cursor-pointer aspect-square ${
+                                                                                            inputs[field.name] === img.imageUrl
+                                                                                                ? 'border-primary ring-2 ring-primary/30'
+                                                                                                : 'border-white/[0.06] hover:border-primary/40'
+                                                                                        }`}>
+                                                                                        <img src={img.imageUrl} alt={img.prompt?.slice(0, 30) || 'Creative'}
+                                                                                            className="w-full h-full object-cover" loading="lazy" />
+                                                                                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-2">
+                                                                                            <p className="text-[10px] text-white font-medium line-clamp-2">{img.prompt?.slice(0, 60) || 'Untitled'}</p>
+                                                                                        </div>
+                                                                                    </button>
+                                                                                ))}
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                    {/* Upload alternative */}
+                                                                    <div className="p-4 border-t border-white/[0.06] flex items-center justify-between">
+                                                                        <p className="text-[11px] text-slate-500">Or upload directly:</p>
+                                                                        <label className="px-4 py-2 rounded-lg bg-white/5 text-xs text-slate-300 font-bold hover:bg-white/10 cursor-pointer transition-all flex items-center gap-1.5">
+                                                                            <span className="material-symbols-outlined text-sm">cloud_upload</span> Upload Image
+                                                                            <input type="file" accept="image/*" className="hidden"
+                                                                                onChange={(e) => { handleImageUpload(field.name, e.target.files[0]); setLibraryOpen(null) }} />
+                                                                        </label>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+                                                /* ── Size Selector ── */
+                                                ) : field.type === 'size_select' ? (
+                                                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                                                        {SIZE_PRESETS.map(sz => {
+                                                            const isSelected = inputs[field.name] === sz.value
+                                                            return (
+                                                                <button key={sz.value}
+                                                                    onClick={() => setInputs({ ...inputs, [field.name]: sz.value })}
+                                                                    className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all cursor-pointer ${
+                                                                        isSelected
+                                                                            ? 'border-primary bg-primary/10 ring-1 ring-primary/20'
+                                                                            : 'border-white/[0.06] bg-white/[0.02] hover:border-primary/30 hover:bg-primary/5'
+                                                                    }`}>
+                                                                    <span className={`material-symbols-outlined text-lg ${isSelected ? 'text-primary' : 'text-slate-500'}`}>{sz.icon}</span>
+                                                                    <span className={`text-[11px] font-bold ${isSelected ? 'text-white' : 'text-slate-400'}`}>{sz.label}</span>
+                                                                    {sz.w && <span className="text-[9px] text-slate-600">{sz.w}×{sz.h}</span>}
+                                                                </button>
+                                                            )
+                                                        })}
+                                                        {inputs[field.name] === 'custom' && (
+                                                            <div className="col-span-full flex gap-2 mt-2">
+                                                                <input type="number" placeholder="Width" value={inputs[`${field.name}_w`] || ''}
+                                                                    onChange={e => setInputs({ ...inputs, [`${field.name}_w`]: e.target.value })}
+                                                                    className="flex-1 px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-xs text-white focus:border-primary focus:outline-none" />
+                                                                <span className="text-slate-500 self-center text-xs">×</span>
+                                                                <input type="number" placeholder="Height" value={inputs[`${field.name}_h`] || ''}
+                                                                    onChange={e => setInputs({ ...inputs, [`${field.name}_h`]: e.target.value })}
+                                                                    className="flex-1 px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-xs text-white focus:border-primary focus:outline-none" />
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+                                                /* ── Default: text/number/url ── */
                                                 ) : (
                                                     <input type={field.type === 'number' ? 'number' : field.type === 'url' ? 'url' : 'text'}
                                                         value={inputs[field.name] || ''} onChange={e => setInputs({ ...inputs, [field.name]: e.target.value })}
@@ -545,22 +865,44 @@ export default function SkillsHub() {
                                     </div>
                                 </div>
 
+                                {/* Route Success Banner */}
+                                {routeSuccess && routeSuccess.executionId === result.executionId && (
+                                    <div className="flex items-center gap-2 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 mb-4 animate-fade-in">
+                                        <span className="material-symbols-outlined text-emerald-400 text-sm">check_circle</span>
+                                        <span className="text-xs text-emerald-300 font-bold">{routeSuccess.message}</span>
+                                        <a href="/content-studio" className="ml-auto text-xs text-emerald-400 hover:underline font-bold">Open Content Studio →</a>
+                                    </div>
+                                )}
+
                                 {/* Render output */}
                                 <ResultRenderer output={result.output} outputFormat={result.outputFormat} />
 
-                                {/* Actions */}
-                                <div className="flex gap-3 mt-6">
-                                    <button onClick={() => { setResult(null); setInputs({}) }}
+                                {/* Actions — Output Routing (Model B) */}
+                                <div className="flex flex-wrap gap-3 mt-6 pt-4 border-t border-white/[0.06]">
+                                    {/* Primary: Route to Content Studio */}
+                                    {result.executionId && (
+                                        <button
+                                            onClick={() => routeToContentStudio(result.executionId)}
+                                            disabled={routing === result.executionId || (routeSuccess && routeSuccess.executionId === result.executionId)}
+                                            className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-primary/15 to-violet-500/10 border border-primary/20 text-primary text-sm font-bold hover:from-primary/25 hover:to-violet-500/20 cursor-pointer transition-all flex items-center gap-2 disabled:opacity-40">
+                                            {routing === result.executionId
+                                                ? <><span className="material-symbols-outlined text-sm animate-spin">progress_activity</span> Saving...</>
+                                                : (routeSuccess && routeSuccess.executionId === result.executionId)
+                                                    ? <><span className="material-symbols-outlined text-sm">check</span> Saved to Content Studio</>
+                                                    : <><span className="material-symbols-outlined text-sm">inbox</span> Save to Content Studio</>}
+                                        </button>
+                                    )}
+                                    <button onClick={() => { setResult(null); setInputs({}); setRouteSuccess(null) }}
                                         className="px-4 py-2 rounded-xl bg-white/5 text-sm text-slate-400 hover:bg-primary/10 hover:text-primary cursor-pointer transition-all font-bold">
                                         Run Again
                                     </button>
                                     <button onClick={() => { navigator.clipboard.writeText(JSON.stringify(result.output, null, 2)) }}
                                         className="px-4 py-2 rounded-xl bg-white/5 text-sm text-slate-400 hover:bg-emerald-500/10 hover:text-emerald-400 cursor-pointer transition-all font-bold flex items-center gap-1">
-                                        <span className="material-symbols-outlined text-xs">content_copy</span> Copy Output
+                                        <span className="material-symbols-outlined text-xs">content_copy</span> Copy
                                     </button>
                                     <button onClick={goHome}
                                         className="px-4 py-2 rounded-xl bg-white/5 text-sm text-slate-400 hover:bg-white/10 hover:text-white cursor-pointer transition-all font-bold">
-                                        Back to Skills
+                                        Back
                                     </button>
                                 </div>
                             </div>
@@ -568,6 +910,91 @@ export default function SkillsHub() {
                     </div>
                 )}
 
+
+                {/* ═══ EXECUTION HISTORY VIEW ═══ */}
+                {view === 'history' && (
+                    <div className="animate-fade-in">
+                        <button onClick={goHome} className="flex items-center gap-2 text-slate-400 hover:text-white text-sm font-bold mb-6 cursor-pointer transition-all">
+                            <span className="material-symbols-outlined text-sm">arrow_back</span> Back to Skills
+                        </button>
+
+                        <div className="glass-panel rounded-2xl p-5 mb-6">
+                            <h2 className="text-lg font-black text-white flex items-center gap-2">
+                                <span className="material-symbols-outlined text-primary text-xl">history</span>
+                                Execution History
+                            </h2>
+                            <p className="text-xs text-slate-500 mt-0.5">{executionsTotal} total executions{activeBrand ? ` for ${activeBrand.name}` : ''}</p>
+                        </div>
+
+                        {loadingHistory ? (
+                            <div className="text-center py-20">
+                                <span className="material-symbols-outlined text-primary animate-spin text-3xl">progress_activity</span>
+                                <p className="text-sm text-slate-500 mt-3">Loading history...</p>
+                            </div>
+                        ) : executions.length === 0 ? (
+                            <div className="text-center py-20 glass-panel rounded-2xl">
+                                <span className="material-symbols-outlined text-slate-600 text-5xl block mb-3">history</span>
+                                <h3 className="text-lg font-bold text-white mb-2">No Executions Yet</h3>
+                                <p className="text-sm text-slate-400">Run some skills to see their history here.</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-3">
+                                {executions.map(exec => {
+                                    const c = getColors(exec.skillColor)
+                                    const date = new Date(exec.createdAt)
+                                    const isRouted = exec.routedTo?.some(r => r.destination === 'content_studio')
+                                    return (
+                                        <div key={exec._id} className="glass-panel rounded-2xl p-4">
+                                            <div className="flex items-start gap-3">
+                                                <div className={`w-10 h-10 rounded-xl ${c.bg} flex items-center justify-center shrink-0`}>
+                                                    <span className={`material-symbols-outlined ${c.text} text-lg`}>{exec.skillIcon || 'auto_awesome'}</span>
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-2">
+                                                        <h4 className="text-sm font-bold text-white">{exec.skillName}</h4>
+                                                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${c.bg} ${c.text} font-bold uppercase`}>{exec.skillCategory}</span>
+                                                        {isRouted && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 font-bold">ROUTED</span>}
+                                                    </div>
+                                                    <p className="text-[11px] text-slate-500 mt-0.5">
+                                                        {date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} at {date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                                                        {exec.rating && <span className="ml-2">{'⭐'.repeat(exec.rating)}</span>}
+                                                    </p>
+                                                </div>
+                                                <div className="flex gap-1.5 shrink-0">
+                                                    {!isRouted && (
+                                                        <button
+                                                            onClick={() => routeToContentStudio(exec._id)}
+                                                            disabled={routing === exec._id}
+                                                            className="px-3 py-1.5 rounded-lg bg-primary/10 text-primary text-[11px] font-bold hover:bg-primary/20 cursor-pointer transition-all flex items-center gap-1 disabled:opacity-40">
+                                                            {routing === exec._id
+                                                                ? <span className="material-symbols-outlined text-xs animate-spin">progress_activity</span>
+                                                                : <span className="material-symbols-outlined text-xs">inbox</span>}
+                                                            Save to Studio
+                                                        </button>
+                                                    )}
+                                                    <button
+                                                        onClick={() => { navigator.clipboard.writeText(JSON.stringify(exec.output, null, 2)) }}
+                                                        className="px-2.5 py-1.5 rounded-lg bg-white/5 text-slate-500 text-[11px] font-bold hover:bg-white/10 hover:text-white cursor-pointer transition-all flex items-center gap-1">
+                                                        <span className="material-symbols-outlined text-xs">content_copy</span>
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            {/* Collapsed output preview */}
+                                            {exec.output && (
+                                                <div className="mt-3 p-3 rounded-xl bg-white/[0.02] border border-white/[0.04] max-h-32 overflow-y-auto">
+                                                    <p className="text-[11px] text-slate-500 font-mono whitespace-pre-wrap line-clamp-5">
+                                                        {typeof exec.output === 'string' ? exec.output.slice(0, 500) : JSON.stringify(exec.output, null, 2).slice(0, 500)}...
+                                                    </p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        )}
+                    </div>
+                )}
 
                 {/* ═══ BUILD SKILL VIEW ═══ */}
                 {view === 'build' && (
@@ -676,8 +1103,15 @@ export default function SkillsHub() {
                                         <input type="text" value={field.label} onChange={e => { const f = [...buildForm.inputFields]; f[i] = { ...f[i], label: e.target.value }; setBuildForm({ ...buildForm, inputFields: f }) }}
                                             placeholder="Display Label" className="flex-1 px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-xs text-white focus:border-primary focus:outline-none" />
                                         <select value={field.type} onChange={e => { const f = [...buildForm.inputFields]; f[i] = { ...f[i], type: e.target.value }; setBuildForm({ ...buildForm, inputFields: f }) }}
-                                            className="w-24 px-2 py-2 rounded-lg bg-white/5 border border-white/10 text-xs text-white focus:border-primary focus:outline-none cursor-pointer">
-                                            <option value="text">Text</option><option value="textarea">Long text</option><option value="select">Select</option><option value="number">Number</option><option value="url">URL</option>
+                                            className="w-32 px-2 py-2 rounded-lg bg-white/5 border border-white/10 text-xs text-white focus:border-primary focus:outline-none cursor-pointer">
+                                            <option value="text">Text</option>
+                                            <option value="textarea">Long text</option>
+                                            <option value="select">Select</option>
+                                            <option value="number">Number</option>
+                                            <option value="url">URL</option>
+                                            <option value="image_upload">📷 Image Upload</option>
+                                            <option value="image_library">🖼️ Image Library</option>
+                                            <option value="size_select">📐 Size Picker</option>
                                         </select>
                                         <button onClick={() => { const f = buildForm.inputFields.filter((_, j) => j !== i); setBuildForm({ ...buildForm, inputFields: f }) }}
                                             className="text-slate-600 hover:text-rose-400 cursor-pointer"><span className="material-symbols-outlined text-sm">close</span></button>

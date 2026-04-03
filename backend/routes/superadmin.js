@@ -1560,6 +1560,300 @@ router.delete('/video-providers/provider', async (req, res) => {
     }
 });
 // ══════════════════════════════════════════════════════════════
+// IMAGE PROVIDER MANAGEMENT — Global API Switcher for Image Models
+// Manage ALL image model providers: add, remove, switch, modify
+// ══════════════════════════════════════════════════════════════
+
+const IMAGE_PROVIDER_REGISTRY = {
+    'nanobanana-2': {
+        name: 'NanoBanana 2',
+        icon: 'auto_awesome',
+        category: 'multimodal',
+        defaultProvider: 'laozhang',
+        providers: [
+            { id: 'laozhang', name: 'LaoZhang (Gemini Flash)', envKey: 'LAOZHANG_API_KEY', costPerImage: 0.003, description: 'Primary — Gemini 3.1 Flash image preview, cheapest, supports ref images', builtIn: true },
+            { id: 'fal', name: 'fal.ai', envKey: 'FAL_API_KEY', costPerImage: 0.04, description: 'Fallback — supports custom pixel sizes', builtIn: true },
+        ],
+    },
+    'nanobanana-pro': {
+        name: 'NanoBanana Pro',
+        icon: 'workspace_premium',
+        category: 'multimodal',
+        defaultProvider: 'laozhang',
+        providers: [
+            { id: 'laozhang', name: 'LaoZhang (Gemini Pro)', envKey: 'LAOZHANG_API_KEY', costPerImage: 0.007, description: 'Primary — Gemini 3 Pro image preview, higher quality, supports ref images', builtIn: true },
+            { id: 'fal', name: 'fal.ai', envKey: 'FAL_API_KEY', costPerImage: 0.06, description: 'Fallback — queue-based async', builtIn: true },
+        ],
+    },
+    'flux-pro-v1.1': {
+        name: 'Flux Pro v1.1',
+        icon: 'flash_on',
+        category: 'text-to-image',
+        defaultProvider: 'laozhang',
+        providers: [
+            { id: 'laozhang', name: 'LaoZhang (Flux Kontext Pro)', envKey: 'LAOZHANG_API_KEY', costPerImage: 0.02, description: 'Primary — Flux Kontext Pro via LZ, 50% cheaper', builtIn: true },
+            { id: 'fal', name: 'fal.ai (Direct)', envKey: 'FAL_API_KEY', costPerImage: 0.04, description: 'Direct — exact pixel sizes, queue-based', builtIn: true },
+        ],
+    },
+    'flux-2-pro': {
+        name: 'Flux 2 Pro',
+        icon: 'bolt',
+        category: 'premium',
+        defaultProvider: 'laozhang',
+        providers: [
+            { id: 'laozhang', name: 'LaoZhang (Flux Kontext Max)', envKey: 'LAOZHANG_API_KEY', costPerImage: 0.04, description: 'Primary — Flux Kontext Max via LZ', builtIn: true },
+            { id: 'fal', name: 'fal.ai (Direct)', envKey: 'FAL_API_KEY', costPerImage: 0.08, description: 'Direct — highest quality, exact pixel sizes', builtIn: true },
+        ],
+    },
+    'seedream-5': {
+        name: 'Seedream 5',
+        icon: 'landscape',
+        category: 'text-to-image',
+        defaultProvider: 'laozhang',
+        providers: [
+            { id: 'laozhang', name: 'LaoZhang (Flux Kontext Max)', envKey: 'LAOZHANG_API_KEY', costPerImage: 0.04, description: 'Rerouted — Seedream not on this LZ account, uses Flux Max', builtIn: true },
+            { id: 'fal', name: 'fal.ai (Direct)', envKey: 'FAL_API_KEY', costPerImage: 0.05, description: 'Direct Seedream — native ByteDance model', builtIn: true },
+        ],
+    },
+    'ideogram': {
+        name: 'Ideogram v3',
+        icon: 'draw',
+        category: 'text-to-image',
+        defaultProvider: 'laozhang',
+        providers: [
+            { id: 'laozhang', name: 'LaoZhang (Flux Kontext Pro)', envKey: 'LAOZHANG_API_KEY', costPerImage: 0.02, description: 'Cheapest — routes through Flux Kontext Pro on LZ', builtIn: true },
+            { id: 'fal', name: 'fal.ai (Direct Ideogram)', envKey: 'FAL_API_KEY', costPerImage: 0.06, description: 'Native Ideogram v3 — true Ideogram quality, supports custom sizes', builtIn: true },
+        ],
+    },
+    'grok-imagen': {
+        name: 'Grok Imagen',
+        icon: 'auto_fix_high',
+        category: 'premium',
+        defaultProvider: 'grok',
+        providers: [
+            { id: 'grok', name: 'xAI (Native)', envKey: 'GROK_API_KEY', costPerImage: 0.05, description: 'Native xAI Grok Imagen API — fast, single provider', builtIn: true },
+        ],
+    },
+};
+
+const IMAGE_CATEGORY_LABELS = {
+    multimodal: { label: 'Multimodal (Ref Images)', color: 'cyan', icon: 'auto_awesome' },
+    'text-to-image': { label: 'Text-to-Image', color: 'violet', icon: 'image' },
+    premium: { label: 'Premium', color: 'amber', icon: 'workspace_premium' },
+};
+
+async function getMergedImageProviderRegistry() {
+    const customProviders = await getSetting('image_provider_custom', {});
+    const merged = {};
+
+    for (const [modelId, config] of Object.entries(IMAGE_PROVIDER_REGISTRY)) {
+        merged[modelId] = { ...config, providers: [...config.providers] };
+    }
+
+    for (const [modelId, customData] of Object.entries(customProviders)) {
+        if (!merged[modelId]) {
+            merged[modelId] = {
+                name: customData.name || modelId,
+                icon: customData.icon || 'image',
+                category: customData.category || 'text-to-image',
+                defaultProvider: customData.defaultProvider || customData.providers?.[0]?.id,
+                providers: [],
+            };
+        }
+        if (customData.providers) {
+            for (const cp of customData.providers) {
+                const existing = merged[modelId].providers.findIndex(p => p.id === cp.id);
+                if (existing >= 0) {
+                    merged[modelId].providers[existing] = { ...merged[modelId].providers[existing], ...cp };
+                } else {
+                    merged[modelId].providers.push({ ...cp, builtIn: false });
+                }
+            }
+        }
+        if (customData.removedProviders) {
+            merged[modelId].providers = merged[modelId].providers.filter(p => !customData.removedProviders.includes(p.id));
+        }
+        if (customData.defaultProvider) {
+            merged[modelId].defaultProvider = customData.defaultProvider;
+        }
+    }
+
+    return merged;
+}
+
+// GET /superadmin/image-providers
+router.get('/image-providers', async (req, res) => {
+    try {
+        const registry = await getMergedImageProviderRegistry();
+        const providerRoutes = await getSetting('image_provider_routes', {});
+        const storedKeys = await getSetting('api_keys', {});
+
+        const models = Object.entries(registry).map(([modelId, config]) => {
+            const activeProvider = providerRoutes[modelId]?.active || config.defaultProvider;
+            const lastSwitched = providerRoutes[modelId]?.updatedAt || null;
+
+            const providers = config.providers.map(p => {
+                const dbKey = storedKeys[p.id]?.apiKey;
+                const envKey = process.env[p.envKey || ''];
+                return {
+                    id: p.id, name: p.name, envKey: p.envKey || '',
+                    costPerImage: p.costPerImage || 0, description: p.description || '',
+                    hasKey: !!(dbKey || envKey), keySource: dbKey ? 'database' : envKey ? 'env' : 'none',
+                    isActive: p.id === activeProvider, builtIn: p.builtIn !== false,
+                };
+            });
+
+            return {
+                id: modelId, name: config.name, icon: config.icon || 'image',
+                category: config.category || 'text-to-image', activeProvider, lastSwitched,
+                providers, multiProvider: providers.length > 1,
+            };
+        });
+
+        res.json({ success: true, models, categories: IMAGE_CATEGORY_LABELS });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// PUT /superadmin/image-providers — switch active provider
+router.put('/image-providers', async (req, res) => {
+    try {
+        const { modelId, provider } = req.body;
+        if (!modelId || !provider) return res.status(400).json({ success: false, error: 'modelId and provider required' });
+
+        const registry = await getMergedImageProviderRegistry();
+        const modelConfig = registry[modelId];
+        if (!modelConfig) return res.status(400).json({ success: false, error: `Unknown model: ${modelId}` });
+
+        const validProvider = modelConfig.providers.find(p => p.id === provider);
+        if (!validProvider) return res.status(400).json({ success: false, error: `Unknown provider '${provider}' for '${modelId}'` });
+
+        const storedKeys = await getSetting('api_keys', {});
+        const hasKey = !!(storedKeys[provider]?.apiKey || process.env[validProvider.envKey || '']);
+        if (!hasKey) return res.status(400).json({ success: false, error: `No API key for ${validProvider.name}. Add it in API Key Management first.` });
+
+        const providerRoutes = await getSetting('image_provider_routes', {});
+        providerRoutes[modelId] = { active: provider, updatedAt: new Date(), updatedBy: req.user._id };
+        await setSetting('image_provider_routes', providerRoutes, req.user._id);
+
+        await logAudit(req, { action: 'SWITCH_IMAGE_PROVIDER', targetModel: 'SystemSettings', targetId: modelId, severity: 'high', metadata: { modelId, provider, providerName: validProvider.name } });
+
+        console.log(`🔀 [SuperAdmin] Image provider switched: ${modelId} → ${validProvider.name} (${provider}) by ${req.user.email}`);
+        res.json({ success: true, message: `${modelConfig.name} now using ${validProvider.name}`, modelId, provider });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// POST /superadmin/image-providers/provider — add new provider
+router.post('/image-providers/provider', async (req, res) => {
+    try {
+        const { modelId, providerId, providerName, envKey, costPerImage, description } = req.body;
+        if (!modelId || !providerId || !providerName) return res.status(400).json({ success: false, error: 'modelId, providerId, and providerName required' });
+        if (!/^[a-z0-9-]+$/.test(providerId)) return res.status(400).json({ success: false, error: 'providerId must be lowercase alphanumeric with hyphens' });
+
+        const registry = await getMergedImageProviderRegistry();
+        const modelConfig = registry[modelId];
+        if (modelConfig) {
+            const existing = modelConfig.providers.find(p => p.id === providerId);
+            if (existing?.builtIn) return res.status(400).json({ success: false, error: `Cannot add '${providerId}' — conflicts with built-in. Use PATCH to modify.` });
+        }
+
+        const customProviders = await getSetting('image_provider_custom', {});
+        if (!customProviders[modelId]) customProviders[modelId] = { providers: [] };
+        if (!customProviders[modelId].providers) customProviders[modelId].providers = [];
+        if (customProviders[modelId].removedProviders) {
+            customProviders[modelId].removedProviders = customProviders[modelId].removedProviders.filter(id => id !== providerId);
+        }
+
+        customProviders[modelId].providers = customProviders[modelId].providers.filter(p => p.id !== providerId);
+        customProviders[modelId].providers.push({
+            id: providerId, name: providerName,
+            envKey: envKey || `${providerId.toUpperCase().replace(/-/g, '_')}_API_KEY`,
+            costPerImage: parseFloat(costPerImage) || 0,
+            description: description || `Custom provider: ${providerName}`,
+            builtIn: false, addedAt: new Date(), addedBy: req.user._id,
+        });
+
+        await setSetting('image_provider_custom', customProviders, req.user._id);
+        await logAudit(req, { action: 'ADD_IMAGE_PROVIDER', targetModel: 'SystemSettings', targetId: `${modelId}/${providerId}`, severity: 'medium', metadata: { modelId, providerId, providerName } });
+
+        console.log(`➕ [SuperAdmin] Image provider added: ${providerName} (${providerId}) → ${modelId} by ${req.user.email}`);
+        res.json({ success: true, message: `${providerName} added to ${modelConfig?.name || modelId}` });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// PATCH /superadmin/image-providers/provider — modify provider
+router.patch('/image-providers/provider', async (req, res) => {
+    try {
+        const { modelId, providerId, updates } = req.body;
+        if (!modelId || !providerId || !updates) return res.status(400).json({ success: false, error: 'modelId, providerId, and updates required' });
+
+        const allowedFields = ['name', 'envKey', 'costPerImage', 'description'];
+        const filtered = {};
+        for (const key of allowedFields) { if (updates[key] !== undefined) filtered[key] = updates[key]; }
+        if (Object.keys(filtered).length === 0) return res.status(400).json({ success: false, error: `No valid fields. Allowed: ${allowedFields.join(', ')}` });
+
+        const customProviders = await getSetting('image_provider_custom', {});
+        if (!customProviders[modelId]) customProviders[modelId] = { providers: [] };
+        if (!customProviders[modelId].providers) customProviders[modelId].providers = [];
+
+        const idx = customProviders[modelId].providers.findIndex(p => p.id === providerId);
+        if (idx >= 0) {
+            customProviders[modelId].providers[idx] = { ...customProviders[modelId].providers[idx], ...filtered };
+        } else {
+            customProviders[modelId].providers.push({ id: providerId, ...filtered });
+        }
+
+        await setSetting('image_provider_custom', customProviders, req.user._id);
+        await logAudit(req, { action: 'MODIFY_IMAGE_PROVIDER', targetModel: 'SystemSettings', targetId: `${modelId}/${providerId}`, severity: 'medium', metadata: { modelId, providerId, updates: filtered } });
+
+        res.json({ success: true, message: `Provider ${providerId} updated for ${modelId}` });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// DELETE /superadmin/image-providers/provider — remove provider
+router.delete('/image-providers/provider', async (req, res) => {
+    try {
+        const { modelId, providerId } = req.body;
+        if (!modelId || !providerId) return res.status(400).json({ success: false, error: 'modelId and providerId required' });
+
+        const providerRoutes = await getSetting('image_provider_routes', {});
+        if (providerRoutes[modelId]?.active === providerId) {
+            return res.status(400).json({ success: false, error: 'Cannot remove active provider. Switch first.' });
+        }
+
+        const customProviders = await getSetting('image_provider_custom', {});
+        if (!customProviders[modelId]) customProviders[modelId] = {};
+
+        const builtIn = IMAGE_PROVIDER_REGISTRY[modelId]?.providers?.find(p => p.id === providerId);
+        if (builtIn) {
+            if (!customProviders[modelId].removedProviders) customProviders[modelId].removedProviders = [];
+            if (!customProviders[modelId].removedProviders.includes(providerId)) {
+                customProviders[modelId].removedProviders.push(providerId);
+            }
+        } else {
+            if (customProviders[modelId].providers) {
+                customProviders[modelId].providers = customProviders[modelId].providers.filter(p => p.id !== providerId);
+            }
+        }
+
+        await setSetting('image_provider_custom', customProviders, req.user._id);
+        await logAudit(req, { action: 'REMOVE_IMAGE_PROVIDER', targetModel: 'SystemSettings', targetId: `${modelId}/${providerId}`, severity: 'high', metadata: { modelId, providerId, wasBuiltIn: !!builtIn } });
+
+        console.log(`➖ [SuperAdmin] Image provider removed: ${providerId} from ${modelId} by ${req.user.email}`);
+        res.json({ success: true, message: `Provider ${providerId} removed${builtIn ? ' (hidden — can be re-added)' : ''}` });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// ══════════════════════════════════════════════════════════════
 // WATERMARK MANAGEMENT
 // ══════════════════════════════════════════════════════════════
 
@@ -1723,6 +2017,46 @@ router.get('/provider-usage', async (req, res) => {
             } catch (e) { /* ignore */ }
         }
 
+        // Try fal.ai account balance
+        let falBalance = null;
+        const falKey = storedKeys.fal?.apiKey || process.env.FAL_API_KEY;
+        if (falKey) {
+            try {
+                const fResp = await fetch('https://rest.alpha.fal.ai/billing', {
+                    headers: { 'Authorization': `Key ${falKey}`, 'Content-Type': 'application/json' },
+                    signal: AbortSignal.timeout(10000),
+                });
+                if (fResp.ok) {
+                    falBalance = await fResp.json();
+                } else {
+                    // Try alternate endpoint
+                    try {
+                        const fResp2 = await fetch('https://queue.fal.run/fal-ai/fast-sdxl', {
+                            method: 'POST',
+                            headers: { 'Authorization': `Key ${falKey}`, 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ prompt: 'test', num_images: 0 }),
+                            signal: AbortSignal.timeout(5000),
+                        });
+                        // If 402/403 = balance issue, 200 = working
+                        falBalance = { status: fResp2.status === 200 || fResp2.status === 422 ? 'active' : fResp2.status === 402 || fResp2.status === 403 ? 'exhausted' : 'unknown', httpStatus: fResp2.status };
+                    } catch (e2) { falBalance = { status: 'unreachable' }; }
+                }
+            } catch (e) { falBalance = { status: 'unreachable', error: e.message }; }
+        }
+
+        // Try LaoZhang balance
+        let laozhangBalance = null;
+        const lzKey = storedKeys.laozhang?.apiKey || process.env.LAOZHANG_API_KEY;
+        if (lzKey) {
+            try {
+                const lzResp = await fetch('https://api.laozhang.ai/v1/models', {
+                    headers: { 'Authorization': `Bearer ${lzKey}` },
+                    signal: AbortSignal.timeout(10000),
+                });
+                laozhangBalance = { status: lzResp.ok ? 'active' : 'error', httpStatus: lzResp.status, modelsAvailable: lzResp.ok ? (await lzResp.json()).data?.length || 0 : 0 };
+            } catch (e) { laozhangBalance = { status: 'unreachable', error: e.message }; }
+        }
+
         // Daily trend (last N days)
         const dailyTrend = await CreditUsage.aggregate([
             { $match: { createdAt: { $gte: since } } },
@@ -1736,6 +2070,8 @@ router.get('/provider-usage', async (req, res) => {
             providerUsage,
             openaiRealUsage,
             piapiBalance,
+            falBalance,
+            laozhangBalance,
             dailyTrend,
             totalEstimatedCostUSD: Math.round(Object.values(providerUsage).reduce((s, p) => s + p.estimatedCostUSD, 0) * 100) / 100,
             totalCalls: Object.values(providerUsage).reduce((s, p) => s + p.calls, 0),

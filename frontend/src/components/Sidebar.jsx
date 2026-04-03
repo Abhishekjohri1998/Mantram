@@ -16,7 +16,7 @@ const navItems = [
     { icon: 'filter_alt', label: 'Funnel Studio', to: '/funnel-studio', studioKey: 'funnelStudio', superAdminOnly: true },
     { icon: 'storefront', label: 'D2C Studio', to: '/d2c-analytics', studioKey: 'd2cAnalytics', superAdminOnly: true },
     { icon: 'loyalty', label: 'Retention Studio', to: '/retention-studio', studioKey: 'retentionStudio', superAdminOnly: true },
-    { icon: 'auto_awesome', label: 'Skills Hub', to: '/skills', studioKey: 'skillsHub', superAdminOnly: true },
+    { icon: 'auto_awesome', label: 'Skills Hub', to: '/skills', studioKey: 'skillsHub' },
 ]
 
 const bottomItems = [

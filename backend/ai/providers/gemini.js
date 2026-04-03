@@ -1,7 +1,4 @@
 import { BaseProvider } from './base.js';
-import { GoogleGenAI } from '@google/genai';
-
-
 
 /**
  * Google Gemini Provider
@@ -13,93 +10,12 @@ export class GeminiProvider extends BaseProvider {
         super(config);
         this.name = 'gemini';
         this.baseUrl = 'https://generativelanguage.googleapis.com/v1beta';
-        
         // Dedicated image generation key (billed) — falls back to main key
         this.imageApiKey = config.imageApiKey || this.apiKey;
-
-        // ── GCP VERTEX AI INTEGRATION (BILLED) ───────────────────────
-        // If credentials and project are provided, initialize the Vertex SDK
-        // This directs traffic to your Google Cloud Project billing credits.
-        const gcpProject = config.gcpProjectId || process.env.GCP_PROJECT_ID;
-        const gcpCreds = config.googleApplicationCredentials || process.env.GOOGLE_APPLICATION_CREDENTIALS;
-
-        if (gcpProject && gcpCreds) {
-            try {
-                this.vertexAi = new GoogleGenAI({
-                    vertexai: true,
-                    project: gcpProject,
-                    location: config.gcpLocation || process.env.GCP_LOCATION || 'us-central1'
-                });
-
-                console.log(`🚀 [Gemini] Vertex AI initialized (Billed Project: ${gcpProject})`);
-            } catch (err) {
-                console.error(`❌ [Gemini] Failed to initialize Vertex AI:`, err.message);
-                // Fallback to API Key is handled implicitly by check in generate methods
-            }
-        }
     }
 
     async generateText({ systemPrompt, userPrompt, temperature = 0.7, maxTokens = 2048, model, images = [] }) {
-        const modelId = model || this.config.defaultModel || 'gemini-2.0-flash';
-
-        // --- BRANCH: VERTEX AI SDK (BILLED CREDITS) ---
-        if (this.vertexAi) {
-            try {
-                const startTime = Date.now();
-                const parts = [{ text: `${systemPrompt}\n\n${userPrompt}` }];
-                
-                // Add images for GenAI SDK
-                for (const img of images) {
-                    let mimeType = 'image/jpeg';
-                    let b64Data = '';
-                    
-                    if (img.startsWith('data:')) {
-                        const match = img.match(/^data:([\w/+]+);base64,(.+)$/);
-                        if (match) {
-                            mimeType = match[1];
-                            b64Data = match[2];
-                        }
-                    } else if (img.startsWith('http')) {
-                        try {
-                            console.log(`📥 [Vertex] Fetching image URL: ${img.substring(0, 100)}...`);
-                            const r = await fetch(img);
-                            const arr = await r.arrayBuffer();
-                            b64Data = Buffer.from(arr).toString('base64');
-                            mimeType = r.headers.get('content-type') || 'image/jpeg';
-                        } catch (e) {
-                            console.warn('⚠️ [Vertex] Failed to fetch image URL:', e.message);
-                        }
-                    }
-                    
-                    if (b64Data) {
-                        parts.push({ inlineData: { mimeType, data: b64Data } });
-                    }
-                }
-
-                const result = await this.vertexAi.models.generateContent({
-                    model: modelId,
-                    contents: [{ role: 'user', parts }],
-                    generationConfig: { temperature, maxOutputTokens: maxTokens }
-                });
-
-                const text = result.text;
-                const tokensUsed = result.usageMetadata?.totalTokenCount || 0;
-
-
-                return {
-                    text,
-                    tokensUsed,
-                    model: modelId,
-                    provider: 'gemini',
-                    generationTime: Date.now() - startTime,
-                };
-            } catch (err) {
-                console.warn(`⚠️ Vertex AI failed, falling back to API Key:`, err.message);
-                // Fall through to legacy API Key logic
-            }
-        }
-
-        // --- BRANCH: REST API (API KEY) ---
+        const modelId = model || this.config.defaultModel || 'gemini-2.5-flash';
         const url = `${this.baseUrl}/models/${modelId}:generateContent?key=${this.apiKey}`;
         
         const parts = [{ text: `${systemPrompt}\n\n${userPrompt}` }];
@@ -175,7 +91,7 @@ export class GeminiProvider extends BaseProvider {
      * Returns text + grounding citations (URLs, titles, snippets).
      */
     async generateTextWithSearch({ systemPrompt, userPrompt, temperature = 0.7, maxTokens = 4096, model }) {
-        const modelId = model || this.config.defaultModel || 'gemini-2.0-flash';
+        const modelId = model || this.config.defaultModel || 'gemini-2.5-flash';
         const url = `${this.baseUrl}/models/${modelId}:generateContent?key=${this.apiKey}`;
 
         const startTime = Date.now();
@@ -261,90 +177,26 @@ export class GeminiProvider extends BaseProvider {
      */
     async generateImage({ prompt, aspectRatio = '1:1', model, imageParts = [] }) {
         const startTime = Date.now();
+        const imageKey = this.imageApiKey;
         const modelId = model || this.config.defaultImageModel || 'gemini-3.1-flash-image-preview';
 
-
-        // --- BRANCH: VERTEX AI SDK (BILLED CREDITS) ---
-        if (this.vertexAi) {
-            try {
-                const parts = [];
-                
-                // Process imageParts (usually contains prompt text + base64/URLs)
-                for (const ip of imageParts) {
-                    if (ip.inlineData) {
-                        parts.push({ inlineData: ip.inlineData });
-                    } else if (ip.text) {
-                        parts.push({ text: ip.text });
-                    } else if (ip.imageUrl) {
-                        // Handle raw URL in imageParts
-                        try {
-                            const r = await fetch(ip.imageUrl);
-                            const arr = await r.arrayBuffer();
-                            parts.push({ 
-                                inlineData: { 
-                                    mimeType: r.headers.get('content-type') || 'image/jpeg',
-                                    data: Buffer.from(arr).toString('base64')
-                                } 
-                            });
-                        } catch (e) {
-                            console.warn('⚠️ [Vertex Image] Failed to fetch part URL:', e.message);
-                        }
-                    }
-                }
-                
-                const arInstruction = aspectRatio !== '1:1' ? `\n\n[ASPECT RATIO: ${aspectRatio}]` : '';
-                parts.push({ text: prompt + arInstruction });
-
-                const result = await this.vertexAi.models.generateContent({
-                    model: modelId,
-                    contents: [{ role: 'user', parts }],
-                    generationConfig: {
-                        responseModalities: ['TEXT', 'IMAGE'],
-                        temperature: 0.4,
-                    }
-                });
-
-                let imageUrl = null;
-                if (result.parts) {
-                    for (const part of result.parts) {
-                        if (part.inlineData?.mimeType?.startsWith('image/')) {
-                            imageUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-                            break;
-                        }
-                    }
-                }
-
-
-                if (imageUrl) {
-                    return {
-                        imageUrl,
-                        model: modelId,
-                        provider: 'gemini',
-                        generationTime: Date.now() - startTime,
-                    };
-                }
-            } catch (err) {
-                console.warn(`⚠️ Vertex AI Image generation failed, falling back to API Key:`, err.message);
-            }
-        }
-
-        // --- BRANCH: REST API (API KEY) ---
-        const imageKey = this.imageApiKey;
         console.log(`\n══════ GEMINI IMAGE GENERATION (${modelId}) ══════`);
         console.log(`📐 Aspect Ratio: ${aspectRatio}`);
         console.log(`📝 Prompt: ${prompt.substring(0, 100)}...`);
 
         try {
-            // Modern models (Flash 2.0/1.5/3.1, etc.) use generateContent
+            // Modern models (Flash 2.5, Flash 3.1 Preview, etc.) use generateContent
             if (modelId.includes('flash') || modelId.includes('pro') || modelId.includes('preview')) {
                 const url = `${this.baseUrl}/models/${modelId}:generateContent?key=${imageKey}`;
                 
+                // Build content parts
                 const parts = [];
                 for (const ip of imageParts) {
                     if (ip.inlineData) parts.push({ inlineData: ip.inlineData });
                     if (ip.text) parts.push({ text: ip.text });
                 }
                 
+                // Append aspect ratio instruction to prompt if needed
                 const arInstruction = aspectRatio !== '1:1' ? `\n\n[ASPECT RATIO: ${aspectRatio}]` : '';
                 parts.push({ text: prompt + arInstruction });
 
@@ -364,8 +216,12 @@ export class GeminiProvider extends BaseProvider {
                 
                 if (data.error) {
                     const errMsg = data.error.message || JSON.stringify(data.error);
-                    const lowerMsg = String(errMsg).toLowerCase();
-                    if (lowerMsg.includes('high demand') || lowerMsg.includes('busy') || response.status === 503 || response.status === 429) {
+                    const isBusy = errMsg.toLowerCase().includes('high demand') || 
+                                   errMsg.toLowerCase().includes('busy') || 
+                                   response.status === 503 || 
+                                   response.status === 429;
+                    
+                    if (isBusy) {
                         throw new Error(`BUSY: ${errMsg}`);
                     }
                     throw new Error(`Gemini Image Error: ${errMsg}`);
@@ -390,6 +246,7 @@ export class GeminiProvider extends BaseProvider {
                 }
                 throw new Error('Gemini returned no image in response');
             } 
+            
             // Legacy Imagen models use predict endpoint
             else {
                 const url = `${this.baseUrl}/models/${modelId}:predict?key=${imageKey}`;
@@ -400,7 +257,7 @@ export class GeminiProvider extends BaseProvider {
                         instances: [{ prompt }],
                         parameters: { sampleCount: 1, aspectRatio: '1:1' }
                     }),
-                 });
+                });
 
                 const data = await response.json();
                 if (data.error) throw new Error(data.error.message);

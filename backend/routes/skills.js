@@ -3,10 +3,15 @@ import { protect } from '../middleware/auth.js';
 import { requireCredits } from '../middleware/credits.js';
 import Skill from '../models/Skill.js';
 import Brand from '../models/Brand.js';
+import User from '../models/User.js';
+import SkillExecution from '../models/SkillExecution.js';
+import Content from '../models/Content.js';
 import { seedDefaultSkills } from '../seeds/defaultSkills.js';
 import { resolveTargetMarkets, getMarketContext, getRelevantFestivals } from '../utils/globalCalendar.js';
 import { safeErrorMessage } from '../utils/safeError.js';
 import { setMaxListeners } from 'events';
+
+const MAX_ACTIVE_SKILLS = 5;
 
 const router = Router();
 
@@ -473,10 +478,31 @@ router.post('/:id/execute', protect, requireCredits('content'), async (req, res)
         skill.lastUsedAt = new Date();
         await skill.save();
 
+        // Save execution to history
+        let execution;
+        try {
+            execution = await SkillExecution.create({
+                user: req.user._id,
+                skill: skill._id,
+                brand: brandId || undefined,
+                skillName: skill.name,
+                skillCategory: skill.category,
+                skillIcon: skill.icon,
+                skillColor: skill.color,
+                inputs: inputs || {},
+                output,
+                outputFormat: skill.outputFormat,
+                status: 'completed',
+            });
+        } catch (histErr) {
+            console.warn('Failed to save skill execution history:', histErr.message);
+        }
+
         res.json({
             success: true,
             skillName: skill.name,
             skillId: skill._id,
+            executionId: execution?._id || null,
             output,
             outputFormat: skill.outputFormat,
             suggestedNextSkills: skill.suggestedNextSkills,
@@ -594,4 +620,258 @@ Rules:
 });
 
 
+// ============================================================================
+// ACTIVATE SKILL — Add to user's persistent active skills (Model A)
+// ============================================================================
+
+router.post('/:id/activate', protect, async (req, res) => {
+    try {
+        const skill = await Skill.findOne({
+            _id: req.params.id,
+            status: 'active',
+            $or: [
+                { user: req.user._id },
+                { isPrebuilt: true },
+                { visibility: 'marketplace' },
+            ],
+        });
+        if (!skill) return res.status(404).json({ success: false, error: 'Skill not found' });
+
+        const user = await User.findById(req.user._id);
+        if (!user) return res.status(404).json({ success: false, error: 'User not found' });
+
+        // Check if already active
+        const alreadyActive = (user.activeSkills || []).some(id => id.toString() === skill._id.toString());
+        if (alreadyActive) return res.json({ success: true, message: 'Skill already active', activeCount: user.activeSkills.length });
+
+        // Cap check
+        if ((user.activeSkills || []).length >= MAX_ACTIVE_SKILLS) {
+            return res.status(400).json({
+                success: false,
+                error: `Maximum ${MAX_ACTIVE_SKILLS} active skills allowed. Deactivate one first.`,
+                activeCount: user.activeSkills.length,
+                max: MAX_ACTIVE_SKILLS,
+            });
+        }
+
+        user.activeSkills = [...(user.activeSkills || []), skill._id];
+        await user.save();
+
+        res.json({ success: true, message: `"${skill.name}" activated`, activeCount: user.activeSkills.length });
+    } catch (error) {
+        console.error('Activate skill error:', error);
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+
+// ============================================================================
+// DEACTIVATE SKILL — Remove from user's persistent active skills
+// ============================================================================
+
+router.post('/:id/deactivate', protect, async (req, res) => {
+    try {
+        const user = await User.findById(req.user._id);
+        if (!user) return res.status(404).json({ success: false, error: 'User not found' });
+
+        user.activeSkills = (user.activeSkills || []).filter(id => id.toString() !== req.params.id);
+        await user.save();
+
+        res.json({ success: true, message: 'Skill deactivated', activeCount: user.activeSkills.length });
+    } catch (error) {
+        console.error('Deactivate skill error:', error);
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+
+// ============================================================================
+// GET ACTIVE SKILLS — List user's currently activated skills with full details
+// ============================================================================
+
+router.get('/active/list', protect, async (req, res) => {
+    try {
+        const user = await User.findById(req.user._id).lean();
+        const activeIds = user?.activeSkills || [];
+
+        if (activeIds.length === 0) {
+            return res.json({ success: true, skills: [], count: 0, max: MAX_ACTIVE_SKILLS });
+        }
+
+        const skills = await Skill.find({ _id: { $in: activeIds }, status: 'active' })
+            .select('name description category icon color tags')
+            .lean();
+
+        res.json({ success: true, skills, count: skills.length, max: MAX_ACTIVE_SKILLS });
+    } catch (error) {
+        console.error('Get active skills error:', error);
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+
+// ============================================================================
+// EXECUTION HISTORY — List past skill executions
+// ============================================================================
+
+router.get('/executions/list', protect, async (req, res) => {
+    try {
+        const { brandId, limit = 20, skip = 0 } = req.query;
+        const query = { user: req.user._id };
+        if (brandId) query.brand = brandId;
+
+        const executions = await SkillExecution.find(query)
+            .sort({ createdAt: -1 })
+            .skip(parseInt(skip))
+            .limit(Math.min(parseInt(limit), 50))
+            .lean();
+
+        const total = await SkillExecution.countDocuments(query);
+
+        res.json({ success: true, executions, total });
+    } catch (error) {
+        console.error('List executions error:', error);
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+
+// ============================================================================
+// ROUTE EXECUTION OUTPUT — Send skill output to Content Studio
+// ============================================================================
+
+router.post('/executions/:executionId/route', protect, async (req, res) => {
+    try {
+        const { destination = 'content_studio' } = req.body;
+        const execution = await SkillExecution.findOne({
+            _id: req.params.executionId,
+            user: req.user._id,
+        });
+        if (!execution) return res.status(404).json({ success: false, error: 'Execution not found' });
+
+        if (destination !== 'content_studio') {
+            return res.status(400).json({ success: false, error: 'Only content_studio routing is supported currently' });
+        }
+
+        const output = execution.output;
+        if (!output || typeof output !== 'object') {
+            return res.status(400).json({ success: false, error: 'No structured output to route' });
+        }
+
+        // ── Smart content extraction ──
+        const contentDocs = [];
+        const brandId = execution.brand;
+        const skillTag = `skill:${execution.skillName}`;
+
+        // Helper: create a Content doc
+        const makeContent = (type, title, content, platform = '', extraTags = []) => ({
+            user: req.user._id,
+            brand: brandId || undefined,
+            type,
+            title: title || execution.skillName,
+            content: typeof content === 'string' ? content : JSON.stringify(content, null, 2),
+            prompt: `Generated by skill: ${execution.skillName}`,
+            platform,
+            status: 'draft',
+            tags: [skillTag, 'auto-generated', ...extraTags],
+            aiMeta: { agenticPipeline: true, pipelineStep: 'skill-output' },
+        });
+
+        // 1. Social posts (socialPosts, posts, variants)
+        const socialData = output.socialPosts || output.posts || output.variants;
+        if (Array.isArray(socialData)) {
+            for (const post of socialData) {
+                const caption = post.caption || post.primaryText || post.text || post.content || JSON.stringify(post);
+                const platform = post.platform || '';
+                const title = post.day ? `Day ${post.day}` : (post.variantName || post.title || '');
+                contentDocs.push(makeContent('social', title, caption, platform, post.hashtags || []));
+            }
+        }
+
+        // 2. Ad creatives
+        const adData = output.adCreatives || output.ads;
+        if (Array.isArray(adData)) {
+            for (const ad of adData) {
+                const body = [ad.headline, ad.body || ad.primaryText, ad.cta ? `CTA: ${ad.cta}` : ''].filter(Boolean).join('\n\n');
+                contentDocs.push(makeContent('ad', ad.concept || ad.headline || 'Ad Creative', body, '', ['ad-creative']));
+            }
+        }
+
+        // 3. Email/WhatsApp messaging
+        const msgData = output.messaging || output.emails || output.emailSequence;
+        if (Array.isArray(msgData)) {
+            for (const msg of msgData) {
+                const body = msg.template || msg.body || msg.content || JSON.stringify(msg);
+                const title = msg.subject || msg.stage || msg.channel || 'Message';
+                contentDocs.push(makeContent('email', title, body, msg.channel || 'email', ['messaging']));
+            }
+        }
+
+        // 4. Blog/article content
+        const blogData = output.blogPost || output.article || output.blog;
+        if (blogData && typeof blogData === 'object') {
+            const body = blogData.content || blogData.body || JSON.stringify(blogData, null, 2);
+            contentDocs.push(makeContent('blog', blogData.title || 'Blog Post', body, '', ['blog']));
+        }
+
+        // 5. Content calendar days
+        const daysData = output.days;
+        if (Array.isArray(daysData) && !socialData) {
+            for (const day of daysData) {
+                if (day.posts && Array.isArray(day.posts)) {
+                    for (const post of day.posts) {
+                        const caption = post.caption || post.content || JSON.stringify(post);
+                        contentDocs.push(makeContent('social', `${day.day || ''} — ${post.platform || ''}`, caption, post.platform || '', post.hashtags || []));
+                    }
+                } else if (day.socialPost) {
+                    const post = day.socialPost;
+                    const caption = post.caption || JSON.stringify(post);
+                    contentDocs.push(makeContent('social', `Day ${day.day} — ${day.phase || day.theme || ''}`, caption, '', post.hashtags || []));
+                }
+            }
+        }
+
+        // 6. Reel/video concepts
+        const reelData = output.reelConcepts || output.reels || output.videoConcepts;
+        if (Array.isArray(reelData)) {
+            for (const reel of reelData) {
+                const body = [reel.title, reel.script, reel.concept].filter(Boolean).join('\n\n');
+                contentDocs.push(makeContent('social', reel.title || 'Reel Concept', body, 'instagram', ['reel', 'video']));
+            }
+        }
+
+        // 7. Fallback — if no structured content was extracted, wrap entire output
+        if (contentDocs.length === 0) {
+            contentDocs.push(makeContent('other', execution.skillName, JSON.stringify(output, null, 2), '', ['raw-output']));
+        }
+
+        // Save all content docs
+        const created = await Content.insertMany(contentDocs);
+        const contentIds = created.map(c => c._id);
+
+        // Update execution with routing info
+        execution.routedTo.push({
+            destination: 'content_studio',
+            contentIds,
+            itemCount: contentIds.length,
+            routedAt: new Date(),
+        });
+        execution.status = 'routed';
+        await execution.save();
+
+        res.json({
+            success: true,
+            message: `${contentIds.length} item(s) saved to Content Studio as drafts`,
+            contentIds,
+            itemCount: contentIds.length,
+        });
+    } catch (error) {
+        console.error('Route execution error:', error);
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+
+
 export default router;
+

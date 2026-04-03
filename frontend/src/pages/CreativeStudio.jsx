@@ -57,6 +57,11 @@ const creativeTypes = [
     { id: 'linkedin-post', icon: 'work', label: 'LinkedIn Post', size: '1200×1200', aspectRatio: '1:1' },
     { id: 'youtube-thumb', icon: 'smart_display', label: 'YouTube Thumb', size: '1280×720', aspectRatio: '16:9' },
     { id: 'banner', icon: 'web', label: 'Banner', size: '1920×600', aspectRatio: '16:9' },
+    { id: 'film-poster', icon: 'movie', label: 'Film Poster', size: '2000×3000', aspectRatio: '2:3', w: 2000, h: 3000 },
+    { id: 'hd-wide', icon: 'monitor', label: 'HD 16:9', size: '1920×1080', aspectRatio: '16:9', w: 1920, h: 1080 },
+    { id: 'a4-portrait', icon: 'description', label: 'A4 Portrait', size: '2480×3508', aspectRatio: '2:3', w: 2480, h: 3508 },
+    { id: 'square-hd', icon: 'crop_square', label: 'Square HD', size: '1200×1200', aspectRatio: '1:1', w: 1200, h: 1200 },
+    { id: 'custom-size', icon: 'tune', label: 'Custom Size', size: 'Custom', aspectRatio: null },
 ]
 
 // ── Design Styles ──
@@ -343,6 +348,8 @@ export default function CreativeStudio() {
     const [textOverlay, setTextOverlay] = useState('')
     const [fromContent, setFromContent] = useState(false)
     const [aspectRatio, setAspectRatio] = useState('4:5')
+    const [customWidth, setCustomWidth] = useState('')
+    const [customHeight, setCustomHeight] = useState('')
     const [publishData, setPublishData] = useState(null) // { image, text } or null
     const [imageModel, setImageModel] = useState('nanobanana-2')
     const [showModelMenu, setShowModelMenu] = useState(false)
@@ -732,6 +739,27 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
     const [campLogoPlacement, setCampLogoPlacement] = useState('bottom-right')
     const [campFeatures, setCampFeatures] = useState([]) // product features to distribute across creatives
     const [campFeatureInput, setCampFeatureInput] = useState('')
+
+    // ── Carousel Mode State ──
+    const [carouselPrompt, setCarouselPrompt] = useState('')
+    const [carouselSlides, setCarouselSlides] = useState(3)
+    const [carouselStyle, setCarouselStyle] = useState('modern')
+    const [carouselGenerating, setCarouselGenerating] = useState(false)
+    const [carouselResult, setCarouselResult] = useState(null)
+    const [carouselError, setCarouselError] = useState(null)
+    const [carouselPolling, setCarouselPolling] = useState(false)
+    const [carouselProductImages, setCarouselProductImages] = useState([])
+    const [carouselCurrentSlide, setCarouselCurrentSlide] = useState(0)
+    const [carouselSlideFormat, setCarouselSlideFormat] = useState('1:1')
+    const [carouselEnhancing, setCarouselEnhancing] = useState(false)
+    const [carouselThemeImage, setCarouselThemeImage] = useState(null) // inspiration image URL or data URI
+    const [carouselThemeAnalysis, setCarouselThemeAnalysis] = useState(null) // MCoT theme result
+    const [carouselAnalyzing, setCarouselAnalyzing] = useState(false)
+    const [carouselThemeError, setCarouselThemeError] = useState(null)
+    const [carouselGenre, setCarouselGenre] = useState('luxury') // cinematic genre treatment
+    const [carouselSlideTexts, setCarouselSlideTexts] = useState([]) // text per slide
+    const [carouselShowModelDrop, setCarouselShowModelDrop] = useState(false)
+    const [carouselShowFormatDrop, setCarouselShowFormatDrop] = useState(false)
     const [campStyleRef, setCampStyleRef] = useState(null)
     const [campScene, setCampScene] = useState('auto') // auto, studio, outdoor, indoor, podium, etc.
     const [campResults, setCampResults] = useState([])
@@ -1070,7 +1098,24 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
         if (typeInfo?.aspectRatio) {
             setAspectRatio(typeInfo.aspectRatio)
         }
-    }, [selectedType])
+        // For custom size, derive aspect ratio from user-entered dimensions
+        if (selectedType === 'custom-size' && customWidth && customHeight) {
+            const w = parseInt(customWidth), h = parseInt(customHeight)
+            if (w > 0 && h > 0) {
+                const r = w / h
+                if (Math.abs(r - 1) < 0.05) setAspectRatio('1:1')
+                else if (Math.abs(r - 16/9) < 0.1) setAspectRatio('16:9')
+                else if (Math.abs(r - 9/16) < 0.1) setAspectRatio('9:16')
+                else if (Math.abs(r - 4/5) < 0.1) setAspectRatio('4:5')
+                else if (Math.abs(r - 2/3) < 0.1) setAspectRatio('2:3')
+                else if (Math.abs(r - 3/4) < 0.1) setAspectRatio('3:4')
+                else if (Math.abs(r - 3/2) < 0.1) setAspectRatio('3:2')
+                else if (Math.abs(r - 4/3) < 0.1) setAspectRatio('4:3')
+                else if (r > 1) setAspectRatio('16:9') // wide-ish
+                else setAspectRatio('9:16') // tall-ish
+            }
+        }
+    }, [selectedType, customWidth, customHeight])
 
 
     // Read URL params from Content Studio
@@ -1290,6 +1335,15 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
                 const shot = CAMERA_SHOT_PRESETS.find(s => s.id === selectedShot)
                 if (shot) fullPrompt += `. CAMERA & SHOT: ${shot.injection}`
             }
+            // Build custom size from format preset or user input
+            let customSize = null
+            const typeInfo = creativeTypes.find(t => t.id === selectedType)
+            if (typeInfo?.w && typeInfo?.h) {
+                customSize = { width: typeInfo.w, height: typeInfo.h }
+            } else if (selectedType === 'custom-size' && customWidth && customHeight) {
+                const cw = parseInt(customWidth), ch = parseInt(customHeight)
+                if (cw > 0 && ch > 0) customSize = { width: cw, height: ch }
+            }
             const options = {
                 style,
                 textOverlay,
@@ -1304,6 +1358,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
                 generateCopy,
                 customHeadline: customHeadline.trim() || null,
                 customCtaText: customCtaText.trim() || null,
+                customSize, // {width, height} for exact pixel output
             }
             if (designBaseImage) {
                 options.templateInpainting = true
@@ -1995,6 +2050,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                     { id: 'tryon', icon: 'checkroom', label: 'Try-On' },
                     { id: 'mockups', icon: 'landscape', label: 'Mockups' },
                     { id: 'campaigns', icon: 'campaign', label: 'Campaigns' },
+                    { id: 'carousel', icon: 'view_carousel', label: 'Carousel' },
                     { id: 'campaignlogo', icon: 'verified', label: 'Logo Gen' },
                     { id: 'templates', icon: 'dashboard_customize', label: 'Templates' },
                     { id: 'imagebank', icon: 'photo_library', label: 'Image Bank', badge: bankTotal > 0 ? bankTotal : null },
@@ -2024,6 +2080,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                 if (studioMode !== 'create' && activeGenerations.length > 0) bgTasks.push({ label: 'AI Create', mode: 'create', icon: 'auto_awesome' })
                 if (studioMode !== 'photoshoot' && photoshootGenerating) bgTasks.push({ label: 'Photoshoot', mode: 'photoshoot', icon: 'photo_camera' })
                 if (studioMode !== 'campaigns' && campGenerating) bgTasks.push({ label: 'Campaign', mode: 'campaigns', icon: 'campaign' })
+                if (studioMode !== 'carousel' && (carouselGenerating || carouselPolling)) bgTasks.push({ label: 'Carousel', mode: 'carousel', icon: 'view_carousel' })
                 if (bgTasks.length === 0) return null
                 return (
                     <div className="mb-3 px-3 py-2 rounded-xl bg-gradient-to-r from-blue-500/10 via-violet-500/10 to-purple-500/10 border border-white/[0.06] flex items-center gap-3 animate-fade-in">
@@ -2092,9 +2149,12 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                         {/* ── Format Selector ── */}
                         <div className="mb-3">
                             <div className="flex items-center justify-between mb-2">
-                                <span className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Format</span>
-                                {selectedTypeInfo && (
+                                <span className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Format & Size</span>
+                                {selectedTypeInfo && selectedType !== 'custom-size' && (
                                     <span className="text-[9px] text-slate-600 font-mono bg-white/[0.04] px-1.5 py-0.5 rounded">{selectedTypeInfo.size} · {selectedTypeInfo.aspectRatio}</span>
+                                )}
+                                {selectedType === 'custom-size' && customWidth && customHeight && (
+                                    <span className="text-[9px] text-emerald-500 font-mono bg-emerald-500/10 px-1.5 py-0.5 rounded">{customWidth}×{customHeight}px</span>
                                 )}
                             </div>
                             <div className="grid grid-cols-2 gap-1">
@@ -2110,7 +2170,55 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     </button>
                                 ))}
                             </div>
-                            {/* Format-specific intelligence hint */}
+
+                            {/* ── Custom Size Inputs ── */}
+                            {selectedType === 'custom-size' && (
+                                <div className="mt-2 p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <span className="material-symbols-outlined text-xs text-emerald-400">straighten</span>
+                                        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Custom Dimensions (px)</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <input type="number" value={customWidth} onChange={e => setCustomWidth(e.target.value)}
+                                            placeholder="Width" min="100" max="4096"
+                                            className="flex-1 px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-xs text-white focus:border-primary focus:outline-none text-center" />
+                                        <span className="text-slate-500 text-xs font-bold">×</span>
+                                        <input type="number" value={customHeight} onChange={e => setCustomHeight(e.target.value)}
+                                            placeholder="Height" min="100" max="4096"
+                                            className="flex-1 px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-xs text-white focus:border-primary focus:outline-none text-center" />
+                                    </div>
+                                    {customWidth && customHeight && (() => {
+                                        const w = parseInt(customWidth), h = parseInt(customHeight)
+                                        if (!w || !h) return null
+                                        const r = w / h
+                                        const totalPx = w * h
+                                        const isExtreme = r > 3 || r < 0.33
+                                        return (
+                                            <div className="mt-2 space-y-1">
+                                                <p className="text-[10px] text-slate-500 flex items-center gap-1">
+                                                    Ratio: <span className="text-white font-mono">{(r).toFixed(2)}:1</span>
+                                                    <span className="text-slate-600">·</span>
+                                                    <span className="text-slate-400">{(totalPx / 1000000).toFixed(1)}MP</span>
+                                                </p>
+                                                {isExtreme && (
+                                                    <p className="text-[10px] text-amber-400/80 flex items-center gap-1">
+                                                        <span className="material-symbols-outlined text-[11px]">warning</span>
+                                                        Extreme ratio — AI will generate at nearest safe ratio, then smart-resize
+                                                    </p>
+                                                )}
+                                                {totalPx > 4194304 && (
+                                                    <p className="text-[10px] text-amber-400/80 flex items-center gap-1">
+                                                        <span className="material-symbols-outlined text-[11px]">memory</span>
+                                                        Over 4MP — image will be generated smaller then AI-upscaled
+                                                    </p>
+                                                )}
+                                            </div>
+                                        )
+                                    })()}
+                                </div>
+                            )}
+
+                            {/* Format-specific intelligence hints */}
                             {selectedType === 'youtube-thumb' && (
                                 <p className="text-[10px] text-amber-400/70 mt-1.5 flex items-center gap-1">
                                     <span className="material-symbols-outlined text-[11px]">tips_and_updates</span>
@@ -2133,6 +2241,12 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 <p className="text-[10px] text-blue-400/70 mt-1.5 flex items-center gap-1">
                                     <span className="material-symbols-outlined text-[11px]">tips_and_updates</span>
                                     AI will optimize for: professional tone, clean layout, corporate-friendly aesthetic
+                                </p>
+                            )}
+                            {selectedType === 'film-poster' && (
+                                <p className="text-[10px] text-violet-400/70 mt-1.5 flex items-center gap-1">
+                                    <span className="material-symbols-outlined text-[11px]">tips_and_updates</span>
+                                    AI will optimize for: cinematic 2:3 portrait, title placement, dramatic composition
                                 </p>
                             )}
                         </div>
@@ -2636,7 +2750,11 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 <span className="material-symbols-outlined text-sm text-primary">{selectedTypeInfo?.icon || 'photo_camera'}</span>
                                 <p className="text-[11px] text-slate-400">
                                     Format: <strong className="text-white">{selectedTypeInfo?.label || 'Instagram Post'}</strong>
-                                    <span className="text-slate-600 ml-1">{selectedTypeInfo?.size} · {selectedTypeInfo?.aspectRatio}</span>
+                                    {selectedType === 'custom-size' && customWidth && customHeight ? (
+                                        <span className="text-emerald-500 ml-1">{customWidth}×{customHeight}px</span>
+                                    ) : (
+                                        <span className="text-slate-600 ml-1">{selectedTypeInfo?.size} · {selectedTypeInfo?.aspectRatio}</span>
+                                    )}
                                 </p>
                                 <span className="text-[9px] text-slate-600 ml-auto">Change above ↑</span>
                             </div>
@@ -4919,6 +5037,632 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     </div>
                                 )}
                             </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+
+            {/* =================== CAROUSEL GENERATOR =================== */}
+            {studioMode === 'carousel' && (
+                <div className="max-w-5xl mx-auto fade-up">
+                    {/* Header */}
+                    <div className="glow-border rounded-2xl p-6 mb-6 relative overflow-hidden" style={{ background: 'linear-gradient(135deg, rgba(234,88,12,0.06), rgba(249,115,22,0.04), rgba(251,146,60,0.03))' }}>
+                        <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(circle at 20% 80%, rgba(249,115,22,0.08) 0%, transparent 50%)' }} />
+                        <div className="relative">
+                            <h2 className="text-xl font-bold text-white flex items-center gap-3 mb-1">
+                                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center shadow-lg">
+                                    <span className="material-symbols-outlined text-white text-xl">view_carousel</span>
+                                </div>
+                                Carousel Generator
+                                <span className="ml-2 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-400">Beta</span>
+                            </h2>
+                            <p className="text-sm text-slate-400 ml-[52px]">
+                                AI generates a panoramic background → auto-splits into seamless carousel panels → composites your product images
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+                        {/* ─── LEFT: Config Panel ─── */}
+                        <div className="lg:col-span-2 space-y-4">
+
+                            {/* Prompt + Theme Inspiration — unified card */}
+                            <div className="glass-panel rounded-xl p-4">
+                                {/* Header row */}
+                                <div className="flex items-center justify-between mb-2">
+                                    <label className="text-[10px] text-slate-500 uppercase tracking-widest font-bold flex items-center gap-1">
+                                        <span className="material-symbols-outlined text-[11px]">edit_note</span>
+                                        Background Scene
+                                    </label>
+                                    {/* Inline theme inspiration uploader — compact */}
+                                    <div className="flex items-center gap-1.5">
+                                        {carouselThemeImage ? (
+                                            <div className="flex items-center gap-1.5">
+                                                {/* Thumbnail */}
+                                                <div className="relative group">
+                                                    <img
+                                                        src={carouselThemeImage}
+                                                        alt="Theme ref"
+                                                        className="w-8 h-8 rounded-lg object-cover border border-violet-500/30 cursor-pointer"
+                                                        onClick={() => { setCarouselThemeImage(null); setCarouselThemeAnalysis(null); setCarouselThemeError(null); }}
+                                                        title="Click to remove"
+                                                    />
+                                                    {carouselAnalyzing && (
+                                                        <div className="absolute inset-0 bg-black/70 rounded-lg flex items-center justify-center">
+                                                            <span className="material-symbols-outlined text-violet-400 text-[14px] animate-spin">progress_activity</span>
+                                                        </div>
+                                                    )}
+                                                    {carouselThemeAnalysis && !carouselAnalyzing && (
+                                                        <div className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-emerald-500 border border-black flex items-center justify-center">
+                                                            <span className="material-symbols-outlined text-white" style={{fontSize:'9px'}}>check</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* Status pill */}
+                                                {carouselAnalyzing ? (
+                                                    <span className="text-[9px] font-semibold text-violet-400 animate-pulse">Analyzing...</span>
+                                                ) : carouselThemeAnalysis ? (
+                                                    <button
+                                                        onClick={() => { setCarouselThemeAnalysis(null); setCarouselThemeError(null); }}
+                                                        className="text-[9px] font-semibold text-emerald-400 hover:text-rose-400 transition-colors cursor-pointer"
+                                                        title="Click to re-analyze"
+                                                    >
+                                                        DNA ✓ re-run?
+                                                    </button>
+                                                ) : carouselThemeError ? (
+                                                    <button
+                                                        onClick={async () => {
+                                                            setCarouselThemeError(null)
+                                                            setCarouselAnalyzing(true)
+                                                            try {
+                                                                const res = await creativesAPI.analyzeCarouselTheme({
+                                                                    themeImageUrl: carouselThemeImage,
+                                                                    brandId: activeBrand?._id,
+                                                                    slideCount: carouselSlides,
+                                                                })
+                                                                if (res.success && res.theme) {
+                                                                    setCarouselThemeAnalysis(res.theme)
+                                                                    if (res.theme.panoramicPrompt) setCarouselPrompt(res.theme.panoramicPrompt)
+                                                                    if (res.theme.suggestedStyle) setCarouselStyle(res.theme.suggestedStyle)
+                                                                    if (res.theme.genre) setCarouselGenre(res.theme.genre)
+                                                                } else {
+                                                                    setCarouselThemeError('Analysis failed — try again')
+                                                                }
+                                                            } catch (err) {
+                                                                setCarouselThemeError(err.message || 'Analysis failed')
+                                                            }
+                                                            setCarouselAnalyzing(false)
+                                                        }}
+                                                        className="text-[9px] font-semibold text-rose-400 hover:text-rose-300 cursor-pointer transition-colors"
+                                                    >
+                                                        Failed — retry
+                                                    </button>
+                                                ) : (
+                                                    <button
+                                                        onClick={async () => {
+                                                            setCarouselThemeError(null)
+                                                            setCarouselAnalyzing(true)
+                                                            try {
+                                                                const res = await creativesAPI.analyzeCarouselTheme({
+                                                                    themeImageUrl: carouselThemeImage,
+                                                                    brandId: activeBrand?._id,
+                                                                    slideCount: carouselSlides,
+                                                                })
+                                                                if (res.success && res.theme) {
+                                                                    setCarouselThemeAnalysis(res.theme)
+                                                                    if (res.theme.panoramicPrompt) setCarouselPrompt(res.theme.panoramicPrompt)
+                                                                    if (res.theme.suggestedStyle) setCarouselStyle(res.theme.suggestedStyle)
+                                                                    if (res.theme.genre) setCarouselGenre(res.theme.genre)
+                                                                } else {
+                                                                    setCarouselThemeError('Analysis failed — try again')
+                                                                }
+                                                            } catch (err) {
+                                                                setCarouselThemeError(err.message || 'Analysis failed')
+                                                            }
+                                                            setCarouselAnalyzing(false)
+                                                        }}
+                                                        className="text-[9px] font-semibold text-violet-400 hover:text-violet-300 cursor-pointer transition-colors flex items-center gap-0.5"
+                                                    >
+                                                        <span className="material-symbols-outlined" style={{fontSize:'11px'}}>psychology</span>
+                                                        Analyze
+                                                    </button>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            /* Upload button — compact chip */
+                                            <label className="flex items-center gap-1 px-2 py-1 rounded-lg border border-dashed border-violet-500/30 hover:border-violet-500/60 bg-violet-500/[0.05] hover:bg-violet-500/[0.08] cursor-pointer transition-all group">
+                                                <span className="material-symbols-outlined text-violet-500 group-hover:text-violet-400 transition-colors" style={{fontSize:'13px'}}>add_photo_alternate</span>
+                                                <span className="text-[9px] font-semibold text-violet-500 group-hover:text-violet-300 transition-colors whitespace-nowrap">Add Inspo</span>
+                                                <span className="text-[8px] px-1 py-0.5 rounded-full bg-violet-500/20 text-violet-400 font-bold">AI</span>
+                                                <input
+                                                    type="file"
+                                                    accept="image/*"
+                                                    className="hidden"
+                                                    onChange={async e => {
+                                                        const file = e.target.files?.[0]
+                                                        if (!file) return
+                                                        setCarouselThemeError(null)
+                                                        // Resize to max 800px to keep data URI small for API transport
+                                                        const dataUrl = await new Promise(resolve => {
+                                                            const img = new Image()
+                                                            const objectUrl = URL.createObjectURL(file)
+                                                            img.onload = () => {
+                                                                URL.revokeObjectURL(objectUrl)
+                                                                const MAX = 800
+                                                                let { width, height } = img
+                                                                if (width > MAX || height > MAX) {
+                                                                    if (width > height) { height = Math.round(height * MAX / width); width = MAX; }
+                                                                    else { width = Math.round(width * MAX / height); height = MAX; }
+                                                                }
+                                                                const canvas = document.createElement('canvas')
+                                                                canvas.width = width; canvas.height = height
+                                                                canvas.getContext('2d').drawImage(img, 0, 0, width, height)
+                                                                resolve(canvas.toDataURL('image/jpeg', 0.82))
+                                                            }
+                                                            img.src = objectUrl
+                                                        })
+                                                        setCarouselThemeImage(dataUrl)
+                                                        setCarouselThemeAnalysis(null)
+                                                        // Auto-trigger analysis
+                                                        setCarouselAnalyzing(true)
+                                                        try {
+                                                            const res = await creativesAPI.analyzeCarouselTheme({
+                                                                themeImageUrl: dataUrl,
+                                                                brandId: activeBrand?._id,
+                                                                slideCount: carouselSlides,
+                                                            })
+                                                            if (res.success && res.theme) {
+                                                                setCarouselThemeAnalysis(res.theme)
+                                                                if (res.theme.panoramicPrompt) setCarouselPrompt(res.theme.panoramicPrompt)
+                                                                if (res.theme.suggestedStyle) setCarouselStyle(res.theme.suggestedStyle)
+                                                                if (res.theme.genre) setCarouselGenre(res.theme.genre)
+                                                            } else {
+                                                                setCarouselThemeError('Analysis failed — click Analyze to retry')
+                                                            }
+                                                        } catch (err) {
+                                                            setCarouselThemeError(err.message || 'Analysis failed')
+                                                        }
+                                                        setCarouselAnalyzing(false)
+                                                    }}
+                                                />
+                                            </label>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Textarea */}
+                                <textarea
+                                    value={carouselPrompt}
+                                    onChange={e => setCarouselPrompt(e.target.value)}
+                                    placeholder={carouselThemeImage && !carouselThemeAnalysis ? 'Analyzing inspiration image...' : "Describe the background scene... e.g. 'Luxurious marble countertop with soft golden lighting, bokeh background'"}
+                                    rows={carouselThemeAnalysis ? 5 : 4}
+                                    className="w-full px-3 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-sm text-white placeholder-slate-600 focus:border-orange-500/50 focus:outline-none resize-none transition-all"
+                                />
+
+                                {/* Analysis result — inline below textarea */}
+                                {carouselThemeAnalysis && (
+                                    <div className="mt-2 p-2.5 rounded-xl bg-violet-500/[0.06] border border-violet-500/20">
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            <span className="material-symbols-outlined text-emerald-400" style={{fontSize:'13px'}}>check_circle</span>
+                                            <span className="text-[10px] text-emerald-400 font-semibold">Visual DNA extracted</span>
+                                            {carouselThemeAnalysis.genre && (
+                                                <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-300 border border-orange-500/30 capitalize flex items-center gap-0.5">
+                                                    <span className="material-symbols-outlined" style={{fontSize:'9px'}}>movie</span>
+                                                    {carouselThemeAnalysis.genre}
+                                                </span>
+                                            )}
+                                            {carouselThemeAnalysis.mood && (
+                                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-violet-500/15 text-violet-300 border border-violet-500/20 capitalize">✦ {carouselThemeAnalysis.mood}</span>
+                                            )}
+                                            {carouselThemeAnalysis.colorPalette?.length > 0 && (
+                                                <div className="flex gap-0.5 ml-auto">
+                                                    {carouselThemeAnalysis.colorPalette.slice(0, 5).map((c, i) => (
+                                                        <div key={i} className="w-3.5 h-3.5 rounded-full border border-white/10" style={{backgroundColor:c}} title={c} />
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                        {carouselThemeAnalysis.lighting && (
+                                            <p className="text-[9px] text-slate-500 mt-1 leading-relaxed">
+                                                <span className="material-symbols-outlined text-amber-400/70 mr-0.5" style={{fontSize:'10px', verticalAlign:'text-bottom'}}>light_mode</span>
+                                                {carouselThemeAnalysis.lighting}
+                                            </p>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* Error state */}
+                                {carouselThemeError && !carouselAnalyzing && (
+                                    <div className="mt-2 flex items-center gap-1.5 text-[10px] text-rose-400">
+                                        <span className="material-symbols-outlined" style={{fontSize:'13px'}}>error</span>
+                                        {carouselThemeError}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Image Model */}
+                            <div className="glass-panel rounded-xl p-4">
+                                <label className="text-[10px] text-slate-500 uppercase tracking-widest font-bold mb-2 block flex items-center gap-1">
+                                    <span className="material-symbols-outlined text-[11px]">model_training</span>
+                                    AI Model
+                                </label>
+                                <div className="grid grid-cols-2 gap-1.5">
+                                    {IMAGE_MODELS.map(m => (
+                                        <button key={m.id} onClick={() => setImageModel(m.id)}
+                                            className={`px-2.5 py-2 rounded-lg text-[10px] font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                                                imageModel === m.id
+                                                    ? 'text-white border shadow-md'
+                                                    : 'bg-white/[0.03] text-slate-500 border border-white/[0.06] hover:bg-white/[0.06]'
+                                            }`}
+                                            style={imageModel === m.id ? { backgroundColor: `${m.color}18`, borderColor: `${m.color}50`, color: m.color } : {}}>
+                                            <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>{m.icon}</span>
+                                            <span className="truncate">{m.name}</span>
+                                            {imageModel === m.id && <span className="material-symbols-outlined text-[10px] ml-auto">check_circle</span>}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Slide Format / Size */}
+                            <div className="glass-panel rounded-xl p-4">
+                                <label className="text-[10px] text-slate-500 uppercase tracking-widest font-bold mb-2 block flex items-center gap-1">
+                                    <span className="material-symbols-outlined text-[11px]">aspect_ratio</span>
+                                    Slide Format
+                                </label>
+                                <div className="grid grid-cols-3 gap-1.5">
+                                    {[
+                                        { id: '1:1', label: 'Square', size: '1080×1080', icon: 'crop_square', desc: 'Instagram Feed' },
+                                        { id: '4:5', label: 'Portrait', size: '1080×1350', icon: 'crop_portrait', desc: 'Instagram Best' },
+                                        { id: '9:16', label: 'Story', size: '1080×1920', icon: 'smartphone', desc: 'Stories / Reels' },
+                                        { id: '16:9', label: 'Landscape', size: '1920×1080', icon: 'crop_landscape', desc: 'YouTube / LinkedIn' },
+                                        { id: '3:4', label: 'Classic', size: '1080×1440', icon: 'photo', desc: 'Classic Portrait' },
+                                        { id: '2:3', label: 'Tall', size: '1080×1620', icon: 'view_agenda', desc: 'Pinterest' },
+                                    ].map(f => (
+                                        <button key={f.id} onClick={() => setCarouselSlideFormat(f.id)}
+                                            className={`px-2 py-2 rounded-lg text-[10px] font-semibold transition-all cursor-pointer flex flex-col items-center gap-0.5 ${
+                                                carouselSlideFormat === f.id
+                                                    ? 'bg-orange-500/15 text-orange-400 border border-orange-500/30'
+                                                    : 'bg-white/[0.03] text-slate-500 border border-white/[0.06] hover:bg-white/[0.06] hover:text-white'
+                                            }`}>
+                                            <span className="material-symbols-outlined text-sm">{f.icon}</span>
+                                            <span className="font-bold">{f.label}</span>
+                                            <span className="text-[8px] opacity-60">{f.size}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Slide Count */}
+                            <div className="glass-panel rounded-xl p-4">
+                                <label className="text-[10px] text-slate-500 uppercase tracking-widest font-bold mb-2 block">Number of Slides</label>
+                                <div className="flex gap-2">
+                                    {[2, 3, 4, 5].map(n => (
+                                        <button key={n} onClick={() => { setCarouselSlides(n); setCarouselProductImages(prev => { const a = [...prev]; a.length = n; return a.fill(null, prev.length) }) }}
+                                            className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all cursor-pointer ${
+                                                carouselSlides === n
+                                                    ? 'bg-orange-500/15 text-orange-400 border border-orange-500/30'
+                                                    : 'bg-white/[0.03] text-slate-500 border border-white/[0.06] hover:bg-white/[0.06] hover:text-white'
+                                            }`}>
+                                            {n} slides
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Genre — Cinematic Theme Treatment */}
+                            <div className="glass-panel rounded-xl p-4">
+                                <div className="flex items-center justify-between mb-2">
+                                    <label className="text-[10px] text-slate-500 uppercase tracking-widest font-bold flex items-center gap-1">
+                                        <span className="material-symbols-outlined text-[11px]">movie</span>
+                                        Genre / Mood
+                                    </label>
+                                    {carouselThemeAnalysis?.genre && (
+                                        <span className="text-[8px] text-violet-400 font-semibold px-1.5 py-0.5 rounded-full bg-violet-500/10 border border-violet-500/20">AI detected</span>
+                                    )}
+                                </div>
+                                <div className="grid grid-cols-4 gap-1">
+                                    {[
+                                        { id: 'drama',         label: 'Drama',    msIcon: 'theater_comedy',   color: '#dc2626' },
+                                        { id: 'thriller',      label: 'Thriller', msIcon: 'experiment',       color: '#7c3aed' },
+                                        { id: 'romance',       label: 'Romance',  msIcon: 'favorite',         color: '#ec4899' },
+                                        { id: 'comedy',        label: 'Comedy',   msIcon: 'sentiment_excited',color: '#f97316' },
+                                        { id: 'horror',        label: 'Horror',   msIcon: 'dark_mode',        color: '#14532d' },
+                                        { id: 'action',        label: 'Action',   msIcon: 'bolt',             color: '#0284c7' },
+                                        { id: 'inspirational', label: 'Inspire',  msIcon: 'emoji_objects',    color: '#f59e0b' },
+                                        { id: 'luxury',        label: 'Luxury',   msIcon: 'diamond',          color: '#d4af37' },
+                                        { id: 'nature',        label: 'Nature',   msIcon: 'eco',              color: '#22c55e' },
+                                        { id: 'tech',          label: 'Tech',     msIcon: 'memory',           color: '#06b6d4' },
+                                        { id: 'modern',        label: 'Modern',   msIcon: 'apartment',        color: '#64748b' },
+                                    ].map(g => (
+                                        <button key={g.id} onClick={() => setCarouselGenre(g.id)}
+                                            title={g.label}
+                                            className={`py-2.5 px-1 rounded-lg text-[9px] font-bold transition-all cursor-pointer flex flex-col items-center gap-1 ${
+                                                carouselGenre === g.id
+                                                    ? 'border shadow-md'
+                                                    : 'bg-white/[0.03] text-slate-500 border border-white/[0.05] hover:bg-white/[0.06]'
+                                            }`}
+                                            style={carouselGenre === g.id ? { backgroundColor: `${g.color}20`, borderColor: `${g.color}50`, color: g.color } : {}}>
+                                            <span className="material-symbols-outlined" style={{ fontSize: '18px', lineHeight: 1 }}>{g.msIcon}</span>
+                                            <span className="leading-none">{g.label}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Style Presets — visual aesthetic */}
+                            <div className="glass-panel rounded-xl p-4">
+                                <label className="text-[10px] text-slate-500 uppercase tracking-widest font-bold mb-2 block flex items-center gap-1">
+                                    <span className="material-symbols-outlined text-[11px]">palette</span>
+                                    Visual Style
+                                </label>
+                                <div className="grid grid-cols-3 gap-1.5">
+                                    {[
+                                        { id: 'modern',  label: 'Modern',  icon: 'auto_awesome', color: '#f97316' },
+                                        { id: 'minimal', label: 'Minimal', icon: 'crop_square',  color: '#64748b' },
+                                        { id: 'vibrant', label: 'Vibrant', icon: 'palette',       color: '#ec4899' },
+                                        { id: 'luxury',  label: 'Luxury',  icon: 'diamond',       color: '#f59e0b' },
+                                        { id: 'nature',  label: 'Nature',  icon: 'park',          color: '#22c55e' },
+                                        { id: 'tech',    label: 'Tech',    icon: 'devices',       color: '#06b6d4' },
+                                    ].map(s => (
+                                        <button key={s.id} onClick={() => setCarouselStyle(s.id)}
+                                            className={`px-2 py-2 rounded-lg text-[10px] font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                                                carouselStyle === s.id
+                                                    ? 'text-white border shadow-md'
+                                                    : 'bg-white/[0.03] text-slate-500 border border-white/[0.06] hover:bg-white/[0.06]'
+                                            }`}
+                                            style={carouselStyle === s.id ? { backgroundColor: `${s.color}18`, borderColor: `${s.color}50`, color: s.color } : {}}>
+                                            <span className="material-symbols-outlined" style={{fontSize:'12px'}}>{s.icon}</span>
+                                            {s.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Product Images per Slide */}
+                            <div className="glass-panel rounded-xl p-4">
+                                <label className="text-[10px] text-slate-500 uppercase tracking-widest font-bold mb-2 block flex items-center gap-1">
+                                    <span className="material-symbols-outlined text-[11px]">shopping_bag</span>
+                                    Product Images (Optional)
+                                </label>
+                                <p className="text-[10px] text-slate-600 mb-3">Add product images to overlay on each carousel panel</p>
+                                <div className="grid grid-cols-3 gap-2">
+                                    {Array.from({ length: carouselSlides }).map((_, i) => (
+                                        <div key={i} className="relative">
+                                            <span className="absolute -top-1 -left-1 z-10 w-4 h-4 rounded-full bg-orange-500 text-white text-[8px] font-bold flex items-center justify-center">{i + 1}</span>
+                                            {carouselProductImages[i] ? (
+                                                <div className="relative group">
+                                                    <img src={carouselProductImages[i]} alt={`Slide ${i + 1}`} className="w-full aspect-square rounded-lg object-cover border border-orange-500/30" />
+                                                    <button onClick={() => setCarouselProductImages(prev => { const a = [...prev]; a[i] = null; return a })}
+                                                        className="absolute top-0 right-0 w-5 h-5 rounded-full bg-rose-500 text-white text-[10px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">×</button>
+                                                </div>
+                                            ) : (
+                                                <label className="w-full aspect-square rounded-lg border border-dashed border-white/10 hover:border-orange-500/30 flex flex-col items-center justify-center cursor-pointer bg-white/[0.02] transition-all">
+                                                    <span className="material-symbols-outlined text-slate-600 text-lg">add_photo_alternate</span>
+                                                    <span className="text-[8px] text-slate-600 mt-0.5">Slide {i + 1}</span>
+                                                    <input type="file" accept="image/*" className="hidden" onChange={async e => {
+                                                        const file = e.target.files?.[0]
+                                                        if (!file) return
+                                                        const reader = new FileReader()
+                                                        reader.onload = () => setCarouselProductImages(prev => { const a = [...prev]; a[i] = reader.result; return a })
+                                                        reader.readAsDataURL(file)
+                                                    }} />
+                                                </label>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Generate Button */}
+                            <button
+                                onClick={async () => {
+                                    if (!activeBrand || !carouselPrompt.trim() || carouselGenerating) return
+                                    setCarouselGenerating(true)
+                                    setCarouselError(null)
+                                    setCarouselResult(null)
+                                    try {
+                                        const data = await creativesAPI.generateCarousel({
+                                            prompt: carouselPrompt,
+                                            slideCount: carouselSlides,
+                                            slideRatio: carouselSlideFormat,
+                                            brandId: activeBrand._id,
+                                            selectedModel: imageModel || 'nanobanana-2',
+                                            productImages: carouselProductImages.filter(Boolean),
+                                            brandLogo: activeBrand?.dna?.logo || null,
+                                            style: carouselStyle,
+                                            themeImageUrl: carouselThemeImage || null,
+                                            themeAnalysis: carouselThemeAnalysis ? { ...carouselThemeAnalysis, genre: carouselGenre } : { genre: carouselGenre },
+                                        })
+                                        if (data.success) {
+                                            setCarouselResult({
+                                                panoramicUrl: data.panoramicUrl,
+                                                carouselId: data.carouselId,
+                                                provider: data.provider,
+                                                panels: [],
+                                            })
+                                            // Start polling for panels
+                                            setCarouselPolling(true)
+                                            const pollId = data.carouselId
+                                            let retries = 0
+                                            const poll = setInterval(async () => {
+                                                try {
+                                                    const status = await creativesAPI.getCarousel(pollId)
+                                                    // Show error from backend
+                                                    if (status.error) {
+                                                        setCarouselError(`Panel processing failed: ${status.error}`)
+                                                        setCarouselPolling(false)
+                                                        clearInterval(poll)
+                                                        return
+                                                    }
+                                                    // Show panels as they arrive (partial results)
+                                                    if (status.panels?.length > 0) {
+                                                        setCarouselResult(prev => ({
+                                                            ...prev,
+                                                            panels: status.panels,
+                                                            panoramicUrl: status.panoramicUrl || prev?.panoramicUrl,
+                                                        }))
+                                                    }
+                                                    // Stop polling when all panels are ready
+                                                    if (status.status === 'ready' || status.status === 'done') {
+                                                        setCarouselPolling(false)
+                                                        clearInterval(poll)
+                                                    }
+                                                    retries++
+                                                    if (retries > 100) { clearInterval(poll); setCarouselPolling(false); setCarouselError('Generation is taking too long — panels may still be processing. Check back in a minute.') }
+                                                } catch { retries++; if (retries > 100) { clearInterval(poll); setCarouselPolling(false) } }
+                                            }, 3000)
+                                        } else {
+                                            setCarouselError(data.error || 'Generation failed')
+                                        }
+                                    } catch (err) {
+                                        setCarouselError(err.message || 'Generation failed')
+                                    }
+                                    setCarouselGenerating(false)
+                                }}
+                                disabled={carouselGenerating || !carouselPrompt.trim() || !activeBrand}
+                                className={`w-full py-3.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                                    carouselGenerating
+                                        ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30 animate-pulse'
+                                        : !carouselPrompt.trim()
+                                            ? 'bg-white/[0.04] text-slate-600 border border-white/[0.06] cursor-not-allowed'
+                                            : 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-lg hover:shadow-orange-500/20 hover:scale-[1.01]'
+                                }`}>
+                                {carouselGenerating ? (
+                                    <><span className="material-symbols-outlined text-lg animate-spin">progress_activity</span> Generating Panoramic...</>
+                                ) : (
+                                    <><span className="material-symbols-outlined text-lg">view_carousel</span> Generate {carouselSlides}-Slide Carousel</>
+                                )}
+                            </button>
+
+                            {carouselError && (
+                                <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-sm">error</span>
+                                    {carouselError}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* ─── RIGHT: Preview Panel ─── */}
+                        <div className="lg:col-span-3">
+                            {carouselResult ? (
+                                <div className="space-y-4">
+                                    {/* Panoramic Preview */}
+                                    {carouselResult.panoramicUrl && (
+                                        <div className="glass-panel rounded-xl p-3">
+                                            <div className="flex items-center justify-between mb-2">
+                                                <span className="text-[10px] text-slate-500 uppercase tracking-widest font-bold flex items-center gap-1">
+                                                    <span className="material-symbols-outlined text-[11px]">panorama_wide_angle</span>
+                                                    Panoramic Background
+                                                </span>
+                                                <a href={carouselResult.panoramicUrl} download className="text-[10px] text-slate-500 hover:text-orange-400 flex items-center gap-0.5 cursor-pointer transition-colors">
+                                                    <span className="material-symbols-outlined text-xs">download</span> Full
+                                                </a>
+                                            </div>
+                                            <img src={carouselResult.panoramicUrl} alt="Panoramic" className="w-full rounded-lg shadow-lg" />
+                                        </div>
+                                    )}
+
+                                    {/* Carousel Panels */}
+                                    {carouselPolling && !carouselResult.panels?.length && (
+                                        <div className="glass-panel rounded-xl p-6 flex flex-col items-center gap-3 animate-pulse">
+                                            <span className="material-symbols-outlined text-3xl text-orange-400 animate-spin">progress_activity</span>
+                                            <p className="text-sm text-slate-400">Splitting into panels & compositing products...</p>
+                                            <p className="text-[10px] text-slate-600">This takes 10-15 seconds</p>
+                                        </div>
+                                    )}
+
+                                    {carouselResult.panels?.length > 0 && (
+                                        <div className="glass-panel rounded-xl p-4">
+                                            <div className="flex items-center justify-between mb-3">
+                                                <span className="text-[10px] text-slate-500 uppercase tracking-widest font-bold flex items-center gap-1">
+                                                    <span className="material-symbols-outlined text-[11px]">grid_view</span>
+                                                    Carousel Panels ({carouselResult.panels.length})
+                                                </span>
+                                                <button
+                                                    onClick={() => {
+                                                        carouselResult.panels.forEach((url, i) => {
+                                                            const a = document.createElement('a')
+                                                            a.href = url
+                                                            a.download = `carousel-panel-${i + 1}.png`
+                                                            a.click()
+                                                        })
+                                                    }}
+                                                    className="text-[10px] px-2.5 py-1 rounded-lg bg-orange-500/10 border border-orange-500/20 text-orange-400 hover:bg-orange-500/20 cursor-pointer transition-all flex items-center gap-1">
+                                                    <span className="material-symbols-outlined text-xs">download</span>
+                                                    Download All
+                                                </button>
+                                            </div>
+
+                                            {/* Swipeable Carousel Preview */}
+                                            <div className="relative">
+                                                <div className="overflow-hidden rounded-xl">
+                                                    <img
+                                                        src={carouselResult.panels[carouselCurrentSlide]}
+                                                        alt={`Panel ${carouselCurrentSlide + 1}`}
+                                                        className="w-full rounded-xl shadow-lg transition-all duration-300"
+                                                    />
+                                                </div>
+                                                {/* Navigation arrows */}
+                                                {carouselCurrentSlide > 0 && (
+                                                    <button onClick={() => setCarouselCurrentSlide(prev => prev - 1)}
+                                                        className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/50 backdrop-blur text-white flex items-center justify-center cursor-pointer hover:bg-black/70 transition-all">
+                                                        <span className="material-symbols-outlined text-sm">chevron_left</span>
+                                                    </button>
+                                                )}
+                                                {carouselCurrentSlide < carouselResult.panels.length - 1 && (
+                                                    <button onClick={() => setCarouselCurrentSlide(prev => prev + 1)}
+                                                        className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/50 backdrop-blur text-white flex items-center justify-center cursor-pointer hover:bg-black/70 transition-all">
+                                                        <span className="material-symbols-outlined text-sm">chevron_right</span>
+                                                    </button>
+                                                )}
+                                                {/* Slide indicator */}
+                                                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
+                                                    {carouselResult.panels.map((_, i) => (
+                                                        <button key={i} onClick={() => setCarouselCurrentSlide(i)}
+                                                            className={`w-2 h-2 rounded-full transition-all cursor-pointer ${
+                                                                i === carouselCurrentSlide ? 'bg-orange-500 w-5' : 'bg-white/30 hover:bg-white/50'
+                                                            }`} />
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            {/* Panel thumbnails strip */}
+                                            <div className="flex gap-2 mt-3 overflow-x-auto scrollbar-hide pb-1">
+                                                {carouselResult.panels.map((url, i) => (
+                                                    <button key={i} onClick={() => setCarouselCurrentSlide(i)}
+                                                        className={`flex-shrink-0 relative rounded-lg overflow-hidden cursor-pointer transition-all ${
+                                                            i === carouselCurrentSlide ? 'ring-2 ring-orange-500 scale-105' : 'opacity-60 hover:opacity-100'
+                                                        }`} style={{ width: '80px' }}>
+                                                        <img src={url} alt={`P${i + 1}`} className="w-full aspect-square object-cover" />
+                                                        <span className="absolute bottom-0.5 right-0.5 text-[8px] font-bold bg-black/60 text-white px-1 rounded">{i + 1}</span>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                /* Empty state */
+                                <div className="glass-panel rounded-xl p-10 flex flex-col items-center justify-center text-center min-h-[400px]">
+                                    <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-orange-500/20 to-amber-500/10 flex items-center justify-center mb-4">
+                                        <span className="material-symbols-outlined text-orange-400 text-4xl">view_carousel</span>
+                                    </div>
+                                    <h3 className="text-lg font-bold text-white mb-2">AI Carousel Generator</h3>
+                                    <p className="text-sm text-slate-400 max-w-sm mb-4">
+                                        Describe a scene and we'll generate a seamless panoramic background, auto-split it into carousel panels, and composite your products on top.
+                                    </p>
+                                    <div className="flex flex-wrap gap-2 justify-center">
+                                        {['Luxury marble kitchen', 'Tropical beach sunset', 'Modern tech workspace', 'Botanical garden'].map(ex => (
+                                            <button key={ex} onClick={() => setCarouselPrompt(ex)}
+                                                className="text-[10px] px-3 py-1.5 rounded-full bg-white/[0.04] border border-white/[0.08] text-slate-400 hover:text-orange-400 hover:border-orange-500/30 cursor-pointer transition-all">
+                                                {ex}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>

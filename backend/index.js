@@ -109,6 +109,27 @@ app.use((req, res, next) => {
     if (!req.isBotScan && !['/api/health', '/health', '/favicon.ico', '/robots.txt'].includes(path)) {
         console.log(`[INCOMING] ${req.method} ${req.path} | Origin: ${req.headers.origin || 'none'}`);
     }
+    
+    // Immediate CORS Force for all allowed origins
+    const origin = req.headers.origin;
+    const isAllowedOrigin = origin && (
+        HARDCODED_ORIGINS.some(ao => origin.toLowerCase() === ao.toLowerCase()) ||
+        origin.toLowerCase().endsWith('mantram.ai') || 
+        origin.toLowerCase().includes('mantram.ai')
+    );
+    if (isAllowedOrigin) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+        res.setHeader('Access-Control-Allow-Credentials', 'true');
+        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin, Cache-Control, Pragma');
+    }
+    
+    // Immediate OPTIONS Intercept
+    if (req.method === 'OPTIONS') {
+        return res.status(200).end();
+    }
+    
+    // Start time for AI budgeting
     req.startTime = Date.now();
     next();
 });

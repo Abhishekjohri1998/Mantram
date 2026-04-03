@@ -9,6 +9,7 @@ import { Router } from 'express';
 import { protect } from '../middleware/auth.js';
 import { getRouter } from '../ai/router.js';
 import { loadBrandContext } from '../agents/shared/agentUtils.js';
+import { loadActiveSkillInstructions } from '../utils/skillHelpers.js';
 import User from '../models/User.js';
 import { safeErrorMessage } from '../utils/safeError.js';
 
@@ -135,14 +136,24 @@ router.post('/chat', protect, async (req, res) => {
             }
         }
 
-        // Build prompt with brand context
+        // Load active skill instructions (Model A — persistent behavioral skills)
+        let skillInstructions = '';
+        try {
+            skillInstructions = await loadActiveSkillInstructions(req.user._id);
+        } catch (e) {
+            console.warn('Fidato: could not load active skills:', e.message);
+        }
+
+        // Build prompt with brand context + active skills
         const systemPrompt = `${FIDATO_SYSTEM_PROMPT}
 
 The user's name is: ${req.user.name || 'there'}
 The user's plan is: ${req.user.plan || 'starter'}
 The user's role is: ${req.user.role || 'user'}
 
-${brandContext ? `## Active Brand Context (USE THIS to give brand-specific advice)\n${brandContext}` : '(No brand selected — give general marketing/branding advice)'}`;
+${brandContext ? `## Active Brand Context (USE THIS to give brand-specific advice)\n${brandContext}` : '(No brand selected \u2014 give general marketing/branding advice)'}
+
+${skillInstructions ? `## Active Skills (FOLLOW these behavioral instructions in EVERY response)\nThe user has activated the following skills. You MUST incorporate their rules and instructions into your responses naturally, as if they are part of your core expertise.\n\n${skillInstructions}` : ''}`;
 
         const userPrompt = history.map(m => `${m.role === 'user' ? 'User' : 'Fidato'}: ${m.content}`).join('\n') + '\n\nNow respond as Fidato to the latest user message. Be helpful, warm, and conversational. If the user asks about their brand, USE the brand context above to give specific, actionable advice. Keep responses concise but thorough.';
 
