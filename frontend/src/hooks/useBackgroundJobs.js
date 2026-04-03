@@ -181,7 +181,19 @@ export function useBackgroundJobs() {
                         };
                     });
                 } catch {
-                    // Ignore polling errors — will retry next interval
+                    // Network error — increment strike counter; auto-fail after 3 consecutive errors
+                    setJobs(prev => {
+                        if (!prev[job.jobId]) return prev;
+                        const strikes = (prev[job.jobId]._errorStrikes || 0) + 1;
+                        if (strikes >= 3) {
+                            console.warn(`[BackgroundJobs] Job ${job.jobId} — 3 poll errors, clearing ghost job`);
+                            return {
+                                ...prev,
+                                [job.jobId]: { ...prev[job.jobId], status: 'failed', errorMessage: 'Lost connection. Please try again.', completedAt: Date.now() },
+                            };
+                        }
+                        return { ...prev, [job.jobId]: { ...prev[job.jobId], _errorStrikes: strikes } };
+                    });
                 }
             })
         );
