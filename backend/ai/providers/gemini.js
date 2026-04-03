@@ -40,7 +40,7 @@ export class GeminiProvider extends BaseProvider {
     }
 
     async generateText({ systemPrompt, userPrompt, temperature = 0.7, maxTokens = 2048, model, images = [] }) {
-        const modelId = model || this.config.defaultModel || 'gemini-2.5-flash';
+        const modelId = model || this.config.defaultModel || 'gemini-2.0-flash';
 
         // --- BRANCH: VERTEX AI SDK (BILLED CREDITS) ---
         if (this.vertexAi) {
@@ -175,7 +175,7 @@ export class GeminiProvider extends BaseProvider {
      * Returns text + grounding citations (URLs, titles, snippets).
      */
     async generateTextWithSearch({ systemPrompt, userPrompt, temperature = 0.7, maxTokens = 4096, model }) {
-        const modelId = model || this.config.defaultModel || 'gemini-2.5-flash';
+        const modelId = model || this.config.defaultModel || 'gemini-2.0-flash';
         const url = `${this.baseUrl}/models/${modelId}:generateContent?key=${this.apiKey}`;
 
         const startTime = Date.now();
@@ -261,7 +261,7 @@ export class GeminiProvider extends BaseProvider {
      */
     async generateImage({ prompt, aspectRatio = '1:1', model, imageParts = [] }) {
         const startTime = Date.now();
-        const modelId = model || this.config.defaultImageModel || 'gemini-2.0-flash';
+        const modelId = model || this.config.defaultImageModel || 'gemini-3.1-flash-image-preview';
 
 
         // --- BRANCH: VERTEX AI SDK (BILLED CREDITS) ---

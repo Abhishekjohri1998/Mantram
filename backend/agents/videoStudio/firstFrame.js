@@ -6,7 +6,7 @@
  * get an HTTP URL that video generation APIs can use.
  */
 
-const GEMINI_MODELS = ['gemini-3.1-flash-image-preview', 'gemini-2.5-flash-image', 'gemini-3-pro-image-preview', 'gemini-2.0-flash'];
+const GEMINI_MODELS = ['gemini-3.1-flash-image-preview'];
 
 import { Agent } from 'undici';
 import { ensureS3Url } from '../../utils/s3.js';

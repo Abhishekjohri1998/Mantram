@@ -21,16 +21,23 @@ class ModelRouter {
         // Register all providers — they self-check if API key exists
         this.providers.gemini = new GeminiProvider({
             apiKey: providerConfigs.gemini?.apiKey,
-            defaultModel: 'gemini-2.5-flash', // Upgraded from 2.0-flash
+            imageApiKey: providerConfigs.gemini?.imageApiKey,
+            defaultModel: config.ai.defaultTextModel || 'gemini-2.0-flash',
+            defaultImageModel: config.ai.defaultImageModel || 'gemini-3.1-flash-image-preview',
+            // GCP Vertex AI (Billed)
+            gcpProjectId: providerConfigs.gemini?.gcpProjectId,
+            gcpLocation: providerConfigs.gemini?.gcpLocation,
+            googleApplicationCredentials: providerConfigs.gemini?.googleApplicationCredentials,
         });
         this.providers.openai = new OpenAIProvider({
             apiKey: providerConfigs.openai?.apiKey,
-            defaultModel: 'gpt-4o-mini',
+            defaultModel: config.ai.defaultTextModel || 'gpt-4o-mini',
         });
         this.providers.anthropic = new AnthropicProvider({
             apiKey: providerConfigs.anthropic?.apiKey,
-            defaultModel: 'claude-sonnet-4-20250514',
+            defaultModel: config.ai.defaultTextModel || 'claude-3-5-sonnet-20240620',
         });
+
 
         // Log available providers
         const available = Object.entries(this.providers)

@@ -335,7 +335,7 @@ const IMAGE_MODEL_CONFIG = {
     },
     'nanobanana-pro': {
         provider: 'laozhang',
-        modelId: 'gemini-3-pro-image-preview',
+        modelId: 'gemini-3.1-flash-image-preview',
         name: 'NanoBanana Pro',
         supportsRefImages: true,
     },
@@ -658,7 +658,7 @@ async function routedImageGenerate(promptText, imageParts = [], temperature = 0.
         // Models without native LZ support → route to best available alternative
         const LZ_IMAGE_MAP = {
             'nanobanana-2':   'gemini-3.1-flash-image-preview',  // Gemini Flash via LZ ✅
-            'nanobanana-pro': 'gemini-3-pro-image-preview',      // Gemini Pro via LZ ✅
+            'nanobanana-pro': 'gemini-3.1-flash-image-preview',  // Gemini Pro via LZ ✅
             'flux-pro-v1.1':  'flux-kontext-pro',                // Flux Kontext Pro via LZ ✅
             'flux-2-pro':     'flux-kontext-max',                // Flux Kontext Max via LZ ✅ (premium)
             'seedream-5':     'flux-kontext-max',                // → Flux Max (seedream not on this LZ account)
@@ -672,7 +672,7 @@ async function routedImageGenerate(promptText, imageParts = [], temperature = 0.
         //  2. Multimodal: /v1/chat/completions (Gemini models only — supports S3 ref images)
         // For non-multimodal models (Flux, Seedream, Ideogram): ALWAYS try LZ text-only first.
         // Brand context is already baked into the text prompt, ref images are a bonus not a requirement.
-        const LZ_MULTIMODAL_MODELS = ['gemini-3.1-flash-image-preview', 'gemini-3-pro-image-preview'];
+        const LZ_MULTIMODAL_MODELS = ['gemini-3.1-flash-image-preview'];
         const isMultimodalCapable = LZ_MULTIMODAL_MODELS.includes(lzModel);
 
         if (lzModel && isLaozhangAvailable()) {
@@ -1011,7 +1011,7 @@ RESPOND WITH ONLY THE ENHANCED PROMPT TEXT. Nothing else.`;
         if (geminiKey) {
             try {
                 const resp = await fetch(
-                    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`,
+                    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,
                     {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },

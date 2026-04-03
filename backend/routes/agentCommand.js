@@ -335,9 +335,9 @@ RESPONSE FORMAT — respond in STRICT JSON:
                     prompt: cleanPrompt,
                     size: imageSize,
                 });
-                if (imageResult?.imageUrl) {
-                    parsed.data.imageUrl = imageResult.imageUrl;
-                    console.log(`✅ Agent: Image generated via ${imageResult.provider}/${imageResult.model}`);
+                if (aiResult?.imageUrl) {
+                    parsed.data.imageUrl = aiResult.imageUrl;
+                    console.log(`✅ Agent: Image generated via ${aiResult.provider}/${aiResult.model}`);
                 }
             } catch (imgErr) {
                 console.warn('Image generation in agent-command failed:', imgErr.message);
