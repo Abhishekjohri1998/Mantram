@@ -1004,14 +1004,14 @@ RESPOND WITH ONLY THE ENHANCED PROMPT TEXT. Nothing else.`;
             referenceDescriptions ? `REFERENCE IMAGES: ${referenceDescriptions}` : '',
         ].filter(Boolean).join('\n');
 
-        // Use Gemini Flash (cheapest)
+        // Use Gemini 1.5 Pro for high-intel creativity
         const geminiKey = process.env.GEMINI_IMAGE_API_KEY || process.env.GEMINI_API_KEY;
         let enhanced = '';
 
         if (geminiKey) {
             try {
                 const resp = await fetch(
-                    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,
+                    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${geminiKey}`,
                     {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
