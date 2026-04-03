@@ -72,7 +72,7 @@ async function callAgent(systemPrompt, userPrompt, temperature = 0.7) {
         systemPrompt,
         userPrompt,
         temperature,
-        maxTokens: 8192,
+        maxTokens: 4096,
     }); // Router auto-selects; video-studio.js handles claude fallback separately
     return parseAgentJSON(result.text || '');
 }
@@ -258,8 +258,10 @@ export async function scriptDirectorNode(state) {
         groundingContext,
     ].filter(Boolean).join('\n');
 
+    // Pass the model that will actually render this script — prompts are structurally different per model
+    const targetModel = state.routing?.selectedModel || 'seedance-2.0';
     const result = await callAgent(
-        SCRIPT_DIRECTOR_PROMPT(brandContext, styleMemory),
+        SCRIPT_DIRECTOR_PROMPT(brandContext, styleMemory, targetModel),
         userPrompt,
         0.6
     );
@@ -643,12 +645,14 @@ export async function enhancePromptNode(state) {
     // Load brand context — CRITICAL: without this, enhanced prompts lose brand DNA
     const { brandContext, styleMemory } = await loadContext(state.brandId, state.userId);
 
-    const userPromptFinal = `Enhance this video generation prompt:\n\n"${state.prompt}"\n\nModel being used: ${state.model || 'general'}\nDesired duration: ${state.duration || 5}s\nAspect ratio: ${state.aspectRatio || '16:9'}\n\nCRITICAL DIRECTIVE: Generate a minimum of 5,000 words. Expand every detail obsessively.`;
+    const targetModel = state.model || 'seedance-2.0';
+    const userPrompt = `Enhance this video generation prompt for the ${targetModel} model:\n\n"${state.prompt}"\n\nDesired duration: ${state.duration || 5}s\nAspect ratio: ${state.aspectRatio || '16:9'}\nKey requirement: follow the exact prompt structure for ${targetModel} as described in your instructions.`;
 
-    const result = await callAgent(
-        PROMPT_ENHANCER_PROMPT(brandContext, styleMemory),
-        userPromptFinal,
-        0.8 // Higher temperature for more creative expansion
+    const result = await callFastAgent(
+        PROMPT_ENHANCER_PROMPT(brandContext, styleMemory, targetModel),
+        userPrompt,
+        0.5,
+        4096
     );
 
     return {
