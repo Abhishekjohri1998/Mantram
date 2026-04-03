@@ -37,6 +37,148 @@ function parseJSON(text) {
   return extractJSON(text);
 }
 
+// ============================================================================
+// BRAND LANGUAGE INFERENCE ENGINE
+// Infers the correct output language from Brand DNA signals.
+// Even if `defaultLanguage` isn't set, we read industry, audience, region,
+// brand name, and content style to determine the right language.
+// ============================================================================
+
+function inferBrandLanguage(brand) {
+  if (!brand) return { lang: 'English', directive: '', isNonEnglish: false };
+
+  const dna = brand.dna || {};
+  const name = (brand.name || '').toLowerCase();
+  const industry = (dna.industry || '').toLowerCase();
+  const audience = (dna.targetAudience || '').toLowerCase();
+  const region = (dna.region || '').toLowerCase();
+  const desc = (dna.brandDescription || '').toLowerCase();
+  const companyOverview = (dna.companyOverview || '').toLowerCase();
+  const voice = (dna.voice?.description || '').toLowerCase();
+  const keyPhrases = (dna.contentStyle?.keyPhrases || []).join(' ').toLowerCase();
+  const country = (dna.country || 'India').toLowerCase();
+
+  // Explicit language set in DNA
+  const explicit = (dna.defaultLanguage || '').toLowerCase().trim();
+  const style = (dna.languageStyle || 'pure').toLowerCase();
+
+  // ── Language signal maps ──
+  const hindiSignals = [
+    'hindi', 'हिन्दी', 'zee', 'zeetv', 'star plus', 'star bharat', 'sony liv', 'colors tv', 'sab tv',
+    'doordarshan', 'dd national', 'india tv', 'aaj tak', 'ndtv india', 'tv9 bharatvarsh',
+    'bollywood', 'hindi cinema', 'daily soap', 'saas-bahu', 'serial', 'melodrama',
+    'bharat', 'hindustani', 'desi audience', 'tier 2', 'tier 3', 'bharat audience',
+    'grameen', 'rural india', 'hindi belt', 'up', 'bihar', 'rajasthan', 'mp',
+    'madhya pradesh', 'uttar pradesh', 'haryana', 'jharkhand', 'chhattisgarh',
+  ];
+
+  const marathiSignals = [
+    'marathi', 'star pravah', 'zee marathi', 'maharashtra', 'mumbai regional', 'pune regional',
+  ];
+  const tamilSignals = [
+    'tamil', 'sun tv', 'vijay tv', 'zee tamil', 'kollywood', 'chennai', 'tamil Nadu', 'tamilnadu',
+  ];
+  const teluguSignals = [
+    'telugu', 'star maa', 'zee telugu', 'tollywood', 'hyderabad regional', 'andhra', 'telangana',
+  ];
+  const kannadaSignals = [
+    'kannada', 'star suvarna', 'zee kannada', 'sandalwood', 'karnataka regional', 'bangalore regional',
+  ];
+  const malayalamSignals = [
+    'malayalam', 'asianet', 'mazhavil manorama', 'mollywood', 'kerala', 'thrissur',
+  ];
+  const bengaliSignals = [
+    'bengali', 'star jalsha', 'zee bangla', 'tollywood bengali', 'kolkata regional', 'west bengal',
+  ];
+  const punjabiSignals = [
+    'punjabi', 'punjab', 'ptc punjabi', 'chandigarh' , 'amritsar',
+  ];
+  const gujaratiSignals = [
+    'gujarati', 'gujarat', 'tv9 gujarati', 'ahmedabad regional', 'surat regional',
+  ];
+
+  // Combine all detectable text
+  const allText = [name, industry, audience, region, desc, companyOverview, voice, keyPhrases].join(' ');
+
+  // Detect language from explicit field first, then signals
+  let detectedLang = null;
+
+  if (explicit && explicit !== 'english') {
+    detectedLang = explicit;
+  } else {
+    if (hindiSignals.some(s => allText.includes(s))) detectedLang = 'hindi';
+    else if (marathiSignals.some(s => allText.includes(s))) detectedLang = 'marathi';
+    else if (tamilSignals.some(s => allText.includes(s))) detectedLang = 'tamil';
+    else if (teluguSignals.some(s => allText.includes(s))) detectedLang = 'telugu';
+    else if (kannadaSignals.some(s => allText.includes(s))) detectedLang = 'kannada';
+    else if (malayalamSignals.some(s => allText.includes(s))) detectedLang = 'malayalam';
+    else if (bengaliSignals.some(s => allText.includes(s))) detectedLang = 'bengali';
+    else if (punjabiSignals.some(s => allText.includes(s))) detectedLang = 'punjabi';
+    else if (gujaratiSignals.some(s => allText.includes(s))) detectedLang = 'gujarati';
+  }
+
+  // Map to readable name + script
+  const LANG_MAP = {
+    hindi:     { display: 'Hindi',    script: 'Devanagari', example: 'आज की रात, कुछ अलग होगा।' },
+    marathi:   { display: 'Marathi',  script: 'Devanagari', example: 'एक नवीन सुरुवात.' },
+    tamil:     { display: 'Tamil',    script: 'Tamil',      example: 'ஒரு புதிய தொடக்கம்.' },
+    telugu:    { display: 'Telugu',   script: 'Telugu',     example: 'ఒక కొత్త ప్రారంభం.' },
+    kannada:   { display: 'Kannada',  script: 'Kannada',    example: 'ಒಂದು ಹೊಸ ಆರಂಭ.' },
+    malayalam: { display: 'Malayalam',script: 'Malayalam',  example: 'ഒരു പുതിയ തുടക്കം.' },
+    bengali:   { display: 'Bengali',  script: 'Bengali',    example: 'একটি নতুন শুরু।' },
+    punjabi:   { display: 'Punjabi',  script: 'Gurmukhi',   example: 'ਇੱਕ ਨਵੀਂ ਸ਼ੁਰੂਆਤ।' },
+    gujarati:  { display: 'Gujarati', script: 'Gujarati',   example: 'એક નવી શરૂઆત.' },
+  };
+
+  if (!detectedLang) {
+    return {
+      lang: 'English',
+      directive: '',
+      isNonEnglish: false,
+      reason: 'No regional signals detected — defaulting to English',
+    };
+  }
+
+  const info = LANG_MAP[detectedLang] || { display: detectedLang, script: '', example: '' };
+
+  // Determine style (pure / hinglish mixing for hindi)
+  let styleNote = '';
+  if (detectedLang === 'hindi') {
+    if (style === 'hinglish' || audience.includes('urban') || audience.includes('metro') || audience.includes('millennial')) {
+      styleNote = `Use a HINGLISH style — mix Hindi and English naturally, the way urban Indians speak. Example: "Yeh campaign tumhari life badal dega." Hindi script for dialogues, Roman/Hinglish for captions.`;
+    } else {
+      styleNote = `Use PURE HINDI in Devanagari script for all taglines, dialogues, and scripts. Campaign names can be in Hindi or bilingual.`;
+    }
+  }
+
+  const directive = `
+🌍 LANGUAGE DIRECTIVE — MANDATORY:
+Brand "${brand.name}" serves a ${info.display}-speaking audience. ALL creative output MUST be in ${info.display}.
+This means:
+- Campaign names / taglines → ${info.display}${info.script ? ` (${info.script} script)` : ''}
+- Dialogues, voiceovers, scripts → ${info.display}
+- Hashtags → in ${info.display} (transliterated or in script)
+- Slogans, hooks, CTA copy → ${info.display}
+- Rationale / analysis (strategy text for the human user) → English is OK
+${styleNote ? `\nSTYLE NOTE: ${styleNote}` : ''}
+
+DO NOT default to English for any creative copy. English is only for meta-descriptions, strategy notes, and labels inside JSON keys.
+`.trim();
+
+  return {
+    lang: info.display,
+    script: info.script,
+    detectedFrom: explicit ? 'explicit_setting' : 'brand_signals',
+    isNonEnglish: true,
+    directive,
+    reason: explicit
+      ? `Explicitly set to ${info.display}`
+      : `Inferred from brand signals: ${allText.slice(0, 80)}…`,
+  };
+}
+
+
+
 // Intent configs — advanced strategic questions with keyword suggestions
 const INTENT_QUESTIONS = {
   campaign: [
@@ -227,11 +369,15 @@ Q6: TEAM — What's the team size and capabilities? (optional)`,
 
     const flowGuide = intentFlows[intent] || intentFlows.custom;
 
+    const langInfo = inferBrandLanguage(brand);
+
     const systemPrompt = `You are a friendly creative partner helping someone brainstorm. You know their brand well and you talk like a helpful friend, NOT like a marketing professor.
 
 BRAND YOU'RE WORKING WITH:
 ${brandContext}
-
+${langInfo.directive ? `
+${langInfo.directive}
+` : ''}
 You are starting a "${intent}" brainstorm session.
 
 YOUR JOB: Generate questions that follow this specific flow:
@@ -287,6 +433,8 @@ Respond in JSON:
           questions: parsed.questions,
           brandInsight: parsed.brandInsight || null,
           brandAware: true,
+          detectedLanguage: langInfo.isNonEnglish ? { lang: langInfo.lang, script: langInfo.script, reason: langInfo.reason } : null,
+
         });
       }
     } catch (aiError) {
@@ -307,6 +455,7 @@ router.post('/confirm', optionalAuth, async (req, res) => {
     const { intent, answers, brand } = req.body;
     if (!intent || !answers) return res.status(400).json({ success: false, error: 'Intent and answers are required' });
 
+    const langInfo = inferBrandLanguage(brand);
     const brandContext = brand
       ? `Brand: ${brand.name}. Industry: ${brand.dna?.industry || 'N/A'}. Voice: ${brand.dna?.voice || 'professional'}. Colors: ${brand.dna?.colors?.map(c => c.hex).join(', ') || 'N/A'}.`
       : '';
@@ -314,8 +463,10 @@ router.post('/confirm', optionalAuth, async (req, res) => {
     const answersText = Object.entries(answers).map(([k, v]) => `${k}: ${v}`).join('\n');
 
     const systemPrompt = `You are a senior brand strategist at a top creative agency. You're having a conversation with a client.
-
-Your job: Summarize what you understood from the client's brief in 3-4 conversational sentences. Show that you truly understand their brand, audience, and goals. End with a specific, insightful observation that shows strategic depth.
+${langInfo.directive ? `
+${langInfo.directive}
+` : ''}
+Your job: Summarize what you understood from the client's brief in 3-4 conversational sentences. Show that you truly understand their brand, audience, and goals. End with a specific, insightful observation that shows strategic depth. If the brand communicates in a regional language, reflect that in your summary tone.
 
 Also suggest 3 refinement directions the user might want (as short 5-8 word options).
 
@@ -346,8 +497,9 @@ router.post('/generate', protect, requireStudio('brainstormStudio'), requireCred
     if (!intent || !answers) return res.status(400).json({ success: false, error: 'Intent and answers are required' });
 
     const dna = brand?.dna || {};
+    const langInfo = inferBrandLanguage(brand);
     const brandContext = brand
-      ? `Brand: ${brand.name}. Industry: ${dna.industry || 'N/A'}. Voice: ${dna.voice?.personality || 'professional'}. Target Audience: ${dna.targetAudience || 'N/A'}. Description: ${dna.brandDescription || 'N/A'}. Country: ${dna.country || 'India'}. Language: ${dna.defaultLanguage || 'english'}.`
+      ? `Brand: ${brand.name}. Industry: ${dna.industry || 'N/A'}. Voice: ${dna.voice?.personality || 'professional'}. Target Audience: ${dna.targetAudience || 'N/A'}. Description: ${dna.brandDescription || 'N/A'}. Country: ${dna.country || 'India'}. Language: ${langInfo.lang} (${langInfo.detectedFrom || 'default'}).`
       : '';
 
     const answersText = Object.entries(answers).map(([k, v]) => `${k}: ${v}`).join('\n');
@@ -483,7 +635,9 @@ Generate exactly ${scriptCount} distinct film concepts with different emotional 
 Generate 3 campaign concepts, 3 tactical idea sets, and a complete execution plan.
 `}
 ${refinementHint ? `REFINEMENT: The user wants to adjust direction: "${refinementHint}". Adapt all ideas.` : ''}
-
+${langInfo.directive ? `
+${langInfo.directive}
+` : ''}
 Make ideas BOLD, SPECIFIC, and CULTURALLY RELEVANT. Not generic.
 
 Respond in STRICT JSON format:
@@ -496,7 +650,7 @@ ${outputFormat}`;
     const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.8, maxTokens: 6000, timeout: remainingBudget });
     const parsed = parseJSON(result);
 
-    res.json({ success: true, ideas: parsed, intent });
+    res.json({ success: true, ideas: parsed, intent, detectedLanguage: langInfo?.isNonEnglish ? langInfo.lang : null });
   } catch (error) {
     console.error('Brainstorm generate error:', error);
     res.status(500).json({ success: false, error: safeErrorMessage(error) });
@@ -509,6 +663,7 @@ router.post('/refine', protect, requireStudio('brainstormStudio'), requireCredit
     const { intent, answers, brand, previousIdeas, refinementPrompt } = req.body;
     if (!refinementPrompt) return res.status(400).json({ success: false, error: 'Refinement prompt is required' });
 
+    const langInfo = inferBrandLanguage(brand);
     const brandContext = brand
       ? `Brand: ${brand.name}. Industry: ${brand.dna?.industry || 'N/A'}. Voice: ${brand.dna?.voice?.personality || 'professional'}.`
       : '';
@@ -517,6 +672,9 @@ router.post('/refine', protect, requireStudio('brainstormStudio'), requireCredit
     const isAdFilm = intent === 'ad-film';
 
     const systemPrompt = `You are refining brainstorm ideas based on feedback: "${refinementPrompt}"
+${langInfo.directive ? `
+${langInfo.directive}
+` : ''}
 
 ${isAdFilm ? 'These are AD FILM concepts — generate film concepts with story, shots, emotion, not campaigns.' : 'Generate campaign concepts with tactical plans.'}
 
@@ -531,7 +689,7 @@ ${isAdFilm ? 'Respond with: filmConcepts (3), productionApproaches (3), namingId
     const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.85, maxTokens: 6000, timeout: remainingBudget });
     const parsed = parseJSON(result);
 
-    res.json({ success: true, ideas: parsed, intent });
+    res.json({ success: true, ideas: parsed, intent, detectedLanguage: langInfo?.isNonEnglish ? langInfo.lang : null });
   } catch (error) {
     console.error('Brainstorm refine error:', error);
     res.status(500).json({ success: false, error: safeErrorMessage(error) });
@@ -578,11 +736,15 @@ router.post('/screenplay', protect, requireStudio('brainstormStudio'), requireCr
     const { filmConcept, brand } = req.body;
     if (!filmConcept) return res.status(400).json({ success: false, error: 'Film concept is required' });
 
+    const langInfo = inferBrandLanguage(brand);
     const brandContext = brand
       ? `Brand: ${brand.name}. Industry: ${brand.dna?.industry || 'N/A'}. Voice: ${brand.dna?.voice?.personality || 'professional'}. Target: ${brand.dna?.targetAudience || 'N/A'}. Country: ${brand.dna?.country || 'India'}.`
       : '';
 
     const systemPrompt = `You are an award-winning ad film scriptwriter. Write a production-ready screenplay.
+${langInfo.directive ? `
+${langInfo.directive}
+` : ''}
 
 RULES:
 1. Scene-by-scene with VISUAL descriptions and DIALOGUE
@@ -658,6 +820,7 @@ router.post('/chat', protect, requireStudio('brainstormStudio'), requireCredits(
       return res.status(400).json({ success: false, error: 'Film concept and message are required' });
     }
 
+    const langInfo = inferBrandLanguage(brand);
     const brandContext = brand
       ? `Brand: ${brand.name}. Industry: ${brand.dna?.industry || 'N/A'}. Voice: ${brand.dna?.voice?.personality || 'professional'}. Target: ${brand.dna?.targetAudience || 'N/A'}.`
       : '';
@@ -665,6 +828,9 @@ router.post('/chat', protect, requireStudio('brainstormStudio'), requireCredits(
     const historyText = (chatHistory || []).map(m => `${m.role === 'user' ? 'USER' : 'CREATIVE DIRECTOR'}: ${m.text}`).join('\n');
 
     const systemPrompt = `You are an award-winning creative director helping refine an ad film concept. You're working closely with the client to perfect their film idea.
+${langInfo.directive ? `
+${langInfo.directive}
+` : ''}
 
 ${brandContext}
 

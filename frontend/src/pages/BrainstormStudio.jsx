@@ -493,6 +493,44 @@ function Message({ msg, onScreenplay, onFeedback, onSelectOption, isLatest, stre
 }
 
 
+// ── Client-side brand language inference (mirrors backend logic) ──────────────
+function detectBrandLang(brand) {
+  if (!brand) return null
+  const dna = brand.dna || {}
+  const explicit = (dna.defaultLanguage || '').toLowerCase().trim()
+  if (explicit && explicit !== 'english') return explicit
+
+  const allText = [
+    brand.name, dna.industry, dna.targetAudience, dna.region,
+    dna.brandDescription, dna.companyOverview,
+  ].join(' ').toLowerCase()
+
+  if (['hindi','zee','zeetv','star plus','star bharat','bollywood','hindi cinema',
+       'aaj tak','ndtv india','tv9 bharatvarsh','bharat','hindustani','hindi belt',
+       'up ','bihar','rajasthan',' mp ','madhya pradesh','uttar pradesh','haryana'].some(s => allText.includes(s))) return 'hindi'
+  if (['marathi','star pravah','zee marathi','maharashtra'].some(s => allText.includes(s))) return 'marathi'
+  if (['tamil','sun tv','vijay tv','zee tamil','kollywood','chennai'].some(s => allText.includes(s))) return 'tamil'
+  if (['telugu','star maa','zee telugu','tollywood','hyderabad regional','andhra','telangana'].some(s => allText.includes(s))) return 'telugu'
+  if (['kannada','star suvarna','zee kannada','sandalwood','karnataka'].some(s => allText.includes(s))) return 'kannada'
+  if (['malayalam','asianet','mazhavil manorama','mollywood','kerala'].some(s => allText.includes(s))) return 'malayalam'
+  if (['bengali','star jalsha','zee bangla','kolkata regional','west bengal'].some(s => allText.includes(s))) return 'bengali'
+  if (['punjabi','ptc punjabi','chandigarh','amritsar'].some(s => allText.includes(s))) return 'punjabi'
+  if (['gujarati','gujarat','tv9 gujarati','ahmedabad','surat'].some(s => allText.includes(s))) return 'gujarati'
+  return null
+}
+
+const LANG_DISPLAY = {
+  hindi: { flag: '🇮🇳', label: 'Hindi', srLang: 'hi-IN' },
+  marathi: { flag: '🇮🇳', label: 'Marathi', srLang: 'mr-IN' },
+  tamil: { flag: '🇮🇳', label: 'Tamil', srLang: 'ta-IN' },
+  telugu: { flag: '🇮🇳', label: 'Telugu', srLang: 'te-IN' },
+  kannada: { flag: '🇮🇳', label: 'Kannada', srLang: 'kn-IN' },
+  malayalam: { flag: '🇮🇳', label: 'Malayalam', srLang: 'ml-IN' },
+  bengali: { flag: '🇮🇳', label: 'Bengali', srLang: 'bn-IN' },
+  punjabi: { flag: '🇮🇳', label: 'Punjabi', srLang: 'pa-IN' },
+  gujarati: { flag: '🇮🇳', label: 'Gujarati', srLang: 'gu-IN' },
+}
+
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function BrainstormStudio() {
   const navigate = useNavigate()
@@ -521,6 +559,8 @@ export default function BrainstormStudio() {
 
   const firstName = user?.name?.split(' ')[0] || 'there'
   const brandName = activeBrand?.name || null
+  const detectedLangKey = detectBrandLang(activeBrand)
+  const langInfo = detectedLangKey ? LANG_DISPLAY[detectedLangKey] : null
 
   // Auto-scroll — trigger on new messages AND during streaming token updates
   const lastMsgContent = messages[messages.length - 1]?.content || ''
@@ -555,7 +595,7 @@ export default function BrainstormStudio() {
     ].filter(Boolean).join(', ')
 
     const greeting = insights
-      ? `Hey ${firstName}! 👋 I'm Fidato — your brand strategist for ${activeBrand.name}. I've studied your brand deeply — you’re a ${insights}. Let’s brainstorm something brilliant together. What are we building today? 🚀`
+      ? `Hey ${firstName}! 👋 I'm Fidato — your brand strategist for ${activeBrand.name}. I've studied your brand deeply — you're a ${insights}.${langInfo ? ` All campaign copy, taglines \      ? `Hey ${firstName}! 👋 I'm Fidato — your brand strategist for ${activeBrand.name}. I've studied your brand deeply — you’re a ${insights}. Let’s brainstorm something brilliant together. What are we building today? 🚀` scripts will be in **${langInfo.label}** — the language of your audience. 🌍` : ''} Let's brainstorm something brilliant together. What are we building today? 🚀`
       : `Hey ${firstName}! 👋 Fidato here — let’s brainstorm for **${activeBrand.name}** today. What are we working on?`
 
     setMessages([{ id: 'welcome', role: 'fidato', content: greeting, timestamp: Date.now() }])
@@ -710,7 +750,7 @@ export default function BrainstormStudio() {
     const rec = new SpeechRecognition()
     rec.continuous = false
     rec.interimResults = false
-    rec.lang = 'en-IN'
+    rec.lang = langInfo?.srLang || 'en-IN'
     rec.onresult = (e) => {
       const transcript = e.results[0]?.[0]?.transcript || ''
       if (transcript) setInput(transcript)
@@ -753,6 +793,12 @@ export default function BrainstormStudio() {
               </div>
             ))}
           </div>
+          {/* Language badge — shown when a regional brand is active */}
+          {langInfo && (
+            <div className="bs-lang-badge" title={`Generating creative copy in ${langInfo.label}`}>
+              {langInfo.flag} {langInfo.label}
+            </div>
+          )}
           <button className="bs-new-session-btn" onClick={resetSession} title="Start new session">
             <span className="material-symbols-outlined" style={{ fontSize: 16 }}>refresh</span>
             New Session
