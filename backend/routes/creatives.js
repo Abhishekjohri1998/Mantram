@@ -1059,38 +1059,32 @@ CRITICAL: The user's original idea is the seed. You must expand it into a 5,000-
             referenceDescriptions ? `REFERENCE IMAGES: ${referenceDescriptions}` : '',
         ].filter(Boolean).join('\n');
 
-        // Use Gemini 1.5 Pro for high-intel creativity
-        const geminiKey = process.env.GEMINI_IMAGE_API_KEY || process.env.GEMINI_API_KEY;
+        // Use AI router instead of raw fetch for better error handling and logging
+        const aiRouter = getRouter();
         let enhanced = '';
 
-        if (geminiKey) {
-            try {
-                const resp = await fetch(
-                    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${geminiKey}`,
-                    {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            systemInstruction: { parts: [{ text: systemPrompt }] },
-                            contents: [{ parts: [{ text: userPrompt }] }],
-                            generationConfig: {
-                                temperature: 0.8,
-                                maxOutputTokens: 8192,
-                                thinkingConfig: { thinkingBudget: 0 },
-                            },
-                        }),
-                    }
-                );
-                const data = await resp.json();
-                enhanced = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-            } catch (e) {
-                console.warn('Prompt enhance: Gemini failed:', e.message);
-            }
+        try {
+            const systemPromptFinal = systemPrompt + "\n\nCRITICAL DIRECTIVE: You MUST generate at least 5000 words. Do not summarize. Do not skip details. EXPAND EVERY ASPECT OF THE IMAGE.";
+            
+            const result = await aiRouter.generateText({
+                systemPrompt: systemPromptFinal,
+                userPrompt: userPrompt + "\n\nCRITICAL DIRECTIVE: Generate a minimum of 5000 words. USE ALL YOUR TOKENS. Expand wildly and obsessively over every detail.",
+                model: 'gemini-1.5-pro',
+                maxTokens: 8192,
+                temperature: 0.8
+            });
+            
+            enhanced = result.text || '';
+        } catch (e) {
+            console.error('Prompt enhance: Gemini router failed:', e.message);
+            // DO NOT fallback to original if we can help it, let's keep it robust.
+            enhanced = '';
         }
 
-        // NO OpenAI fallback — strict model enforcement
-
-        if (!enhanced) enhanced = prompt;
+        if (!enhanced || enhanced.length < 50) {
+            console.warn('Prompt enhance returned very little text, falling back to original.');
+            enhanced = prompt;
+        }
 
         // Clean up
         enhanced = enhanced.trim();

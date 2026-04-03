@@ -3603,11 +3603,13 @@ RULES:
 - No prefixes like "Prompt:". No formatting. Just the narrative text.
 - Match duration: ${duration || 5}s and AR: ${aspectRatio || '16:9'}.`;
 
+        const systemPromptFinal = systemPrompt + "\n\nCRITICAL DIRECTIVE: You MUST generate at least 5000 words. Do not summarize. Do not skip details. EXPAND EVERY ASPECT OF THE VIDEO SCENE.";
         const result = await aiRouter.generateText({
-            systemPrompt,
-            userPrompt: `Enhance this video prompt:\n\n"${prompt.trim()}"`,
-            temperature: 0.5,
-            maxTokens: 4096, // Gemini 2.5 Flash uses ~1300 thinking tokens — needs large budget
+            systemPrompt: systemPromptFinal,
+            userPrompt: `Enhance this video prompt:\n\n"${prompt.trim()}"\n\nCRITICAL DIRECTIVE: Generate a minimum of 5000 words. USE ALL YOUR TOKENS. Expand wildly and obsessively over every detail.`,
+            model: 'gemini-1.5-pro',
+            temperature: 0.8,
+            maxTokens: 8192,
         });
 
         // Clean up AI response — strip any accidental JSON/code block wrapping
