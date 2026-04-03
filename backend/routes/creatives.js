@@ -167,6 +167,7 @@ router.get('/jobs', protect, async (req, res) => {
             .lean();
         res.json({ success: true, jobs });
     } catch (error) {
+        console.error('❌ [API] GET /jobs error:', error);
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
@@ -182,6 +183,7 @@ router.get('/jobs/:jobId', protect, async (req, res) => {
         if (!job) return res.status(404).json({ success: false, error: 'Job not found' });
         res.json({ success: true, job });
     } catch (error) {
+        console.error('❌ [API] GET /jobs/:id error:', error);
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
@@ -194,16 +196,15 @@ router.delete('/jobs/:jobId', protect, async (req, res) => {
             { status: 'cancelled', completedAt: new Date() }
         );
         if (!job) return res.status(404).json({ success: false, error: 'Job not found or already finished' });
-        // Note: we can't actually cancel the in-flight pipeline, but marking cancelled
-        // means the frontend won't poll it anymore. Credits are NOT refunded for in-flight jobs.
         res.json({ success: true, message: 'Job marked as cancelled' });
     } catch (error) {
+        console.error('❌ [API] DELETE /jobs/:id error:', error);
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
-
 // ══════════════════════════════════════════════════════════════════════════════
+
 // GET /api/creatives/progress/:id — Poll real-time pipeline progress
 // Lightweight endpoint — no auth required (progress IDs are UUIDs, unguessable)
 // ══════════════════════════════════════════════════════════════════════════════
@@ -983,8 +984,8 @@ RULES:
 5. NEVER include hex codes, font names, or metadata text
 6. Describe colors by visual appearance, not codes
 7. Premium quality — ready for a global brand campaign
-8. Keep under 150 words — concise but vivid
-9. Match the brand's personality and aesthetic throughout
+8. Provide exhaustive detail — 300-500 words. Focus on cinematic lighting, intricate textures, camera specifications (lens choice, f-stop), and environmental depth.
+9. Match the brand's personality and aesthetic throughout. Use the Brand DNA as the absolute source of truth for color and tone.
 ${formatInfo ? `10. FORMAT: ${formatInfo.label} — ${formatInfo.rules}` : ''}
 ${formatInfo?.needsText ? `11. TEXT ON IMAGE: Since this is a ${formatInfo.label}, your prompt MUST include a SUGGESTED HEADLINE. Write it like: "Bold text reading 'YOUR HEADLINE HERE' prominently displayed..." Make the headline catchy, 3-5 words.` : ''}
 12. NEVER wrap in quotes or add prefixes like "Generate:" — return ONLY the raw enhanced prompt
@@ -1137,7 +1138,7 @@ No markdown, no explanation.`;
         if (geminiKey) {
             try {
                 const resp = await fetch(
-                    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`,
+                    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,
                     {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -1182,55 +1183,8 @@ No markdown, no explanation.`;
     }
 });
 
-// ── GET /api/creatives/jobs — List recent jobs for the current user ────────────
-// Used on page load to reconnect to any in-progress or completed jobs.
-router.get('/jobs', protect, async (req, res) => {
-    try {
-        const since = new Date(Date.now() - 24 * 60 * 60 * 1000); // last 24h
-        const jobs = await GenerationJob.find(
-            { user: req.user._id, createdAt: { $gte: since } },
-            { jobId: 1, status: 1, type: 1, prompt: 1, format: 1, imageUrl: 1, errorMessage: 1,
-              creativeId: 1, createdAt: 1, startedAt: 1, completedAt: 1, steps: { $slice: -5 } }
-        )
-            .sort({ createdAt: -1 })
-            .limit(20)
-            .lean();
-        res.json({ success: true, jobs });
-    } catch (error) {
-        res.status(500).json({ success: false, error: safeErrorMessage(error) });
-    }
-});
 
-// ── GET /api/creatives/jobs/:jobId — Poll a specific job ──────────────────────
-router.get('/jobs/:jobId', protect, async (req, res) => {
-    try {
-        const job = await GenerationJob.findOne(
-            { jobId: req.params.jobId, user: req.user._id },
-            { jobId: 1, status: 1, type: 1, prompt: 1, format: 1, imageUrl: 1, errorMessage: 1,
-              creativeId: 1, result: 1, warnings: 1, createdAt: 1, startedAt: 1, completedAt: 1, steps: 1 }
-        ).lean();
-        if (!job) return res.status(404).json({ success: false, error: 'Job not found' });
-        res.json({ success: true, job });
-    } catch (error) {
-        res.status(500).json({ success: false, error: safeErrorMessage(error) });
-    }
-});
 
-// ── DELETE /api/creatives/jobs/:jobId — Cancel a pending/processing job ───────
-router.delete('/jobs/:jobId', protect, async (req, res) => {
-    try {
-        const job = await GenerationJob.findOneAndUpdate(
-            { jobId: req.params.jobId, user: req.user._id, status: { $in: ['pending', 'processing'] } },
-            { status: 'cancelled', completedAt: new Date() }
-        );
-        if (!job) return res.status(404).json({ success: false, error: 'Job not found or already finished' });
-        // Note: we can't actually cancel the in-flight pipeline, but marking cancelled
-        // means the frontend won't poll it anymore. Credits are NOT refunded for in-flight jobs.
-        res.json({ success: true, message: 'Job marked as cancelled' });
-    } catch (error) {
-        res.status(500).json({ success: false, error: safeErrorMessage(error) });
-    }
-});
 
 // ══════════════════════════════════════════════════════════════════════════════
 // POST /api/creatives/generate
