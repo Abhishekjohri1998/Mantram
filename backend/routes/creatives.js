@@ -984,14 +984,14 @@ RULES:
 5. NEVER include hex codes, font names, or metadata text
 6. Describe colors by visual appearance, not codes
 7. Premium quality — ready for a global brand campaign
-8. Provide exhaustive detail — 300-500 words. Focus on cinematic lighting, intricate textures, camera specifications (lens choice, f-stop), and environmental depth.
+8. EXTREME NARRATIVE DETAIL: Provide a massive, exhaustive description ($5000+ tokens). This should be a full creative screenplay for the image, detailing every microscopic texture, atmospheric particle, specific camera lens (e.g., 85mm f/1.2), complex lighting setups (e.g., three-point lighting with soft rim light), and environmental storytelling. Do not hold back — the more detail, the better.
 9. Match the brand's personality and aesthetic throughout. Use the Brand DNA as the absolute source of truth for color and tone.
 ${formatInfo ? `10. FORMAT: ${formatInfo.label} — ${formatInfo.rules}` : ''}
 ${formatInfo?.needsText ? `11. TEXT ON IMAGE: Since this is a ${formatInfo.label}, your prompt MUST include a SUGGESTED HEADLINE. Write it like: "Bold text reading 'YOUR HEADLINE HERE' prominently displayed..." Make the headline catchy, 3-5 words.` : ''}
 12. NEVER wrap in quotes or add prefixes like "Generate:" — return ONLY the raw enhanced prompt
 13. NEVER describe the output as a "mockup" or "presentation" — describe the ACTUAL visual content
 
-RESPOND WITH ONLY THE ENHANCED PROMPT TEXT. Nothing else.`;
+RESPOND WITH THE MOST EXHAUSTIVE AND DETAILED NARRATIVE POSSIBLE. Minimum length: 2000 words.`;
 
         const userPrompt = [
             `USER'S IDEA: ${prompt}`,
@@ -1020,8 +1020,8 @@ RESPOND WITH ONLY THE ENHANCED PROMPT TEXT. Nothing else.`;
                             systemInstruction: { parts: [{ text: systemPrompt }] },
                             contents: [{ parts: [{ text: userPrompt }] }],
                             generationConfig: {
-                                temperature: 0.7,
-                                maxOutputTokens: 2048,
+                                temperature: 0.8,
+                                maxOutputTokens: 8192,
                                 thinkingConfig: { thinkingBudget: 0 },
                             },
                         }),
