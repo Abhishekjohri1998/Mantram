@@ -64,6 +64,7 @@ export const MODEL_CAPABILITIES = {
         resolutions: ['720p', '1080p', '4k'], aspectRatios: ['16:9', '9:16', '1:1'],
         features: { firstFrame: true, lastFrame: true, referenceImages: false, extendVideo: false, multiShot: true, nativeAudio: true, voiceIds: true, cameraControl: false },
         maxReferenceImages: 0, costPerSecond: COST_PER_SECOND['kling-3.0'], recommended: true,
+        maxPromptLength: 2500, // Kling 3.0 supports approx 2k-3k chars
     },
     'veo-3.1': {
         id: 'veo-3.1', name: 'Google Veo 3.1', icon: '🎬', provider: 'fal',
@@ -73,6 +74,7 @@ export const MODEL_CAPABILITIES = {
         resolutions: ['720p', '1080p', '4k'], aspectRatios: ['16:9', '9:16'],
         features: { firstFrame: true, lastFrame: true, referenceImages: true, extendVideo: true, multiShot: false, nativeAudio: true, voiceIds: false, cameraControl: false },
         maxReferenceImages: 3, costPerSecond: COST_PER_SECOND['veo-3.1'], recommended: false,
+        maxPromptLength: 2000, // Veo usually limited to ~2k
     },
     'veo-3.1-fast': {
         id: 'veo-3.1-fast', name: 'Veo 3.1 Fast', icon: '⚡', provider: 'kie',
@@ -91,6 +93,7 @@ export const MODEL_CAPABILITIES = {
         resolutions: ['720p', '1080p'], aspectRatios: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'],
         features: { firstFrame: true, lastFrame: false, referenceImages: true, extendVideo: true, multiShot: true, nativeAudio: true, voiceIds: false, cameraControl: true },
         maxReferenceImages: 3, costPerSecond: COST_PER_SECOND['seedance-2.0'], recommended: false,
+        maxPromptLength: 4000, // HARD LIMIT from MuAPI/Seedance
     },
     'grok-imagine': {
         id: 'grok-imagine', name: 'Grok Imagine', icon: '🤖', provider: 'grok',
@@ -109,6 +112,7 @@ export const MODEL_CAPABILITIES = {
         resolutions: ['480p', '720p', '1080p'], aspectRatios: ['16:9', '9:16', '1:1'],
         features: { firstFrame: true, lastFrame: false, referenceImages: false, extendVideo: false, multiShot: false, nativeAudio: false, voiceIds: false, cameraControl: false },
         maxReferenceImages: 0, costPerSecond: COST_PER_SECOND['hunyuan'], recommended: false,
+        maxPromptLength: 1000, // Hunyuan is very sensitive to length
     },
     'sora-2': {
         id: 'sora-2', name: 'Sora 2', icon: '🎞️', provider: 'laozhang',
@@ -152,6 +156,30 @@ export function estimateCost(model = 'kling-3.0', durationSeconds = 5, resolutio
     const inr = Number((usd * 93.21).toFixed(0));
     const credits = Math.max(Math.ceil(usd * 70), 5);
     return { usd, inr, credits, model, resolution, mode, durationSeconds, maxDuration: DURATION_LIMITS[model]?.max || 15 };
+}
+
+/**
+ * Intelligent Truncation: Keeps the most important parts of the prompt
+ * while ensuring it fits within the provider's limit.
+ */
+function truncatePrompt(prompt, modelId) {
+    if (!prompt) return '';
+    const model = MODEL_CAPABILITIES[modelId];
+    const limit = model?.maxPromptLength || 2000;
+    
+    if (prompt.length <= limit) return prompt;
+    
+    console.log(`⚠️ Truncating prompt for ${modelId} from ${prompt.length} to ${limit} characters...`);
+    
+    // We keep the first (limit) characters.
+    // Try to end at a sentence/period for a cleaner cut.
+    let truncated = prompt.substring(0, limit);
+    const lastPeriod = truncated.lastIndexOf('.');
+    if (lastPeriod > limit * 0.8) {
+        truncated = truncated.substring(0, lastPeriod + 1);
+    }
+    
+    return truncated;
 }
 
 function getApiKey() {
@@ -252,6 +280,10 @@ async function trySeedanceCascade({ prompt, imageUrl, duration, aspectRatio, gen
 
 export async function submitVideoGeneration({ model, prompt, imageUrl, duration, resolution, mode, shots, generateAudio, aspectRatio, referenceImages }) {
     if (!MODEL_AVAILABLE[model]) throw new Error(`Model '${model}' is not available.`);
+
+    // Enforce provider-specific prompt length limits
+    const safePrompt = truncatePrompt(prompt, model);
+
     const [s3ImageUrl, ...s3ReferenceImages] = await Promise.all([
         ensureS3Url(imageUrl, 'video-studio/generations'),
         ...(referenceImages || []).map(img => ensureS3Url(img, 'video-studio/references'))
@@ -269,7 +301,7 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
         try {
             if (provider === 'muapi') {
                 const result = await submitMuApiVideoGeneration({
-                    prompt, imageUrl: s3ImageUrl, duration,
+                    prompt: safePrompt, imageUrl: s3ImageUrl, duration,
                     aspectRatio: aspectRatio || '16:9', qualityMode: mode || 'fast',
                     generateAudio, referenceImages: s3ReferenceImages,
                 });
@@ -280,7 +312,7 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
                 };
             } else if (provider === 'piapi') {
                 const result = await submitPiApiVideoGeneration({
-                    prompt, imageUrl: s3ImageUrl, duration,
+                    prompt: safePrompt, imageUrl: s3ImageUrl, duration,
                     aspectRatio: aspectRatio || '16:9', generateAudio,
                     referenceImages: s3ReferenceImages, qualityMode: mode || 'fast',
                 });
@@ -291,7 +323,7 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
                 };
             } else if (provider === 'laozhang' && isLaozhangAvailable()) {
                 const lzResult = await submitLaozhangVideoGeneration({
-                    model: 'seedance-2.0', prompt, imageUrl: s3ImageUrl,
+                    model: 'seedance-2.0', prompt: safePrompt, imageUrl: s3ImageUrl,
                     duration: duration || 5, aspectRatio: aspectRatio || '16:9',
                     generateAudio: generateAudio !== false,
                     referenceImages: s3ReferenceImages,
@@ -308,7 +340,7 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
         } catch (err) {
             console.warn(`⚠️ [Seedance 2.0] Primary Provider (${provider}) failed: ${err.message}. Cascading...`);
             const cascade = await trySeedanceCascade({
-                prompt, imageUrl: s3ImageUrl, duration,
+                prompt: safePrompt, imageUrl: s3ImageUrl, duration,
                 aspectRatio: aspectRatio || '16:9', generateAudio, mode,
                 referenceImages: s3ReferenceImages,
             });
@@ -325,7 +357,7 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
     const endpoints = MODEL_ENDPOINTS[model];
     if (!endpoints) throw new Error(`Unknown video model: ${model}`);
     const endpoint = s3ImageUrl ? endpoints.imageToVideo : endpoints.textToVideo;
-    const payload = buildPayload(model, { prompt, imageUrl: s3ImageUrl, duration, resolution, mode, shots, generateAudio });
+    const payload = buildPayload(model, { prompt: safePrompt, imageUrl: s3ImageUrl, duration, resolution, mode, shots, generateAudio });
     
     // Pass primary image for I2V
     if (s3ImageUrl) payload.image_url = s3ImageUrl;
@@ -349,7 +381,8 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
 
 export async function extendVideo({ videoUrl, prompt, duration = 7 }) {
     const apiKey = getApiKey();
-    const response = await fetch(`${FAL_BASE_URL}/${MODEL_ENDPOINTS['veo-3.1'].extendVideo}`, { method: 'POST', headers: { 'Authorization': `Key ${apiKey}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ video_url: videoUrl, prompt, duration: String(duration), generate_audio: true, auto_fix: true }) });
+    const safePrompt = truncatePrompt(prompt, 'veo-3.1'); // Extend is usually Veo
+    const response = await fetch(`${FAL_BASE_URL}/${MODEL_ENDPOINTS['veo-3.1'].extendVideo}`, { method: 'POST', headers: { 'Authorization': `Key ${apiKey}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ video_url: videoUrl, prompt: safePrompt, duration: String(duration), generate_audio: true, auto_fix: true }) });
     if (!response.ok) throw new Error('fal.ai extend failed');
     const data = await response.json();
     return { requestId: data.request_id, provider: 'fal' };
@@ -398,7 +431,7 @@ export async function submitGrokVideoGeneration({ prompt, imageUrl, duration = 5
         messages: [{
             role: 'user',
             content: [
-                { type: 'text', text: prompt },
+                { type: 'text', text: truncatePrompt(prompt, 'grok-imagine') },
                 ...(imageUrl ? [{ type: 'image_url', image_url: { url: imageUrl } }] : [])
             ]
         }]
