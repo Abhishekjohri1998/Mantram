@@ -1,0 +1,519 @@
+import { memo, useState } from 'react'
+import PromptArea from './PromptArea'
+import { IMAGE_MODELS, CAMERA_SHOT_PRESETS, creativeTypes, styles, ASPECT_RATIOS, templateCategories } from '../constants'
+import VoiceInput from '../../../components/VoiceInput'
+import CreditTooltipWrapper from '../../../components/CreditTooltipWrapper'
+import CreditBadge from '../../../components/CreditBadge'
+
+const CreateToolsPanel = memo(({ 
+    activeBrand, fromContent, setFromContent, designBaseImage, setDesignBaseImage,
+    selectedProduct, setSelectedProduct, setShowProductPicker, setProductsList, productsAPI,
+    selectedType, setSelectedType, aspectRatio, setAspectRatio, customWidth, setCustomWidth, customHeight, setCustomHeight,
+    textOverlay, setTextOverlay, addLogo, setAddLogo, logoPosition, setLogoPosition, logoSize, setLogoSize,
+    selectedShot, setSelectedShot, 
+    prompt, setPrompt, promptTextareaRef, handleGenerate, activeGenerations,
+    showCharTags, setShowCharTags, charTagFilter, setCharTagFilter, characters, setCharacters, referenceImages, setReferenceImages, 
+    suggestCopy, copyLoading, copyIsAiSuggested, setCopyIsAiSuggested, customHeadline, setCustomHeadline, customCtaText, setCustomCtaText, copyRationale,
+    activeQuickTemplate, setActiveQuickTemplate, templateFields, setTemplateFields,
+    handleEnhancePrompt, enhancing, imageModel, setImageModel, showModelMenu, setShowModelMenu,
+    showAdvanced, setShowAdvanced, agenticQuality, setAgenticQuality, style, setStyle,
+    generateCopy, setGenerateCopy, setRefPickerSlot, setRefPickerTab
+}) => {
+    
+    const selectedTypeInfo = creativeTypes.find(t => t.id === selectedType)
+
+    return (
+        <div className="creative-tools-panel">
+
+            {/* Content-linked banner */}
+            {fromContent && (
+                <div className="flex items-center gap-3 p-3 rounded-xl bg-primary/10 border border-primary/20 mb-4">
+                    <span className="material-symbols-outlined text-primary">link</span>
+                    <div className="flex-1">
+                        <p className="text-sm font-bold text-white">Linked to Content Studio</p>
+                        <p className="text-sm text-slate-400">Image will match your content in {activeBrand?.name}'s brand style</p>
+                    </div>
+                    <button onClick={() => setFromContent(false)} className="text-slate-500 hover:text-white cursor-pointer">
+                        <span className="material-symbols-outlined text-sm">close</span>
+                    </button>
+                </div>
+            )}
+            {designBaseImage && (
+                <div className="flex items-center gap-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 mb-4">
+                    <img src={designBaseImage} alt="Base" className="w-10 h-10 rounded-lg object-cover" />
+                    <div className="flex-1">
+                        <p className="text-sm font-bold text-white">✏️ Editing image as template</p>
+                        <p className="text-sm text-slate-400">Describe what to change — layout, characters & products will be preserved</p>
+                    </div>
+                    <button onClick={() => setDesignBaseImage(null)} className="text-slate-500 hover:text-white cursor-pointer">
+                        <span className="material-symbols-outlined text-sm">close</span>
+                    </button>
+                </div>
+            )}
+
+            {/* Product Selection Banner */}
+            {selectedProduct && (
+                <div className="flex items-center gap-3 mb-4 p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/20">
+                    {selectedProduct.images?.[0]?.url && (
+                        <img src={selectedProduct.images[0].url} alt="" className="w-10 h-10 rounded-lg object-cover" />
+                    )}
+                    <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-white truncate">{selectedProduct.title}</p>
+                        <p className="text-sm text-cyan-400">Product selected — will be featured in creative</p>
+                    </div>
+                    <button onClick={() => setSelectedProduct(null)} className="text-slate-500 hover:text-white cursor-pointer">
+                        <span className="material-symbols-outlined text-sm">close</span>
+                    </button>
+                </div>
+            )}
+
+            {/* ── Format Selector ── */}
+            <div className="mb-3">
+                <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Format & Size</span>
+                    {selectedTypeInfo && selectedType !== 'custom-size' && (
+                        <span className="text-[9px] text-slate-600 font-mono bg-white/[0.04] px-1.5 py-0.5 rounded">{selectedTypeInfo.size} · {selectedTypeInfo.aspectRatio}</span>
+                    )}
+                    {selectedType === 'custom-size' && customWidth && customHeight && (
+                        <span className="text-[9px] text-emerald-500 font-mono bg-emerald-500/10 px-1.5 py-0.5 rounded">{customWidth}×{customHeight}px</span>
+                    )}
+                </div>
+                <div className="grid grid-cols-2 gap-1">
+                    {creativeTypes.map(ct => (
+                        <button key={ct.id} onClick={() => setSelectedType(ct.id)}
+                            className={`px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                                selectedType === ct.id
+                                ? 'bg-primary/15 text-primary border border-primary/30'
+                                : 'bg-white/[0.03] text-slate-500 hover:text-slate-300 border border-white/[0.05] hover:border-white/[0.1] hover:bg-white/[0.05]'
+                            }`}>
+                            <span className="material-symbols-outlined text-xs">{ct.icon}</span>
+                            <span className="truncate">{ct.label}</span>
+                        </button>
+                    ))}
+                </div>
+
+                {/* ── Custom Size Inputs ── */}
+                {selectedType === 'custom-size' && (
+                    <div className="mt-2 p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+                        <div className="flex items-center gap-2 mb-2">
+                            <span className="material-symbols-outlined text-xs text-emerald-400">straighten</span>
+                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Custom Dimensions (px)</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <input type="number" value={customWidth} onChange={e => setCustomWidth(e.target.value)}
+                                placeholder="Width" min="100" max="4096"
+                                className="flex-1 px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-xs text-white focus:border-primary focus:outline-none text-center" />
+                            <span className="text-slate-500 text-xs font-bold">×</span>
+                            <input type="number" value={customHeight} onChange={e => setCustomHeight(e.target.value)}
+                                placeholder="Height" min="100" max="4096"
+                                className="flex-1 px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-xs text-white focus:border-primary focus:outline-none text-center" />
+                        </div>
+                        {customWidth && customHeight && (() => {
+                            const w = parseInt(customWidth), h = parseInt(customHeight)
+                            if (!w || !h) return null
+                            const r = w / h
+                            const totalPx = w * h
+                            const isExtreme = r > 3 || r < 0.33
+                            return (
+                                <div className="mt-2 space-y-1">
+                                    <p className="text-[10px] text-slate-500 flex items-center gap-1">
+                                        Ratio: <span className="text-white font-mono">{(r).toFixed(2)}:1</span>
+                                        <span className="text-slate-600">·</span>
+                                        <span className="text-slate-400">{(totalPx / 1000000).toFixed(1)}MP</span>
+                                    </p>
+                                    {isExtreme && (
+                                        <p className="text-[10px] text-amber-400/80 flex items-center gap-1">
+                                            <span className="material-symbols-outlined text-[11px]">warning</span>
+                                            Extreme ratio — AI will generate at nearest safe ratio, then smart-resize
+                                        </p>
+                                    )}
+                                    {totalPx > 4194304 && (
+                                        <p className="text-[10px] text-amber-400/80 flex items-center gap-1">
+                                            <span className="material-symbols-outlined text-[11px]">memory</span>
+                                            Over 4MP — image will be generated smaller then AI-upscaled
+                                        </p>
+                                    )}
+                                </div>
+                            )
+                        })()}
+                    </div>
+                )}
+            </div>
+
+            {/* ── References Row ── */}
+            <div className="mb-3">
+                <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">References</span>
+                    <span className="text-[9px] text-slate-600">Style guide for the image</span>
+                </div>
+                <div className="flex items-center gap-2">
+                    {/* Style Ref */}
+                    {referenceImages.style ? (
+                        <div className="relative flex-shrink-0 group">
+                            <div className="w-10 h-10 rounded-lg overflow-hidden border border-amber-500/40">
+                                <img src={referenceImages.style} alt="Style" className="w-full h-full object-cover" />
+                            </div>
+                            <button onClick={() => setReferenceImages(prev => ({ ...prev, style: null }))}
+                                className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-500 text-white text-[8px] flex items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity">×</button>
+                        </div>
+                    ) : (
+                        <button onClick={() => { setRefPickerSlot('style'); setRefPickerTab('upload') }}
+                            className="flex-shrink-0 w-10 h-10 rounded-lg border border-dashed border-white/10 hover:border-amber-500/40 flex flex-col items-center justify-center cursor-pointer transition-all bg-white/[0.02] group" title="Add style reference">
+                            <span className="material-symbols-outlined text-sm text-slate-600 group-hover:text-amber-400">brush</span>
+                            <span className="text-[7px] text-slate-600 group-hover:text-amber-400 font-bold leading-none">Style</span>
+                        </button>
+                    )}
+
+                    {/* Characters */}
+                    {characters.map((char, idx) => (
+                        <div key={idx} className="relative flex-shrink-0 group">
+                            <div className="w-10 h-10 rounded-lg overflow-hidden border border-violet-500/40">
+                                <img src={char.image} alt={char.name} className="w-full h-full object-cover" />
+                            </div>
+                            <button onClick={() => setCharacters(prev => prev.filter((_, i) => i !== idx))}
+                                className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-500 text-white text-[8px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">×</button>
+                            <input
+                                value={char.name}
+                                onChange={e => setCharacters(prev => prev.map((c, i) => i === idx ? { ...c, name: e.target.value } : c))}
+                                className="w-10 mt-0.5 text-[7px] text-center bg-transparent text-violet-300 outline-none font-bold truncate"
+                                placeholder="Name"
+                            />
+                        </div>
+                    ))}
+                    {characters.length < 5 && (
+                        <button onClick={() => { setRefPickerSlot(`character-${characters.length}`); setRefPickerTab('upload') }}
+                            className="flex-shrink-0 w-10 h-10 rounded-lg border border-dashed border-white/10 hover:border-violet-500/40 flex flex-col items-center justify-center cursor-pointer transition-all bg-white/[0.02] group" title="Add character">
+                            <span className="material-symbols-outlined text-sm text-slate-600 group-hover:text-violet-400">person_add</span>
+                            <span className="text-[7px] text-slate-600 group-hover:text-violet-400 font-bold leading-none">Person</span>
+                        </button>
+                    )}
+
+                    {/* Upload Ref */}
+                    {referenceImages.upload ? (
+                        <div className="relative flex-shrink-0 group">
+                            <div className="w-10 h-10 rounded-lg overflow-hidden border border-cyan-500/40">
+                                <img src={referenceImages.upload} alt="Ref" className="w-full h-full object-cover" />
+                            </div>
+                            <button onClick={() => setReferenceImages(prev => ({ ...prev, upload: null }))}
+                                className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-500 text-white text-[8px] flex items-center justify-center cursor-pointer z-10 opacity-0 group-hover:opacity-100 transition-opacity">×</button>
+                            <button onClick={() => { setCharacters(prev => [...prev, { name: `Character ${prev.length + 1}`, image: referenceImages.upload }]); setReferenceImages(prev => ({ ...prev, upload: null })) }}
+                                className="absolute -bottom-1 -left-1 w-4 h-4 rounded-full bg-violet-500 text-white text-[8px] flex items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity z-10" title="Use as Character">
+                                <span className="material-symbols-outlined text-[8px]">person_add</span>
+                            </button>
+                        </div>
+                    ) : (
+                        <button onClick={() => { setRefPickerSlot('upload'); setRefPickerTab('upload') }}
+                            className="flex-shrink-0 w-10 h-10 rounded-lg border border-dashed border-white/10 hover:border-cyan-500/40 flex flex-col items-center justify-center cursor-pointer transition-all bg-white/[0.02] group" title="Upload reference image">
+                            <span className="material-symbols-outlined text-sm text-slate-600 group-hover:text-cyan-400">add_photo_alternate</span>
+                            <span className="text-[7px] text-slate-600 group-hover:text-cyan-400 font-bold leading-none">Upload</span>
+                        </button>
+                    )}
+                </div>
+            </div>
+            {characters.length > 0 && (
+                <p className="text-[9px] text-violet-400/50 mb-2 -mt-1 flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[10px]">info</span>
+                    Type <span className="font-bold text-violet-400">@name</span> in prompt to tag characters
+                </p>
+            )}
+
+            {/* ── Camera Shot Presets ── */}
+            <div className="mb-3">
+                <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] text-slate-500 uppercase tracking-widest font-bold flex items-center gap-1">
+                        <span className="material-symbols-outlined text-[11px]">movie</span>
+                        Camera Shot
+                    </span>
+                    {selectedShot && (
+                        <button onClick={() => setSelectedShot(null)}
+                            className="text-[9px] text-slate-500 hover:text-rose-400 transition-colors cursor-pointer flex items-center gap-0.5">
+                            <span className="material-symbols-outlined text-[10px]">close</span> Clear
+                        </button>
+                    )}
+                </div>
+                <div className="grid grid-cols-3 gap-1">
+                    {CAMERA_SHOT_PRESETS.map(shot => (
+                        <button key={shot.id}
+                            onClick={() => setSelectedShot(prev => prev === shot.id ? null : shot.id)}
+                            title={shot.description}
+                            className={`relative px-2 py-2 rounded-lg text-[10px] font-semibold transition-all cursor-pointer flex flex-col items-center gap-0.5 group ${
+                                selectedShot === shot.id
+                                ? 'border text-white shadow-lg'
+                                : 'bg-white/[0.03] text-slate-500 hover:text-slate-300 border border-white/[0.05] hover:border-white/[0.1] hover:bg-white/[0.05]'
+                            }`}
+                            style={selectedShot === shot.id ? {
+                                backgroundColor: `${shot.color}18`,
+                                borderColor: `${shot.color}50`,
+                                color: shot.color,
+                            } : {}}
+                        >
+                            <span className="text-base leading-none">{shot.emoji}</span>
+                            <span className="leading-tight text-center">{shot.label}</span>
+                            {selectedShot === shot.id && (
+                                <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full flex items-center justify-center"
+                                    style={{ backgroundColor: shot.color }}>
+                                    <span className="material-symbols-outlined text-white" style={{ fontSize: '8px' }}>check</span>
+                                </span>
+                            )}
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            {/* ── Add Text to Image Toggle ── */}
+            <div className={`rounded-xl mb-3 border transition-all overflow-hidden ${generateCopy ? 'bg-violet-500/10 border-violet-500/30' : 'bg-white/[0.03] border-white/[0.06]'}`}>
+                <div className="flex items-center justify-between px-3 py-2">
+                    <div className="flex items-center gap-2.5">
+                        <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${generateCopy ? 'bg-violet-500/20' : 'bg-white/[0.06]'}`}>
+                            <span className={`material-symbols-outlined text-sm ${generateCopy ? 'text-violet-400' : 'text-slate-500'}`}>title</span>
+                        </div>
+                        <div>
+                            <p className="text-xs font-bold text-white leading-tight">Add Text to Image</p>
+                            <p className="text-[10px] text-slate-500 leading-tight truncate max-w-[150px]">
+                                {!generateCopy && 'AI generates headline + CTA printed on the image'}
+                                {generateCopy && copyLoading && 'Reading brief...'}
+                                {generateCopy && !copyLoading && customHeadline && `"${customHeadline}"`}
+                            </p>
+                        </div>
+                    </div>
+                    <button onClick={() => setGenerateCopy(!generateCopy)}
+                        className={`w-9 h-5 rounded-full transition-all cursor-pointer flex-shrink-0 ${generateCopy ? 'bg-violet-500' : 'bg-white/[0.1]'}`}>
+                        <div className={`w-3.5 h-3.5 rounded-full bg-white shadow transition-transform ${generateCopy ? 'translate-x-4.5' : 'translate-x-0.5'}`} />
+                    </button>
+                </div>
+
+                {generateCopy && (
+                    <div className="px-3 pb-3 border-t border-violet-500/10 pt-2.5 space-y-2">
+                        <div className="flex items-center justify-between">
+                            {copyLoading ? (
+                                <span className="flex items-center gap-1.5 text-[10px] text-violet-400 animate-pulse">
+                                    Agent is reading your brief...
+                                </span>
+                            ) : copyIsAiSuggested ? (
+                                <span className="flex items-center gap-1 text-[10px] text-violet-300">
+                                    <span className="material-symbols-outlined text-[9px]">auto_awesome</span>
+                                    AI suggested — edit freely
+                                </span>
+                            ) : (
+                                <span className="text-[10px] text-slate-600">Type your brief below</span>
+                            )}
+                            {!copyLoading && prompt?.trim().length > 5 && (
+                                <button onClick={() => suggestCopy(prompt)}
+                                    className="flex items-center gap-0.5 text-[10px] text-slate-600 hover:text-violet-400 transition-colors cursor-pointer">
+                                    <span className="material-symbols-outlined text-[10px]">refresh</span>
+                                    Regenerate
+                                </button>
+                            )}
+                        </div>
+                        <input
+                            type="text"
+                            value={customHeadline}
+                            onChange={e => { setCustomHeadline(e.target.value); setCopyIsAiSuggested(false) }}
+                            maxLength={40}
+                            placeholder="Headline (AI will generate from brief)"
+                            className="w-full px-3 py-1.5 text-xs rounded-lg bg-white/5 border border-white/10 text-white focus:outline-none"
+                        />
+                        <input
+                            type="text"
+                            value={customCtaText}
+                            onChange={e => { setCustomCtaText(e.target.value); setCopyIsAiSuggested(false) }}
+                            maxLength={20}
+                            placeholder="CTA button (e.g. Shop Now)"
+                            className="w-full px-3 py-1.5 text-xs rounded-lg bg-white/5 border border-white/10 text-white focus:outline-none"
+                        />
+                        {copyRationale && !copyLoading && (
+                            <p className="text-[9px] text-slate-600 italic flex items-start gap-1 pt-0.5">
+                                <span className="material-symbols-outlined text-[9px] mt-[1px] flex-shrink-0">lightbulb</span>
+                                {copyRationale}
+                            </p>
+                        )}
+                    </div>
+                )}
+            </div>
+
+            {/* ── Prompt Area ── */}
+            <div className="relative mb-3">
+                <PromptArea
+                    value={prompt}
+                    onChange={val => {
+                        setPrompt(val)
+                        const textarea = promptTextareaRef.current
+                        if (textarea) {
+                            const cursor = textarea.selectionStart
+                            const textBefore = val.substring(0, cursor)
+                            const atMatch = textBefore.match(/@(\w*)$/)
+                            if (atMatch && (characters.length > 0 || referenceImages.upload)) {
+                                setShowCharTags(true)
+                                setCharTagFilter(atMatch[1].toLowerCase())
+                            } else {
+                                setShowCharTags(false)
+                            }
+                        }
+                    }}
+                    onKeyDown={e => {
+                        if (e.key === 'Enter' && !e.shiftKey && !showCharTags) { e.preventDefault(); handleGenerate() }
+                        if (e.key === 'Escape') setShowCharTags(false)
+                    }}
+                    placeholder={activeBrand
+                        ? `Describe your visual for ${activeBrand.name}...`
+                        : "Create a brand first to start generating visuals"}
+                    disabled={!activeBrand || activeGenerations.length >= 3}
+                    textareaRef={promptTextareaRef}
+                />
+
+                {/* @character dropdown */}
+                {showCharTags && (characters.length > 0 || referenceImages.upload) && (
+                    <div className="absolute left-4 bottom-full mb-1 bg-[#1a1a2e] border border-violet-500/30 rounded-xl shadow-2xl p-2 z-50 min-w-[200px]">
+                        {characters.filter(c => !charTagFilter || c.name.toLowerCase().includes(charTagFilter)).map((char, idx) => (
+                            <button key={idx} onClick={() => {
+                                const textarea = promptTextareaRef.current
+                                if (!textarea) return
+                                const cursor = textarea.selectionStart
+                                const textBefore = prompt.substring(0, cursor)
+                                const textAfter = prompt.substring(cursor)
+                                const tagName = char.name.replace(/\s/g, '')
+                                const newBefore = textBefore.replace(/@\w*$/, `@${tagName} `)
+                                setPrompt(newBefore + textAfter)
+                                setShowCharTags(false)
+                                setTimeout(() => { textarea.focus(); textarea.selectionStart = textarea.selectionEnd = newBefore.length }, 50)
+                            }} className="flex items-center gap-2 w-full px-2 py-1.5 rounded-lg hover:bg-violet-500/15 text-left transition-colors">
+                                <img src={char.image} alt="" className="w-6 h-6 rounded-full object-cover" />
+                                <div>
+                                    <span className="text-xs font-bold text-white">{char.name}</span>
+                                    <span className="text-[10px] text-violet-400 ml-1.5">@{char.name.replace(/\s/g, '')}</span>
+                                </div>
+                            </button>
+                        ))}
+                    </div>
+                )}
+
+                <div className="absolute right-3 top-3">
+                    <VoiceInput onResult={(text) => setPrompt(prev => prev ? prev + ' ' + text : text)} size="small" />
+                </div>
+
+                <div className="absolute left-2 right-2 bottom-2 flex items-center gap-1.5 pointer-events-none">
+                    {prompt.trim() && (
+                        <CreditTooltipWrapper action="promptEnhance">
+                            <button onClick={handleEnhancePrompt} disabled={enhancing || !activeBrand}
+                                className={`pointer-events-auto flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all ${enhancing ? 'bg-amber-500/20 text-amber-400' : 'bg-white/[0.06] text-slate-400 hover:text-amber-400'}`}>
+                                <span className={`material-symbols-outlined text-xs ${enhancing ? 'animate-spin' : ''}`}>{enhancing ? 'progress_activity' : 'auto_awesome'}</span>
+                                {enhancing ? 'Enhancing...' : 'Enhance'}
+                            </button>
+                        </CreditTooltipWrapper>
+                    )}
+                </div>
+            </div>
+
+            {/* ── Action Row ── */}
+            <div className="space-y-2">
+                <div className="relative">
+                    <button onClick={() => setShowModelMenu(!showModelMenu)}
+                        className="flex items-center gap-2 w-full px-3 py-2 rounded-xl text-[11px] font-bold bg-white/[0.04] text-slate-300 border border-white/[0.06] hover:border-white/10 cursor-pointer transition-all">
+                        <span className="material-symbols-outlined text-xs" style={{ color: IMAGE_MODELS.find(m => m.id === imageModel)?.color || '#a855f7' }}>
+                            {IMAGE_MODELS.find(m => m.id === imageModel)?.icon || 'auto_awesome'}
+                        </span>
+                        <span>{IMAGE_MODELS.find(m => m.id === imageModel)?.name || 'NanoBanana 2'}</span>
+                        <span className="material-symbols-outlined text-[10px] ml-auto">{showModelMenu ? 'expand_less' : 'expand_more'}</span>
+                    </button>
+                    {showModelMenu && (
+                        <div className="absolute left-0 right-0 bottom-full mb-1 bg-[#1a1a2e]/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl z-50 p-1.5 space-y-0.5">
+                            {IMAGE_MODELS.map(m => (
+                                <button key={m.id} onClick={() => { setImageModel(m.id); setShowModelMenu(false) }}
+                                    className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-left transition-all ${imageModel === m.id ? 'bg-white/10 text-white' : 'text-slate-400 hover:bg-white/[0.06] hover:text-white'}`}>
+                                    <span className="material-symbols-outlined text-sm" style={{ color: m.color }}>{m.icon}</span>
+                                    <div className="flex-1 min-w-0">
+                                        <span className="text-[11px] font-bold truncate block">{m.name}</span>
+                                        <span className="text-[9px] text-slate-500 truncate block">{m.desc}</span>
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                <div className="flex items-center gap-2">
+                    <CreditTooltipWrapper action="creative">
+                        <button onClick={handleGenerate} disabled={!prompt.trim() || !activeBrand || activeGenerations.length >= 3}
+                            className="btn-primary flex-1 py-3 rounded-xl font-bold cursor-pointer transition-all">
+                            {activeGenerations.length > 0 ? (
+                                <><span className="material-symbols-outlined animate-spin text-sm">progress_activity</span> Generating...</>
+                            ) : (
+                                <><span className="material-symbols-outlined text-sm">auto_awesome</span> Generate <CreditBadge action="creative" /></>
+                            )}
+                        </button>
+                    </CreditTooltipWrapper>
+                    <button onClick={() => setShowAdvanced(!showAdvanced)} className={`p-3 rounded-xl transition-all border ${showAdvanced ? 'bg-white/10 border-white/20 text-white' : 'bg-white/[0.04] border-white/[0.06] text-slate-400 hover:text-white'}`}>
+                        <span className="material-symbols-outlined text-sm">tune</span>
+                    </button>
+                    <button onClick={() => {
+                        if (activeBrand?._id) {
+                            productsAPI.list({ brandId: activeBrand._id, limit: 50 })
+                                .then(res => setProductsList(res.products || []))
+                        }
+                        setShowProductPicker(true)
+                    }} className="p-3 rounded-xl bg-white/[0.04] border border-white/[0.06] text-slate-400 hover:text-cyan-400 transition-all cursor-pointer">
+                        <span className="material-symbols-outlined text-sm">inventory_2</span>
+                    </button>
+                </div>
+            </div>
+
+            {/* ── Advanced Drawer ── */}
+            {showAdvanced && (
+                <div className="studio-card p-5 mt-4 space-y-4 animate-fade-in">
+                    <div className="flex items-center justify-between">
+                        <p className="text-xs font-bold text-white">Advanced Options</p>
+                        <button onClick={() => setShowAdvanced(false)} className="text-slate-500 hover:text-white cursor-pointer"><span className="material-symbols-outlined text-sm">close</span></button>
+                    </div>
+                    <div className="flex items-center justify-between py-2 border-b border-white/[0.05]">
+                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">AI Quality</p>
+                        <div className="flex gap-1 bg-white/[0.04] rounded-lg p-0.5">
+                            {['fast', 'quality'].map(q => (
+                                <button key={q} onClick={() => setAgenticQuality(q)} className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all ${agenticQuality === q ? 'bg-amber-500/20 text-amber-400 shadow-sm' : 'text-slate-500 hover:text-white'}`}>
+                                    {q.toUpperCase()}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                    <div>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-2">Style Preset</p>
+                        <div className="flex flex-wrap gap-1.5">
+                            {styles.map(s => (
+                                <button key={s.id} onClick={() => setStyle(s.id)} className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all ${style === s.id ? 'bg-primary text-white' : 'bg-white/[0.04] text-slate-400 hover:text-white'}`}>
+                                    {s.label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Inline Template Form ── */}
+            {activeQuickTemplate && (
+                <div className="studio-card p-4 mt-4 border border-primary/20 animate-fade-in">
+                    <div className="flex items-center justify-between mb-3">
+                        <h4 className="text-xs font-bold text-white">{activeQuickTemplate.label}</h4>
+                        <button onClick={() => setActiveQuickTemplate(null)} className="text-slate-500 hover:text-white cursor-pointer"><span className="material-symbols-outlined text-sm">close</span></button>
+                    </div>
+                    <div className="space-y-3">
+                        {activeQuickTemplate.fields?.filter(f => f.type !== 'image').map(field => (
+                            <div key={field.key}>
+                                <label className="text-[10px] font-bold text-slate-500 mb-1 block">{field.label}</label>
+                                <input value={templateFields[field.key] || ''} onChange={e => setTemplateFields(prev => ({ ...prev, [field.key]: e.target.value }))}
+                                    placeholder={field.placeholder} className="input-glass w-full py-2 text-xs" />
+                            </div>
+                        ))}
+                        <button onClick={() => {
+                            const built = activeQuickTemplate.buildPrompt(activeBrand, templateFields)
+                            setPrompt(built)
+                            setActiveQuickTemplate(null)
+                        }} className="btn-primary w-full py-2 text-xs font-bold mt-2">
+                            Apply to Prompt
+                        </button>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+});
+
+export default CreateToolsPanel;
