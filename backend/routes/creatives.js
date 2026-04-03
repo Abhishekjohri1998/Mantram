@@ -23,6 +23,16 @@ import { laozhangImageGenerate, laozhangMultimodalImageGenerate, isLaozhangAvail
 
 const router = Router();
 
+// In-memory job tracker for carousel async pipeline
+// Allows polling to see real-time progress before DB write
+const carouselJobs = new Map(); // carouselId → { status, panels, panoramicUrl, error, updatedAt }
+setInterval(() => {
+    const cutoff = Date.now() - 10 * 60 * 1000; // 10min TTL
+    for (const [id, job] of carouselJobs) {
+        if (job.updatedAt < cutoff) carouselJobs.delete(id);
+    }
+}, 2 * 60 * 1000);
+
 // ══════════════════════════════════════════════════════════════════════════════
 
 /**
@@ -370,7 +380,7 @@ const IMAGE_MODEL_CONFIG = {
 };
 
 // ── fal.ai Image Generation (queue-based async) ─────────────────────────
-async function falImageGenerate(promptText, endpoint, aspectRatio = '1:1') {
+async function falImageGenerate(promptText, endpoint, aspectRatio = '1:1', customSize = null) {
     const falKey = process.env.FAL_API_KEY || process.env.FAL_KEY;  // FIXED: FAL_API_KEY is the actual env var
     if (!falKey) throw new Error('FAL_API_KEY not configured for image generation');
 
@@ -385,7 +395,26 @@ async function falImageGenerate(promptText, endpoint, aspectRatio = '1:1') {
         '3:2': { width: 1248, height: 832 },
         '4:3': { width: 1184, height: 896 },
     };
-    const imgSize = sizeMap[aspectRatio] || sizeMap['1:1'];
+    // Use custom size if provided, otherwise fall back to ratio map
+    // Custom sizes are clamped to 4MP max total pixels for fal.ai compatibility
+    let imgSize;
+    if (customSize && customSize.width && customSize.height) {
+        let w = customSize.width, h = customSize.height;
+        const totalPx = w * h;
+        const MAX_PX = 4194304; // 4MP
+        if (totalPx > MAX_PX) {
+            const scale = Math.sqrt(MAX_PX / totalPx);
+            w = Math.round(w * scale);
+            h = Math.round(h * scale);
+        }
+        // Round to nearest 8px (required by most diffusion models)
+        w = Math.round(w / 8) * 8;
+        h = Math.round(h / 8) * 8;
+        imgSize = { width: Math.max(256, w), height: Math.max(256, h) };
+        console.log(`📐 Custom size: ${customSize.width}x${customSize.height} → clamped to ${imgSize.width}x${imgSize.height}`);
+    } else {
+        imgSize = sizeMap[aspectRatio] || sizeMap['1:1'];
+    }
 
     console.log(`\n══════ FAL.AI IMAGE GENERATION ══════`);
     console.log(`🎨 Endpoint: ${endpoint}`);
@@ -623,11 +652,12 @@ async function geminiImageGenerate(promptText, imageParts = [], temperature = 0.
 
 // ── Unified Image Generate — routes to correct provider based on selected model ──
 // refImageUrls: original S3/HTTP URLs of reference images (for LZ multimodal routing)
-async function routedImageGenerate(promptText, imageParts = [], temperature = 0.4, aspectRatio = '1:1', imageSize = '1K', selectedModel = 'nanobanana-2', refImageUrls = []) {
+async function routedImageGenerate(promptText, imageParts = [], temperature = 0.4, aspectRatio = '1:1', imageSize = '1K', selectedModel = 'nanobanana-2', refImageUrls = [], customSize = null) {
     const modelConfig = IMAGE_MODEL_CONFIG[selectedModel] || IMAGE_MODEL_CONFIG['nanobanana-2'];
     const router = getRouter();
 
     console.log(`🎯 Image Model Router: ${selectedModel} → ${modelConfig.provider} (${modelConfig.name})`);
+    if (customSize) console.log(`📐 Custom Size: ${customSize.width}x${customSize.height}`);
 
     // ── HARD TIMEOUT: 120 seconds max for any image generation ──
     const TIMEOUT_MS = 120_000;
@@ -659,6 +689,25 @@ async function routedImageGenerate(promptText, imageParts = [], temperature = 0.
         const lzModel = LZ_IMAGE_MAP[selectedModel];
         const hasRefImages = imageParts && imageParts.length > 0;
 
+        // ── CUSTOM SIZE BYPASS: LaoZhang doesn't support arbitrary pixel sizes ──
+        // Route custom-size requests directly to fal.ai which accepts exact {width, height}
+        if (customSize && customSize.width && customSize.height) {
+            const isStandardSize = ['1024x1024', '1024x1792', '1792x1024', '1536x1024', '1024x1536'].includes(
+                `${customSize.width}x${customSize.height}`
+            );
+            if (!isStandardSize) {
+                try {
+                    console.log(`📐 Custom size ${customSize.width}x${customSize.height} → bypassing LaoZhang, routing to fal.ai (Flux) for exact pixel support`);
+                    const falEndpoint = modelConfig.endpoint || 'fal-ai/flux-pro/v1.1';
+                    const falResult = await falImageGenerate(promptText, falEndpoint, aspectRatio, customSize);
+                    return { ...falResult, provider: 'fal', model: selectedModel };
+                } catch (falErr) {
+                    console.warn(`⚠️ fal.ai custom-size failed (${falErr.message?.substring(0, 80)}), falling back to LaoZhang with nearest standard AR...`);
+                    // Fall through to LaoZhang — will use the nearest standard AR from aspectRatio
+                }
+            }
+        }
+
         // LaoZhang supports TWO image generation modes:
         //  1. Text-only: /v1/images/generations (all LZ models)
         //  2. Multimodal: /v1/chat/completions (Gemini models only — supports S3 ref images)
@@ -676,22 +725,24 @@ async function routedImageGenerate(promptText, imageParts = [], temperature = 0.
                     '3:2':  '1536x1024', '2:3':  '1024x1536',
                 };
                 const lzSize = AR_SIZE_MAP[aspectRatio] || (imageSize === '2K' ? '2048x2048' : '1024x1024');
+                // Use custom size for LaoZhang if provided
+                const finalLzSize = customSize ? `${Math.min(customSize.width, 2048)}x${Math.min(customSize.height, 2048)}` : lzSize;
 
                 let lzResult;
                 const lzRefUrls = (refImageUrls || []).filter(u => u && u.startsWith('http'));
 
                 if (hasRefImages && isMultimodalCapable && lzRefUrls.length > 0) {
                     // MULTIMODAL: Send S3 image URLs directly via chat/completions (Gemini only)
-                    console.log(`🏷️ [LaoZhang-Multimodal] ${selectedModel} → ${lzModel} with ${lzRefUrls.length} S3 URLs (size=${lzSize})...`);
-                    lzResult = await laozhangMultimodalImageGenerate(promptText, lzRefUrls, { model: lzModel, size: lzSize });
+                    console.log(`🏷️ [LaoZhang-Multimodal] ${selectedModel} → ${lzModel} with ${lzRefUrls.length} S3 URLs (size=${finalLzSize})...`);
+                    lzResult = await laozhangMultimodalImageGenerate(promptText, lzRefUrls, { model: lzModel, size: finalLzSize });
                 } else {
                     // TEXT-ONLY: /v1/images/generations — works for ALL LZ models
                     // Ref images aren't sent but brand context is in the text prompt
                     if (hasRefImages && !isMultimodalCapable) {
                         console.log(`ℹ️ [LaoZhang] ${selectedModel}: ref images present but not multimodal-capable — using text-only (brand context is in prompt)`);
                     }
-                    console.log(`🏷️ [LaoZhang-First] ${selectedModel} → ${lzModel} via LaoZhang (cheapest, size=${lzSize})...`);
-                    lzResult = await laozhangImageGenerate(promptText, { model: lzModel, size: lzSize });
+                    console.log(`🏷️ [LaoZhang-First] ${selectedModel} → ${lzModel} via LaoZhang (cheapest, size=${finalLzSize})...`);
+                    lzResult = await laozhangImageGenerate(promptText, { model: lzModel, size: finalLzSize });
                 }
 
                 if (lzResult?.imageUrl) {
@@ -711,7 +762,7 @@ async function routedImageGenerate(promptText, imageParts = [], temperature = 0.
 
         // Special handling for fal.ai
         if (modelConfig.provider === 'fal') {
-            const falResult = await falImageGenerate(promptText, modelConfig.endpoint, aspectRatio);
+            const falResult = await falImageGenerate(promptText, modelConfig.endpoint, aspectRatio, customSize);
             return { ...falResult, provider: 'fal' };
         }
 
@@ -1445,7 +1496,8 @@ router.post('/generate', protect, requireStudio('creativeStudio'), requireCredit
         // Determine the aspect ratio and resolution to pass to Gemini API
         const geminiAspectRatio = options?.aspectRatio || '1:1';
         const geminiImageSize = options?.imageSize || '1K';
-        console.log(`📐 Final aspect ratio: ${geminiAspectRatio}, resolution: ${geminiImageSize} (from type: ${type})`);
+        const customSize = options?.customSize || null; // {width, height} for exact pixel output
+        console.log(`📐 Final aspect ratio: ${geminiAspectRatio}, resolution: ${geminiImageSize}${customSize ? `, custom: ${customSize.width}x${customSize.height}` : ''} (from type: ${type})`);
 
         // ── Build the full prompt ───────────────────────────────────────
         const hasImages = imageParts.filter(p => p.inlineData).length > 0;
@@ -1707,7 +1759,7 @@ The output must fill the entire canvas edge-to-edge. Do NOT render any color pal
                 await agentStep({ agent: 'image-inject', message: `${imageParts.filter(p => p.inlineData).length} reference images loaded`, status: 'done' });
                 await agentStep({ agent: 'generating', message: 'Generating image with AI...', status: 'working' });
             }
-            const genResult = await routedImageGenerate(fullPrompt, imageParts, 0.2, geminiAspectRatio, geminiImageSize, selectedImageModel, refImageUrls);
+            const genResult = await routedImageGenerate(fullPrompt, imageParts, 0.2, geminiAspectRatio, geminiImageSize, selectedImageModel, refImageUrls, customSize);
 
             // Handle model busy — notify frontend instead of silent fallback
             if (genResult.modelBusy) {
@@ -1736,7 +1788,7 @@ The output must fill the entire canvas edge-to-edge. Do NOT render any color pal
             // Text-only generation — route to selected model
             console.log(`🎨 Creative Studio: generating from text prompt, aspect: ${geminiAspectRatio}, model: ${selectedImageModel}`);
             if (progressId) await agentStep({ agent: 'generating', message: 'Generating image with AI...', status: 'working' });
-            const genResult = await routedImageGenerate(fullPrompt, [], 0.3, geminiAspectRatio, geminiImageSize, selectedImageModel, refImageUrls);
+            const genResult = await routedImageGenerate(fullPrompt, [], 0.3, geminiAspectRatio, geminiImageSize, selectedImageModel, refImageUrls, customSize);
 
             // Handle model busy
             if (genResult.modelBusy) {
@@ -1961,7 +2013,8 @@ The output must fill the entire canvas edge-to-edge. Do NOT render any color pal
                                     geminiAspectRatio,
                                     geminiImageSize,
                                     selectedImageModel,
-                                    []
+                                    [],
+                                    customSize
                                 );
 
                                 if (retryResult?.imageUrl && !retryResult.modelBusy) {
@@ -2860,5 +2913,540 @@ CRITICAL RULES:
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
+
+// ══════════════════════════════════════════════════════════════════════════════
+// CAROUSEL: ANALYZE THEME — Vision analysis of an inspiration image
+// Uses Gemini structured JSON output (responseSchema) — zero parsing issues.
+// Extracts color palette, mood, lighting, texture, panoramic prompt + style.
+// ══════════════════════════════════════════════════════════════════════════════
+router.post('/carousel/analyze-theme', protect, requireStudio('creativeStudio'), async (req, res) => {
+    try {
+        const { themeImageUrl, brandId, slideCount = 3, userHint = '' } = req.body;
+        if (!themeImageUrl) return res.status(400).json({ success: false, error: 'themeImageUrl is required' });
+
+        console.log(`\n🎥 CAROUSEL THEME ANALYSIS`);
+        console.log(`📷 Image: ${themeImageUrl.substring(0, 80)}...`);
+
+        // ── Extract image bytes from data URI or HTTP URL ──
+        let imagePart = null;
+        if (themeImageUrl.startsWith('data:')) {
+            const match = themeImageUrl.match(/^data:([\/\w+]+);base64,(.+)$/);
+            if (!match) return res.status(400).json({ success: false, error: 'Invalid image data URI format' });
+            imagePart = { inlineData: { mimeType: match[1], data: match[2] } };
+        } else if (themeImageUrl.startsWith('http')) {
+            const r = await fetch(themeImageUrl, { signal: AbortSignal.timeout(15000) });
+            const arr = await r.arrayBuffer();
+            imagePart = { inlineData: { mimeType: r.headers.get('content-type') || 'image/jpeg', data: Buffer.from(arr).toString('base64') } };
+        }
+        if (!imagePart) return res.status(400).json({ success: false, error: 'Could not process theme image' });
+
+        // ── Direct Gemini call with forced JSON schema ──
+        // responseMimeType + responseSchema = model returns valid JSON every time, zero parsing
+        const geminiKey = process.env.GOOGLE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
+        if (!geminiKey) return res.status(500).json({ success: false, error: 'Gemini API key not configured' });
+
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
+
+        const userPrompt = `You are analyzing an inspiration image for a ${slideCount}-slide premium social media carousel.${userHint ? ` User notes: ${userHint}.` : ''}
+
+Analyze deeply and extract:
+1. MOOD — the emotional tone (e.g. "cinematic drama", "romantic warmth", "thrilling tension", "playful energy")
+2. GENRE — the creative genre that best matches this image's feel. Choose ONE from: drama, thriller, romance, comedy, horror, action, inspirational, luxury, nature, tech, modern
+3. COLOR PALETTE — 5 dominant hex colors from the image
+4. LIGHTING — describe the light (e.g. "dramatic side lighting", "soft golden bokeh", "harsh neon edge")
+5. PANORAMIC PROMPT — write 2-3 vivid sentences describing a seamless ultra-wide BACKGROUND ENVIRONMENT that matches this image's aesthetic. No people, text, products, or logos — purely the environment.
+6. SUGGESTED STYLE — pick one: modern, minimal, vibrant, luxury, nature, tech`;
+
+        // ── ATTEMPT 1: Structured JSON schema ──
+        let geminiResponse = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            signal: AbortSignal.timeout(30000),
+            body: JSON.stringify({
+                system_instruction: { parts: [{ text: 'You are a world-class creative director and visual analyst. Extract visual DNA from images to help create stunning carousel backgrounds.' }] },
+                contents: [{ role: 'user', parts: [imagePart, { text: userPrompt }] }],
+                generationConfig: {
+                    temperature: 0.3,
+                    maxOutputTokens: 1024,
+                    responseMimeType: 'application/json',
+                    responseSchema: {
+                        type: 'OBJECT',
+                        properties: {
+                            mood:            { type: 'STRING' },
+                            genre:           { type: 'STRING' },
+                            colorPalette:    { type: 'ARRAY', items: { type: 'STRING' } },
+                            dominantColor:   { type: 'STRING' },
+                            lighting:        { type: 'STRING' },
+                            texture:         { type: 'STRING' },
+                            panoramicPrompt: { type: 'STRING' },
+                            suggestedStyle:  { type: 'STRING' },
+                        },
+                        required: ['mood', 'genre', 'colorPalette', 'lighting', 'panoramicPrompt', 'suggestedStyle'],
+                    },
+                },
+            }),
+        });
+
+        let analysis = null;
+
+        if (geminiResponse.ok) {
+            const schemaData = await geminiResponse.json().catch(() => null);
+            if (schemaData && !schemaData.error) {
+                const candidate = schemaData.candidates?.[0];
+                const rawText = candidate?.content?.parts?.[0]?.text || '';
+                console.log(`📊 Attempt 1 — finishReason=${candidate?.finishReason}, textLen=${rawText.length}`);
+                if (rawText) {
+                    try {
+                        analysis = JSON.parse(rawText);
+                        console.log(`✅ Parsed via responseSchema`);
+                    } catch {
+                        const stripped = rawText.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
+                        const m = stripped.match(/\{[\s\S]*\}/);
+                        if (m) { try { analysis = JSON.parse(m[0]); console.log(`✅ Parsed via schema+regex`); } catch { /* falls through */ } }
+                    }
+                }
+            }
+        } else {
+            console.warn(`⚠️ Attempt 1 HTTP ${geminiResponse.status} — will retry`);
+        }
+
+        // ── ATTEMPT 2: Plain text, no schema ──
+        if (!analysis) {
+            console.warn(`⚠️ Attempting plain-text fallback...`);
+            const fbRes = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                signal: AbortSignal.timeout(30000),
+                body: JSON.stringify({
+                    contents: [{
+                        role: 'user',
+                        parts: [
+                            imagePart,
+                            { text: `Analyze this image. Reply ONLY with a raw JSON object — no markdown, no fences, no explanation.\nRequired format:\n{"mood":"string","genre":"drama|thriller|romance|comedy|horror|action|inspirational|luxury|nature|tech|modern","colorPalette":["#hex","#hex","#hex","#hex","#hex"],"dominantColor":"#hex","lighting":"string","panoramicPrompt":"2-3 sentence wide background scene","suggestedStyle":"modern|minimal|vibrant|luxury|nature|tech"}` }
+                        ]
+                    }],
+                    generationConfig: { temperature: 0.2, maxOutputTokens: 1024 },
+                }),
+            });
+            if (fbRes.ok) {
+                const fbData = await fbRes.json().catch(() => null);
+                const rawFb = fbData?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+                console.log(`📊 Attempt 2 raw (first 400): ${rawFb.substring(0, 400)}`);
+                if (rawFb) {
+                    const cleaned = rawFb.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
+                    const m = cleaned.match(/\{[\s\S]*?\}/);
+                    if (m) { try { analysis = JSON.parse(m[0]); console.log(`✅ Parsed via plain-text fallback`); } catch (e) { console.error('Fallback parse error:', e.message); } }
+                }
+            }
+        }
+
+        // ── ATTEMPT 3: Emergency defaults ──
+        if (!analysis) {
+            console.warn(`⚠️ All attempts failed — using emergency defaults`);
+            analysis = {
+                mood: 'cinematic luxury',
+                genre: 'luxury',
+                colorPalette: ['#1a1a2e', '#16213e', '#0f3460', '#533483', '#e94560'],
+                dominantColor: '#1a1a2e',
+                lighting: 'soft dramatic side lighting with rich depth',
+                texture: 'smooth cinematic',
+                panoramicPrompt: `A breathtaking ultra-wide cinematic environment with ${slideCount} seamlessly connected panels — deep atmospheric lighting, rich bokeh gradients fading into darkness, and a luxurious ambient glow creating visual flow from left to right.`,
+                suggestedStyle: 'luxury',
+            };
+        }
+
+        if (!analysis.panoramicPrompt) analysis.panoramicPrompt = `A seamless cinematic environment with elegant lighting across all ${slideCount} carousel panels.`;
+
+        const VALID = ['modern', 'minimal', 'vibrant', 'luxury', 'nature', 'tech'];
+        const VALID_GENRES = ['drama', 'thriller', 'romance', 'comedy', 'horror', 'action', 'inspirational', 'luxury', 'nature', 'tech', 'modern'];
+        if (!VALID.includes(analysis.suggestedStyle?.toLowerCase())) analysis.suggestedStyle = 'modern';
+        else analysis.suggestedStyle = analysis.suggestedStyle.toLowerCase();
+        if (!VALID_GENRES.includes(analysis.genre?.toLowerCase())) analysis.genre = analysis.suggestedStyle || 'luxury';
+        else analysis.genre = analysis.genre.toLowerCase();
+
+        console.log(`✅ Theme analysis complete: mood=${analysis.mood}, genre=${analysis.genre}, style=${analysis.suggestedStyle}, colors=${analysis.colorPalette?.length}`);
+        res.json({ success: true, theme: analysis });
+
+    } catch (err) {
+        console.error('❌ Theme analysis error:', err.message);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CAROUSEL GENERATION v3 — TRUE PANORAMIC PIPELINE
+//
+// Architecture: ONE wide panoramic background → pixel-perfect split into N panels
+// This is the only way to achieve true visual continuity (like ZEE5, Netflix strips).
+// N independent generations can never look like one image — this guarantees it.
+//
+// Flow:
+//   1. Generate ONE wide landscape background (16:9 or widest supported ratio)
+//   2. Sharp resizes + crops to exact total canvas (slideW × slideCount × slideH)
+//   3. Split into N equal panels — pixel-perfect seams, zero continuity issues
+//   4. Per-panel: Gemini composites product INTO scene; Sharp fallback if needed
+//   5. Upload to S3 per-panel — live polling via carouselJobs Map
+// ═══════════════════════════════════════════════════════════════════════════════
+router.post('/carousel', protect, requireStudio('creativeStudio'), requireCredits('creative'), async (req, res) => {
+    const ts = Date.now();
+    try {
+        const {
+            prompt,
+            slideCount = 3,
+            slideRatio = '1:1',
+            brandId,
+            selectedModel = 'nanobanana-2',
+            productImages = [],
+            brandLogo,
+            style = 'modern',
+            themeImageUrl = null,
+            themeAnalysis = null,
+        } = req.body;
+
+        if (!prompt) return res.status(400).json({ success: false, error: 'Prompt is required' });
+        if (slideCount < 2 || slideCount > 6) return res.status(400).json({ success: false, error: 'slideCount must be 2-6' });
+
+        console.log(`\n══════ CAROUSEL v3 — TRUE PANORAMIC ══════`);
+        console.log(`📐 ${slideCount}×${slideRatio} | Model: ${selectedModel} | Style: ${style}`);
+
+        // Each panel's pixel dimensions
+        const SLIDE_DIMS = { '1:1':[1080,1080], '4:5':[1080,1350], '9:16':[1080,1920], '16:9':[1920,1080], '3:4':[1080,1440], '2:3':[1080,1620] };
+        const [slideW, slideH] = SLIDE_DIMS[slideRatio] || [1080, 1080];
+        const totalW = slideW * slideCount;   // full panoramic canvas width
+        const totalH = slideH;
+
+        // Genre/treatment system
+        const GENRE_TREATMENTS = {
+            drama:        { lighting: 'dramatic chiaroscuro, deep shadows one side, warm golden rim light', palette: 'deep burgundy, charcoal, amber gold', atmosphere: 'intense, cinematic, emotionally charged depth-of-field' },
+            thriller:     { lighting: 'cool desaturated, stark single-source key light, harsh edge lighting', palette: 'steel blue, near-black, cold silver', atmosphere: 'suspenseful, tense, sharp focus, ominous' },
+            romance:      { lighting: 'soft golden hour backlight, warm bokeh, diffused fill', palette: 'blush rose, champagne, warm ivory, peach', atmosphere: 'dreamy, intimate, hazy warmth' },
+            comedy:       { lighting: 'bright high-key even lighting, cheerful shadows', palette: 'vibrant coral, sunshine yellow, sky blue, lime', atmosphere: 'playful, lively, upbeat, energetic' },
+            horror:       { lighting: 'single harsh upward key light, toxic green ambient, deep shadow pools', palette: 'near-black, toxic green, blood red', atmosphere: 'eerie, dread, unsettling fog' },
+            action:       { lighting: 'explosive rim lighting, lens flares, harsh directional', palette: 'electric blue, fire orange, gunmetal grey', atmosphere: 'kinetic, high-energy, bold, epic' },
+            inspirational:{ lighting: 'golden sunrise rays flooding scene, ethereal God-rays', palette: 'warm gold, sky blue, soft white, sunrise orange', atmosphere: 'uplifting, majestic, hopeful, vast' },
+            luxury:       { lighting: 'soft silk-quality directional light, specular highlights on surfaces', palette: 'champagne gold, deep navy, pearl white', atmosphere: 'opulent, refined, timeless, premium' },
+            nature:       { lighting: 'dappled natural sunlight, soft green ambient', palette: 'forest green, earthy brown, sky blue, muted gold', atmosphere: 'serene, organic, fresh, peaceful' },
+            tech:         { lighting: 'cool blue LED rim light, gradient neon glow', palette: 'electric blue, deep violet, silver, cyan', atmosphere: 'futuristic, clean, minimal, sleek' },
+            modern:       { lighting: 'clean studio soft box, even fill light', palette: 'crisp white, charcoal, accent color', atmosphere: 'clean, professional, contemporary' },
+        };
+
+        let genre = style || 'luxury';
+        if (themeAnalysis?.genre) genre = themeAnalysis.genre.toLowerCase().replace(/[^a-z]/g, '');
+        else if (themeAnalysis?.mood) {
+            const moodMap = { cinematic:'drama', dark:'thriller', romantic:'romance', playful:'comedy', scary:'horror', bold:'action', inspiring:'inspirational', natural:'nature', futuristic:'tech' };
+            for (const [k, v] of Object.entries(moodMap)) {
+                if (themeAnalysis.mood.toLowerCase().includes(k)) { genre = v; break; }
+            }
+        }
+        const treatment = GENRE_TREATMENTS[genre] || GENRE_TREATMENTS.luxury;
+        console.log(`🎭 Genre: ${genre} | ${treatment.atmosphere}`);
+        console.log(`🖼️  Panoramic canvas: ${totalW}×${totalH}px (${slideCount} panels × ${slideW}px each)`);
+
+        // Upload theme image as reference if provided
+        let themeRefUrls = [];
+        if (themeImageUrl) {
+            try {
+                const s3Url = themeImageUrl.startsWith('data:')
+                    ? await uploadToS3(themeImageUrl, `carousel-themes/${brandId||'default'}/${Date.now()}-theme.png`)
+                    : themeImageUrl;
+                themeRefUrls = [s3Url];
+                console.log(`✅ Theme reference uploaded`);
+            } catch(e) { console.warn(`⚠️ Theme upload failed: ${e.message}`); }
+        }
+
+        // ── Build the SINGLE panoramic background prompt ──
+        // This generates ONE wide image that covers all panels as a unified scene
+        const themeStr    = themeAnalysis?.panoramicPrompt ? `SCENE INSPIRATION: "${themeAnalysis.panoramicPrompt}" — use this as the visual blueprint. ` : '';
+        const moodStr     = themeAnalysis?.mood ? `Mood: ${themeAnalysis.mood}. ` : '';
+        const lightStr    = themeAnalysis?.lighting ? `Lighting: ${themeAnalysis.lighting}. ` : `Lighting: ${treatment.lighting}. `;
+        const colorStr    = themeAnalysis?.colorPalette?.length
+            ? `Colors from reference: ${themeAnalysis.colorPalette.slice(0,5).join(', ')}. `
+            : `Color palette: ${treatment.palette}. `;
+
+        const panoramicPrompt = `${themeStr}${moodStr}Ultra-wide seamless panoramic background environment for a ${slideCount}-panel marketing carousel. ${prompt}.
+
+Genre & Visual Treatment — ${genre.toUpperCase()}:
+${lightStr}
+${colorStr}
+Atmosphere: ${treatment.atmosphere}
+
+PANORAMIC REQUIREMENTS:
+- This is ONE continuous ultra-wide landscape scene that will be split into ${slideCount} equal panels
+- The scene must flow naturally from left to right as one unified environment — NO obvious center point or focal element
+- Camera is at eye level, looking straight ahead — consistent camera angle across the entire width
+- Depth and perspective must extend across the FULL WIDTH: foreground elements on both far left and far right, mid-ground and background flowing continuously
+- NO abrupt changes in color, lighting, or texture across the width — gradual environmental flow only
+- The overall scene is wide open, like a film establishing shot — panoramic vistas, wide landscapes
+
+STRICT RULES: No text, no people, no faces, no products, no logos, no watermarks. Pure background environment only.`;
+
+        console.log(`\n🌅 Generating ONE panoramic background...`);
+
+        // Generate the panoramic — use widest ratio available (16:9)
+        // We'll scale and extend to total canvas size using sharp
+        let panoramicResult;
+        try {
+            panoramicResult = await routedImageGenerate(panoramicPrompt, [], 0.3, '16:9', '1K', selectedModel, themeRefUrls, null);
+        } catch(err) {
+            if (req.creditsDeducted > 0) await refundCredits(req.user._id, req.creditsDeducted, 'carousel', 'Refund: Panoramic generation failed', 'creative');
+            return res.status(500).json({ success: false, error: `Panoramic background failed: ${safeErrorMessage(err)}` });
+        }
+        if (!panoramicResult?.imageUrl) {
+            if (req.creditsDeducted > 0) await refundCredits(req.user._id, req.creditsDeducted, 'carousel', 'Refund: No panoramic image', 'creative');
+            return res.status(500).json({ success: false, error: 'No background image generated' });
+        }
+        console.log(`✅ Panoramic generated (${panoramicResult.provider})`);
+
+        // Register job and respond immediately — background processing continues async
+        const carouselId = randomUUID();
+        carouselJobs.set(carouselId, { status: 'generating', panels: [], panoramicUrl: panoramicResult.imageUrl, error: null, updatedAt: Date.now() });
+        res.json({ success: true, carouselId, status: 'processing', message: `Panoramic background ready. Splitting into ${slideCount} panels...`, panoramicUrl: panoramicResult.imageUrl, slideCount, provider: panoramicResult.provider });
+
+        // ── Async: Split panoramic, composite products, upload ──
+        (async () => {
+            try {
+                const sharp = (await import('sharp')).default;
+                const geminiKey = process.env.GOOGLE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
+
+                // Utility: URL/dataURI → Buffer with retry
+                const toBuffer = async (url, timeoutMs = 25000) => {
+                    if (!url) return null;
+                    if (url.startsWith('data:')) return Buffer.from(url.split(',')[1], 'base64');
+                    const r = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
+                    if (!r.ok) throw new Error(`HTTP ${r.status} fetching image`);
+                    return Buffer.from(await r.arrayBuffer());
+                };
+
+                // ── STEP 1: Load panoramic, extend to exact total canvas ──
+                let panoBuf;
+                try {
+                    panoBuf = await toBuffer(panoramicResult.imageUrl, 30000);
+                } catch(fetchErr) {
+                    console.warn(`   ⚠️ Panoramic fetch failed, retrying in 3s... (${fetchErr.message})`);
+                    await new Promise(r => setTimeout(r, 3000));
+                    panoBuf = await toBuffer(panoramicResult.imageUrl, 30000);
+                }
+                if (!panoBuf) throw new Error('Could not load panoramic buffer');
+
+                const panoMeta = await sharp(panoBuf).metadata();
+                console.log(`📐 Loaded panoramic: ${panoMeta.width}×${panoMeta.height}px`);
+
+                // Scale panoramic to fill exact canvas (totalW × totalH)
+                // 'cover' zooms to the larger dimension; 'fill' stretches — cover is better for environments
+                const fullCanvasBuf = await sharp(panoBuf)
+                    .resize(totalW, totalH, { fit: 'cover', position: 'centre' })
+                    .png()
+                    .toBuffer();
+                console.log(`✅ Canvas scaled to ${totalW}×${totalH}px`);
+
+                // ── STEP 2: Pixel-perfect split into N panels ──
+                // Each panel is extracted by left-offset — guaranteed seamless seams
+                const panelBufs = [];
+                for (let i = 0; i < slideCount; i++) {
+                    const panelBuf = await sharp(fullCanvasBuf)
+                        .extract({ left: i * slideW, top: 0, width: slideW, height: slideH })
+                        .png()
+                        .toBuffer();
+                    panelBufs.push(panelBuf);
+                    console.log(`   ✂️  Panel ${i+1}/${slideCount} extracted at x=${i * slideW}`);
+                }
+                console.log(`✅ Split complete: ${panelBufs.length} panels at ${slideW}×${slideH}px each`);
+
+                // ── STEP 3: Per-panel AI generation with product as visual reference ──
+                // Architecture: Upload panel slice → S3 URL → routedImageGenerate(prompt, refUrls)
+                // Gemini sees the background panel + product image as vision inputs and generates
+                // a FRESH unified scene. This is the correct approach — no compositing, no SVG,
+                // no gradients. Pure AI generation like all other images in the system.
+
+                const GENRE_PRODUCT_PROMPT = {
+                    drama:        'cinematic chiaroscuro lighting, warm golden rim light, emotionally charged atmosphere, deep shadows',
+                    thriller:     'cool harsh key light, long sharp shadows, suspenseful and tense visual energy',
+                    romance:      'soft golden hour backlight, warm bokeh, dreamy hazy warmth, intimate atmosphere',
+                    comedy:       'bright cheerful high-key lighting, vibrant playful colors, energetic upbeat mood',
+                    horror:       'toxic green ambient light, harsh upward shadows, eerie fog at ground level',
+                    action:       'explosive rim lighting, lens flares, kinetic energy, high-impact bold visuals',
+                    inspirational:'golden sunrise God-rays, uplifting majestic atmosphere, hopeful and vast',
+                    luxury:       'silk-quality soft directional light, specular highlights, opulent premium atmosphere',
+                    nature:       'dappled natural sunlight, organic serene atmosphere, fresh and peaceful',
+                    tech:         'cool blue neon edge lighting, futuristic clean minimal aesthetic',
+                    modern:       'clean soft-box studio light, contemporary professional atmosphere',
+                };
+                const genrePromptAddition = GENRE_PRODUCT_PROMPT[genre] || 'professional premium marketing lighting';
+
+                const finalPanels = [];
+                for (let i = 0; i < panelBufs.length; i++) {
+                    let panelBuf = panelBufs[i];
+
+                    if (productImages[i]) {
+                        try {
+                            console.log(`\n   🎨 Panel ${i+1}/${slideCount}: AI generation with product reference...`);
+
+                            // Upload this panel's background slice to S3 so LaoZhang can see it
+                            const panelSliceKey = `carousels/${brandId||'default'}/${carouselId}-slice-${i+1}.png`;
+                            const panelSliceUrl = await uploadToS3(panelBuf, panelSliceKey, 'image/png');
+
+                            // Resolve product image to S3 URL (may already be S3 or could be dataURL)
+                            let productUrl = productImages[i];
+                            if (productImages[i].startsWith('data:')) {
+                                productUrl = await uploadToS3(
+                                    productImages[i],
+                                    `carousels/${brandId||'default'}/${carouselId}-product-${i+1}.png`
+                                );
+                            }
+
+                            // Build the generation prompt — tells Gemini how to fuse the two images
+                            const panelPrompt = `Create a single unified, immersive marketing carousel panel (panel ${i+1} of ${slideCount}).
+
+REFERENCE IMAGE 1 (background environment): Use this as the background setting of the full image.
+REFERENCE IMAGE 2 (subject/product): Naturally integrate this subject into the background environment from IMAGE 1.
+
+REQUIREMENTS:
+- The main subject from IMAGE 2 must appear NATURALLY INSIDE the world of IMAGE 1
+- This must look like ONE unified photograph shot on location — not composited, not overlaid
+- The subject's lighting matches the environment: ${genrePromptAddition}
+- The subject has realistic ground shadow and surface interaction
+- The background from IMAGE 1 flows naturally around and behind the subject
+- Subject is prominent, centered, occupying 55-65% of frame height
+- Maintain the exact aspect ratio and dimensions — output must be ${slideW}×${slideH}
+- The scene tells a story — ${genre} genre treatment
+- NO borders, NO frames, NO text, NO logos, NO picture-in-picture, NO vignette effects
+- This is panel ${i+1} of a continuous ${slideCount}-panel carousel strip — the background environment extends beyond the edges left and right
+
+${themeStr}${moodStr}`;
+
+                            // Call the SAME pipeline as all other image generation
+                            // refImageUrls = [panelSliceUrl, productUrl] → LaoZhang multimodal sends both to Gemini
+                            console.log(`   📡 LaoZhang multimodal → Gemini with 2 visual refs (panel bg + product)`);
+                            const panelResult = await routedImageGenerate(
+                                panelPrompt,
+                                [],         // imageParts (inline) — empty, refs go via refImageUrls
+                                0.25,       // temperature — slightly creative but accurate
+                                slideRatio, // output aspect ratio
+                                '1K',
+                                selectedModel,
+                                [panelSliceUrl, productUrl],   // ← THE KEY: both images as multimodal refs
+                                null
+                            );
+
+                            if (panelResult?.imageUrl) {
+                                panelBuf = await toBuffer(panelResult.imageUrl, 30000);
+                                if (!panelBuf) throw new Error('Panel result buffer was null');
+                                // Ensure exact dimensions
+                                panelBuf = await sharp(panelBuf)
+                                    .resize(slideW, slideH, { fit: 'cover', position: 'centre' })
+                                    .png()
+                                    .toBuffer();
+                                console.log(`   ✅ Panel ${i+1}: AI generated (${panelResult.provider})`);
+                            } else {
+                                console.warn(`   ⚠️ Panel ${i+1}: generation returned no image — using clean background`);
+                            }
+                        } catch(pErr) {
+                            console.warn(`   ⚠️ Panel ${i+1}: AI generation failed (${pErr.message}) — using clean background`);
+                        }
+                    }
+
+                    // Brand logo watermark (top-left, 6% height)
+                    if (brandLogo) {
+                        try {
+                            const logoBuf = await toBuffer(brandLogo, 10000);
+                            if (logoBuf) {
+                                const logo = await sharp(logoBuf).resize({ height: Math.floor(slideH * 0.06), fit: 'inside' }).png().toBuffer();
+                                panelBuf = await sharp(panelBuf).composite([{ input: logo, top: 24, left: 24, blend: 'over' }]).png().toBuffer();
+                            }
+                        } catch { /* optional */ }
+                    }
+
+                    finalPanels.push(panelBuf);
+                }
+                console.log(`✅ Step 3: ${finalPanels.length} panels generated`);
+
+
+                // ── STEP 4: Upload to S3 — update job Map per-panel for live polling ──
+                const panelUrls = [];
+                const panoKey = `carousels/${brandId||'default'}/${carouselId}-pano.png`;
+                const panoramicS3Url = await uploadToS3(finalPanels[0], panoKey, 'image/png');
+
+                for (let i = 0; i < finalPanels.length; i++) {
+                    const url = await uploadToS3(finalPanels[i], `carousels/${brandId||'default'}/${carouselId}-panel-${i+1}.png`, 'image/png');
+                    panelUrls.push(url);
+                    carouselJobs.set(carouselId, {
+                        status: i === finalPanels.length - 1 ? 'ready' : 'uploading',
+                        panels: [...panelUrls],
+                        panoramicUrl: panoramicS3Url,
+                        error: null,
+                        updatedAt: Date.now(),
+                    });
+                    console.log(`   ☁️  Panel ${i+1}/${finalPanels.length} → S3`);
+                }
+
+                // Persist to MongoDB
+                await Creative.create({
+                    user: req.user._id,
+                    brand: brandId || undefined,
+                    prompt,
+                    imageUrl: panelUrls[0],
+                    type: 'carousel',
+                    aiMeta: { model: selectedModel, provider: panoramicResult.provider, carouselId, slideCount, slideRatio, style, genre, panoramicUrl: panoramicS3Url, panels: panelUrls, processingStatus: 'ready' },
+                });
+
+                const elapsed = Math.round((Date.now() - ts) / 1000);
+                console.log(`\n══════ CAROUSEL v3 DONE in ${elapsed}s ══════`);
+                console.log(`🎭 ${genre} | ${slideCount} panels | ${slideW}×${slideH}px each`);
+                console.log(`🖼️  Full panoramic: ${totalW}×${totalH}px`);
+                console.log(`══════════════════════════════════════════\n`);
+
+            } catch(pipeErr) {
+                console.error('❌ Carousel pipeline error:', pipeErr.message);
+                console.error('❌ Stack:', pipeErr.stack);
+                carouselJobs.set(carouselId, { status: 'error', panels: [], panoramicUrl: panoramicResult?.imageUrl||'', error: pipeErr.message, updatedAt: Date.now() });
+            }
+        })();
+
+    } catch (error) {
+        console.error('❌ Carousel generation error:', error);
+        if (req.creditsDeducted > 0) await refundCredits(req.user._id, req.creditsDeducted, 'carousel', `Refund: ${safeErrorMessage(error)}`, 'creative');
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+router.get('/carousel/:carouselId', protect, async (req, res) => {
+    try {
+        const { carouselId } = req.params;
+
+        // Check in-memory Map first (real-time updates during processing)
+        const liveJob = carouselJobs.get(carouselId);
+        if (liveJob) {
+            return res.json({
+                success: true,
+                status: liveJob.status,
+                panels: liveJob.panels || [],
+                panoramicUrl: liveJob.panoramicUrl || '',
+                error: liveJob.error || null,
+            });
+        }
+
+        // Fallback: check MongoDB for completed jobs from previous sessions
+        const creative = await Creative.findOne({
+            user: req.user._id,
+            'aiMeta.carouselId': carouselId,
+        }).lean();
+
+        if (!creative) {
+            return res.json({ success: true, status: 'processing', panels: [], panoramicUrl: '' });
+        }
+
+        res.json({
+            success: true,
+            status: creative.aiMeta?.processingStatus || 'ready',
+            panels: creative.aiMeta?.panels || [],
+            panoramicUrl: creative.aiMeta?.panoramicUrl || '',
+            slideCount: creative.aiMeta?.slideCount || 0,
+            creativeId: creative._id,
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
 
 export default router;

@@ -83,8 +83,13 @@ app.use((req, res, next) => {
         console.log(`[INCOMING] ${req.method} ${req.path} | Origin: ${origin} | User-Agent: ${req.headers['user-agent']}`);
     }
     
-    // Immediate CORS Force for mantram.ai
-    if (origin && (origin.toLowerCase().endsWith('mantram.ai') || origin.toLowerCase().includes('mantram.ai'))) {
+    // Immediate CORS Force for all allowed origins
+    const isAllowedOrigin = origin && (
+        HARDCODED_ORIGINS.some(ao => origin.toLowerCase() === ao.toLowerCase()) ||
+        origin.toLowerCase().endsWith('mantram.ai') || 
+        origin.toLowerCase().includes('mantram.ai')
+    );
+    if (isAllowedOrigin) {
         res.setHeader('Access-Control-Allow-Origin', origin);
         res.setHeader('Access-Control-Allow-Credentials', 'true');
         res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');

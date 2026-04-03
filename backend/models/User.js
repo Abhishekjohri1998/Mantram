@@ -92,6 +92,9 @@ const userSchema = new mongoose.Schema({
         brandsCreated: { type: Number, default: 0 },
     },
 
+    // Active Skills (Model A — persistent behavioral instructions injected into Fidato)
+    activeSkills: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Skill' }],
+
     // AI Preferences
     preferences: {
         defaultTextProvider: { type: String, default: '' },

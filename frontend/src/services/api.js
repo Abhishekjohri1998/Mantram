@@ -188,6 +188,10 @@ export const creatives = {
     lifestyleMockup: (data) => apiFetch('/creatives/lifestyle-mockup', { method: 'POST', body: JSON.stringify(data) }),
     virtualTryon: (data) => apiFetch('/creatives/virtual-tryon', { method: 'POST', body: JSON.stringify(data) }),
     vtoStatus: (requestId, brandId) => apiFetch(`/creatives/virtual-tryon/status/${requestId}?brandId=${brandId}`),
+    // Carousel generation
+    generateCarousel: (data) => apiFetch('/creatives/carousel', { method: 'POST', body: JSON.stringify(data) }),
+    getCarousel: (carouselId) => apiFetch(`/creatives/carousel/${carouselId}`),
+    analyzeCarouselTheme: (data) => apiFetch('/creatives/carousel/analyze-theme', { method: 'POST', body: JSON.stringify(data) }),
     // Agentic creative pipeline (multi-agent: ArtDirector + PromptEngineer + StyleCritic)
     agenticStart: (data) => apiFetch('/creatives/agentic/start', { method: 'POST', body: JSON.stringify(data) }),
     agenticVariations: (id) => apiFetch(`/creatives/agentic/${id}/variations`, { method: 'POST' }),
@@ -603,6 +607,13 @@ export const superadmin = {
     addVideoProvider: (data) => apiFetch('/superadmin/video-providers/provider', { method: 'POST', body: JSON.stringify(data) }),
     modifyVideoProvider: (data) => apiFetch('/superadmin/video-providers/provider', { method: 'PATCH', body: JSON.stringify(data) }),
     removeVideoProvider: (data) => apiFetch('/superadmin/video-providers/provider', { method: 'DELETE', body: JSON.stringify(data) }),
+
+    // Image Provider Switching
+    getImageProviders: () => apiFetch('/superadmin/image-providers'),
+    updateImageProvider: (data) => apiFetch('/superadmin/image-providers', { method: 'PUT', body: JSON.stringify(data) }),
+    addImageProvider: (data) => apiFetch('/superadmin/image-providers/provider', { method: 'POST', body: JSON.stringify(data) }),
+    modifyImageProvider: (data) => apiFetch('/superadmin/image-providers/provider', { method: 'PATCH', body: JSON.stringify(data) }),
+    removeImageProvider: (data) => apiFetch('/superadmin/image-providers/provider', { method: 'DELETE', body: JSON.stringify(data) }),
 };
 
 // ============ Credits API ============
@@ -804,6 +815,16 @@ export const skills = {
     execute: (id, data) => apiFetch(`/skills/${id}/execute`, { method: 'POST', body: JSON.stringify(data) }),
     generate: (data) => apiFetch('/skills/generate', { method: 'POST', body: JSON.stringify(data) }),
     enhanceInstructions: (data) => apiFetch('/skills/enhance-instructions', { method: 'POST', body: JSON.stringify(data) }),
+    // Model A — Persistent skill activation
+    activate: (id) => apiFetch(`/skills/${id}/activate`, { method: 'POST' }),
+    deactivate: (id) => apiFetch(`/skills/${id}/deactivate`, { method: 'POST' }),
+    getActive: () => apiFetch('/skills/active/list'),
+    // Model B — Execution history & output routing
+    listExecutions: (params = {}) => {
+        const query = new URLSearchParams(params).toString();
+        return apiFetch(`/skills/executions/list?${query}`);
+    },
+    routeExecution: (executionId, data) => apiFetch(`/skills/executions/${executionId}/route`, { method: 'POST', body: JSON.stringify(data) }),
 };
 
 // ============ Google Analytics + Search Console API (brand-aware) ============
