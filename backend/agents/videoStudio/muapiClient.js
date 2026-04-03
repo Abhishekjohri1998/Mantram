@@ -180,7 +180,25 @@ export async function getMuApiGenerationStatus(requestId) {
         }, 2);
 
         const muapiStatus = (data.status || '').toLowerCase();
-        
+
+        // STUCK TASK DETECTION: If processing for > 12 minutes, fail it
+        const createdAt = data.created_at ? new Date(data.created_at) : null;
+        if (muapiStatus === 'processing' && createdAt) {
+            const now = new Date();
+            const elapsedMins = (now - createdAt) / 60000;
+            if (elapsedMins > 12) {
+                console.warn(`🛑 MuAPI task ${requestId} stuck in processing for ${elapsedMins.toFixed(1)} mins. Failing for recovery.`);
+                return {
+                    status: 'FAILED',
+                    progress: 0,
+                    error: `Task timed out: The provider (MuAPI) has had this task in 'processing' for over 12 minutes. This usually indicates a stuck worker or a massive queue. Please try again or switch to a different model.`,
+                    retryable: true,
+                    provider: 'muapi',
+                    isProviderError: true,
+                };
+            }
+        }
+
         if (muapiStatus === 'completed' || muapiStatus === 'succeeded') {
             const videoUrl = data.outputs?.[0]?.url 
                 || data.outputs?.[0] 
@@ -219,14 +237,15 @@ export async function getMuApiGenerationStatus(requestId) {
 
         return {
             status: 'IN_PROGRESS',
-            progress: 30,
+            progress: muapiStatus === 'processing' ? 45 : 15, // Differentiate between queued and processing
             provider: 'muapi',
         };
 
     } catch (err) {
+        console.error(`⚠️ MuAPI status fetch error for ${requestId}:`, err.message);
         return {
             status: 'IN_PROGRESS',
-            progress: 15,
+            progress: 10,
             error: '',
             provider: 'muapi',
         };

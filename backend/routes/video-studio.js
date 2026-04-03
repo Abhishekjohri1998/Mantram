@@ -62,7 +62,21 @@ router.post(['/advanced/i2v', '/advanced/image-to-video'], protect, requireCredi
 
         console.log(`🖼️→🎬 I2V request: quality=${qualityMode}, duration=${duration}`);
 
-        // Create project
+        // 1. ENHANCE PROMPT (Mandatory 5,000 words)
+        // ══════════════════════════════════════════════════════════════════════════════
+        console.log('✨ Enhancing I2V prompt with Gemini 1.5 Pro...');
+        const enhancedState = await enhancePromptNode({
+            prompt: prompt || 'Animate this image with natural cinematic motion',
+            model: 'seedance-2.0',
+            duration: duration || 5,
+            aspectRatio: aspectRatio || '16:9',
+            brandId: brandId || null,
+            userId: req.user._id,
+        });
+        const finalPrompt = enhancedState.enhancedPrompt;
+        console.log(`✅ Enhanced prompt length: ${finalPrompt.length} chars`);
+
+        // 2. Create project
         const project = await VideoProject.create({
             user: req.user._id,
             brand: brandId || null,
@@ -82,10 +96,10 @@ router.post(['/advanced/i2v', '/advanced/image-to-video'], protect, requireCredi
             },
         });
 
-        // 3. Submit to dynamic routing engine (MuAPI/LaoZhang/Kie.ai/PiAPI) instead of hardcoded PiAPI
+        // 3. Submit to dynamic routing engine (MuAPI/LaoZhang/Kie.ai/PiAPI)
         const result = await submitVideoGeneration({
             model: 'seedance-2.0',
-            prompt: prompt || 'Animate this image with natural cinematic motion',
+            prompt: finalPrompt, // Use enhanced prompt
             imageUrl,
             duration: duration || 5,
             aspectRatio: aspectRatio || '16:9',
@@ -242,13 +256,21 @@ router.post('/advanced/generate', protect, requireCredits('videoGenerate'), asyn
 
         console.log(`📸 Advanced generate: ${(referenceImages || []).length} ref images, firstImage: ${firstImageUrl ? 'yes' : 'no'}, model: ${model}, quality: ${qualityMode}`);
 
-        // Create project in advanced mode
-        // Format referenceImages for schema: [{url, label}]
-        // Skip base64 data URIs for storage (too large for MongoDB) — they're already embedded in the prompt via <img> tags
-        const formattedRefImages = (referenceImages || [])
-            .filter(r => typeof r === 'string' ? !r.startsWith('data:') : !r?.url?.startsWith('data:'))
-            .map((r, i) => typeof r === 'string' ? { url: r, label: `@image${i + 1}` } : r);
+        // 1. ENHANCE PROMPT (Mandatory 5,000 words)
+        // ══════════════════════════════════════════════════════════════════════════════
+        console.log('✨ Enhancing Advanced Generate prompt with Gemini 1.5 Pro...');
+        const enhancedState = await enhancePromptNode({
+            prompt: prompt.trim(),
+            model: model || 'kling-3.0',
+            duration: duration || 5,
+            aspectRatio: aspectRatio || '16:9',
+            brandId: brandId || null,
+            userId: req.user._id,
+        });
+        const finalPrompt = enhancedState.enhancedPrompt;
+        console.log(`✅ Enhanced prompt length: ${finalPrompt.length} chars`);
 
+        // 2. Create project in advanced mode
         const project = await VideoProject.create({
             user: req.user._id,
             brand: brandId || null,
@@ -272,15 +294,15 @@ router.post('/advanced/generate', protect, requireCredits('videoGenerate'), asyn
             creditsUsed: req.creditsDeducted || 0,
         });
 
-        // Plan duration if needed
+        // 3. Plan duration if needed
         const durationPlan = await durationPlannerNode({
             model: model || 'kling-3.0',
             duration: duration || 5,
         });
 
-        // Run generation
+        // 4. Run generation
         const state = await advancedGenerateNode({
-            prompt: prompt.trim(),
+            prompt: finalPrompt, // Use enhanced prompt
             model: model || 'kling-3.0',
             duration: duration || 5,
             resolution: resolution || '1080p',
