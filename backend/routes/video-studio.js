@@ -44,7 +44,7 @@ import { listAvatars, listVoices, generateUGCVideo, generatePhotoAvatarVideo, ge
 import { generateUGCScript, UGC_STYLES } from '../agents/videoStudio/ugcScriptGenerator.js';
 import { saveLearnings, getStylePreferences } from '../agents/videoStudio/selfLearning.js';
 import { getRouter as getAIRouter } from '../ai/router.js';
-import { uploadToS3 } from '../utils/s3.js';
+import { uploadToS3, mirrorUrlToS3 } from '../utils/s3.js';
 import { safeErrorMessage } from '../utils/safeError.js';
 
 const router = Router();
@@ -281,7 +281,7 @@ router.post('/advanced/generate', protect, requireCredits('videoGenerate'), asyn
                 prompt: prompt.trim(),
                 firstImageUrl: (firstImageUrl && !firstImageUrl.startsWith('data:')) ? firstImageUrl : '',
                 lastImageUrl: (lastImageUrl && !lastImageUrl.startsWith('data:')) ? lastImageUrl : '',
-                referenceImages: formattedRefImages,
+                referenceImages: (referenceImages || []).filter(Boolean),
                 aspectRatio: aspectRatio || '16:9',
                 duration: duration || 5,
                 generateAudio: generateAudio !== false,
@@ -329,8 +329,9 @@ router.post('/advanced/generate', protect, requireCredits('videoGenerate'), asyn
         // LaoZhang sync: video is already generated — upload to S3 before CDN expires
         // This normally happens in the polling loop, but LZ projects skip polling
         if (projectStatus === 'completed' && state.generation?.videoUrl) {
-            downloadAndUploadVideoToS3(project._id.toString(), state.generation.videoUrl)
-                .catch(e => console.warn('⚠️ LZ Video S3 upload failed:', e.message));
+            const targetKey = `video-studio/generations/${project._id}-${Date.now()}.mp4`;
+            mirrorUrlToS3(state.generation.videoUrl, targetKey)
+                .catch(e => console.warn('⚠️ LZ Video S3 mirror failed:', e.message));
         }
 
         res.json({
