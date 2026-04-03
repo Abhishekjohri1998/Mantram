@@ -97,12 +97,12 @@ router.get('/stats', async (req, res) => {
 
         const planDistribution = await User.aggregate([
             { $group: { _id: '$plan', count: { $sum: 1 } } },
-        ]);
+        ]).allowDiskUse(true);
 
         const revenueData = await Subscription.aggregate([
             { $match: { status: 'active', price: { $gt: 0 } } },
             { $group: { _id: null, totalRevenue: { $sum: '$price' }, count: { $sum: 1 } } },
-        ]);
+        ]).allowDiskUse(true);
 
         const recentUsersRaw = await User.find()
             .sort('-createdAt').limit(10)
@@ -116,7 +116,7 @@ router.get('/stats', async (req, res) => {
 
         const totalCreditsUsed = await User.aggregate([
             { $group: { _id: null, total: { $sum: '$credits.used' } } },
-        ]);
+        ]).allowDiskUse(true);
 
         // Content by type
         const contentByType = await Content.aggregate([
@@ -127,14 +127,14 @@ router.get('/stats', async (req, res) => {
         const feedbackSentiment = await Feedback.aggregate([
             { $match: { createdAt: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } } },
             { $group: { _id: '$signalType', count: { $sum: 1 }, avgSentiment: { $avg: '$sentimentScore' } } },
-        ]);
+        ]).allowDiskUse(true);
 
         // Users created per day (last 30 days)
         const userGrowth = await User.aggregate([
             { $match: { createdAt: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } } },
             { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } }, count: { $sum: 1 } } },
             { $sort: { _id: 1 } },
-        ]);
+        ]).allowDiskUse(true);
 
         // Usage Analytics: Top users, exhausted, and near exhaustion
         const [topUsersRaw, exhaustedUsersData] = await Promise.all([
@@ -174,7 +174,7 @@ router.get('/stats', async (req, res) => {
                         nearEmptyCount: { $sum: { $cond: ['$isNearExhaustion', 1, 0] } }
                     }
                 }
-            ])
+            ]).allowDiskUse(true)
         ]);
 
         const [topUsers, churnedUsersCount, returningUsersCount] = await Promise.all([
@@ -1968,12 +1968,12 @@ router.get('/provider-usage', async (req, res) => {
                 totalCredits: { $sum: '$cost' },
             }},
             { $sort: { estimatedCost: -1 } },
-        ]);
+        ]).allowDiskUse(true);
 
         // Map models to providers
         const providerModels = {
             openai: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo'],
-            anthropic: ['claude-sonnet-4-20250514', 'claude-3-5-sonnet', 'claude-3-haiku'],
+            anthropic: ['claude-3-5-sonnet-20240620', 'claude-3-5-sonnet', 'claude-3-haiku'],
             gemini: ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-flash-image'],
             grok: ['grok-3', 'grok-3-mini', 'grok-beta'],
             piapi: ['seedance-2.0', 'kling-v2'],
@@ -3622,3 +3622,4 @@ router.get('/users/:id/studio-access', async (req, res) => {
 });
 
 export default router;
+

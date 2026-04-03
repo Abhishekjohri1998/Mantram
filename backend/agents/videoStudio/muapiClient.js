@@ -137,7 +137,6 @@ export async function submitMuApiVideoGeneration({
         console.log(`📸 [MuAPI] Final images_list (${imagesList.length} total):`, imagesList.map(u => u.substring(0, 60)));
 
         // Prompt Auto-Tagging & Hard Length Guard (4,000 chars)
-        // MuAPI strictly rejects anything over 4,000 characters.
         let finalPrompt = prompt.trim();
         if (finalPrompt.length > 4000) {
             console.warn(`🛑 MuAPI prompt exceeds 4,000 chars (${finalPrompt.length}). Truncating for technical compatibility.`);
@@ -155,6 +154,12 @@ export async function submitMuApiVideoGeneration({
             payload.prompt = finalPrompt;
             console.log(`📝 [MuAPI] Auto-tagged prompt: ${finalPrompt}`);
         }
+    } else {
+        // TEXT-TO-VIDEO ONLY: Strictly remove any @image tags that might have leaked from prompt enhancement
+        // This prevents "Prompt references @image1 but only 0 image(s) provided" MuAPI error.
+        let cleanPrompt = prompt.trim().replace(/@image\d+/g, '').replace(/\(\s*Visual reference:\s*\)/g, '').trim();
+        payload.prompt = cleanPrompt;
+        console.log(`📝 [MuAPI] T2V Clean Prompt: ${cleanPrompt}`);
     }
 
     console.log(`🎬 [MuAPI] Submitting to ${endpoint} | Payload keys: ${Object.keys(payload).join(', ')}`);

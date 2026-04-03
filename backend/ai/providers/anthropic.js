@@ -12,7 +12,7 @@ export class AnthropicProvider extends BaseProvider {
     }
 
     async generateText({ systemPrompt, userPrompt, temperature = 0.7, maxTokens = 2048, model }) {
-        const modelId = model || this.config.defaultModel || 'claude-sonnet-4-20250514';
+        const modelId = model || this.config.defaultModel || 'claude-3-5-sonnet-20240620';
 
         const startTime = Date.now();
         const response = await fetch(`${this.baseUrl}/messages`, {
@@ -68,7 +68,7 @@ export class AnthropicProvider extends BaseProvider {
      * Returns both the text response and the array of tool calls made.
      */
     async generateWithTools({ systemPrompt, userPrompt, tools, toolHandlers = {}, temperature = 0.5, maxTokens = 4096, model }) {
-        const modelId = model || this.config.defaultModel || 'claude-sonnet-4-20250514';
+        const modelId = model || this.config.defaultModel || 'claude-3-5-sonnet-20240620';
         const startTime = Date.now();
 
         let messages = [{ role: 'user', content: userPrompt }];

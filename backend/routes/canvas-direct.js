@@ -632,7 +632,7 @@ Then call the tools for Phase 1 in order. After Phase 1 completes, STOP and ask 
                 toolHandlers: {}, // No server-side tools needed — research done pre-flight
                 temperature: 0.5,
                 maxTokens: 8192,
-                model: 'claude-sonnet-4-20250514',
+                model: 'claude-3-5-sonnet-20240620',
             });
 
             // Attach reference images to response
@@ -1071,3 +1071,4 @@ router.post('/canvas-compile', protect, async (req, res) => {
 });
 
 export default router;
+

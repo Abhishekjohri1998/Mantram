@@ -103,7 +103,8 @@ app.use((req, res, next) => {
     const path = req.path.toLowerCase();
     req.isBotScan = [
         '.php', '.xml', 'wp-admin', 'vendor', 'phpunit', '.env', '.git', 
-        'boaform', 'shell', 'cgi-bin', 'autodiscover', 'config', 'admin'
+        'boaform', 'shell', 'cgi-bin', 'autodiscover', 'config', 'admin',
+        'sdk/weblanguage', 'pdown', 'web-language', 'scripts'
     ].some(p => path.includes(p.toLowerCase()));
 
     if (!req.isBotScan && !['/api/health', '/health', '/favicon.ico', '/robots.txt'].includes(path)) {

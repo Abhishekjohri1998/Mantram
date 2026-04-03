@@ -41,7 +41,7 @@ export const PROVIDER_PRICING = {
     'anthropic': {
         provider: 'Anthropic', icon: '🟠',
         models: {
-            'claude-sonnet-4-20250514': {
+            'claude-3-5-sonnet-20240620': {
                 name: 'Claude Sonnet 4', type: 'text',
                 inputPer1M: 3.00, outputPer1M: 15.00, unit: 'USD/1M tokens',
                 pricingUrl: 'https://docs.anthropic.com/en/docs/about-claude/pricing',
@@ -128,17 +128,17 @@ export const PROVIDER_PRICING = {
             'sarvam-m': {
                 name: 'Sarvam-M (Text LLM)', type: 'text',
                 inputPer1M: 0.20, outputPer1M: 0.80, unit: 'USD/1M tokens',
-                pricingUrl: 'https://www.sarvam.ai/pricing',
+                pricingUrl: 'https://www.sarvam.ai',
             },
             'sarvam-stt-saaras-v3': {
                 name: 'Saaras STT v3', type: 'voice',
                 costPerMinute: 0.018, unit: 'USD/min (₹1.5/min)',
-                pricingUrl: 'https://www.sarvam.ai/pricing',
+                pricingUrl: 'https://www.sarvam.ai',
             },
             'sarvam-tts-bulbul-v2': {
                 name: 'Bulbul TTS v2', type: 'voice',
                 costPerMinute: 0.014, unit: 'USD/min (₹1.2/min)',
-                pricingUrl: 'https://www.sarvam.ai/pricing',
+                pricingUrl: 'https://www.sarvam.ai',
             },
         },
     },
@@ -227,7 +227,7 @@ export const PROVIDER_PRICING = {
             'seedance-2.0': {
                 name: 'Seedance 2.0 Pro', type: 'video',
                 costPerSecFast: 0.08, costPerSecQuality: 0.15, unit: 'USD/sec',
-                pricingUrl: 'https://muapi.ai/pricing',
+                pricingUrl: 'https://www.muapi.ai', // Pointing to main landing if pricing 404s
             },
         },
     },
@@ -312,7 +312,16 @@ async function extractPricingFromWeb(url, modelsList, providerName) {
     if (!process.env.GEMINI_API_KEY) return null;
     try {
         console.log(`📡 Fetching live pricing for ${providerName} from ${url}...`);
-        const { data: html } = await axios.get(url, { timeout: 15000 });
+        const { data: html } = await axios.get(url, { 
+            timeout: 15000,
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Cache-Control': 'no-cache',
+                'Pragma': 'no-cache'
+            }
+        });
         const $ = cheerio.load(html);
         
         // Clean up unneeded tags to save context
@@ -353,7 +362,22 @@ async function extractPricingFromWeb(url, modelsList, providerName) {
             }
         });
 
-        const resultJson = JSON.parse(response.text);
+        const textResponse = response.text();
+        let cleanJson = textResponse.trim();
+        
+        // Remove Markdown wrapping if present
+        if (cleanJson.startsWith('```')) {
+            cleanJson = cleanJson.replace(/^```(?:json)?\s*\n?/, '').replace(/\n?```\s*$/, '');
+        }
+        
+        // If still contains garbage before/after the JSON object
+        const firstBrace = cleanJson.indexOf('{');
+        const lastBrace = cleanJson.lastIndexOf('}');
+        if (firstBrace !== -1 && lastBrace !== -1) {
+            cleanJson = cleanJson.substring(firstBrace, lastBrace + 1);
+        }
+
+        const resultJson = JSON.parse(cleanJson);
         return resultJson.models;
     } catch (e) {
         console.warn(`⚠️ Failed to extract live pricing for ${providerName}:`, e.message);
@@ -532,3 +556,4 @@ export function startPricingMonitor() {
 
     console.log('📊 Pricing Monitor active — checking every 24h');
 }
+

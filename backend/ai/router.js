@@ -22,7 +22,7 @@ class ModelRouter {
         this.providers.gemini = new GeminiProvider({
             apiKey: providerConfigs.gemini?.apiKey,
             imageApiKey: providerConfigs.gemini?.imageApiKey,
-            defaultModel: config.ai.defaultTextModel || 'gemini-2.0-flash',
+            defaultModel: config.ai.defaultGeminiModel || 'gemini-2.0-flash',
             defaultImageModel: config.ai.defaultImageModel || 'gemini-3.1-flash-image-preview',
             // GCP Vertex AI (Billed)
             gcpProjectId: providerConfigs.gemini?.gcpProjectId,
@@ -31,11 +31,11 @@ class ModelRouter {
         });
         this.providers.openai = new OpenAIProvider({
             apiKey: providerConfigs.openai?.apiKey,
-            defaultModel: config.ai.defaultTextModel || 'gpt-4o-mini',
+            defaultModel: config.ai.defaultOpenAIModel || 'gpt-4o-mini',
         });
         this.providers.anthropic = new AnthropicProvider({
             apiKey: providerConfigs.anthropic?.apiKey,
-            defaultModel: config.ai.defaultTextModel || 'claude-3-5-sonnet-20240620',
+            defaultModel: config.ai.defaultAnthropicModel || 'claude-3-5-sonnet-20240620',
         });
 
 

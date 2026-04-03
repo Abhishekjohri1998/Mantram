@@ -66,7 +66,7 @@ const ROUTING_RULES = [
     {
         match: (ctx) => (!ctx.language || ctx.language === 'english') &&
             ['educate', 'brand', 'blog', 'seo', 'email'].includes(ctx.taskType),
-        route: { provider: 'anthropic', model: 'claude-sonnet-4-20250514', reason: 'Best for long-form English' },
+        route: { provider: 'anthropic', model: 'claude-3-5-sonnet-20240620', reason: 'Best for long-form English' },
         icon: '📝',
     },
 
