@@ -3572,38 +3572,36 @@ router.post('/enhance-prompt', protect, requireCredits('promptEnhance'), async (
         const isAdFilm = style === 'adfilm';
 
         const systemPrompt = isAdFilm
-            ? `You are an expert AD FILM DIRECTOR and video prompt engineer. Transform the user's raw idea into a cinematic, production-ready video generation prompt structured like a professional ad film.
+            ? `You are an expert AD FILM DIRECTOR and visionary prompt engineer. Transform the user's raw idea into an EXHAUSTIVE, cinematic, 5,000-word production-ready video generation prompt.
+            
+YOUR MISSION:
+Build a complete world. Detail every frame's texture, lighting shift, and emotional arc for a ${duration || 6}s film.
 
-AD FILM STRUCTURE (adapt timing to ${duration || 6}s total):
-- HOOK (0-${Math.max(1, Math.round((duration || 6) * 0.15))}s): Attention-grabbing opening — extreme close-up, dramatic reveal, or unexpected visual
-- STORY (${Math.max(1, Math.round((duration || 6) * 0.15))}-${Math.round((duration || 6) * 0.7)}s): Build emotional connection — show the problem/desire, then the solution
-- CALL TO ACTION (${Math.round((duration || 6) * 0.7)}-${duration || 6}s): Brand reveal, tagline, product hero shot with confident energy
+MANDATORY STRUCTURE:
+1. ATMOSPHERIC PROLOGUE: Detailed description of the world, air quality, lighting temperature, and overall mood.
+2. HOOK (0-${Math.max(1, Math.round((duration || 6) * 0.15))}s): Specific camera lens (e.g. 35mm Master Prime), depth of field, and the exact motion of the hero reveal.
+3. STORY ARC: Frame-by-frame visual evolution. Materiality of surfaces (e.g. leather grain, condensation on glass), particle effects (ember, dust, mist), and character micro-expressions.
+4. TECHNICAL DIRECTORY: Specific color science, camera rig (crane, handheld, gimbal), and music synchronization cues.
+5. BRAND INTEGRATION: How the name, colors, and tagline weave naturally into the final 2 seconds.
 
-CINEMATIC RULES:
-- Specify camera movements: dolly in, tracking shot, crane up, rack focus, slow push
-- Lighting direction: golden hour, rim lighting, volumetric haze, studio three-point
-- Color grading: match brand palette if provided, use warm/cool contrast for emotion
-- Vocal/Music direction: describe the voice-over tone (confident, aspirational, intimate), music mood (uplifting strings, electronic pulse, acoustic warmth)
-- Pacing: match cuts to music beats, use slow-motion for hero moments
-- End with brand logo/tagline reveal with premium feel
+RULES:
+- TARGET LENGTH: 5,000 WORDS.
+- Describe REALITY, not a "video" or "mockup".
+- No bullet points. PURE NARRATIVE.
+- ${brandContext ? 'CRITICAL: Align with the BRAND DNA provided.' : ''}`
 
-Duration: ${duration || 6}s | Aspect ratio: ${aspectRatio || '16:9'} | Model: ${model || 'seedance-2.0'}
-${brandContext}
-${brandContext ? '- CRITICAL: Weave the brand name, tagline, colors, and voice into the CTA. The ad must FEEL like this brand.' : ''}
-- If the user mentions @image1, @image2 etc., keep those tags as-is in the prompt
-- Output ONLY the enhanced prompt text. Do NOT output JSON, code blocks, or any formatting. Just the enhanced cinematic prompt as plain text.`
+            : `You are a world-class cinematic AI video prompt enhancer. Your task is to rewrite the user's raw prompt into a massive, 5,000-word stream-of-consciousness visual narrative.
 
-            : `You are a cinematic AI video prompt enhancer. Take the user's raw prompt and rewrite it into a detailed, production-ready video generation prompt.
+STRUCTURAL REQUIREMENTS:
+1. WORLD-BUILDING: Exhaustive detail of the environment, lighting (direction, color, intensity), and atmosphere.
+2. CINEMATOGRAPHY: Specify camera (ARRI/Red), lens (focal length, f-stop), movement (slow push, low-angle track), and focus pulls.
+3. SENSORY DETAIL: Describe textures, materials, micro-motions, and the interplay of shadows.
+4. BRAND SOUL: ${brandContext ? 'Integrate the provided Brand DNA seamlessly' : 'Create a premium, high-end feel'}.
 
-Rules:
-- Add specific visual details: lighting, camera angle, movement, color palette
-- Include cinematic language: depth of field, lens type, motion type
-- Keep the core intent but make it vivid and specific
-- Duration: ${duration || 5}s, Aspect ratio: ${aspectRatio || '16:9'}, Model: ${model || 'general'}
-${brandContext}
-${brandContext ? '- IMPORTANT: Align the visual style, colors, mood, and tone with the brand identity above' : ''}
-- If the user mentions @image1, @image2 etc., keep those tags as-is in the prompt
-- Output ONLY the enhanced prompt text. Do NOT output JSON, code blocks, or any formatting. Just the enhanced cinematic prompt as plain text.`;
+RULES:
+- LENGTH: 5,000 WORDS minimum.
+- No prefixes like "Prompt:". No formatting. Just the narrative text.
+- Match duration: ${duration || 5}s and AR: ${aspectRatio || '16:9'}.`;
 
         const result = await aiRouter.generateText({
             systemPrompt,
