@@ -17,13 +17,17 @@ import React, { useState, useEffect, useMemo } from 'react';
 
 // Agent metadata for display
 const AGENT_META = {
-    'brand-intel':      { icon: 'psychology', label: 'Brand Intelligence', color: '#8b5cf6' },
-    'art-director':     { icon: 'palette', label: 'Art Director', color: '#ec4899' },
-    'prompt-engineer':  { icon: 'code', label: 'Prompt Engineer', color: '#06b6d4' },
-    'style-critic':     { icon: 'verified', label: 'Style Critic', color: '#f59e0b' },
-    'image-inject':     { icon: 'photo_library', label: 'Image Grounding', color: '#10b981' },
-    'generating':       { icon: 'auto_awesome', label: 'AI Generation', color: '#6366f1' },
-    'complete':         { icon: 'check_circle', label: 'Complete', color: '#22c55e' },
+    'brand-intel':       { icon: 'psychology',       label: 'Brand Intelligence',    color: '#8b5cf6' },
+    'art-director':      { icon: 'palette',           label: 'Art Director',          color: '#ec4899' },
+    'prompt-engineer':   { icon: 'code',              label: 'Prompt Engineer',       color: '#06b6d4' },
+    'style-critic':      { icon: 'verified',          label: 'Style Critic',          color: '#f59e0b' },
+    'image-inject':      { icon: 'photo_library',     label: 'Image Grounding',       color: '#10b981' },
+    'visual-grounding':  { icon: 'image_search',      label: 'Visual Grounding (MCoT)',color: '#14b8a6' },
+    'copywriter':        { icon: 'edit_note',          label: 'Copywriter Agent',      color: '#f97316' },
+    'generating':        { icon: 'auto_awesome',      label: 'AI Generation',         color: '#6366f1' },
+    'complete':          { icon: 'check_circle',      label: 'Complete',              color: '#22c55e' },
+    'queued':            { icon: 'schedule',          label: 'Queued',                color: '#64748b' },
+    'processing':        { icon: 'sync',              label: 'Processing',            color: '#8b5cf6' },
 };
 
 export default function GlobalLoader({

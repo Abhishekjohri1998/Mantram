@@ -951,7 +951,14 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
                                 setError({ message: job.errorMessage || 'Generation failed.', isRetryable: true })
                                 setActiveGenerations(prev => prev.filter(j => j.jobId !== localJobId))
                             } else if (job.status === 'processing') {
-                                setPipelineSteps([{ agent: 'processing', message: 'AI agents are working on your creative...', status: 'working' }])
+                                // ✅ Read real agent steps from DB (brand-intel, art-director, prompt-engineer, etc.)
+                                // job.steps is populated by agentStep() in creatives.js — this drives the thinking display
+                                if (job.steps?.length > 0) {
+                                    setPipelineSteps(job.steps)
+                                } else {
+                                    // Fallback only if steps haven’t arrived yet (first poll)
+                                    setPipelineSteps([{ agent: 'brand-intel', message: 'Launching AI agent pipeline...', status: 'working' }])
+                                }
                             }
                         } catch { /* ignore polling errors */ }
                     }, 5000)
