@@ -169,11 +169,12 @@ router.get('/jobs', protect, async (req, res) => {
         const since = new Date(Date.now() - 24 * 60 * 60 * 1000); // last 24h
         const jobs = await GenerationJob.find(
             { user: req.user._id, createdAt: { $gte: since } },
-            { jobId: 1, status: 1, type: 1, prompt: 1, format: 1, imageUrl: 1, errorMessage: 1,
+            { jobId: 1, status: 1, type: 1, format: 1, imageUrl: 1, errorMessage: 1,
               creativeId: 1, createdAt: 1, startedAt: 1, completedAt: 1, steps: { $slice: -5 } }
         )
             .sort({ createdAt: -1 })
             .limit(20)
+            .allowDiskUse(true)
             .lean();
         res.json({ success: true, jobs });
     } catch (error) {
