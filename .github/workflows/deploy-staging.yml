@@ -1,0 +1,232 @@
+name: 🧪 Staging Deployment
+
+on:
+  push:
+    branches: [staging]
+  workflow_dispatch:
+
+jobs:
+  # ═══════════════════════════════════════════
+  # 🎨 Job 1: Build & Deploy Frontend (S3)
+  # ═══════════════════════════════════════════
+  deploy-frontend-staging:
+    name: 🎨 Frontend → staging.mantram.ai
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: cd frontend && npm ci
+
+      - name: Build frontend (staging)
+        run: |
+          cd frontend
+          npm run build
+        env:
+          VITE_API_URL: ${{ secrets.STAGING_VITE_API_URL }}
+          VITE_ENV: staging
+
+      - name: 📦 Sync to S3 (staging)
+        run: |
+          echo "📁 Dist folder content:"
+          ls -R frontend/dist
+          aws s3 sync frontend/dist s3://${{ secrets.STAGING_FRONTEND_S3_BUCKET }} --delete
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.FRONTEND_AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.FRONTEND_AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
+
+      - name: ⚡ Invalidate CloudFront (staging)
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ secrets.STAGING_CLOUDFRONT_DISTRIBUTION_ID }} \
+            --paths "/*"
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.FRONTEND_AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.FRONTEND_AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
+
+  # ═══════════════════════════════════════════
+  # 🚀 Job 2: Deploy Backend (EC2)
+  # ═══════════════════════════════════════════
+  deploy-backend-staging:
+    name: 🚀 Backend → port 3002 (staging)
+    runs-on: ubuntu-latest
+    needs: deploy-frontend-staging
+    steps:
+      - name: ⬇️ Checkout Code
+        uses: actions/checkout@v4
+
+      - name: ⚙️ Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v5.0.0
+        with:
+          aws-access-key-id: ${{ secrets.MEDIA_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.MEDIA_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: 🔍 Get Runner IP
+        id: ip
+        run: echo "ipv4=$(curl -s https://checkip.amazonaws.com)" >> $GITHUB_OUTPUT
+
+      - name: 🔓 Whitelist Runner IP (Port 22)
+        run: |
+          RUNNER_IP="${{ steps.ip.outputs.ipv4 }}"
+          SG_ID="${{ secrets.AWS_SECURITY_GROUP_ID }}"
+
+          echo "🌐 Runner IP: $RUNNER_IP"
+          echo "🛡️ SG ID: $SG_ID"
+
+          aws ec2 authorize-security-group-ingress \
+            --group-id "$SG_ID" \
+            --protocol tcp \
+            --port 22 \
+            --cidr "$RUNNER_IP/32" || echo "✅ Rule may already exist, continuing..."
+
+          echo "⏳ Waiting 10s for SG rule to propagate..."
+          sleep 10
+
+          for i in {1..5}; do
+            if nc -zv ${{ secrets.EC2_HOST }} 22 -w 5 2>/dev/null; then
+              echo "✅ Port 22 is reachable"
+              break
+            fi
+            echo "Attempt $i failed, retrying in 5s..."
+            sleep 5
+          done
+
+      - name: 🚀 Deploy via SSH (staging)
+        uses: appleboy/ssh-action@v1.2.3
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.MEDIA_AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.MEDIA_AWS_SECRET_ACCESS_KEY }}
+          AWS_S3_BUCKET: ${{ secrets.STAGING_MEDIA_S3_BUCKET }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          RAZORPAY_KEY_ID: ${{ secrets.RAZORPAY_KEY_ID }}
+          RAZORPAY_KEY_SECRET: ${{ secrets.RAZORPAY_KEY_SECRET }}
+          PIAPI_API_KEY: ${{ secrets.PIAPI_API_KEY }}
+          STAGING_PORT: "3002"
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          command_timeout: 3600s
+          envs: AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY,AWS_S3_BUCKET,AWS_REGION,RAZORPAY_KEY_ID,RAZORPAY_KEY_SECRET,PIAPI_API_KEY,STAGING_PORT
+          script: |
+            set -e
+
+            BASE_DIR=$HOME/deployments-staging
+            CURRENT_LINK=$HOME/Mantram-staging
+            TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+            RELEASE_DIR=$BASE_DIR/$TIMESTAMP
+
+            echo "📦 Creating staging release: $TIMESTAMP"
+            mkdir -p $BASE_DIR
+            rm -rf $RELEASE_DIR
+
+            # 1. Clone staging branch
+            git clone --depth=1 -b staging https://github.com/Abhishekjohri1998/Mantram.git $RELEASE_DIR
+            mkdir -p $RELEASE_DIR/backend/logs
+
+            # 2. Restore .env from current staging or production as fallback
+            echo "🔐 Restoring .env file..."
+            if [ -f "$CURRENT_LINK/backend/.env" ]; then
+              cp "$CURRENT_LINK/backend/.env" "$RELEASE_DIR/backend/.env"
+            elif [ -f "$HOME/Mantram/backend/.env" ]; then
+              cp "$HOME/Mantram/backend/.env" "$RELEASE_DIR/backend/.env"
+              echo "⚠️ Used production .env as base — verify staging values!"
+            else
+              echo "❌ CRITICAL: .env file not found! Deployment will fail."
+              exit 1
+            fi
+
+            # Function to safely update or append .env vars
+            update_env_var() {
+              local key=$1
+              local value=$2
+              if grep -q "^$key=" "$RELEASE_DIR/backend/.env"; then
+                sed -i "s|^$key=.*|$key=$value|" "$RELEASE_DIR/backend/.env"
+              else
+                echo "$key=$value" >> "$RELEASE_DIR/backend/.env"
+              fi
+            }
+
+            # 2.1 Set staging-specific values
+            update_env_var "PORT" "3002"
+            update_env_var "NODE_ENV" "staging"
+            update_env_var "AWS_S3_BUCKET" "$AWS_S3_BUCKET"
+            update_env_var "AWS_ACCESS_KEY_ID" "$AWS_ACCESS_KEY_ID"
+            update_env_var "AWS_SECRET_ACCESS_KEY" "$AWS_SECRET_ACCESS_KEY"
+            update_env_var "AWS_REGION" "$AWS_REGION"
+            update_env_var "FRONTEND_URL" "https://staging.mantram.ai,https://d2wj8dsljyx28w.cloudfront.net"
+
+            # 2.2 Inject Razorpay & PiAPI
+            [ ! -z "$RAZORPAY_KEY_ID" ] && update_env_var "RAZORPAY_KEY_ID" "$RAZORPAY_KEY_ID"
+            [ ! -z "$RAZORPAY_KEY_SECRET" ] && update_env_var "RAZORPAY_KEY_SECRET" "$RAZORPAY_KEY_SECRET"
+            [ ! -z "$PIAPI_API_KEY" ] && update_env_var "PIAPI_API_KEY" "$PIAPI_API_KEY"
+
+            echo "🌐 Staging CORS origins:"
+            grep "FRONTEND_URL" "$RELEASE_DIR/backend/.env"
+
+            # 3. Install dependencies
+            echo "📦 Installing backend dependencies..."
+            cd $RELEASE_DIR/backend
+            PUPPETEER_SKIP_DOWNLOAD=true npm ci --omit=dev --no-audit --no-fund --loglevel=error
+
+            # 4. Atomic Symlink Switch
+            echo "🔗 Switching symlink..."
+            if [ ! -L "$CURRENT_LINK" ] && [ -d "$CURRENT_LINK" ]; then
+              mv "$CURRENT_LINK" "${CURRENT_LINK}_old"
+            fi
+            ln -sfn $RELEASE_DIR $CURRENT_LINK
+
+            # 5. Restart PM2 (staging process)
+            echo "🔄 Restarting staging backend..."
+            cd $CURRENT_LINK
+
+            pm2 delete mantram-staging || true
+            NODE_OPTIONS="--max-old-space-size=2048" pm2 start backend/deploy/ecosystem.config.cjs \
+              --name mantram-staging \
+              --update-env
+            pm2 save
+
+            # 6. Health Check on port 3002
+            echo "🏥 Health check on port 3002..."
+            success=false
+            for i in {1..60}; do
+              echo "Attempt $i: Checking http://127.0.0.1:3002/api/health"
+              if curl -sf http://127.0.0.1:3002/api/health; then
+                echo "✅ Staging backend is UP"
+                success=true
+                break
+              fi
+              sleep 5
+            done
+
+            if [ "$success" = false ]; then
+              echo "❌ Staging health check failed! PM2 Logs:"
+              pm2 logs mantram-staging --lines 50 --no-daemon --raw & sleep 10 && kill $!
+              exit 1
+            fi
+
+            # 7. Cleanup old staging releases (keep last 3)
+            cd $BASE_DIR
+            ls -1t | tail -n +4 | xargs rm -rf || true
+            echo "🧹 Old staging releases cleaned up"
+
+      - name: 🔒 Revoke Runner IP (Cleanup)
+        if: always()
+        run: |
+          aws ec2 revoke-security-group-ingress \
+            --group-id ${{ secrets.AWS_SECURITY_GROUP_ID }} \
+            --protocol tcp \
+            --port 22 \
+            --cidr ${{ steps.ip.outputs.ipv4 }}/32 || echo "Rule already removed"
