@@ -35,6 +35,172 @@ setInterval(() => {
     }
 }, 2 * 60 * 1000);
 
+async function internalGenerateCreative({ body, user, creditsDeducted, jobId, progressId }) {
+    try {
+        const { brandId, type, prompt, options } = body;
+        
+        let agenticMeta = { mcotEnabled: true }; 
+
+        if (progressId) {
+            await addStep(progressId, { agent: 'intel', message: 'Analyzing brand DNA...', status: 'working' });
+        }
+
+        const brand = await Brand.findById(brandId);
+        if (!brand) throw new Error('Brand not found');
+
+        let pipelineResult;
+        try {
+            pipelineResult = await runCreativePipeline({
+                brandId,
+                brief: prompt,
+                type: type || 'instagram-post',
+                options: options || {},
+                emit: async (agent, message, status, detail) => {
+                    if (progressId) {
+                        await addStep(progressId, { agent, message, status, detail });
+                    }
+                }
+            });
+            agenticMeta = {
+                ...agenticMeta,
+                ...pipelineResult,
+                pipelineRan: true
+            };
+        } catch (pipelineErr) {
+            console.error('Agentic Pipeline failed, falling back to raw prompt:', pipelineErr.message);
+            agenticMeta.pipelineError = pipelineErr.message;
+        }
+
+        const fullPrompt = agenticMeta.engineeredPrompt?.totalPrompt || prompt;
+        const selectedImageModel = (options?.imageModel || 'nanobanana-2').toLowerCase();
+        const aspectRatio = options?.aspectRatio || '1:1';
+        const imageSize = options?.imageSize || '1K';
+        const customSize = options?.customSize || null;
+
+        if (progressId) {
+            await addStep(progressId, { agent: 'generating', message: `Generating using ${selectedImageModel}...`, status: 'working' });
+        }
+
+        const result = await routedImageGenerate(
+            fullPrompt,
+            [], // imageParts
+            0.4, // temperature
+            aspectRatio,
+            imageSize,
+            selectedImageModel,
+            [], // refImageUrls
+            customSize
+        );
+
+        if (result.modelBusy) {
+            throw new Error('AI model servers are busy. Please try again soon.');
+        }
+
+        const rawImageUrl = result.imageUrl || '';
+        if (!rawImageUrl) {
+            throw new Error('Image generation produced no image');
+        }
+
+        const creative = await Creative.create({
+            user: user._id,
+            brand: brandId,
+            type: type || 'instagram-post',
+            title: result.title || '',
+            prompt,
+            imageUrl: rawImageUrl,
+            thumbnailUrl: result.thumbnailUrl || rawImageUrl,
+            dimensions: result.dimensions || {},
+            designData: result.designData || {},
+            aiMeta: { ...result.aiMeta || {}, processingStatus: 'uploading' },
+            ...(agenticMeta?.copy ? { copy: agenticMeta.copy } : {}),
+        });
+
+        if (jobId) {
+            await GenerationJob.findOneAndUpdate(
+                { jobId },
+                { 
+                    status: 'completed', 
+                    completedAt: new Date(), 
+                    creativeId: creative._id,
+                    imageUrl: creative.imageUrl,
+                    result: { creative, warnings: result.warnings || [] }
+                }
+            ).catch(() => {});
+        }
+
+        user.updateOne({ $inc: { 'usage.creativesGenerated': 1 } }).catch(() => {});
+
+        if (progressId) {
+            await addStep(progressId, { agent: 'generating', message: 'Image created successfully!', status: 'done' });
+            await addStep(progressId, { agent: 'complete', message: 'Creative ready!', status: 'done' });
+            endProgress(progressId);
+        }
+
+        // BACKGROUND POST-PROCESSING
+        (async () => {
+            try {
+                let finalUrl = rawImageUrl;
+                const ts = Date.now();
+
+                if (finalUrl.startsWith('data:image/')) {
+                    try {
+                        finalUrl = await uploadToS3(finalUrl, `creatives/${brandId}/${ts}.png`);
+                    } catch (s3Err) {
+                        console.error('[BG-S3] Upload failed:', s3Err.message);
+                    }
+                }
+
+                if (options?.addLogo && finalUrl) {
+                    try {
+                        const brandData = await Brand.findById(brandId).lean();
+                        const logoUrl = brandData?.dna?.logo?.url;
+                        if (logoUrl) {
+                            const [imageBuffer, logoBuffer] = await Promise.all([
+                                fetchImageBuffer(finalUrl),
+                                fetchImageBuffer(logoUrl),
+                            ]);
+                            if (imageBuffer && logoBuffer) {
+                                const compositedBuffer = await overlayLogo(
+                                    imageBuffer, logoBuffer,
+                                    options.logoPosition || 'bottom-right',
+                                    options.logoSize || 'medium'
+                                );
+                                const compositedBase64 = `data:image/png;base64,${compositedBuffer.toString('base64')}`;
+                                try {
+                                    finalUrl = await uploadToS3(compositedBase64, `creatives/${brandId}/${ts}-logo.png`);
+                                } catch (s3Err) {
+                                    console.warn('[BG-LOGO] S3 re-upload failed:', s3Err.message);
+                                }
+                            }
+                        }
+                    } catch (logoErr) {
+                        console.warn('[BG-LOGO] Overlay failed:', logoErr.message);
+                    }
+                }
+
+                if (finalUrl !== rawImageUrl) {
+                    await Creative.updateOne(
+                        { _id: creative._id },
+                        { $set: { imageUrl: finalUrl, thumbnailUrl: finalUrl, 'aiMeta.processingStatus': 'ready' } }
+                    );
+                } else {
+                    await Creative.updateOne(
+                        { _id: creative._id },
+                        { $set: { 'aiMeta.processingStatus': 'ready' } }
+                    );
+                }
+            } catch (bgErr) {
+                console.error('[BG] error:', bgErr.message);
+            }
+        })();
+
+        return { success: true, creative, warnings: result.warnings || [] };
+    } catch (error) {
+        console.error('❌ internalGenerateCreative Error:', error.message);
+        throw error;
+    }
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 
 /**
@@ -42,7 +208,7 @@ setInterval(() => {
  * Makes an internal server-side fetch to the existing /generate endpoint so all
  * pipeline logic (agents, MCoT, logo overlay, S3, etc.) is fully reused.
  */
-async function runCreativeJobAsync(jobId, userId, payload, authToken) {
+async function runCreativeJobAsync(jobId, userId, payload) {
     try {
         await GenerationJob.findOneAndUpdate(
             { jobId },
@@ -50,28 +216,18 @@ async function runCreativeJobAsync(jobId, userId, payload, authToken) {
         );
 
         const { brandId, type, prompt, options, creditsDeducted } = payload;
+        
+        // Find the user object needed for internalGenerateCreative
+        const user = await mongoose.model('User').findById(userId);
+        if (!user) throw new Error('User not found for background job');
 
-        // Determine the internal API base URL
-        const port = process.env.PORT || 3001;
-        const internalBase = `http://localhost:${port}/api`;
-
-        // Make an internal server-to-server call to the existing generate endpoint.
-        // We pass the user's auth token so the protect middleware authenticates correctly.
-        // We also skip credit deduction by adding a special bypass header (credits were
-        // already deducted when POST /jobs was called).
-        const resp = await fetch(`${internalBase}/creatives/generate`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${authToken}`,
-                'X-Job-Id': jobId,               // Job ID for logging
-                'X-Skip-Credits': 'true',         // Credits already deducted
-            },
-            body: JSON.stringify({ brandId, type, prompt, options, jobId }),
-            signal: AbortSignal.timeout(300000), // 5 min max
+        // Call the internal generation logic directly (bypassing HTTP overhead)
+        const data = await internalGenerateCreative({
+            body: { brandId, type, prompt, options, jobId },
+            user,
+            creditsDeducted: creditsDeducted || 0,
+            jobId
         });
-
-        const data = await resp.json();
 
         if (data?.success && data?.creative) {
             await GenerationJob.findOneAndUpdate(
@@ -475,7 +631,7 @@ async function falImageGenerate(promptText, endpoint, aspectRatio = '1:1', custo
         console.log(`⏳ fal.ai queued: ${data.request_id}, polling...`);
         const resultUrl = `https://queue.fal.run/${endpoint}/requests/${data.request_id}`;
         for (let i = 0; i < 30; i++) {
-            await new Promise(r => setTimeout(r, 3000));
+            await new Promise(r => setTimeout(r, 1000));
             try {
                 const pollResp = await fetch(resultUrl, {
                     headers: { 'Authorization': `Key ${falKey}` },
@@ -1236,9 +1392,41 @@ No markdown, no explanation.`;
 
 
 // ══════════════════════════════════════════════════════════════════════════════
-// POST /api/creatives/generate
-
+// POST /api/creatives/generate — Optimized Agentic Image Generation
+// ══════════════════════════════════════════════════════════════════════════════
 router.post('/generate', protect, requireStudio('creativeStudio'), requireCredits('creative'), async (req, res) => {
+    try {
+        const jobId = req.body.jobId || req.headers['x-job-id'];
+        const result = await internalGenerateCreative({
+            body: req.body,
+            user: req.user,
+            creditsDeducted: req.creditsDeducted,
+            jobId
+        });
+        res.json(result);
+    } catch (error) {
+        console.error('❌ /generate error:', error);
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// POST /api/creatives/lifestyle-mockup — Optimized Mockup Generation
+// ══════════════════════════════════════════════════════════════════════════════
+router.post('/lifestyle-mockup', protect, requireStudio('creativeStudio'), requireCredits('creative'), async (req, res) => {
+    try {
+        const result = await internalGenerateCreative({
+            body: { ...req.body, type: 'lifestyle-mockup' },
+            user: req.user,
+            creditsDeducted: req.creditsDeducted
+        });
+        res.json(result);
+    } catch (error) {
+        console.error('❌ /lifestyle-mockup error:', error);
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
     try {
         const { brandId, type, prompt, options, jobId: bodyJobId } = req.body;
         const jobId = bodyJobId || req.headers['x-job-id'];
@@ -3183,7 +3371,7 @@ STRICT RULES: No text, no people, no faces, no products, no logos, no watermarks
                     panoBuf = await toBuffer(panoramicResult.imageUrl, 30000);
                 } catch(fetchErr) {
                     console.warn(`   ⚠️ Panoramic fetch failed, retrying in 3s... (${fetchErr.message})`);
-                    await new Promise(r => setTimeout(r, 3000));
+                    await new Promise(r => setTimeout(r, 1000));
                     panoBuf = await toBuffer(panoramicResult.imageUrl, 30000);
                 }
                 if (!panoBuf) throw new Error('Could not load panoramic buffer');

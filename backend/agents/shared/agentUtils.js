@@ -18,9 +18,14 @@ import { resolveTargetMarkets, getMarketContext, getRelevantFestivals } from '..
  */
 export async function callAgent(systemPrompt, userPrompt, temperature = 0.7, maxTokens = 4096) {
     const router = getRouter();
+    // Safety: Truncate extremely long prompts to prevent context overflow / max token errors
+    const MAX_INPUT_CHARS = 100000; // ~25k tokens safety limit
+    const safeSystem = systemPrompt.length > MAX_INPUT_CHARS ? systemPrompt.substring(0, MAX_INPUT_CHARS) + '... [truncated]' : systemPrompt;
+    const safeUser = userPrompt.length > MAX_INPUT_CHARS ? userPrompt.substring(0, MAX_INPUT_CHARS) + '... [truncated]' : userPrompt;
+
     const result = await router.generateText({
-        systemPrompt,
-        userPrompt,
+        systemPrompt: safeSystem,
+        userPrompt: safeUser,
         temperature,
         maxTokens,
     }); // Router auto-selects cheapest provider
@@ -125,9 +130,15 @@ export async function callAgent(systemPrompt, userPrompt, temperature = 0.7, max
  */
 export async function callAgentText(systemPrompt, userPrompt, temperature = 0.7, maxTokens = 4096) {
     const router = getRouter();
+
+    // Safety: Truncate extremely long prompts
+    const MAX_INPUT_CHARS = 100000;
+    const safeSystem = systemPrompt.length > MAX_INPUT_CHARS ? systemPrompt.substring(0, MAX_INPUT_CHARS) + '... [truncated]' : systemPrompt;
+    const safeUser = userPrompt.length > MAX_INPUT_CHARS ? userPrompt.substring(0, MAX_INPUT_CHARS) + '... [truncated]' : userPrompt;
+
     const result = await router.generateText({
-        systemPrompt,
-        userPrompt,
+        systemPrompt: safeSystem,
+        userPrompt: safeUser,
         temperature,
         maxTokens,
     }); // Router auto-selects cheapest provider
@@ -234,7 +245,14 @@ export function buildBrandContext(brand, products = []) {
         parts.push('');
         parts.push('=== PRODUCT CATALOG ===');
         const maxProducts = Math.min(products.length, 15);
+        const MAX_PRODUCT_CHARS = 4000;
+        let productTotalChars = 0;
+
         for (let i = 0; i < maxProducts; i++) {
+            if (productTotalChars >= MAX_PRODUCT_CHARS) {
+                parts.push(`... and ${maxProducts - i} more products (truncated to save context)`);
+                break;
+            }
             const p = products[i];
             const pParts = [`• ${p.title}`];
             if (p.category) pParts.push(`Category: ${p.category}${p.subCategory ? ` > ${p.subCategory}` : ''}`);
@@ -244,9 +262,12 @@ export function buildBrandContext(brand, products = []) {
             if (p.features?.length) pParts.push(`Features: ${p.features.slice(0, 5).join(', ')}`);
             if (p.keywords?.length) pParts.push(`Keywords: ${p.keywords.slice(0, 5).join(', ')}`);
             if (p.tags?.length) pParts.push(`Tags: ${p.tags.slice(0, 5).join(', ')}`);
-            parts.push(pParts.join(' | '));
+            
+            const productLine = pParts.join(' | ');
+            parts.push(productLine);
+            productTotalChars += productLine.length;
         }
-        if (products.length > maxProducts) {
+        if (products.length > maxProducts && productTotalChars < MAX_PRODUCT_CHARS) {
             parts.push(`... and ${products.length - maxProducts} more products`);
         }
     }

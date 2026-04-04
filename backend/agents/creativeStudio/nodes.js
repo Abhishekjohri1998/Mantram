@@ -969,95 +969,48 @@ export async function runCreativePipeline(params) {
     const productName = state.matchedProduct?.title || '';
     emit('brand-intel', productName ? `Matched product: ${productName}` : 'Brand context loaded', 'done', productName ? `Using "${productName}" as hero product` : '');
 
-    // ── MCoT: Visual Grounding — analyze product/brand images before generation ──
-    // This is the key MCoT Stage 1: AI "sees" real images and produces a visual rationale
-    // that prevents product hallucination in downstream prompt engineering
-    emit('visual-grounding', 'Analyzing product visuals (MCoT)...', 'working');
-    state = await visualGroundingNode(state);
-    if (state.visualGrounding) {
-        emit('visual-grounding', `Visual analysis: ${state.visualGrounding.confidence || 'done'}`, 'done', state.visualGrounding.productAnalysis?.substring(0, 60) || '');
-    } else {
-        emit('visual-grounding', 'No product images — skipped', 'done');
-    }
+    // ── STEP 1: Parallel Node Execution (Visual Grounding + Art/Director + Copywriter) ──
+    // We run independent agents in parallel to drastically reduce pipeline latency.
+    const nodePromises = [];
 
-    // ── Copywriter result — runs BEFORE image prompt is finalized ──
-    // When generateCopy is ON, the copywriter generates headline/CTA first,
-    // then those texts are INJECTED into the image prompt so the AI model
-    // actually renders the copy on the generated image.
-    let copyResult = null;
+    // Promise 1: Visual Grounding (Multimodal MCoT)
+    const visualGroundingTask = (async () => {
+        emit('visual-grounding', 'Analyzing product visuals (MCoT)...', 'working');
+        const updatedState = await visualGroundingNode(state);
+        state.visualGrounding = updatedState.visualGrounding;
+        if (state.visualGrounding) {
+            emit('visual-grounding', `Visual analysis: ${state.visualGrounding.confidence || 'done'}`, 'done', state.visualGrounding.productAnalysis?.substring(0, 60) || '');
+        } else {
+            emit('visual-grounding', 'No product images — skipped', 'done');
+        }
+    })();
+    nodePromises.push(visualGroundingTask);
 
+    // Promise 2: Creative Vision (Fast vs Quality)
+    let creativeVisionTask;
     if (mode === 'fast') {
-        // ══════════════════════════════════════════════════════════════════
-        // FAST MODE: Single LLM call — Art Director + Prompt Engineer combined
-        // Saves ~10-15s by eliminating the second round-trip
-        // ══════════════════════════════════════════════════════════════════
-        emit('art-director', 'Creative Director crafting vision & prompt...', 'working');
-        state = await fastCreativeDirectorNode(state);
-        emit('art-director', `Direction: ${state.artDirection?.mood || 'defined'}`, 'done', state.artDirection?.visualStyle || '');
-        state.finalPrompt = state.engineeredPrompt?.primaryPrompt || brief;
-
-        // ── MCoT: Inject visual grounding rationale into the prompt ──
-        if (state.visualGrounding?.generationGuidance) {
-            const vg = state.visualGrounding;
-            const groundingInjection = [
-                `\nVISUAL GROUNDING (from real product/brand photos):`,
-                vg.productAnalysis ? `Product: ${vg.productAnalysis}` : '',
-                vg.colorPalette?.length > 0 ? `Accurate colors: ${vg.colorPalette.join(', ')}` : '',
-                vg.materialFinish ? `Material: ${vg.materialFinish}` : '',
-                vg.generationGuidance ? `CRITICAL: ${vg.generationGuidance}` : '',
-                vg.avoidList?.length > 0 ? `DO NOT: ${vg.avoidList.join('; ')}` : '',
-            ].filter(Boolean).join('\n');
-            state.finalPrompt = state.finalPrompt + '\n' + groundingInjection;
-            console.log(`🧠 MCoT: Visual grounding rationale injected into prompt`);
-        }
-
-        // ── Run copywriter BEFORE finalizing prompt (so copy goes INTO the image) ──
-        if (generateCopy) {
-            if (hasCustomCopy) {
-                // User provided their own text — use it directly, skip AI copywriter
-                copyResult = {
-                    headline: customCopy.headline || '',
-                    subtext: null,
-                    ctaText: customCopy.ctaText || null,
-                    textStyle: 'bold, high-contrast typography matching brand style',
-                    designRationale: 'User-specified custom copy',
-                };
-                emit('copywriter', `Custom text: "${copyResult.headline}"`, 'done');
-                console.log(`✍️  Using custom copy: "${copyResult.headline}" | CTA: "${copyResult.ctaText || 'none'}"`);
-            } else {
-                emit('copywriter', 'Copywriter crafting brand copy...', 'working');
-                try {
-                    const copyState = await copywriterNode(state);
-                    copyResult = copyState.copy || null;
-                    if (copyResult) {
-                        emit('copywriter', `Copy ready: "${copyResult.headline || ''}"`, 'done');
-                    }
-                } catch (err) {
-                    console.warn('✍️  Copywriter failed (non-critical):', err.message);
-                    emit('copywriter', 'Copy generation skipped', 'done');
-                }
-            }
-            // ── INJECT copy text into the image prompt ──
-            if (copyResult) {
-                const copyInjection = buildCopyInjection(copyResult);
-                if (copyInjection) {
-                    state.finalPrompt = state.finalPrompt + '\n\n' + copyInjection;
-                    console.log(`✍️  Copy injected into image prompt: "${copyResult.headline}" | CTA: "${copyResult.ctaText}"`);
-                }
-            }
-        }
+        creativeVisionTask = (async () => {
+            emit('art-director', 'Creative Director crafting vision & prompt...', 'working');
+            const updatedState = await fastCreativeDirectorNode(state);
+            state.artDirection = updatedState.artDirection;
+            state.engineeredPrompt = updatedState.engineeredPrompt;
+            emit('art-director', `Direction: ${state.artDirection?.mood || 'defined'}`, 'done', state.artDirection?.visualStyle || '');
+        })();
     } else {
-        // ══════════════════════════════════════════════════════════════════
-        // QUALITY MODE: Sequential agents for maximum quality
-        // ══════════════════════════════════════════════════════════════════
-        emit('art-director', 'Art Director crafting creative vision...', 'working');
-        state = await artDirectorNode(state);
-        emit('art-director', `Creative direction: ${state.artDirection?.mood || 'defined'}`, 'done', state.artDirection?.visualStyle || '');
+        creativeVisionTask = (async () => {
+            emit('art-director', 'Art Director crafting creative vision...', 'working');
+            const updatedState = await artDirectorNode(state);
+            state.artDirection = updatedState.artDirection;
+            emit('art-director', `Creative direction: ${state.artDirection?.mood || 'defined'}`, 'done', state.artDirection?.visualStyle || '');
+        })();
+    }
+    nodePromises.push(creativeVisionTask);
 
-        // ── Run copywriter BEFORE prompt engineering (so copy informs the prompt) ──
+    // Promise 3: Copywriter (AI vs Custom)
+    let copyResult = null;
+    const copywriterPromise = (async () => {
         if (generateCopy) {
             if (hasCustomCopy) {
-                // User provided their own text — use it directly, skip AI copywriter
                 copyResult = {
                     headline: customCopy.headline || '',
                     subtext: null,
@@ -1066,7 +1019,6 @@ export async function runCreativePipeline(params) {
                     designRationale: 'User-specified custom copy',
                 };
                 emit('copywriter', `Custom text: "${copyResult.headline}"`, 'done');
-                console.log(`✍️  Using custom copy (quality mode): "${copyResult.headline}" | CTA: "${copyResult.ctaText || 'none'}"`);
             } else {
                 emit('copywriter', 'Copywriter crafting brand copy...', 'working');
                 try {
@@ -1081,41 +1033,51 @@ export async function runCreativePipeline(params) {
                 }
             }
         }
+    })();
+    nodePromises.push(copywriterPromise);
 
+    // Wait for the parallel initial block to finish
+    await Promise.all(nodePromises);
+
+    // ── STEP 2: Sequential Refinement (Quality Mode Only) ──
+    if (mode !== 'fast') {
         emit('prompt-engineer', 'Prompt Engineer optimizing for image model...', 'working');
-        state = await promptEngineerNode(state);
+        state = await promptEngineerNode(state); // Now state has artDirection from parallel step
         emit('prompt-engineer', 'Prompt optimized for maximum quality', 'done');
 
         emit('style-critic', 'Style Critic reviewing brand alignment...', 'working');
         state = await styleCriticNode(state);
         emit('style-critic', 'Brand alignment verified', 'done');
+    }
 
-        state.finalPrompt = state.styleCritique?.improvedPrompt || state.engineeredPrompt?.primaryPrompt || brief;
+    // ── STEP 3: Finalize Prompt with MCoT Grounding + Copy Injection ──
+    state.finalPrompt = mode === 'fast' 
+        ? (state.engineeredPrompt?.primaryPrompt || brief)
+        : (state.styleCritique?.improvedPrompt || state.engineeredPrompt?.primaryPrompt || brief);
 
-        // ── MCoT: Inject visual grounding rationale into the prompt (Quality Mode) ──
-        if (state.visualGrounding?.generationGuidance) {
-            const vg = state.visualGrounding;
-            const groundingInjection = [
-                `\nVISUAL GROUNDING (from real product/brand photos):`,
-                vg.productAnalysis ? `Product: ${vg.productAnalysis}` : '',
-                vg.colorPalette?.length > 0 ? `Accurate colors: ${vg.colorPalette.join(', ')}` : '',
-                vg.materialFinish ? `Material: ${vg.materialFinish}` : '',
-                vg.generationGuidance ? `CRITICAL: ${vg.generationGuidance}` : '',
-                vg.avoidList?.length > 0 ? `DO NOT: ${vg.avoidList.join('; ')}` : '',
-            ].filter(Boolean).join('\n');
-            state.finalPrompt = state.finalPrompt + '\n' + groundingInjection;
-            console.log(`🧠 MCoT: Visual grounding rationale injected into prompt (quality mode)`);
-        }
+    // Inject Visual Grounding rationale (MCoT Stage 2)
+    if (state.visualGrounding?.generationGuidance) {
+        const vg = state.visualGrounding;
+        const groundingInjection = [
+            `\nVISUAL GROUNDING (from real product/brand photos):`,
+            vg.productAnalysis ? `Product: ${vg.productAnalysis}` : '',
+            vg.colorPalette?.length > 0 ? `Accurate colors: ${vg.colorPalette.join(', ')}` : '',
+            vg.materialFinish ? `Material: ${vg.materialFinish}` : '',
+            vg.generationGuidance ? `CRITICAL: ${vg.generationGuidance}` : '',
+            vg.avoidList?.length > 0 ? `DO NOT: ${vg.avoidList.join('; ')}` : '',
+        ].filter(Boolean).join('\n');
+        state.finalPrompt = state.finalPrompt + '\n' + groundingInjection;
+        console.log(`🧠 MCoT: Visual grounding rationale injected into prompt`);
+    }
 
-        // ── INJECT copy text into the final image prompt ──
-        if (copyResult) {
-            const copyInjection = buildCopyInjection(copyResult);
-            if (copyInjection) {
-                state.finalPrompt = state.finalPrompt + '\n\n' + copyInjection;
-                console.log(`✍️  Copy injected into image prompt: "${copyResult.headline}" | CTA: "${copyResult.cta}"`);
-            }
+    // Inject Copy Rendering instructions
+    if (copyResult) {
+        const copyInjection = buildCopyInjection(copyResult);
+        if (copyInjection) {
+            state.finalPrompt = state.finalPrompt + '\n\n' + copyInjection;
         }
     }
+
 
     const totalMs = Date.now() - pipelineStart;
     console.log(`══════════ PIPELINE COMPLETE (${totalMs}ms)${copyResult ? ' — copy included & injected' : ''} ══════════\n`);
