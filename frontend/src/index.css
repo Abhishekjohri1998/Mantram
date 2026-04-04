@@ -114,12 +114,11 @@
     text-rendering: optimizeLegibility;
     font-feature-settings: 'liga';
     
-    /* Prevent icon names from showing before font loads (FOUC) */
+    /* ── Definitive FOUC Fix: Hide text, show icon via shadow ── */
     font-display: block !important;
     user-select: none;
-    width: 1em;
-    height: 1em;
-    overflow: hidden;
+    color: transparent !important;
+    text-shadow: 0 0 0 white; /* This renders the icon glyph while 'color: transparent' hides the text word */
   }
 
   .glass-panel-hover:hover {
