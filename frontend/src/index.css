@@ -113,6 +113,13 @@
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
     font-feature-settings: 'liga';
+    
+    /* Prevent icon names from showing before font loads (FOUC) */
+    font-display: block !important;
+    user-select: none;
+    width: 1em;
+    height: 1em;
+    overflow: hidden;
   }
 
   .glass-panel-hover:hover {
