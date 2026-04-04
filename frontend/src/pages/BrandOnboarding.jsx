@@ -835,12 +835,12 @@ function ReviewBrand({ brand, onFinish }) {
                     </span>
                 )}
                 {socialPlatforms > 0 && (
-                    <span className="px-3 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-medium flex items-center gap-1.5">
+                    <span className="px-3 py-1.5 rounded-full bg-[#FF4D00]/10 border border-[#FF4D00]/20 text-[#FF4D00] text-xs font-medium flex items-center gap-1.5">
                         <span className="material-symbols-outlined text-sm">share</span> {socialPlatforms} Social Profiles
                     </span>
                 )}
                 {hasVoice && (
-                    <span className="px-3 py-1.5 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-400 text-xs font-medium flex items-center gap-1.5">
+                    <span className="px-3 py-1.5 rounded-full bg-[#FF4D00]/10 border border-[#FF4D00]/20 text-[#FF4D00] text-xs font-medium flex items-center gap-1.5">
                         <span className="material-symbols-outlined text-sm">record_voice_over</span> Voice Analyzed
                     </span>
                 )}
@@ -994,7 +994,7 @@ function ReviewBrand({ brand, onFinish }) {
                     {/* Social Link Pills */}
                     <div className="flex flex-wrap gap-2 mb-5">
                         {Object.entries(socialLinks).filter(([, url]) => url).map(([platform, url]) => {
-                            const cfg = platformConfig[platform] || { icon: '🔗', label: platform, color: '#888' }
+                            const cfg = platformConfig[platform] || { icon: 'link', label: platform, color: '#888' }
                             return (
                                 <a key={platform} href={url} target="_blank" rel="noopener"
                                     className="flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all hover:scale-105"

@@ -11,10 +11,10 @@ import PublishModal from '../components/PublishModal'
 // ═══════════════════════════════════════════════════════════════
 
 const PLATFORM_META = {
-    instagram: { label: 'Instagram', icon: '📸', color: '#E1306C', gradient: 'from-pink-500 to-purple-600', ring: 'ring-pink-500/30' },
-    facebook: { label: 'Facebook', icon: '👥', color: '#1877F2', gradient: 'from-blue-500 to-indigo-600', ring: 'ring-blue-500/30' },
+    instagram: { label: 'Instagram', icon: '📸', color: '#E1306C', gradient: 'from-[#FF4D00] to-[#FF7A00]', ring: 'ring-pink-500/30' },
+    facebook: { label: 'Facebook', icon: '👥', color: '#1877F2', gradient: 'from-[#FF4D00] to-[#FF7A00]', ring: 'ring-[#FF4D00]/30' },
     twitter: { label: 'Twitter / X', icon: '𝕏', color: '#1DA1F2', gradient: 'from-slate-400 to-slate-600', ring: 'ring-slate-400/30' },
-    linkedin: { label: 'LinkedIn', icon: '💼', color: '#0A66C2', gradient: 'from-sky-500 to-blue-600', ring: 'ring-sky-500/30' },
+    linkedin: { label: 'LinkedIn', icon: '💼', color: '#0A66C2', gradient: 'from-sky-500 to-[#FF7A00]', ring: 'ring-sky-500/30' },
 }
 
 const typeIcons = {
@@ -128,11 +128,11 @@ export default function PublishSchedule() {
                     </div>
 
                     {/* Scheduled Stat */}
-                    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-violet-500/[0.08] to-violet-600/[0.03] border border-violet-500/10 p-5 group hover:border-violet-500/20 transition-all">
-                        <div className="absolute top-0 right-0 w-20 h-20 bg-violet-500/5 rounded-full -translate-y-1/2 translate-x-1/2 group-hover:scale-150 transition-transform duration-500" />
+                    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#FF4D00]/[0.08] to-[#FF7A00]/[0.03] border border-[#FF4D00]/10 p-5 group hover:border-[#FF4D00]/20 transition-all">
+                        <div className="absolute top-0 right-0 w-20 h-20 bg-[#FF4D00]/5 rounded-full -translate-y-1/2 translate-x-1/2 group-hover:scale-150 transition-transform duration-500" />
                         <div className="flex items-center gap-3 mb-3">
-                            <div className="w-10 h-10 rounded-xl bg-violet-500/15 flex items-center justify-center">
-                                <span className="material-symbols-outlined text-violet-400">schedule_send</span>
+                            <div className="w-10 h-10 rounded-xl bg-[#FF4D00]/15 flex items-center justify-center">
+                                <span className="material-symbols-outlined text-[#FF4D00]">schedule_send</span>
                             </div>
                             <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Scheduled</span>
                         </div>
@@ -212,7 +212,7 @@ export default function PublishSchedule() {
                                                 {/* Meta row */}
                                                 <div className="flex items-center gap-2 mb-2 flex-wrap">
                                                     <span className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-lg bg-gradient-to-r ${meta.gradient || 'from-primary to-primary-light'} text-white shadow-sm`}>
-                                                        {meta.icon || '📱'} {meta.label || post.platform}
+                                                        {meta.icon || 'smartphone'} {meta.label || post.platform}
                                                     </span>
                                                     <span className="text-xs text-slate-500 font-medium">{post.accountName}</span>
                                                     <span className="inline-flex items-center gap-0.5 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400">
@@ -263,32 +263,32 @@ export default function PublishSchedule() {
                                 const meta = PLATFORM_META[post.platform] || {}
                                 return (
                                     <div key={post._id}
-                                        className="group relative rounded-2xl bg-violet-500/[0.03] border border-violet-500/10 hover:border-violet-500/20 p-5 transition-all duration-200"
+                                        className="group relative rounded-2xl bg-[#FF4D00]/[0.03] border border-[#FF4D00]/10 hover:border-[#FF4D00]/20 p-5 transition-all duration-200"
                                         style={{ animation: `fadeInUp 0.4s ease-out ${idx * 60}ms both` }}>
 
-                                        <div className="absolute left-0 top-4 bottom-4 w-[3px] rounded-full bg-gradient-to-b from-violet-400 to-fuchsia-500 opacity-60" />
+                                        <div className="absolute left-0 top-4 bottom-4 w-[3px] rounded-full bg-gradient-to-b from-[#FF4D00] to-[#FF7A00] opacity-60" />
 
                                         <div className="flex items-start gap-4 pl-3">
                                             {post.imageUrl && (
-                                                <img src={post.imageUrl} alt="" className="w-16 h-16 rounded-xl object-cover flex-shrink-0 border border-violet-500/20" onError={e => e.target.style.display = 'none'} />
+                                                <img src={post.imageUrl} alt="" className="w-16 h-16 rounded-xl object-cover flex-shrink-0 border border-[#FF4D00]/20" onError={e => e.target.style.display = 'none'} />
                                             )}
 
                                             <div className="min-w-0 flex-1">
                                                 <div className="flex items-center gap-2 mb-2 flex-wrap">
                                                     <span className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-lg bg-gradient-to-r ${meta.gradient || 'from-primary to-primary-light'} text-white shadow-sm`}>
-                                                        {meta.icon || '📱'} {meta.label || post.platform}
+                                                        {meta.icon || 'smartphone'} {meta.label || post.platform}
                                                     </span>
                                                     <span className="text-xs text-slate-500 font-medium">{post.accountName}</span>
                                                     {/* Countdown badge */}
-                                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full bg-violet-500/15 text-violet-300 border border-violet-500/20">
+                                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full bg-[#FF4D00]/15 text-[#FF7A00] border border-[#FF4D00]/20">
                                                         <span className="material-symbols-outlined text-[12px]">timer</span>
                                                         {formatCountdown(post.scheduledFor)}
                                                     </span>
                                                 </div>
                                                 <p className="text-[13px] text-slate-300 line-clamp-2 whitespace-pre-wrap leading-relaxed">{post.caption?.substring(0, 250)}</p>
                                                 <div className="flex items-center gap-2 mt-2.5">
-                                                    <span className="material-symbols-outlined text-xs text-violet-400">event</span>
-                                                    <span className="text-[11px] text-violet-400 font-medium">
+                                                    <span className="material-symbols-outlined text-xs text-[#FF4D00]">event</span>
+                                                    <span className="text-[11px] text-[#FF4D00] font-medium">
                                                         {new Date(post.scheduledFor).toLocaleString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
                                                     </span>
                                                 </div>
@@ -386,7 +386,7 @@ export default function PublishSchedule() {
                                             <div className="min-w-0 flex-1">
                                                 <div className="flex items-center gap-2 mb-2 flex-wrap">
                                                     <span className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-lg bg-gradient-to-r ${meta.gradient || 'from-slate-500 to-slate-600'} text-white/80`}>
-                                                        {meta.icon || '📱'} {meta.label || post.platform}
+                                                        {meta.icon || 'smartphone'} {meta.label || post.platform}
                                                     </span>
                                                     <span className="text-xs text-slate-500">{post.accountName}</span>
                                                     <span className="inline-flex items-center gap-0.5 text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400">

@@ -12,7 +12,7 @@ const STUDIO_DATA = {
         name: 'Content Studio',
         tagline: 'AI-Powered Writing for Every Channel',
         icon: 'draw',
-        gradient: 'from-violet-500 to-purple-600',
+        gradient: 'from-[#FF4D00] to-[#FF7A00]',
         accentHex: '#8b5cf6',
         metaDesc: 'Generate brand-aligned blog posts, social captions, ad copy & emails with Mantram AI Content Studio. AI writing that sounds like you.',
         heroLine: 'What if every piece of content your brand publishes was perfectly aligned to your voice — written in seconds, not hours?',
@@ -32,7 +32,7 @@ const STUDIO_DATA = {
         name: 'Creative Studio',
         tagline: 'Design That Scales with AI',
         icon: 'auto_fix_high',
-        gradient: 'from-pink-500 to-rose-600',
+        gradient: 'from-[#FF4D00] to-rose-600',
         accentHex: '#ec4899',
         metaDesc: 'Design social posts, banners, ads & AI photoshoots with brand consistency using Mantram AI Creative Studio.',
         heroLine: 'What if every visual your brand produces maintains pixel-perfect brand consistency — without a design team?',
@@ -92,7 +92,7 @@ const STUDIO_DATA = {
         name: 'SEO Studio',
         tagline: 'AI-Powered Search Intelligence',
         icon: 'query_stats',
-        gradient: 'from-blue-500 to-indigo-600',
+        gradient: 'from-[#FF4D00] to-[#FF7A00]',
         accentHex: '#3b82f6',
         metaDesc: 'AI keyword research, site audits, content gap analysis & competitive intelligence with Mantram AI SEO Studio.',
         heroLine: 'What if your SEO strategy was powered by AI that understands search intent, competitor gaps & ranking opportunities?',
@@ -132,7 +132,7 @@ const STUDIO_DATA = {
         name: 'Conversation Studio',
         tagline: 'AI Auto-Responder for Social DMs',
         icon: 'forum',
-        gradient: 'from-fuchsia-500 to-pink-600',
+        gradient: 'from-[#FF4D00] to-[#FF7A00]',
         accentHex: '#d946ef',
         metaDesc: 'AI auto-responder for Instagram & Facebook DMs. Route leads, answer FAQs & never miss a message with Mantram AI.',
         heroLine: 'What if every DM your brand receives gets an intelligent, on-brand response — instantly, 24/7, without human intervention?',
@@ -192,7 +192,7 @@ const STUDIO_DATA = {
         name: 'Analytics',
         tagline: 'Traffic Intelligence & Growth Insights',
         icon: 'analytics',
-        gradient: 'from-indigo-500 to-violet-600',
+        gradient: 'from-[#FF4D00] to-[#FF7A00]',
         accentHex: '#6366f1',
         metaDesc: 'AI-powered traffic analytics, audience insights, Google Analytics integration & growth strategies with Mantram AI.',
         heroLine: 'What if your analytics dashboard didn\'t just show numbers — but told you exactly what to do next to grow faster?',
@@ -232,7 +232,7 @@ const STUDIO_DATA = {
         name: 'Fidato',
         tagline: 'Your AI Brand OS Concierge',
         icon: 'smart_toy',
-        gradient: 'from-sky-500 to-blue-600',
+        gradient: 'from-sky-500 to-[#FF7A00]',
         accentHex: '#0ea5e9',
         metaDesc: 'Meet Fidato — your personal AI marketing assistant. One command bar to orchestrate all 12 studios. Mantram AI.',
         heroLine: 'What if one intelligent command could orchestrate your entire marketing stack — content, creative, video, ads, SEO — all at once?',
@@ -349,7 +349,7 @@ export default function StudioPreview() {
                         <div className="flex items-center gap-3">
                             <Link to="/" className="text-slate-400 hover:text-white text-sm font-medium transition-colors">← All Studios</Link>
                             <button onClick={() => document.getElementById('studio-cta')?.scrollIntoView({ behavior: 'smooth' })}
-                                className="bg-gradient-to-r from-violet-600 to-primary hover:from-violet-500 hover:to-primary-light text-white text-sm font-bold py-2.5 px-6 rounded-full transition-all transform hover:scale-105 active:scale-95 shadow-lg shadow-violet-500/20 cursor-pointer"
+                                className="bg-gradient-to-r from-[#FF4D00] to-primary hover:from-[#FF4D00] hover:to-primary-light text-white text-sm font-bold py-2.5 px-6 rounded-full transition-all transform hover:scale-105 active:scale-95 shadow-lg shadow-[#FF4D00]/20 cursor-pointer"
                                 aria-label="Scroll to early access signup">
                                 Get Early Access
                             </button>
@@ -442,7 +442,7 @@ export default function StudioPreview() {
                                         aria-label="Email address for early access"
                                         className="flex-1 px-5 py-3.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm focus:border-primary focus:outline-none placeholder:text-slate-600" />
                                     <button type="submit"
-                                        className="bg-gradient-to-r from-violet-600 to-primary hover:from-violet-500 hover:to-primary-light text-white font-bold py-3.5 px-7 rounded-xl transition-all transform hover:scale-105 active:scale-95 shadow-lg shadow-violet-500/20 cursor-pointer text-sm whitespace-nowrap">
+                                        className="bg-gradient-to-r from-[#FF4D00] to-primary hover:from-[#FF4D00] hover:to-primary-light text-white font-bold py-3.5 px-7 rounded-xl transition-all transform hover:scale-105 active:scale-95 shadow-lg shadow-[#FF4D00]/20 cursor-pointer text-sm whitespace-nowrap">
                                         Get Access
                                     </button>
                                 </form>

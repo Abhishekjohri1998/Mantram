@@ -13,7 +13,7 @@ const STUDIO_CONTENT = [
     {
         icon: 'draw',
         title: 'AI Content Studio',
-        color: '#8b5cf6',
+        color: '#FF4D00',
         content: 'Mantram AI Content Studio is an intelligent writing engine that crafts blog posts, social media captions, ad copy, email campaigns, press releases, and product descriptions — all perfectly aligned to your brand voice. Powered by multi-model AI (Gemini, Claude, GPT-4o), the studio analyzes your Brand DNA to ensure every piece of content carries your unique tone, terminology, and messaging framework. With built-in SEO optimization, readability scoring, and multilingual support across 20+ languages, Content Studio replaces entire content teams. Features include YouTube Wizard for optimized video scripts and metadata, AI press release generation, and intelligent product catalog matching for e-commerce content.'
     },
     {
@@ -37,7 +37,7 @@ const STUDIO_CONTENT = [
     {
         icon: 'query_stats',
         title: 'AI SEO Studio',
-        color: '#3b82f6',
+        color: '#FF4D00',
         content: 'SEO Studio delivers Semrush-level site audits, keyword research, content gap analysis, and GEO (Generative Engine Optimization). The Crawl Engine scans 800+ pages with JS rendering, detecting H1 issues, duplicate content, missing alt text, slow pages, and technical SEO problems. Each issue includes AI-generated auto-fix code — ready-to-use HTML, JSON-LD, and meta tag snippets. The GEO module measures AI Visibility, Schema & Data quality, Content optimization, and Authority scores, ensuring your brand appears in ChatGPT, Perplexity, Gemini, and Claude responses. LLM Brand Probe and Prompt Mining tools identify citation opportunities across AI search engines.'
     },
     {
@@ -169,7 +169,7 @@ export default function LandingSEOBlock() {
     }
 
     return (
-        <section className="relative py-24 border-t border-white/[0.04]" style={{ background: 'linear-gradient(180deg, transparent 0%, rgba(139,92,246,0.02) 50%, transparent 100%)' }}>
+        <section className="relative py-24 border-t border-white/[0.04]" style={{ background: 'linear-gradient(180deg, transparent 0%, rgba(255, 77, 0,0.02) 50%, transparent 100%)' }}>
             {/* JSON-LD Structured Data */}
             <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }} />
             <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareSchema) }} />
@@ -180,7 +180,7 @@ export default function LandingSEOBlock() {
                 <div className="text-center mb-16">
                     <p className="text-primary text-xs font-bold uppercase tracking-[0.3em] mb-3">Deep Dive</p>
                     <h2 className="text-3xl md:text-4xl font-black text-white mb-4">
-                        Explore the <span className="bg-gradient-to-r from-violet-400 via-primary to-cyan-400 bg-clip-text text-transparent">Mantram AI Platform</span>
+                        Explore the <span className="bg-gradient-to-r from-[#FF4D00] via-primary to-cyan-400 bg-clip-text text-transparent">Mantram AI Platform</span>
                     </h2>
                     <p className="text-slate-400 max-w-2xl mx-auto text-sm leading-relaxed">
                         Learn how each AI-powered studio works together to form a complete marketing operating system — from brand intelligence extraction to published, optimized content across every channel.

@@ -21,8 +21,8 @@ const SOCIAL_PLATFORMS = [
 ]
 
 const AD_PLATFORMS = [
-    { key: 'meta', name: 'Meta Ads', icon: '📱', color: '#0081FB', desc: 'Facebook & Instagram ads' },
-    { key: 'google', name: 'Google Ads', icon: '📊', color: '#34A853', desc: 'Search, display & YouTube ads' },
+    { key: 'meta', name: 'Meta Ads', icon: 'smartphone', color: '#0081FB', desc: 'Facebook & Instagram ads' },
+    { key: 'google', name: 'Google Ads', icon: 'bar_chart', color: '#34A853', desc: 'Search, display & YouTube ads' },
 ]
 
 export default function Integrations() {
@@ -215,7 +215,7 @@ export default function Integrations() {
             setLoading(l => ({ ...l, shopify: true }))
             try {
                 const data = await shopifyAPI.connectToken(shopifyDomain, shopifyToken, brandId)
-                alert(`✅ Connected to ${data.shopName}!`); setShopifyToken(''); loadAllStatuses()
+                alert(` Connected to ${data.shopName}!`); setShopifyToken(''); loadAllStatuses()
             } catch (err) { alert(`Connection failed: ${err.message}`) }
             finally { setLoading(l => ({ ...l, shopify: false })) }
         } else {
@@ -231,7 +231,7 @@ export default function Integrations() {
         setSyncing(true)
         try {
             const data = await shopifyAPI.sync(brandId)
-            alert(`✅ Synced ${data.synced} products from Shopify!`); loadProducts()
+            alert(` Synced ${data.synced} products from Shopify!`); loadProducts()
         } catch (err) { alert(`Sync failed: ${err.message}`) }
         finally { setSyncing(false) }
     }
@@ -277,7 +277,7 @@ export default function Integrations() {
                         {/* ═══════════ ANALYTICS SECTION ═══════════ */}
                         <section>
                             <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
-                                <span className="text-2xl">📊</span> Analytics & Search Console
+                                <span className="text-2xl"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">bar_chart</span></span> Analytics & Search Console
                                 <span className="text-xs text-slate-600 font-normal ml-2">Used by SEO Studio</span>
                             </h2>
                             <div className="glass-panel rounded-2xl p-6">
@@ -326,7 +326,7 @@ export default function Integrations() {
                         {/* ═══════════ AD PLATFORMS SECTION ═══════════ */}
                         <section>
                             <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
-                                <span className="text-2xl">📢</span> Ad Platforms
+                                <span className="material-symbols-outlined text-2xl">📢</span> Ad Platforms
                                 <span className="text-xs text-slate-600 font-normal ml-2">Used by Performance Studio</span>
                             </h2>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -383,7 +383,7 @@ export default function Integrations() {
                                                     {connectingPlatform === p.key ? (
                                                         <><span className="material-symbols-outlined animate-spin text-sm align-middle mr-1">progress_activity</span>Connecting...</>
                                                     ) : (
-                                                        `🔗 Connect ${p.name}`
+                                                        ` Connect ${p.name}`
                                                     )}
                                                 </button>
                                             )}
@@ -396,7 +396,7 @@ export default function Integrations() {
                         {/* ═══════════ E-COMMERCE SECTION ═══════════ */}
                         <section>
                             <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
-                                <span className="text-2xl">🛍️</span> E-Commerce
+                                <span className="text-2xl"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">shopping_bag</span></span> E-Commerce
                                 <span className="text-xs text-slate-600 font-normal ml-2">Used by D2C Studio</span>
                             </h2>
                             <div className="glass-panel rounded-2xl p-6">
@@ -502,7 +502,7 @@ export default function Integrations() {
                         {/* ═══════════ SOCIAL MEDIA SECTION ═══════════ */}
                         <section>
                             <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
-                                <span className="text-2xl">📱</span> Social Media
+                                <span className="text-2xl"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">smartphone</span></span> Social Media
                                 <span className="text-xs text-slate-600 font-normal ml-2">Used by Content & Publish Studios</span>
                             </h2>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -576,7 +576,7 @@ export default function Integrations() {
                         {/* ═══════════ COMING SOON ═══════════ */}
                         <section>
                             <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
-                                <span className="text-2xl">🔮</span> Coming Soon
+                                <span className="material-symbols-outlined text-2xl">🔮</span> Coming Soon
                             </h2>
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                                 {['WooCommerce', 'Amazon', 'Pinterest', 'YouTube'].map(name => (

@@ -13,7 +13,7 @@ import IntelReportViewer from './IntelReportViewer'
 const API_BASE = import.meta.env.VITE_API_URL || `${window.location.origin}/api`
 
 const MISSION_TYPES = [
-    { value: 'competitor_watch', label: 'Competitor Watch', icon: 'visibility', desc: 'General monitoring of competitor activity', color: '#8b5cf6' },
+    { value: 'competitor_watch', label: 'Competitor Watch', icon: 'visibility', desc: 'General monitoring of competitor activity', color: '#FF4D00' },
     { value: 'price_alert', label: 'Price Alert', icon: 'payments', desc: 'Track pricing changes and offers', color: '#f59e0b' },
     { value: 'ad_monitor', label: 'Ad Monitor', icon: 'campaign', desc: 'Track new ad campaigns and creatives', color: '#ec4899' },
     { value: 'product_launch', label: 'Product Launch', icon: 'rocket_launch', desc: 'Detect new product launches', color: '#06b6d4' },
@@ -212,16 +212,16 @@ export default function AgentFidatoPanel({ studio = 'seo', panelOnly = false, on
                 <button
                     onClick={() => setPanelOpen(!panelOpen)}
                     className={`group relative w-full glass-panel rounded-2xl p-4 flex items-center gap-4 cursor-pointer transition-all duration-300 border ${panelOpen
-                        ? 'border-violet-500/40 bg-violet-500/[0.08]'
-                        : 'border-white/[0.06] hover:border-violet-500/30 hover:bg-white/[0.04]'
+                        ? 'border-[#FF4D00]/40 bg-[#FF4D00]/[0.08]'
+                        : 'border-white/[0.06] hover:border-[#FF4D00]/30 hover:bg-white/[0.04]'
                         }`}
                 >
                     <div className="relative shrink-0">
                         <div className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all duration-300 ${panelOpen
-                            ? 'bg-gradient-to-br from-violet-500/30 to-emerald-500/20'
-                            : 'bg-gradient-to-br from-violet-500/15 to-emerald-500/10 group-hover:from-violet-500/25 group-hover:to-emerald-500/15'
+                            ? 'bg-gradient-to-br from-[#FF4D00]/30 to-emerald-500/20'
+                            : 'bg-gradient-to-br from-[#FF4D00]/15 to-emerald-500/10 group-hover:from-[#FF4D00]/25 group-hover:to-emerald-500/15'
                             }`}>
-                            <span className="material-symbols-outlined text-violet-400 text-xl group-hover:scale-110 transition-transform duration-300">shield</span>
+                            <span className="material-symbols-outlined text-[#FF4D00] text-xl group-hover:scale-110 transition-transform duration-300">shield</span>
                         </div>
                         {activeMissions.length > 0 && (
                             <span className="absolute -top-0.5 -right-0.5 flex h-2.5 w-2.5">
@@ -233,7 +233,7 @@ export default function AgentFidatoPanel({ studio = 'seo', panelOnly = false, on
                     <div className="flex-1 text-left min-w-0">
                         <div className="flex items-center gap-2">
                             <span className="text-sm font-bold text-white tracking-wide">Agent Fidato</span>
-                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-violet-500/15 text-violet-400 border border-violet-500/20">Intel</span>
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-[#FF4D00]/15 text-[#FF4D00] border border-[#FF4D00]/20">Intel</span>
                         </div>
                         <p className="text-[11px] text-slate-500 mt-0.5 truncate">
                             {missions.length > 0 ? `${activeMissions.length} active · ${totalInsights} insights` : 'Deploy competitive intelligence missions'}
@@ -245,7 +245,7 @@ export default function AgentFidatoPanel({ studio = 'seo', panelOnly = false, on
                                 <span className="material-symbols-outlined text-xs">notifications_active</span>{unreadCount}
                             </span>
                         )}
-                        <span className={`material-symbols-outlined text-slate-600 text-lg transition-all duration-300 ${panelOpen ? 'rotate-180 text-violet-400' : 'group-hover:text-slate-400'}`}>
+                        <span className={`material-symbols-outlined text-slate-600 text-lg transition-all duration-300 ${panelOpen ? 'rotate-180 text-[#FF4D00]' : 'group-hover:text-slate-400'}`}>
                             {panelOpen ? 'close' : 'chevron_right'}
                         </span>
                     </div>
@@ -278,30 +278,30 @@ export default function AgentFidatoPanel({ studio = 'seo', panelOnly = false, on
                         {/* Grid overlay */}
                         <div style={{
                             position: 'absolute', inset: 0, opacity: 0.03,
-                            backgroundImage: 'linear-gradient(rgba(139,92,246,0.4) 1px, transparent 1px), linear-gradient(90deg, rgba(139,92,246,0.4) 1px, transparent 1px)',
+                            backgroundImage: 'linear-gradient(rgba(255, 77, 0,0.4) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 77, 0,0.4) 1px, transparent 1px)',
                             backgroundSize: '24px 24px',
                         }} />
                         {/* Top glow */}
-                        <div style={{ position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)', width: 400, height: 200, background: 'radial-gradient(ellipse, rgba(139,92,246,0.12) 0%, transparent 70%)', pointerEvents: 'none' }} />
+                        <div style={{ position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)', width: 400, height: 200, background: 'radial-gradient(ellipse, rgba(255, 77, 0,0.12) 0%, transparent 70%)', pointerEvents: 'none' }} />
                         {/* Left accent line */}
                         <div style={{
                             position: 'absolute', left: 0, top: 0, bottom: 0, width: 2,
-                            background: 'linear-gradient(180deg, #8b5cf6 0%, rgba(139,92,246,0.3) 30%, rgba(16,185,129,0.2) 70%, transparent 100%)',
+                            background: 'linear-gradient(180deg, #FF4D00 0%, rgba(255, 77, 0,0.3) 30%, rgba(16,185,129,0.2) 70%, transparent 100%)',
                         }} />
 
                         {/* ─────── HEADER ─────── */}
-                        <div style={{ position: 'relative', padding: '20px 24px 16px', borderBottom: '1px solid rgba(139,92,246,0.12)' }}>
+                        <div style={{ position: 'relative', padding: '20px 24px 16px', borderBottom: '1px solid rgba(255, 77, 0,0.12)' }}>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
                                     {/* Animated shield */}
                                     <div className="fidato-icon-pulse" style={{
                                         width: 48, height: 48, borderRadius: 14,
-                                        background: 'linear-gradient(135deg, rgba(139,92,246,0.2) 0%, rgba(16,185,129,0.12) 100%)',
-                                        border: '1px solid rgba(139,92,246,0.3)',
+                                        background: 'linear-gradient(135deg, rgba(255, 77, 0,0.2) 0%, rgba(16,185,129,0.12) 100%)',
+                                        border: '1px solid rgba(255, 77, 0,0.3)',
                                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                        boxShadow: '0 0 24px rgba(139,92,246,0.15), inset 0 1px 0 rgba(255,255,255,0.05)',
+                                        boxShadow: '0 0 24px rgba(255, 77, 0,0.15), inset 0 1px 0 rgba(255,255,255,0.05)',
                                     }}>
-                                        <span className="material-symbols-outlined" style={{ fontSize: 26, color: '#a78bfa', filter: 'drop-shadow(0 0 6px rgba(139,92,246,0.5))' }}>shield</span>
+                                        <span className="material-symbols-outlined" style={{ fontSize: 26, color: '#a78bfa', filter: 'drop-shadow(0 0 6px rgba(255, 77, 0,0.5))' }}>shield</span>
                                     </div>
                                     <div>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -309,8 +309,8 @@ export default function AgentFidatoPanel({ studio = 'seo', panelOnly = false, on
                                             <span style={{
                                                 padding: '2px 8px', borderRadius: 6, fontSize: 9, fontWeight: 800,
                                                 letterSpacing: '0.18em', textTransform: 'uppercase',
-                                                background: 'linear-gradient(135deg, rgba(139,92,246,0.2), rgba(16,185,129,0.15))',
-                                                border: '1px solid rgba(139,92,246,0.3)', color: '#a78bfa',
+                                                background: 'linear-gradient(135deg, rgba(255, 77, 0,0.2), rgba(16,185,129,0.15))',
+                                                border: '1px solid rgba(255, 77, 0,0.3)', color: '#a78bfa',
                                             }}>INTEL</span>
                                         </div>
                                         <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600, marginTop: 2, letterSpacing: '0.06em' }}>
@@ -336,7 +336,7 @@ export default function AgentFidatoPanel({ studio = 'seo', panelOnly = false, on
                             {/* Stats ribbon */}
                             <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
                                 {[
-                                    { label: 'Missions', value: missions.length, icon: 'target', color: '#8b5cf6' },
+                                    { label: 'Missions', value: missions.length, icon: 'target', color: '#FF4D00' },
                                     { label: 'Active', value: activeMissions.length, icon: 'radar', color: '#10b981' },
                                     { label: 'Insights', value: totalInsights, icon: 'lightbulb', color: '#f59e0b' },
                                 ].map((s, i) => (
@@ -360,13 +360,13 @@ export default function AgentFidatoPanel({ studio = 'seo', panelOnly = false, on
                                 className="fidato-deploy-btn"
                                 style={{
                                     width: '100%', marginTop: 12, padding: '12px 0',
-                                    background: showCreate ? 'rgba(255,255,255,0.04)' : 'linear-gradient(135deg, rgba(139,92,246,0.18), rgba(16,185,129,0.12))',
-                                    border: `1px solid ${showCreate ? 'rgba(255,255,255,0.08)' : 'rgba(139,92,246,0.3)'}`,
+                                    background: showCreate ? 'rgba(255,255,255,0.04)' : 'linear-gradient(135deg, rgba(255, 77, 0,0.18), rgba(16,185,129,0.12))',
+                                    border: `1px solid ${showCreate ? 'rgba(255,255,255,0.08)' : 'rgba(255, 77, 0,0.3)'}`,
                                     borderRadius: 10, color: showCreate ? '#94a3b8' : '#a78bfa',
                                     fontSize: 12, fontWeight: 700, letterSpacing: '0.08em',
                                     cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                                     transition: 'all 0.3s',
-                                    boxShadow: showCreate ? 'none' : '0 0 20px rgba(139,92,246,0.1)',
+                                    boxShadow: showCreate ? 'none' : '0 0 20px rgba(255, 77, 0,0.1)',
                                 }}
                             >
                                 <span className="material-symbols-outlined" style={{ fontSize: 16 }}>{showCreate ? 'close' : 'add_circle'}</span>
@@ -380,8 +380,8 @@ export default function AgentFidatoPanel({ studio = 'seo', panelOnly = false, on
                             {/* ── Create Mission Form ── */}
                             {showCreate && (
                                 <div className="fidato-form-slide" style={{
-                                    background: 'linear-gradient(135deg, rgba(139,92,246,0.06), rgba(16,185,129,0.04))',
-                                    border: '1px solid rgba(139,92,246,0.15)', borderRadius: 14,
+                                    background: 'linear-gradient(135deg, rgba(255, 77, 0,0.06), rgba(16,185,129,0.04))',
+                                    border: '1px solid rgba(255, 77, 0,0.15)', borderRadius: 14,
                                     padding: 20, marginBottom: 20,
                                 }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
@@ -452,12 +452,12 @@ export default function AgentFidatoPanel({ studio = 'seo', panelOnly = false, on
                                         className="fidato-deploy-btn"
                                         style={{
                                             width: '100%', padding: 12,
-                                            background: form.title && form.targetName ? 'linear-gradient(135deg, #8b5cf6, #10b981)' : 'rgba(255,255,255,0.05)',
+                                            background: form.title && form.targetName ? 'linear-gradient(135deg, #FF4D00, #10b981)' : 'rgba(255,255,255,0.05)',
                                             border: 'none', borderRadius: 10, color: 'white',
                                             fontSize: 13, fontWeight: 700, cursor: form.title && form.targetName ? 'pointer' : 'not-allowed',
                                             opacity: form.title && form.targetName ? 1 : 0.4,
                                             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                                            boxShadow: form.title && form.targetName ? '0 4px 20px rgba(139,92,246,0.3)' : 'none',
+                                            boxShadow: form.title && form.targetName ? '0 4px 20px rgba(255, 77, 0,0.3)' : 'none',
                                             letterSpacing: '0.06em', transition: 'all 0.3s',
                                         }}
                                     >
@@ -473,7 +473,7 @@ export default function AgentFidatoPanel({ studio = 'seo', panelOnly = false, on
                                     <button
                                         onClick={() => { setFindings(null); setSelectedMission(null) }}
                                         style={{
-                                            background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)',
+                                            background: 'rgba(255, 77, 0,0.08)', border: '1px solid rgba(255, 77, 0,0.2)',
                                             borderRadius: 8, color: '#a78bfa', fontSize: 11, fontWeight: 700,
                                             cursor: 'pointer', marginBottom: 16, padding: '6px 12px',
                                             display: 'flex', alignItems: 'center', gap: 6, letterSpacing: '0.04em',
@@ -485,12 +485,12 @@ export default function AgentFidatoPanel({ studio = 'seo', panelOnly = false, on
 
                                     <div style={{
                                         padding: 16, borderRadius: 12, marginBottom: 16,
-                                        background: 'linear-gradient(135deg, rgba(139,92,246,0.08), rgba(16,185,129,0.05))',
-                                        border: '1px solid rgba(139,92,246,0.15)',
+                                        background: 'linear-gradient(135deg, rgba(255, 77, 0,0.08), rgba(16,185,129,0.05))',
+                                        border: '1px solid rgba(255, 77, 0,0.15)',
                                     }}>
                                         <div style={{ fontSize: 16, fontWeight: 800, color: '#e2e8f0', marginBottom: 4 }}>{findings.title}</div>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: '#64748b' }}>
-                                            <span className="material-symbols-outlined" style={{ fontSize: 14, color: '#8b5cf6' }}>target</span>
+                                            <span className="material-symbols-outlined" style={{ fontSize: 14, color: '#FF4D00' }}>target</span>
                                             {findings.target?.name}
                                             <span style={{ color: '#334155' }}>•</span>
                                             {findings.stats?.totalFindings} insights from {findings.stats?.totalChecks} checks
@@ -540,8 +540,8 @@ export default function AgentFidatoPanel({ studio = 'seo', panelOnly = false, on
                                         <div style={{ textAlign: 'center', padding: 50 }}>
                                             <div className="fidato-loading-radar" style={{
                                                 width: 60, height: 60, margin: '0 auto 16px', borderRadius: '50%',
-                                                border: '2px solid rgba(139,92,246,0.2)',
-                                                borderTopColor: '#8b5cf6',
+                                                border: '2px solid rgba(255, 77, 0,0.2)',
+                                                borderTopColor: '#FF4D00',
                                             }} />
                                             <div style={{ fontSize: 12, color: '#64748b', fontWeight: 600, letterSpacing: '0.08em' }}>SCANNING...</div>
                                         </div>
@@ -552,22 +552,22 @@ export default function AgentFidatoPanel({ studio = 'seo', panelOnly = false, on
                                             {/* Animated radar empty state */}
                                             <div style={{ position: 'relative', width: 120, height: 120, margin: '0 auto 20px' }}>
                                                 <svg width="120" height="120" viewBox="0 0 120 120">
-                                                    <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(139,92,246,0.1)" strokeWidth="1" />
-                                                    <circle cx="60" cy="60" r="36" fill="none" stroke="rgba(139,92,246,0.08)" strokeWidth="1" />
-                                                    <circle cx="60" cy="60" r="20" fill="none" stroke="rgba(139,92,246,0.12)" strokeWidth="1" />
-                                                    <line x1="60" y1="6" x2="60" y2="114" stroke="rgba(139,92,246,0.05)" strokeWidth="0.5" />
-                                                    <line x1="6" y1="60" x2="114" y2="60" stroke="rgba(139,92,246,0.05)" strokeWidth="0.5" />
-                                                    <circle cx="60" cy="60" r="3" fill="#8b5cf6" opacity="0.5" />
+                                                    <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(255, 77, 0,0.1)" strokeWidth="1" />
+                                                    <circle cx="60" cy="60" r="36" fill="none" stroke="rgba(255, 77, 0,0.08)" strokeWidth="1" />
+                                                    <circle cx="60" cy="60" r="20" fill="none" stroke="rgba(255, 77, 0,0.12)" strokeWidth="1" />
+                                                    <line x1="60" y1="6" x2="60" y2="114" stroke="rgba(255, 77, 0,0.05)" strokeWidth="0.5" />
+                                                    <line x1="6" y1="60" x2="114" y2="60" stroke="rgba(255, 77, 0,0.05)" strokeWidth="0.5" />
+                                                    <circle cx="60" cy="60" r="3" fill="#FF4D00" opacity="0.5" />
                                                 </svg>
                                                 <svg width="120" height="120" viewBox="0 0 120 120" className="fidato-sweep" style={{ position: 'absolute', inset: 0 }}>
                                                     <defs>
                                                         <linearGradient id="fidatoSweepGrad" gradientTransform="rotate(90)">
-                                                            <stop offset="0%" stopColor="rgba(139,92,246,0.4)" />
+                                                            <stop offset="0%" stopColor="rgba(255, 77, 0,0.4)" />
                                                             <stop offset="100%" stopColor="transparent" />
                                                         </linearGradient>
                                                     </defs>
                                                     <path d="M60,60 L60,10 A50,50 0 0,1 100,38 Z" fill="url(#fidatoSweepGrad)" />
-                                                    <line x1="60" y1="60" x2="60" y2="10" stroke="rgba(139,92,246,0.5)" strokeWidth="1" />
+                                                    <line x1="60" y1="60" x2="60" y2="10" stroke="rgba(255, 77, 0,0.5)" strokeWidth="1" />
                                                 </svg>
                                             </div>
                                             <div style={{ fontSize: 15, fontWeight: 800, color: '#e2e8f0', marginBottom: 6 }}>Deploy Your First Agent</div>
@@ -577,11 +577,11 @@ export default function AgentFidatoPanel({ studio = 'seo', panelOnly = false, on
                                             <button
                                                 onClick={() => setShowCreate(true)}
                                                 style={{
-                                                    padding: '12px 28px', background: 'linear-gradient(135deg, rgba(139,92,246,0.2), rgba(16,185,129,0.15))',
-                                                    border: '1px solid rgba(139,92,246,0.35)', borderRadius: 10, color: '#a78bfa',
+                                                    padding: '12px 28px', background: 'linear-gradient(135deg, rgba(255, 77, 0,0.2), rgba(16,185,129,0.15))',
+                                                    border: '1px solid rgba(255, 77, 0,0.35)', borderRadius: 10, color: '#a78bfa',
                                                     fontWeight: 700, fontSize: 12, cursor: 'pointer', letterSpacing: '0.06em',
                                                     display: 'inline-flex', alignItems: 'center', gap: 8,
-                                                    boxShadow: '0 0 20px rgba(139,92,246,0.12)',
+                                                    boxShadow: '0 0 20px rgba(255, 77, 0,0.12)',
                                                     transition: 'all 0.3s',
                                                 }}
                                             >
@@ -673,7 +673,7 @@ export default function AgentFidatoPanel({ studio = 'seo', panelOnly = false, on
                                                     </span>
 
                                                     <div style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
-                                                        <button onClick={() => forceRun(m._id)} disabled={isRunning} style={actionBtnStyle(isRunning ? '#8b5cf6' : '#10b981')}>
+                                                        <button onClick={() => forceRun(m._id)} disabled={isRunning} style={actionBtnStyle(isRunning ? '#FF4D00' : '#10b981')}>
                                                             <span className="material-symbols-outlined" style={{ fontSize: 13 }}>{isRunning ? 'hourglass_top' : 'play_arrow'}</span>
                                                         </button>
                                                         <button onClick={() => toggleMission(m)} style={actionBtnStyle(isActive ? '#f59e0b' : '#10b981')}>
@@ -690,7 +690,7 @@ export default function AgentFidatoPanel({ studio = 'seo', panelOnly = false, on
                                                     <div style={{
                                                         marginTop: 10, padding: '8px 0', borderTop: '1px solid rgba(255,255,255,0.04)',
                                                         display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                                                        fontSize: 10, fontWeight: 700, color: '#8b5cf6', letterSpacing: '0.1em',
+                                                        fontSize: 10, fontWeight: 700, color: '#FF4D00', letterSpacing: '0.1em',
                                                         opacity: 0.7, transition: 'opacity 0.2s',
                                                     }}
                                                         onMouseOver={e => e.currentTarget.style.opacity = '1'}
@@ -723,7 +723,7 @@ export default function AgentFidatoPanel({ studio = 'seo', panelOnly = false, on
             <style>{`
                 @keyframes fidatoPanelSlide { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
                 @keyframes fidatoSweep { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-                @keyframes fidatoIconPulse { 0%,100% { box-shadow: 0 0 24px rgba(139,92,246,0.15); } 50% { box-shadow: 0 0 36px rgba(139,92,246,0.3); } }
+                @keyframes fidatoIconPulse { 0%,100% { box-shadow: 0 0 24px rgba(255, 77, 0,0.15); } 50% { box-shadow: 0 0 36px rgba(255, 77, 0,0.3); } }
                 @keyframes fidatoLoadingRadar { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
                 @keyframes fidatoFormSlide { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
                 @keyframes fidatoCardSlide { from { opacity: 0; transform: translateX(16px); } to { opacity: 1; transform: translateX(0); } }
@@ -735,8 +735,8 @@ export default function AgentFidatoPanel({ studio = 'seo', panelOnly = false, on
                 .fidato-mission-card { animation: fidatoCardSlide 0.4s ease-out both; }
                 .fidato-content::-webkit-scrollbar { width: 4px; }
                 .fidato-content::-webkit-scrollbar-track { background: transparent; }
-                .fidato-content::-webkit-scrollbar-thumb { background: rgba(139,92,246,0.2); border-radius: 4px; }
-                .fidato-content::-webkit-scrollbar-thumb:hover { background: rgba(139,92,246,0.4); }
+                .fidato-content::-webkit-scrollbar-thumb { background: rgba(255, 77, 0,0.2); border-radius: 4px; }
+                .fidato-content::-webkit-scrollbar-thumb:hover { background: rgba(255, 77, 0,0.4); }
                 .fidato-deploy-btn:hover { filter: brightness(1.15); transform: translateY(-1px); }
                 
                 /* ── Fidato Mobile Responsive ── */

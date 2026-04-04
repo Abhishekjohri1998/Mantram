@@ -415,7 +415,7 @@ export default function SuperAdminDashboard() {
     const handleDeleteCoupon = async (id) => { if (!confirm('Delete coupon?')) return; try { await API.deleteCoupon(id); showToast('Deleted'); loadCoupons() } catch { showToast('Failed', 'error') } }
     const handleToggleSetting = async (key, val) => { try { await API.updateSystemSettings({ [key]: val }); showToast('Updated'); loadSettings() } catch { showToast('Failed', 'error') } }
 
-    const platformIcons = { instagram: '📸', facebook: '📘', linkedin: '💼', twitter: '🐦', shopify: '🛍️', 'google-analytics': '📊', 'meta-ads': '📱', 'google-ads': '🔍', meta: '📱', google: '🔍' }
+    const platformIcons = { instagram: '📸', facebook: '📘', linkedin: '💼', twitter: '🐦', shopify: '', 'google-analytics': 'bar_chart', 'meta-ads': 'smartphone', 'google-ads': '🔍', meta: 'smartphone', google: '🔍' }
 
     // Impersonation search handler
     useEffect(() => {
@@ -451,7 +451,7 @@ export default function SuperAdminDashboard() {
                         <div className="w-full max-w-lg bg-[#0e1025] border border-white/[0.08] rounded-2xl shadow-2xl p-6 max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
                             <div className="flex items-center justify-between mb-6">
                                 <div>
-                                    <h3 className="text-lg font-bold text-white flex items-center gap-2"><span className="material-symbols-outlined text-violet-400">shield_person</span>Studio Access</h3>
+                                    <h3 className="text-lg font-bold text-white flex items-center gap-2"><span className="material-symbols-outlined text-[#FF4D00]">shield_person</span>Studio Access</h3>
                                     <p className="text-sm text-slate-500 mt-1">{userStudioModal.userName} ({userStudioModal.userEmail}) — {userStudioModal.userPlan} plan</p>
                                 </div>
                                 <button onClick={() => setUserStudioModal(null)} className="p-2 rounded-lg hover:bg-white/[0.08] text-slate-500 cursor-pointer"><span className="material-symbols-outlined">close</span></button>
@@ -573,7 +573,7 @@ export default function SuperAdminDashboard() {
                             </div>
                             {/* Results Dropdown */}
                             {impersonateResults.length > 0 && impersonateSearch.length >= 2 && (
-                                <div className="absolute top-full left-0 right-0 mt-1 bg-slate-900/95 border border-white/[0.08] rounded-xl shadow-2xl shadow-black/40 overflow-hidden z-40 backdrop-blur-xl">
+                                <div className="absolute top-full left-0 right-0 mt-1 bg-[#08080C]/95 border border-white/[0.08] rounded-xl shadow-2xl shadow-black/40 overflow-hidden z-40 backdrop-blur-xl">
                                     {impersonateResults.map(u => (
                                         <div key={u._id} className="flex items-center gap-3 px-4 py-3 hover:bg-white/[0.04] transition-all cursor-pointer group" onClick={() => { handleImpersonate(u._id, u.name); setImpersonateSearch(''); setImpersonateResults([]) }}>
                                             <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-500 to-rose-500 flex items-center justify-center text-white text-xs font-black">
@@ -621,10 +621,10 @@ export default function SuperAdminDashboard() {
                         {loading ? <div className="flex items-center justify-center py-20 text-slate-500"><span className="material-symbols-outlined animate-spin mr-2">progress_activity</span>Loading...</div> : stats && (
                             <>
                                 <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-5">
-                                    <Card icon="group" color="text-blue-400" value={stats.totalUsers} label="Users" />
-                                    <Card icon="branding_watermark" color="text-purple-400" value={stats.totalBrands} label="Brands" />
+                                    <Card icon="group" color="text-[#FF4D00]" value={stats.totalUsers} label="Users" />
+                                    <Card icon="branding_watermark" color="text-[#FF4D00]" value={stats.totalBrands} label="Brands" />
                                     <Card icon="article" color="text-emerald-400" value={stats.totalContent} label="Content" />
-                                    <Card icon="image" color="text-pink-400" value={stats.totalCreatives} label="Creatives" />
+                                    <Card icon="image" color="text-[#FF7A00]" value={stats.totalCreatives} label="Creatives" />
                                     <Card icon="inventory_2" color="text-cyan-400" value={stats.totalProducts} label="Products" />
                                 </div>
 
@@ -645,8 +645,8 @@ export default function SuperAdminDashboard() {
                                                 if (w.budget === 0 && w.consumed === 0) return null;
                                                 const remaining = Math.max(0, w.budget - w.consumed);
                                                 const isLow = w.budget > 0 && (remaining / w.budget) < 0.15;
-                                                const colors = { anthropic: 'text-orange-400', openai: 'text-emerald-400', gemini: 'text-blue-400', xai: 'text-slate-200', grok: 'text-slate-200', sarvam: 'text-rose-400' };
-                                                const bgHighlights = { anthropic: 'border-orange-500/10', openai: 'border-emerald-500/10', gemini: 'border-blue-500/10', xai: 'border-slate-500/10', grok: 'border-slate-500/10', sarvam: 'border-rose-500/10' };
+                                                const colors = { anthropic: 'text-orange-400', openai: 'text-emerald-400', gemini: 'text-[#FF4D00]', xai: 'text-slate-200', grok: 'text-slate-200', sarvam: 'text-rose-400' };
+                                                const bgHighlights = { anthropic: 'border-orange-500/10', openai: 'border-emerald-500/10', gemini: 'border-[#FF4D00]/10', xai: 'border-slate-500/10', grok: 'border-slate-500/10', sarvam: 'border-rose-500/10' };
                                                 
                                                 return (
                                                     <div key={w.provider} className={`glass-panel border-white/[0.04] rounded-xl p-3 flex flex-col justify-between transition-all ${isLow ? 'bg-amber-500/10 border-amber-500/30' : 'bg-white/[0.01]'}`}>
@@ -682,9 +682,9 @@ export default function SuperAdminDashboard() {
                                         <div className="flex items-center gap-2 mb-2"><span className="material-symbols-outlined text-rose-400">rate_review</span><span className="text-sm font-bold text-white">AI Feedback</span></div>
                                         <p className="text-2xl font-extrabold text-rose-400">{stats.totalFeedback}</p>
                                     </div>
-                                    <div className="glass-panel rounded-2xl p-5 border border-indigo-500/10">
-                                        <div className="flex items-center gap-2 mb-2"><span className="material-symbols-outlined text-indigo-400">trending_up</span><span className="text-sm font-bold text-white">Retention Rate</span></div>
-                                        <p className="text-2xl font-extrabold text-indigo-400">{stats.usageAnalytics?.retentionRate || '0%'}</p>
+                                    <div className="glass-panel rounded-2xl p-5 border border-[#FF4D00]/10">
+                                        <div className="flex items-center gap-2 mb-2"><span className="material-symbols-outlined text-[#FF4D00]">trending_up</span><span className="text-sm font-bold text-white">Retention Rate</span></div>
+                                        <p className="text-2xl font-extrabold text-[#FF4D00]">{stats.usageAnalytics?.retentionRate || '0%'}</p>
                                         <p className="text-xs text-slate-600 mt-1">{stats.usageAnalytics?.churnedUsersCount || 0} churned (20d+)</p>
                                     </div>
                                 </div>
@@ -712,7 +712,7 @@ export default function SuperAdminDashboard() {
                                     </div>
                                 </div>
                                 <div className="glass-panel rounded-2xl p-5">
-                                    <h3 className="font-bold text-white text-sm mb-3 flex items-center gap-2"><span className="material-symbols-outlined text-blue-400 text-lg">group</span>Recent Users</h3>
+                                    <h3 className="font-bold text-white text-sm mb-3 flex items-center gap-2"><span className="material-symbols-outlined text-[#FF4D00] text-lg">group</span>Recent Users</h3>
                                     <div className="space-y-1">{(stats.recentUsers || []).map(u => (
                                         <div key={u._id} className="flex items-center justify-between p-2.5 rounded-xl hover:bg-white/[0.03] transition-all">
                                             <div className="flex items-center gap-3">
@@ -738,7 +738,7 @@ export default function SuperAdminDashboard() {
                                                 </span>
                                                 <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${
                                                     u.plan === 'enterprise' ? 'bg-amber-500/15 text-amber-400' : 
-                                                    u.plan === 'professional' ? 'bg-blue-500/15 text-blue-400' : 
+                                                    u.plan === 'professional' ? 'bg-[#FF4D00]/15 text-[#FF4D00]' : 
                                                     u.plan === 'test' ? 'bg-rose-500/15 text-rose-400' :
                                                     'bg-slate-500/15 text-slate-400'
                                                 }`}>Plan: {u.plan}</span>
@@ -846,7 +846,7 @@ export default function SuperAdminDashboard() {
                                                         {u.email} • {u.company || 'Individual'} 
                                                         <span className={`ml-2 text-[10px] px-1.5 py-0.5 rounded font-bold uppercase ${
                                                             u.plan === 'enterprise' ? 'bg-amber-500/15 text-amber-400' : 
-                                                            u.plan === 'professional' ? 'bg-blue-500/15 text-blue-400' : 
+                                                            u.plan === 'professional' ? 'bg-[#FF4D00]/15 text-[#FF4D00]' : 
                                                             u.plan === 'test' ? 'bg-rose-500/15 text-rose-400' :
                                                             'bg-slate-500/15 text-slate-400'
                                                         }`}>Plan: {u.plan}</span>
@@ -882,7 +882,7 @@ export default function SuperAdminDashboard() {
                         <div className="flex items-center justify-between mb-6">
                             <div>
                                 <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-indigo-400">list_alt</span>
+                                    <span className="material-symbols-outlined text-[#FF4D00]">list_alt</span>
                                     Waitlist Submissions ({waitlist.length})
                                 </h3>
                                 <p className="text-sm text-slate-500 mt-1">Direct early access requests from the landing page waitlist</p>
@@ -909,7 +909,7 @@ export default function SuperAdminDashboard() {
                                                 <tr key={entry._id} className="text-sm group hover:bg-white/[0.01] transition-all">
                                                     <td className="px-6 py-4">
                                                         <div className="flex items-center gap-3">
-                                                            <div className="w-9 h-9 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-400 font-black shadow-lg">
+                                                            <div className="w-9 h-9 rounded-xl bg-[#FF4D00]/10 flex items-center justify-center text-[#FF4D00] font-black shadow-lg">
                                                                 {entry.name?.[0]?.toUpperCase()}
                                                             </div>
                                                             <div className="min-w-0">
@@ -934,7 +934,7 @@ export default function SuperAdminDashboard() {
                                                             </div>
                                                         ) : entry.status === 'invited' ? (
                                                             <div className="inline-flex flex-col items-center gap-1">
-                                                                <span className="px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 text-[10px] font-black uppercase tracking-wider border border-indigo-500/20">Invited</span>
+                                                                <span className="px-2 py-0.5 rounded-full bg-[#FF4D00]/10 text-[#FF4D00] text-[10px] font-black uppercase tracking-wider border border-[#FF4D00]/20">Invited</span>
                                                                 {entry.invitedAt && <span className="text-[9px] text-slate-700">{new Date(entry.invitedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span>}
                                                             </div>
                                                         ) : (
@@ -948,7 +948,7 @@ export default function SuperAdminDashboard() {
                                                                     onClick={() => handleApproveWaitlist(entry._id)}
                                                                     className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all border cursor-pointer ${
                                                                         entry.status === 'invited' 
-                                                                        ? 'bg-indigo-500/10 hover:bg-indigo-500 text-indigo-400 hover:text-white border-indigo-500/20' 
+                                                                        ? 'bg-[#FF4D00]/10 hover:bg-[#FF4D00] text-[#FF4D00] hover:text-white border-[#FF4D00]/20' 
                                                                         : 'bg-emerald-500/10 hover:bg-emerald-500 text-emerald-500 hover:text-white border-emerald-500/20'
                                                                     }`}
                                                                     title={entry.status === 'invited' ? 'Resend Invitation' : 'Send Invitation'}
@@ -1008,7 +1008,7 @@ export default function SuperAdminDashboard() {
                                                 <p className="text-base font-bold text-white truncate">{u.name}</p>
                                                 <span className={`text-xs px-1.5 py-0.5 rounded font-bold capitalize ${
                                                     u.plan === 'enterprise' ? 'bg-amber-500/15 text-amber-400' : 
-                                                    u.plan === 'professional' ? 'bg-blue-500/15 text-blue-400' : 
+                                                    u.plan === 'professional' ? 'bg-[#FF4D00]/15 text-[#FF4D00]' : 
                                                     u.plan === 'test' ? 'bg-rose-500/15 text-rose-400' :
                                                     'bg-slate-500/15 text-slate-400'
                                                 }`}>Plan: {u.plan}</span>
@@ -1037,7 +1037,7 @@ export default function SuperAdminDashboard() {
                                     <div className="flex items-center gap-1 shrink-0">
                                          <button onClick={() => setCreditModal(u)} title="Add Credits" className="p-2 rounded-lg hover:bg-emerald-500/10 text-slate-500 hover:text-emerald-400 transition-all cursor-pointer"><span className="material-symbols-outlined text-base">add_circle</span></button>
                                         <button onClick={() => handleResetCredits(u._id)} title="Reset Credits" className="p-2 rounded-lg hover:bg-cyan-500/10 text-slate-500 hover:text-cyan-400 transition-all cursor-pointer"><span className="material-symbols-outlined text-base">restart_alt</span></button>
-                                        <button onClick={() => setPlanModal(u)} title="Change Plan" className="p-2 rounded-lg hover:bg-blue-500/10 text-slate-500 hover:text-blue-400 transition-all cursor-pointer"><span className="material-symbols-outlined text-base">upgrade</span></button>
+                                        <button onClick={() => setPlanModal(u)} title="Change Plan" className="p-2 rounded-lg hover:bg-[#FF4D00]/10 text-slate-500 hover:text-[#FF4D00] transition-all cursor-pointer"><span className="material-symbols-outlined text-base">upgrade</span></button>
                                         
                                         {(!u.approvalStatus || u.approvalStatus === 'pending') ? (
                                             <div className="flex gap-1 border-x border-white/[0.04] px-1 mx-1">
@@ -1061,7 +1061,7 @@ export default function SuperAdminDashboard() {
                                         )}
 
                                         <button onClick={() => handleImpersonate(u._id, u.name)} title="Login as User" className="p-2 rounded-lg hover:bg-amber-500/10 text-slate-500 hover:text-amber-400 transition-all cursor-pointer"><span className="material-symbols-outlined text-base">login</span></button>
-                                        <button onClick={() => openUserStudioModal(u._id)} title="Studio Access" className="p-2 rounded-lg hover:bg-violet-500/10 text-slate-500 hover:text-violet-400 transition-all cursor-pointer"><span className="material-symbols-outlined text-base">shield_person</span></button>
+                                        <button onClick={() => openUserStudioModal(u._id)} title="Studio Access" className="p-2 rounded-lg hover:bg-[#FF4D00]/10 text-slate-500 hover:text-[#FF4D00] transition-all cursor-pointer"><span className="material-symbols-outlined text-base">shield_person</span></button>
                                         <button onClick={() => handleDeleteUser(u._id, u.name)} title="Delete" className="p-2 rounded-lg hover:bg-rose-500/10 text-slate-500 hover:text-rose-400 transition-all cursor-pointer"><span className="material-symbols-outlined text-base">delete</span></button>
                                     </div>
                                 </div>
@@ -1206,7 +1206,7 @@ export default function SuperAdminDashboard() {
                                                 <tr key={u._id} className="text-sm group hover:bg-white/[0.01] transition-all">
                                                     <td className="px-6 py-4">
                                                         <div className="flex items-center gap-3">
-                                                            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary/20 to-indigo-500/10 flex items-center justify-center text-primary font-black shadow-lg">
+                                                            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary/20 to-[#FF7A00]/10 flex items-center justify-center text-primary font-black shadow-lg">
                                                                 {u.name?.[0]?.toUpperCase()}
                                                             </div>
                                                             <div className="min-w-0">
@@ -1218,7 +1218,7 @@ export default function SuperAdminDashboard() {
                                                     <td className="px-6 py-4">
                                                         <span className={`text-[9px] px-2 py-1 rounded-lg font-black uppercase tracking-wider border ${
                                                             u.plan === 'enterprise' ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 
-                                                            u.plan === 'professional' ? 'bg-blue-500/10 border-blue-500/20 text-blue-400' : 
+                                                            u.plan === 'professional' ? 'bg-[#FF4D00]/10 border-[#FF4D00]/20 text-[#FF4D00]' : 
                                                             u.plan === 'test' ? 'bg-rose-500/10 border-rose-500/20 text-rose-400' :
                                                             'bg-slate-500/10 border-white/10 text-slate-400'
                                                         }`}>
@@ -1345,12 +1345,12 @@ export default function SuperAdminDashboard() {
                                         <p className="text-[10px] text-slate-500">Total Tokens</p>
                                     </div>
                                     <div className="glass-panel rounded-2xl p-4">
-                                        <span className="material-symbols-outlined text-blue-400 text-lg mb-1 block">input</span>
+                                        <span className="material-symbols-outlined text-[#FF4D00] text-lg mb-1 block">input</span>
                                         <p className="text-xl font-extrabold text-white">{(tokenData.totals?.inputTokens || 0).toLocaleString()}</p>
                                         <p className="text-[10px] text-slate-500">Input Tokens</p>
                                     </div>
                                     <div className="glass-panel rounded-2xl p-4">
-                                        <span className="material-symbols-outlined text-purple-400 text-lg mb-1 block">output</span>
+                                        <span className="material-symbols-outlined text-[#FF4D00] text-lg mb-1 block">output</span>
                                         <p className="text-xl font-extrabold text-white">{(tokenData.totals?.outputTokens || 0).toLocaleString()}</p>
                                         <p className="text-[10px] text-slate-500">Output Tokens</p>
                                     </div>
@@ -1388,8 +1388,8 @@ export default function SuperAdminDashboard() {
                                             const pct = w.budget > 0 ? Math.min(100, (w.consumed / w.budget) * 100) : 0;
                                             const remaining = Math.max(0, w.budget - w.consumed);
                                             const isLow = w.budget > 0 && (remaining / w.budget) < 0.15;
-                                            const colors = { anthropic: 'text-orange-400', openai: 'text-emerald-400', gemini: 'text-blue-400', xai: 'text-slate-200', grok: 'text-slate-200', sarvam: 'text-rose-400' };
-                                            const bgColors = { anthropic: 'bg-orange-500', openai: 'bg-emerald-500', gemini: 'bg-blue-500', xai: 'bg-slate-500', grok: 'bg-slate-500', sarvam: 'bg-rose-500' };
+                                            const colors = { anthropic: 'text-orange-400', openai: 'text-emerald-400', gemini: 'text-[#FF4D00]', xai: 'text-slate-200', grok: 'text-slate-200', sarvam: 'text-rose-400' };
+                                            const bgColors = { anthropic: 'bg-orange-500', openai: 'bg-emerald-500', gemini: 'bg-[#FF4D00]', xai: 'bg-slate-500', grok: 'bg-slate-500', sarvam: 'bg-rose-500' };
                                             
                                             return (
                                                 <div key={w.provider} className={`glass-panel rounded-2xl p-5 border transition-all ${isLow ? 'border-amber-500/30' : 'border-white/[0.06]'}`}>
@@ -1455,7 +1455,7 @@ export default function SuperAdminDashboard() {
                                     {/* Per-Studio Breakdown */}
                                     <div className="glass-panel rounded-2xl p-5">
                                         <h4 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
-                                            <span className="material-symbols-outlined text-indigo-400 text-lg">apps</span>
+                                            <span className="material-symbols-outlined text-[#FF4D00] text-lg">apps</span>
                                             Usage by Studio
                                         </h4>
                                         {(tokenData.byStudio || []).length > 0 ? (
@@ -1489,7 +1489,7 @@ export default function SuperAdminDashboard() {
                                     {/* Per-Model Breakdown */}
                                     <div className="glass-panel rounded-2xl p-5">
                                         <h4 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
-                                            <span className="material-symbols-outlined text-purple-400 text-lg">smart_toy</span>
+                                            <span className="material-symbols-outlined text-[#FF4D00] text-lg">smart_toy</span>
                                             Usage by Model
                                         </h4>
                                         {(tokenData.byModel || []).length > 0 ? (
@@ -1576,7 +1576,7 @@ export default function SuperAdminDashboard() {
                         <div className="flex justify-between items-center mb-6">
                             <div>
                                 <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-indigo-400">inventory_2</span>
+                                    <span className="material-symbols-outlined text-[#FF4D00]">inventory_2</span>
                                     Subscription Packages ({packages.length})
                                 </h3>
                                 <p className="text-sm text-slate-500 mt-1">AI-driven package builder — design, suggest, and manage subscription tiers</p>
@@ -1585,7 +1585,7 @@ export default function SuperAdminDashboard() {
                                 <button onClick={handleSeedDefaults} className="px-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-slate-400 text-xs font-medium hover:bg-white/[0.06] flex items-center gap-1.5 cursor-pointer">
                                     <span className="material-symbols-outlined text-sm">database</span>Seed Defaults
                                 </button>
-                                <button onClick={handleAISuggest} disabled={suggestingAI} className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-purple-500/20 to-indigo-500/20 border border-purple-500/30 text-purple-300 text-xs font-bold hover:from-purple-500/30 hover:to-indigo-500/30 flex items-center gap-1.5 cursor-pointer disabled:opacity-50">
+                                <button onClick={handleAISuggest} disabled={suggestingAI} className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#FF4D00]/20 to-[#FF7A00]/20 border border-[#FF4D00]/30 text-[#FF7A00] text-xs font-bold hover:from-[#FF4D00]/30 hover:to-[#FF7A00]/30 flex items-center gap-1.5 cursor-pointer disabled:opacity-50">
                                     <span className={`material-symbols-outlined text-sm ${suggestingAI ? 'animate-spin' : ''}`}>{suggestingAI ? 'progress_activity' : 'auto_awesome'}</span>
                                     {suggestingAI ? 'Analyzing...' : 'AI Suggest Packages'}
                                 </button>
@@ -1598,31 +1598,31 @@ export default function SuperAdminDashboard() {
                         {/* AI Suggestions Panel */}
                         {aiSuggestions && aiSuggestions.length > 0 && (
                             <div className="mb-6">
-                                <div className="glass-panel rounded-2xl p-5 border border-purple-500/20 bg-gradient-to-br from-purple-500/5 to-indigo-500/5">
+                                <div className="glass-panel rounded-2xl p-5 border border-[#FF4D00]/20 bg-gradient-to-br from-[#FF4D00]/5 to-[#FF7A00]/5">
                                     <div className="flex items-center gap-2 mb-4">
-                                        <span className="material-symbols-outlined text-purple-400">auto_awesome</span>
+                                        <span className="material-symbols-outlined text-[#FF4D00]">auto_awesome</span>
                                         <h4 className="font-bold text-white text-sm">AI-Recommended Packages</h4>
-                                        <span className="text-xs px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 font-bold">Based on platform analytics</span>
+                                        <span className="text-xs px-2 py-0.5 rounded-full bg-[#FF4D00]/20 text-[#FF7A00] font-bold">Based on platform analytics</span>
                                         <button onClick={() => setAiSuggestions(null)} className="ml-auto text-slate-600 hover:text-slate-400 cursor-pointer"><span className="material-symbols-outlined text-sm">close</span></button>
                                     </div>
                                     {/* Analytics summary */}
                                     {aiAnalytics && (
                                         <div className="flex gap-3 mb-4">
-                                            {[{ l: 'Users', v: aiAnalytics.totalUsers, c: 'text-blue-400' }, { l: 'Content', v: aiAnalytics.totalContent, c: 'text-emerald-400' }, { l: 'Creatives', v: aiAnalytics.totalCreatives, c: 'text-pink-400' }, { l: 'SEO Audits', v: aiAnalytics.seoUsage, c: 'text-cyan-400' }].map(a => (
+                                            {[{ l: 'Users', v: aiAnalytics.totalUsers, c: 'text-[#FF4D00]' }, { l: 'Content', v: aiAnalytics.totalContent, c: 'text-emerald-400' }, { l: 'Creatives', v: aiAnalytics.totalCreatives, c: 'text-[#FF7A00]' }, { l: 'SEO Audits', v: aiAnalytics.seoUsage, c: 'text-cyan-400' }].map(a => (
                                                 <div key={a.l} className="px-3 py-2 rounded-lg bg-white/[0.03] text-center">
                                                     <p className={`text-sm font-bold ${a.c}`}>{a.v}</p>
                                                     <p className="text-xs text-slate-600">{a.l}</p>
                                                 </div>
                                             ))}
                                             {aiAnalytics.contentHeavy && <span className="self-center text-xs px-2 py-1 rounded bg-emerald-500/10 text-emerald-400 font-bold">Content-Heavy</span>}
-                                            {aiAnalytics.creativeHeavy && <span className="self-center text-xs px-2 py-1 rounded bg-pink-500/10 text-pink-400 font-bold">Creative-Heavy</span>}
+                                            {aiAnalytics.creativeHeavy && <span className="self-center text-xs px-2 py-1 rounded bg-[#FF4D00]/10 text-[#FF7A00] font-bold">Creative-Heavy</span>}
                                             {aiAnalytics.seoActive && <span className="self-center text-xs px-2 py-1 rounded bg-cyan-500/10 text-cyan-400 font-bold">SEO Active</span>}
                                         </div>
                                     )}
                                     {/* Suggestion cards */}
                                     <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-3 gap-3">
                                         {aiSuggestions.map((s, i) => (
-                                            <div key={i} className="relative rounded-xl border border-white/[0.08] p-4 hover:border-purple-500/30 transition-all" style={{ background: `linear-gradient(135deg, ${s.color}08, transparent)` }}>
+                                            <div key={i} className="relative rounded-xl border border-white/[0.08] p-4 hover:border-[#FF4D00]/30 transition-all" style={{ background: `linear-gradient(135deg, ${s.color}08, transparent)` }}>
                                                 {s.badge && <span className="absolute -top-2 right-3 text-[8px] px-2 py-0.5 rounded-full font-bold text-white" style={{ background: s.color }}>{s.badge}</span>}
                                                 <div className="flex items-center gap-2 mb-2">
                                                     <span className="material-symbols-outlined text-lg" style={{ color: s.color }}>{s.icon || 'star'}</span>
@@ -1641,7 +1641,7 @@ export default function SuperAdminDashboard() {
                                                     <span className="text-sm text-slate-500 ml-auto">{s.credits?.monthly >= 999999 ? '∞' : s.credits?.monthly} credits</span>
                                                 </div>
                                                 {/* AI rationale */}
-                                                <p className="text-xs text-purple-400/70 italic mb-3 line-clamp-2">🤖 {s.aiRationale}</p>
+                                                <p className="text-xs text-[#FF4D00]/70 italic mb-3 line-clamp-2"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">smart_toy</span> {s.aiRationale}</p>
                                                 <button onClick={() => handleAdoptSuggestion(s)} className="w-full py-2 rounded-lg text-sm font-bold text-white cursor-pointer hover:opacity-90 transition-all" style={{ background: `linear-gradient(135deg, ${s.color}, ${s.color}cc)` }}>
                                                     Adopt This Package
                                                 </button>
@@ -1671,7 +1671,7 @@ export default function SuperAdminDashboard() {
                                 <textarea placeholder="Description" value={pkgForm.description} onChange={e => setPkgForm(f => ({ ...f, description: e.target.value }))} rows={2} className="w-full mb-4 px-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none resize-none" />
 
                                 {/* Row 2: Studio Access */}
-                                <h5 className="text-xs font-bold text-slate-400 mb-2 flex items-center gap-1.5"><span className="material-symbols-outlined text-sm text-indigo-400">apps</span>Studio Access</h5>
+                                <h5 className="text-xs font-bold text-slate-400 mb-2 flex items-center gap-1.5"><span className="material-symbols-outlined text-sm text-[#FF4D00]">apps</span>Studio Access</h5>
                                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
                                     {Object.entries(studioNames).map(([key, label]) => (
                                         <button key={key} type="button" onClick={() => setPkgForm(f => ({ ...f, studios: { ...f.studios, [key]: !f.studios[key] } }))}
@@ -1712,7 +1712,7 @@ export default function SuperAdminDashboard() {
                                 </div>
 
                                 {/* Row 4: Limits + Pricing */}
-                                <h5 className="text-xs font-bold text-slate-400 mb-2 flex items-center gap-1.5"><span className="material-symbols-outlined text-sm text-blue-400">tune</span>Limits & Pricing</h5>
+                                <h5 className="text-xs font-bold text-slate-400 mb-2 flex items-center gap-1.5"><span className="material-symbols-outlined text-sm text-[#FF4D00]">tune</span>Limits & Pricing</h5>
                                 <div className="grid grid-cols-7 gap-3 mb-4">
                                     <div><label className="text-xs text-slate-600 block mb-1">Max Brands</label><input type="number" value={pkgForm.limits.maxBrands} onChange={e => setPkgForm(f => ({ ...f, limits: { ...f.limits, maxBrands: Number(e.target.value) } }))} className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none" /></div>
                                     <div><label className="text-xs text-slate-600 block mb-1">Team Seats</label><input type="number" value={pkgForm.limits.maxTeamMembers} onChange={e => setPkgForm(f => ({ ...f, limits: { ...f.limits, maxTeamMembers: Number(e.target.value) } }))} className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none" /></div>
@@ -1761,7 +1761,7 @@ export default function SuperAdminDashboard() {
                                             <div className="flex items-center gap-2 mb-1">
                                                 <span className="material-symbols-outlined" style={{ color: pkg.color }}>{pkg.icon || 'star'}</span>
                                                 <h4 className="text-base font-extrabold text-white">{pkg.name}</h4>
-                                                {pkg.generatedByAI && <span className="text-[8px] px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-400 font-bold">AI</span>}
+                                                {pkg.generatedByAI && <span className="text-[8px] px-1.5 py-0.5 rounded bg-[#FF4D00]/15 text-[#FF4D00] font-bold">AI</span>}
                                             </div>
                                             {pkg.tagline && <p className="text-sm text-slate-500 mb-3">{pkg.tagline}</p>}
 
@@ -1834,7 +1834,7 @@ export default function SuperAdminDashboard() {
                                 <span className="material-symbols-outlined text-5xl text-slate-700 mb-3">inventory_2</span>
                                 <h3 className="text-lg font-bold text-white mb-1">No Packages Yet</h3>
                                 <p className="text-sm text-slate-500 mb-4">Use AI to suggest packages based on usage patterns, or create one manually</p>
-                                <button onClick={handleAISuggest} disabled={suggestingAI} className="px-6 py-3 rounded-xl bg-gradient-to-r from-purple-500/20 to-indigo-500/20 border border-purple-500/30 text-purple-300 text-sm font-bold cursor-pointer">
+                                <button onClick={handleAISuggest} disabled={suggestingAI} className="px-6 py-3 rounded-xl bg-gradient-to-r from-[#FF4D00]/20 to-[#FF7A00]/20 border border-[#FF4D00]/30 text-[#FF7A00] text-sm font-bold cursor-pointer">
                                     <span className="material-symbols-outlined text-sm align-middle mr-1">auto_awesome</span>Generate AI Suggestions
                                 </button>
                             </div>
@@ -1980,7 +1980,7 @@ export default function SuperAdminDashboard() {
                                                                 {!c.isActive ? 'Paused' : isExpired ? 'Expired' : 'Active'}
                                                             </span>
                                                             {c.applicablePlans?.length > 0 && (
-                                                                <span className="px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-widest bg-indigo-500/20 text-indigo-400 border border-indigo-500/20">
+                                                                <span className="px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-widest bg-[#FF4D00]/20 text-[#FF4D00] border border-[#FF4D00]/20">
                                                                     Targeted ({c.applicablePlans.length})
                                                                 </span>
                                                             )}
@@ -2034,12 +2034,12 @@ export default function SuperAdminDashboard() {
                 {/* ════════════ CONTENT & BRANDS ════════════ */}
                 {tab === 'content' && (
                     <div>
-                        <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><span className="material-symbols-outlined text-purple-400">branding_watermark</span>{totalBrands} Brands</h3>
+                        <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><span className="material-symbols-outlined text-[#FF4D00]">branding_watermark</span>{totalBrands} Brands</h3>
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-8">{brands.map(b => (
                             <div key={b._id} className="glass-panel rounded-2xl p-4">
                                 <div className="flex items-center justify-between mb-3">
                                     <div className="flex items-center gap-2">
-                                        <div className="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center text-purple-400 text-xs font-bold">{b.name?.[0]?.toUpperCase()}</div>
+                                        <div className="w-8 h-8 rounded-lg bg-[#FF4D00]/20 flex items-center justify-center text-[#FF4D00] text-xs font-bold">{b.name?.[0]?.toUpperCase()}</div>
                                         <div><p className="text-base font-bold text-white">{b.name}</p><p className="text-xs text-slate-600">{b.user?.name} • {b.user?.email}</p></div>
                                     </div>
                                     <button onClick={() => handleDeleteBrand(b, b.name)} className="p-1.5 rounded-lg hover:bg-rose-500/10 text-slate-600 hover:text-rose-400 cursor-pointer"><span className="material-symbols-outlined text-sm">delete</span></button>
@@ -2055,7 +2055,7 @@ export default function SuperAdminDashboard() {
                         <div className="space-y-2">{content.map(c => (
                             <div key={c._id} className="glass-panel rounded-2xl p-3 flex items-center justify-between">
                                 <div className="flex items-center gap-3 flex-1 min-w-0">
-                                    <span className={`text-xs px-1.5 py-0.5 rounded font-bold capitalize ${c.status === 'published' ? 'bg-emerald-500/15 text-emerald-400' : c.status === 'approved' ? 'bg-blue-500/15 text-blue-400' : 'bg-slate-500/15 text-slate-400'}`}>{c.status}</span>
+                                    <span className={`text-xs px-1.5 py-0.5 rounded font-bold capitalize ${c.status === 'published' ? 'bg-emerald-500/15 text-emerald-400' : c.status === 'approved' ? 'bg-[#FF4D00]/15 text-[#FF4D00]' : 'bg-slate-500/15 text-slate-400'}`}>{c.status}</span>
                                     <p className="text-sm text-white truncate max-w-[300px]">{c.title || c.prompt?.slice(0, 60) || 'Untitled'}</p>
                                     <span className="text-xs text-slate-600 capitalize">{c.type}</span>
                                     <span className="text-xs text-slate-700">{c.brand?.name}</span>
@@ -2106,9 +2106,9 @@ export default function SuperAdminDashboard() {
 
                         {/* ═══ Video Provider Management — Global API Switcher ═══ */}
                         <h3 className="text-lg font-bold text-white mb-2 flex items-center gap-2">
-                            <span className="material-symbols-outlined text-violet-400">movie_filter</span>
+                            <span className="material-symbols-outlined text-[#FF4D00]">movie_filter</span>
                             Video Provider Management
-                            <span className="text-[9px] font-black text-violet-400 bg-violet-500/10 px-2 py-0.5 rounded-full uppercase tracking-wider">Global API Switcher</span>
+                            <span className="text-[9px] font-black text-[#FF4D00] bg-[#FF4D00]/10 px-2 py-0.5 rounded-full uppercase tracking-wider">Global API Switcher</span>
                         </h3>
                         <p className="text-[11px] text-slate-500 mb-5">Switch active providers, add new APIs, or remove unused ones for any video model. Changes take effect immediately.</p>
 
@@ -2145,7 +2145,7 @@ export default function SuperAdminDashboard() {
                                                                 {model.multiProvider && <span className="text-[8px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-black uppercase">Multi-Provider</span>}
                                                                 {!model.multiProvider && <span className="text-[8px] px-1.5 py-0.5 rounded bg-slate-500/10 text-slate-500 font-black uppercase">Single</span>}
                                                                 <button onClick={() => setAddProviderForm({ modelId: model.id, providerId: '', providerName: '', envKey: '', costPerSecond: '', description: '' })}
-                                                                    className="text-[10px] px-2 py-1 rounded-lg bg-white/[0.04] text-slate-400 hover:text-violet-400 hover:bg-violet-500/10 transition-all cursor-pointer flex items-center gap-1">
+                                                                    className="text-[10px] px-2 py-1 rounded-lg bg-white/[0.04] text-slate-400 hover:text-[#FF4D00] hover:bg-[#FF4D00]/10 transition-all cursor-pointer flex items-center gap-1">
                                                                     <span className="material-symbols-outlined text-[12px]">add</span>Add Provider
                                                                 </button>
                                                             </div>
@@ -2171,7 +2171,7 @@ export default function SuperAdminDashboard() {
                                                                                         provider.isActive ? `border-${color}-500` : 'border-slate-600 hover:border-slate-400'
                                                                                     }`}>
                                                                                     {provider.isActive && <div className={`w-1.5 h-1.5 rounded-full bg-${color}-500`} />}
-                                                                                    {isSwitching && <span className="material-symbols-outlined text-[8px] animate-spin text-violet-400">progress_activity</span>}
+                                                                                    {isSwitching && <span className="material-symbols-outlined text-[8px] animate-spin text-[#FF4D00]">progress_activity</span>}
                                                                                 </div>
                                                                                 <span className="text-[11px] font-bold text-white flex-1">{provider.name}</span>
                                                                                 {provider.isActive && <span className={`text-[7px] px-1 py-0.5 rounded bg-${color}-500/20 text-${color}-400 font-black uppercase`}>Active</span>}
@@ -2205,30 +2205,30 @@ export default function SuperAdminDashboard() {
 
                                                             {/* Add Provider inline form */}
                                                             {addProviderForm?.modelId === model.id && (
-                                                                <div className="mt-3 p-4 rounded-xl border border-violet-500/20 bg-violet-500/[0.03]">
-                                                                    <h5 className="text-[11px] font-bold text-violet-400 mb-3 flex items-center gap-1">
+                                                                <div className="mt-3 p-4 rounded-xl border border-[#FF4D00]/20 bg-[#FF4D00]/[0.03]">
+                                                                    <h5 className="text-[11px] font-bold text-[#FF4D00] mb-3 flex items-center gap-1">
                                                                         <span className="material-symbols-outlined text-[13px]">add_circle</span>Add New Provider to {model.name}
                                                                     </h5>
                                                                     <div className="grid grid-cols-2 gap-2 mb-3">
                                                                         <input placeholder="Provider ID (e.g., replicate)" value={addProviderForm.providerId}
                                                                             onChange={e => setAddProviderForm(f => ({ ...f, providerId: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') }))}
-                                                                            className="px-2 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-[11px] focus:border-violet-500/40 outline-none" />
+                                                                            className="px-2 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-[11px] focus:border-[#FF4D00]/40 outline-none" />
                                                                         <input placeholder="Provider Name (e.g., Replicate)" value={addProviderForm.providerName}
                                                                             onChange={e => setAddProviderForm(f => ({ ...f, providerName: e.target.value }))}
-                                                                            className="px-2 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-[11px] focus:border-violet-500/40 outline-none" />
+                                                                            className="px-2 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-[11px] focus:border-[#FF4D00]/40 outline-none" />
                                                                         <input placeholder="Env Key (e.g., REPLICATE_API_KEY)" value={addProviderForm.envKey}
                                                                             onChange={e => setAddProviderForm(f => ({ ...f, envKey: e.target.value }))}
-                                                                            className="px-2 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-[11px] focus:border-violet-500/40 outline-none" />
+                                                                            className="px-2 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-[11px] focus:border-[#FF4D00]/40 outline-none" />
                                                                         <input placeholder="Cost/sec (e.g., 0.10)" value={addProviderForm.costPerSecond} type="number" step="0.01"
                                                                             onChange={e => setAddProviderForm(f => ({ ...f, costPerSecond: e.target.value }))}
-                                                                            className="px-2 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-[11px] focus:border-violet-500/40 outline-none" />
+                                                                            className="px-2 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-[11px] focus:border-[#FF4D00]/40 outline-none" />
                                                                     </div>
                                                                     <input placeholder="Description (optional)" value={addProviderForm.description}
                                                                         onChange={e => setAddProviderForm(f => ({ ...f, description: e.target.value }))}
-                                                                        className="w-full px-2 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-[11px] focus:border-violet-500/40 outline-none mb-3" />
+                                                                        className="w-full px-2 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-[11px] focus:border-[#FF4D00]/40 outline-none mb-3" />
                                                                     <div className="flex gap-2">
                                                                         <button onClick={handleAddVideoProvider}
-                                                                            className="px-3 py-1.5 rounded-lg bg-violet-500/20 text-violet-400 text-[11px] font-bold hover:bg-violet-500/30 cursor-pointer transition-all">
+                                                                            className="px-3 py-1.5 rounded-lg bg-[#FF4D00]/20 text-[#FF4D00] text-[11px] font-bold hover:bg-[#FF4D00]/30 cursor-pointer transition-all">
                                                                             Add Provider
                                                                         </button>
                                                                         <button onClick={() => setAddProviderForm(null)}
@@ -2622,7 +2622,7 @@ export default function SuperAdminDashboard() {
                                         {[{ l: 'Profitable', v: pricingData.summary?.profitableActions, c: 'text-emerald-400', bg: 'from-emerald-500/10', i: 'trending_up' },
                                           { l: 'Break-even', v: pricingData.summary?.breakevenActions, c: 'text-amber-400', bg: 'from-amber-500/10', i: 'trending_flat' },
                                           { l: 'Loss', v: pricingData.summary?.lossActions, c: 'text-rose-400', bg: 'from-rose-500/10', i: 'trending_down' },
-                                          { l: 'Overall Margin', v: `${pricingData.summary?.overallMarginPct || 0}%`, c: (pricingData.summary?.overallMarginPct || 0) >= 50 ? 'text-emerald-400' : (pricingData.summary?.overallMarginPct || 0) >= 20 ? 'text-amber-400' : 'text-rose-400', bg: 'from-indigo-500/10', i: 'donut_large' },
+                                          { l: 'Overall Margin', v: `${pricingData.summary?.overallMarginPct || 0}%`, c: (pricingData.summary?.overallMarginPct || 0) >= 50 ? 'text-emerald-400' : (pricingData.summary?.overallMarginPct || 0) >= 20 ? 'text-amber-400' : 'text-rose-400', bg: 'from-[#FF4D00]/10', i: 'donut_large' },
                                         ].map(s => (
                                             <div key={s.l} className={`glass-panel rounded-xl p-4 bg-gradient-to-br ${s.bg} to-transparent`}>
                                                 <div className="flex items-center gap-2 mb-1">
@@ -2722,25 +2722,25 @@ export default function SuperAdminDashboard() {
                         <div className="mt-8">
                             <div className="flex items-center justify-between mb-4">
                                 <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500/20 to-purple-500/20 flex items-center justify-center">
-                                        <span className="material-symbols-outlined text-violet-400">key</span>
+                                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#FF4D00]/20 to-[#FF7A00]/20 flex items-center justify-center">
+                                        <span className="material-symbols-outlined text-[#FF4D00]">key</span>
                                     </div>
                                     <div>
                                         <p className="text-base font-bold text-white">API Key Management</p>
                                         <p className="text-sm text-slate-500">Manage external API keys — DB overrides env vars</p>
                                     </div>
                                 </div>
-                                <button onClick={loadApiKeys} className="px-3 py-1.5 rounded-lg bg-violet-500/10 border border-violet-500/20 text-violet-400 text-xs font-bold hover:bg-violet-500/20 cursor-pointer flex items-center gap-1">
+                                <button onClick={loadApiKeys} className="px-3 py-1.5 rounded-lg bg-[#FF4D00]/10 border border-[#FF4D00]/20 text-[#FF4D00] text-xs font-bold hover:bg-[#FF4D00]/20 cursor-pointer flex items-center gap-1">
                                     <span className="material-symbols-outlined text-sm">refresh</span> Refresh
                                 </button>
                             </div>
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                                 {apiProviders.map(p => (
-                                    <div key={p.id} className="glass-panel rounded-xl p-4 border border-white/[0.06] hover:border-violet-500/20 transition-all">
+                                    <div key={p.id} className="glass-panel rounded-xl p-4 border border-white/[0.06] hover:border-[#FF4D00]/20 transition-all">
                                         <div className="flex items-center justify-between mb-3">
                                             <div className="flex items-center gap-2">
-                                                <span className="material-symbols-outlined text-violet-400 text-lg">{p.icon}</span>
+                                                <span className="material-symbols-outlined text-[#FF4D00] text-lg">{p.icon}</span>
                                                 <span className="text-sm font-bold text-white">{p.label}</span>
                                             </div>
                                             <div className="flex gap-1">
@@ -2759,7 +2759,7 @@ export default function SuperAdminDashboard() {
                                                 <span className="text-[10px] text-slate-500 font-bold">{f.label}</span>
                                                 <div className="flex items-center gap-2">
                                                     <span className="text-xs text-slate-400 font-mono">{f.masked || '—'}</span>
-                                                    <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${f.source === 'database' ? 'bg-violet-500/15 text-violet-400' : f.source === 'env' ? 'bg-emerald-500/15 text-emerald-400' : 'bg-rose-500/15 text-rose-400'}`}>{f.source}</span>
+                                                    <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${f.source === 'database' ? 'bg-[#FF4D00]/15 text-[#FF4D00]' : f.source === 'env' ? 'bg-emerald-500/15 text-emerald-400' : 'bg-rose-500/15 text-rose-400'}`}>{f.source}</span>
                                                 </div>
                                             </div>
                                         ))}
@@ -2769,12 +2769,12 @@ export default function SuperAdminDashboard() {
                                             </div>
                                         )}
                                         {editingProvider === p.id && (
-                                            <div className="mt-3 pt-3 border-t border-violet-500/20 space-y-2">
+                                            <div className="mt-3 pt-3 border-t border-[#FF4D00]/20 space-y-2">
                                                 {p.fields.map(f => (
-                                                    <input key={f.key} type="password" placeholder={`New ${f.label}`} value={editProviderKeys[f.key] || ''} onChange={e => setEditProviderKeys(k => ({ ...k, [f.key]: e.target.value }))} className="w-full px-3 py-1.5 rounded-lg bg-white/[0.05] border border-white/[0.1] text-white text-xs focus:border-violet-500/50 outline-none" />
+                                                    <input key={f.key} type="password" placeholder={`New ${f.label}`} value={editProviderKeys[f.key] || ''} onChange={e => setEditProviderKeys(k => ({ ...k, [f.key]: e.target.value }))} className="w-full px-3 py-1.5 rounded-lg bg-white/[0.05] border border-white/[0.1] text-white text-xs focus:border-[#FF4D00]/50 outline-none" />
                                                 ))}
                                                 <div className="flex gap-2">
-                                                    <button onClick={() => handleSaveApiKey(p.id)} className="flex-1 px-3 py-1.5 rounded-lg bg-violet-500/20 text-violet-400 text-xs font-bold hover:bg-violet-500/30 cursor-pointer">Save</button>
+                                                    <button onClick={() => handleSaveApiKey(p.id)} className="flex-1 px-3 py-1.5 rounded-lg bg-[#FF4D00]/20 text-[#FF4D00] text-xs font-bold hover:bg-[#FF4D00]/30 cursor-pointer">Save</button>
                                                     <button onClick={() => handleDeleteApiKey(p.id)} className="px-3 py-1.5 rounded-lg bg-rose-500/10 text-rose-400 text-xs font-bold hover:bg-rose-500/20 cursor-pointer">Remove</button>
                                                     <button onClick={() => setEditingProvider(null)} className="px-3 py-1.5 rounded-lg bg-white/[0.05] text-slate-500 text-xs font-bold hover:bg-white/[0.1] cursor-pointer">Cancel</button>
                                                 </div>
@@ -2803,11 +2803,11 @@ export default function SuperAdminDashboard() {
                                         <label className="text-xs font-bold text-slate-400 mb-2 block">WATERMARK LOGO</label>
                                         <div className="flex flex-col items-center gap-3">
                                             {(watermarkLogoPreview || systemSettings.watermarkLogoUrl) ? (
-                                                <div className="w-full h-24 rounded-lg bg-slate-800/50 flex items-center justify-center overflow-hidden border border-white/[0.06]">
+                                                <div className="w-full h-24 rounded-lg bg-[#121217]/50 flex items-center justify-center overflow-hidden border border-white/[0.06]">
                                                     <img src={watermarkLogoPreview || systemSettings.watermarkLogoUrl} alt="Watermark" className="max-h-20 max-w-full object-contain" />
                                                 </div>
                                             ) : (
-                                                <div className="w-full h-24 rounded-lg bg-slate-800/50 flex items-center justify-center border border-dashed border-white/[0.1]">
+                                                <div className="w-full h-24 rounded-lg bg-[#121217]/50 flex items-center justify-center border border-dashed border-white/[0.1]">
                                                     <span className="text-slate-600 text-xs">No logo — text watermark active</span>
                                                 </div>
                                             )}
@@ -2822,7 +2822,7 @@ export default function SuperAdminDashboard() {
                                         <label className="text-xs font-bold text-slate-400 mb-2 block">POSITION</label>
                                         <select value={systemSettings.watermarkPosition || 'bottom-right'} onChange={e => handleWatermarkSettingsUpdate({ position: e.target.value })} className="w-full px-3 py-2 rounded-lg bg-white/[0.05] border border-white/[0.1] text-white text-xs mb-4 cursor-pointer outline-none">
                                             {['top-left', 'top-right', 'center', 'bottom-left', 'bottom-right'].map(pos => (
-                                                <option key={pos} value={pos} className="bg-slate-900">{pos.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}</option>
+                                                <option key={pos} value={pos} className="bg-[#08080C]">{pos.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}</option>
                                             ))}
                                         </select>
                                         <label className="text-xs font-bold text-slate-400 mb-2 block">OPACITY ({Math.round((systemSettings.watermarkOpacity || 0.4) * 100)}%)</label>
@@ -2861,7 +2861,7 @@ export default function SuperAdminDashboard() {
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <select value={providerUsageDays} onChange={e => { setProviderUsageDays(parseInt(e.target.value)); loadProviderUsage(parseInt(e.target.value)) }} className="px-2 py-1.5 rounded-lg bg-white/[0.05] border border-white/[0.1] text-white text-xs cursor-pointer outline-none">
-                                        {[7, 14, 30, 60, 90].map(d => <option key={d} value={d} className="bg-slate-900">{d} days</option>)}
+                                        {[7, 14, 30, 60, 90].map(d => <option key={d} value={d} className="bg-[#08080C]">{d} days</option>)}
                                     </select>
                                     <button onClick={() => loadProviderUsage()} disabled={providerUsageLoading} className="px-3 py-1.5 rounded-lg bg-orange-500/10 border border-orange-500/20 text-orange-400 text-xs font-bold hover:bg-orange-500/20 cursor-pointer flex items-center gap-1 disabled:opacity-50">
                                         <span className={`material-symbols-outlined text-sm ${providerUsageLoading ? 'animate-spin' : ''}`}>{providerUsageLoading ? 'progress_activity' : 'refresh'}</span>
@@ -2884,7 +2884,7 @@ export default function SuperAdminDashboard() {
                                         </div>
                                         <div className="glass-panel rounded-xl p-4 text-center">
                                             <p className="text-xs text-slate-500 mb-1">Credits Consumed</p>
-                                            <p className="text-xl font-extrabold text-indigo-400">{(providerUsageData.totalCreditsUsed || 0).toLocaleString()}</p>
+                                            <p className="text-xl font-extrabold text-[#FF4D00]">{(providerUsageData.totalCreditsUsed || 0).toLocaleString()}</p>
                                         </div>
                                     </div>
 
@@ -2935,7 +2935,7 @@ export default function SuperAdminDashboard() {
                         <div className="flex items-center justify-between mb-6">
                             <div>
                                 <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-violet-400">rocket_launch</span>
+                                    <span className="material-symbols-outlined text-[#FF4D00]">rocket_launch</span>
                                     Studio Launch Control
                                 </h3>
                                 <p className="text-sm text-slate-500 mt-1">Control which studios are visible across the platform — globally or per user</p>
@@ -3014,14 +3014,14 @@ export default function SuperAdminDashboard() {
                                     {impersonateResults.map(u => (
                                         <div key={u._id} className="flex items-center justify-between px-4 py-3 hover:bg-white/[0.04] transition-all border-b border-white/[0.04] last:border-b-0">
                                             <div className="flex items-center gap-3">
-                                                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-white text-xs font-black">{u.name?.charAt(0)?.toUpperCase() || '?'}</div>
+                                                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#FF4D00] to-[#FF7A00] flex items-center justify-center text-white text-xs font-black">{u.name?.charAt(0)?.toUpperCase() || '?'}</div>
                                                 <div>
                                                     <p className="text-sm font-bold text-white">{u.name}</p>
                                                     <p className="text-[10px] text-slate-500">{u.email} · {u.plan || 'free'}</p>
                                                 </div>
                                             </div>
                                             <button onClick={() => { openUserStudioModal(u._id); setImpersonateSearch(''); setImpersonateResults([]) }}
-                                                className="px-3 py-1.5 rounded-lg text-xs font-bold bg-violet-500/10 text-violet-400 border border-violet-500/20 hover:bg-violet-500/20 cursor-pointer transition-all flex items-center gap-1.5">
+                                                className="px-3 py-1.5 rounded-lg text-xs font-bold bg-[#FF4D00]/10 text-[#FF4D00] border border-[#FF4D00]/20 hover:bg-[#FF4D00]/20 cursor-pointer transition-all flex items-center gap-1.5">
                                                 <span className="material-symbols-outlined text-xs">tune</span> Manage Access
                                             </button>
                                         </div>
@@ -3143,7 +3143,7 @@ export default function SuperAdminDashboard() {
                         <div className="flex items-center justify-between mb-6">
                             <div>
                                 <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-indigo-400">history</span>
+                                    <span className="material-symbols-outlined text-[#FF4D00]">history</span>
                                     System Audit Logs
                                 </h3>
                                 <p className="text-sm text-slate-500 mt-1">Immutable record of all administrative actions performed on the platform</p>
@@ -3177,7 +3177,7 @@ export default function SuperAdminDashboard() {
                                                 </td>
                                                 <td className="px-5 py-4">
                                                     <div className="flex items-center gap-2">
-                                                        <div className="w-6 h-6 rounded bg-indigo-500/10 flex items-center justify-center text-[10px] font-bold text-indigo-400">{log.admin?.name?.[0]}</div>
+                                                        <div className="w-6 h-6 rounded bg-[#FF4D00]/10 flex items-center justify-center text-[10px] font-bold text-[#FF4D00]">{log.admin?.name?.[0]}</div>
                                                         <span className="text-slate-300 font-medium">{log.admin?.name || 'System'}</span>
                                                     </div>
                                                 </td>
@@ -3238,7 +3238,7 @@ export default function SuperAdminDashboard() {
                 {planModal && (
                     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50" onClick={() => setPlanModal(null)}>
                         <div className="glass-panel rounded-2xl p-6 w-[95%] max-w-md border border-primary/20" onClick={e => e.stopPropagation()}>
-                            <h3 className="font-bold text-white mb-4 flex items-center gap-2"><span className="material-symbols-outlined text-blue-400">upgrade</span>Change Plan — {planModal.name}</h3>
+                            <h3 className="font-bold text-white mb-4 flex items-center gap-2"><span className="material-symbols-outlined text-[#FF4D00]">upgrade</span>Change Plan — {planModal.name}</h3>
                             <p className="text-sm text-slate-500 mb-4">Current: <strong className="text-white capitalize">{planModal.plan}</strong></p>
                             <div className="space-y-2">
                                 {packages.length > 0 ? packages.map((pkg) => (
@@ -3267,7 +3267,7 @@ export default function SuperAdminDashboard() {
                 )}
                 {/* Provider Budgets Modal */}
                 {showBudgetModal && (
-                    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-300">
+                    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-[#08080C]/80 backdrop-blur-sm animate-in fade-in duration-300">
                         <div className="glass-panel rounded-3xl w-full max-w-md border border-white/10 shadow-2xl p-6">
                             <div className="flex items-center justify-between mb-6">
                                 <h3 className="text-xl font-black text-white flex items-center gap-2">
@@ -3362,7 +3362,7 @@ export default function SuperAdminDashboard() {
                                         <div>
                                             <div className="flex items-center justify-between mb-2">
                                                 <label className="text-xs font-bold text-slate-400">USD/INR Rate</label>
-                                                <span className="text-lg font-black text-blue-400">₹{calcExRate}</span>
+                                                <span className="text-lg font-black text-[#FF4D00]">₹{calcExRate}</span>
                                             </div>
                                             <input type="range" min="80" max="95" step="1" value={calcExRate}
                                                 onChange={e => { setCalcExRate(parseInt(e.target.value)); loadPricingData(calcCreditPrice, calcMargin, parseInt(e.target.value)) }}
@@ -3479,15 +3479,15 @@ export default function SuperAdminDashboard() {
                         {policySection === 'policy' && policyData && (
                             <div className="space-y-6">
                                 {/* Formula */}
-                                <div className="glass-panel rounded-2xl p-6 border border-indigo-500/10">
+                                <div className="glass-panel rounded-2xl p-6 border border-[#FF4D00]/10">
                                     <h4 className="text-sm font-black text-white uppercase tracking-wider mb-4 flex items-center gap-2">
-                                        <span className="material-symbols-outlined text-indigo-400">function</span>
+                                        <span className="material-symbols-outlined text-[#FF4D00]">function</span>
                                         Pricing Formula & Guardrails
                                     </h4>
                                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                                        <div className="bg-indigo-500/5 rounded-xl p-4 border border-indigo-500/10">
+                                        <div className="bg-[#FF4D00]/5 rounded-xl p-4 border border-[#FF4D00]/10">
                                             <p className="text-[10px] text-slate-500 uppercase font-bold">Formula</p>
-                                            <p className="text-sm font-black text-indigo-400 mt-1">{policyData.formula?.text}</p>
+                                            <p className="text-sm font-black text-[#FF4D00] mt-1">{policyData.formula?.text}</p>
                                         </div>
                                         <div className="bg-emerald-500/5 rounded-xl p-4 border border-emerald-500/10">
                                             <p className="text-[10px] text-slate-500 uppercase font-bold">Floor Price</p>
@@ -3497,9 +3497,9 @@ export default function SuperAdminDashboard() {
                                             <p className="text-[10px] text-slate-500 uppercase font-bold">Target Margin</p>
                                             <p className="text-sm font-black text-amber-400 mt-1">{policyData.formula?.targetMargin}</p>
                                         </div>
-                                        <div className="bg-blue-500/5 rounded-xl p-4 border border-blue-500/10">
+                                        <div className="bg-[#FF4D00]/5 rounded-xl p-4 border border-[#FF4D00]/10">
                                             <p className="text-[10px] text-slate-500 uppercase font-bold">Exchange Rate</p>
-                                            <p className="text-sm font-black text-blue-400 mt-1">{policyData.formula?.exchangeRate}</p>
+                                            <p className="text-sm font-black text-[#FF4D00] mt-1">{policyData.formula?.exchangeRate}</p>
                                         </div>
                                     </div>
                                     {policyData.guardrails && (
@@ -3728,19 +3728,19 @@ export default function SuperAdminDashboard() {
                                                                 <div className="flex items-center justify-between mb-1.5">
                                                                     <p className="text-xs font-bold text-white">{model.name}</p>
                                                                     <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${
-                                                                        model.type === 'text' ? 'bg-blue-500/10 text-blue-400' :
+                                                                        model.type === 'text' ? 'bg-[#FF4D00]/10 text-[#FF4D00]' :
                                                                         model.type === 'image' ? 'bg-emerald-500/10 text-emerald-400' :
                                                                         model.type === 'video' ? 'bg-amber-500/10 text-amber-400' :
-                                                                        'bg-pink-500/10 text-pink-400'}`}>{model.type}</span>
+                                                                        'bg-[#FF4D00]/10 text-[#FF7A00]'}`}>{model.type}</span>
                                                                 </div>
                                                                 <div className="flex flex-wrap gap-1.5 text-[10px]">
-                                                                    {model.inputPer1M !== undefined && <span className="px-2 py-0.5 rounded bg-blue-500/10 text-blue-400">In: ${model.inputPer1M}/1M</span>}
-                                                                    {model.outputPer1M !== undefined && <span className="px-2 py-0.5 rounded bg-violet-500/10 text-violet-400">Out: ${model.outputPer1M}/1M</span>}
+                                                                    {model.inputPer1M !== undefined && <span className="px-2 py-0.5 rounded bg-[#FF4D00]/10 text-[#FF4D00]">In: ${model.inputPer1M}/1M</span>}
+                                                                    {model.outputPer1M !== undefined && <span className="px-2 py-0.5 rounded bg-[#FF4D00]/10 text-[#FF4D00]">Out: ${model.outputPer1M}/1M</span>}
                                                                     {model.flatCostUSD !== undefined && <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400">${model.flatCostUSD}/{model.type === 'video' ? 'gen' : 'image'}</span>}
                                                                     {model.costPerSecFast !== undefined && <span className="px-2 py-0.5 rounded bg-amber-500/10 text-amber-400">Fast: ${model.costPerSecFast}/s</span>}
                                                                     {model.costPerSecQuality !== undefined && <span className="px-2 py-0.5 rounded bg-rose-500/10 text-rose-400">Quality: ${model.costPerSecQuality}/s</span>}
                                                                     {model.costPerMinute !== undefined && <span className="px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-400">${model.costPerMinute}/min</span>}
-                                                                    {model.costPerSecond !== undefined && <span className="px-2 py-0.5 rounded bg-pink-500/10 text-pink-400">${model.costPerSecond}/sec</span>}
+                                                                    {model.costPerSecond !== undefined && <span className="px-2 py-0.5 rounded bg-[#FF4D00]/10 text-[#FF7A00]">${model.costPerSecond}/sec</span>}
                                                                 </div>
                                                                 <p className="text-[9px] text-slate-600 mt-1.5 flex items-center gap-1">
                                                                     <span className="text-[8px] font-mono text-slate-700">{modelId}</span>
@@ -3781,10 +3781,10 @@ export default function SuperAdminDashboard() {
                                                         <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.04]">
                                                             <div className="flex items-center gap-2">
                                                                 <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${
-                                                                    comp.type === 'text' ? 'bg-blue-500/10 text-blue-400' :
+                                                                    comp.type === 'text' ? 'bg-[#FF4D00]/10 text-[#FF4D00]' :
                                                                     comp.type === 'image' ? 'bg-emerald-500/10 text-emerald-400' :
                                                                     comp.type === 'video' ? 'bg-amber-500/10 text-amber-400' :
-                                                                    'bg-pink-500/10 text-pink-400'}`}>{comp.type}</span>
+                                                                    'bg-[#FF4D00]/10 text-[#FF7A00]'}`}>{comp.type}</span>
                                                                 <p className="text-sm font-bold text-white">{comp.modelName}</p>
                                                                 {comp.providerCount > 1 && (
                                                                     <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400 font-bold">{comp.providerCount} providers</span>
@@ -3965,8 +3965,8 @@ export default function SuperAdminDashboard() {
                         {/* Create/Edit Pack Modal */}
                         {showPackForm && (
                             <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={e => e.target === e.currentTarget && setShowPackForm(false)}>
-                                <div className="bg-slate-900 border border-white/[0.08] rounded-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto shadow-2xl" style={{ scrollbarWidth: 'thin' }}>
-                                    <div className="p-5 border-b border-white/[0.06] flex items-center justify-between sticky top-0 bg-slate-900 z-10">
+                                <div className="bg-[#08080C] border border-white/[0.08] rounded-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto shadow-2xl" style={{ scrollbarWidth: 'thin' }}>
+                                    <div className="p-5 border-b border-white/[0.06] flex items-center justify-between sticky top-0 bg-[#08080C] z-10">
                                         <h4 className="text-sm font-black text-white uppercase tracking-wider">{editingPack ? 'Edit Pack' : 'New Credit Pack'}</h4>
                                         <button onClick={() => setShowPackForm(false)} className="p-1 rounded-lg hover:bg-white/[0.06] text-slate-500 cursor-pointer"><span className="material-symbols-outlined">close</span></button>
                                     </div>

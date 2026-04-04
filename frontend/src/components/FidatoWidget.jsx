@@ -146,23 +146,23 @@ export default function FidatoWidget() {
                     <div className="relative w-full max-w-md rounded-3xl overflow-hidden animate-fade-in"
                         style={{
                             background: 'linear-gradient(180deg, rgba(20,15,40,0.98), rgba(10,10,26,0.99))',
-                            border: '1px solid rgba(139, 92, 246, 0.25)',
-                            boxShadow: '0 24px 80px rgba(0,0,0,0.6), 0 0 60px rgba(139, 92, 246, 0.15)',
+                            border: '1px solid rgba(255, 77, 0, 0.25)',
+                            boxShadow: '0 24px 80px rgba(0,0,0,0.6), 0 0 60px rgba(255, 77, 0, 0.15)',
                         }}
                         onClick={e => e.stopPropagation()}>
 
                         {/* Briefing header with animated gradient */}
                         <div className="relative p-6 pb-4 text-center overflow-hidden">
                             <div className="absolute inset-0 opacity-20"
-                                style={{ background: 'radial-gradient(circle at 50% 0%, #8b5cf6 0%, transparent 70%)' }} />
+                                style={{ background: 'radial-gradient(circle at 50% 0%, #FF4D00 0%, transparent 70%)' }} />
                             <div className="relative">
                                 <div className="size-16 rounded-full mx-auto mb-3 flex items-center justify-center text-white text-2xl"
-                                    style={{ background: 'linear-gradient(135deg, #8b5cf6, #ec4899)' }}>
+                                    style={{ background: 'linear-gradient(135deg, #FF4D00, #ec4899)' }}>
                                     <span className="material-symbols-outlined text-3xl">support_agent</span>
                                 </div>
                                 <p className="text-xl font-bold text-white">{briefing.greeting}</p>
                                 {activeBrand?.name && (
-                                    <p className="text-xs text-violet-300/60 mt-1">Advising for {activeBrand.name}</p>
+                                    <p className="text-xs text-[#FF7A00]/60 mt-1">Advising for {activeBrand.name}</p>
                                 )}
                             </div>
                         </div>
@@ -171,8 +171,8 @@ export default function FidatoWidget() {
                         <div className="px-6 pb-4 space-y-3">
                             {/* Day special */}
                             <div className="rounded-2xl p-3.5 flex items-start gap-3"
-                                style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.12)' }}>
-                                <span className="material-symbols-outlined text-violet-400 text-lg mt-0.5">celebration</span>
+                                style={{ background: 'rgba(255, 77, 0,0.08)', border: '1px solid rgba(255, 77, 0,0.12)' }}>
+                                <span className="material-symbols-outlined text-[#FF4D00] text-lg mt-0.5">celebration</span>
                                 <p className="text-sm text-slate-300 leading-relaxed">{briefing.daySpecial}</p>
                             </div>
 
@@ -197,8 +197,8 @@ export default function FidatoWidget() {
                                             onClick={() => { dismissBriefing(); setOpen(true); setTimeout(() => sendMessage(s), 300) }}
                                             className="px-3 py-1.5 rounded-xl text-[11px] font-medium cursor-pointer transition-all hover:scale-[1.03]"
                                             style={{
-                                                background: 'rgba(139,92,246,0.1)',
-                                                border: '1px solid rgba(139,92,246,0.15)',
+                                                background: 'rgba(255, 77, 0,0.1)',
+                                                border: '1px solid rgba(255, 77, 0,0.15)',
                                                 color: 'rgba(196,181,253,0.9)',
                                             }}>
                                             {s.length > 40 ? s.substring(0, 37) + '...' : s}
@@ -216,7 +216,7 @@ export default function FidatoWidget() {
                             </button>
                             <button onClick={() => dismissBriefing()}
                                 className="px-5 py-2 rounded-xl text-sm font-bold text-white cursor-pointer transition-all hover:scale-[1.03]"
-                                style={{ background: 'linear-gradient(135deg, #8b5cf6, #ec4899)' }}>
+                                style={{ background: 'linear-gradient(135deg, #FF4D00, #ec4899)' }}>
                                 let's go! 🚀
                             </button>
                         </div>
@@ -229,8 +229,8 @@ export default function FidatoWidget() {
                 onClick={() => setOpen(!open)}
                 className="fixed bottom-6 right-6 z-50 size-14 rounded-full shadow-2xl flex items-center justify-center cursor-pointer transition-all hover:scale-110 active:scale-95"
                 style={{
-                    background: 'linear-gradient(135deg, #8b5cf6, #ec4899)',
-                    boxShadow: '0 8px 32px rgba(139, 92, 246, 0.4)',
+                    background: 'linear-gradient(135deg, #FF4D00, #ec4899)',
+                    boxShadow: '0 8px 32px rgba(255, 77, 0, 0.4)',
                 }}
                 title="Chat with Fidato"
             >
@@ -251,17 +251,17 @@ export default function FidatoWidget() {
                 <div className="fixed bottom-24 right-6 z-50 w-[400px] max-h-[600px] rounded-2xl overflow-hidden flex flex-col animate-fade-in"
                     style={{
                         background: 'linear-gradient(180deg, rgba(15,15,30,0.98), rgba(10,10,26,0.99))',
-                        border: '1px solid rgba(139, 92, 246, 0.2)',
-                        boxShadow: '0 24px 80px rgba(0,0,0,0.6), 0 0 40px rgba(139, 92, 246, 0.1)',
+                        border: '1px solid rgba(255, 77, 0, 0.2)',
+                        boxShadow: '0 24px 80px rgba(0,0,0,0.6), 0 0 40px rgba(255, 77, 0, 0.1)',
                         backdropFilter: 'blur(24px)',
                     }}>
 
                     {/* Header */}
                     <div className="p-4 flex items-center gap-3 border-b border-white/[0.06]"
-                        style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.1), rgba(236,72,153,0.05))' }}>
+                        style={{ background: 'linear-gradient(135deg, rgba(255, 77, 0,0.1), rgba(236,72,153,0.05))' }}>
                         <div className="relative">
                             <div className="size-10 rounded-full flex items-center justify-center text-white text-lg"
-                                style={{ background: 'linear-gradient(135deg, #8b5cf6, #ec4899)' }}>
+                                style={{ background: 'linear-gradient(135deg, #FF4D00, #ec4899)' }}>
                                 <span className="material-symbols-outlined">support_agent</span>
                             </div>
                             <span className="absolute bottom-0 right-0 size-3 rounded-full bg-emerald-400 border-2 border-[#0f0f1e]" />
@@ -300,12 +300,12 @@ export default function FidatoWidget() {
                                         if (n.action) sendMessage(n.action)
                                     }}
                                     className="w-full text-left px-4 py-2.5 flex items-start gap-2.5 hover:bg-white/[0.03] transition-colors cursor-pointer border-b border-white/[0.03] last:border-0">
-                                    <span className={`material-symbols-outlined text-sm mt-0.5 ${n.severity === 'warning' ? 'text-amber-400' : 'text-blue-400'}`}>
+                                    <span className={`material-symbols-outlined text-sm mt-0.5 ${n.severity === 'warning' ? 'text-amber-400' : 'text-[#FF4D00]'}`}>
                                         {n.severity === 'warning' ? 'warning' : 'info'}
                                     </span>
                                     <div className="flex-1 min-w-0">
                                         <p className="text-xs text-slate-300 leading-relaxed">{n.message}</p>
-                                        <p className="text-[10px] text-violet-400 mt-0.5">{n.action} →</p>
+                                        <p className="text-[10px] text-[#FF4D00] mt-0.5">{n.action} →</p>
                                     </div>
                                 </button>
                             ))}
@@ -318,7 +318,7 @@ export default function FidatoWidget() {
                             <div key={i} className={`flex gap-2.5 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
                                 {m.role === 'assistant' && (
                                     <div className="size-7 rounded-full shrink-0 flex items-center justify-center text-white text-xs"
-                                        style={{ background: 'linear-gradient(135deg, #8b5cf6, #ec4899)' }}>
+                                        style={{ background: 'linear-gradient(135deg, #FF4D00, #ec4899)' }}>
                                         <span className="material-symbols-outlined text-xs">support_agent</span>
                                     </div>
                                 )}
@@ -334,14 +334,14 @@ export default function FidatoWidget() {
                         {loading && (
                             <div className="flex gap-2.5">
                                 <div className="size-7 rounded-full shrink-0 flex items-center justify-center text-white text-xs"
-                                    style={{ background: 'linear-gradient(135deg, #8b5cf6, #ec4899)' }}>
+                                    style={{ background: 'linear-gradient(135deg, #FF4D00, #ec4899)' }}>
                                     <span className="material-symbols-outlined text-xs">support_agent</span>
                                 </div>
                                 <div className="px-3.5 py-2.5 rounded-2xl rounded-bl-sm bg-white/[0.05] border border-white/[0.06]">
                                     <div className="flex gap-1">
-                                        <span className="size-2 rounded-full bg-violet-400 animate-bounce" style={{ animationDelay: '0ms' }} />
-                                        <span className="size-2 rounded-full bg-pink-400 animate-bounce" style={{ animationDelay: '150ms' }} />
-                                        <span className="size-2 rounded-full bg-violet-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+                                        <span className="size-2 rounded-full bg-[#FF4D00] animate-bounce" style={{ animationDelay: '0ms' }} />
+                                        <span className="size-2 rounded-full bg-[#FF4D00] animate-bounce" style={{ animationDelay: '150ms' }} />
+                                        <span className="size-2 rounded-full bg-[#FF4D00] animate-bounce" style={{ animationDelay: '300ms' }} />
                                     </div>
                                 </div>
                             </div>
@@ -354,7 +354,7 @@ export default function FidatoWidget() {
                         <div className="px-4 pb-2 flex flex-wrap gap-1.5">
                             {suggestions.map((q, i) => (
                                 <button key={i} onClick={() => sendMessage(q)}
-                                    className="px-2.5 py-1.5 rounded-lg bg-violet-500/10 text-violet-300 text-[11px] border border-violet-500/15 hover:bg-violet-500/20 cursor-pointer transition-all">
+                                    className="px-2.5 py-1.5 rounded-lg bg-[#FF4D00]/10 text-[#FF7A00] text-[11px] border border-[#FF4D00]/15 hover:bg-[#FF4D00]/20 cursor-pointer transition-all">
                                     {q}
                                 </button>
                             ))}
@@ -369,13 +369,13 @@ export default function FidatoWidget() {
                             onChange={e => setInput(e.target.value)}
                             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() } }}
                             placeholder={activeBrand ? `Ask about ${activeBrand.name}...` : 'Ask Fidato anything...'}
-                            className="flex-1 bg-white/[0.04] border border-white/[0.08] rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-500 outline-none focus:border-violet-500/40 transition-all"
+                            className="flex-1 bg-white/[0.04] border border-white/[0.08] rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-500 outline-none focus:border-[#FF4D00]/40 transition-all"
                         />
                         <button
                             onClick={() => sendMessage()}
                             disabled={loading || !input.trim()}
                             className="px-3.5 py-2.5 rounded-xl text-white text-sm font-bold cursor-pointer transition-all disabled:opacity-40 flex items-center"
-                            style={{ background: 'linear-gradient(135deg, #8b5cf6, #ec4899)' }}
+                            style={{ background: 'linear-gradient(135deg, #FF4D00, #ec4899)' }}
                         >
                             <span className="material-symbols-outlined text-sm">send</span>
                         </button>

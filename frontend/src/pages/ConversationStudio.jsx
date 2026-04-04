@@ -17,9 +17,9 @@ const INTENT_ICONS = {
 }
 
 const CHANNEL_CONFIG = {
-    instagram_dm: { label: 'Instagram DM', icon: 'photo_camera', color: 'text-pink-400', bg: 'bg-pink-500/10' },
-    facebook_messenger: { label: 'Messenger', icon: 'messenger', color: 'text-blue-400', bg: 'bg-blue-500/10' },
-    instagram_comment: { label: 'IG Comment', icon: 'mode_comment', color: 'text-purple-400', bg: 'bg-purple-500/10' },
+    instagram_dm: { label: 'Instagram DM', icon: 'photo_camera', color: 'text-[#FF7A00]', bg: 'bg-[#FF4D00]/10' },
+    facebook_messenger: { label: 'Messenger', icon: 'messenger', color: 'text-[#FF4D00]', bg: 'bg-[#FF4D00]/10' },
+    instagram_comment: { label: 'IG Comment', icon: 'mode_comment', color: 'text-[#FF4D00]', bg: 'bg-[#FF4D00]/10' },
     instagram_story_reply: { label: 'Story Reply', icon: 'auto_stories', color: 'text-orange-400', bg: 'bg-orange-500/10' },
     instagram_mention: { label: 'Mention', icon: 'alternate_email', color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
 }
@@ -197,7 +197,7 @@ export default function ConversationStudio() {
                         {[
                             { label: 'Total', value: stats.total, icon: 'forum', color: 'text-primary' },
                             { label: 'Active', value: stats.active, icon: 'mark_chat_unread', color: 'text-emerald-400' },
-                            { label: 'AI Handled', value: stats.aiHandled, icon: 'smart_toy', color: 'text-purple-400' },
+                            { label: 'AI Handled', value: stats.aiHandled, icon: 'smart_toy', color: 'text-[#FF4D00]' },
                             { label: 'Human', value: stats.handedOff, icon: 'person', color: 'text-amber-400' },
                             { label: 'Resolved', value: stats.resolved, icon: 'check_circle', color: 'text-slate-400' },
                         ].map((s, i) => (
@@ -255,7 +255,7 @@ export default function ConversationStudio() {
                                     ${selected === t._id ? 'bg-primary/5 border-l-2 border-l-primary' : 'hover:bg-white/[0.03]'}`}>
                                 <div className="flex items-center gap-3">
                                     {/* Avatar */}
-                                    <div className="size-10 rounded-full bg-gradient-to-br from-primary/30 to-purple-500/30 flex items-center justify-center shrink-0">
+                                    <div className="size-10 rounded-full bg-gradient-to-br from-primary/30 to-[#FF7A00]/30 flex items-center justify-center shrink-0">
                                         <span className="text-base font-bold text-white">
                                             {(t.contact?.name || 'U').charAt(0).toUpperCase()}
                                         </span>
@@ -293,7 +293,7 @@ export default function ConversationStudio() {
                                         </span>
                                     )}
                                     {t.isAIHandling && (
-                                        <span className="px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-400 text-xs font-bold">AI</span>
+                                        <span className="px-2 py-0.5 rounded-md bg-[#FF4D00]/10 text-[#FF4D00] text-xs font-bold">AI</span>
                                     )}
                                 </div>
                             </button>
@@ -325,7 +325,7 @@ export default function ConversationStudio() {
                             {/* Thread Header */}
                             <div className="p-4 border-b border-white/[0.06] flex items-center justify-between">
                                 <div className="flex items-center gap-3">
-                                    <div className="size-9 rounded-full bg-gradient-to-br from-primary/30 to-purple-500/30 flex items-center justify-center">
+                                    <div className="size-9 rounded-full bg-gradient-to-br from-primary/30 to-[#FF7A00]/30 flex items-center justify-center">
                                         <span className="text-base font-bold text-white">{(contact?.name || 'U').charAt(0)}</span>
                                     </div>
                                     <div>
@@ -343,7 +343,7 @@ export default function ConversationStudio() {
                                     {/* AI toggle */}
                                     <button onClick={handleToggleAI}
                                         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer
-                                            ${conversation.isAIHandling ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' : 'bg-white/[0.04] text-slate-400 border border-white/[0.06]'}`}>
+                                            ${conversation.isAIHandling ? 'bg-[#FF4D00]/10 text-[#FF4D00] border border-[#FF4D00]/20' : 'bg-white/[0.04] text-slate-400 border border-white/[0.06]'}`}>
                                         <span className="material-symbols-outlined text-sm">{conversation.isAIHandling ? 'smart_toy' : 'person'}</span>
                                         {conversation.isAIHandling ? 'AI Mode' : 'Human'}
                                     </button>
@@ -462,7 +462,7 @@ export default function ConversationStudio() {
                         <div className="p-4 space-y-5">
                             {/* Contact Header */}
                             <div className="text-center">
-                                <div className="size-16 rounded-full bg-gradient-to-br from-primary/40 to-purple-500/40 flex items-center justify-center mx-auto mb-3">
+                                <div className="size-16 rounded-full bg-gradient-to-br from-primary/40 to-[#FF7A00]/40 flex items-center justify-center mx-auto mb-3">
                                     <span className="text-2xl font-bold text-white">{(contact.name || 'U').charAt(0)}</span>
                                 </div>
                                 <p className="text-white font-bold">{contact.name}</p>

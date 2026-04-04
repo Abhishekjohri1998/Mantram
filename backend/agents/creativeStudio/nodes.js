@@ -10,6 +10,7 @@
 import { callAgent, callMultimodalAgent, loadBrandContext } from '../shared/agentUtils.js';
 import Brand from '../../models/Brand.js';
 import Product from '../../models/Product.js';
+import { inferBrandLanguage, buildLanguageDirective } from '../../utils/brandLanguage.js';
 import {
     ART_DIRECTOR_PROMPT,
     FAST_CREATIVE_DIRECTOR_PROMPT,
@@ -681,7 +682,29 @@ export async function copywriterNode(state) {
     console.log('✍️  Creative Agent: Copywriter — writing brand copy...');
     const startMs = Date.now();
 
-    const brandContext = state.brandContext || (await loadBrandContext(state.brandId)).brandContext;
+    // Load brand context — also fetch brand object for language inference
+    let resolvedBrandContext = state.brandContext;
+    let brandObj = null;
+    if (!resolvedBrandContext && state.brandId) {
+        const { brandContext: ctx, brand } = await loadBrandContext(state.brandId);
+        resolvedBrandContext = ctx;
+        brandObj = brand;
+    }
+    if (!brandObj && state.brandId) {
+        brandObj = await Brand.findById(state.brandId).select('name dna').lean();
+    }
+
+    // Language inference — generate copy in the brand's audience language
+    const langInfo = inferBrandLanguage(brandObj);
+    const languageDirective = buildLanguageDirective(
+        langInfo,
+        brandObj?.name || '',
+        brandObj?.dna?.targetAudience || ''
+    );
+    if (langInfo.isRegional) {
+        console.log(`🌍 Creative Copywriter: Language directive active — ${langInfo.displayName} (${langInfo.source})`);
+    }
+
     const intel = state.brandIntel || {};
     const mp = state.matchedProduct;
 
@@ -738,6 +761,10 @@ export async function copywriterNode(state) {
         '',
         `PLATFORM: ${platformLabel}`,
         `FORMAT: ${state.format || 'instagram-post'}`,
+        // Language enforcement
+        langInfo.isRegional
+            ? `LANGUAGE: Write ALL copy (headline, subtext, CTA) ENTIRELY in ${langInfo.displayName}. Do NOT write in English.`
+            : '',
         '',
         '--- ART DIRECTION (what the image will look like) ---',
         `VISUAL MOOD: ${artDir.mood || 'professional'}`,
@@ -768,9 +795,14 @@ export async function copywriterNode(state) {
     // ── DEBUG: Log exactly what we're sending to the copywriter ──
     console.log('✍️  COPYWRITER DEBUG — userPrompt length:', userPrompt.length);
     console.log('✍️  COPYWRITER userPrompt:\n', userPrompt.substring(0, 800));
-    console.log('✍️  COPYWRITER brandContext length:', brandContext?.length || 0);
+    console.log('✍️  COPYWRITER brandContext length:', resolvedBrandContext?.length || 0);
 
-    const result = await callAgent(COPYWRITER_PROMPT(brandContext), userPrompt, 0.75, 8192);
+    // Build system prompt with language directive prepended
+    const systemPrompt = languageDirective
+        ? `${languageDirective}\n\n${COPYWRITER_PROMPT(resolvedBrandContext)}`
+        : COPYWRITER_PROMPT(resolvedBrandContext);
+
+    const result = await callAgent(systemPrompt, userPrompt, 0.75, 8192);
     console.log(`✍️  Copywriter result keys: ${Object.keys(result || {}).join(', ')}`);
     console.log(`✍️  Copywriter done in ${Date.now() - startMs}ms — headline: "${result.headline || '?'}" | subtext: "${result.subtext || 'none'}" | cta: "${result.ctaText || 'none'}"${result.error ? ` [PARSE ERROR: ${result.error}] RAW: ${result.raw?.substring(0, 200)}` : ''}`);
     if (result.ctaText) console.log(`✍️  Copywriter CTA: "${result.ctaText}"`);
@@ -784,6 +816,7 @@ export async function copywriterNode(state) {
             textStyle: result.textStyle || '',
             designRationale: result.designRationale || '',
         },
+        detectedLanguage: langInfo,
         status: 'copywriting',
     };
 }

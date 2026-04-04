@@ -11,10 +11,10 @@ import { getEventsForMonth, getUpcomingEvents, EVENT_COLORS, COUNTRIES } from '.
 // ═══════════════════════════════════════════════════════════════
 
 const PLATFORM_META = {
-    instagram: { label: 'Instagram', icon: '📸', color: '#E1306C', gradient: 'from-pink-500 to-purple-600' },
-    facebook: { label: 'Facebook', icon: '👥', color: '#1877F2', gradient: 'from-blue-500 to-indigo-600' },
+    instagram: { label: 'Instagram', icon: '📸', color: '#E1306C', gradient: 'from-[#FF4D00] to-[#FF7A00]' },
+    facebook: { label: 'Facebook', icon: '👥', color: '#1877F2', gradient: 'from-[#FF4D00] to-[#FF7A00]' },
     twitter: { label: 'Twitter / X', icon: '𝕏', color: '#1DA1F2', gradient: 'from-slate-400 to-slate-600' },
-    linkedin: { label: 'LinkedIn', icon: '💼', color: '#0A66C2', gradient: 'from-sky-500 to-blue-600' },
+    linkedin: { label: 'LinkedIn', icon: '💼', color: '#0A66C2', gradient: 'from-sky-500 to-[#FF7A00]' },
 }
 
 export default function SmartCalendar() {
@@ -73,7 +73,7 @@ export default function SmartCalendar() {
                     ...p,
                     _calDay: d.getDate(),
                     _calType: p.status === 'scheduled' ? 'scheduled' : p.status === 'published' ? 'published' : 'scheduled',
-                    _calName: `${meta.icon || '📱'} ${meta.label || p.platform}`,
+                    _calName: `${meta.icon || ''} ${meta.label || p.platform}`,
                     _calTime: d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }),
                 }
             })
@@ -190,8 +190,8 @@ export default function SmartCalendar() {
                         {!postsLoading && (scheduledCount > 0 || publishedCount > 0) && (
                             <div className="flex items-center gap-2">
                                 {scheduledCount > 0 && (
-                                    <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full bg-violet-500/15 text-violet-300 border border-violet-500/20">
-                                        <span className="w-2 h-2 rounded-full bg-violet-400 animate-pulse" />
+                                    <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full bg-[#FF4D00]/15 text-[#FF7A00] border border-[#FF4D00]/20">
+                                        <span className="w-2 h-2 rounded-full bg-[#FF4D00] animate-pulse" />
                                         {scheduledCount} scheduled
                                     </span>
                                 )}
@@ -361,9 +361,9 @@ export default function SmartCalendar() {
                                 {selectedScheduled.length > 0 && (
                                     <div className="mb-5">
                                         <div className="flex items-center gap-2 mb-3">
-                                            <span className="material-symbols-outlined text-violet-400 text-sm">schedule_send</span>
-                                            <h4 className="text-xs font-bold text-violet-300 uppercase tracking-widest">Scheduled Posts</h4>
-                                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-500/15 text-violet-300">{selectedScheduled.length}</span>
+                                            <span className="material-symbols-outlined text-[#FF4D00] text-sm">schedule_send</span>
+                                            <h4 className="text-xs font-bold text-[#FF7A00] uppercase tracking-widest">Scheduled Posts</h4>
+                                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#FF4D00]/15 text-[#FF7A00]">{selectedScheduled.length}</span>
                                         </div>
                                         <div className="space-y-2">
                                             {selectedScheduled.map((post) => {
@@ -372,8 +372,8 @@ export default function SmartCalendar() {
                                                 return (
                                                     <div key={post._id}
                                                         className={`group rounded-xl border transition-all duration-200 overflow-hidden ${isExpanded
-                                                            ? 'bg-violet-500/[0.08] border-violet-500/30 shadow-lg shadow-violet-500/5'
-                                                            : `border-white/[0.06] hover:border-violet-500/20 ${post.status === 'published' ? 'bg-cyan-500/[0.04]' : 'bg-white/[0.02]'}`
+                                                            ? 'bg-[#FF4D00]/[0.08] border-[#FF4D00]/30 shadow-lg shadow-[#FF4D00]/5'
+                                                            : `border-white/[0.06] hover:border-[#FF4D00]/20 ${post.status === 'published' ? 'bg-cyan-500/[0.04]' : 'bg-white/[0.02]'}`
                                                             }`}>
                                                         {/* Summary row */}
                                                         <button className="w-full p-3 text-left cursor-pointer" onClick={() => setPreviewPost(isExpanded ? null : post)}>
@@ -381,12 +381,12 @@ export default function SmartCalendar() {
                                                                 {/* Platform icon */}
                                                                 <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 bg-gradient-to-br"
                                                                     style={{ background: `linear-gradient(135deg, ${meta.color || '#8B5CF6'}20, ${meta.color || '#8B5CF6'}40)` }}>
-                                                                    <span className="text-sm">{meta.icon || '📱'}</span>
+                                                                    <span className="text-sm">{meta.icon || 'smartphone'}</span>
                                                                 </div>
                                                                 <div className="min-w-0 flex-1">
                                                                     <div className="flex items-center gap-2">
                                                                         <span className="text-sm font-bold text-white">{meta.label || post.platform}</span>
-                                                                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${post.status === 'published' ? 'bg-cyan-500/20 text-cyan-300' : 'bg-violet-500/20 text-violet-300'
+                                                                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${post.status === 'published' ? 'bg-cyan-500/20 text-cyan-300' : 'bg-[#FF4D00]/20 text-[#FF7A00]'
                                                                             }`}>
                                                                             {post.status === 'published' ? '✓ SENT' : '⏰ QUEUED'}
                                                                         </span>
@@ -421,11 +421,11 @@ export default function SmartCalendar() {
                                                                 </div>
 
                                                                 {/* Schedule info */}
-                                                                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-violet-500/10 border border-violet-500/15">
-                                                                    <span className="material-symbols-outlined text-violet-400 text-sm">
+                                                                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[#FF4D00]/10 border border-[#FF4D00]/15">
+                                                                    <span className="material-symbols-outlined text-[#FF4D00] text-sm">
                                                                         {post.status === 'published' ? 'check_circle' : 'event'}
                                                                     </span>
-                                                                    <p className="text-xs text-violet-300 font-medium">
+                                                                    <p className="text-xs text-[#FF7A00] font-medium">
                                                                         {post.status === 'published' ? 'Published' : 'Scheduled'} · {
                                                                             new Date(post.scheduledFor || post.publishedAt || post.createdAt).toLocaleString('en-IN', {
                                                                                 weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'

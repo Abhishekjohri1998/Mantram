@@ -28,15 +28,15 @@ const STATUS_TO_STEP = {
 const CREATIVE_TEMPLATES = [
     { id: 'price-showdown', label: 'Price Showdown', icon: '⚔️', desc: 'Side-by-side Amazon vs Website pricing' },
     { id: 'savings-spotlight', label: 'Savings Spotlight', icon: '💰', desc: 'Large product + savings callout badge' },
-    { id: 'loyalty-unlock', label: 'Loyalty Unlock', icon: '🎁', desc: 'Price comparison + rewards messaging' },
+    { id: 'loyalty-unlock', label: 'Loyalty Unlock', icon: 'redeem', desc: 'Price comparison + rewards messaging' },
     { id: 'bundle-builder', label: 'Bundle Builder', icon: '📦', desc: 'Cross-sell — complete the set on our store' },
     { id: 'vip-welcome', label: 'VIP Welcome', icon: '👑', desc: 'Premium exclusive offer design' },
 ];
 
 const MAILER_TEMPLATES = [
-    { id: 'clean-minimal', label: 'Clean Minimal', icon: '✨', desc: 'White bg, brand header, single card CTA' },
+    { id: 'clean-minimal', label: 'Clean Minimal', icon: 'auto_awesome', desc: 'White bg, brand header, single card CTA' },
     { id: 'dark-premium', label: 'Dark Premium', icon: '🌙', desc: 'Dark gradient, premium feel, multi-product' },
-    { id: 'social-proof', label: 'Social Proof', icon: '⭐', desc: 'Product card + reviews + testimonial' },
+    { id: 'social-proof', label: 'Social Proof', icon: 'star', desc: 'Product card + reviews + testimonial' },
     { id: 'urgency-drive', label: 'Urgency Drive', icon: '⏰', desc: 'Countdown timer + limited-time offer' },
 ];
 
@@ -296,7 +296,7 @@ export default function RetentionStudio() {
             setTestEmailSent('');
             const res = await retentionStudio.testEmail(activeCampaign._id, testEmail.trim());
             if (res.success) {
-                setTestEmailSent(`✅ Test email sent to ${testEmail}`);
+                setTestEmailSent(` Test email sent to ${testEmail}`);
             } else {
                 setError({
                     message: res.error || 'Test email failed',
@@ -381,7 +381,7 @@ export default function RetentionStudio() {
                     </div>
                     {mode === 'pipeline' && view === 'dashboard' && (
                         <button onClick={createCampaign} disabled={loading}
-                            style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', border: 'none', borderRadius: 12, padding: '12px 24px', color: '#fff', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, boxShadow: '0 4px 20px rgba(99,102,241,0.3)' }}>
+                            style={{ background: 'linear-gradient(135deg, #6366f1, #FF4D00)', border: 'none', borderRadius: 12, padding: '12px 24px', color: '#fff', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, boxShadow: '0 4px 20px rgba(99,102,241,0.3)' }}>
                             <span className="material-symbols-outlined" style={{ fontSize: 20 }}>add</span>
                             New Campaign
                         </button>
@@ -463,7 +463,7 @@ export default function RetentionStudio() {
                                     Create your first Amazon→D2C re-engagement campaign to start converting marketplace customers into loyal website buyers.
                                 </p>
                                 <button onClick={createCampaign}
-                                    style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', border: 'none', borderRadius: 12, padding: '12px 28px', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 14 }}>
+                                    style={{ background: 'linear-gradient(135deg, #6366f1, #FF4D00)', border: 'none', borderRadius: 12, padding: '12px 28px', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 14 }}>
                                     Create First Campaign
                                 </button>
                             </div>
@@ -475,7 +475,7 @@ export default function RetentionStudio() {
                                         onMouseEnter={e => e.currentTarget.style.borderColor = 'rgba(99,102,241,0.3)'}
                                         onMouseLeave={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                                            <div style={{ width: 44, height: 44, borderRadius: 12, background: 'linear-gradient(135deg, rgba(99,102,241,0.2), rgba(139,92,246,0.2))', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                            <div style={{ width: 44, height: 44, borderRadius: 12, background: 'linear-gradient(135deg, rgba(99,102,241,0.2), rgba(255, 77, 0,0.2))', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                                 <span className="material-symbols-outlined" style={{ fontSize: 22, color: '#a78bfa' }}>campaign</span>
                                             </div>
                                             <div>
@@ -511,7 +511,7 @@ export default function RetentionStudio() {
                                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, flex: 1 }}>
                                         <div style={{
                                             width: 40, height: 40, borderRadius: '50%',
-                                            background: i < currentStep ? 'linear-gradient(135deg, #10b981, #059669)' : i === currentStep ? 'linear-gradient(135deg, #6366f1, #8b5cf6)' : 'rgba(255,255,255,0.05)',
+                                            background: i < currentStep ? 'linear-gradient(135deg, #10b981, #059669)' : i === currentStep ? 'linear-gradient(135deg, #6366f1, #FF4D00)' : 'rgba(255,255,255,0.05)',
                                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                                             border: i === currentStep ? '2px solid rgba(99,102,241,0.5)' : '2px solid transparent',
                                             boxShadow: i === currentStep ? '0 0 20px rgba(99,102,241,0.3)' : 'none',
@@ -580,7 +580,7 @@ export default function RetentionStudio() {
                                             Load Sample Data
                                         </button>
                                         <button onClick={runIngest} disabled={nodeLoading === 'ingest'}
-                                            style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', border: 'none', borderRadius: 10, padding: '10px 24px', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', gap: 8, opacity: nodeLoading === 'ingest' ? 0.6 : 1 }}>
+                                            style={{ background: 'linear-gradient(135deg, #6366f1, #FF4D00)', border: 'none', borderRadius: 10, padding: '10px 24px', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', gap: 8, opacity: nodeLoading === 'ingest' ? 0.6 : 1 }}>
                                             {nodeLoading === 'ingest' ? (
                                                 <><div style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,0.3)', borderTop: '2px solid #fff', borderRadius: '50%', animation: 'spin 1s linear infinite' }} /> Parsing...</>
                                             ) : (
@@ -776,7 +776,7 @@ export default function RetentionStudio() {
                                                     style={{ flex: 1, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '8px 12px', color: '#e2e8f0', fontSize: 13, outline: 'none' }}
                                                 />
                                                 <button onClick={sendTestEmail} disabled={nodeLoading === 'test'}
-                                                    style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', border: 'none', borderRadius: 8, padding: '8px 16px', color: '#fff', fontWeight: 600, cursor: 'pointer', fontSize: 12, opacity: nodeLoading === 'test' ? 0.6 : 1, whiteSpace: 'nowrap' }}>
+                                                    style={{ background: 'linear-gradient(135deg, #6366f1, #FF4D00)', border: 'none', borderRadius: 8, padding: '8px 16px', color: '#fff', fontWeight: 600, cursor: 'pointer', fontSize: 12, opacity: nodeLoading === 'test' ? 0.6 : 1, whiteSpace: 'nowrap' }}>
                                                     {nodeLoading === 'test' ? 'Sending...' : '📧 Send Test'}
                                                 </button>
                                             </div>
@@ -813,7 +813,7 @@ export default function RetentionStudio() {
                             {currentStep === 4 && (
                                 <div style={{ padding: 32 }}>
                                     <h3 style={{ color: '#fff', fontSize: 18, fontWeight: 700, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
-                                        <span className="material-symbols-outlined" style={{ fontSize: 24, color: '#8b5cf6' }}>send</span>
+                                        <span className="material-symbols-outlined" style={{ fontSize: 24, color: '#FF4D00' }}>send</span>
                                         {activeCampaign.status === 'sent' || activeCampaign.status === 'completed' ? 'Campaign Sent!' : 'Ready to Send'}
                                     </h3>
 
@@ -850,7 +850,7 @@ export default function RetentionStudio() {
                                                 Real emails will be sent via Gmail SMTP to each matched customer with personalized product & price data.
                                             </div>
                                             <button onClick={runSend} disabled={nodeLoading === 'send'}
-                                                style={{ background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)', border: 'none', borderRadius: 10, padding: '12px 28px', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', gap: 8, boxShadow: '0 4px 20px rgba(139,92,246,0.3)', opacity: nodeLoading === 'send' ? 0.6 : 1 }}>
+                                                style={{ background: 'linear-gradient(135deg, #FF4D00, #7c3aed)', border: 'none', borderRadius: 10, padding: '12px 28px', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', gap: 8, boxShadow: '0 4px 20px rgba(255, 77, 0,0.3)', opacity: nodeLoading === 'send' ? 0.6 : 1 }}>
                                                 {nodeLoading === 'send' ? (
                                                     <><div style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,0.3)', borderTop: '2px solid #fff', borderRadius: '50%', animation: 'spin 1s linear infinite' }} /> Sending...</>
                                                 ) : (

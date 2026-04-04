@@ -84,7 +84,7 @@ export function CreditTooltipWrapper({ action, children, position = 'top', class
                     style={{ animationDuration: '150ms' }}>
                     <div className={`px-3 py-2 rounded-xl text-[11px] font-medium whitespace-nowrap shadow-2xl border backdrop-blur-xl ${!canAfford
                             ? 'bg-rose-950/90 border-rose-500/30 text-rose-300'
-                            : 'bg-slate-900/95 border-white/10 text-slate-200'
+                            : 'bg-[#08080C]/95 border-white/10 text-slate-200'
                         }`}>
                         <div className="flex items-center gap-2">
                             <span className="material-symbols-outlined" style={{ fontSize: '14px', color: canAfford ? '#a78bfa' : '#fb7185' }}>toll</span>

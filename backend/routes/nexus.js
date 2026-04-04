@@ -23,6 +23,7 @@ import { getSmartRouter } from '../ai/smartRouter.js';
 import { loadBrandContext, callMultimodalAgent } from '../agents/shared/agentUtils.js';
 import User from '../models/User.js';
 import { safeErrorMessage } from '../utils/safeError.js';
+import { inferBrandLanguage, buildLanguageDirective } from '../utils/brandLanguage.js';
 
 const router = Router();
 
@@ -465,14 +466,20 @@ router.post('/chat', protect, async (req, res) => {
         history.push({ role: 'user', content: message });
         if (history.length > 20) history.splice(0, history.length - 20);
 
-        // Load brand context
         let brandContext = '';
         let brandName = '';
+        let brandLangDirective = '';
         if (brandId) {
             try {
                 const { brandContext: ctx, brand } = await loadBrandContext(brandId);
                 brandContext = ctx || '';
                 brandName = brand?.name || '';
+                // Inject brand language directive so Fidato knows what language to generate content in
+                const langInfo = inferBrandLanguage(brand);
+                brandLangDirective = buildLanguageDirective(langInfo, brandName, brand?.dna?.targetAudience || '');
+                if (langInfo.isRegional) {
+                    console.log(`🌍 Nexus: Brand language directive — ${langInfo.displayName} (${langInfo.source})`);
+                }
             } catch (e) {
                 console.warn('Nexus: could not load brand context:', e.message);
             }
@@ -490,7 +497,7 @@ router.post('/chat', protect, async (req, res) => {
         const now = new Date();
         const dateStr = now.toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
-        let systemPrompt = `${NEXUS_SYSTEM_PROMPT}
+        let systemPrompt = `${brandLangDirective ? brandLangDirective + '\n\n' : ''}${NEXUS_SYSTEM_PROMPT}
 
 Today's date: ${dateStr}
 User's plan: ${req.user.plan || 'starter'}
@@ -728,11 +735,14 @@ router.post('/stream', protect, async (req, res) => {
 
         let brandContext = '';
         let brandName = '';
+        let brandLangDirective = '';
         if (brandId) {
             try {
                 const { brandContext: ctx, brand } = await loadBrandContext(brandId);
                 brandContext = ctx || '';
                 brandName = brand?.name || '';
+                const langInfo = inferBrandLanguage(brand);
+                brandLangDirective = buildLanguageDirective(langInfo, brandName, brand?.dna?.targetAudience || '');
             } catch (e) { /* silent */ }
         }
 
@@ -749,7 +759,7 @@ router.post('/stream', protect, async (req, res) => {
         const now = new Date();
         const dateStr = now.toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
-        let streamSystemPrompt = `${NEXUS_SYSTEM_PROMPT}
+        let streamSystemPrompt = `${brandLangDirective ? brandLangDirective + '\n\n' : ''}${NEXUS_SYSTEM_PROMPT}
 
 Today's date: ${dateStr}
 User's plan: ${req.user.plan || 'starter'}

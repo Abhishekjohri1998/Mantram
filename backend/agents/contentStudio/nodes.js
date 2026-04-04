@@ -13,6 +13,7 @@ import { loadBrandContext } from '../shared/agentUtils.js';
 import { gatherIntelligence } from './tools.js';
 import Brand from '../../models/Brand.js';
 import Product from '../../models/Product.js';
+import { inferBrandLanguage, buildLanguageDirective } from '../../utils/brandLanguage.js';
 import {
     RESEARCH_PROMPT,
     WRITER_PROMPT,
@@ -29,13 +30,45 @@ import {
     CONTENT_VISUAL_GROUNDING_PROMPT,
 } from './prompts.js';
 
+// ────────────────────────────────────────────────────────────────────────────
+// HELPER: Get language directive from state (passed from researchNode)
+// or re-derive it from brand if state doesn't have it (e.g., standalone calls)
+// ────────────────────────────────────────────────────────────────────────────
+async function getLangDirective(state) {
+    if (state.languageDirective !== undefined) {
+        return { langInfo: state.langInfo || { isRegional: false }, languageDirective: state.languageDirective };
+    }
+    try {
+        const { brand } = await loadBrandContext(state.brandId);
+        const langInfo = inferBrandLanguage(brand);
+        const languageDirective = buildLanguageDirective(langInfo, brand?.name || '', brand?.dna?.targetAudience || '');
+        return { langInfo, languageDirective };
+    } catch (e) {
+        return { langInfo: { isRegional: false }, languageDirective: '' };
+    }
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // NODE 1: RESEARCH — Gathers REAL intelligence, then analyzes
 // ══════════════════════════════════════════════════════════════════════════════
 export async function researchNode(state) {
     console.log('🔍 Content Agent: Research — gathering real intelligence...');
 
-    const { brandContext } = await loadBrandContext(state.brandId);
+    const { brandContext, brand } = await loadBrandContext(state.brandId);
+
+    // ── Language inference: detect brand's regional language ──
+    const langInfo = inferBrandLanguage(brand);
+    const languageDirective = buildLanguageDirective(
+        langInfo,
+        brand?.name || '',
+        brand?.dna?.targetAudience || ''
+    );
+    if (langInfo.isRegional) {
+        console.log(`🌍 Content Pipeline: Language directive active — ${langInfo.displayName} (${langInfo.source})`);
+    }
+    // Store for downstream nodes
+    state.langInfo = langInfo;
+    state.languageDirective = languageDirective;
 
     // ── NEW: Gather real data from tools ──
     const intelligence = await gatherIntelligence(state);
@@ -55,11 +88,16 @@ export async function researchNode(state) {
         intelligenceContext,
     ].filter(Boolean).join('\n');
 
-    const result = await callAgent(RESEARCH_PROMPT(brandContext), userPrompt, 0.6);
+    const systemPrompt = languageDirective
+        ? `${languageDirective}\n\n${RESEARCH_PROMPT(brandContext)}`
+        : RESEARCH_PROMPT(brandContext);
+
+    const result = await callAgent(systemPrompt, userPrompt, 0.6);
 
     return {
         ...state,
         research: result,
+        detectedLanguage: langInfo,
         status: 'research',
     };
 }
@@ -75,6 +113,9 @@ export async function writerNode(state) {
     console.log(`✍️ Content Agent: Writer — ${state.rewriteCount > 0 ? `rewriting (attempt ${state.rewriteCount + 1})...` : 'creating content...'}`);
 
     const { brandContext } = await loadBrandContext(state.brandId);
+    // Reuse language directive from researchNode (already on state)
+    const languageDirective = state.languageDirective || '';
+    const langInfo = state.langInfo || { isRegional: false, displayName: 'English' };
 
     // Include real web research data if available
     const webInsights = state.intelligence?.web?.success
@@ -124,7 +165,10 @@ Top Pages: ${(state.intelligence.ga4.data?.pages || []).slice(0, 3).map(p => `${
         `WRITE CONTENT FOR: ${state.brief}`,
         `TYPE: ${state.contentType || 'social'}`,
         `PLATFORM: ${state.platform || 'instagram'}`,
-        state.language ? `LANGUAGE: Write in ${state.language}` : '',
+        // Enforce detected language in user prompt too
+        langInfo.isRegional
+            ? `LANGUAGE: Write ENTIRELY in ${langInfo.displayName}. Do NOT output English creative copy.`
+            : (state.language ? `LANGUAGE: Write in ${state.language}` : ''),
         '',
         `RESEARCH INSIGHTS:`,
         `Key Angles: ${(state.research?.keyAngles || []).join(', ')}`,
@@ -144,8 +188,11 @@ Top Pages: ${(state.intelligence.ga4.data?.pages || []).slice(0, 3).map(p => `${
         rewriteNote,
     ].filter(Boolean).join('\n');
 
+    const systemPrompt = languageDirective
+        ? `${languageDirective}\n\n${WRITER_PROMPT(brandContext)}`
+        : WRITER_PROMPT(brandContext);
 
-    const result = await callAgent(WRITER_PROMPT(brandContext), userPrompt, 0.7);
+    const result = await callAgent(systemPrompt, userPrompt, 0.7);
 
     return {
         ...state,
@@ -161,6 +208,7 @@ export async function seoNode(state) {
     console.log('🔎 Content Agent: SEO — optimizing...');
 
     const { brandContext } = await loadBrandContext(state.brandId);
+    const languageDirective = state.languageDirective || '';
 
     // Include real SEO audit data if available
     const seoAuditContext = state.intelligence?.seo?.success
@@ -176,7 +224,11 @@ export async function seoNode(state) {
         seoAuditContext,
     ].join('\n');
 
-    const result = await callAgent(SEO_PROMPT(brandContext), userPrompt, 0.3);
+    const systemPrompt = languageDirective
+        ? `${languageDirective}\n\n${SEO_PROMPT(brandContext)}`
+        : SEO_PROMPT(brandContext);
+
+    const result = await callAgent(systemPrompt, userPrompt, 0.3);
 
     return {
         ...state,
@@ -192,16 +244,24 @@ export async function toneMatcherNode(state) {
     console.log('🎭 Content Agent: Tone Matcher — aligning voice...');
 
     const { brandContext } = await loadBrandContext(state.brandId);
+    const languageDirective = state.languageDirective || '';
+    const langInfo = state.langInfo || { isRegional: false, displayName: 'English' };
 
     const userPrompt = [
         `CHECK TONE CONSISTENCY:`,
         `Content: ${state.seoOptimized?.optimizedContent || state.draft?.content || ''}`,
         `Platform: ${state.platform || 'instagram'}`,
         state.tone ? `Requested Tone: ${state.tone}` : '',
-        state.language ? `Language: ${state.language}` : '',
+        langInfo.isRegional
+            ? `Language: Content MUST remain in ${langInfo.displayName} — do NOT translate to English`
+            : (state.language ? `Language: ${state.language}` : ''),
     ].filter(Boolean).join('\n');
 
-    const result = await callAgent(TONE_MATCHER_PROMPT(brandContext), userPrompt, 0.4);
+    const systemPrompt = languageDirective
+        ? `${languageDirective}\n\n${TONE_MATCHER_PROMPT(brandContext)}`
+        : TONE_MATCHER_PROMPT(brandContext);
+
+    const result = await callAgent(systemPrompt, userPrompt, 0.4);
 
     return {
         ...state,
@@ -217,6 +277,7 @@ export async function contentStrategistNode(state) {
     console.log('🎯 Content Agent: Strategist — creating content strategy...');
 
     const { brandContext } = await loadBrandContext(state.brandId);
+    const languageDirective = state.languageDirective || '';
 
     // Competitor context if available
     const competitorContext = state.intelligence?.competitors?.success
@@ -240,14 +301,18 @@ export async function contentStrategistNode(state) {
             ? `\nPAST CONTENT PERFORMANCE: ${state.intelligence.contentHistory.data?.totalPieces || 0} pieces previously created`
             : '',
         state.intelligence?.performanceLearnings?.success
-            ? `\nPERFORMANCE PLAYBOOK:\nBest Types: ${Object.entries(state.intelligence.performanceLearnings.data?.byType || {}).sort((a, b) => b[1].avgRating - a[1].avgRating).slice(0, 3).map(([t, d]) => `${t}(${d.avgRating}★, ${d.count} pieces)`).join(', ')}\nBest Platforms: ${Object.entries(state.intelligence.performanceLearnings.data?.byPlatform || {}).sort((a, b) => b[1].avgRating - a[1].avgRating).slice(0, 3).map(([p, d]) => `${p}(${d.avgRating}★)`).join(', ')}\nAccept Rate: ${state.intelligence.performanceLearnings.data?.feedbackPatterns?.acceptRate || 0}% | Regenerate Rate: ${state.intelligence.performanceLearnings.data?.feedbackPatterns?.regenerateRate || 0}%`
+            ? `\nPERFORMANCE PLAYBOOK:\nBest Types: ${Object.entries(state.intelligence.performanceLearnings.data?.byType || {}).sort((a, b) => b[1].avgRating - a[1].avgRating).slice(0, 3).map(([t, d]) => `${t}(${d.avgRating}\u2605, ${d.count} pieces)`).join(', ')}\nBest Platforms: ${Object.entries(state.intelligence.performanceLearnings.data?.byPlatform || {}).sort((a, b) => b[1].avgRating - a[1].avgRating).slice(0, 3).map(([p, d]) => `${p}(${d.avgRating}\u2605)`).join(', ')}\nAccept Rate: ${state.intelligence.performanceLearnings.data?.feedbackPatterns?.acceptRate || 0}% | Regenerate Rate: ${state.intelligence.performanceLearnings.data?.feedbackPatterns?.regenerateRate || 0}%`
             : '',
         state.intelligence?.ga4?.success
             ? `\nGA4 TOP CONTENT: ${(state.intelligence.ga4.data?.pages || []).slice(0, 3).map(p => `${p.contentTitle || p.path} (${p.pageViews} views, ${(p.bounceRate * 100).toFixed(0)}% bounce)`).join(', ')}`
             : '',
     ].filter(Boolean).join('\n');
 
-    const result = await callAgent(CONTENT_STRATEGIST_PROMPT(brandContext), userPrompt, 0.5);
+    const systemPrompt = languageDirective
+        ? `${languageDirective}\n\n${CONTENT_STRATEGIST_PROMPT(brandContext)}`
+        : CONTENT_STRATEGIST_PROMPT(brandContext);
+
+    const result = await callAgent(systemPrompt, userPrompt, 0.5);
 
     return {
         ...state,
@@ -263,6 +328,7 @@ export async function platformOptimizerNode(state) {
     console.log(`📱 Content Agent: Platform Optimizer — optimizing for ${state.platform || 'general'}...`);
 
     const { brandContext } = await loadBrandContext(state.brandId);
+    const { langInfo, languageDirective } = await getLangDirective(state);
 
     const userPrompt = [
         `OPTIMIZE THIS CONTENT FOR ${(state.platform || 'instagram').toUpperCase()}:`,
@@ -273,9 +339,14 @@ export async function platformOptimizerNode(state) {
         state.strategy?.ctaStrategy ? `CTA Strategy: ${state.strategy.ctaStrategy}` : '',
         state.strategy?.hookStrategy ? `Hook Strategy: ${state.strategy.hookStrategy}` : '',
         state.research?.targetKeywords ? `Target Keywords: ${state.research.targetKeywords.join(', ')}` : '',
+        langInfo.isRegional ? `LANGUAGE: Final output MUST remain in ${langInfo.displayName} — do NOT translate` : '',
     ].filter(Boolean).join('\n');
 
-    const result = await callAgent(PLATFORM_OPTIMIZER_PROMPT(brandContext), userPrompt, 0.4);
+    const systemPrompt = languageDirective
+        ? `${languageDirective}\n\n${PLATFORM_OPTIMIZER_PROMPT(brandContext)}`
+        : PLATFORM_OPTIMIZER_PROMPT(brandContext);
+
+    const result = await callAgent(systemPrompt, userPrompt, 0.4);
 
     return {
         ...state,
@@ -291,6 +362,7 @@ export async function qualityCriticNode(state) {
     console.log(`⭐ Content Agent: Quality Critic — scoring... (attempt ${(state.rewriteCount || 0) + 1})`);
 
     const { brandContext } = await loadBrandContext(state.brandId);
+    const { langInfo, languageDirective } = await getLangDirective(state);
 
     const userPrompt = [
         `ASSESS THIS FINAL CONTENT:`,
@@ -299,10 +371,15 @@ export async function qualityCriticNode(state) {
         `Platform: ${state.platform || 'instagram'}`,
         `Content Type: ${state.contentType || 'social'}`,
         `Brief: ${state.brief}`,
+        langInfo.isRegional ? `LANGUAGE CHECK: Verify all creative copy is in ${langInfo.displayName}. Deduct points if English is used instead.` : '',
         state.rewriteCount > 0 ? `\nThis is rewrite attempt #${state.rewriteCount}. Be fair but watch for improvement.` : '',
-    ].join('\n');
+    ].filter(Boolean).join('\n');
 
-    const result = await callAgent(QUALITY_CRITIC_PROMPT(brandContext), userPrompt, 0.3);
+    const systemPrompt = languageDirective
+        ? `${languageDirective}\n\n${QUALITY_CRITIC_PROMPT(brandContext)}`
+        : QUALITY_CRITIC_PROMPT(brandContext);
+
+    const result = await callAgent(systemPrompt, userPrompt, 0.3);
 
     const overallScore = result?.scores?.overall || result?.overallScore || 10;
     const rewriteCount = state.rewriteCount || 0;
@@ -352,6 +429,7 @@ export async function contentABTestNode(state) {
     console.log('🔬 Content Agent: A/B Test — generating variants...');
 
     const { brandContext } = await loadBrandContext(state.brandId);
+    const { langInfo, languageDirective } = await getLangDirective(state);
 
     const userPrompt = [
         `GENERATE A/B TEST VARIANTS FOR THIS CONTENT:`,
@@ -359,6 +437,7 @@ export async function contentABTestNode(state) {
         `Content: ${state.finalContent || state.draft?.content || ''}`,
         `Platform: ${state.platform || 'instagram'}`,
         `Content Type: ${state.contentType || 'social'}`,
+        langInfo.isRegional ? `LANGUAGE: All variants MUST be in ${langInfo.displayName} — do NOT produce English alternatives` : '',
         state.strategy?.funnelPosition ? `Funnel Position: ${state.strategy.funnelPosition}` : '',
         state.strategy?.hookStrategy ? `Hook Strategy Used: ${state.strategy.hookStrategy}` : '',
         state.strategy?.ctaStrategy ? `CTA Strategy Used: ${state.strategy.ctaStrategy}` : '',
@@ -367,7 +446,11 @@ export async function contentABTestNode(state) {
             : '',
     ].filter(Boolean).join('\n');
 
-    const result = await callAgent(CONTENT_AB_TEST_PROMPT(brandContext), userPrompt, 0.7);
+    const systemPrompt = languageDirective
+        ? `${languageDirective}\n\n${CONTENT_AB_TEST_PROMPT(brandContext)}`
+        : CONTENT_AB_TEST_PROMPT(brandContext);
+
+    const result = await callAgent(systemPrompt, userPrompt, 0.7);
 
     return {
         ...state,
@@ -384,6 +467,7 @@ export async function youtubeResearchNode(state) {
     console.log('🎬 YouTube Agent: Research — analyzing topic for YouTube...');
 
     const { brandContext } = await loadBrandContext(state.brandId);
+    const { langInfo, languageDirective } = await getLangDirective(state);
 
     // Gather intelligence for YouTube too
     if (!state.intelligence) {
@@ -402,17 +486,23 @@ export async function youtubeResearchNode(state) {
         state.videoLength ? `TARGET LENGTH: ${state.videoLength}` : '',
         state.targetAudience ? `TARGET AUDIENCE: ${state.targetAudience}` : '',
         state.style ? `VIDEO STYLE: ${state.style}` : '',
-        state.language ? `LANGUAGE: ${state.language}` : '',
+        state.language ? `LANGUAGE: ${state.language}` : (langInfo.isRegional ? `LANGUAGE: ${langInfo.displayName}` : ''),
         state.subType ? `VIDEO TYPE: ${state.subType}` : '',
         '',
         intelligenceContext,
     ].filter(Boolean).join('\n');
 
-    const result = await callAgent(YOUTUBE_RESEARCH_PROMPT(brandContext), userPrompt, 0.6);
+    const systemPrompt = languageDirective
+        ? `${languageDirective}\n\n${YOUTUBE_RESEARCH_PROMPT(brandContext)}`
+        : YOUTUBE_RESEARCH_PROMPT(brandContext);
+
+    const result = await callAgent(systemPrompt, userPrompt, 0.6);
 
     return {
         ...state,
         youtubeResearch: result,
+        langInfo,
+        languageDirective,
         status: 'youtube_research',
     };
 }
@@ -421,13 +511,14 @@ export async function youtubeWriterNode(state) {
     console.log('✍️ YouTube Agent: Writer — creating YouTube content...');
 
     const { brandContext } = await loadBrandContext(state.brandId);
+    const { langInfo, languageDirective } = await getLangDirective(state);
     const research = state.youtubeResearch || {};
 
     const userPrompt = [
         `WRITE YOUTUBE CONTENT FOR: ${state.brief}`,
         `FORMAT: ${state.format || 'video'} (${state.format === 'shorts' ? 'YouTube Shorts — MAX 60 seconds, punchy, no intro' : 'Long-form YouTube video'})`,
         state.videoLength ? `TARGET VIDEO LENGTH: ${state.videoLength}` : '',
-        state.language ? `LANGUAGE: Write in ${state.language}` : '',
+        state.language ? `LANGUAGE: Write in ${state.language}` : (langInfo.isRegional ? `LANGUAGE: Write ENTIRELY in ${langInfo.displayName}` : ''),
         state.style ? `VIDEO STYLE: ${state.style}` : '',
         '',
         `YOUTUBE RESEARCH INSIGHTS:`,
@@ -442,7 +533,11 @@ export async function youtubeWriterNode(state) {
         `Brand Notes: ${research.brandNotes || ''}`,
     ].filter(Boolean).join('\n');
 
-    const result = await callAgent(YOUTUBE_WRITER_PROMPT(brandContext), userPrompt, 0.7, 8192);
+    const systemPrompt = languageDirective
+        ? `${languageDirective}\n\n${YOUTUBE_WRITER_PROMPT(brandContext)}`
+        : YOUTUBE_WRITER_PROMPT(brandContext);
+
+    const result = await callAgent(systemPrompt, userPrompt, 0.7, 8192);
 
     return {
         ...state,
@@ -455,13 +550,14 @@ export async function youtubeSeoNode(state) {
     console.log('🚀 YouTube Agent: SEO Optimizer — generating publish metadata...');
 
     const { brandContext } = await loadBrandContext(state.brandId);
+    const { langInfo, languageDirective } = await getLangDirective(state);
     const research = state.youtubeResearch || {};
 
     const userPrompt = [
         `GENERATE YOUTUBE PUBLISHING METADATA FOR: ${state.brief}`,
         `FORMAT: ${state.format || 'video'} (${state.format === 'shorts' ? 'YouTube Shorts — under 60 seconds' : 'Long-form YouTube video'})`,
         state.targetAudience ? `TARGET AUDIENCE: ${state.targetAudience}` : '',
-        state.language ? `LANGUAGE: ${state.language}` : '',
+        state.language ? `LANGUAGE: ${state.language}` : (langInfo.isRegional ? `LANGUAGE: ${langInfo.displayName} audience` : ''),
         '',
         `YOUTUBE RESEARCH INSIGHTS:`,
         `Primary Keyword: ${research.primaryKeyword || ''}`,
@@ -473,7 +569,11 @@ export async function youtubeSeoNode(state) {
         `Brand Notes: ${research.brandNotes || ''}`,
     ].filter(Boolean).join('\n');
 
-    const result = await callAgent(YOUTUBE_SEO_PROMPT(brandContext), userPrompt, 0.5, 4096);
+    const systemPrompt = languageDirective
+        ? `${languageDirective}\n\n${YOUTUBE_SEO_PROMPT(brandContext)}`
+        : YOUTUBE_SEO_PROMPT(brandContext);
+
+    const result = await callAgent(systemPrompt, userPrompt, 0.5, 4096);
 
     return {
         ...state,
@@ -552,9 +652,18 @@ export async function blogWriterNode(state) {
     console.log('📝 Blog Agent: Writing structured blog article...');
 
     const { brandContext } = await loadBrandContext(state.brandId);
+    const { langInfo, languageDirective } = await getLangDirective(state);
+    if (langInfo.isRegional) {
+        console.log(`🌍 Blog Agent: Language directive active — ${langInfo.displayName}`);
+    }
+
     const intelligenceContext = buildIntelligenceContext(state.intelligence || {});
 
-    const prompt = BLOG_STRUCTURED_PROMPT
+    const langNote = langInfo.isRegional
+        ? `\n\nCRITICAL LANGUAGE REQUIREMENT: This blog MUST be written ENTIRELY in ${langInfo.displayName}. ALL sections, headings, metadata, and body content must be in ${langInfo.displayName}. English is NOT acceptable.`
+        : '';
+
+    const prompt = (languageDirective ? `${languageDirective}\n\n` : '') + BLOG_STRUCTURED_PROMPT
         .replace('{brandContext}', brandContext || 'No brand context')
         .replace('{researchContext}', intelligenceContext || 'No research data')
         .replace('{topic}', state.topic || state.brief || '')
@@ -562,7 +671,7 @@ export async function blogWriterNode(state) {
         .replace('{targetWordCount}', String(state.targetWordCount || 1500))
         .replace('{keywords}', (state.keywords || []).join(', ') || 'auto-detect')
         .replace('{audience}', state.targetAudience || 'general')
-        .replace('{tone}', state.tone || 'professional, engaging');
+        .replace('{tone}', state.tone || 'professional, engaging') + langNote;
 
     const result = await callAgent(prompt, `Generate a structured blog article about: ${state.topic || state.brief}`, 0.7, 8192);
 

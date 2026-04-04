@@ -266,7 +266,7 @@ export default function BrandManagement() {
                                                 <p className="text-xs text-primary truncate">{brand.website.replace(/^https?:\/\//, '')}</p>
                                             )}
                                             {!isOwner && (
-                                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-violet-500/10 text-violet-400 uppercase tracking-wider">Shared with you</span>
+                                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-[#FF4D00]/10 text-[#FF4D00] uppercase tracking-wider">Shared with you</span>
                                             )}
                                         </div>
                                     </div>

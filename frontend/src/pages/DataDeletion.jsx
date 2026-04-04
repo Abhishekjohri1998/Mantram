@@ -6,7 +6,7 @@ export default function DataDeletion() {
     const code = searchParams.get('code')
 
     return (
-        <div className="min-h-screen bg-slate-950 text-slate-300 py-12 px-4 sm:px-6 lg:px-8">
+        <div className="min-h-screen bg-[#08080C] text-slate-300 py-12 px-4 sm:px-6 lg:px-8">
             <SEOHead
                 title="Data Deletion — Mantram AI"
                 description="Request deletion of your Mantram AI account data, brand identities, generated content, and connected social media accounts. We process requests within 48 hours."

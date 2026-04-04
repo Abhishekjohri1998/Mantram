@@ -1113,7 +1113,7 @@ export default function FunnelStudio() {
                                                 <div className="flex items-center gap-2 min-w-0">
                                                     {/* Score Ring Avatar */}
                                                     <div className="relative shrink-0">
-                                                        <div className="size-8 rounded-full bg-gradient-to-br from-primary/30 to-purple-500/30 flex items-center justify-center text-xs font-bold text-white"
+                                                        <div className="size-8 rounded-full bg-gradient-to-br from-primary/30 to-[#FF7A00]/30 flex items-center justify-center text-xs font-bold text-white"
                                                             style={{ boxShadow: `0 0 0 2px ${scoreColor}50` }}>
                                                             {(entry.name || '?')[0].toUpperCase()}
                                                         </div>
@@ -1285,7 +1285,7 @@ export default function FunnelStudio() {
                     </div>
                     <div className="flex items-center gap-2">
                         <button onClick={() => setShowAIModal(true)}
-                            className="px-5 py-2.5 rounded-xl text-sm font-bold bg-gradient-to-r from-primary to-purple-500 text-white flex items-center gap-2 cursor-pointer hover:shadow-lg hover:shadow-primary/20 transition-all">
+                            className="px-5 py-2.5 rounded-xl text-sm font-bold bg-gradient-to-r from-primary to-[#FF7A00] text-white flex items-center gap-2 cursor-pointer hover:shadow-lg hover:shadow-primary/20 transition-all">
                             <span className="material-symbols-outlined text-sm">auto_awesome</span> AI Architect
                         </button>
                     </div>
@@ -1383,7 +1383,7 @@ export default function FunnelStudio() {
                         <p className="text-slate-500 text-sm mb-6 max-w-md mx-auto">Choose a template below or use AI Architect to build a custom sales funnel tailored to your brand.</p>
                         <div className="flex gap-3 justify-center">
                             <button onClick={() => setShowAIModal(true)}
-                                className="px-6 py-3 rounded-xl text-sm font-bold bg-gradient-to-r from-primary to-purple-500 text-white flex items-center gap-2 cursor-pointer hover:shadow-lg hover:shadow-primary/20 transition-all">
+                                className="px-6 py-3 rounded-xl text-sm font-bold bg-gradient-to-r from-primary to-[#FF7A00] text-white flex items-center gap-2 cursor-pointer hover:shadow-lg hover:shadow-primary/20 transition-all">
                                 <span className="material-symbols-outlined text-sm">auto_awesome</span> AI Architect
                             </button>
                             <button onClick={() => setShowTemplates(true)}
@@ -1591,7 +1591,7 @@ function AddEntryModal({ stages, onSubmit, onClose }) {
                             className="w-full accent-primary" />
                     </div>
                     <button onClick={() => onSubmit({ name, email, phone, company, source, score, stage, dealValue: dealValue ? parseInt(dealValue) : undefined })}
-                        className="w-full py-3 rounded-xl text-sm font-bold bg-gradient-to-r from-primary to-purple-500 text-white cursor-pointer hover:shadow-lg hover:shadow-primary/20 transition-all flex items-center justify-center gap-2 mt-2">
+                        className="w-full py-3 rounded-xl text-sm font-bold bg-gradient-to-r from-primary to-[#FF7A00] text-white cursor-pointer hover:shadow-lg hover:shadow-primary/20 transition-all flex items-center justify-center gap-2 mt-2">
                         <span className="material-symbols-outlined text-sm">person_add</span> Add Lead
                     </button>
                 </div>
@@ -1662,7 +1662,7 @@ function AIGenerateModal({ brandId, onCreated, onClose }) {
                     </div>
 
                     <button onClick={handleGenerate} disabled={generating || !prompt.trim()}
-                        className={`w-full py-3 rounded-xl text-sm font-bold text-white cursor-pointer flex items-center justify-center gap-2 transition-all ${generating ? 'bg-slate-600 cursor-not-allowed' : 'bg-gradient-to-r from-primary to-purple-500 hover:shadow-lg hover:shadow-primary/20'} disabled:opacity-50`}>
+                        className={`w-full py-3 rounded-xl text-sm font-bold text-white cursor-pointer flex items-center justify-center gap-2 transition-all ${generating ? 'bg-slate-600 cursor-not-allowed' : 'bg-gradient-to-r from-primary to-[#FF7A00] hover:shadow-lg hover:shadow-primary/20'} disabled:opacity-50`}>
                         {generating ? (
                             <><span className="material-symbols-outlined text-sm animate-spin">progress_activity</span> Generating funnel...</>
                         ) : (
@@ -2252,7 +2252,7 @@ function NurtureView({ funnel, sequences, loading, onBack, onCreate, onAIGenerat
                 <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setAiGenStage(null)}>
                     <div style={{ background: '#1e293b', borderRadius: '16px', border: '1px solid #334155', width: '500px', maxHeight: '85vh', overflow: 'auto' }} onClick={e => e.stopPropagation()}>
                         <div style={{ padding: '1.25rem', borderBottom: '1px solid #334155' }}>
-                            <h3 style={{ margin: 0, color: '#e2e8f0', fontSize: '1rem', fontWeight: 700 }}>✨ AI Nurture Generator</h3>
+                            <h3 style={{ margin: 0, color: '#e2e8f0', fontSize: '1rem', fontWeight: 700 }}><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">auto_awesome</span> AI Nurture Generator</h3>
                             <p style={{ color: '#64748b', margin: '0.2rem 0 0', fontSize: '0.7rem' }}>Generate a complete nurture sequence for the <strong>{aiGenStage}</strong> stage</p>
                         </div>
                         <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
@@ -2447,15 +2447,15 @@ function HealthDashboardView({ funnel, health, loading, scoringResult, scoringLo
                             <div className="flex gap-3 mb-4">
                                 <div className="flex-1 p-3 rounded-xl bg-rose-500/[0.06] border border-rose-500/10 text-center">
                                     <p className="text-rose-400 text-2xl font-black">{scoringResult.summary?.hot || 0}</p>
-                                    <p className="text-rose-400/60 text-xs font-bold">🔥 Hot (70+)</p>
+                                    <p className="text-rose-400/60 text-xs font-bold"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">local_fire_department</span> Hot (70+)</p>
                                 </div>
                                 <div className="flex-1 p-3 rounded-xl bg-amber-500/[0.06] border border-amber-500/10 text-center">
                                     <p className="text-amber-400 text-2xl font-black">{scoringResult.summary?.warm || 0}</p>
                                     <p className="text-amber-400/60 text-xs font-bold">🌡️ Warm (40-69)</p>
                                 </div>
-                                <div className="flex-1 p-3 rounded-xl bg-blue-500/[0.06] border border-blue-500/10 text-center">
-                                    <p className="text-blue-400 text-2xl font-black">{scoringResult.summary?.cold || 0}</p>
-                                    <p className="text-blue-400/60 text-xs font-bold">❄️ Cold (&lt;40)</p>
+                                <div className="flex-1 p-3 rounded-xl bg-[#FF4D00]/[0.06] border border-[#FF4D00]/10 text-center">
+                                    <p className="text-[#FF4D00] text-2xl font-black">{scoringResult.summary?.cold || 0}</p>
+                                    <p className="text-[#FF4D00]/60 text-xs font-bold">❄️ Cold (&lt;40)</p>
                                 </div>
                             </div>
                             <div className="space-y-1.5">
@@ -2523,7 +2523,7 @@ function LandingPagesView({ funnel, pages, loading, onBack, onRefresh, onCreate,
                     </button>
                     <div>
                         <h2 className="text-white font-bold text-lg flex items-center gap-2">
-                            <span className="material-symbols-outlined text-violet-400">web</span> Landing Pages
+                            <span className="material-symbols-outlined text-[#FF4D00]">web</span> Landing Pages
                         </h2>
                         <p className="text-sm text-slate-500">Capture leads with branded landing pages and forms</p>
                     </div>
@@ -2588,7 +2588,7 @@ function LandingPagesView({ funnel, pages, loading, onBack, onRefresh, onCreate,
                                             <span className="material-symbols-outlined text-xs text-slate-500">{SECTION_ICONS[s.type] || 'article'}</span>
                                         </span>
                                     ))}
-                                    {page.form?.enabled && <span className="size-6 rounded flex items-center justify-center bg-violet-500/10"><span className="material-symbols-outlined text-xs text-violet-400">description</span></span>}
+                                    {page.form?.enabled && <span className="size-6 rounded flex items-center justify-center bg-[#FF4D00]/10"><span className="material-symbols-outlined text-xs text-[#FF4D00]">description</span></span>}
                                 </div>
                                 <div className="flex gap-2 mt-3">
                                     <button onClick={() => onDelete(page._id)} className="size-7 rounded-md flex items-center justify-center text-slate-600 hover:text-rose-400 hover:bg-rose-500/10 transition-all cursor-pointer">
@@ -2605,7 +2605,7 @@ function LandingPagesView({ funnel, pages, loading, onBack, onRefresh, onCreate,
                 <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setShowAiGen(false)}>
                     <div style={{ background: '#1e293b', borderRadius: '16px', border: '1px solid #334155', width: '480px', maxHeight: '85vh', overflow: 'auto' }} onClick={e => e.stopPropagation()}>
                         <div style={{ padding: '1.25rem', borderBottom: '1px solid #334155' }}>
-                            <h3 style={{ margin: 0, color: '#e2e8f0', fontSize: '1rem', fontWeight: 700 }}>✨ AI Landing Page Generator</h3>
+                            <h3 style={{ margin: 0, color: '#e2e8f0', fontSize: '1rem', fontWeight: 700 }}><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">auto_awesome</span> AI Landing Page Generator</h3>
                             <p style={{ color: '#64748b', margin: '0.2rem 0 0', fontSize: '0.7rem' }}>Generate a conversion-optimized landing page</p>
                         </div>
                         <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
@@ -2778,17 +2778,17 @@ const HELP_SECTIONS = [
 
 const PRO_TIPS = [
     { icon: '🧭', tip: 'Use the 4-tab navigation (Pipeline → Intelligence → Engage → Configure) to access all features without toolbar clutter.' },
-    { icon: '📊', tip: 'Check the Command Center dashboard for quick metrics. The "What To Do Next" cards suggest AI-powered actions based on your funnel data.' },
+    { icon: 'bar_chart', tip: 'Check the Command Center dashboard for quick metrics. The "What To Do Next" cards suggest AI-powered actions based on your funnel data.' },
     { icon: '🎯', tip: 'Start with a template, then customize stages in the Configure → Stage Builder tab. Templates give you best-practice stage flows.' },
-    { icon: '🤖', tip: 'Use AI Architect to create funnels, then AI Generate for nurture sequences, landing pages, and automation rules — all tailored to your brand.' },
+    { icon: 'smart_toy', tip: 'Use AI Architect to create funnels, then AI Generate for nurture sequences, landing pages, and automation rules — all tailored to your brand.' },
     { icon: '🔥', tip: 'Look for green dots on Kanban cards — those are hot leads (score 70+). Prioritize them for maximum conversion.' },
     { icon: '💰', tip: 'Always add a Deal Value when creating leads. The ₹ badge on cards helps you prioritize high-value opportunities at a glance.' },
     { icon: '📧', tip: 'Every stage should have a Nurture Sequence (Engage tab → Nurture). Leads that receive timely follow-ups convert 2-3x better.' },
-    { icon: '🔗', tip: 'Connect stages to studios in the Configure → Stage Builder. This enables cross-studio workflows triggered by funnel events.' },
+    { icon: 'link', tip: 'Connect stages to studios in the Configure → Stage Builder. This enables cross-studio workflows triggered by funnel events.' },
     { icon: '📱', tip: 'Use multi-channel nurture (DM + Email + WhatsApp) for 5x higher engagement vs. single-channel sequences.' },
     { icon: '⚡', tip: 'Use AI Auto-Generate automation rules (Engage → Automations). One click sets up smart rules for stage advancement, inactivity detection, and scoring.' },
     { icon: '⏰', tip: 'Watch the "last activity" timer on Kanban cards. Leads inactive for 3+ days need immediate attention — set up inactivity automation rules.' },
-    { icon: '📈', tip: 'Check Intelligence → Health weekly. Fix bottlenecks first — stages with 50%+ drop-off are the biggest leaks in your funnel.' },
+    { icon: 'trending_up', tip: 'Check Intelligence → Health weekly. Fix bottlenecks first — stages with 50%+ drop-off are the biggest leaks in your funnel.' },
 ]
 
 function HelpDocumentationView({ onBack }) {
@@ -2926,7 +2926,7 @@ function HelpDocumentationView({ onBack }) {
             <div className="text-center mt-6 py-6">
                 <p className="text-slate-500 text-sm mb-3">Ready to get started?</p>
                 <button onClick={onBack}
-                    className="px-6 py-3 rounded-xl text-sm font-bold bg-gradient-to-r from-primary to-purple-500 text-white cursor-pointer hover:shadow-lg hover:shadow-primary/20 transition-all flex items-center gap-2 mx-auto">
+                    className="px-6 py-3 rounded-xl text-sm font-bold bg-gradient-to-r from-primary to-[#FF7A00] text-white cursor-pointer hover:shadow-lg hover:shadow-primary/20 transition-all flex items-center gap-2 mx-auto">
                     <span className="material-symbols-outlined text-sm">rocket_launch</span> Go to Dashboard
                 </button>
             </div>
@@ -3012,7 +3012,7 @@ function AutomationView({ funnel, rules, loading, running, generating, onBack, o
                         <span className="material-symbols-outlined text-sm">refresh</span> Refresh
                     </button>
                     <button onClick={() => setShowAiInput(!showAiInput)}
-                        className="px-4 py-2 rounded-xl text-sm font-bold text-purple-400 hover:text-purple-300 bg-purple-500/[0.06] hover:bg-purple-500/[0.1] border border-purple-500/10 transition-all cursor-pointer flex items-center gap-1.5">
+                        className="px-4 py-2 rounded-xl text-sm font-bold text-[#FF4D00] hover:text-[#FF7A00] bg-[#FF4D00]/[0.06] hover:bg-[#FF4D00]/[0.1] border border-[#FF4D00]/10 transition-all cursor-pointer flex items-center gap-1.5">
                         <span className="material-symbols-outlined text-sm">auto_awesome</span> AI Generate
                     </button>
                     <button onClick={onRunAll} disabled={running}
@@ -3032,7 +3032,7 @@ function AutomationView({ funnel, rules, loading, running, generating, onBack, o
             {showAiInput && (
                 <div className="glass-panel rounded-2xl p-5" style={{ background: 'linear-gradient(135deg, #8b5cf610, #6366f110)' }}>
                     <h3 className="text-white font-bold text-sm mb-3 flex items-center gap-2">
-                        <span className="material-symbols-outlined text-purple-400">auto_awesome</span>
+                        <span className="material-symbols-outlined text-[#FF4D00]">auto_awesome</span>
                         AI Auto-Generate Rules
                     </h3>
                     <p className="text-xs text-slate-500 mb-3">Describe what you want to automate, or leave blank to get smart defaults.</p>
@@ -3042,10 +3042,10 @@ function AutomationView({ funnel, rules, loading, running, generating, onBack, o
                             value={aiPrompt}
                             onChange={(e) => setAiPrompt(e.target.value)}
                             placeholder="e.g. Auto-move hot leads to Decision stage, flag inactive leads after 7 days..."
-                            className="flex-1 px-4 py-2.5 rounded-xl bg-white/[0.06] border border-white/[0.08] text-white text-sm outline-none focus:border-purple-500/30 transition-all"
+                            className="flex-1 px-4 py-2.5 rounded-xl bg-white/[0.06] border border-white/[0.08] text-white text-sm outline-none focus:border-[#FF4D00]/30 transition-all"
                         />
                         <button onClick={handleAIGenerate} disabled={generating}
-                            className="px-5 py-2.5 rounded-xl text-sm font-bold bg-gradient-to-r from-purple-500 to-indigo-500 text-white cursor-pointer flex items-center gap-1.5 disabled:opacity-50">
+                            className="px-5 py-2.5 rounded-xl text-sm font-bold bg-gradient-to-r from-[#FF4D00] to-[#FF7A00] text-white cursor-pointer flex items-center gap-1.5 disabled:opacity-50">
                             {generating ? (
                                 <><span className="material-symbols-outlined text-sm animate-spin">progress_activity</span> Generating...</>
                             ) : (
@@ -3198,7 +3198,7 @@ function AutomationView({ funnel, rules, loading, running, generating, onBack, o
                     </p>
                     <div className="flex gap-3 justify-center">
                         <button onClick={() => setShowAiInput(true)}
-                            className="px-5 py-2.5 rounded-xl text-sm font-bold bg-gradient-to-r from-purple-500 to-indigo-500 text-white cursor-pointer flex items-center gap-1.5">
+                            className="px-5 py-2.5 rounded-xl text-sm font-bold bg-gradient-to-r from-[#FF4D00] to-[#FF7A00] text-white cursor-pointer flex items-center gap-1.5">
                             <span className="material-symbols-outlined text-sm">auto_awesome</span> AI Auto-Generate
                         </button>
                         <button onClick={() => setShowCreate(true)}
@@ -3228,7 +3228,7 @@ function AutomationView({ funnel, rules, loading, running, generating, onBack, o
                                             <h4 className="text-white font-bold text-sm truncate flex items-center gap-2">
                                                 {rule.name}
                                                 {rule.aiGenerated && (
-                                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-500/20 text-purple-300">AI</span>
+                                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-[#FF4D00]/20 text-[#FF7A00]">AI</span>
                                                 )}
                                             </h4>
                                             <p className="text-xs text-slate-500 truncate">
@@ -3402,7 +3402,7 @@ function RevenueForecastView({ forecast, funnel, onBack }) {
                         <p className="text-xs text-slate-500">Converted</p>
                     </div>
                     <div className="text-center p-3 rounded-xl bg-white/[0.02]">
-                        <p className="text-2xl font-bold text-blue-400">{forecast.activeEntries}</p>
+                        <p className="text-2xl font-bold text-[#FF4D00]">{forecast.activeEntries}</p>
                         <p className="text-xs text-slate-500">Active</p>
                     </div>
                     <div className="text-center p-3 rounded-xl bg-white/[0.02]">
@@ -3472,7 +3472,7 @@ function ActivityFeedView({ feed, funnel, onBack, onRefresh }) {
                     <span className="material-symbols-outlined text-sm">arrow_back</span> Back to Pipeline
                 </button>
                 <button onClick={onRefresh}
-                    className="px-3 py-1.5 rounded-lg text-xs font-bold text-blue-400 hover:text-blue-300 bg-blue-500/10 hover:bg-blue-500/15 transition-all cursor-pointer flex items-center gap-1">
+                    className="px-3 py-1.5 rounded-lg text-xs font-bold text-[#FF4D00] hover:text-[#FF7A00] bg-[#FF4D00]/10 hover:bg-[#FF4D00]/15 transition-all cursor-pointer flex items-center gap-1">
                     <span className="material-symbols-outlined text-xs">refresh</span> Refresh
                 </button>
             </div>
@@ -3729,7 +3729,7 @@ function FidatoFunnelSidebar({ funnel, onClose, onScoreDecay, onPredictiveScore,
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b border-white/[0.06]">
                 <div className="flex items-center gap-2">
-                    <div className="size-8 rounded-xl bg-gradient-to-br from-primary/30 to-purple-500/30 flex items-center justify-center">
+                    <div className="size-8 rounded-xl bg-gradient-to-br from-primary/30 to-[#FF7A00]/30 flex items-center justify-center">
                         <span className="material-symbols-outlined text-primary text-sm">smart_toy</span>
                     </div>
                     <div>
@@ -3750,7 +3750,7 @@ function FidatoFunnelSidebar({ funnel, onClose, onScoreDecay, onPredictiveScore,
                         <button key={qa.label} onClick={async () => {
                             setFidatoMessages(prev => [...prev, { role: 'assistant', text: `Running: ${qa.label}...` }])
                             await qa.action()
-                            setFidatoMessages(prev => [...prev, { role: 'assistant', text: `✅ ${qa.label} completed!` }])
+                            setFidatoMessages(prev => [...prev, { role: 'assistant', text: ` ${qa.label} completed!` }])
                         }}
                             className="w-full text-left px-3 py-2 rounded-lg text-xs text-slate-300 hover:text-white hover:bg-white/[0.04] transition-all cursor-pointer">
                             <span className="font-bold">{qa.label}</span>
@@ -3840,10 +3840,10 @@ function VisualWorkflowBuilder({ rules, funnel }) {
                         <div className="flex items-start gap-0 overflow-x-auto pb-2">
                             {/* Trigger Node */}
                             <div className="shrink-0 w-40">
-                                <div className="rounded-xl p-3 bg-blue-500/10 border border-blue-500/20">
+                                <div className="rounded-xl p-3 bg-[#FF4D00]/10 border border-[#FF4D00]/20">
                                     <div className="flex items-center gap-1.5 mb-1">
-                                        <span className="material-symbols-outlined text-blue-400 text-xs">{triggerIcons[rule.trigger?.type] || 'sensors'}</span>
-                                        <span className="text-[10px] text-blue-400 font-bold uppercase">Trigger</span>
+                                        <span className="material-symbols-outlined text-[#FF4D00] text-xs">{triggerIcons[rule.trigger?.type] || 'sensors'}</span>
+                                        <span className="text-[10px] text-[#FF4D00] font-bold uppercase">Trigger</span>
                                     </div>
                                     <p className="text-xs text-white font-bold">{(rule.trigger?.type || '').replace(/_/g, ' ')}</p>
                                     {rule.trigger?.config?.stage && <p className="text-[10px] text-slate-400">Stage: {rule.trigger.config.stage}</p>}

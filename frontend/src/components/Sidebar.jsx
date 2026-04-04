@@ -25,33 +25,26 @@ const bottomItems = [
     { icon: 'settings', label: 'Settings', to: '/settings' },
 ]
 
-// Filter nav items based on studio access and role
 function filterNavByAccess(items, studioAccess, isSuperAdmin) {
     return items.filter(item => {
-        if (item.superAdminOnly && !isSuperAdmin) return false;
-        if (!studioAccess) return true; // fallback: show all permitted
-        if (!item.studioKey) return true; // non-studio items always visible
-        return studioAccess[item.studioKey] !== false;
-    });
+        if (item.superAdminOnly && !isSuperAdmin) return false
+        if (!studioAccess) return true
+        if (!item.studioKey) return true
+        return studioAccess[item.studioKey] !== false
+    })
 }
 
 export default function Sidebar({ mobileOpen, onClose }) {
     const { user } = useAuth()
 
+    const handleNavClick = () => { if (onClose) onClose() }
 
-    // Close sidebar on route change (mobile)
-    const handleNavClick = () => {
-        if (onClose) onClose()
-    }
-
-    // Close on Escape key
     useEffect(() => {
         const handleKey = (e) => { if (e.key === 'Escape' && mobileOpen) onClose?.() }
         window.addEventListener('keydown', handleKey)
         return () => window.removeEventListener('keydown', handleKey)
     }, [mobileOpen, onClose])
 
-    // Prevent body scroll when mobile sidebar is open
     useEffect(() => {
         if (mobileOpen) {
             document.body.style.overflow = 'hidden'
@@ -65,92 +58,102 @@ export default function Sidebar({ mobileOpen, onClose }) {
 
     const sidebarContent = (
         <>
-            {/* Logo */}
-            <div className="p-4 lg:p-6 flex items-center gap-3">
-                <div className="size-10 rounded-xl overflow-hidden flex-shrink-0 shadow-lg shadow-primary/20">
-                    <img src="/mantram-logo.png" alt="Mantram AI" className="size-10" />
+            {/* ── Antigravity Logo / Wordmark ── */}
+            <div className="p-5 flex items-center gap-3 border-b border-outline-variant/10">
+                <div className="size-9 rounded-xl overflow-hidden flex-shrink-0 molten-glow">
+                    <img src="/mantram-logo.png" alt="Mantram AI" className="size-9" />
                 </div>
-                <div className="min-w-0">
-                    <h1 className="text-lg font-bold leading-tight text-white truncate">Mantram AI</h1>
-                    <p className="text-sm text-slate-500 uppercase tracking-widest font-semibold">Brand OS</p>
+                <div className="min-w-0 flex-1">
+                    <h1 className="text-base font-bold leading-tight text-white truncate tracking-tight font-headline">
+                        Mantram<span className="text-primary-fixed">.</span><span className="text-primary-fixed">AI</span>
+                    </h1>
+                    <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-primary-fixed/50">Brand OS</p>
                 </div>
-                {/* Close button on mobile */}
+                {/* Mobile close */}
                 <button
                     onClick={onClose}
-                    className="lg:hidden ml-auto p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.08] transition-all cursor-pointer"
+                    className="lg:hidden p-1.5 rounded-lg heavy-in-soft-out text-outline-variant hover:text-white hover:bg-white/5 cursor-pointer"
                 >
                     <span className="material-symbols-outlined text-xl">close</span>
                 </button>
             </div>
 
-            {/* Main Nav */}
-            <nav className="flex-1 px-3 space-y-0.5 overflow-y-auto">
-                <p className="px-3 pt-4 pb-2 text-xs text-slate-600 uppercase tracking-widest font-bold">Create</p>
+            {/* ── Main Nav ── */}
+            <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto custom-scrollbar">
+                <p className="px-3 pt-2 pb-2 text-[9px] uppercase tracking-[0.2em] font-black text-outline-variant/40 font-mono">Create</p>
                 {filterNavByAccess(navItems, user?.studioAccess, isSuperAdmin).map((item) => (
                     <NavLink
                         key={item.label}
                         to={item.to}
                         onClick={handleNavClick}
                         className={({ isActive }) =>
-                            `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${isActive
-                                ? 'bg-primary/10 text-primary shadow-sm'
-                                : 'text-slate-400 hover:bg-white/[0.04] hover:text-slate-200'
+                            `flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] font-medium heavy-in-soft-out transition-all duration-300 cursor-pointer group relative ${
+                                isActive
+                                    ? 'bg-primary-fixed/10 text-primary-fixed border-r-2 border-primary-fixed'
+                                    : 'text-outline-variant hover:text-on-surface-variant hover:bg-white/5'
                             }`
                         }
                     >
-                        <span className="material-symbols-outlined text-xl">{item.icon}</span>
-                        <span>{item.label}</span>
+                        {({ isActive }) => (
+                            <>
+                                <span className={`material-symbols-outlined text-[20px] flex-shrink-0 ${isActive ? 'text-primary-fixed' : 'group-hover:text-tertiary'}`}>{item.icon}</span>
+                                <span className="truncate text-xs uppercase tracking-widest font-label">{item.label}</span>
+                            </>
+                        )}
                     </NavLink>
                 ))}
 
-                <div className="my-4 mx-3 border-t border-white/[0.06]" />
-                <p className="px-3 pb-2 text-xs text-slate-600 uppercase tracking-widest font-bold">Manage</p>
+                <div className="my-3 mx-2 border-t border-outline-variant/10" />
+                <p className="px-3 pb-2 text-[9px] uppercase tracking-[0.2em] font-black text-outline-variant/40 font-mono">Manage</p>
                 {bottomItems.map((item) => (
                     <NavLink
                         key={item.label}
                         to={item.to}
                         onClick={handleNavClick}
                         className={({ isActive }) =>
-                            `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${isActive
-                                ? 'bg-primary/10 text-primary shadow-sm'
-                                : 'text-slate-400 hover:bg-white/[0.04] hover:text-slate-200'
+                            `flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] font-medium heavy-in-soft-out transition-all duration-300 cursor-pointer relative ${
+                                isActive
+                                    ? 'bg-primary-fixed/10 text-primary-fixed border-r-2 border-primary-fixed'
+                                    : 'text-outline-variant hover:text-on-surface-variant hover:bg-white/5'
                             }`
                         }
                     >
-                        <span className="material-symbols-outlined text-xl">{item.icon}</span>
-                        <span>{item.label}</span>
+                        {({ isActive }) => (
+                            <>
+                                <span className={`material-symbols-outlined text-[20px] flex-shrink-0 ${isActive ? 'text-primary-fixed' : 'group-hover:text-tertiary'}`}>{item.icon}</span>
+                                <span className="truncate text-xs uppercase tracking-widest font-label">{item.label}</span>
+                            </>
+                        )}
                     </NavLink>
                 ))}
 
                 {/* Super Admin Link */}
                 {isSuperAdmin && (
                     <>
-                        <div className="my-4 mx-3 border-t border-amber-500/20" />
+                        <div className="my-3 mx-2 border-t border-primary-fixed/15" />
                         <NavLink
                             to="/superadmin"
                             onClick={handleNavClick}
                             className={({ isActive }) =>
-                                `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${isActive
-                                    ? 'bg-amber-500/10 text-amber-400 shadow-sm'
-                                    : 'text-amber-400/60 hover:bg-amber-500/5 hover:text-amber-400'
+                                `flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] font-medium heavy-in-soft-out transition-all duration-300 cursor-pointer relative ${isActive
+                                    ? 'text-amber-400 bg-amber-400/8 border border-amber-400/20'
+                                    : 'text-amber-400/40 hover:text-amber-400 border border-transparent'
                                 }`
                             }
                         >
-                            <span className="material-symbols-outlined text-xl">shield_person</span>
+                            <span className="material-symbols-outlined text-[20px] flex-shrink-0">shield_person</span>
                             <span>Super Admin</span>
                         </NavLink>
                     </>
                 )}
             </nav>
 
-
-
-            {/* New Project CTA */}
-            <div className="p-4">
+            {/* ── Bottom CTA + Plan indicator ── */}
+            <div className="p-3 space-y-2 border-t border-outline-variant/10">
                 <NavLink
                     to="/onboarding"
                     onClick={handleNavClick}
-                    className="w-full py-3 px-4 bg-primary text-white text-sm font-bold rounded-xl hover:bg-primary-light transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary/20 cursor-pointer mb-3"
+                    className="w-full py-3 px-4 bg-primary-fixed-dim text-black text-xs font-bold uppercase tracking-tighter rounded-lg heavy-in-soft-out transition-all flex items-center justify-center gap-2 cursor-pointer molten-glow font-headline active:scale-95"
                 >
                     <span className="material-symbols-outlined text-sm">add</span>
                     New Brand
@@ -158,12 +161,12 @@ export default function Sidebar({ mobileOpen, onClose }) {
 
                 {/* Plan Indicator */}
                 {!isSuperAdmin && (
-                    <div className="px-4 py-3 rounded-xl bg-white/[0.03] border border-white/[0.06] flex items-center justify-between group hover:bg-white/[0.05] transition-all">
+                    <div className="px-3 py-2.5 rounded-lg flex items-center justify-between bg-white/[0.02] border border-outline-variant/10">
                         <div className="min-w-0 flex-1">
-                            <p className="text-[10px] text-slate-600 uppercase font-black tracking-widest leading-none mb-1">Your Plan</p>
-                            <p className="text-xs font-bold text-slate-300 truncate capitalize">{user?.plan || 'Free'} Tier</p>
+                            <p className="text-[8px] font-black uppercase tracking-[0.2em] leading-none mb-1 text-outline-variant/40 font-mono">Current Plan</p>
+                            <p className="text-xs font-semibold text-on-surface-variant truncate capitalize">{user?.plan || 'Free'} Tier</p>
                         </div>
-                        <NavLink to="/credits" className="px-2 py-1 bg-primary/10 text-primary hover:bg-primary/20 rounded-lg text-[10px] font-black uppercase transition-all whitespace-nowrap">
+                        <NavLink to="/credits" className="px-2 py-1 rounded-lg text-[10px] font-black uppercase heavy-in-soft-out whitespace-nowrap bg-primary-fixed/10 text-primary-fixed border border-primary-fixed/20 hover:bg-primary-fixed/20">
                             Upgrade
                         </NavLink>
                     </div>
@@ -175,21 +178,19 @@ export default function Sidebar({ mobileOpen, onClose }) {
     return (
         <>
             {/* ── Desktop Sidebar (lg+) ── */}
-            <aside className="hidden lg:flex w-64 flex-shrink-0 flex-col border-r border-white/[0.06] bg-[#080a14] z-20 h-screen sticky top-0">
+            <aside
+                className="hidden lg:flex w-64 flex-shrink-0 flex-col h-screen fixed top-0 left-0 z-20 bg-[#0e0e12] border-r border-outline-variant/10 backdrop-blur-xl"
+            >
                 {sidebarContent}
             </aside>
 
             {/* ── Mobile Sidebar Drawer (< lg) ── */}
-            {/* Backdrop overlay */}
             <div
-                className={`lg:hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-40 transition-opacity duration-300 ${mobileOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
-                    }`}
+                className={`lg:hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-40 transition-opacity duration-300 ${mobileOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
                 onClick={onClose}
             />
-            {/* Sliding drawer */}
             <aside
-                className={`lg:hidden fixed top-0 left-0 h-full w-72 flex flex-col bg-[#080a14] border-r border-white/[0.06] z-50 transform transition-transform duration-300 ease-out ${mobileOpen ? 'translate-x-0' : '-translate-x-full'
-                    }`}
+                className={`lg:hidden fixed top-0 left-0 h-full w-72 flex flex-col z-50 transform heavy-in-soft-out transition-transform duration-300 bg-[#0e0e12] border-r border-outline-variant/10 backdrop-blur-xl ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}
             >
                 {sidebarContent}
             </aside>

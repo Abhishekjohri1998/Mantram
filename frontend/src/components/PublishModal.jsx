@@ -2,10 +2,10 @@ import { useState, useEffect } from 'react'
 import { social } from '../services/api'
 
 const PLATFORM_META = {
-    instagram: { label: 'Instagram', icon: '📸', color: '#E1306C', accent: 'from-pink-500/20 to-purple-500/20', border: 'border-pink-500/30' },
-    facebook: { label: 'Facebook', icon: '👥', color: '#1877F2', accent: 'from-blue-500/20 to-indigo-500/20', border: 'border-blue-500/30' },
+    instagram: { label: 'Instagram', icon: '📸', color: '#E1306C', accent: 'from-[#FF4D00]/20 to-[#FF7A00]/20', border: 'border-[#FF4D00]/30' },
+    facebook: { label: 'Facebook', icon: '👥', color: '#1877F2', accent: 'from-[#FF4D00]/20 to-[#FF7A00]/20', border: 'border-[#FF4D00]/30' },
     twitter: { label: 'Twitter / X', icon: '𝕏', color: '#000000', accent: 'from-slate-500/20 to-slate-600/20', border: 'border-slate-400/30' },
-    linkedin: { label: 'LinkedIn', icon: '💼', color: '#0A66C2', accent: 'from-sky-500/20 to-blue-500/20', border: 'border-sky-500/30' },
+    linkedin: { label: 'LinkedIn', icon: '💼', color: '#0A66C2', accent: 'from-sky-500/20 to-[#FF7A00]/20', border: 'border-sky-500/30' },
 }
 
 /**
@@ -219,8 +219,8 @@ export default function PublishModal({ isOpen, onClose, defaultText = '', defaul
                     <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-primary/60 to-transparent rounded-t-3xl" />
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${scheduleMode ? 'bg-violet-500/15' : 'bg-primary/15'}`}>
-                                <span className={`material-symbols-outlined text-xl ${scheduleMode ? 'text-violet-400' : 'text-primary'}`}>
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${scheduleMode ? 'bg-[#FF4D00]/15' : 'bg-primary/15'}`}>
+                                <span className={`material-symbols-outlined text-xl ${scheduleMode ? 'text-[#FF4D00]' : 'text-primary'}`}>
                                     {scheduleMode ? 'schedule_send' : 'send'}
                                 </span>
                             </div>
@@ -273,17 +273,17 @@ export default function PublishModal({ isOpen, onClose, defaultText = '', defaul
                     ) : scheduleResults ? (
                         <div className="space-y-4">
                             <div className="text-center py-8">
-                                <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-violet-500/20 to-violet-600/10 flex items-center justify-center mx-auto mb-4 border border-violet-500/20">
-                                    <span className="material-symbols-outlined text-4xl text-violet-400">schedule_send</span>
+                                <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-[#FF4D00]/20 to-[#FF7A00]/10 flex items-center justify-center mx-auto mb-4 border border-[#FF4D00]/20">
+                                    <span className="material-symbols-outlined text-4xl text-[#FF4D00]">schedule_send</span>
                                 </div>
                                 <h4 className="text-2xl font-bold text-white">Scheduled! ⏰</h4>
                                 <p className="text-slate-400 text-sm mt-1">
-                                    Posting on <span className="text-violet-300 font-medium">{new Date(scheduledFor).toLocaleString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                                    Posting on <span className="text-[#FF7A00] font-medium">{new Date(scheduledFor).toLocaleString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
                                 </p>
                             </div>
                             <div className="space-y-2">
                                 {scheduleResults.map((s, i) => (
-                                    <div key={i} className="p-4 rounded-xl border bg-violet-500/5 border-violet-500/15 flex items-center justify-between">
+                                    <div key={i} className="p-4 rounded-xl border bg-[#FF4D00]/5 border-[#FF4D00]/15 flex items-center justify-between">
                                         <div className="flex items-center gap-3 min-w-0">
                                             <span className="text-xl">{PLATFORM_META[s.platform]?.icon || '📱'}</span>
                                             <div>
@@ -291,7 +291,7 @@ export default function PublishModal({ isOpen, onClose, defaultText = '', defaul
                                                 <p className="text-[10px] text-slate-500 uppercase">{s.platform}</p>
                                             </div>
                                         </div>
-                                        <div className="px-3 py-1.5 rounded-lg text-xs font-bold bg-violet-500/15 text-violet-400">
+                                        <div className="px-3 py-1.5 rounded-lg text-xs font-bold bg-[#FF4D00]/15 text-[#FF4D00]">
                                             ⏰ Queued
                                         </div>
                                     </div>
@@ -304,8 +304,8 @@ export default function PublishModal({ isOpen, onClose, defaultText = '', defaul
                             {isCarouselMode ? (
                                 <div className="rounded-2xl overflow-hidden border border-white/[0.06] bg-black/30 p-3">
                                     <div className="flex items-center gap-2 mb-2">
-                                        <span className="material-symbols-outlined text-violet-400 text-sm">view_carousel</span>
-                                        <span className="text-xs font-bold text-violet-300">Carousel Post</span>
+                                        <span className="material-symbols-outlined text-[#FF4D00] text-sm">view_carousel</span>
+                                        <span className="text-xs font-bold text-[#FF7A00]">Carousel Post</span>
                                         <span className="text-[10px] text-slate-500 bg-white/[0.06] px-2 py-0.5 rounded-full">{imageUrls.length} images</span>
                                     </div>
                                     <div className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar">
@@ -344,7 +344,7 @@ export default function PublishModal({ isOpen, onClose, defaultText = '', defaul
                                                     await navigator.share(shareData)
                                                 } catch (e) { if (e.name !== 'AbortError') console.warn('Share failed:', e) }
                                             }}
-                                            className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-gradient-to-br from-purple-500/10 to-pink-500/10 border border-purple-500/20 hover:border-purple-500/40 text-purple-300 hover:text-white transition-all cursor-pointer group"
+                                            className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-gradient-to-br from-[#FF4D00]/10 to-[#FF7A00]/10 border border-[#FF4D00]/20 hover:border-[#FF4D00]/40 text-[#FF7A00] hover:text-white transition-all cursor-pointer group"
                                         >
                                             <span className="material-symbols-outlined text-2xl group-hover:scale-110 transition-transform">smartphone</span>
                                             <span className="text-[11px] font-bold">Share via...</span>
@@ -450,7 +450,7 @@ export default function PublishModal({ isOpen, onClose, defaultText = '', defaul
                                             <button
                                                 onClick={handleAdaptForPlatforms}
                                                 disabled={adapting || !caption.trim()}
-                                                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer disabled:opacity-30 bg-gradient-to-r from-violet-500/10 to-fuchsia-500/10 hover:from-violet-500/20 hover:to-fuchsia-500/20 text-violet-300 border border-violet-500/20 hover:border-violet-500/40">
+                                                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer disabled:opacity-30 bg-gradient-to-r from-[#FF4D00]/10 to-[#FF7A00]/10 hover:from-[#FF4D00]/20 hover:to-[#FF7A00]/20 text-[#FF7A00] border border-[#FF4D00]/20 hover:border-[#FF4D00]/40">
                                                 {adapting ? (
                                                     <><span className="material-symbols-outlined text-xs animate-spin">progress_activity</span> Adapting...</>
                                                 ) : (
@@ -496,7 +496,7 @@ export default function PublishModal({ isOpen, onClose, defaultText = '', defaul
                                                 }
                                             }}
                                             disabled={generatingCaption}
-                                            className="mt-2 flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer disabled:opacity-40 bg-gradient-to-r from-violet-500/10 to-primary/10 hover:from-violet-500/20 hover:to-primary/20 text-violet-300 border border-violet-500/20 hover:border-violet-500/40 w-full justify-center"
+                                            className="mt-2 flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer disabled:opacity-40 bg-gradient-to-r from-[#FF4D00]/10 to-primary/10 hover:from-[#FF4D00]/20 hover:to-primary/20 text-[#FF7A00] border border-[#FF4D00]/20 hover:border-[#FF4D00]/40 w-full justify-center"
                                         >
                                             {generatingCaption ? (
                                                 <><span className="material-symbols-outlined text-xs animate-spin">progress_activity</span> Generating caption...</>
@@ -587,12 +587,12 @@ export default function PublishModal({ isOpen, onClose, defaultText = '', defaul
                             )}
 
                             {/* ── Schedule Section — Premium ── */}
-                            <div className={`rounded-2xl border overflow-hidden transition-all duration-300 ${scheduleMode ? 'bg-gradient-to-br from-violet-500/[0.06] via-fuchsia-500/[0.03] to-violet-600/[0.06] border-violet-500/25 shadow-lg shadow-violet-500/5' : 'bg-white/[0.02] border-white/[0.06]'}`}>
+                            <div className={`rounded-2xl border overflow-hidden transition-all duration-300 ${scheduleMode ? 'bg-gradient-to-br from-[#FF4D00]/[0.06] via-fuchsia-500/[0.03] to-[#FF7A00]/[0.06] border-[#FF4D00]/25 shadow-lg shadow-[#FF4D00]/5' : 'bg-white/[0.02] border-white/[0.06]'}`}>
                                 {/* Toggle Header */}
                                 <div className="flex items-center justify-between p-4">
                                     <div className="flex items-center gap-3">
-                                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-300 ${scheduleMode ? 'bg-gradient-to-br from-violet-500/25 to-fuchsia-500/25 shadow-inner' : 'bg-white/[0.05]'}`}>
-                                            <span className={`material-symbols-outlined text-xl transition-colors ${scheduleMode ? 'text-violet-300' : 'text-slate-500'}`}>schedule_send</span>
+                                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-300 ${scheduleMode ? 'bg-gradient-to-br from-[#FF4D00]/25 to-[#FF7A00]/25 shadow-inner' : 'bg-white/[0.05]'}`}>
+                                            <span className={`material-symbols-outlined text-xl transition-colors ${scheduleMode ? 'text-[#FF7A00]' : 'text-slate-500'}`}>schedule_send</span>
                                         </div>
                                         <div>
                                             <span className="text-sm font-semibold text-white">Schedule for later</span>
@@ -601,7 +601,7 @@ export default function PublishModal({ isOpen, onClose, defaultText = '', defaul
                                     </div>
                                     <button
                                         onClick={() => { setScheduleMode(!scheduleMode); if (scheduleMode) setScheduledFor('') }}
-                                        className={`relative w-12 h-7 rounded-full transition-all duration-300 cursor-pointer ${scheduleMode ? 'bg-gradient-to-r from-violet-500 to-fuchsia-500 shadow-lg shadow-violet-500/40' : 'bg-white/10 hover:bg-white/15'}`}>
+                                        className={`relative w-12 h-7 rounded-full transition-all duration-300 cursor-pointer ${scheduleMode ? 'bg-gradient-to-r from-[#FF4D00] to-[#FF7A00] shadow-lg shadow-[#FF4D00]/40' : 'bg-white/10 hover:bg-white/15'}`}>
                                         <span className={`absolute top-1 left-1 w-5 h-5 rounded-full bg-white shadow-md transition-transform duration-300 ${scheduleMode ? 'translate-x-5' : 'translate-x-0'}`} />
                                     </button>
                                 </div>
@@ -614,7 +614,7 @@ export default function PublishModal({ isOpen, onClose, defaultText = '', defaul
 
                                         {/* Quick Select Times */}
                                         <div>
-                                            <p className="text-[10px] text-violet-400/70 uppercase tracking-widest font-bold mb-2">Quick Schedule</p>
+                                            <p className="text-[10px] text-[#FF4D00]/70 uppercase tracking-widest font-bold mb-2">Quick Schedule</p>
                                             <div className="grid grid-cols-5 gap-1.5">
                                                 {[
                                                     { label: 'In 1h', hours: 1 },
@@ -638,7 +638,7 @@ export default function PublishModal({ isOpen, onClose, defaultText = '', defaul
                                                     return (
                                                         <button key={opt.label} onClick={() => setScheduledFor(optVal)}
                                                             className={`py-2.5 px-1 rounded-xl text-center transition-all cursor-pointer text-[10px] font-bold leading-tight whitespace-pre-line ${isActive
-                                                                ? 'bg-gradient-to-b from-violet-500/30 to-fuchsia-500/20 text-violet-200 border border-violet-400/40 shadow-md shadow-violet-500/10'
+                                                                ? 'bg-gradient-to-b from-[#FF4D00]/30 to-[#FF7A00]/20 text-orange-50 border border-[#FF4D00]/40 shadow-md shadow-[#FF4D00]/10'
                                                                 : 'bg-white/[0.04] text-slate-400 border border-transparent hover:bg-white/[0.08] hover:text-white'
                                                                 }`}>
                                                             {opt.label}
@@ -650,30 +650,30 @@ export default function PublishModal({ isOpen, onClose, defaultText = '', defaul
 
                                         {/* Custom DateTime */}
                                         <div>
-                                            <p className="text-[10px] text-violet-400/70 uppercase tracking-widest font-bold mb-2">Or pick exact time</p>
+                                            <p className="text-[10px] text-[#FF4D00]/70 uppercase tracking-widest font-bold mb-2">Or pick exact time</p>
                                             <input
                                                 type="datetime-local"
                                                 value={scheduledFor}
                                                 onChange={e => setScheduledFor(e.target.value)}
                                                 min={getMinDateTime()}
-                                                className="w-full p-3 bg-black/20 border border-violet-500/15 text-white text-sm rounded-xl focus:outline-none focus:border-violet-500/40 [color-scheme:dark] transition-all"
+                                                className="w-full p-3 bg-black/20 border border-[#FF4D00]/15 text-white text-sm rounded-xl focus:outline-none focus:border-[#FF4D00]/40 [color-scheme:dark] transition-all"
                                             />
                                         </div>
 
                                         {/* Visual Confirmation */}
                                         {scheduledFor && (
-                                            <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-violet-500/10 via-fuchsia-500/5 to-violet-600/10 border border-violet-500/15 p-4">
-                                                <div className="absolute top-0 right-0 w-24 h-24 bg-violet-500/5 rounded-full -translate-y-1/2 translate-x-1/2" />
+                                            <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-[#FF4D00]/10 via-fuchsia-500/5 to-[#FF7A00]/10 border border-[#FF4D00]/15 p-4">
+                                                <div className="absolute top-0 right-0 w-24 h-24 bg-[#FF4D00]/5 rounded-full -translate-y-1/2 translate-x-1/2" />
                                                 <div className="flex items-center gap-3 relative">
-                                                    <div className="w-10 h-10 rounded-xl bg-violet-500/20 flex items-center justify-center flex-shrink-0">
-                                                        <span className="material-symbols-outlined text-violet-300 text-xl">event_available</span>
+                                                    <div className="w-10 h-10 rounded-xl bg-[#FF4D00]/20 flex items-center justify-center flex-shrink-0">
+                                                        <span className="material-symbols-outlined text-[#FF7A00] text-xl">event_available</span>
                                                     </div>
                                                     <div>
-                                                        <p className="text-[10px] text-violet-400/70 uppercase tracking-wider font-bold">Posting on</p>
+                                                        <p className="text-[10px] text-[#FF4D00]/70 uppercase tracking-wider font-bold">Posting on</p>
                                                         <p className="text-sm text-white font-bold">
                                                             {new Date(scheduledFor).toLocaleString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}
                                                         </p>
-                                                        <p className="text-xs text-violet-300">
+                                                        <p className="text-xs text-[#FF7A00]">
                                                             {new Date(scheduledFor).toLocaleString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
                                                         </p>
                                                     </div>
@@ -697,7 +697,7 @@ export default function PublishModal({ isOpen, onClose, defaultText = '', defaul
                             <button
                                 onClick={handleSchedule}
                                 disabled={publishing}
-                                className="px-7 py-3 rounded-xl text-sm font-bold flex items-center gap-2.5 disabled:opacity-40 transition-all cursor-pointer bg-gradient-to-r from-violet-600 to-fuchsia-500 hover:from-violet-500 hover:to-fuchsia-400 text-white shadow-xl shadow-violet-500/25 hover:shadow-violet-500/40">
+                                className="px-7 py-3 rounded-xl text-sm font-bold flex items-center gap-2.5 disabled:opacity-40 transition-all cursor-pointer bg-gradient-to-r from-[#FF4D00] to-[#FF7A00] hover:from-[#FF4D00] hover:to-[#FF7A00] text-white shadow-xl shadow-[#FF4D00]/25 hover:shadow-[#FF4D00]/40">
                                 {publishing ? (
                                     <><span className="material-symbols-outlined text-lg animate-spin">progress_activity</span> Scheduling...</>
                                 ) : (

@@ -185,7 +185,7 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                         disabled={isLoading}
                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-all border"
                         style={{
-                            background: isLoading ? 'rgba(99,102,241,0.1)' : 'linear-gradient(135deg, rgba(99,102,241,0.15), rgba(139,92,246,0.1))',
+                            background: isLoading ? 'rgba(99,102,241,0.1)' : 'linear-gradient(135deg, rgba(99,102,241,0.15), rgba(255, 77, 0,0.1))',
                             borderColor: 'rgba(99,102,241,0.3)',
                             color: '#a5b4fc',
                         }}
@@ -238,7 +238,7 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
         return (
             <button onClick={onClick} disabled={disabled || isBusy}
                 className="group px-6 py-3 rounded-xl text-white text-sm font-bold cursor-pointer transition-all duration-300 flex items-center gap-2.5 disabled:opacity-30 hover:scale-[1.02] active:scale-[0.98]"
-                style={{ background: isMe ? 'rgba(99,102,241,0.2)' : isBusy ? 'rgba(99,102,241,0.12)' : 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%)', boxShadow: isBusy ? 'none' : '0 4px 20px rgba(99,102,241,0.35), inset 0 1px 0 rgba(255,255,255,0.1)' }}>
+                style={{ background: isMe ? 'rgba(99,102,241,0.2)' : isBusy ? 'rgba(99,102,241,0.12)' : 'linear-gradient(135deg, #6366f1 0%, #FF4D00 50%, #FF4D00 100%)', boxShadow: isBusy ? 'none' : '0 4px 20px rgba(99,102,241,0.35), inset 0 1px 0 rgba(255,255,255,0.1)' }}>
                 <span className="material-symbols-outlined text-sm" style={isMe ? { animation: 'spin 1s linear infinite' } : {}}>{isMe ? 'sync' : icon}</span>
                 {isMe ? loadingMsg : label}
                 {!isBusy && <span className="material-symbols-outlined text-sm opacity-0 group-hover:opacity-100 transition-opacity -ml-1">arrow_forward</span>}
@@ -253,7 +253,7 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                 <div className="w-64 h-64 rounded-full" style={{ background: 'radial-gradient(circle, rgba(99,102,241,0.12) 0%, transparent 70%)' }} />
             </div>
             {/* Icon with gradient circle */}
-            <div className="relative inline-flex items-center justify-center w-20 h-20 rounded-2xl mb-5" style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.12) 0%, rgba(139,92,246,0.08) 100%)', border: '1px solid rgba(99,102,241,0.15)' }}>
+            <div className="relative inline-flex items-center justify-center w-20 h-20 rounded-2xl mb-5" style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.12) 0%, rgba(255, 77, 0,0.08) 100%)', border: '1px solid rgba(99,102,241,0.15)' }}>
                 <span className="material-symbols-outlined text-4xl" style={{ color: '#a78bfa' }}>{icon}</span>
             </div>
             <h3 className="text-xl font-bold text-white mb-2">{title}</h3>
@@ -268,7 +268,7 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
             {title && (
                 <div className="flex items-center gap-2 mb-4">
                     {icon && <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
-                        style={{ background: accent || 'linear-gradient(135deg, rgba(99,102,241,0.15), rgba(139,92,246,0.1))' }}>
+                        style={{ background: accent || 'linear-gradient(135deg, rgba(99,102,241,0.15), rgba(255, 77, 0,0.1))' }}>
                         <span className="material-symbols-outlined text-sm" style={{ color: '#a78bfa' }}>{icon}</span>
                     </div>}
                     <h3 className="text-sm font-bold text-white tracking-wide">{title}</h3>
@@ -333,7 +333,7 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                         {/* ═══ LIVE ANALYTICS DASHBOARD (Primary Content) ═══ */}
                         {isLoading && (
                             <div className="glass-panel rounded-2xl p-10 text-center border border-white/[0.08] relative overflow-hidden">
-                                <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-violet-500/5 pointer-events-none" />
+                                <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-[#FF7A00]/5 pointer-events-none" />
                                 <div className="relative z-10 flex flex-col items-center">
                                     <div className="w-16 h-16 rounded-2xl bg-white/[0.03] border border-white/[0.05] flex items-center justify-center mb-5 relative group">
                                         <div className="absolute inset-0 bg-primary/20 rounded-2xl blur-xl group-hover:bg-primary/30 transition-all" />
@@ -363,7 +363,7 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                                         <select 
                                             value={gaSelectedProp} 
                                             onChange={e => { setGaSelectedProp(e.target.value); loadGAReport(e.target.value); }}
-                                            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all cursor-pointer"
+                                            className="w-full bg-[#08080C] border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all cursor-pointer"
                                         >
                                             <option value="">Select Property...</option>
                                             {gaProperties.map(p => (
@@ -380,7 +380,7 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                                         <select 
                                             value={gaSelectedSite} 
                                             onChange={e => { setGaSelectedSite(e.target.value); loadGSCReport(e.target.value); }}
-                                            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all cursor-pointer"
+                                            className="w-full bg-[#08080C] border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all cursor-pointer"
                                         >
                                             <option value="">Select Site...</option>
                                             {gaSites.map(s => (
@@ -635,7 +635,7 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                                             clicks: k.clicks?.toLocaleString(),
                                             impressions: k.impressions?.toLocaleString(),
                                             ctr: `${((k.ctr || 0) * 100).toFixed(1)}%`,
-                                            position: <span className={`font-bold ${k.position <= 3 ? 'text-emerald-400' : k.position <= 10 ? 'text-blue-400' : k.position <= 20 ? 'text-amber-400' : 'text-slate-400'}`}>{k.position?.toFixed(1)}</span>,
+                                            position: <span className={`font-bold ${k.position <= 3 ? 'text-emerald-400' : k.position <= 10 ? 'text-[#FF4D00]' : k.position <= 20 ? 'text-amber-400' : 'text-slate-400'}`}>{k.position?.toFixed(1)}</span>,
                                         }))} />
                                         {/* Striking distance */}
                                         {(() => {
@@ -670,7 +670,7 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                                             { key: 'ctr', label: 'CTR' },
                                             { key: 'position', label: 'Avg Pos' },
                                         ]} rows={gscReport.pages.slice(0, 15).map(p => ({
-                                            page: <span className="text-xs truncate max-w-[300px] block text-blue-400" title={p.page}>{p.page?.replace(/https?:\/\/[^/]+/, '') || p.page}</span>,
+                                            page: <span className="text-xs truncate max-w-[300px] block text-[#FF4D00]" title={p.page}>{p.page?.replace(/https?:\/\/[^/]+/, '') || p.page}</span>,
                                             clicks: p.clicks?.toLocaleString(),
                                             impressions: p.impressions?.toLocaleString(),
                                             ctr: `${((p.ctr || 0) * 100).toFixed(1)}%`,
@@ -747,13 +747,13 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                                         </button>
                                     </div>
                                 ) : (
-                                    <div className="rounded-2xl p-6 text-center" style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.06), rgba(139,92,246,0.03))', border: '1px dashed rgba(99,102,241,0.25)' }}>
+                                    <div className="rounded-2xl p-6 text-center" style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.06), rgba(255, 77, 0,0.03))', border: '1px dashed rgba(99,102,241,0.25)' }}>
                                         <span className="material-symbols-outlined text-4xl mb-3 block" style={{ color: '#818cf8' }}>link</span>
                                         <h3 className="text-base font-bold text-white mb-1">Connect Google Analytics & Search Console</h3>
                                         <p className="text-xs text-slate-400 max-w-md mx-auto mb-4">See live traffic, top pages, search keywords, and performance data. Just like your Google dashboard — right here in SEO Studio.</p>
                                         <button onClick={() => window.location.href = '/integrations'}
                                             className="px-6 py-2.5 rounded-xl text-sm font-bold text-white cursor-pointer transition-all hover:shadow-lg flex items-center gap-2 mx-auto"
-                                            style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', boxShadow: '0 4px 20px rgba(99,102,241,0.35)' }}>
+                                            style={{ background: 'linear-gradient(135deg, #6366f1, #FF4D00)', boxShadow: '0 4px 20px rgba(99,102,241,0.35)' }}>
                                             <span className="material-symbols-outlined text-sm">link</span> Go to Integrations
                                         </button>
                                     </div>
@@ -943,7 +943,7 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                                     clicks: k.clicks?.toLocaleString(),
                                     impressions: k.impressions?.toLocaleString(),
                                     ctr: `${((k.ctr || 0) * 100).toFixed(1)}%`,
-                                    position: <span className={`font-bold ${k.position <= 3 ? 'text-emerald-400' : k.position <= 10 ? 'text-blue-400' : k.position <= 20 ? 'text-amber-400' : 'text-slate-400'}`}>{k.position?.toFixed(1)}</span>,
+                                    position: <span className={`font-bold ${k.position <= 3 ? 'text-emerald-400' : k.position <= 10 ? 'text-[#FF4D00]' : k.position <= 20 ? 'text-amber-400' : 'text-slate-400'}`}>{k.position?.toFixed(1)}</span>,
                                 }))} />
                             </SectionCard>
                         )}
@@ -988,9 +988,9 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                                 <div className="space-y-3">{data.contentGaps.map((gap, i) => {
                                     const gapTitle = gap.topic || gap.title || (typeof gap === 'string' ? gap : '');
                                     return (
-                                        <div key={i} className="p-3 rounded-lg bg-violet-500/5 border border-violet-500/10">
+                                        <div key={i} className="p-3 rounded-lg bg-[#FF4D00]/5 border border-[#FF4D00]/10">
                                             <div className="flex items-start gap-2">
-                                                <span className="text-violet-400 mt-0.5">◆</span>
+                                                <span className="text-[#FF4D00] mt-0.5">◆</span>
                                                 <div className="flex-1">
                                                     <p className="text-sm font-bold text-white">{gapTitle}</p>
                                                     {gap.competitorUrl && <p className="text-xs text-slate-500 mt-0.5">Competitor: {gap.competitorUrl}</p>}
@@ -1086,7 +1086,7 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                                 <div className="space-y-3">{data.minedPrompts.map((mp, i) => (
                                     <div key={`mp-${i}`} className="rounded-xl p-4 bg-white/[0.02] border border-white/[0.04]">
                                         <div className="flex items-center gap-2 mb-2">
-                                            {mp.priority && <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${mp.priority === 'critical' ? 'bg-rose-500/15 text-rose-400' : mp.priority === 'high' ? 'bg-amber-500/15 text-amber-400' : 'bg-blue-500/15 text-blue-400'}`}>{mp.priority}</span>}
+                                            {mp.priority && <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${mp.priority === 'critical' ? 'bg-rose-500/15 text-rose-400' : mp.priority === 'high' ? 'bg-amber-500/15 text-amber-400' : 'bg-[#FF4D00]/15 text-[#FF4D00]'}`}>{mp.priority}</span>}
                                             <span className="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase bg-white/10 text-slate-300">{mp.category}</span>
                                             {mp.currentlyCited && <span className="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase bg-emerald-500/15 text-emerald-400">Cited</span>}
                                         </div>
@@ -1125,9 +1125,9 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                         {(data.optimizations || data.recommendations)?.length > 0 && (
                             <SectionCard title="GEO Optimization Actions" icon="tips_and_updates">
                                 <div className="space-y-3">{(data.optimizations || data.recommendations || []).map((opt, i) => (
-                                    <div key={i} className="rounded-xl p-4 bg-violet-500/5 border border-violet-500/10">
+                                    <div key={i} className="rounded-xl p-4 bg-[#FF4D00]/5 border border-[#FF4D00]/10">
                                         <div className="flex items-center gap-2 mb-2">
-                                            {opt.priority && <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${opt.priority === 'critical' ? 'bg-rose-500/15 text-rose-400' : opt.priority === 'high' ? 'bg-amber-500/15 text-amber-400' : 'bg-blue-500/15 text-blue-400'}`}>{opt.priority}</span>}
+                                            {opt.priority && <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${opt.priority === 'critical' ? 'bg-rose-500/15 text-rose-400' : opt.priority === 'high' ? 'bg-amber-500/15 text-amber-400' : 'bg-[#FF4D00]/15 text-[#FF4D00]'}`}>{opt.priority}</span>}
                                             <p className="text-sm font-bold text-white">{opt.title || opt.action || opt}</p>
                                         </div>
                                         {opt.description && <p className="text-xs text-slate-400 mb-3">{opt.description}</p>}
@@ -1166,7 +1166,7 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                         <div className="flex flex-wrap gap-3 justify-center">
                             <RunButton onClick={() => runAnalysis('competitor-detail', seoAPI.competitors, buildPayload({ competitorUrls: competitors.map(c => c.url).filter(Boolean) }), 'Analyzing competitors...')} label="Run Competitor Analysis" icon="swords" disabled={!competitors?.length} />
                             <button onClick={runDiscovery} disabled={isDiscovering}
-                                className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold bg-violet-500/10 text-violet-400 border border-violet-500/20 hover:bg-violet-500/20 transition-all disabled:opacity-50 cursor-pointer">
+                                className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold bg-[#FF4D00]/10 text-[#FF4D00] border border-[#FF4D00]/20 hover:bg-[#FF4D00]/20 transition-all disabled:opacity-50 cursor-pointer">
                                 <span className={`material-symbols-outlined text-lg ${isDiscovering ? 'animate-spin' : ''}`}>{isDiscovering ? 'sync' : 'auto_awesome'}</span>
                                 {isDiscovering ? 'Discovering...' : 'Auto-Discover Competitors'}
                             </button>
@@ -1313,7 +1313,7 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                                 {data.h1Suggestion && (
                                     <SectionCard title="H1 Heading Suggestion" icon="format_h1">
                                         <div className="flex items-center gap-2">
-                                            <p className="text-sm text-white bg-violet-500/[0.07] p-3 rounded-lg border border-violet-500/20 flex-1">{data.h1Suggestion}</p>
+                                            <p className="text-sm text-white bg-[#FF4D00]/[0.07] p-3 rounded-lg border border-[#FF4D00]/20 flex-1">{data.h1Suggestion}</p>
                                             <button onClick={() => navigator.clipboard.writeText(data.h1Suggestion)} className="text-xs text-primary font-bold cursor-pointer hover:underline whitespace-nowrap flex items-center gap-1">
                                                 <span className="material-symbols-outlined text-xs">content_copy</span> Copy
                                             </button>
@@ -1529,12 +1529,12 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                                             </div>
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-center gap-2 flex-wrap">
-                                                    <a href={bl.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-400 hover:text-blue-300 truncate max-w-[400px]">{bl.sourceDomain || bl.sourceUrl}</a>
+                                                    <a href={bl.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-[#FF4D00] hover:text-[#FF7A00] truncate max-w-[400px]">{bl.sourceDomain || bl.sourceUrl}</a>
                                                     <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold uppercase ${bl.linkType === 'dofollow' ? 'text-emerald-400 bg-emerald-400/10' : bl.linkType === 'nofollow' ? 'text-amber-400 bg-amber-400/10' : 'text-slate-400 bg-slate-400/10'}`}>
                                                         {bl.linkType || 'link'}
                                                     </span>
                                                     {bl.status === 'verified-live' && <span className="text-[10px] px-1.5 py-0.5 rounded font-bold text-emerald-400 bg-emerald-400/10">VERIFIED</span>}
-                                                    <span className={`text-[10px] px-1.5 py-0.5 rounded ${bl.estimatedAuthority === 'high' ? 'text-violet-400 bg-violet-400/10' : bl.estimatedAuthority === 'medium' ? 'text-sky-400 bg-sky-400/10' : 'text-slate-400 bg-slate-400/10'}`}>
+                                                    <span className={`text-[10px] px-1.5 py-0.5 rounded ${bl.estimatedAuthority === 'high' ? 'text-[#FF4D00] bg-[#FF4D00]/10' : bl.estimatedAuthority === 'medium' ? 'text-sky-400 bg-sky-400/10' : 'text-slate-400 bg-slate-400/10'}`}>
                                                         {bl.estimatedAuthority || 'unknown'} authority
                                                     </span>
                                                 </div>
@@ -1559,7 +1559,7 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                                                 <span className="text-sm font-medium text-white">{gap.domain}</span>
                                                 <div className="flex items-center gap-1">
                                                     <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${gap.difficulty === 'easy' ? 'text-emerald-400 bg-emerald-400/10' : gap.difficulty === 'medium' ? 'text-amber-400 bg-amber-400/10' : 'text-rose-400 bg-rose-400/10'}`}>{gap.difficulty}</span>
-                                                    <span className="text-[10px] px-1.5 py-0.5 rounded text-violet-400 bg-violet-400/10 font-bold">{gap.impactScore}/10</span>
+                                                    <span className="text-[10px] px-1.5 py-0.5 rounded text-[#FF4D00] bg-[#FF4D00]/10 font-bold">{gap.impactScore}/10</span>
                                                 </div>
                                             </div>
                                             <p className="text-xs text-slate-500 mb-1">Competitor: <span className="text-slate-400">{gap.competitorLinkedFrom}</span></p>
@@ -1580,15 +1580,15 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                                                 <div className="flex-1">
                                                     <div className="flex items-center gap-2 flex-wrap mb-1">
                                                         <span className="text-sm font-medium text-white">{opp.title}</span>
-                                                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-400/10 text-indigo-400 font-bold uppercase">{opp.type?.replace(/-/g, ' ')}</span>
+                                                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#FF4D00]/10 text-[#FF4D00] font-bold uppercase">{opp.type?.replace(/-/g, ' ')}</span>
                                                     </div>
                                                     <p className="text-xs text-slate-400 mb-2">{opp.description}</p>
                                                     {opp.strategy && <p className="text-xs text-slate-500 italic">{opp.strategy}</p>}
-                                                    {opp.targetUrl && <a href={opp.targetUrl} target="_blank" rel="noopener noreferrer" className="text-[11px] text-blue-400 hover:text-blue-300 mt-1 inline-block">{opp.targetUrl}</a>}
+                                                    {opp.targetUrl && <a href={opp.targetUrl} target="_blank" rel="noopener noreferrer" className="text-[11px] text-[#FF4D00] hover:text-[#FF7A00] mt-1 inline-block">{opp.targetUrl}</a>}
                                                 </div>
                                                 <div className="flex flex-col items-end gap-1 flex-shrink-0">
                                                     <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${opp.difficulty === 'easy' ? 'text-emerald-400 bg-emerald-400/10' : opp.difficulty === 'medium' ? 'text-amber-400 bg-amber-400/10' : 'text-rose-400 bg-rose-400/10'}`}>{opp.difficulty}</span>
-                                                    <span className="text-[10px] px-1.5 py-0.5 rounded text-violet-400 bg-violet-400/10 font-bold">Impact: {opp.impactScore}/10</span>
+                                                    <span className="text-[10px] px-1.5 py-0.5 rounded text-[#FF4D00] bg-[#FF4D00]/10 font-bold">Impact: {opp.impactScore}/10</span>
                                                     {opp.estimatedTimeline && <span className="text-[10px] text-slate-500">{opp.estimatedTimeline}</span>}
                                                 </div>
                                             </div>
@@ -1647,7 +1647,7 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                                     {data.thirtyDayPlan.map((w, i) => (
                                         <div key={i} className="p-4 rounded-xl" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
                                             <div className="flex items-center gap-2 mb-2">
-                                                <span className="w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold text-white" style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}>{w.week}</span>
+                                                <span className="w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold text-white" style={{ background: 'linear-gradient(135deg, #6366f1, #FF4D00)' }}>{w.week}</span>
                                                 <span className="text-sm font-medium text-white">{w.focus}</span>
                                             </div>
                                             <div className="space-y-1">
@@ -1657,7 +1657,7 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                                                     </p>
                                                 ))}
                                             </div>
-                                            {w.expectedLinks && <p className="text-[10px] text-violet-400 mt-2 font-medium">Target: {w.expectedLinks}</p>}
+                                            {w.expectedLinks && <p className="text-[10px] text-[#FF4D00] mt-2 font-medium">Target: {w.expectedLinks}</p>}
                                         </div>
                                     ))}
                                 </div>
@@ -1774,14 +1774,14 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                 <div className="flex-shrink-0 w-56 hidden lg:block pr-5">
                     <div className="rounded-2xl sticky top-24 overflow-hidden"
                         style={{ background: 'rgba(255,255,255,0.015)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                        <div className="h-1" style={{ background: 'linear-gradient(90deg, #6366f1, #8b5cf6, #a855f7, #ec4899)' }} />
+                        <div className="h-1" style={{ background: 'linear-gradient(90deg, #6366f1, #FF4D00, #FF4D00, #ec4899)' }} />
                         <div className="p-3">
                             <p className="text-[10px] text-slate-600 font-bold uppercase tracking-[0.15em] px-2.5 mb-2 mt-1">Navigation</p>
                             {TABS.map((t, idx) => (
                                 <button key={t.id} onClick={() => setAdvPage(t.id)}
                                     className={`w-full text-left px-3 py-2.5 rounded-xl text-[13px] font-medium flex items-center gap-2.5 cursor-pointer transition-all duration-200 mb-0.5
                                         ${advPage === t.id ? 'text-white' : 'text-slate-500 hover:text-slate-300 hover:bg-white/[0.03]'}`}
-                                    style={advPage === t.id ? { background: 'linear-gradient(135deg, rgba(99,102,241,0.18), rgba(139,92,246,0.08))', border: '1px solid rgba(99,102,241,0.25)', boxShadow: '0 2px 8px rgba(99,102,241,0.12)' } : { border: '1px solid transparent' }}>
+                                    style={advPage === t.id ? { background: 'linear-gradient(135deg, rgba(99,102,241,0.18), rgba(255, 77, 0,0.08))', border: '1px solid rgba(99,102,241,0.25)', boxShadow: '0 2px 8px rgba(99,102,241,0.12)' } : { border: '1px solid transparent' }}>
                                     <span className={`material-symbols-outlined text-[16px] transition-colors ${advPage === t.id ? '' : ''}`} style={advPage === t.id ? { color: '#a78bfa' } : {}}>{t.icon}</span>
                                     <span className="flex-1">{t.label}</span>
                                     {advPage === t.id && <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#a78bfa', boxShadow: '0 0 6px rgba(167,139,250,0.5)' }} />}
@@ -1817,7 +1817,7 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                         <div className="absolute top-0 right-0 w-48 h-48 rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(99,102,241,0.08) 0%, transparent 70%)' }} />
                         <div className="relative flex items-center gap-4">
                             <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
-                                style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', boxShadow: '0 4px 20px rgba(99,102,241,0.4)' }}>
+                                style={{ background: 'linear-gradient(135deg, #6366f1, #FF4D00)', boxShadow: '0 4px 20px rgba(99,102,241,0.4)' }}>
                                 <span className="material-symbols-outlined text-white text-xl">{currentTab?.icon}</span>
                             </div>
                             <div className="flex-1">

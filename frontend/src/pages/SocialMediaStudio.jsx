@@ -9,11 +9,11 @@ import PublishModal from '../components/PublishModal'
 import { getEventsForMonth, getUpcomingEvents, EVENT_COLORS, COUNTRIES } from '../data/calendarData'
 
 const PLATFORMS = [
-    { id: 'instagram', label: 'Instagram', icon: '📸', color: '#E1306C', gradient: 'from-pink-500 to-purple-600' },
-    { id: 'facebook', label: 'Facebook', icon: '📘', color: '#1877F2', gradient: 'from-blue-500 to-indigo-600' },
-    { id: 'linkedin', label: 'LinkedIn', icon: '💼', color: '#0A66C2', gradient: 'from-sky-500 to-blue-600' },
+    { id: 'instagram', label: 'Instagram', icon: '📸', color: '#E1306C', gradient: 'from-[#FF4D00] to-[#FF7A00]' },
+    { id: 'facebook', label: 'Facebook', icon: '📘', color: '#1877F2', gradient: 'from-[#FF4D00] to-[#FF7A00]' },
+    { id: 'linkedin', label: 'LinkedIn', icon: '💼', color: '#0A66C2', gradient: 'from-sky-500 to-[#FF7A00]' },
     { id: 'twitter', label: 'Twitter / X', icon: '🐦', color: '#1DA1F2', gradient: 'from-slate-400 to-slate-600' },
-    { id: 'youtube', label: 'YouTube', icon: '🎬', color: '#FF0000', gradient: 'from-red-500 to-red-700' },
+    { id: 'youtube', label: 'YouTube', icon: 'movie', color: '#FF0000', gradient: 'from-red-500 to-red-700' },
 ]
 
 const TABS = [
@@ -143,7 +143,7 @@ export default function SocialMediaStudio() {
     }).map(p => {
         const d = new Date(p.scheduledFor || p.publishedAt || p.createdAt)
         const pl = PLATFORMS.find(x => x.id === p.platform) || {}
-        return { ...p, _day: d.getDate(), _icon: pl.icon || '📱', _label: pl.label || p.platform }
+        return { ...p, _day: d.getDate(), _icon: pl.icon || 'smartphone', _label: pl.label || p.platform }
     }), [socialPosts, currentMonth, currentYear])
 
     const calendarDays = useMemo(() => {
@@ -336,7 +336,7 @@ export default function SocialMediaStudio() {
             <div className="flex gap-1 p-1.5 rounded-2xl bg-white/[0.02] border border-white/[0.06] mb-6 overflow-x-auto">
                 {TABS.map(t => (
                     <button key={t.id} onClick={() => { setTab(t.id); setError(null) }}
-                        className={`flex-1 flex items-center justify-center gap-2 py-3 px-3 rounded-xl text-sm font-medium transition-all whitespace-nowrap cursor-pointer ${tab === t.id ? 'bg-gradient-to-r from-primary/15 to-violet-500/15 text-white border border-primary/30' : 'text-slate-500 hover:text-slate-300 hover:bg-white/[0.03]'}`}>
+                        className={`flex-1 flex items-center justify-center gap-2 py-3 px-3 rounded-xl text-sm font-medium transition-all whitespace-nowrap cursor-pointer ${tab === t.id ? 'bg-gradient-to-r from-primary/15 to-[#FF7A00]/15 text-white border border-primary/30' : 'text-slate-500 hover:text-slate-300 hover:bg-white/[0.03]'}`}>
                         <span className="material-symbols-outlined text-base">{t.icon}</span>
                         <span className="hidden md:inline">{t.label}</span>
                         {t.id === 'accounts' && connectedAccounts.length > 0 && <span className="w-2 h-2 rounded-full bg-emerald-400" />}
@@ -365,7 +365,7 @@ export default function SocialMediaStudio() {
             {tab === 'dashboard' && (
                 <div className="space-y-6">
                     {/* Connected Accounts Banner */}
-                    <div className="glass-panel rounded-2xl p-6 border border-white/[0.06] bg-gradient-to-br from-primary/5 via-violet-500/5 to-pink-500/5">
+                    <div className="glass-panel rounded-2xl p-6 border border-white/[0.06] bg-gradient-to-br from-primary/5 via-violet-500/5 to-[#FF7A00]/5">
                         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
                             <div>
                                 <h2 className="text-2xl font-extrabold text-white mb-2">Social Media Command Center</h2>
@@ -374,7 +374,7 @@ export default function SocialMediaStudio() {
                                     <div className="flex items-center gap-2 mt-3">
                                         <span className="material-symbols-outlined text-emerald-400 text-sm">check_circle</span>
                                         <span className="text-sm text-emerald-400 font-medium">{connectedAccounts.length} account{connectedAccounts.length > 1 ? 's' : ''} connected</span>
-                                        <div className="flex -space-x-1 ml-2">{connectedAccounts.slice(0, 4).map((a, i) => { const p = PLATFORMS.find(x => x.id === a.platform); return <span key={i} className="text-base" title={p?.label}>{p?.icon || '📱'}</span> })}</div>
+                                        <div className="flex -space-x-1 ml-2">{connectedAccounts.slice(0, 4).map((a, i) => { const p = PLATFORMS.find(x => x.id === a.platform); return <span key={i} className="text-base" title={p?.label}>{p?.icon || 'smartphone'}</span> })}</div>
                                     </div>
                                 )}
                                 {connectedAccounts.length === 0 && !accountsLoading && (
@@ -384,7 +384,7 @@ export default function SocialMediaStudio() {
                             <div className="flex flex-col gap-3">
                                 {/* AGENTIC: Full Analysis Button */}
                                 <button onClick={runFullAnalysis} disabled={loading}
-                                    className="flex items-center gap-3 px-6 py-4 rounded-2xl bg-gradient-to-r from-primary via-violet-500 to-pink-500 text-white font-bold text-sm hover:opacity-90 transition-all cursor-pointer shadow-xl shadow-primary/25 disabled:opacity-40">
+                                    className="flex items-center gap-3 px-6 py-4 rounded-2xl bg-gradient-to-r from-primary via-violet-500 to-[#FF7A00] text-white font-bold text-sm hover:opacity-90 transition-all cursor-pointer shadow-xl shadow-primary/25 disabled:opacity-40">
                                     <span className="material-symbols-outlined text-xl">rocket_launch</span>
                                     <div className="text-left"><p className="font-extrabold">Full Analysis</p><p className="text-[10px] text-white/70 font-normal">Strategy + Audit + Competitor — One Click</p></div>
                                 </button>
@@ -418,9 +418,9 @@ export default function SocialMediaStudio() {
                         <div className="glass-panel rounded-2xl p-6 border border-emerald-500/20 bg-gradient-to-br from-emerald-500/5 to-teal-500/5">
                             <h3 className="font-bold text-white flex items-center gap-2 mb-4"><span className="material-symbols-outlined text-emerald-400">check_circle</span>Analysis Results Ready</h3>
                             <div className="flex flex-wrap gap-3">
-                                {strategyResult && <button onClick={() => setTab('strategy')} className="px-4 py-2.5 rounded-xl bg-violet-500/15 border border-violet-500/20 text-violet-300 text-xs font-bold cursor-pointer hover:bg-violet-500/25">✅ Strategy Generated — View</button>}
-                                {auditResult && <button onClick={() => setTab('audit')} className="px-4 py-2.5 rounded-xl bg-amber-500/15 border border-amber-500/20 text-amber-300 text-xs font-bold cursor-pointer hover:bg-amber-500/25">✅ Audit Score: {auditResult.overallScore}/100 — View</button>}
-                                {compResult && <button onClick={() => setTab('competitor')} className="px-4 py-2.5 rounded-xl bg-rose-500/15 border border-rose-500/20 text-rose-300 text-xs font-bold cursor-pointer hover:bg-rose-500/25">✅ Competitor Intel — View</button>}
+                                {strategyResult && <button onClick={() => setTab('strategy')} className="px-4 py-2.5 rounded-xl bg-[#FF4D00]/15 border border-[#FF4D00]/20 text-[#FF7A00] text-xs font-bold cursor-pointer hover:bg-[#FF4D00]/25"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">check_circle</span> Strategy Generated — View</button>}
+                                {auditResult && <button onClick={() => setTab('audit')} className="px-4 py-2.5 rounded-xl bg-amber-500/15 border border-amber-500/20 text-amber-300 text-xs font-bold cursor-pointer hover:bg-amber-500/25"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">check_circle</span> Audit Score: {auditResult.overallScore}/100 — View</button>}
+                                {compResult && <button onClick={() => setTab('competitor')} className="px-4 py-2.5 rounded-xl bg-rose-500/15 border border-rose-500/20 text-rose-300 text-xs font-bold cursor-pointer hover:bg-rose-500/25"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">check_circle</span> Competitor Intel — View</button>}
                             </div>
                         </div>
                     )}
@@ -455,12 +455,12 @@ export default function SocialMediaStudio() {
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div><label className="text-sm font-bold text-slate-300 mb-2 block">Timeframe</label>
                                         <select value={timeframe} onChange={e => setTimeframe(e.target.value)} className="w-full input-glass py-3 px-4 rounded-xl bg-white/[0.04] text-white cursor-pointer"><option value="monthly">1 Month</option><option value="quarterly">3 Months</option></select></div>
-                                    <div><label className="text-sm font-bold text-slate-300 mb-2 block">Goals {activeBrand?.dna?.targetAudience && <span className="text-emerald-400 text-[10px] ml-1">✨ auto-filled</span>}</label>
+                                    <div><label className="text-sm font-bold text-slate-300 mb-2 block">Goals {activeBrand?.dna?.targetAudience && <span className="text-emerald-400 text-[10px] ml-1"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">auto_awesome</span> auto-filled</span>}</label>
                                         <input value={goals} onChange={e => setGoals(e.target.value)} placeholder="e.g., 10K followers, 5% engagement" className="w-full input-glass py-3 px-4 rounded-xl bg-white/[0.04] text-white placeholder:text-slate-600" /></div>
                                 </div>
                                 <div><label className="text-sm font-bold text-slate-300 mb-2 block">Current Metrics (optional)</label>
                                     <textarea value={currentMetrics} onChange={e => setCurrentMetrics(e.target.value)} rows={2} placeholder="e.g., 2K Instagram, 500 LinkedIn, 3x/week" className="w-full input-glass py-3 px-4 rounded-xl bg-white/[0.04] text-white placeholder:text-slate-600 resize-none" /></div>
-                                <button onClick={generateStrategy} disabled={loading || !selectedPlatforms.length} className="flex items-center gap-2 px-6 py-3.5 rounded-xl bg-gradient-to-r from-primary to-violet-500 text-white font-bold text-sm hover:opacity-90 transition-all cursor-pointer disabled:opacity-40 shadow-lg shadow-primary/25">
+                                <button onClick={generateStrategy} disabled={loading || !selectedPlatforms.length} className="flex items-center gap-2 px-6 py-3.5 rounded-xl bg-gradient-to-r from-primary to-[#FF7A00] text-white font-bold text-sm hover:opacity-90 transition-all cursor-pointer disabled:opacity-40 shadow-lg shadow-primary/25">
                                     <span className="material-symbols-outlined text-base">auto_awesome</span>Generate Strategy <CreditBadge action="socialMedia" /></button>
                             </div>
                         </div>
@@ -468,47 +468,47 @@ export default function SocialMediaStudio() {
                         <div className="space-y-6">
                             <div className="flex items-center justify-between"><h3 className="text-xl font-extrabold text-white">Your Strategy</h3>
                                 <button onClick={() => setStrategyResult(null)} className="text-sm text-slate-400 hover:text-white cursor-pointer flex items-center gap-1"><span className="material-symbols-outlined text-base">arrow_back</span>New</button></div>
-                            <div className="glass-panel rounded-2xl p-6 border border-primary/20 bg-gradient-to-br from-primary/5 to-violet-500/5"><p className="text-slate-300 leading-relaxed">{strategyResult.overview}</p></div>
+                            <div className="glass-panel rounded-2xl p-6 border border-primary/20 bg-gradient-to-br from-primary/5 to-[#FF7A00]/5"><p className="text-slate-300 leading-relaxed">{strategyResult.overview}</p></div>
 
                             {/* ── Data Insights (NEW) ── */}
                             {strategyResult.dataInsights?.length > 0 && <div className="glass-panel rounded-2xl p-6 border border-amber-500/20 bg-gradient-to-br from-amber-500/5 to-orange-500/5"><h4 className="font-bold text-white flex items-center gap-2 mb-4"><span className="material-symbols-outlined text-amber-400">insights</span>Data Insights</h4>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">{strategyResult.dataInsights.map((d, i) => <div key={i} className="p-4 rounded-xl bg-white/[0.03] border border-amber-500/10">
-                                    <div className="flex items-start gap-3"><span className="text-2xl">{d.icon || '📊'}</span><div className="flex-1"><p className="text-sm font-semibold text-white mb-1">{d.insight}</p><p className="text-xs text-slate-400 mb-2">{d.recommendation}</p>{d.impact && <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">⚡ {d.impact}</span>}</div></div>
+                                    <div className="flex items-start gap-3"><span className="text-2xl">{d.icon || 'bar_chart'}</span><div className="flex-1"><p className="text-sm font-semibold text-white mb-1">{d.insight}</p><p className="text-xs text-slate-400 mb-2">{d.recommendation}</p>{d.impact && <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">⚡ {d.impact}</span>}</div></div>
                                 </div>)}</div></div>}
 
                             {strategyResult.contentPillars?.length > 0 && <div className="glass-panel rounded-2xl p-6 border border-white/[0.06]"><h4 className="font-bold text-white flex items-center gap-2 mb-4"><span className="material-symbols-outlined text-primary">category</span>Content Pillars</h4>
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">{strategyResult.contentPillars.map((p, i) => <div key={i} className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06]"><div className="flex items-center gap-2 mb-2"><span className="text-2xl">{p.icon || '📌'}</span><div><p className="text-sm font-bold text-white">{p.name}</p><p className="text-xs text-primary font-bold">{p.percentage}%</p></div></div><p className="text-xs text-slate-400 leading-relaxed">{p.description}</p>{p.examples?.map((ex,j) => <p key={j} className="text-[11px] text-slate-500 mt-1">• {ex}</p>)}</div>)}</div></div>}
 
                             {/* ── Calendar Hooks (NEW) ── */}
-                            {strategyResult.calendarHooks?.length > 0 && <div className="glass-panel rounded-2xl p-6 border border-cyan-500/20 bg-gradient-to-br from-cyan-500/5 to-blue-500/5"><h4 className="font-bold text-white flex items-center gap-2 mb-4"><span className="material-symbols-outlined text-cyan-400">calendar_month</span>Calendar Hooks — Moments to Leverage</h4>
+                            {strategyResult.calendarHooks?.length > 0 && <div className="glass-panel rounded-2xl p-6 border border-cyan-500/20 bg-gradient-to-br from-cyan-500/5 to-[#FF7A00]/5"><h4 className="font-bold text-white flex items-center gap-2 mb-4"><span className="material-symbols-outlined text-cyan-400">calendar_month</span>Calendar Hooks — Moments to Leverage</h4>
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">{strategyResult.calendarHooks.map((ch, i) => <div key={i} className="p-4 rounded-xl bg-white/[0.03] border border-cyan-500/10">
                                     <div className="flex items-center justify-between mb-2"><span className="text-xs font-mono text-cyan-400">{ch.date}</span><span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${ch.priority === 'high' ? 'bg-red-500/15 text-red-400' : ch.priority === 'medium' ? 'bg-amber-500/15 text-amber-400' : 'bg-slate-500/15 text-slate-400'}`}>{ch.priority || 'medium'}</span></div>
                                     <p className="text-sm font-bold text-white mb-1">{ch.event}</p>
                                     <p className="text-xs text-slate-400 mb-2">{ch.contentIdea}</p>
-                                    {ch.platforms?.length > 0 && <div className="flex gap-1 flex-wrap">{ch.platforms.map((cp,j) => { const plt = PLATFORMS.find(pp => pp.id === cp); return <span key={j} className="text-[10px] px-1.5 py-0.5 rounded bg-white/[0.05] text-slate-400">{plt?.icon || '📱'} {cp}</span> })}</div>}
+                                    {ch.platforms?.length > 0 && <div className="flex gap-1 flex-wrap">{ch.platforms.map((cp,j) => { const plt = PLATFORMS.find(pp => pp.id === cp); return <span key={j} className="text-[10px] px-1.5 py-0.5 rounded bg-white/[0.05] text-slate-400">{plt?.icon || 'smartphone'} {cp}</span> })}</div>}
                                 </div>)}</div></div>}
 
                             {strategyResult.platformStrategies?.length > 0 && <div className="glass-panel rounded-2xl p-6 border border-white/[0.06]"><h4 className="font-bold text-white flex items-center gap-2 mb-4"><span className="material-symbols-outlined text-primary">devices</span>Platform Strategies</h4>
-                                <div className="space-y-4">{strategyResult.platformStrategies.map((ps, i) => { const pl = PLATFORMS.find(p => p.id === ps.platform) || { icon:'📱',label:ps.platform }; return <div key={i} className="p-5 rounded-xl bg-white/[0.02] border border-white/[0.06]"><div className="flex items-center gap-3 mb-3"><span className="text-2xl">{pl.icon}</span><div><h5 className="font-bold text-white">{pl.label}</h5><p className="text-xs text-slate-400">{ps.frequency}</p>{ps.currentCadence && <p className="text-[10px] text-amber-400/80 mt-0.5">📌 Current: {ps.currentCadence}</p>}</div></div>
+                                <div className="space-y-4">{strategyResult.platformStrategies.map((ps, i) => { const pl = PLATFORMS.find(p => p.id === ps.platform) || { icon:'smartphone',label:ps.platform }; return <div key={i} className="p-5 rounded-xl bg-white/[0.02] border border-white/[0.06]"><div className="flex items-center gap-3 mb-3"><span className="text-2xl">{pl.icon}</span><div><h5 className="font-bold text-white">{pl.label}</h5><p className="text-xs text-slate-400">{ps.frequency}</p>{ps.currentCadence && <p className="text-[10px] text-amber-400/80 mt-0.5">📌 Current: {ps.currentCadence}</p>}</div></div>
                                     {ps.toneGuide && <p className="text-xs text-slate-400 mb-2 italic border-l-2 border-primary/30 pl-3">{ps.toneGuide}</p>}
                                     {ps.bestTimes?.length > 0 && <div className="flex items-center gap-2 mb-2 flex-wrap"><span className="text-[10px] text-slate-500">🕐 Best Times:</span>{ps.bestTimes.map((t,j) => <span key={j} className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400">{t}</span>)}</div>}
-                                    {ps.bestDays?.length > 0 && <div className="flex items-center gap-2 mb-2 flex-wrap"><span className="text-[10px] text-slate-500">📅 Best Days:</span>{ps.bestDays.map((d,j) => <span key={j} className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400">{d}</span>)}</div>}
-                                    {ps.formatMix && <div className="flex items-center gap-2 mb-3 flex-wrap">{Object.entries(ps.formatMix).map(([k,v],j) => <span key={j} className="text-[10px] px-2 py-0.5 rounded-full bg-violet-500/10 text-violet-400">{k}: {v}%</span>)}</div>}
+                                    {ps.bestDays?.length > 0 && <div className="flex items-center gap-2 mb-2 flex-wrap"><span className="text-[10px] text-slate-500"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">calendar_month</span> Best Days:</span>{ps.bestDays.map((d,j) => <span key={j} className="text-[10px] px-2 py-0.5 rounded-full bg-[#FF4D00]/10 text-[#FF4D00]">{d}</span>)}</div>}
+                                    {ps.formatMix && <div className="flex items-center gap-2 mb-3 flex-wrap">{Object.entries(ps.formatMix).map(([k,v],j) => <span key={j} className="text-[10px] px-2 py-0.5 rounded-full bg-[#FF4D00]/10 text-[#FF4D00]">{k}: {v}%</span>)}</div>}
                                     {ps.growthTactics?.map((t,j) => <p key={j} className="text-xs text-slate-400">✦ {t}</p>)}
                                     {ps.doNot?.length > 0 && <div className="mt-2 pt-2 border-t border-white/[0.04]">{ps.doNot.map((d,j) => <p key={j} className="text-xs text-red-400/70">✕ {d}</p>)}</div>}
                                     {ps.hashtags && <div className="mt-3 flex flex-wrap gap-1.5">{[...(ps.hashtags.branded||[]),...(ps.hashtags.niche||[]),...(ps.hashtags.trending||[])].slice(0,15).map((h,j) => <span key={j} className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">{h}</span>)}</div>}
                                 </div> })}</div></div>}
 
                             {/* ── D2C Strategy (NEW — conditional) ── */}
-                            {strategyResult.d2cStrategy && <div className="glass-panel rounded-2xl p-6 border border-pink-500/20 bg-gradient-to-br from-pink-500/5 to-rose-500/5"><h4 className="font-bold text-white flex items-center gap-2 mb-4"><span className="material-symbols-outlined text-pink-400">storefront</span>D2C Strategy</h4>
+                            {strategyResult.d2cStrategy && <div className="glass-panel rounded-2xl p-6 border border-[#FF4D00]/20 bg-gradient-to-br from-[#FF4D00]/5 to-rose-500/5"><h4 className="font-bold text-white flex items-center gap-2 mb-4"><span className="material-symbols-outlined text-[#FF7A00]">storefront</span>D2C Strategy</h4>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    {strategyResult.d2cStrategy.saleCalendar?.length > 0 && <div className="p-4 rounded-xl bg-white/[0.03] border border-pink-500/10"><h5 className="text-sm font-bold text-white mb-3 flex items-center gap-1.5"><span className="text-sm">🏷️</span>Sale Calendar</h5>
+                                    {strategyResult.d2cStrategy.saleCalendar?.length > 0 && <div className="p-4 rounded-xl bg-white/[0.03] border border-[#FF4D00]/10"><h5 className="text-sm font-bold text-white mb-3 flex items-center gap-1.5"><span className="text-sm">🏷️</span>Sale Calendar</h5>
                                         {strategyResult.d2cStrategy.saleCalendar.map((s,i) => <div key={i} className="mb-2 last:mb-0"><p className="text-xs font-semibold text-white">{s.event} <span className="text-slate-500 font-normal">({s.timing})</span></p><p className="text-[11px] text-slate-400">Prep {s.prepDays || '?'} days — {s.contentPlan}</p></div>)}</div>}
-                                    {strategyResult.d2cStrategy.collectionDrops?.length > 0 && <div className="p-4 rounded-xl bg-white/[0.03] border border-pink-500/10"><h5 className="text-sm font-bold text-white mb-3 flex items-center gap-1.5"><span className="text-sm">✨</span>Collection Drops</h5>
+                                    {strategyResult.d2cStrategy.collectionDrops?.length > 0 && <div className="p-4 rounded-xl bg-white/[0.03] border border-[#FF4D00]/10"><h5 className="text-sm font-bold text-white mb-3 flex items-center gap-1.5"><span className="text-sm"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">auto_awesome</span></span>Collection Drops</h5>
                                         {strategyResult.d2cStrategy.collectionDrops.map((c,i) => <p key={i} className="text-xs text-slate-400 mb-1">• {c}</p>)}</div>}
-                                    {strategyResult.d2cStrategy.loyaltyTactics?.length > 0 && <div className="p-4 rounded-xl bg-white/[0.03] border border-pink-500/10"><h5 className="text-sm font-bold text-white mb-3 flex items-center gap-1.5"><span className="text-sm">💎</span>Loyalty Tactics</h5>
+                                    {strategyResult.d2cStrategy.loyaltyTactics?.length > 0 && <div className="p-4 rounded-xl bg-white/[0.03] border border-[#FF4D00]/10"><h5 className="text-sm font-bold text-white mb-3 flex items-center gap-1.5"><span className="text-sm">💎</span>Loyalty Tactics</h5>
                                         {strategyResult.d2cStrategy.loyaltyTactics.map((l,i) => <p key={i} className="text-xs text-slate-400 mb-1">• {l}</p>)}</div>}
-                                    {strategyResult.d2cStrategy.retentionContent?.length > 0 && <div className="p-4 rounded-xl bg-white/[0.03] border border-pink-500/10"><h5 className="text-sm font-bold text-white mb-3 flex items-center gap-1.5"><span className="text-sm">🔁</span>Retention Content</h5>
+                                    {strategyResult.d2cStrategy.retentionContent?.length > 0 && <div className="p-4 rounded-xl bg-white/[0.03] border border-[#FF4D00]/10"><h5 className="text-sm font-bold text-white mb-3 flex items-center gap-1.5"><span className="text-sm">🔁</span>Retention Content</h5>
                                         {strategyResult.d2cStrategy.retentionContent.map((r,i) => <p key={i} className="text-xs text-slate-400 mb-1">• {r}</p>)}</div>}
                                 </div></div>}
 
@@ -550,7 +550,7 @@ export default function SocialMediaStudio() {
                                 <span className={`text-sm font-semibold ${dy.isToday ? 'text-primary' : dy.other ? 'text-slate-700' : 'text-slate-300'}`}>{dy.day}</span>
                                 {(dy.events.length + dy.posts.length) > 0 && <div className="mt-1 space-y-0.5">
                                     {dy.events.slice(0,2).map((e,j) => { const c = EVENT_COLORS[e.type] || EVENT_COLORS.global; return <div key={j} className="flex items-center gap-1 truncate"><div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{background:c.dot}} /><span className="text-[10px] truncate" style={{color:c.dot}}>{e.emoji} {e.name}</span></div> })}
-                                    {dy.posts.slice(0,2).map((p,j) => <div key={j} className="flex items-center gap-1 truncate"><div className="w-1.5 h-1.5 rounded-full flex-shrink-0 bg-violet-400" /><span className="text-[10px] text-violet-300 truncate">{p._icon} {p._label}</span></div>)}
+                                    {dy.posts.slice(0,2).map((p,j) => <div key={j} className="flex items-center gap-1 truncate"><div className="w-1.5 h-1.5 rounded-full flex-shrink-0 bg-[#FF4D00]" /><span className="text-[10px] text-[#FF7A00] truncate">{p._icon} {p._label}</span></div>)}
                                 </div>}
                             </button>
                         ))}
@@ -559,7 +559,7 @@ export default function SocialMediaStudio() {
                     {/* AI Calendar Result */}
                     {calendarResult?.weeks?.map((week, wi) => (
                         <div key={wi} className="glass-panel rounded-2xl p-5 border border-white/[0.06]"><h4 className="font-bold text-white mb-1">Week {week.weekNumber}</h4><p className="text-xs text-primary mb-4">{week.theme}</p>
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">{week.posts?.map((post, pi) => { const pl = PLATFORMS.find(p => p.id === post.platform) || { icon:'📱' }; return (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">{week.posts?.map((post, pi) => { const pl = PLATFORMS.find(p => p.id === post.platform) || { icon:'smartphone' }; return (
                                 <div key={pi} className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.04] hover:bg-white/[0.04] transition-all">
                                     <div className="flex items-center justify-between mb-2"><div className="flex items-center gap-2"><span>{pl.icon}</span><span className="text-xs text-white font-bold">{post.day}</span></div><span className="text-[10px] px-2 py-0.5 rounded-full bg-white/[0.05] text-slate-400 capitalize">{post.type}</span></div>
                                     <p className="text-xs text-slate-300 leading-relaxed mb-2">{post.captionAngle}</p>
@@ -575,7 +575,7 @@ export default function SocialMediaStudio() {
                     {showPanel && selectedDate && <div className="fixed right-0 top-0 h-full w-[340px] glass-panel border-l border-white/[0.06] z-40 p-5 overflow-y-auto">
                         <div className="flex items-center justify-between mb-4"><h3 className="text-lg font-bold text-white">{monthNames[currentMonth]} {selectedDate}</h3><button onClick={() => setShowPanel(false)} className="text-slate-500 hover:text-white cursor-pointer"><span className="material-symbols-outlined text-sm">close</span></button></div>
                         {(() => { const dayPosts = scheduledForMonth.filter(p => p._day === selectedDate); const dayEvents = monthEvents.filter(e => e.day === selectedDate); return <>
-                            {dayPosts.length > 0 && <div className="mb-5"><h4 className="text-xs font-bold text-violet-300 uppercase mb-2">Scheduled Posts</h4>{dayPosts.map(p => <div key={p._id} className="p-3 rounded-xl bg-violet-500/[0.06] border border-violet-500/15 mb-2"><p className="text-xs text-white font-bold">{p._icon} {p._label}</p><p className="text-[11px] text-slate-400 mt-1 line-clamp-3">{p.caption}</p></div>)}</div>}
+                            {dayPosts.length > 0 && <div className="mb-5"><h4 className="text-xs font-bold text-[#FF7A00] uppercase mb-2">Scheduled Posts</h4>{dayPosts.map(p => <div key={p._id} className="p-3 rounded-xl bg-[#FF4D00]/[0.06] border border-[#FF4D00]/15 mb-2"><p className="text-xs text-white font-bold">{p._icon} {p._label}</p><p className="text-[11px] text-slate-400 mt-1 line-clamp-3">{p.caption}</p></div>)}</div>}
                             {dayEvents.length > 0 && <div><h4 className="text-xs font-bold text-slate-400 uppercase mb-2">Marketing Events</h4>{dayEvents.map((e,i) => { const c = EVENT_COLORS[e.type] || EVENT_COLORS.global; return <div key={i} className="p-3 rounded-xl border mb-2" style={{background:c.bg, borderColor:c.border+'40'}}><p className="text-sm font-bold text-white">{e.emoji} {e.name}</p><p className="text-[11px] text-slate-400">Tone: {e.tone}</p></div> })}</div>}
                             {dayPosts.length === 0 && dayEvents.length === 0 && <div className="text-center py-8"><p className="text-slate-500 text-sm">No events or posts</p></div>}
                         </> })()}
@@ -614,9 +614,9 @@ export default function SocialMediaStudio() {
                                 </div>
                             )})}
                             {publishTab === 'scheduled' && scheduledPosts.map((post,i) => { const m = PLATFORMS.find(x => x.id === post.platform) || {}; return (
-                                <div key={post._id} className="group rounded-2xl bg-violet-500/[0.03] border border-violet-500/10 hover:border-violet-500/20 p-5 transition-all" style={{animation:`fadeUp 0.4s ease-out ${i*60}ms both`}}>
-                                    <div className="flex items-start gap-4"><div className="flex-1 min-w-0"><div className="flex items-center gap-2 mb-2"><span className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-lg bg-gradient-to-r ${m.gradient||'from-violet-500 to-fuchsia-500'} text-white`}>{m.icon} {m.label||post.platform}</span><span className="text-xs text-slate-500">{post.accountName}</span></div>
-                                        <p className="text-[13px] text-slate-300 line-clamp-2">{post.caption?.substring(0,250)}</p><span className="text-[11px] text-violet-400 mt-2 block">{new Date(post.scheduledFor).toLocaleString('en-IN',{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</span></div>
+                                <div key={post._id} className="group rounded-2xl bg-[#FF4D00]/[0.03] border border-[#FF4D00]/10 hover:border-[#FF4D00]/20 p-5 transition-all" style={{animation:`fadeUp 0.4s ease-out ${i*60}ms both`}}>
+                                    <div className="flex items-start gap-4"><div className="flex-1 min-w-0"><div className="flex items-center gap-2 mb-2"><span className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-lg bg-gradient-to-r ${m.gradient||'from-[#FF4D00] to-[#FF7A00]'} text-white`}>{m.icon} {m.label||post.platform}</span><span className="text-xs text-slate-500">{post.accountName}</span></div>
+                                        <p className="text-[13px] text-slate-300 line-clamp-2">{post.caption?.substring(0,250)}</p><span className="text-[11px] text-[#FF4D00] mt-2 block">{new Date(post.scheduledFor).toLocaleString('en-IN',{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</span></div>
                                         <button onClick={() => handleCancel(post._id)} disabled={cancellingId===post._id} className="px-4 py-2 rounded-xl bg-rose-500/10 text-rose-400 text-xs font-bold hover:bg-rose-500/20 cursor-pointer border border-rose-500/15 disabled:opacity-30">{cancellingId===post._id ? '...' : '✕ Cancel'}</button>
                                     </div>
                                 </div>
@@ -630,7 +630,7 @@ export default function SocialMediaStudio() {
                             ))}
                             {publishTab === 'failed' && failedPosts.map((post,i) => (
                                 <div key={post._id} className="rounded-2xl bg-rose-500/[0.03] border border-rose-500/10 p-5 transition-all" style={{animation:`fadeUp 0.4s ease-out ${i*60}ms both`}}>
-                                    <div className="flex items-center gap-2 mb-2"><span className="text-xs font-bold text-rose-400">❌ {PLATFORMS.find(x=>x.id===post.platform)?.label||post.platform}</span><span className="text-xs text-slate-500">{post.accountName}</span></div>
+                                    <div className="flex items-center gap-2 mb-2"><span className="text-xs font-bold text-rose-400"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">cancel</span> {PLATFORMS.find(x=>x.id===post.platform)?.label||post.platform}</span><span className="text-xs text-slate-500">{post.accountName}</span></div>
                                     <p className="text-[13px] text-slate-400 line-clamp-2">{post.caption?.substring(0,200)}</p>{post.error && <p className="text-xs text-rose-300/80 mt-2">{post.error}</p>}
                                 </div>
                             ))}
@@ -645,7 +645,7 @@ export default function SocialMediaStudio() {
                 <div className="space-y-6">
                     {/* Audit view toggle */}
                     <div className="flex gap-2">
-                        <button onClick={() => setAuditView('score')} className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all cursor-pointer border ${auditView === 'score' ? 'bg-gradient-to-r from-violet-500/20 to-purple-500/20 border-violet-500/30 text-white' : 'bg-white/[0.02] border-white/[0.06] text-slate-400 hover:bg-white/[0.04]'}`}>
+                        <button onClick={() => setAuditView('score')} className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all cursor-pointer border ${auditView === 'score' ? 'bg-gradient-to-r from-[#FF4D00]/20 to-[#FF7A00]/20 border-[#FF4D00]/30 text-white' : 'bg-white/[0.02] border-white/[0.06] text-slate-400 hover:bg-white/[0.04]'}`}>
                             <span className="flex items-center gap-2"><span className="material-symbols-outlined text-base">speed</span>Profile Score Card</span></button>
                         <button onClick={() => setAuditView('deep')} className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all cursor-pointer border ${auditView === 'deep' ? 'bg-gradient-to-r from-amber-500/20 to-orange-500/20 border-amber-500/30 text-white' : 'bg-white/[0.02] border-white/[0.06] text-slate-400 hover:bg-white/[0.04]'}`}>
                             <span className="flex items-center gap-2"><span className="material-symbols-outlined text-base">query_stats</span>Deep Account Audit</span></button>
@@ -654,10 +654,10 @@ export default function SocialMediaStudio() {
                     {/* ═══ PROFILE SCORE CARD ═══ */}
                     {auditView === 'score' && (
                         !profileScore ? (
-                            <div className="glass-panel rounded-2xl p-8 border border-white/[0.06] bg-gradient-to-br from-violet-500/[0.03] to-purple-500/[0.03]">
+                            <div className="glass-panel rounded-2xl p-8 border border-white/[0.06] bg-gradient-to-br from-[#FF4D00]/[0.03] to-[#FF7A00]/[0.03]">
                                 <div className="flex items-start gap-4 mb-6">
-                                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-500/20 to-purple-500/20 flex items-center justify-center flex-shrink-0"><span className="material-symbols-outlined text-violet-400 text-2xl">speed</span></div>
-                                    <div><h3 className="text-xl font-extrabold text-white mb-1">Profile Score Card</h3><p className="text-sm text-slate-400">AI grades your profile on platform-specific parameters — like LinkedIn's profile strength, but for every platform. Each parameter scored 0-10 with <span className="text-violet-400 font-semibold">measurable, data-driven recommendations</span>.</p></div>
+                                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#FF4D00]/20 to-[#FF7A00]/20 flex items-center justify-center flex-shrink-0"><span className="material-symbols-outlined text-[#FF4D00] text-2xl">speed</span></div>
+                                    <div><h3 className="text-xl font-extrabold text-white mb-1">Profile Score Card</h3><p className="text-sm text-slate-400">AI grades your profile on platform-specific parameters — like LinkedIn's profile strength, but for every platform. Each parameter scored 0-10 with <span className="text-[#FF4D00] font-semibold">measurable, data-driven recommendations</span>.</p></div>
                                 </div>
                                 <div className="space-y-6">
                                     <div><label className="text-sm font-bold text-slate-300 mb-3 block">Select Platform to Score</label>
@@ -669,7 +669,7 @@ export default function SocialMediaStudio() {
                                             </button>
                                         ))}</div>
                                     </div>
-                                    <button onClick={runProfileScore} disabled={profileScoreLoading || loading} className="flex items-center gap-2 px-6 py-3.5 rounded-xl bg-gradient-to-r from-violet-500 to-purple-600 text-white font-bold text-sm hover:opacity-90 cursor-pointer disabled:opacity-40 shadow-lg shadow-violet-500/20">
+                                    <button onClick={runProfileScore} disabled={profileScoreLoading || loading} className="flex items-center gap-2 px-6 py-3.5 rounded-xl bg-gradient-to-r from-[#FF4D00] to-[#FF7A00] text-white font-bold text-sm hover:opacity-90 cursor-pointer disabled:opacity-40 shadow-lg shadow-[#FF4D00]/20">
                                         {profileScoreLoading ? <><span className="animate-spin">⏳</span>Scoring...</> : <><span className="material-symbols-outlined text-base">speed</span>Scan Profile</>} <CreditBadge action="socialMedia" /></button>
                                 </div>
                             </div>
@@ -685,7 +685,7 @@ export default function SocialMediaStudio() {
                                 </div>
 
                                 {/* Overall Score Circle + Grade */}
-                                <div className="glass-panel rounded-2xl p-8 border border-white/[0.06] bg-gradient-to-br from-violet-500/[0.04] to-purple-500/[0.04]">
+                                <div className="glass-panel rounded-2xl p-8 border border-white/[0.06] bg-gradient-to-br from-[#FF4D00]/[0.04] to-[#FF7A00]/[0.04]">
                                     <div className="flex flex-col md:flex-row items-center gap-8">
                                         <div className="relative">
                                             <svg width="160" height="160" viewBox="0 0 160 160">
@@ -722,7 +722,7 @@ export default function SocialMediaStudio() {
 
                                 {/* Parameter Breakdown */}
                                 <div className="glass-panel rounded-2xl p-6 border border-white/[0.06]">
-                                    <h4 className="font-bold text-white flex items-center gap-2 mb-5"><span className="material-symbols-outlined text-violet-400">tune</span>Parameter Breakdown</h4>
+                                    <h4 className="font-bold text-white flex items-center gap-2 mb-5"><span className="material-symbols-outlined text-[#FF4D00]">tune</span>Parameter Breakdown</h4>
                                     <div className="space-y-3">
                                         {(profileScore.parameters || []).map((param, i) => {
                                             const scoreColor = param.score >= 8 ? '#10b981' : param.score >= 5 ? '#f59e0b' : '#ef4444'
@@ -755,8 +755,8 @@ export default function SocialMediaStudio() {
                                                                     <p className="text-xs text-white">{param.benchmark}</p>
                                                                 </div>
                                                             </div>
-                                                            <div className="rounded-lg bg-violet-500/[0.06] border border-violet-500/10 p-3">
-                                                                <p className="text-[10px] text-violet-400 uppercase font-bold mb-1 flex items-center gap-1"><span className="material-symbols-outlined text-xs">trending_up</span>Measurable Impact</p>
+                                                            <div className="rounded-lg bg-[#FF4D00]/[0.06] border border-[#FF4D00]/10 p-3">
+                                                                <p className="text-[10px] text-[#FF4D00] uppercase font-bold mb-1 flex items-center gap-1"><span className="material-symbols-outlined text-xs">trending_up</span>Measurable Impact</p>
                                                                 <p className="text-xs text-white font-medium">{param.impact}</p>
                                                             </div>
                                                             {param.fix && (
@@ -801,13 +801,13 @@ export default function SocialMediaStudio() {
                                 {/* Generated Assets */}
                                 {profileScore.generatedAssets && Object.values(profileScore.generatedAssets).some(v => v && !v.includes('If ')) && (
                                     <div className="glass-panel rounded-2xl p-6 border border-white/[0.06]">
-                                        <h4 className="font-bold text-white flex items-center gap-2 mb-4"><span className="material-symbols-outlined text-purple-400">auto_awesome</span>AI-Generated Profile Assets</h4>
+                                        <h4 className="font-bold text-white flex items-center gap-2 mb-4"><span className="material-symbols-outlined text-[#FF4D00]">auto_awesome</span>AI-Generated Profile Assets</h4>
                                         <div className="space-y-4">
                                             {Object.entries(profileScore.generatedAssets).filter(([,v]) => v && !v.includes('If ')).map(([key, val]) => (
                                                 <div key={key} className="rounded-xl bg-white/[0.02] border border-white/[0.06] p-4">
                                                     <div className="flex items-center justify-between mb-2">
                                                         <span className="text-xs text-slate-400 uppercase font-bold">Optimized {key}</span>
-                                                        <button onClick={() => { navigator.clipboard.writeText(val) }} className="text-[10px] text-violet-400 hover:text-violet-300 cursor-pointer flex items-center gap-1"><span className="material-symbols-outlined text-xs">content_copy</span>Copy</button>
+                                                        <button onClick={() => { navigator.clipboard.writeText(val) }} className="text-[10px] text-[#FF4D00] hover:text-[#FF7A00] cursor-pointer flex items-center gap-1"><span className="material-symbols-outlined text-xs">content_copy</span>Copy</button>
                                                     </div>
                                                     <p className="text-sm text-white whitespace-pre-wrap leading-relaxed">{val}</p>
                                                 </div>
@@ -870,23 +870,23 @@ export default function SocialMediaStudio() {
                             <p className="text-sm text-slate-400 mb-6">AI analyzes competitors and finds content gaps</p>
                             <div className="space-y-6">
                                 <div><label className="text-sm font-bold text-slate-300 mb-3 block">Platforms</label><PlatformSelector auto /></div>
-                                <div><label className="text-sm font-bold text-slate-300 mb-3 block">Competitors {activeBrand?.dna?.competitors?.length > 0 && <span className="text-emerald-400 text-[10px] ml-1">✨ auto-filled from Brand DNA</span>}</label>
+                                <div><label className="text-sm font-bold text-slate-300 mb-3 block">Competitors {activeBrand?.dna?.competitors?.length > 0 && <span className="text-emerald-400 text-[10px] ml-1"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">auto_awesome</span> auto-filled from Brand DNA</span>}</label>
                                     {competitors.map((c,i) => <div key={i} className="flex items-center gap-2 mb-2"><input value={c} onChange={e=>{const nc=[...competitors];nc[i]=e.target.value;setCompetitors(nc)}} placeholder={`Competitor ${i+1}`} className="flex-1 input-glass py-2.5 px-3 rounded-lg bg-white/[0.04] text-white text-sm placeholder:text-slate-600" />{competitors.length > 1 && <button onClick={()=>setCompetitors(p=>p.filter((_,j)=>j!==i))} className="text-slate-500 hover:text-rose-400 cursor-pointer"><span className="material-symbols-outlined text-base">close</span></button>}</div>)}
                                     {competitors.length < 5 && <button onClick={()=>setCompetitors(p=>[...p,''])} className="text-xs text-primary hover:underline cursor-pointer mt-1">+ Add competitor</button>}
                                 </div>
-                                <button onClick={runCompetitorAnalysis} disabled={loading} className="flex items-center gap-2 px-6 py-3.5 rounded-xl bg-gradient-to-r from-rose-500 to-pink-500 text-white font-bold text-sm hover:opacity-90 cursor-pointer disabled:opacity-40 shadow-lg">
+                                <button onClick={runCompetitorAnalysis} disabled={loading} className="flex items-center gap-2 px-6 py-3.5 rounded-xl bg-gradient-to-r from-rose-500 to-[#FF7A00] text-white font-bold text-sm hover:opacity-90 cursor-pointer disabled:opacity-40 shadow-lg">
                                     <span className="material-symbols-outlined text-base">auto_awesome</span>Analyze <CreditBadge action="socialMedia" /></button>
                             </div>
                         </div>
                     ) : (
                         <div className="space-y-6">
                             <div className="flex items-center justify-between"><h3 className="text-xl font-extrabold text-white">Competitor Analysis</h3><button onClick={()=>setCompResult(null)} className="text-sm text-slate-400 hover:text-white cursor-pointer flex items-center gap-1"><span className="material-symbols-outlined text-base">arrow_back</span>New</button></div>
-                            <div className="glass-panel rounded-2xl p-6 border border-rose-500/20 bg-gradient-to-br from-rose-500/5 to-pink-500/5"><p className="text-slate-300 leading-relaxed">{compResult.overview}</p></div>
+                            <div className="glass-panel rounded-2xl p-6 border border-rose-500/20 bg-gradient-to-br from-rose-500/5 to-[#FF7A00]/5"><p className="text-slate-300 leading-relaxed">{compResult.overview}</p></div>
                             {compResult.competitors?.map((comp,i) => <div key={i} className="glass-panel rounded-2xl p-6 border border-white/[0.06]"><h4 className="text-lg font-bold text-white mb-2">{comp.name}</h4><p className="text-sm text-slate-400 mb-4">{comp.overallStrategy}</p>
-                                {comp.vulnerabilities?.map((v,j) => <p key={j} className="text-xs text-amber-400 mb-1">🎯 {v}</p>)}</div>)}
+                                {comp.vulnerabilities?.map((v,j) => <p key={j} className="text-xs text-amber-400 mb-1"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">ads_click</span> {v}</p>)}</div>)}
                             {compResult.contentGaps?.length > 0 && <div className="glass-panel rounded-2xl p-6 border border-white/[0.06]"><h4 className="font-bold text-white flex items-center gap-2 mb-4"><span className="material-symbols-outlined text-amber-400">lightbulb</span>Content Gaps</h4>
                                 {compResult.contentGaps.map((g,i) => <div key={i} className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.04] mb-2"><p className="text-sm font-bold text-white">{g.gap}</p><p className="text-xs text-slate-400 mt-1">{g.opportunity}</p></div>)}</div>}
-                            {compResult.stealablePlaybook?.length > 0 && <div className="glass-panel rounded-2xl p-6 border border-white/[0.06]"><h4 className="font-bold text-white flex items-center gap-2 mb-4"><span className="material-symbols-outlined text-violet-400">content_copy</span>Steal Their Playbook</h4>
+                            {compResult.stealablePlaybook?.length > 0 && <div className="glass-panel rounded-2xl p-6 border border-white/[0.06]"><h4 className="font-bold text-white flex items-center gap-2 mb-4"><span className="material-symbols-outlined text-[#FF4D00]">content_copy</span>Steal Their Playbook</h4>
                                 {compResult.stealablePlaybook.map((p,i) => <div key={i} className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.04] mb-2"><div className="flex items-center justify-between"><p className="text-sm font-bold text-white">{p.tactic}</p><span className={`text-[10px] px-2 py-0.5 rounded-full ${p.difficulty==='Easy'?'bg-emerald-500/10 text-emerald-400':'bg-amber-500/10 text-amber-400'}`}>{p.difficulty}</span></div><p className="text-xs text-slate-400 mt-1">{p.adaptation}</p></div>)}</div>}
                         </div>
                     )}
@@ -911,7 +911,7 @@ export default function SocialMediaStudio() {
                                                     <div className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-emerald-400 animate-pulse" /><span className="text-xs text-emerald-400 font-bold">Active</span></div>
                                                 ) : (
                                                     <button onClick={() => handleConnect(p.id)}
-                                                        className="px-4 py-2 rounded-xl bg-gradient-to-r from-primary to-violet-500 text-white text-xs font-bold hover:opacity-90 cursor-pointer">Connect</button>
+                                                        className="px-4 py-2 rounded-xl bg-gradient-to-r from-primary to-[#FF7A00] text-white text-xs font-bold hover:opacity-90 cursor-pointer">Connect</button>
                                                 )}
                                             </div>
                                             {accts.length > 0 && <div className="mt-3 space-y-1">{accts.map((a,i) => (

@@ -32,7 +32,7 @@ const GOALS = [
     {
         id: 'celebrate', icon: 'celebration', label: 'Celebrate Something',
         desc: 'Festival, occasion, milestone, or trending event',
-        glow: 'glow-pink', iconColor: 'text-pink-400', accent: '#EC4899',
+        glow: 'glow-pink', iconColor: 'text-[#FF7A00]', accent: '#EC4899',
         subTypes: [
             { id: 'festival', icon: 'auto_awesome', label: 'Festival' },
             { id: 'national_day', icon: 'flag', label: 'National / World Day' },
@@ -45,7 +45,7 @@ const GOALS = [
     {
         id: 'launch', icon: 'rocket_launch', label: 'Launch Something',
         desc: 'New product, store, campaign, or announcement',
-        glow: 'glow-blue', iconColor: 'text-blue-400', accent: '#3B82F6',
+        glow: 'glow-blue', iconColor: 'text-[#FF4D00]', accent: '#3B82F6',
         subTypes: [
             { id: 'product_launch', icon: 'new_releases', label: 'Product Launch' },
             { id: 'store_launch', icon: 'store', label: 'Store Launch' },
@@ -71,7 +71,7 @@ const GOALS = [
     {
         id: 'brand', icon: 'diamond', label: 'Build Brand',
         desc: 'Brand story, about us, website copy, taglines',
-        glow: 'glow-violet', iconColor: 'text-violet-400', accent: '#8B5CF6',
+        glow: 'glow-violet', iconColor: 'text-[#FF4D00]', accent: '#8B5CF6',
         subTypes: [
             { id: 'about_us', icon: 'info', label: 'About Us' },
             { id: 'brand_story', icon: 'auto_stories', label: 'Brand Story' },
@@ -224,14 +224,14 @@ function SmartInput({ onParse, onSkip }) {
     }
 
     return (
-        <div className="max-w-2xl mx-auto text-center mb-10 animate-fade-in">
+        <div className="max-w-2xl mx-auto text-center mb-8 animate-fade-in">
             <div className="relative">
-                <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-primary text-xl">auto_awesome</span>
+                <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-primary-fixed text-xl">auto_awesome</span>
                 <input
                     value={input} onChange={e => setInput(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && handleSubmit()}
                     placeholder="What do you want to create? Type or speak in any language..."
-                    className="input-glass w-full pl-12 pr-28 py-4 text-white text-base rounded-2xl"
+                    className="input-glass w-full pl-12 pr-28 py-4 text-on-surface text-base rounded-2xl"
                     autoFocus
                 />
                 <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
@@ -245,7 +245,7 @@ function SmartInput({ onParse, onSkip }) {
                     </button>
                 </div>
             </div>
-            <p className="text-xs text-slate-600 mt-3">
+            <p className="text-xs text-on-surface-variant/50 mt-2.5">
                 <span className="material-symbols-outlined text-xs align-middle mr-0.5">mic</span>
                 Speak in Hindi, Tamil, Spanish, or any language • Or type below ↓
             </p>
@@ -260,11 +260,11 @@ function StepGoal({ onSelect }) {
                 <button key={g.id} onClick={() => onSelect(g.id)}
                     className="glass-card p-5 text-left cursor-pointer group animate-fade-in"
                     style={{ animationDelay: `${i * 60}ms` }}>
-                    <div className={`glass-icon ${g.glow} mb-3 group-hover:scale-110 transition-transform`}>
+                    <div className={`glass-icon ${g.glow} mb-3 group-hover:scale-110 transition-transform duration-300`}>
                         <span className={`material-symbols-outlined ${g.iconColor} text-lg`}>{g.icon}</span>
                     </div>
-                    <h3 className="text-base font-bold text-white mb-1">{g.label}</h3>
-                    <p className="text-sm text-slate-500 leading-relaxed">{g.desc}</p>
+                    <h3 className="text-base font-bold text-on-surface mb-1">{g.label}</h3>
+                    <p className="text-sm text-on-surface-variant leading-relaxed">{g.desc}</p>
                 </button>
             ))}
         </div>
@@ -713,7 +713,7 @@ function StepContext({ onComplete, onBack, goal, subType, initialImage, brandId 
                                     <div className="absolute bottom-0 left-0 right-0 p-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                         <p className="text-sm text-white font-bold truncate">{img.title || 'Untitled'}</p>
                                         <div className="flex items-center gap-1 mt-0.5">
-                                            <span className={`text-[8px] px-1.5 py-0.5 rounded-full font-bold ${img.type === 'uploaded' ? 'bg-blue-500/30 text-blue-300' : img.type === 'ai-photoshoot' ? 'bg-amber-500/30 text-amber-300' : 'bg-emerald-500/30 text-emerald-300'} `}>
+                                            <span className={`text-[8px] px-1.5 py-0.5 rounded-full font-bold ${img.type === 'uploaded' ? 'bg-[#FF4D00]/30 text-[#FF7A00]' : img.type === 'ai-photoshoot' ? 'bg-amber-500/30 text-amber-300' : 'bg-emerald-500/30 text-emerald-300'} `}>
                                                 {img.type === 'uploaded' ? 'Uploaded' : img.type === 'ai-photoshoot' ? 'Photoshoot' : 'Generated'}
                                             </span>
                                             <span className="text-[8px] text-slate-400">{new Date(img.createdAt).toLocaleDateString()}</span>
@@ -1015,8 +1015,8 @@ function StepTone({ onComplete, onBack, goal, activeBrand, availableProviders, m
                         <p className="text-xs text-slate-600 mt-0.5">Fast + trending data</p>
                     </button>
                     <button onClick={() => setResearchDepth('deep')}
-                        className={`glass-panel rounded-xl p-3 text-center transition-all cursor-pointer ${researchDepth === 'deep' ? 'bg-indigo-500/15 border-indigo-500/40' : 'hover:bg-white/[0.05]'}`}>
-                        <span className={`material-symbols-outlined text-lg block mb-1 ${researchDepth === 'deep' ? 'text-indigo-400' : 'text-slate-500'}`}>psychology</span>
+                        className={`glass-panel rounded-xl p-3 text-center transition-all cursor-pointer ${researchDepth === 'deep' ? 'bg-[#FF4D00]/15 border-[#FF4D00]/40' : 'hover:bg-white/[0.05]'}`}>
+                        <span className={`material-symbols-outlined text-lg block mb-1 ${researchDepth === 'deep' ? 'text-[#FF4D00]' : 'text-slate-500'}`}>psychology</span>
                         <p className={`text-xs font-bold ${researchDepth === 'deep' ? 'text-white' : 'text-slate-400'}`}>Deep Research</p>
                         <p className="text-xs text-slate-600 mt-0.5">Web search + competitor + SEO</p>
                     </button>
@@ -1350,7 +1350,7 @@ function StepPressRelease({ onComplete, onBack, activeBrand, goal, availableProv
 
 const YT_FORMATS = [
     { id: 'video', icon: 'movie', label: 'YouTube Video', desc: 'Long-form (5-60 min)', color: 'from-red-500/20 to-rose-500/10' },
-    { id: 'shorts', icon: 'slow_motion_video', label: 'YouTube Shorts', desc: 'Under 60 seconds', color: 'from-pink-500/20 to-rose-500/10' },
+    { id: 'shorts', icon: 'slow_motion_video', label: 'YouTube Shorts', desc: 'Under 60 seconds', color: 'from-[#FF4D00]/20 to-rose-500/10' },
 ]
 
 const YT_LENGTHS = [
@@ -1631,7 +1631,7 @@ function YouTubeResultView({ result, youtubeData, onNewContent, generating, acti
 
             {/* Title Section */}
             <div className="glass-panel rounded-2xl p-5 mb-4">
-                <SectionHeader icon="title" title="Video Title" sectionKey="title" copyText={videoTitle} color="text-blue-400" />
+                <SectionHeader icon="title" title="Video Title" sectionKey="title" copyText={videoTitle} color="text-[#FF4D00]" />
                 {expandedSections.title && (
                     <div className="animate-fade-in">
                         <p className="text-lg font-bold text-white leading-relaxed">{videoTitle}</p>
@@ -1667,12 +1667,12 @@ function YouTubeResultView({ result, youtubeData, onNewContent, generating, acti
             {/* Tags Section */}
             {tags.length > 0 && (
                 <div className="glass-panel rounded-2xl p-5 mb-4">
-                    <SectionHeader icon="sell" title="Tags" count={`${tags.length} tags`} sectionKey="tags" copyText={tags.join(', ')} color="text-violet-400" />
+                    <SectionHeader icon="sell" title="Tags" count={`${tags.length} tags`} sectionKey="tags" copyText={tags.join(', ')} color="text-[#FF4D00]" />
                     {expandedSections.tags && (
                         <div className="animate-fade-in flex flex-wrap gap-2">
                             {tags.map((tag, i) => (
                                 <button key={i} onClick={() => copySection(tag, `tag-${i}`)}
-                                    className="px-3 py-1.5 rounded-lg bg-violet-500/10 text-violet-300 text-xs font-medium hover:bg-violet-500/20 transition-colors cursor-pointer border border-violet-500/20">
+                                    className="px-3 py-1.5 rounded-lg bg-[#FF4D00]/10 text-[#FF7A00] text-xs font-medium hover:bg-[#FF4D00]/20 transition-colors cursor-pointer border border-[#FF4D00]/20">
                                     {copiedSection === `tag-${i}` ? '✓' : ''} {tag}
                                 </button>
                             ))}
@@ -1741,13 +1741,13 @@ function YouTubeResultView({ result, youtubeData, onNewContent, generating, acti
                 {thumbnailIdeas.length > 0 && (
                     <div className="glass-panel rounded-2xl p-5">
                         <div className="flex items-center gap-2 mb-3">
-                            <span className="material-symbols-outlined text-lg text-pink-400">image</span>
+                            <span className="material-symbols-outlined text-lg text-[#FF7A00]">image</span>
                             <h4 className="text-sm font-bold text-white">Thumbnail Ideas</h4>
                         </div>
                         <div className="space-y-2">
                             {thumbnailIdeas.map((idea, i) => (
                                 <div key={i} className="flex items-start gap-2 text-xs">
-                                    <span className="text-pink-400 font-bold mt-0.5">{i + 1}.</span>
+                                    <span className="text-[#FF7A00] font-bold mt-0.5">{i + 1}.</span>
                                     <span className="text-slate-300 leading-relaxed">{idea}</span>
                                 </div>
                             ))}
@@ -1765,7 +1765,7 @@ function YouTubeResultView({ result, youtubeData, onNewContent, generating, acti
                                 <p className="text-xs font-bold text-slate-500 mb-1.5">Hashtags</p>
                                 <div className="flex flex-wrap gap-1.5">
                                     {hashtags.map((h, i) => (
-                                        <span key={i} className="text-xs text-blue-400 bg-blue-500/10 px-2 py-1 rounded-lg font-medium">{h}</span>
+                                        <span key={i} className="text-xs text-[#FF4D00] bg-[#FF4D00]/10 px-2 py-1 rounded-lg font-medium">{h}</span>
                                     ))}
                                 </div>
                             </div>
@@ -2020,9 +2020,9 @@ function YouTubeSeoResultView({ result, youtubeSeoData, onNewContent }) {
             <div className="glass-panel rounded-2xl p-5 mb-4">
                 <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2">
-                        <span className="material-symbols-outlined text-lg text-blue-400">title</span>
+                        <span className="material-symbols-outlined text-lg text-[#FF4D00]">title</span>
                         <h4 className="text-base font-bold text-white">Title Options</h4>
-                        <span className="text-xs bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded-full font-bold">{titles.length} options</span>
+                        <span className="text-xs bg-[#FF4D00]/10 text-[#FF4D00] px-2 py-0.5 rounded-full font-bold">{titles.length} options</span>
                     </div>
                     {titles[selectedTitle]?.text && (
                         <button onClick={() => copySection(titles[selectedTitle].text, 'title')}
@@ -2090,9 +2090,9 @@ function YouTubeSeoResultView({ result, youtubeSeoData, onNewContent }) {
                 <div className="glass-panel rounded-2xl p-5 mb-4">
                     <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2">
-                            <span className="material-symbols-outlined text-lg text-violet-400">sell</span>
+                            <span className="material-symbols-outlined text-lg text-[#FF4D00]">sell</span>
                             <h4 className="text-base font-bold text-white">Tags</h4>
-                            <span className="text-xs bg-violet-500/10 text-violet-400 px-2 py-0.5 rounded-full font-bold">{tags.length} tags</span>
+                            <span className="text-xs bg-[#FF4D00]/10 text-[#FF4D00] px-2 py-0.5 rounded-full font-bold">{tags.length} tags</span>
                         </div>
                         <button onClick={() => copySection(tags.join(', '), 'tags')}
                             className="flex items-center gap-1 text-xs text-slate-500 hover:text-white transition-colors cursor-pointer">
@@ -2105,7 +2105,7 @@ function YouTubeSeoResultView({ result, youtubeSeoData, onNewContent }) {
                             <button key={i} onClick={() => copySection(tag, `tag-${i}`)}
                                 className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer border ${i === 0
                                     ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30 font-bold'
-                                    : 'bg-violet-500/10 text-violet-300 hover:bg-violet-500/20 border-violet-500/20'}`}>
+                                    : 'bg-[#FF4D00]/10 text-[#FF7A00] hover:bg-[#FF4D00]/20 border-[#FF4D00]/20'}`}>
                                 {copiedSection === `tag-${i}` ? '✓' : ''} {tag}
                                 {i === 0 && <span className="ml-1 text-[8px] text-emerald-400">PRIMARY</span>}
                             </button>
@@ -2179,7 +2179,7 @@ function YouTubeSeoResultView({ result, youtubeSeoData, onNewContent }) {
                 {competitorInsight && (
                     <div className="glass-panel rounded-2xl p-5">
                         <div className="flex items-center gap-2 mb-3">
-                            <span className="material-symbols-outlined text-lg text-pink-400">psychology</span>
+                            <span className="material-symbols-outlined text-lg text-[#FF7A00]">psychology</span>
                             <h4 className="text-sm font-bold text-white">Competitor Insight</h4>
                         </div>
                         <p className="text-sm text-slate-300 leading-relaxed">{competitorInsight}</p>
@@ -2192,7 +2192,7 @@ function YouTubeSeoResultView({ result, youtubeSeoData, onNewContent }) {
                 <div className="glass-panel rounded-2xl p-5 mb-4">
                     <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2">
-                            <span className="material-symbols-outlined text-lg text-blue-400">tag</span>
+                            <span className="material-symbols-outlined text-lg text-[#FF4D00]">tag</span>
                             <h4 className="text-sm font-bold text-white">Hashtags</h4>
                         </div>
                         <button onClick={() => copySection(hashtags.join(' '), 'hashtags')}
@@ -2203,7 +2203,7 @@ function YouTubeSeoResultView({ result, youtubeSeoData, onNewContent }) {
                     </div>
                     <div className="flex flex-wrap gap-2">
                         {hashtags.map((h, i) => (
-                            <span key={i} className="text-xs text-blue-400 bg-blue-500/10 px-2 py-1 rounded-lg font-medium border border-blue-500/20">{h}</span>
+                            <span key={i} className="text-xs text-[#FF4D00] bg-[#FF4D00]/10 px-2 py-1 rounded-lg font-medium border border-[#FF4D00]/20">{h}</span>
                         ))}
                     </div>
                 </div>
@@ -2317,7 +2317,7 @@ function StepBlogWizard({ activeBrand, blogType, onGenerate, onBack, generating 
             {/* Generate */}
             <button onClick={() => onGenerate({ topic, blogType, targetWordCount, keywords: keywords.split(',').map(k => k.trim()).filter(Boolean), targetAudience: audience, tone })}
                 disabled={!topic.trim() || generating}
-                className="w-full py-4 rounded-2xl bg-gradient-to-r from-primary to-violet-500 text-white font-bold text-base disabled:opacity-30 hover:shadow-lg hover:shadow-primary/20 transition-all cursor-pointer flex items-center justify-center gap-2">
+                className="w-full py-4 rounded-2xl bg-gradient-to-r from-primary to-[#FF7A00] text-white font-bold text-base disabled:opacity-30 hover:shadow-lg hover:shadow-primary/20 transition-all cursor-pointer flex items-center justify-center gap-2">
                 <span className="material-symbols-outlined">{generating ? 'progress_activity' : 'auto_awesome'}</span>
                 {generating ? 'Generating your blog...' : 'Generate Blog Article'}
             </button>
@@ -3112,8 +3112,8 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
                         <p className="text-[11px] text-slate-500">Copy the content to paste on your platform</p>
                     </button>
                     <button onClick={onNewContent}
-                        className="glass-panel rounded-2xl p-5 hover:bg-white/[0.05] hover:border-violet-500/30 transition-all cursor-pointer text-left group border border-white/[0.06]">
-                        <div className="size-12 rounded-xl bg-violet-400/10 flex items-center justify-center text-violet-400 mb-3 group-hover:scale-110 transition-transform">
+                        className="glass-panel rounded-2xl p-5 hover:bg-white/[0.05] hover:border-[#FF4D00]/30 transition-all cursor-pointer text-left group border border-white/[0.06]">
+                        <div className="size-12 rounded-xl bg-[#FF4D00]/10 flex items-center justify-center text-[#FF4D00] mb-3 group-hover:scale-110 transition-transform">
                             <span className="material-symbols-outlined text-2xl">add_circle</span>
                         </div>
                         <h4 className="text-base font-bold text-white mb-1">Create New Content</h4>
@@ -3121,8 +3121,8 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
                     </button>
                     {result?._id && (
                         <button onClick={onABTest} disabled={abTestLoading}
-                            className="glass-panel rounded-2xl p-5 hover:bg-white/[0.05] hover:border-violet-500/30 transition-all cursor-pointer text-left group border border-white/[0.06] disabled:opacity-40">
-                            <div className="size-12 rounded-xl bg-violet-400/10 flex items-center justify-center text-violet-400 mb-3 group-hover:scale-110 transition-transform">
+                            className="glass-panel rounded-2xl p-5 hover:bg-white/[0.05] hover:border-[#FF4D00]/30 transition-all cursor-pointer text-left group border border-white/[0.06] disabled:opacity-40">
+                            <div className="size-12 rounded-xl bg-[#FF4D00]/10 flex items-center justify-center text-[#FF4D00] mb-3 group-hover:scale-110 transition-transform">
                                 <span className={`material-symbols-outlined text-2xl ${abTestLoading ? 'animate-spin' : ''}`}>{abTestLoading ? 'progress_activity' : 'science'}</span>
                             </div>
                             <h4 className="text-base font-bold text-white mb-1 flex items-center gap-1">{abTestLoading ? 'Creating...' : <><span className="material-symbols-outlined text-sm">science</span> A/B Test</>}</h4>
@@ -3130,8 +3130,8 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
                         </button>
                     )}
                     <button onClick={() => setShowPublish(true)}
-                        className="glass-panel rounded-2xl p-5 hover:bg-white/[0.05] hover:border-blue-500/30 transition-all cursor-pointer text-left group border border-white/[0.06]">
-                        <div className="size-12 rounded-xl bg-blue-400/10 flex items-center justify-center text-blue-400 mb-3 group-hover:scale-110 transition-transform">
+                        className="glass-panel rounded-2xl p-5 hover:bg-white/[0.05] hover:border-[#FF4D00]/30 transition-all cursor-pointer text-left group border border-white/[0.06]">
+                        <div className="size-12 rounded-xl bg-[#FF4D00]/10 flex items-center justify-center text-[#FF4D00] mb-3 group-hover:scale-110 transition-transform">
                             <span className="material-symbols-outlined text-2xl">share</span>
                         </div>
                         <h4 className="text-base font-bold text-white mb-1">Publish Now</h4>
@@ -3145,11 +3145,11 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
 
                 {/* A/B Test Variants in accepted view */}
                 {abTestData && abTestData.variants && abTestData.variants.length > 0 && (
-                    <div className="mt-6 glass-panel rounded-2xl p-5 border border-violet-500/20">
+                    <div className="mt-6 glass-panel rounded-2xl p-5 border border-[#FF4D00]/20">
                         <div className="flex items-center gap-2 mb-4">
-                            <span className="material-symbols-outlined text-violet-400">science</span>
+                            <span className="material-symbols-outlined text-[#FF4D00]">science</span>
                             <h4 className="text-sm font-bold text-white">A/B Test Variants</h4>
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-400/10 text-violet-400 border border-violet-400/20">
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#FF4D00]/10 text-[#FF4D00] border border-[#FF4D00]/20">
                                 {abTestData.variants.length} variants generated
                             </span>
                         </div>
@@ -3157,7 +3157,7 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
                             {abTestData.variants.map((v, i) => (
                                 <div key={i} className={`rounded-xl p-4 border transition-all ${v.isControl ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-white/[0.02] border-white/[0.06]'}`}>
                                     <div className="flex items-center gap-2 mb-2">
-                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${v.isControl ? 'bg-emerald-400/10 text-emerald-400' : 'bg-violet-400/10 text-violet-400'}`}>
+                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${v.isControl ? 'bg-emerald-400/10 text-emerald-400' : 'bg-[#FF4D00]/10 text-[#FF4D00]'}`}>
                                             {v.variantLabel || `Variant ${String.fromCharCode(65 + i)}`}
                                         </span>
                                         {v.abTestChangeType && v.abTestChangeType !== 'control' && (
@@ -3204,8 +3204,8 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
                             <span className="text-[10px] text-slate-600">Powered by:</span>
                             {result.agenticData.research.sources.map(s => (
                                 <span key={s} className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium border ${
-                                    s === 'Playbook' ? 'bg-violet-500/10 text-violet-400 border-violet-500/20' :
-                                    s === 'GA4' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
+                                    s === 'Playbook' ? 'bg-[#FF4D00]/10 text-[#FF4D00] border-[#FF4D00]/20' :
+                                    s === 'GA4' ? 'bg-[#FF4D00]/10 text-[#FF4D00] border-[#FF4D00]/20' :
                                     s === 'Competitors' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' :
                                     'bg-white/[0.04] text-slate-400 border-white/[0.06]'
                                 }`}>
@@ -3320,7 +3320,7 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
                 </button>
                 {result?._id && (
                     <button onClick={onABTest} disabled={abTestLoading}
-                        className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold bg-violet-500/10 text-violet-400 hover:bg-violet-500/20 transition-all cursor-pointer border border-violet-500/30 disabled:opacity-30">
+                        className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold bg-[#FF4D00]/10 text-[#FF4D00] hover:bg-[#FF4D00]/20 transition-all cursor-pointer border border-[#FF4D00]/30 disabled:opacity-30">
                         <span className={`material-symbols-outlined text-lg ${abTestLoading ? 'animate-spin' : ''}`}>{abTestLoading ? 'progress_activity' : 'science'}</span>
                         {abTestLoading ? 'Creating...' : 'A/B Test'}
                     </button>
@@ -3361,21 +3361,21 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
 
             {/* A/B Test Variants */}
             {abTestData && abTestData.variants && abTestData.variants.length > 0 && (
-                <div className="mt-6 glass-panel rounded-2xl p-5 border border-violet-500/20">
+                <div className="mt-6 glass-panel rounded-2xl p-5 border border-[#FF4D00]/20">
                     <div className="flex items-center gap-2 mb-4">
-                        <span className="material-symbols-outlined text-violet-400">science</span>
+                        <span className="material-symbols-outlined text-[#FF4D00]">science</span>
                         <h4 className="text-sm font-bold text-white">A/B Test Variants</h4>
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-400/10 text-violet-400 border border-violet-400/20">
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#FF4D00]/10 text-[#FF4D00] border border-[#FF4D00]/20">
                             {abTestData.testPlan?.primaryMetric?.replace('_', ' ')} • {abTestData.testPlan?.testDuration}
                         </span>
                     </div>
                     <div className="space-y-3">
                         {abTestData.variants.map((v, i) => (
                             <div key={i} className={`rounded-xl p-4 border transition-all ${
-                                v.isControl ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-white/[0.02] border-white/[0.06] hover:border-violet-500/30'
+                                v.isControl ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-white/[0.02] border-white/[0.06] hover:border-[#FF4D00]/30'
                             }`}>
                                 <div className="flex items-center gap-2 mb-2">
-                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${v.isControl ? 'bg-emerald-400/10 text-emerald-400' : 'bg-violet-400/10 text-violet-400'}`}>
+                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${v.isControl ? 'bg-emerald-400/10 text-emerald-400' : 'bg-[#FF4D00]/10 text-[#FF4D00]'}`}>
                                         {v.variantLabel || `Variant ${String.fromCharCode(65 + i)}`}
                                     </span>
                                     {v.abTestChangeType && v.abTestChangeType !== 'control' && (
@@ -3410,7 +3410,7 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
 
             {/* Learning note */}
             <div className="mt-6 p-3 rounded-xl bg-primary/5 border border-primary/10 text-center">
-                <p className="text-sm text-primary font-bold">🧠 Every action teaches the AI your preferences</p>
+                <p className="text-sm text-primary font-bold"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">psychology</span> Every action teaches the AI your preferences</p>
                 <p className="text-sm text-slate-500">Accept → AI replicates style • Edit → AI learns your preferences • Refine → AI adapts to your feedback</p>
             </div>
         </div>
@@ -4226,27 +4226,27 @@ SPOKESPERSON QUOTES:`
             {step === 0 && (
                 <div className="animate-fade-in">
                     {/* Hero Section */}
-                    <div className="text-center mb-10">
-                        <span className="material-symbols-outlined text-5xl text-primary mb-3 block">edit_note</span>
-                        <h2 className="text-2xl font-black text-white mb-2">What do you want to <span className="text-primary">create?</span></h2>
-                        <p className="text-sm text-slate-400 max-w-lg mx-auto">Tell us what you need — we'll handle the rest.</p>
+                    <div className="text-center mb-8">
+                        <span className="material-symbols-outlined text-4xl text-primary-fixed mb-2 block">edit_note</span>
+                        <h2 className="text-2xl font-headline font-bold text-on-surface mb-1.5">What do you want to <span className="text-primary-fixed">create?</span></h2>
+                        <p className="text-sm text-on-surface-variant max-w-lg mx-auto">Tell us what you need — we'll handle the rest.</p>
                     </div>
 
                     {/* Smart Input */}
                     <SmartInput onParse={handleSmartParse} />
 
                     {/* Divider */}
-                    <div className="flex items-center gap-3 max-w-4xl mx-auto mb-6">
-                        <div className="flex-1 h-px bg-white/[0.06]" />
-                        <span className="text-xs text-slate-500 font-bold uppercase tracking-wider">Or pick your content type</span>
-                        <div className="flex-1 h-px bg-white/[0.06]" />
+                    <div className="flex items-center gap-3 max-w-4xl mx-auto mb-5">
+                        <div className="flex-1 h-px bg-outline-variant/20" />
+                        <span className="text-xs text-on-surface-variant font-bold uppercase tracking-wider">Or pick your content type</span>
+                        <div className="flex-1 h-px bg-outline-variant/20" />
                     </div>
 
                     {/* Pre-filled Context Banner */}
                     {prefilledOccasion && step >= 2 && step <= 4 && (
                         <div className="max-w-2xl mx-auto mb-6 animate-fade-in">
                             <div className="flex items-center gap-3 p-4 rounded-xl bg-primary/10 border border-primary/20">
-                                <span className="text-2xl">{prefilledOccasion.emoji || '🎯'}</span>
+                                <span className="text-2xl">{prefilledOccasion.emoji || 'ads_click'}</span>
                                 <div className="flex-1">
                                     <p className="text-base font-bold text-white">Creating content for <span className="text-primary">{prefilledOccasion.name}</span></p>
                                     <p className="text-sm text-slate-400 mt-0.5">Suggested tone: {prefilledOccasion.tone || 'festive'} • Select your channel below</p>

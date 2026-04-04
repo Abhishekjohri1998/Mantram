@@ -3,7 +3,7 @@ import SEOHead from '../components/SEOHead'
 
 export default function PrivacyPolicy() {
     return (
-        <div className="min-h-screen bg-slate-950 text-slate-300 py-12 px-4 sm:px-6 lg:px-8">
+        <div className="min-h-screen bg-[#08080C] text-slate-300 py-12 px-4 sm:px-6 lg:px-8">
             <SEOHead
                 title="Privacy Policy — Mantram AI"
                 description="Mantram AI privacy policy: how we collect, use & protect your data across 12 AI marketing studios. Covers social media integrations, Google Analytics, Shopify, AI model routing & GDPR compliance."
@@ -102,7 +102,7 @@ export default function PrivacyPolicy() {
                             <li>Generate AI-driven marketing recommendations based on traffic patterns</li>
                             <li>Display website analytics in your Mantram AI Dashboard</li>
                         </ul>
-                        <div className="mt-4 p-4 rounded-xl bg-violet-500/5 border border-violet-500/10">
+                        <div className="mt-4 p-4 rounded-xl bg-[#FF4D00]/5 border border-[#FF4D00]/10">
                             <p className="text-sm leading-relaxed">
                                 <strong className="text-white">Google API Limited Use Disclosure:</strong> Our use and transfer of information received from Google APIs adheres to the <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Google API Services User Data Policy</a>, including the Limited Use requirements. We do not sell, share, or use this data for advertising purposes.
                             </p>

@@ -1027,7 +1027,7 @@ export default function UGCCreator({ activeBrand }) {
                                 {/* ── HeyGen Pro Features — Generate Looks, Add Motion, Digital Twin ── */}
                                 <div style={{ marginTop: 16, borderRadius: 14, border: '1px solid rgba(124,58,237,.15)', overflow: 'hidden' }}>
                                     <button onClick={() => { setShowProFeatures(!showProFeatures); if (!showProFeatures && avatarGroups.length === 0) loadAvatarGroups() }}
-                                        style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', background: 'linear-gradient(135deg, rgba(124,58,237,.08), rgba(139,92,246,.04))', border: 'none', color: '#a78bfa', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
+                                        style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', background: 'linear-gradient(135deg, rgba(124,58,237,.08), rgba(255, 77, 0,.04))', border: 'none', color: '#a78bfa', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
                                         <span>✨ Pro Features — Looks · Motion · Digital Twin</span>
                                         <span style={{ transition: 'transform .2s', transform: showProFeatures ? 'rotate(180deg)' : 'none' }}>▾</span>
                                     </button>

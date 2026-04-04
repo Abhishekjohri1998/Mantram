@@ -190,7 +190,7 @@ export default function TeamDashboard() {
 
     const roleColors = {
         owner: { bg: 'bg-amber-400/10', text: 'text-amber-400', label: 'Owner' },
-        manager: { bg: 'bg-violet-400/10', text: 'text-violet-400', label: 'Manager' },
+        manager: { bg: 'bg-[#FF4D00]/10', text: 'text-[#FF4D00]', label: 'Manager' },
         member: { bg: 'bg-emerald-400/10', text: 'text-emerald-400', label: 'Member' },
     }
 
@@ -198,7 +198,7 @@ export default function TeamDashboard() {
         pending: { bg: 'bg-amber-500/10', text: 'text-amber-400', icon: 'schedule' },
         approved: { bg: 'bg-emerald-500/10', text: 'text-emerald-400', icon: 'check_circle' },
         rejected: { bg: 'bg-rose-500/10', text: 'text-rose-400', icon: 'cancel' },
-        'revision-requested': { bg: 'bg-violet-500/10', text: 'text-violet-400', icon: 'edit_note' },
+        'revision-requested': { bg: 'bg-[#FF4D00]/10', text: 'text-[#FF4D00]', icon: 'edit_note' },
     }
 
     return (
@@ -257,7 +257,7 @@ export default function TeamDashboard() {
                                         return (
                                             <div key={m._id} className="flex items-center gap-4 p-4 rounded-xl bg-white/[0.02] border border-white/[0.06] hover:bg-white/[0.04] transition-all animate-fade-in"
                                                 style={{ animationDelay: `${i * 60}ms` }}>
-                                                <div className="size-10 rounded-full bg-gradient-to-br from-primary to-purple-500 flex items-center justify-center text-white text-sm font-bold shrink-0">
+                                                <div className="size-10 rounded-full bg-gradient-to-br from-primary to-[#FF7A00] flex items-center justify-center text-white text-sm font-bold shrink-0">
                                                     {m.name?.charAt(0)?.toUpperCase() || '?'}
                                                 </div>
                                                 <div className="flex-1 min-w-0">
@@ -323,7 +323,7 @@ export default function TeamDashboard() {
                             <h3 className="font-bold text-white flex items-center gap-2 mb-4">
                                 <span className="material-symbols-outlined text-primary">diamond</span>Plan
                             </h3>
-                            <div className="p-4 rounded-xl bg-gradient-to-br from-primary/10 to-purple-500/10 border border-primary/20 mb-3">
+                            <div className="p-4 rounded-xl bg-gradient-to-br from-primary/10 to-[#FF7A00]/10 border border-primary/20 mb-3">
                                 <p className="text-lg font-extrabold text-white capitalize">Mantram Unlimited</p>
                                 <p className="text-sm text-slate-400">Unlimited team members & brands</p>
                             </div>
@@ -395,7 +395,7 @@ export default function TeamDashboard() {
                                 </div>
                             ) : messages.map(m => (
                                 <div key={m._id} className={`flex gap-3 ${String(m.sender?._id) === String(user?.id) ? 'flex-row-reverse' : ''}`}>
-                                    <div className="size-8 rounded-full bg-gradient-to-br from-primary to-purple-500 flex items-center justify-center text-white text-xs font-bold shrink-0">
+                                    <div className="size-8 rounded-full bg-gradient-to-br from-primary to-[#FF7A00] flex items-center justify-center text-white text-xs font-bold shrink-0">
                                         {m.sender?.name?.charAt(0) || '?'}
                                     </div>
                                     <div className={`max-w-[70%] p-3 rounded-2xl ${String(m.sender?._id) === String(user?.id) ? 'bg-primary/15 border border-primary/20' : 'bg-white/[0.04] border border-white/[0.06]'}`}>
@@ -507,12 +507,12 @@ export default function TeamDashboard() {
                                             {/* Actions */}
                                             {a.status === 'pending' && String(a.approver?._id) === String(user?.id) && (
                                                 <div className="flex gap-2 mt-2">
-                                                    <button onClick={() => handleApprovalAction(a._id, 'approve', 'Approved ✅')}
-                                                        className="flex-1 py-2 rounded-xl bg-emerald-500/10 text-emerald-400 text-xs font-bold hover:bg-emerald-500/20 cursor-pointer border border-emerald-500/20 transition-all">✅ Approve</button>
+                                                    <button onClick={() => handleApprovalAction(a._id, 'approve', 'Approved <span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">check_circle</span>')}
+                                                        className="flex-1 py-2 rounded-xl bg-emerald-500/10 text-emerald-400 text-xs font-bold hover:bg-emerald-500/20 cursor-pointer border border-emerald-500/20 transition-all"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">check_circle</span> Approve</button>
                                                     <button onClick={() => { const msg = prompt('Revision notes:'); if (msg) handleApprovalAction(a._id, 'revision', msg) }}
-                                                        className="flex-1 py-2 rounded-xl bg-amber-500/10 text-amber-400 text-xs font-bold hover:bg-amber-500/20 cursor-pointer border border-amber-500/20 transition-all">✏️ Request Revision</button>
+                                                        className="flex-1 py-2 rounded-xl bg-amber-500/10 text-amber-400 text-xs font-bold hover:bg-amber-500/20 cursor-pointer border border-amber-500/20 transition-all"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">edit</span> Request Revision</button>
                                                     <button onClick={() => handleApprovalAction(a._id, 'reject', 'Rejected')}
-                                                        className="flex-1 py-2 rounded-xl bg-rose-500/10 text-rose-400 text-xs font-bold hover:bg-rose-500/20 cursor-pointer border border-rose-500/20 transition-all">❌ Reject</button>
+                                                        className="flex-1 py-2 rounded-xl bg-rose-500/10 text-rose-400 text-xs font-bold hover:bg-rose-500/20 cursor-pointer border border-rose-500/20 transition-all"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">cancel</span> Reject</button>
                                                 </div>
                                             )}
                                         </div>
@@ -572,13 +572,13 @@ export default function TeamDashboard() {
                             {/* Member breakdown */}
                             <div className="glass-panel rounded-2xl p-6">
                                 <h3 className="font-bold text-white flex items-center gap-2 mb-4">
-                                    <span className="material-symbols-outlined text-violet-400">leaderboard</span>Member Performance
+                                    <span className="material-symbols-outlined text-[#FF4D00]">leaderboard</span>Member Performance
                                 </h3>
                                 <div className="space-y-2">
                                     {healthData.members?.sort((a, b) => (b.contentGenerated + b.creativesGenerated) - (a.contentGenerated + a.creativesGenerated)).map((m, i) => (
                                         <div key={i} className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
                                             <span className="text-sm font-bold text-slate-500 w-6">#{i + 1}</span>
-                                            <div className="size-8 rounded-full bg-gradient-to-br from-primary to-purple-500 flex items-center justify-center text-white text-xs font-bold shrink-0">
+                                            <div className="size-8 rounded-full bg-gradient-to-br from-primary to-[#FF7A00] flex items-center justify-center text-white text-xs font-bold shrink-0">
                                                 {m.name?.charAt(0)}
                                             </div>
                                             <div className="flex-1 min-w-0">
@@ -590,7 +590,7 @@ export default function TeamDashboard() {
                                                 <p className="text-[10px] text-slate-500">outputs</p>
                                             </div>
                                             <div className="w-24 h-1.5 rounded-full bg-white/[0.04] overflow-hidden">
-                                                <div className="h-full rounded-full bg-gradient-to-r from-primary to-purple-500 transition-all"
+                                                <div className="h-full rounded-full bg-gradient-to-r from-primary to-[#FF7A00] transition-all"
                                                     style={{ width: `${Math.min(100, ((m.contentGenerated + m.creativesGenerated) / Math.max(1, healthData.totalContent + healthData.totalCreatives)) * 100 * healthData.teamSize)}%` }} />
                                             </div>
                                         </div>
@@ -685,7 +685,7 @@ export default function TeamDashboard() {
 
                             {inviteResult && (
                                 <div className={`p-3 rounded-xl text-sm ${inviteResult.error ? 'bg-rose-500/10 text-rose-400' : 'bg-emerald-500/10 text-emerald-400'}`}>
-                                    {inviteResult.error || `✅ Invite sent to ${inviteResult.sentTo}! They'll receive an email with a link to join your team.`}
+                                    {inviteResult.error || ` Invite sent to ${inviteResult.sentTo}! They'll receive an email with a link to join your team.`}
                                 </div>
                             )}
 

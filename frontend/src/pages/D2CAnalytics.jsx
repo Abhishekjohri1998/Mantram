@@ -71,7 +71,7 @@ export default function D2CAnalytics() {
     }
 
     const kpiCards = data?.kpis ? [
-        { label: 'Revenue', value: `₹${data.kpis.totalRevenue?.toLocaleString()}`, icon: 'payments', color: '#8b5cf6', sub: `${data.kpis.revenueGrowth > 0 ? '+' : ''}${data.kpis.revenueGrowth}% WoW`, subColor: data.kpis.revenueGrowth >= 0 ? '#34d399' : '#f43f5e' },
+        { label: 'Revenue', value: `₹${data.kpis.totalRevenue?.toLocaleString()}`, icon: 'payments', color: '#FF4D00', sub: `${data.kpis.revenueGrowth > 0 ? '+' : ''}${data.kpis.revenueGrowth}% WoW`, subColor: data.kpis.revenueGrowth >= 0 ? '#34d399' : '#f43f5e' },
         { label: 'Orders', value: data.kpis.totalOrders?.toLocaleString(), icon: 'shopping_cart', color: '#06b6d4', sub: `${days}d` },
         { label: 'AOV', value: `₹${data.kpis.avgOrderValue?.toLocaleString()}`, icon: 'receipt_long', color: '#f59e0b', sub: 'avg order' },
         { label: 'Customers', value: data.kpis.totalCustomers?.toLocaleString(), icon: 'group', color: '#ec4899', sub: `${data.kpis.newCustomers} new` },
@@ -192,15 +192,15 @@ export default function D2CAnalytics() {
             ) : !data?.connected ? (
                 /* Not Connected State */
                 <div className="glass-panel rounded-2xl p-10 text-center border border-white/[0.06]">
-                    <div className="size-20 rounded-2xl bg-gradient-to-br from-violet-500/10 to-cyan-500/10 flex items-center justify-center mx-auto mb-5 border border-violet-500/20">
-                        <span className="material-symbols-outlined text-4xl text-violet-400">storefront</span>
+                    <div className="size-20 rounded-2xl bg-gradient-to-br from-[#FF4D00]/10 to-cyan-500/10 flex items-center justify-center mx-auto mb-5 border border-[#FF4D00]/20">
+                        <span className="material-symbols-outlined text-4xl text-[#FF4D00]">storefront</span>
                     </div>
                     <h3 className="text-2xl font-bold text-white mb-2">Connect Your Shopify Store</h3>
                     <p className="text-slate-400 max-w-md mx-auto mb-6">
                         Link your Shopify store to unlock powerful D2C intelligence — revenue tracking, product health scores, customer insights, red flag alerts, and AI-powered growth strategies.
                     </p>
                     <button onClick={() => navigate('/integrations')}
-                        className="px-6 py-3 rounded-xl bg-gradient-to-r from-primary to-violet-500 text-white font-bold hover:shadow-lg hover:shadow-primary/20 transition-all cursor-pointer">
+                        className="px-6 py-3 rounded-xl bg-gradient-to-r from-primary to-[#FF7A00] text-white font-bold hover:shadow-lg hover:shadow-primary/20 transition-all cursor-pointer">
                         <span className="material-symbols-outlined text-sm align-middle mr-1">link</span>
                         Connect Shopify
                     </button>
@@ -249,11 +249,11 @@ export default function D2CAnalytics() {
                                 <div className="glass-panel rounded-2xl p-6 border border-white/[0.06]">
                                     <div className="flex items-center justify-between mb-4">
                                         <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                                            <span className="material-symbols-outlined text-violet-400 text-lg">show_chart</span>
+                                            <span className="material-symbols-outlined text-[#FF4D00] text-lg">show_chart</span>
                                             Revenue Trend ({days} days)
                                         </h3>
                                         <button onClick={handleAiInsights} disabled={insightsLoading}
-                                            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-gradient-to-r from-primary/20 to-violet-500/20 border border-primary/30 text-primary font-medium text-xs hover:from-primary/30 transition-all cursor-pointer disabled:opacity-50">
+                                            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-gradient-to-r from-primary/20 to-[#FF7A00]/20 border border-primary/30 text-primary font-medium text-xs hover:from-primary/30 transition-all cursor-pointer disabled:opacity-50">
                                             <span className="material-symbols-outlined text-sm">{insightsLoading ? 'progress_activity' : 'auto_awesome'}</span>
                                             {insightsLoading ? 'Analyzing...' : 'AI Insights'}
                                         </button>
@@ -277,7 +277,7 @@ export default function D2CAnalytics() {
                                                 <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-60" preserveAspectRatio="none">
                                                     <defs>
                                                         <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
-                                                            <stop offset="0%" stopColor="#8b5cf6" stopOpacity="0.5" />
+                                                            <stop offset="0%" stopColor="#FF4D00" stopOpacity="0.5" />
                                                             <stop offset="100%" stopColor="#2B4BEE" stopOpacity="0.05" />
                                                         </linearGradient>
                                                     </defs>
@@ -286,14 +286,14 @@ export default function D2CAnalytics() {
                                                         <line key={f} x1={PAD} y1={PAD + (1 - f) * (H - PAD * 2)} x2={W - PAD} y2={PAD + (1 - f) * (H - PAD * 2)} stroke="rgba(255,255,255,0.04)" strokeDasharray="4 6" />
                                                     ))}
                                                     <path d={area} fill="url(#revGrad)" />
-                                                    <path d={line} fill="none" stroke="#8b5cf6" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
+                                                    <path d={line} fill="none" stroke="#FF4D00" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
                                                     {/* Hover dots */}
                                                     {points.map((p, i) => (
                                                         <g key={i}>
                                                             <circle cx={p.x} cy={p.y} r="12" fill="transparent" className="cursor-pointer">
                                                                 <title>{`${p.date}\n₹${p.revenue.toLocaleString()}\n${p.orders} orders`}</title>
                                                             </circle>
-                                                            <circle cx={p.x} cy={p.y} r="3" fill="#8b5cf6" stroke="#1e1b4b" strokeWidth="1.5" className="pointer-events-none opacity-0 hover:opacity-100" style={{ transition: 'opacity 0.15s' }} />
+                                                            <circle cx={p.x} cy={p.y} r="3" fill="#FF4D00" stroke="#1e1b4b" strokeWidth="1.5" className="pointer-events-none opacity-0 hover:opacity-100" style={{ transition: 'opacity 0.15s' }} />
                                                         </g>
                                                     ))}
                                                 </svg>
@@ -312,7 +312,7 @@ export default function D2CAnalytics() {
 
                                 {/* AI Insights Panel */}
                                 {insights && (
-                                    <div className="glass-panel rounded-2xl p-6 border border-primary/20 bg-gradient-to-br from-primary/5 to-violet-500/5">
+                                    <div className="glass-panel rounded-2xl p-6 border border-primary/20 bg-gradient-to-br from-primary/5 to-[#FF7A00]/5">
                                         <div className="flex items-center gap-2 mb-4">
                                             <span className="material-symbols-outlined text-primary">auto_awesome</span>
                                             <h3 className="text-sm font-bold text-white">AI Intelligence Report</h3>
@@ -322,7 +322,7 @@ export default function D2CAnalytics() {
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
                                             {insights.whatsWorking?.length > 0 && (
                                                 <div>
-                                                    <p className="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-2">✅ What's Working</p>
+                                                    <p className="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-2"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">check_circle</span> What's Working</p>
                                                     <div className="space-y-2">
                                                         {insights.whatsWorking.map((item, i) => (
                                                             <div key={i} className="p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/10">
@@ -350,7 +350,7 @@ export default function D2CAnalytics() {
 
                                         {insights.actionPlan?.length > 0 && (
                                             <div>
-                                                <p className="text-xs font-bold text-primary uppercase tracking-wider mb-2">🎯 Action Plan</p>
+                                                <p className="text-xs font-bold text-primary uppercase tracking-wider mb-2"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">ads_click</span> Action Plan</p>
                                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                                     {insights.actionPlan.map((item, i) => (
                                                         <div key={i} className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
@@ -383,17 +383,17 @@ export default function D2CAnalytics() {
                                                 <circle cx="110" cy="110" r="25" fill="none" stroke="rgba(255,255,255,0.04)" strokeWidth="1" />
                                                 <line x1="110" y1="8" x2="110" y2="212" stroke="rgba(255,255,255,0.03)" strokeWidth="0.5" />
                                                 <line x1="8" y1="110" x2="212" y2="110" stroke="rgba(255,255,255,0.03)" strokeWidth="0.5" />
-                                                <circle cx="110" cy="110" r="100" fill="none" stroke="rgba(139,92,246,0.12)" strokeWidth="2" />
+                                                <circle cx="110" cy="110" r="100" fill="none" stroke="rgba(255, 77, 0,0.12)" strokeWidth="2" />
                                             </svg>
                                             <svg width="220" height="220" viewBox="0 0 220 220" className="absolute inset-0 radar-sweep-arm">
                                                 <defs>
                                                     <linearGradient id="d2cSweep" gradientTransform="rotate(90)">
-                                                        <stop offset="0%" stopColor="rgba(139,92,246,0.3)" />
-                                                        <stop offset="100%" stopColor="rgba(139,92,246,0)" />
+                                                        <stop offset="0%" stopColor="rgba(255, 77, 0,0.3)" />
+                                                        <stop offset="100%" stopColor="rgba(255, 77, 0,0)" />
                                                     </linearGradient>
                                                 </defs>
                                                 <path d="M110,110 L110,10 A100,100 0 0,1 195,65 Z" fill="url(#d2cSweep)" />
-                                                <line x1="110" y1="110" x2="110" y2="10" stroke="rgba(139,92,246,0.7)" strokeWidth="1.5" />
+                                                <line x1="110" y1="110" x2="110" y2="10" stroke="rgba(255, 77, 0,0.7)" strokeWidth="1.5" />
                                             </svg>
                                             <svg width="220" height="220" viewBox="0 0 220 220" className="absolute inset-0">
                                                 {data.productHealth?.slice(0, 5).map((p, i) => {
@@ -409,8 +409,8 @@ export default function D2CAnalytics() {
                                                         </g>
                                                     )
                                                 })}
-                                                <circle cx="110" cy="110" r="3" fill="#8b5cf6" />
-                                                <circle cx="110" cy="110" r="6" fill="none" stroke="#8b5cf6" strokeWidth="0.5" opacity="0.5" />
+                                                <circle cx="110" cy="110" r="3" fill="#FF4D00" />
+                                                <circle cx="110" cy="110" r="6" fill="none" stroke="#FF4D00" strokeWidth="0.5" opacity="0.5" />
                                             </svg>
                                         </div>
                                         <div className="flex flex-col gap-2 min-w-[200px]">
@@ -530,13 +530,13 @@ export default function D2CAnalytics() {
                                 {data.popularVariants?.length > 0 && (
                                     <div className="glass-panel rounded-2xl p-6 border border-white/[0.06]">
                                         <div className="flex items-center gap-2 mb-4">
-                                            <span className="material-symbols-outlined text-pink-400">palette</span>
+                                            <span className="material-symbols-outlined text-[#FF7A00]">palette</span>
                                             <h3 className="text-sm font-bold text-white">Popular Variants</h3>
                                             <span className="text-xs text-slate-500 ml-auto">Colors · Sizes · Options</span>
                                         </div>
                                         <div className="flex flex-wrap gap-2">
                                             {data.popularVariants.map((v, i) => {
-                                                const chipColors = ['bg-violet-500/15 text-violet-300 border-violet-500/20', 'bg-cyan-500/15 text-cyan-300 border-cyan-500/20', 'bg-emerald-500/15 text-emerald-300 border-emerald-500/20', 'bg-amber-500/15 text-amber-300 border-amber-500/20', 'bg-rose-500/15 text-rose-300 border-rose-500/20', 'bg-pink-500/15 text-pink-300 border-pink-500/20', 'bg-blue-500/15 text-blue-300 border-blue-500/20'];
+                                                const chipColors = ['bg-[#FF4D00]/15 text-[#FF7A00] border-[#FF4D00]/20', 'bg-cyan-500/15 text-cyan-300 border-cyan-500/20', 'bg-emerald-500/15 text-emerald-300 border-emerald-500/20', 'bg-amber-500/15 text-amber-300 border-amber-500/20', 'bg-rose-500/15 text-rose-300 border-rose-500/20', 'bg-[#FF4D00]/15 text-[#FF7A00] border-[#FF4D00]/20', 'bg-[#FF4D00]/15 text-[#FF7A00] border-[#FF4D00]/20'];
                                                 return (
                                                     <div key={i} className={`px-3 py-1.5 rounded-xl border text-xs font-medium ${chipColors[i % chipColors.length]}`}>
                                                         {v.name} <span className="font-extrabold ml-1">{v.units}</span>
@@ -591,7 +591,7 @@ export default function D2CAnalytics() {
                                 <div className="glass-panel rounded-2xl border border-white/[0.06] overflow-hidden">
                                     <div className="p-4 border-b border-white/[0.04]">
                                         <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                                            <span className="material-symbols-outlined text-violet-400">inventory_2</span>
+                                            <span className="material-symbols-outlined text-[#FF4D00]">inventory_2</span>
                                             Product Intelligence ({data.productHealth?.length || 0} products)
                                         </h3>
                                     </div>
@@ -658,7 +658,7 @@ export default function D2CAnalytics() {
 
                                 {/* Boost Plan Panel */}
                                 {boostPlan && (
-                                    <div className="glass-panel rounded-2xl p-6 border border-primary/20 bg-gradient-to-br from-primary/5 to-violet-500/5">
+                                    <div className="glass-panel rounded-2xl p-6 border border-primary/20 bg-gradient-to-br from-primary/5 to-[#FF7A00]/5">
                                         <div className="flex items-center justify-between mb-4">
                                             <div className="flex items-center gap-2">
                                                 <span className="material-symbols-outlined text-primary">rocket_launch</span>
@@ -697,7 +697,7 @@ export default function D2CAnalytics() {
                                         )}
 
                                         <button onClick={() => navigate('/performance-marketing')}
-                                            className="mt-4 w-full py-2.5 rounded-xl bg-gradient-to-r from-primary to-violet-500 text-white text-sm font-bold hover:shadow-lg transition-all cursor-pointer">
+                                            className="mt-4 w-full py-2.5 rounded-xl bg-gradient-to-r from-primary to-[#FF7A00] text-white text-sm font-bold hover:shadow-lg transition-all cursor-pointer">
                                             Launch Campaign in Performance Studio →
                                         </button>
                                     </div>
@@ -712,13 +712,13 @@ export default function D2CAnalytics() {
                                     {/* Customer KPIs */}
                                     <div className="glass-panel rounded-2xl p-6 border border-white/[0.06]">
                                         <h3 className="text-sm font-bold text-white flex items-center gap-2 mb-4">
-                                            <span className="material-symbols-outlined text-pink-400">group</span>Customer Overview
+                                            <span className="material-symbols-outlined text-[#FF7A00]">group</span>Customer Overview
                                         </h3>
                                         <div className="grid grid-cols-2 gap-4">
                                             {[
                                                 { label: 'Total', value: data.customerAnalytics.totalCustomers, color: '#ec4899' },
                                                 { label: 'New (30d)', value: data.customerAnalytics.newCustomers, color: '#34d399' },
-                                                { label: 'Returning', value: data.customerAnalytics.returningCustomers, color: '#8b5cf6' },
+                                                { label: 'Returning', value: data.customerAnalytics.returningCustomers, color: '#FF4D00' },
                                                 { label: 'Avg LTV', value: `₹${data.customerAnalytics.avgLTV?.toLocaleString()}`, color: '#f59e0b' },
                                             ].map((m, i) => (
                                                 <div key={i} className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.04] text-center">
@@ -734,7 +734,7 @@ export default function D2CAnalytics() {
                                         <h3 className="text-sm font-bold text-white mb-4">Customer Tiers</h3>
                                         {[
                                             { label: '👑 VIP (5+ orders)', value: data.customerAnalytics.ltvTiers.vip, color: '#f59e0b' },
-                                            { label: '🔁 Regular (2+ orders)', value: data.customerAnalytics.ltvTiers.regular, color: '#8b5cf6' },
+                                            { label: '🔁 Regular (2+ orders)', value: data.customerAnalytics.ltvTiers.regular, color: '#FF4D00' },
                                             { label: '1️⃣ One-Time', value: data.customerAnalytics.ltvTiers.oneTime, color: '#64748b' },
                                         ].map((t, i) => {
                                             const total = data.customerAnalytics.totalCustomers || 1
@@ -770,7 +770,7 @@ export default function D2CAnalytics() {
                                                         <span className="text-xs font-bold text-white">{city.count} ({city.pct}%)</span>
                                                     </div>
                                                     <div className="h-1.5 rounded-full bg-white/[0.04] overflow-hidden">
-                                                        <div className="h-full rounded-full" style={{ width: `${(city.count / (data.customerAnalytics.topCities[0]?.count || 1)) * 100}%`, background: 'linear-gradient(90deg, #06b6d4, #8b5cf6)' }} />
+                                                        <div className="h-full rounded-full" style={{ width: `${(city.count / (data.customerAnalytics.topCities[0]?.count || 1)) * 100}%`, background: 'linear-gradient(90deg, #06b6d4, #FF4D00)' }} />
                                                     </div>
                                                 </div>
                                             ))}
@@ -799,7 +799,7 @@ export default function D2CAnalytics() {
                                 {data.rfmSegmentation?.segments?.length > 0 && (
                                     <div className="md:col-span-2 glass-panel rounded-2xl p-6 border border-white/[0.06]">
                                         <h3 className="text-sm font-bold text-white flex items-center gap-2 mb-1">
-                                            <span className="material-symbols-outlined text-violet-400">hub</span>RFM Customer Segmentation
+                                            <span className="material-symbols-outlined text-[#FF4D00]">hub</span>RFM Customer Segmentation
                                         </h3>
                                         <p className="text-xs text-slate-500 mb-4">Customers scored by Recency, Frequency, and Monetary value</p>
                                         <div className="grid grid-cols-3 gap-3 mb-5">
@@ -864,7 +864,7 @@ export default function D2CAnalytics() {
                                                 </thead>
                                                 <tbody>
                                                     {data.inventoryForecast.map((item, i) => {
-                                                        const urgColors = { critical: { bg: 'bg-rose-500/10', text: 'text-rose-400', label: '🔴 CRITICAL' }, warning: { bg: 'bg-amber-500/10', text: 'text-amber-400', label: '🟡 WARNING' }, watch: { bg: 'bg-blue-500/10', text: 'text-blue-400', label: '🔵 WATCH' }, healthy: { bg: 'bg-emerald-500/10', text: 'text-emerald-400', label: '🟢 HEALTHY' } }
+                                                        const urgColors = { critical: { bg: 'bg-rose-500/10', text: 'text-rose-400', label: '🔴 CRITICAL' }, warning: { bg: 'bg-amber-500/10', text: 'text-amber-400', label: '🟡 WARNING' }, watch: { bg: 'bg-[#FF4D00]/10', text: 'text-[#FF4D00]', label: '🔵 WATCH' }, healthy: { bg: 'bg-emerald-500/10', text: 'text-emerald-400', label: '🟢 HEALTHY' } }
                                                         const uc = urgColors[item.urgency] || urgColors.healthy
                                                         return (
                                                             <tr key={i} className={`border-b border-white/[0.02] ${item.urgency === 'critical' ? 'bg-rose-500/[0.03]' : ''}`}>
@@ -947,7 +947,7 @@ export default function D2CAnalytics() {
                                 <div className="space-y-6">
                                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                                         {[
-                                            { label: 'Published Content', value: creativeData.totalContent, icon: 'article', color: '#8b5cf6' },
+                                            { label: 'Published Content', value: creativeData.totalContent, icon: 'article', color: '#FF4D00' },
                                             { label: 'Ad Campaigns', value: creativeData.totalCampaigns, icon: 'campaign', color: '#06b6d4' },
                                             { label: 'Total Ad Spend', value: `₹${creativeData.totalAdSpend?.toLocaleString()}`, icon: 'payments', color: '#f59e0b' },
                                             { label: 'Winning Format', value: creativeData.winningFormat, icon: 'emoji_events', color: '#34d399' },
@@ -957,17 +957,17 @@ export default function D2CAnalytics() {
                                     </div>
                                     {/* Content Type Ranking */}
                                     <div className="glass-panel rounded-2xl p-6 border border-white/[0.06]">
-                                        <h3 className="text-sm font-bold text-white flex items-center gap-2 mb-4"><span className="material-symbols-outlined text-violet-400">bar_chart</span>Content Type Performance</h3>
+                                        <h3 className="text-sm font-bold text-white flex items-center gap-2 mb-4"><span className="material-symbols-outlined text-[#FF4D00]">bar_chart</span>Content Type Performance</h3>
                                         <div className="space-y-3">
                                             {(creativeData.contentTypeRanking || []).map((t, i) => {
                                                 const maxEng = creativeData.contentTypeRanking[0]?.totalEngagement || 1
                                                 return (
                                                     <div key={i}>
                                                         <div className="flex justify-between mb-1">
-                                                            <span className="text-xs text-white font-medium capitalize flex items-center gap-2">{i === 0 && <span className="text-amber-400">🏆</span>}{t.type} <span className="text-[10px] text-slate-500">({t.count} posts)</span></span>
+                                                            <span className="text-xs text-white font-medium capitalize flex items-center gap-2">{i === 0 && <span className="text-amber-400"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">emoji_events</span></span>}{t.type} <span className="text-[10px] text-slate-500">({t.count} posts)</span></span>
                                                             <span className="text-xs font-bold text-slate-300">Eng: {t.totalEngagement} · Views: {t.totalViews.toLocaleString()}</span>
                                                         </div>
-                                                        <div className="h-2.5 rounded-full bg-white/[0.04] overflow-hidden"><div className="h-full rounded-full" style={{ width: `${(t.totalEngagement / maxEng) * 100}%`, background: 'linear-gradient(90deg, #8b5cf6, #2B4BEE)' }} /></div>
+                                                        <div className="h-2.5 rounded-full bg-white/[0.04] overflow-hidden"><div className="h-full rounded-full" style={{ width: `${(t.totalEngagement / maxEng) * 100}%`, background: 'linear-gradient(90deg, #FF4D00, #2B4BEE)' }} /></div>
                                                     </div>
                                                 )
                                             })}
@@ -975,13 +975,13 @@ export default function D2CAnalytics() {
                                     </div>
                                     {/* Top Creatives */}
                                     <div className="glass-panel rounded-2xl p-6 border border-white/[0.06]">
-                                        <h3 className="text-sm font-bold text-white mb-4">🔥 Top Performing Creatives</h3>
+                                        <h3 className="text-sm font-bold text-white mb-4"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">local_fire_department</span> Top Performing Creatives</h3>
                                         <div className="space-y-2">
                                             {(creativeData.topCreatives || []).slice(0, 8).map((c, i) => (
                                                 <div key={i} className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.02] hover:bg-white/[0.04] transition-all">
                                                     <span className="text-sm font-bold text-slate-500 w-6">#{i + 1}</span>
                                                     <div className="flex-1 min-w-0"><p className="text-xs text-white font-medium truncate">{c.title}</p><p className="text-[10px] text-slate-500">{c.platform} · {c.type}</p></div>
-                                                    <div className="text-right text-[10px]"><p className="text-white font-bold">Score: {c.engagement?.score}</p><p className="text-slate-500">♥{c.engagement?.likes} 💬{c.engagement?.comments} 🔄{c.engagement?.shares}</p></div>
+                                                    <div className="text-right text-[10px]"><p className="text-white font-bold">Score: {c.engagement?.score}</p><p className="text-slate-500">♥{c.engagement?.likes} <span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">chat</span>{c.engagement?.comments} 🔄{c.engagement?.shares}</p></div>
                                                 </div>
                                             ))}
                                         </div>
@@ -1010,7 +1010,7 @@ export default function D2CAnalytics() {
                                     {/* LTV Metrics Row */}
                                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                                         {[
-                                            { label: 'Avg LTV', value: `₹${cohortData.ltvMetrics?.avgLTV?.toLocaleString()}`, color: '#8b5cf6' },
+                                            { label: 'Avg LTV', value: `₹${cohortData.ltvMetrics?.avgLTV?.toLocaleString()}`, color: '#FF4D00' },
                                             { label: 'Median LTV', value: `₹${cohortData.ltvMetrics?.medianLTV?.toLocaleString()}`, color: '#06b6d4' },
                                             { label: 'Top 10% LTV', value: `₹${cohortData.ltvMetrics?.top10PctLTV?.toLocaleString()}`, color: '#f59e0b' },
                                             { label: 'Churn Rate', value: `${cohortData.churn?.churnRate}%`, color: cohortData.churn?.churnRate < 30 ? '#34d399' : '#f43f5e' },
@@ -1020,7 +1020,7 @@ export default function D2CAnalytics() {
                                     </div>
                                     {/* Cohort Retention Grid */}
                                     <div className="glass-panel rounded-2xl p-6 border border-white/[0.06]">
-                                        <h3 className="text-sm font-bold text-white flex items-center gap-2 mb-4"><span className="material-symbols-outlined text-violet-400">grid_on</span>Monthly Cohort Retention</h3>
+                                        <h3 className="text-sm font-bold text-white flex items-center gap-2 mb-4"><span className="material-symbols-outlined text-[#FF4D00]">grid_on</span>Monthly Cohort Retention</h3>
                                         <div className="overflow-x-auto">
                                             <table className="w-full text-xs">
                                                 <thead><tr className="text-slate-500"><th className="text-left py-2 px-2">Cohort</th><th className="text-center py-2 px-2">Size</th>{[0, 1, 2, 3, 4, 5].map(m => <th key={m} className="text-center py-2 px-2">M{m}</th>)}</tr></thead>
@@ -1048,8 +1048,8 @@ export default function D2CAnalytics() {
                                             {(() => {
                                                 const total = (cohortData.revenueSplit?.new || 0) + (cohortData.revenueSplit?.returning || 0) || 1; const newPct = Math.round((cohortData.revenueSplit?.new / total) * 100); return (
                                                     <div>
-                                                        <div className="flex gap-4 mb-3">{[{ label: 'New Customers', value: `₹${cohortData.revenueSplit?.new?.toLocaleString()}`, pct: newPct, color: '#06b6d4' }, { label: 'Returning', value: `₹${cohortData.revenueSplit?.returning?.toLocaleString()}`, pct: 100 - newPct, color: '#8b5cf6' }].map((s, i) => <div key={i} className="flex-1 p-3 rounded-xl bg-white/[0.02] text-center"><p className="text-lg font-extrabold text-white">{s.value}</p><p className="text-[10px] text-slate-500">{s.label} ({s.pct}%)</p></div>)}</div>
-                                                        <div className="h-3 rounded-full bg-white/[0.04] overflow-hidden flex"><div style={{ width: `${newPct}%`, background: '#06b6d4' }} className="h-full" /><div style={{ width: `${100 - newPct}%`, background: '#8b5cf6' }} className="h-full" /></div>
+                                                        <div className="flex gap-4 mb-3">{[{ label: 'New Customers', value: `₹${cohortData.revenueSplit?.new?.toLocaleString()}`, pct: newPct, color: '#06b6d4' }, { label: 'Returning', value: `₹${cohortData.revenueSplit?.returning?.toLocaleString()}`, pct: 100 - newPct, color: '#FF4D00' }].map((s, i) => <div key={i} className="flex-1 p-3 rounded-xl bg-white/[0.02] text-center"><p className="text-lg font-extrabold text-white">{s.value}</p><p className="text-[10px] text-slate-500">{s.label} ({s.pct}%)</p></div>)}</div>
+                                                        <div className="h-3 rounded-full bg-white/[0.04] overflow-hidden flex"><div style={{ width: `${newPct}%`, background: '#06b6d4' }} className="h-full" /><div style={{ width: `${100 - newPct}%`, background: '#FF4D00' }} className="h-full" /></div>
                                                     </div>
                                                 )
                                             })()}
@@ -1066,14 +1066,14 @@ export default function D2CAnalytics() {
 
                                     {/* Predictive LTV (from overview data) */}
                                     {data?.predictiveLTV?.totalCustomers > 0 && (
-                                        <div className="glass-panel rounded-2xl p-6 border border-primary/15 bg-gradient-to-br from-primary/[0.03] to-violet-500/[0.03]">
+                                        <div className="glass-panel rounded-2xl p-6 border border-primary/15 bg-gradient-to-br from-primary/[0.03] to-[#FF7A00]/[0.03]">
                                             <h3 className="text-sm font-bold text-white flex items-center gap-2 mb-4">
                                                 <span className="material-symbols-outlined text-primary">auto_graph</span>Predictive LTV (AI Projected)
                                             </h3>
                                             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
                                                 {[
                                                     { label: 'Avg 90-Day LTV', value: `₹${data.predictiveLTV.avg90d?.toLocaleString()}`, color: '#06b6d4' },
-                                                    { label: 'Avg 365-Day LTV', value: `₹${data.predictiveLTV.avg365d?.toLocaleString()}`, color: '#8b5cf6' },
+                                                    { label: 'Avg 365-Day LTV', value: `₹${data.predictiveLTV.avg365d?.toLocaleString()}`, color: '#FF4D00' },
                                                     { label: 'Median 365d', value: `₹${data.predictiveLTV.median365d?.toLocaleString()}`, color: '#34d399' },
                                                     { label: 'Top 10% LTV', value: `₹${data.predictiveLTV.top10pctLTV?.toLocaleString()}`, color: '#f59e0b' },
                                                 ].map((m, i) => (
@@ -1119,7 +1119,7 @@ export default function D2CAnalytics() {
                                     {/* Efficiency Cards */}
                                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                                         {[
-                                            { label: 'Revenue', value: `₹${profitData.revenue?.total?.toLocaleString()}`, color: '#8b5cf6' },
+                                            { label: 'Revenue', value: `₹${profitData.revenue?.total?.toLocaleString()}`, color: '#FF4D00' },
                                             { label: 'MER', value: `${profitData.efficiency?.mer}x`, color: '#06b6d4', sub: 'Marketing Efficiency' },
                                             { label: 'Blended ROAS', value: `${profitData.efficiency?.blendedROAS}x`, color: '#34d399' },
                                             { label: 'CAC', value: `₹${profitData.efficiency?.cac?.toLocaleString()}`, color: '#f59e0b', sub: 'Cost per Acq.' },
@@ -1156,9 +1156,9 @@ export default function D2CAnalytics() {
                         {/* AI CO-PILOT TAB */}
                         {activeTab === 'copilot' && (
                             <div className="space-y-4">
-                                <div className="glass-panel rounded-2xl p-6 border border-primary/20 bg-gradient-to-br from-primary/5 to-violet-500/5">
+                                <div className="glass-panel rounded-2xl p-6 border border-primary/20 bg-gradient-to-br from-primary/5 to-[#FF7A00]/5">
                                     <div className="flex items-center gap-3 mb-4">
-                                        <div className="size-10 rounded-xl bg-gradient-to-br from-primary to-violet-500 flex items-center justify-center"><span className="material-symbols-outlined text-white text-xl">smart_toy</span></div>
+                                        <div className="size-10 rounded-xl bg-gradient-to-br from-primary to-[#FF7A00] flex items-center justify-center"><span className="material-symbols-outlined text-white text-xl">smart_toy</span></div>
                                         <div><h3 className="text-sm font-bold text-white">AI Co-Pilot</h3><p className="text-[10px] text-slate-500">Ask anything about your store's performance</p></div>
                                     </div>
                                     {/* Suggested questions */}
@@ -1190,7 +1190,7 @@ export default function D2CAnalytics() {
                                         <input value={copilotInput} onChange={e => setCopilotInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleCopilotSend()}
                                             placeholder="Ask about your store..." className="flex-1 px-4 py-3 rounded-xl bg-white/[0.04] border border-white/[0.06] text-sm text-white placeholder-slate-500 outline-none focus:border-primary/40" />
                                         <button id="copilot-send" onClick={handleCopilotSend} disabled={copilotLoading || !copilotInput.trim()}
-                                            className="px-4 py-3 rounded-xl bg-gradient-to-r from-primary to-violet-500 text-white font-bold text-sm hover:shadow-lg transition-all cursor-pointer disabled:opacity-50">
+                                            className="px-4 py-3 rounded-xl bg-gradient-to-r from-primary to-[#FF7A00] text-white font-bold text-sm hover:shadow-lg transition-all cursor-pointer disabled:opacity-50">
                                             <span className="material-symbols-outlined text-sm">send</span>
                                         </button>
                                     </div>
@@ -1213,7 +1213,7 @@ const D2C_HELP_SECTIONS = [
     {
         id: 'getting-started',
         icon: 'rocket_launch',
-        color: '#8b5cf6',
+        color: '#FF4D00',
         title: 'Getting Started',
         subtitle: 'Connect your Shopify store and get started',
         steps: [
@@ -1287,11 +1287,11 @@ const D2C_HELP_SECTIONS = [
 ]
 
 const D2C_PRO_TIPS = [
-    { icon: '📊', tip: 'Check the Overview tab daily. Revenue trends and red flags are your early warning system.' },
+    { icon: 'bar_chart', tip: 'Check the Overview tab daily. Revenue trends and red flags are your early warning system.' },
     { icon: '🟢', tip: 'Focus on products with Hot health status. They\'re your money makers — double down on their promotion.' },
     { icon: '🔄', tip: 'Repeat Rate below 20%? Use AI Co-Pilot to generate a retention strategy tailored to your data.' },
     { icon: '🚨', tip: 'Never ignore High severity red flags. They indicate revenue-threatening issues that need immediate action.' },
-    { icon: '🚀', tip: 'Use AI Boost Plans on cold products. The AI might find untapped potential you\'re missing.' },
+    { icon: 'rocket_launch', tip: 'Use AI Boost Plans on cold products. The AI might find untapped potential you\'re missing.' },
     { icon: '💰', tip: 'Check Profitability tab monthly. Revenue growth means nothing if margins are shrinking.' },
 ]
 
@@ -1313,7 +1313,7 @@ function D2CHelpView({ onBack }) {
                 </div>
             </div>
 
-            <div className="glass-panel rounded-2xl p-6 mb-6" style={{ background: 'linear-gradient(135deg, #8b5cf608, #06b6d408, #ec489808)' }}>
+            <div className="glass-panel rounded-2xl p-6 mb-6" style={{ background: 'linear-gradient(135deg, #FF4D0008, #06b6d408, #ec489808)' }}>
                 <h3 className="text-white font-bold mb-3 flex items-center gap-2"><span className="material-symbols-outlined text-primary">info</span> What is D2C Studio?</h3>
                 <p className="text-slate-400 text-sm leading-relaxed mb-4">
                     D2C Studio is your <strong className="text-white">Shopify intelligence hub</strong>.
@@ -1335,7 +1335,7 @@ function D2CHelpView({ onBack }) {
                 </h3>
                 <div className="flex items-center gap-0 overflow-x-auto pb-2">
                     {[
-                        { label: 'Connect Store', icon: 'storefront', color: '#8b5cf6' },
+                        { label: 'Connect Store', icon: 'storefront', color: '#FF4D00' },
                         { label: 'Check KPIs', icon: 'dashboard', color: '#06b6d4' },
                         { label: 'Review Alerts', icon: 'warning', color: '#f43f5e' },
                         { label: 'Analyze Products', icon: 'inventory_2', color: '#f59e0b' },
@@ -1408,7 +1408,7 @@ function D2CHelpView({ onBack }) {
 
             <div className="text-center mt-6 py-6">
                 <p className="text-slate-500 text-sm mb-3">Ready to grow?</p>
-                <button onClick={onBack} className="px-6 py-3 rounded-xl text-sm font-bold bg-gradient-to-r from-primary to-purple-500 text-white cursor-pointer hover:shadow-lg hover:shadow-primary/20 transition-all flex items-center gap-2 mx-auto">
+                <button onClick={onBack} className="px-6 py-3 rounded-xl text-sm font-bold bg-gradient-to-r from-primary to-[#FF7A00] text-white cursor-pointer hover:shadow-lg hover:shadow-primary/20 transition-all flex items-center gap-2 mx-auto">
                     <span className="material-symbols-outlined text-sm">dashboard</span> Go to Dashboard
                 </button>
             </div>

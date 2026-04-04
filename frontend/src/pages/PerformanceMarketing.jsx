@@ -367,8 +367,8 @@ export default function PerformanceMarketing() {
             <DashboardLayout title="Performance Studio" subtitle="AI-powered ad research, strategy & management">
                 <SEOHead title="Performance Studio — Mantram AI" noIndex={true} />
                 <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-4">
-                    <div className="w-20 h-20 rounded-full bg-violet-500/10 flex items-center justify-center mb-4">
-                        <span className="material-symbols-outlined text-4xl text-violet-400">brand_awareness</span>
+                    <div className="w-20 h-20 rounded-full bg-[#FF4D00]/10 flex items-center justify-center mb-4">
+                        <span className="material-symbols-outlined text-4xl text-[#FF4D00]">brand_awareness</span>
                     </div>
                     <h2 className="text-2xl font-bold text-white">Select a Brand to Continue</h2>
                     <p className="text-slate-400 max-w-md mx-auto">
@@ -423,7 +423,7 @@ export default function PerformanceMarketing() {
                             key={t.id}
                             onClick={() => setTab(t.id)}
                             className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all cursor-pointer ${tab === t.id
-                                ? 'bg-gradient-to-r from-violet-500/20 to-cyan-500/20 text-white border border-violet-500/30'
+                                ? 'bg-gradient-to-r from-[#FF4D00]/20 to-cyan-500/20 text-white border border-[#FF4D00]/30'
                                 : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.04]'
                                 }`}
                         >
@@ -432,7 +432,7 @@ export default function PerformanceMarketing() {
                         </button>
                     ))}
                     <button onClick={() => setTab('help')}
-                        className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all cursor-pointer ${tab === 'help' ? 'bg-gradient-to-r from-violet-500/20 to-cyan-500/20 text-white border border-violet-500/30' : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.04]'}`}>
+                        className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all cursor-pointer ${tab === 'help' ? 'bg-gradient-to-r from-[#FF4D00]/20 to-cyan-500/20 text-white border border-[#FF4D00]/30' : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.04]'}`}>
                         <span className="material-symbols-outlined text-lg">menu_book</span>
                         How It Works
                     </button>
@@ -464,7 +464,7 @@ export default function PerformanceMarketing() {
                             {/* Quick Actions */}
                             <div className="glass-panel rounded-2xl p-6 border border-white/[0.06]">
                                 <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-violet-400">bolt</span>
+                                    <span className="material-symbols-outlined text-[#FF4D00]">bolt</span>
                                     Quick Actions
                                 </h3>
                                 <div className="grid grid-cols-2 gap-3">
@@ -548,7 +548,7 @@ export default function PerformanceMarketing() {
                                                 {!isConnected && (
                                                     <div className="mt-3">
                                                         <button onClick={() => navigate('/integrations')}
-                                                            className="w-full py-2.5 rounded-lg bg-gradient-to-r from-violet-600/20 to-cyan-600/20 text-white/80 text-sm font-medium hover:from-violet-600/30 hover:to-cyan-600/30 transition-all cursor-pointer flex items-center justify-center gap-2 border border-violet-500/20">
+                                                            className="w-full py-2.5 rounded-lg bg-gradient-to-r from-[#FF4D00]/20 to-cyan-600/20 text-white/80 text-sm font-medium hover:from-[#FF4D00]/30 hover:to-cyan-600/30 transition-all cursor-pointer flex items-center justify-center gap-2 border border-[#FF4D00]/20">
                                                             <span className="material-symbols-outlined text-sm">link</span>Connect in Integrations
                                                         </button>
                                                     </div>
@@ -581,7 +581,7 @@ export default function PerformanceMarketing() {
                                                     .then(res => setAdsenseReport(res.report))
                                                     .finally(() => setAdsenseLoading(false));
                                             }}
-                                            className="bg-slate-800/50 border border-slate-700 text-white text-xs rounded-lg px-3 py-1.5 focus:outline-none focus:border-emerald-500 transition-colors"
+                                            className="bg-[#121217]/50 border border-slate-700 text-white text-xs rounded-lg px-3 py-1.5 focus:outline-none focus:border-emerald-500 transition-colors"
                                         >
                                             {adsenseAccounts.map(a => <option key={a.id} value={a.id}>{a.displayName}</option>)}
                                         </select>
@@ -653,14 +653,14 @@ export default function PerformanceMarketing() {
                                                 const impressions = parseInt(adsenseReport.totals?.cells?.[2]?.value || 0);
                                                 
                                                 return (
-                                                    <div className="p-4 bg-violet-500/5 border border-violet-500/10 rounded-xl relative overflow-hidden group">
-                                                        <div className="absolute top-0 right-0 w-24 h-24 bg-violet-500/10 blur-2xl rounded-full -mr-10 -mt-10 transition-transform group-hover:scale-150" />
-                                                        <h4 className="text-sm font-bold text-violet-400 flex items-center gap-2 mb-2">
+                                                    <div className="p-4 bg-[#FF4D00]/5 border border-[#FF4D00]/10 rounded-xl relative overflow-hidden group">
+                                                        <div className="absolute top-0 right-0 w-24 h-24 bg-[#FF4D00]/10 blur-2xl rounded-full -mr-10 -mt-10 transition-transform group-hover:scale-150" />
+                                                        <h4 className="text-sm font-bold text-[#FF4D00] flex items-center gap-2 mb-2">
                                                             <span className="material-symbols-outlined text-base">visibility_off</span>
                                                             Ad Blindness Risk
                                                         </h4>
                                                         {(ctr < 1.0 && impressions > 1000) ? (
-                                                            <p className="text-xs text-slate-300 mb-2">Your ad CTR is low (<span className="font-bold text-violet-400">{ctr.toFixed(2)}%</span>). Visitors might be experiencing ad blindness. Consider testing new ad placements.</p>
+                                                            <p className="text-xs text-slate-300 mb-2">Your ad CTR is low (<span className="font-bold text-[#FF4D00]">{ctr.toFixed(2)}%</span>). Visitors might be experiencing ad blindness. Consider testing new ad placements.</p>
                                                         ) : (
                                                             <p className="text-xs text-emerald-400 mb-2">Ad engagement is healthy. CTR is stable relative to your page views.</p>
                                                         )}
@@ -730,14 +730,14 @@ export default function PerformanceMarketing() {
                                                 </div>
                                                 <p className="text-sm text-slate-400 mb-2 line-clamp-2">{t.description}</p>
                                                 <div className="flex items-center gap-2 mb-2">
-                                                    <span className={`px-2 py-0.5 rounded-full text-xs ${t.category === 'entertainment' ? 'bg-pink-500/10 text-pink-400'
+                                                    <span className={`px-2 py-0.5 rounded-full text-xs ${t.category === 'entertainment' ? 'bg-[#FF4D00]/10 text-[#FF7A00]'
                                                         : t.category === 'tech' ? 'bg-cyan-500/10 text-cyan-400'
                                                             : t.category === 'sports' ? 'bg-green-500/10 text-green-400'
                                                                 : t.category === 'viral' ? 'bg-orange-500/10 text-orange-400'
-                                                                    : t.category === 'lifestyle' ? 'bg-violet-500/10 text-violet-400'
+                                                                    : t.category === 'lifestyle' ? 'bg-[#FF4D00]/10 text-[#FF4D00]'
                                                                         : 'bg-slate-500/10 text-slate-400'
                                                         }`}>{t.category}</span>
-                                                    {t.format && <span className="text-sm text-slate-500">📱 {t.format}</span>}
+                                                    {t.format && <span className="text-sm text-slate-500"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">smartphone</span> {t.format}</span>}
                                                 </div>
                                                 {t.marketingAngle && (
                                                     <p className="text-sm text-emerald-400 mb-2">💡 {t.marketingAngle}</p>
@@ -745,7 +745,7 @@ export default function PerformanceMarketing() {
                                                 {t.hashtags?.length > 0 && (
                                                     <div className="flex flex-wrap gap-1">
                                                         {t.hashtags.slice(0, 4).map((h, hi) => (
-                                                            <span key={hi} className="px-2 py-0.5 rounded-full bg-violet-500/10 text-violet-400 text-sm">{h}</span>
+                                                            <span key={hi} className="px-2 py-0.5 rounded-full bg-[#FF4D00]/10 text-[#FF4D00] text-sm">{h}</span>
                                                         ))}
                                                     </div>
                                                 )}
@@ -772,23 +772,23 @@ export default function PerformanceMarketing() {
                                     {grokContent.slice(0, 4).map((s, i) => (
                                         <div key={i} className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.04] hover:border-cyan-500/20 transition-all">
                                             <div className="flex items-center gap-2 mb-2">
-                                                <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${s.platform === 'instagram' ? 'bg-pink-500/10 text-pink-400'
+                                                <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${s.platform === 'instagram' ? 'bg-[#FF4D00]/10 text-[#FF7A00]'
                                                     : s.platform === 'twitter' ? 'bg-sky-500/10 text-sky-400'
-                                                        : s.platform === 'linkedin' ? 'bg-blue-500/10 text-blue-400'
+                                                        : s.platform === 'linkedin' ? 'bg-[#FF4D00]/10 text-[#FF4D00]'
                                                             : 'bg-slate-500/10 text-slate-400'
                                                     }`}>{s.platform}</span>
                                                 <span className="text-sm text-slate-500">{s.format}</span>
-                                                {s.viralPotential === 'high' && <span className="text-sm text-orange-400">🔥 High viral</span>}
+                                                {s.viralPotential === 'high' && <span className="text-sm text-orange-400"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">local_fire_department</span> High viral</span>}
                                             </div>
                                             <h4 className="text-base font-bold text-white mb-1">{s.title}</h4>
                                             <p className="text-sm text-slate-400 mb-2">{s.hook}</p>
                                             {s.trendConnection && (
-                                                <p className="text-sm text-emerald-400 mb-2">📈 Trend: {s.trendConnection}</p>
+                                                <p className="text-sm text-emerald-400 mb-2"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">trending_up</span> Trend: {s.trendConnection}</p>
                                             )}
                                             {s.hashtags?.length > 0 && (
                                                 <div className="flex flex-wrap gap-1">
                                                     {s.hashtags.slice(0, 5).map((h, hi) => (
-                                                        <span key={hi} className="px-2 py-0.5 rounded-full bg-violet-500/10 text-violet-400 text-sm">{h}</span>
+                                                        <span key={hi} className="px-2 py-0.5 rounded-full bg-[#FF4D00]/10 text-[#FF4D00] text-sm">{h}</span>
                                                     ))}
                                                 </div>
                                             )}
@@ -861,7 +861,7 @@ export default function PerformanceMarketing() {
                                                         : k.trend === 'seasonal' ? 'bg-amber-500/10 text-amber-400'
                                                             : 'bg-cyan-500/10 text-cyan-400'
                                                     }`}>
-                                                    {k.trend === 'breakout' ? '🚀' : k.trend === 'rising' ? '📈' : '📅'} {k.trend}
+                                                    {k.trend === 'breakout' ? 'rocket_launch' : k.trend === 'rising' ? 'trending_up' : 'calendar_month'} {k.trend}
                                                 </span>
                                             </div>
                                             <p className="text-sm text-slate-500 mb-1">{k.growthRate} · {k.intent} intent · {k.difficulty} difficulty</p>
@@ -874,11 +874,11 @@ export default function PerformanceMarketing() {
                                 {/* Question Queries */}
                                 {grokSeoKeywords.questionQueries?.length > 0 && (
                                     <div className="mt-4 pt-4 border-t border-white/[0.04]">
-                                        <p className="text-sm font-bold text-violet-400 mb-3">❓ People Are Asking</p>
+                                        <p className="text-sm font-bold text-[#FF4D00] mb-3">❓ People Are Asking</p>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                                             {grokSeoKeywords.questionQueries.slice(0, 6).map((q, i) => (
                                                 <div key={i} className="flex items-start gap-2 p-2 rounded-lg bg-white/[0.01]">
-                                                    <span className="text-violet-400 mt-0.5 text-sm">Q:</span>
+                                                    <span className="text-[#FF4D00] mt-0.5 text-sm">Q:</span>
                                                     <div>
                                                         <p className="text-sm font-medium text-white">{q.question}</p>
                                                         <p className="text-sm text-slate-500">{q.searchVolume} volume · {q.answerAngle}</p>
@@ -892,7 +892,7 @@ export default function PerformanceMarketing() {
                                 {/* Seasonal Keywords */}
                                 {grokSeoKeywords.seasonalUpcoming?.length > 0 && (
                                     <div className="mt-4 pt-4 border-t border-white/[0.04]">
-                                        <p className="text-sm font-bold text-amber-400 mb-3">📅 Upcoming Seasonal Peaks</p>
+                                        <p className="text-sm font-bold text-amber-400 mb-3"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">calendar_month</span> Upcoming Seasonal Peaks</p>
                                         <div className="flex flex-wrap gap-2">
                                             {grokSeoKeywords.seasonalUpcoming.slice(0, 6).map((s, i) => (
                                                 <div key={i} className="px-3 py-2 rounded-xl bg-amber-500/5 border border-amber-500/10">
@@ -905,9 +905,9 @@ export default function PerformanceMarketing() {
                                 )}
                             </div>
                         )}
-                        <div className="glass-panel rounded-2xl p-6 border border-violet-500/20">
+                        <div className="glass-panel rounded-2xl p-6 border border-[#FF4D00]/20">
                             <h2 className="text-lg font-bold text-white mb-1 flex items-center gap-2">
-                                <span className="material-symbols-outlined text-violet-400">search_insights</span>
+                                <span className="material-symbols-outlined text-[#FF4D00]">search_insights</span>
                                 Competitor Research
                             </h2>
                             <p className="text-sm text-slate-400 mb-6">AI-powered analysis of competitor ad strategies across Meta & Google</p>
@@ -919,7 +919,7 @@ export default function PerformanceMarketing() {
                                         value={researchQuery}
                                         onChange={e => setResearchQuery(e.target.value)}
                                         placeholder="e.g., Analyze performance marketing strategies of D2C skincare brands in India targeting Gen Z..."
-                                        className="w-full h-24 px-4 py-3 rounded-xl bg-black/30 border border-violet-500/20 text-white placeholder-slate-600 text-sm outline-none focus:border-violet-400/50 resize-y"
+                                        className="w-full h-24 px-4 py-3 rounded-xl bg-black/30 border border-[#FF4D00]/20 text-white placeholder-slate-600 text-sm outline-none focus:border-[#FF4D00]/50 resize-y"
                                     />
                                 </div>
                                 <div>
@@ -928,13 +928,13 @@ export default function PerformanceMarketing() {
                                         value={competitors}
                                         onChange={e => setCompetitors(e.target.value)}
                                         placeholder="e.g., Minimalist, mCaffeine, Plum Goodness"
-                                        className="w-full px-4 py-3 rounded-xl bg-black/30 border border-violet-500/20 text-white placeholder-slate-600 text-sm outline-none focus:border-violet-400/50"
+                                        className="w-full px-4 py-3 rounded-xl bg-black/30 border border-[#FF4D00]/20 text-white placeholder-slate-600 text-sm outline-none focus:border-[#FF4D00]/50"
                                     />
                                 </div>
                                 <button
                                     onClick={handleResearch}
                                     disabled={loading || (!researchQuery.trim() && !competitors.trim())}
-                                    className="w-full py-4 rounded-2xl bg-gradient-to-r from-violet-600 to-purple-600 text-white font-bold text-sm hover:shadow-xl hover:shadow-violet-500/20 transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
+                                    className="w-full py-4 rounded-2xl bg-gradient-to-r from-[#FF4D00] to-[#FF7A00] text-white font-bold text-sm hover:shadow-xl hover:shadow-[#FF4D00]/20 transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
                                 >
                                     {loading ? (
                                         <><span className="material-symbols-outlined animate-spin">progress_activity</span>Analyzing competitors with AI...</>
@@ -1004,7 +1004,7 @@ export default function PerformanceMarketing() {
                                                             : t.trend === 'declining' ? 'bg-rose-500/10 text-rose-400'
                                                                 : 'bg-slate-500/10 text-slate-400'
                                                             }`}>
-                                                            {t.trend === 'rising' ? '📈' : t.trend === 'declining' ? '📉' : '➡️'} {t.trend}
+                                                            {t.trend === 'rising' ? 'trending_up' : t.trend === 'declining' ? '📉' : '➡️'} {t.trend}
                                                         </span>
                                                         <span className="text-xs text-slate-500">
                                                             {t.trendStrength > 0 ? '+' : ''}{t.trendStrength}%
@@ -1237,7 +1237,7 @@ export default function PerformanceMarketing() {
                                 <button
                                     onClick={handleStrategy}
                                     disabled={loading || strategyGoals.length === 0}
-                                    className="flex-1 py-4 rounded-2xl bg-gradient-to-r from-cyan-600 to-blue-600 text-white font-bold text-sm hover:shadow-xl hover:shadow-cyan-500/20 transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
+                                    className="flex-1 py-4 rounded-2xl bg-gradient-to-r from-cyan-600 to-[#FF7A00] text-white font-bold text-sm hover:shadow-xl hover:shadow-cyan-500/20 transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
                                 >
                                     {loading ? (
                                         <><span className="material-symbols-outlined animate-spin">progress_activity</span>AI is building expert strategy...</>
@@ -1346,22 +1346,22 @@ export default function PerformanceMarketing() {
                                                     <span>Location: <strong>${strategyTargetGeo || 'Not specified'}</strong></span>
                                                 </div>
                                                 
-                                                <h2>🎯 Campaign Goals</h2>
+                                                <h2><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">ads_click</span> Campaign Goals</h2>
                                                 ${(sp.goals || []).map(g => {
                                                     const goal = typeof g === 'string' ? { goal: g } : g
                                                     const c = goal.confidenceScore || 5
                                                     return `<div class="goal-card"><span class="conf ${c >= 7 ? 'high' : c >= 5 ? 'med' : 'low'}">${c}/10</span><strong>${goal.goal}</strong>${goal.currentBaseline || goal.target ? `<br/><span class="baseline">${goal.currentBaseline || ''} → ${goal.target || ''} (${goal.timeframe || ''})</span>` : ''}${goal.planB ? `<div class="planb">Plan B: ${goal.planB}</div>` : ''}</div>`
                                                 }).join('')}
                                                 
-                                                ${sp.platformBreakout ? `<h2>📊 Platform Breakout</h2><div class="platform-grid">${sp.platformBreakout.meta ? `<div class="platform-card"><h3>Meta (${sp.platformBreakout.meta.budgetPercent || 0}% — ${sp.platformBreakout.meta.budgetAmount || ''})</h3><p>${sp.platformBreakout.meta.rationale || ''}</p>` + (sp.platformBreakout.meta.campaigns || []).map(c => `<p>• <strong>${c.name}</strong>: ${c.objective} — ${c.dailyBudget}/day</p>`).join('') + '</div>' : ''}${sp.platformBreakout.google ? `<div class="platform-card"><h3>Google (${sp.platformBreakout.google.budgetPercent || 0}% — ${sp.platformBreakout.google.budgetAmount || ''})</h3><p>${sp.platformBreakout.google.rationale || ''}</p>` + (sp.platformBreakout.google.campaigns || []).map(c => `<p>• <strong>${c.name}</strong>: ${c.objective} — ${c.dailyBudget}/day</p>`).join('') + '</div>' : ''}</div>` : ''}
+                                                ${sp.platformBreakout ? `<h2> Platform Breakout</h2><div class="platform-grid">${sp.platformBreakout.meta ? `<div class="platform-card"><h3>Meta (${sp.platformBreakout.meta.budgetPercent || 0}% — ${sp.platformBreakout.meta.budgetAmount || ''})</h3><p>${sp.platformBreakout.meta.rationale || ''}</p>` + (sp.platformBreakout.meta.campaigns || []).map(c => `<p>• <strong>${c.name}</strong>: ${c.objective} — ${c.dailyBudget}/day</p>`).join('') + '</div>' : ''}${sp.platformBreakout.google ? `<div class="platform-card"><h3>Google (${sp.platformBreakout.google.budgetPercent || 0}% — ${sp.platformBreakout.google.budgetAmount || ''})</h3><p>${sp.platformBreakout.google.rationale || ''}</p>` + (sp.platformBreakout.google.campaigns || []).map(c => `<p>• <strong>${c.name}</strong>: ${c.objective} — ${c.dailyBudget}/day</p>`).join('') + '</div>' : ''}</div>` : ''}
                                                 
                                                 ${kwRows ? `<h2>🔑 Keyword Strategy (${(sp.keywordStrategy?.keywordTable || []).length} keywords)</h2><table><thead><tr><th>Keyword</th><th>Category</th><th>CPC</th><th>Volume</th><th>Intent</th><th>Match</th><th>Geo</th><th>Priority</th></tr></thead><tbody>${kwRows}</tbody></table>` : ''}
                                                 
                                                 ${compRows ? `<h2>⚔️ Competitive Edge</h2>${compRows}` : ''}
                                                 
-                                                ${locCards ? `<h2>📍 Location Strategy</h2>${locCards}` : ''}
+                                                ${locCards ? `<h2> Location Strategy</h2>${locCards}` : ''}
                                                 
-                                                ${sp.achievabilityAudit ? `<h2>✅ Achievability Audit</h2><div style="display:flex;align-items:center;margin-bottom:16px"><div class="audit-score ${sp.achievabilityAudit.overallScore >= 7 ? 'high' : sp.achievabilityAudit.overallScore >= 5 ? 'med' : 'low'}">${sp.achievabilityAudit.overallScore}/10</div><div><strong>Implementation Confidence</strong><br/><span style="font-size:12px;color:#666">${sp.achievabilityAudit.overallAssessment || ''}</span></div></div>` : ''}
+                                                ${sp.achievabilityAudit ? `<h2> Achievability Audit</h2><div style="display:flex;align-items:center;margin-bottom:16px"><div class="audit-score ${sp.achievabilityAudit.overallScore >= 7 ? 'high' : sp.achievabilityAudit.overallScore >= 5 ? 'med' : 'low'}">${sp.achievabilityAudit.overallScore}/10</div><div><strong>Implementation Confidence</strong><br/><span style="font-size:12px;color:#666">${sp.achievabilityAudit.overallAssessment || ''}</span></div></div>` : ''}
                                                 
                                                 <div class="footer">Generated by Mantram AI — Performance Marketing Studio</div>
                                                 </body></html>`
@@ -1375,7 +1375,7 @@ export default function PerformanceMarketing() {
                                         </button>
                                         <button
                                             onClick={() => setShowStrategyPresentation(true)}
-                                            className="px-4 py-2 rounded-xl bg-gradient-to-r from-violet-600/80 to-indigo-600/80 text-white text-xs font-medium hover:shadow-lg hover:shadow-violet-500/20 transition-all flex items-center gap-1.5 cursor-pointer"
+                                            className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#FF4D00]/80 to-[#FF7A00]/80 text-white text-xs font-medium hover:shadow-lg hover:shadow-[#FF4D00]/20 transition-all flex items-center gap-1.5 cursor-pointer"
                                         >
                                             <span className="material-symbols-outlined text-sm">slideshow</span>
                                             Present Strategy
@@ -1450,7 +1450,7 @@ export default function PerformanceMarketing() {
                                 {strategyResult.strategyPlan.channelAllocation?.length > 0 && (
                                     <div className="glass-panel rounded-2xl p-6 border border-white/[0.06]">
                                         <h3 className="text-base font-bold text-white mb-3 flex items-center gap-2">
-                                            <span className="material-symbols-outlined text-violet-400">donut_large</span>
+                                            <span className="material-symbols-outlined text-[#FF4D00]">donut_large</span>
                                             Channel Allocation
                                         </h3>
                                         <div className="space-y-3">
@@ -1459,10 +1459,10 @@ export default function PerformanceMarketing() {
                                                     <div className="flex-1">
                                                         <div className="flex items-center justify-between mb-1">
                                                             <p className="text-sm font-medium text-white">{ch.channel}</p>
-                                                            <p className="text-sm font-bold text-violet-400">{ch.budgetPercent}%</p>
+                                                            <p className="text-sm font-bold text-[#FF4D00]">{ch.budgetPercent}%</p>
                                                         </div>
                                                         <div className="w-full h-2 rounded-full bg-white/[0.06] overflow-hidden">
-                                                            <div className="h-full rounded-full bg-gradient-to-r from-violet-500 to-cyan-500 transition-all" style={{ width: `${ch.budgetPercent}%` }} />
+                                                            <div className="h-full rounded-full bg-gradient-to-r from-[#FF4D00] to-cyan-500 transition-all" style={{ width: `${ch.budgetPercent}%` }} />
                                                         </div>
                                                         <p className="text-xs text-slate-500 mt-1">{ch.rationale}</p>
                                                     </div>
@@ -1484,14 +1484,14 @@ export default function PerformanceMarketing() {
                                             {strategyResult.strategyPlan.platformBreakout.meta && (() => {
                                                 const meta = strategyResult.strategyPlan.platformBreakout.meta
                                                 return (
-                                                    <div className="rounded-xl border border-blue-500/20 bg-blue-500/[0.04] p-5">
+                                                    <div className="rounded-xl border border-[#FF4D00]/20 bg-[#FF4D00]/[0.04] p-5">
                                                         <div className="flex items-center gap-2 mb-3">
-                                                            <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                                                                <span className="material-symbols-outlined text-blue-400 text-lg">campaign</span>
+                                                            <div className="w-8 h-8 rounded-lg bg-[#FF4D00]/10 flex items-center justify-center">
+                                                                <span className="material-symbols-outlined text-[#FF4D00] text-lg">campaign</span>
                                                             </div>
                                                             <div>
                                                                 <h4 className="text-sm font-bold text-white">Meta Ads</h4>
-                                                                <p className="text-xs text-blue-400">{meta.budgetPercent}% of budget • {meta.budgetAmount || ''}</p>
+                                                                <p className="text-xs text-[#FF4D00]">{meta.budgetPercent}% of budget • {meta.budgetAmount || ''}</p>
                                                             </div>
                                                         </div>
 
@@ -1510,12 +1510,12 @@ export default function PerformanceMarketing() {
                                                         {/* Projections */}
                                                         {meta.projections && Object.keys(meta.projections).length > 0 && (
                                                             <div className="mb-3">
-                                                                <p className="text-xs text-slate-400 font-medium mb-1.5">📊 Projections (math-backed)</p>
+                                                                <p className="text-xs text-slate-400 font-medium mb-1.5"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">bar_chart</span> Projections (math-backed)</p>
                                                                 <div className="grid grid-cols-2 gap-1.5">
                                                                     {Object.entries(meta.projections).map(([key, val]) => (
                                                                         <div key={key} className="flex justify-between text-xs p-1.5 rounded bg-black/10">
                                                                             <span className="text-slate-500">{key}</span>
-                                                                            <span className="text-blue-300 font-medium">{typeof val === 'object' ? JSON.stringify(val) : val}</span>
+                                                                            <span className="text-[#FF7A00] font-medium">{typeof val === 'object' ? JSON.stringify(val) : val}</span>
                                                                         </div>
                                                                     ))}
                                                                 </div>
@@ -1539,7 +1539,7 @@ export default function PerformanceMarketing() {
                                                         {meta.creativeFormats?.length > 0 && (
                                                             <div className="flex flex-wrap gap-1.5 mb-2">
                                                                 {meta.creativeFormats.map((f, i) => (
-                                                                    <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-300 border border-blue-500/20">{f}</span>
+                                                                    <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-[#FF4D00]/10 text-[#FF7A00] border border-[#FF4D00]/20">{f}</span>
                                                                 ))}
                                                             </div>
                                                         )}
@@ -1579,7 +1579,7 @@ export default function PerformanceMarketing() {
                                                         {/* Projections */}
                                                         {google.projections && Object.keys(google.projections).length > 0 && (
                                                             <div className="mb-3">
-                                                                <p className="text-xs text-slate-400 font-medium mb-1.5">📊 Projections (math-backed)</p>
+                                                                <p className="text-xs text-slate-400 font-medium mb-1.5"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">bar_chart</span> Projections (math-backed)</p>
                                                                 <div className="grid grid-cols-2 gap-1.5">
                                                                     {Object.entries(google.projections).map(([key, val]) => (
                                                                         <div key={key} className="flex justify-between text-xs p-1.5 rounded bg-black/10">
@@ -1662,7 +1662,7 @@ export default function PerformanceMarketing() {
                                                     <tbody>
                                                         {strategyResult.strategyPlan.keywordStrategy.keywordTable.map((kw, i) => {
                                                             const catColor = {
-                                                                'Branded': 'bg-violet-500/15 text-violet-400',
+                                                                'Branded': 'bg-[#FF4D00]/15 text-[#FF4D00]',
                                                                 'Generic-High Intent': 'bg-cyan-500/15 text-cyan-400',
                                                                 'Long-tail': 'bg-teal-500/15 text-teal-400',
                                                                 'Competitor': 'bg-rose-500/15 text-rose-400',
@@ -1791,7 +1791,7 @@ export default function PerformanceMarketing() {
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                             {strategyResult.strategyPlan.competitiveEdge.uniqueAngles?.length > 0 && (
                                                 <div className="p-3 rounded-xl bg-white/[0.02]">
-                                                    <p className="text-[10px] text-violet-400 uppercase mb-1.5">Unique Angles</p>
+                                                    <p className="text-[10px] text-[#FF4D00] uppercase mb-1.5">Unique Angles</p>
                                                     {strategyResult.strategyPlan.competitiveEdge.uniqueAngles.map((a, i) => (
                                                         <p key={i} className="text-xs text-slate-300 mb-1">• {a}</p>
                                                     ))}
@@ -1854,9 +1854,9 @@ export default function PerformanceMarketing() {
 
                                 {/* ═══ ACHIEVABILITY AUDIT ═══ */}
                                 {strategyResult.strategyPlan.achievabilityAudit && (
-                                    <div className="glass-panel rounded-2xl p-6 border border-violet-500/15">
+                                    <div className="glass-panel rounded-2xl p-6 border border-[#FF4D00]/15">
                                         <h3 className="text-base font-bold text-white mb-3 flex items-center gap-2">
-                                            <span className="material-symbols-outlined text-violet-400">verified</span>
+                                            <span className="material-symbols-outlined text-[#FF4D00]">verified</span>
                                             Achievability Audit
                                         </h3>
                                         {/* Overall Score */}
@@ -1902,7 +1902,7 @@ export default function PerformanceMarketing() {
                                             )}
                                             {strategyResult.strategyPlan.achievabilityAudit.prerequisites?.length > 0 && (
                                                 <div className="p-3 rounded-xl bg-white/[0.02]">
-                                                    <p className="text-[10px] text-violet-400 uppercase mb-1.5">Prerequisites</p>
+                                                    <p className="text-[10px] text-[#FF4D00] uppercase mb-1.5">Prerequisites</p>
                                                     {strategyResult.strategyPlan.achievabilityAudit.prerequisites.map((p, i) => (
                                                         <p key={i} className="text-xs text-slate-300 mb-1">• {p}</p>
                                                     ))}
@@ -2028,7 +2028,7 @@ export default function PerformanceMarketing() {
                                 <p className="text-sm text-slate-400 mb-6">Start by researching competitors and building a strategy, then create your first campaign.</p>
                                 <button
                                     onClick={() => setTab('research')}
-                                    className="px-6 py-3 rounded-xl bg-violet-500/10 text-violet-400 font-medium text-sm border border-violet-500/20 hover:bg-violet-500/20 transition-all cursor-pointer"
+                                    className="px-6 py-3 rounded-xl bg-[#FF4D00]/10 text-[#FF4D00] font-medium text-sm border border-[#FF4D00]/20 hover:bg-[#FF4D00]/20 transition-all cursor-pointer"
                                 >
                                     Start with Research →
                                 </button>
@@ -2049,7 +2049,7 @@ export default function PerformanceMarketing() {
                                             <span className={`px-3 py-1 rounded-full text-xs font-bold ${c.status === 'active' ? 'bg-emerald-500/10 text-emerald-400'
                                                 : c.status === 'draft' ? 'bg-slate-500/10 text-slate-400'
                                                     : c.status === 'paused' ? 'bg-amber-500/10 text-amber-400'
-                                                        : 'bg-violet-500/10 text-violet-400'
+                                                        : 'bg-[#FF4D00]/10 text-[#FF4D00]'
                                                 }`}>
                                                 {c.status}
                                             </span>
@@ -2082,7 +2082,7 @@ export default function PerformanceMarketing() {
                                 <button
                                     onClick={handleGenerateAdImage}
                                     disabled={generatingImage || !adImagePrompt.trim()}
-                                    className="px-6 py-3 rounded-xl bg-gradient-to-r from-cyan-600 to-violet-600 text-white font-bold text-sm hover:shadow-xl hover:shadow-cyan-500/20 transition-all disabled:opacity-50 cursor-pointer flex items-center gap-2"
+                                    className="px-6 py-3 rounded-xl bg-gradient-to-r from-cyan-600 to-[#FF7A00] text-white font-bold text-sm hover:shadow-xl hover:shadow-cyan-500/20 transition-all disabled:opacity-50 cursor-pointer flex items-center gap-2"
                                 >
                                     {generatingImage ? (
                                         <><span className="material-symbols-outlined animate-spin text-sm">progress_activity</span>Generating...</>
@@ -2106,7 +2106,7 @@ export default function PerformanceMarketing() {
                 {tab === 'ab-tests' && (
                     <div className="space-y-6">
                         <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                            <span className="material-symbols-outlined text-purple-400">science</span>
+                            <span className="material-symbols-outlined text-[#FF4D00]">science</span>
                             A/B Testing
                         </h2>
 
@@ -2117,7 +2117,7 @@ export default function PerformanceMarketing() {
                                 <p className="text-sm text-slate-400 mb-6">Create a campaign first, then design an A/B test to optimize your ad performance.</p>
                                 <button
                                     onClick={() => setTab('campaigns')}
-                                    className="px-6 py-3 rounded-xl bg-purple-500/10 text-purple-400 font-medium text-sm border border-purple-500/20 hover:bg-purple-500/20 transition-all cursor-pointer"
+                                    className="px-6 py-3 rounded-xl bg-[#FF4D00]/10 text-[#FF4D00] font-medium text-sm border border-[#FF4D00]/20 hover:bg-[#FF4D00]/20 transition-all cursor-pointer"
                                 >
                                     Go to Campaigns
                                 </button>
@@ -2125,14 +2125,14 @@ export default function PerformanceMarketing() {
                         ) : (
                             <div className="space-y-4">
                                 {campaigns.filter(c => c.abTest?.enabled).map(c => (
-                                    <div key={c._id} className="glass-panel rounded-2xl p-6 border border-purple-500/20">
+                                    <div key={c._id} className="glass-panel rounded-2xl p-6 border border-[#FF4D00]/20">
                                         <h3 className="text-base font-bold text-white mb-4">{c.title} — A/B Test</h3>
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                             {(c.abTest.variants || []).map((v, i) => (
                                                 <div key={i} className={`p-4 rounded-xl border ${c.abTest.winnerVariant === v.name ? 'border-emerald-500/40 bg-emerald-500/5' : 'border-white/[0.06] bg-white/[0.02]'}`}>
                                                     <p className="text-sm font-bold text-white mb-2">
                                                         {v.name}
-                                                        {c.abTest.winnerVariant === v.name && <span className="ml-2 text-emerald-400">🏆 Winner</span>}
+                                                        {c.abTest.winnerVariant === v.name && <span className="ml-2 text-emerald-400"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">emoji_events</span> Winner</span>}
                                                     </p>
                                                     <div className="grid grid-cols-2 gap-2 text-xs">
                                                         <div><span className="text-slate-500">Clicks</span><p className="text-white font-bold">{v.performance?.clicks || 0}</p></div>
@@ -2143,7 +2143,7 @@ export default function PerformanceMarketing() {
                                                 </div>
                                             ))}
                                         </div>
-                                        <p className="text-xs text-slate-500 mt-3">Primary metric: <span className="text-purple-400 font-bold">{c.abTest.metric?.toUpperCase()}</span></p>
+                                        <p className="text-xs text-slate-500 mt-3">Primary metric: <span className="text-[#FF4D00] font-bold">{c.abTest.metric?.toUpperCase()}</span></p>
                                     </div>
                                 ))}
                             </div>
@@ -2158,7 +2158,7 @@ export default function PerformanceMarketing() {
                     <div className="space-y-6">
                         <div className="flex items-center justify-between">
                             <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                                <span className="material-symbols-outlined text-purple-400">psychology</span>
+                                <span className="material-symbols-outlined text-[#FF4D00]">psychology</span>
                                 AI Learnings
                             </h2>
                             <p className="text-xs text-slate-500">{learnings.length} insights stored</p>
@@ -2171,7 +2171,7 @@ export default function PerformanceMarketing() {
                                 <p className="text-sm text-slate-400 mb-6">Run competitor research or create campaigns — the AI will automatically extract insights and get smarter over time.</p>
                                 <button
                                     onClick={() => setTab('research')}
-                                    className="px-6 py-3 rounded-xl bg-violet-500/10 text-violet-400 font-medium text-sm border border-violet-500/20 hover:bg-violet-500/20 transition-all cursor-pointer"
+                                    className="px-6 py-3 rounded-xl bg-[#FF4D00]/10 text-[#FF4D00] font-medium text-sm border border-[#FF4D00]/20 hover:bg-[#FF4D00]/20 transition-all cursor-pointer"
                                 >
                                     Start with Research →
                                 </button>
@@ -2179,12 +2179,12 @@ export default function PerformanceMarketing() {
                         ) : (
                             <div className="space-y-3">
                                 {learnings.map(l => (
-                                    <div key={l._id} className="glass-panel rounded-2xl p-5 border border-white/[0.06] hover:border-purple-500/20 transition-all">
+                                    <div key={l._id} className="glass-panel rounded-2xl p-5 border border-white/[0.06] hover:border-[#FF4D00]/20 transition-all">
                                         <div className="flex items-start justify-between mb-2">
                                             <div className="flex items-center gap-2">
                                                 <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${l.type === 'campaign-result' ? 'bg-emerald-500/10 text-emerald-400'
                                                     : l.type === 'audience-insight' ? 'bg-cyan-500/10 text-cyan-400'
-                                                        : l.type === 'creative-insight' ? 'bg-violet-500/10 text-violet-400'
+                                                        : l.type === 'creative-insight' ? 'bg-[#FF4D00]/10 text-[#FF4D00]'
                                                             : l.type === 'competitor-pattern' ? 'bg-rose-500/10 text-rose-400'
                                                                 : 'bg-amber-500/10 text-amber-400'
                                                     }`}>
@@ -2197,7 +2197,7 @@ export default function PerformanceMarketing() {
                                         <h4 className="text-sm font-bold text-white mb-1">{l.title}</h4>
                                         <p className="text-xs text-slate-400 mb-2">{l.insight?.summary}</p>
                                         {l.insight?.actionable && (
-                                            <p className="text-xs text-purple-400">💡 {l.insight.actionable}</p>
+                                            <p className="text-xs text-[#FF4D00]">💡 {l.insight.actionable}</p>
                                         )}
                                         {l.metrics?.roas && (
                                             <div className="flex gap-4 mt-2 text-xs text-slate-500">
@@ -2284,7 +2284,7 @@ export default function PerformanceMarketing() {
                                         <div>
                                             <h4 className="text-sm font-bold text-white">{r.title}</h4>
                                             <div className="flex items-center gap-3 mt-1">
-                                                <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${r.type === 'competitor-research' ? 'bg-violet-500/10 text-violet-400'
+                                                <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${r.type === 'competitor-research' ? 'bg-[#FF4D00]/10 text-[#FF4D00]'
                                                     : r.type === 'strategy' ? 'bg-cyan-500/10 text-cyan-400'
                                                         : r.type === 'budget-plan' ? 'bg-amber-500/10 text-amber-400'
                                                             : 'bg-emerald-500/10 text-emerald-400'
@@ -2403,9 +2403,9 @@ const PM_HELP_SECTIONS = [
 
 const PM_PRO_TIPS = [
     { icon: '🔍', tip: 'Always start with Research before creating a Strategy. Research data makes strategies 10x more effective.' },
-    { icon: '🎯', tip: 'Match your campaign objective to your business goal. Traffic ≠ Conversions ≠ Brand Awareness.' },
+    { icon: 'ads_click', tip: 'Match your campaign objective to your business goal. Traffic ≠ Conversions ≠ Brand Awareness.' },
     { icon: '🧪', tip: 'Run A/B tests on everything. Small improvements in CTR compound into massive ROAS gains.' },
-    { icon: '📊', tip: 'Check Grok trends daily. Being first to trend-jack gives you 3x cheaper CPMs.' },
+    { icon: 'bar_chart', tip: 'Check Grok trends daily. Being first to trend-jack gives you 3x cheaper CPMs.' },
     { icon: '🧠', tip: 'Review Learnings before creating new campaigns. Your past data is your biggest competitive advantage.' },
     { icon: '🖼️', tip: 'Use AI Ad Creative to generate multiple variations quickly, then A/B test the best ones.' },
 ]
@@ -2523,7 +2523,7 @@ function PMHelpView({ onBack }) {
 
             <div className="text-center mt-6 py-6">
                 <p className="text-slate-500 text-sm mb-3">Ready to advertise?</p>
-                <button onClick={onBack} className="px-6 py-3 rounded-xl text-sm font-bold bg-gradient-to-r from-primary to-purple-500 text-white cursor-pointer hover:shadow-lg hover:shadow-primary/20 transition-all flex items-center gap-2 mx-auto">
+                <button onClick={onBack} className="px-6 py-3 rounded-xl text-sm font-bold bg-gradient-to-r from-primary to-[#FF7A00] text-white cursor-pointer hover:shadow-lg hover:shadow-primary/20 transition-all flex items-center gap-2 mx-auto">
                     <span className="material-symbols-outlined text-sm">space_dashboard</span> Go to Dashboard
                 </button>
             </div>

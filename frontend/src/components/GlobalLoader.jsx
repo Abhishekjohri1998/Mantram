@@ -17,7 +17,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 
 // Agent metadata for display
 const AGENT_META = {
-    'brand-intel':       { icon: 'psychology',       label: 'Brand Intelligence',    color: '#8b5cf6' },
+    'brand-intel':       { icon: 'psychology',       label: 'Brand Intelligence',    color: '#FF4D00' },
     'art-director':      { icon: 'palette',           label: 'Art Director',          color: '#ec4899' },
     'prompt-engineer':   { icon: 'code',              label: 'Prompt Engineer',       color: '#06b6d4' },
     'style-critic':      { icon: 'verified',          label: 'Style Critic',          color: '#f59e0b' },
@@ -27,7 +27,7 @@ const AGENT_META = {
     'generating':        { icon: 'auto_awesome',      label: 'AI Generation',         color: '#6366f1' },
     'complete':          { icon: 'check_circle',      label: 'Complete',              color: '#22c55e' },
     'queued':            { icon: 'schedule',          label: 'Queued',                color: '#64748b' },
-    'processing':        { icon: 'sync',              label: 'Processing',            color: '#8b5cf6' },
+    'processing':        { icon: 'sync',              label: 'Processing',            color: '#FF4D00' },
 };
 
 export default function GlobalLoader({
@@ -121,7 +121,7 @@ export default function GlobalLoader({
             {hasRealSteps && (
                 <div className="w-full max-w-md mt-2 mb-4 text-left">
                     {uniqueSteps.map((step, i) => {
-                        const meta = AGENT_META[step.agent] || { icon: 'circle', label: step.agent, color: '#8b5cf6' };
+                        const meta = AGENT_META[step.agent] || { icon: 'circle', label: step.agent, color: '#FF4D00' };
                         const isDone = step.status === 'done';
                         const isWorking = step.status === 'working';
                         const duration = step.durationMs ? `${(step.durationMs / 1000).toFixed(1)}s` : '';
@@ -177,8 +177,8 @@ export default function GlobalLoader({
                         className="h-full rounded-full transition-all duration-700 ease-out"
                         style={{
                             width: `${displayPct}%`,
-                            background: 'linear-gradient(90deg, #8b5cf6, #6366f1, #06b6d4)',
-                            boxShadow: '0 0 12px rgba(139,92,246,0.4)',
+                            background: 'linear-gradient(90deg, #FF4D00, #6366f1, #06b6d4)',
+                            boxShadow: '0 0 12px rgba(255, 77, 0,0.4)',
                         }}
                     />
                 </div>
@@ -186,7 +186,7 @@ export default function GlobalLoader({
                     <span className="text-[11px] text-slate-500">{etaLabel}</span>
                     {hasRealSteps && (
                         <span className="text-[10px] text-slate-600 flex items-center gap-1">
-                            <span className="material-symbols-outlined text-[12px] text-violet-400">smart_toy</span>
+                            <span className="material-symbols-outlined text-[12px] text-[#FF4D00]">smart_toy</span>
                             Agentic Pipeline
                         </span>
                     )}
@@ -221,7 +221,7 @@ export default function GlobalLoader({
             {/* Inline CSS for mesh rings */}
             <style dangerouslySetInnerHTML={{__html: `
                 .loader-mesh { position: relative; width: 80px; height: 80px; display: flex; align-items: center; justify-content: center; }
-                .mesh-ring { position: absolute; border-radius: 50%; border: 2px solid transparent; border-top-color: #8b5cf6; }
+                .mesh-ring { position: absolute; border-radius: 50%; border: 2px solid transparent; border-top-color: #FF4D00; }
                 .mesh-ring-1 { width: 100%; height: 100%; animation: spin 2s linear infinite; opacity: 0.6; }
                 .mesh-ring-2 { width: 80%; height: 80%; animation: spin 1.5s linear infinite reverse; border-top-color: #6366f1; opacity: 0.8; }
                 .mesh-ring-3 { width: 60%; height: 60%; animation: spin 1s linear infinite; border-top-color: #e2e8f0; opacity: 0.3; }

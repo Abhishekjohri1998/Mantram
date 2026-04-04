@@ -142,7 +142,7 @@ export default function AISettings() {
             <DashboardLayout title="Conversation Studio" subtitle="AI-powered routing & settings">
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh', color: '#94a3b8' }}>
                     <div style={{ textAlign: 'center' }}>
-                        <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🧠</div>
+                        <div style={{ fontSize: '3rem', marginBottom: '1rem' }}><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">psychology</span></div>
                         <h3 style={{ margin: 0, color: '#e2e8f0' }}>Select a Brand</h3>
                         <p style={{ margin: '0.5rem 0 0', fontSize: '0.875rem' }}>Choose a brand to configure AI settings</p>
                     </div>
@@ -224,7 +224,7 @@ export default function AISettings() {
 
                     {/* Confidence Threshold */}
                     <div style={{ background: '#1e293b', borderRadius: '12px', border: '1px solid #334155', padding: '1.25rem', marginTop: '1rem' }}>
-                        <h3 style={{ margin: '0 0 1rem', color: '#e2e8f0', fontSize: '1rem' }}>🎯 Auto-Reply Confidence Threshold</h3>
+                        <h3 style={{ margin: '0 0 1rem', color: '#e2e8f0', fontSize: '1rem' }}><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">ads_click</span> Auto-Reply Confidence Threshold</h3>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                             <input
                                 type="range"
@@ -371,7 +371,7 @@ export default function AISettings() {
             <div style={{ marginTop: '1.5rem', background: '#1e293b', borderRadius: '12px', border: '1px solid #334155', overflow: 'hidden' }}>
                 <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid #334155', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
-                        <h3 style={{ margin: 0, color: '#e2e8f0', fontSize: '1rem' }}>🤖 Autonomous Agent Controls</h3>
+                        <h3 style={{ margin: 0, color: '#e2e8f0', fontSize: '1rem' }}><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">smart_toy</span> Autonomous Agent Controls</h3>
                         <p style={{ color: '#64748b', margin: '0.25rem 0 0', fontSize: '0.75rem' }}>Configure how the AI agent handles DMs and comments autonomously</p>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>

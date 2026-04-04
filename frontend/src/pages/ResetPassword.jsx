@@ -55,7 +55,7 @@ export default function ResetPassword() {
             {/* Background */}
             <div className="fixed inset-0 pointer-events-none z-0">
                 <div className="absolute top-[-20%] left-[20%] w-[40%] h-[40%] bg-primary/15 blur-[150px] rounded-full" />
-                <div className="absolute bottom-[-10%] right-[10%] w-[30%] h-[30%] bg-purple-500/10 blur-[120px] rounded-full" />
+                <div className="absolute bottom-[-10%] right-[10%] w-[30%] h-[30%] bg-[#FF4D00]/10 blur-[120px] rounded-full" />
             </div>
 
             <div className="relative z-10 w-full max-w-md px-6">

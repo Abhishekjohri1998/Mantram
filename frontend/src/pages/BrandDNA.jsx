@@ -1050,7 +1050,7 @@ function KnowledgeBank({ brandId, setError }) {
                                 const levelStyles = {
                                     EXACT_DUPLICATE: { bg: 'bg-rose-500/8', border: 'border-rose-500/15', icon: 'content_copy', iconColor: 'text-rose-400', label: 'Exact Duplicate' },
                                     CONFLICTING_DATA: { bg: 'bg-amber-500/8', border: 'border-amber-500/15', icon: 'warning', iconColor: 'text-amber-400', label: 'Conflicting Data' },
-                                    SAME_SOURCE: { bg: 'bg-blue-500/8', border: 'border-blue-500/15', icon: 'source', iconColor: 'text-blue-400', label: 'Same Source' },
+                                    SAME_SOURCE: { bg: 'bg-[#FF4D00]/8', border: 'border-[#FF4D00]/15', icon: 'source', iconColor: 'text-[#FF4D00]', label: 'Same Source' },
                                     SIMILAR_CONTENT: { bg: 'bg-slate-500/8', border: 'border-slate-500/15', icon: 'compare', iconColor: 'text-slate-400', label: 'Similar Content' },
                                 }
                                 const s = levelStyles[w.level] || levelStyles.SIMILAR_CONTENT
@@ -1288,8 +1288,8 @@ export default function BrandDNA() {
         brand_archived: { icon: 'archive', label: 'Brand Archived', color: 'text-amber-400' },
         brand_restored: { icon: 'unarchive', label: 'Brand Restored', color: 'text-emerald-400' },
         dna_updated: { icon: 'edit', label: 'DNA Updated', color: 'text-primary' },
-        voice_updated: { icon: 'record_voice_over', label: 'Voice Updated', color: 'text-purple-400' },
-        colors_updated: { icon: 'palette', label: 'Colors Updated', color: 'text-pink-400' },
+        voice_updated: { icon: 'record_voice_over', label: 'Voice Updated', color: 'text-[#FF4D00]' },
+        colors_updated: { icon: 'palette', label: 'Colors Updated', color: 'text-[#FF7A00]' },
         fonts_updated: { icon: 'text_fields', label: 'Typography Updated', color: 'text-cyan-400' },
         content_style_updated: { icon: 'checklist', label: 'Style Guide Updated', color: 'text-amber-400' },
         description_updated: { icon: 'description', label: 'Description Updated', color: 'text-primary' },
@@ -1398,7 +1398,7 @@ export default function BrandDNA() {
                                 <span className="text-slate-600 text-xs self-center">•</span>
                                 {dna.targetMarkets.map(m => {
                                     const flags = { IN: '🇮🇳', US: '🇺🇸', CA: '🇨🇦', UK: '🇬🇧', EU: '🇪🇺', AE: '🇦🇪', SA: '🇸🇦', SG: '🇸🇬', MY: '🇲🇾', ID: '🇮🇩', TH: '🇹🇭', AU: '🇦🇺', NZ: '🇳🇿', BR: '🇧🇷', JP: '🇯🇵', KR: '🇰🇷' };
-                                    return <span key={m} className="px-2 py-0.5 rounded-lg bg-primary/10 text-primary text-xs font-bold" title={`Target Market: ${m}`}>{flags[m] || '🌐'} {m}</span>;
+                                    return <span key={m} className="px-2 py-0.5 rounded-lg bg-primary/10 text-primary text-xs font-bold" title={`Target Market: ${m}`}>{flags[m] || 'language'} {m}</span>;
                                 })}
                             </>
                         )}
@@ -1519,7 +1519,7 @@ export default function BrandDNA() {
                         <div className="space-y-4">
                             {dna.contentStyle.dos?.length > 0 && (
                                 <div>
-                                    <p className="text-sm text-emerald-400 font-bold mb-2">✅ ALWAYS</p>
+                                    <p className="text-sm text-emerald-400 font-bold mb-2"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">check_circle</span> ALWAYS</p>
                                     <ul className="space-y-1.5">
                                         {dna.contentStyle.dos.map((d, i) => (
                                             <li key={i} className="text-sm text-slate-300 flex items-start gap-2">
@@ -1531,7 +1531,7 @@ export default function BrandDNA() {
                             )}
                             {dna.contentStyle.donts?.length > 0 && (
                                 <div>
-                                    <p className="text-sm text-rose-400 font-bold mb-2">❌ NEVER</p>
+                                    <p className="text-sm text-rose-400 font-bold mb-2"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">cancel</span> NEVER</p>
                                     <ul className="space-y-1.5">
                                         {dna.contentStyle.donts.map((d, i) => (
                                             <li key={i} className="text-sm text-slate-300 flex items-start gap-2">
@@ -1563,8 +1563,8 @@ export default function BrandDNA() {
                                 <p className="text-sm text-slate-500">Satisfaction</p>
                             </div>
                         </div>
-                        <div className="p-4 rounded-xl bg-gradient-to-r from-primary/5 to-purple-500/5 border border-primary/10">
-                            <p className="text-sm text-primary font-bold mb-1">🧠 How the AI learns</p>
+                        <div className="p-4 rounded-xl bg-gradient-to-r from-primary/5 to-[#FF7A00]/5 border border-primary/10">
+                            <p className="text-sm text-primary font-bold mb-1"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">psychology</span> How the AI learns</p>
                             <p className="text-sm text-slate-400 leading-relaxed">
                                 Every like, dislike, edit, and regeneration teaches the AI your preferences.
                                 After enough feedback, generated content becomes indistinguishable from your own writing.
@@ -1760,13 +1760,13 @@ export default function BrandDNA() {
             {editSection === 'contentStyle' && (
                 <EditModal title="Edit Content Style Guide" icon="checklist" onClose={() => setEditSection(null)} onSave={saveSection}>
                     <div>
-                        <label className="text-sm text-emerald-400 font-bold mb-1 block">✅ ALWAYS (one per line)</label>
+                        <label className="text-sm text-emerald-400 font-bold mb-1 block"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">check_circle</span> ALWAYS (one per line)</label>
                         <textarea value={editData.dos} onChange={e => setEditData(p => ({ ...p, dos: e.target.value }))}
                             placeholder="Use active voice&#10;Keep sentences short&#10;Include data points" rows={5}
                             className="w-full input-glass rounded-xl p-3 text-sm text-white resize-none" />
                     </div>
                     <div>
-                        <label className="text-sm text-rose-400 font-bold mb-1 block">❌ NEVER (one per line)</label>
+                        <label className="text-sm text-rose-400 font-bold mb-1 block"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">cancel</span> NEVER (one per line)</label>
                         <textarea value={editData.donts} onChange={e => setEditData(p => ({ ...p, donts: e.target.value }))}
                             placeholder="Don't use jargon&#10;Avoid passive voice&#10;Don't exaggerate claims" rows={5}
                             className="w-full input-glass rounded-xl p-3 text-sm text-white resize-none" />

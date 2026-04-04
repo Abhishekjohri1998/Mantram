@@ -159,7 +159,7 @@ export default function UserSettings() {
                     <div className="glass-panel rounded-2xl border border-white/[0.08] p-3 lg:sticky lg:top-24">
                         {/* User mini card */}
                         <div className="flex items-center gap-3 p-3 mb-2">
-                            <div className="size-11 rounded-xl bg-gradient-to-br from-primary to-purple-500 flex items-center justify-center text-white font-bold text-base border-2 border-primary/30">
+                            <div className="size-11 rounded-xl bg-gradient-to-br from-primary to-[#FF7A00] flex items-center justify-center text-white font-bold text-base border-2 border-primary/30">
                                 {initials}
                             </div>
                             <div className="min-w-0">
@@ -200,7 +200,7 @@ export default function UserSettings() {
     <div className="space-y-6">
         <div className="glass-panel rounded-2xl border border-white/[0.08] p-8">
             <div className="flex items-center gap-6 mb-8">
-                <div className="size-20 rounded-2xl bg-gradient-to-br from-primary to-purple-500 flex items-center justify-center text-white font-bold text-2xl border-2 border-primary/30">
+                <div className="size-20 rounded-2xl bg-gradient-to-br from-primary to-[#FF7A00] flex items-center justify-center text-white font-bold text-2xl border-2 border-primary/30">
                     {initials}
                 </div>
                 <div>
@@ -281,12 +281,12 @@ export default function UserSettings() {
         <p className="text-sm text-slate-500 mb-8">Your unique identity on Mantram AI. Visible as your handle across the platform.</p>
 
         {/* Current ID display */}
-        <div className="bg-gradient-to-r from-violet-500/5 to-cyan-500/5 border border-violet-500/20 rounded-xl p-6 mb-8">
+        <div className="bg-gradient-to-r from-[#FF4D00]/5 to-cyan-500/5 border border-[#FF4D00]/20 rounded-xl p-6 mb-8">
             <div className="flex items-center justify-between">
                 <div>
                     <p className="text-xs text-slate-500 uppercase font-bold tracking-wider mb-1">Current User ID</p>
                     <div className="flex items-center gap-3">
-                        <p className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-violet-400 to-cyan-400">
+                        <p className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-[#FF4D00] to-cyan-400">
                             {profile?.userId || '—'}
                         </p>
                         {profile?.userIdClaimed && (
@@ -603,7 +603,7 @@ export default function UserSettings() {
             {/* AI Model Preferences */}
             <div>
                 <h4 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
-                    <span className="material-symbols-outlined text-base text-violet-400">auto_awesome</span>
+                    <span className="material-symbols-outlined text-base text-[#FF4D00]">auto_awesome</span>
                     AI Model Defaults
                 </h4>
                 <div className="space-y-4">
@@ -697,7 +697,7 @@ export default function UserSettings() {
                     <div className="flex -space-x-2">
                         {teamInfo.members.slice(0, 8).map((m, i) => (
                             <div key={m._id || i}
-                                className="size-10 rounded-full bg-gradient-to-br from-primary to-purple-500 flex items-center justify-center text-white text-xs font-bold border-2 border-[#0a0a1a]"
+                                className="size-10 rounded-full bg-gradient-to-br from-primary to-[#FF7A00] flex items-center justify-center text-white text-xs font-bold border-2 border-[#0a0a1a]"
                                 title={m.name || m.email}>
                                 {(m.name || '?').charAt(0).toUpperCase()}
                             </div>

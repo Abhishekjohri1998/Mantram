@@ -378,14 +378,14 @@ export default function UserDashboard() {
     const radar = summary?.strikesRadar || null
 
     const studios = [
-        { icon: 'psychology', label: 'Brainstorm', path: '/brainstorm', color: '#8b5cf6', bg: 'from-violet-500/15 to-purple-500/5' },
+        { icon: 'psychology', label: 'Brainstorm', path: '/brainstorm', color: '#FF4D00', bg: 'from-[#FF4D00]/15 to-[#FF7A00]/5' },
         { icon: 'edit_note', label: 'Content', path: '/content-studio', color: '#34d399', bg: 'from-emerald-500/15 to-emerald-500/5' },
-        { icon: 'auto_fix_high', label: 'Creative', path: '/creative-studio', color: '#ec4899', bg: 'from-pink-500/15 to-pink-500/5' },
+        { icon: 'auto_fix_high', label: 'Creative', path: '/creative-studio', color: '#ec4899', bg: 'from-[#FF4D00]/15 to-[#FF7A00]/5' },
         { icon: 'movie', label: 'Video', path: '/video-studio', color: '#f59e0b', bg: 'from-amber-500/15 to-amber-500/5' },
         { icon: 'search_insights', label: 'SEO', path: '/seo-studio', color: '#06b6d4', bg: 'from-cyan-500/15 to-cyan-500/5' },
         { icon: 'campaign', label: 'Ads', path: '/performance-marketing', color: '#f43f5e', bg: 'from-rose-500/15 to-rose-500/5' },
         { icon: 'calendar_month', label: 'Calendar', path: '/smart-calendar', color: '#fb923c', bg: 'from-orange-500/15 to-orange-500/5' },
-        { icon: 'forum', label: 'Inbox', path: '/conversations', color: '#3b82f6', bg: 'from-blue-500/15 to-blue-500/5' },
+        { icon: 'forum', label: 'Inbox', path: '/conversations', color: '#FF4D00', bg: 'from-[#FF4D00]/15 to-[#FF7A00]/5' },
     ]
 
     // ── Intel tabs (Trends / News / Ideas) ──
@@ -396,473 +396,233 @@ export default function UserDashboard() {
     ]
 
     return (
-        <DashboardLayout title="Dashboard" subtitle="Your AI command center">
-            <SEOHead title="Dashboard — Mantram AI" noIndex={true} />
+        <DashboardLayout title="Command Center" subtitle="Your AI-driven operational hub">
+            <SEOHead title="Command Center — Mantram AI" noIndex={true} />
 
-            {/* ═══ CSS ═══ */}
-            <style>{`
-                @keyframes shimmer { 100% { transform: translateX(100%) } }
-                @keyframes slide-up { from { opacity:0; transform: translateY(16px) } to { opacity:1; transform: translateY(0) } }
-                @keyframes cursor-blink { 0%,100% { opacity:1 } 50% { opacity:0 } }
-                @keyframes float { 0%,100% { transform:translateY(0) } 50% { transform:translateY(-4px) } }
-                @keyframes glow-pulse { 0%,100%{box-shadow:0 0 20px rgba(139,92,246,.12)}50%{box-shadow:0 0 36px rgba(139,92,246,.25)} }
-                .anim-up { animation: slide-up .5s ease-out both }
-                .anim-float { animation: float 3s ease-in-out infinite }
-                .anim-glow { animation: glow-pulse 3s ease-in-out infinite }
-                .studio-btn { transition: all .25s cubic-bezier(.4,0,.2,1) }
-                .studio-btn:hover { transform:translateY(-3px) scale(1.03); box-shadow:0 10px 30px rgba(0,0,0,.3) }
-                .intel-tab { transition: all .2s ease }
-                .intel-tab.active { background:rgba(139,92,246,.12); color:#fff; border-color:rgba(139,92,246,.35) }
-                .dash-card { background:rgba(255,255,255,.015); border:1px solid rgba(255,255,255,.06); border-radius:16px; padding:20px }
-            `}</style>
-
-            {/* ── 0. ERROR BANNER ── */}
+            {/* ERROR BANNER */}
             {error && (
-                <div className={`mb-5 p-3.5 rounded-xl border flex items-center gap-3 anim-up ${error.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'}`}>
-                    <span className="material-symbols-outlined text-lg">{error.isProviderError ? 'warning' : 'error'}</span>
-                    <p className="flex-1 text-sm">{error.isProviderError && <span className="font-bold mr-1">[{error.provider}]</span>}{error.message}</p>
-                    <button onClick={() => setError(null)}><span className="material-symbols-outlined text-sm text-slate-500 hover:text-white transition-colors">close</span></button>
+                <div className={`mb-6 p-4 rounded-xl border flex items-center gap-4 ${error.isProviderError ? 'bg-[#ff7a00]/10 border-[#ff7a00]/20 text-[#ff7a00]' : 'bg-[#ff4d00]/10 border-[#ff4d00]/20 text-[#ff4d00]'}`}>
+                    <span className="material-symbols-outlined text-xl">{error.isProviderError ? 'warning' : 'error'}</span>
+                    <p className="flex-1 text-sm font-medium">{error.isProviderError && <span className="font-bold mr-1">[{error.provider}]</span>}{error.message}</p>
+                    <button onClick={() => setError(null)}><span className="material-symbols-outlined text-sm text-[#48474c] hover:text-[#f3eff6] transition-colors">close</span></button>
                 </div>
             )}
 
-            {/* ── 1. HERO GREETING ── */}
-            <div className="flex items-center justify-between mb-5 anim-up">
-                <div>
-                    <p className="text-slate-500 text-xs font-medium mb-1">{getDateString()}</p>
-                    {loadingSummary ? (
-                        <div className="h-8 w-56 rounded-lg bg-white/[.03] animate-pulse" />
-                    ) : (
-                        <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight flex items-center gap-3">
-                            {typedGreeting}
-                            {!greetingDone && <span className="inline-block w-1 h-6 bg-violet-500 rounded-full animate-[cursor-blink_1s_step-end_infinite]" />}
-                            <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[10px] font-bold text-emerald-400 uppercase tracking-widest">
-                                <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />AI Active
-                            </span>
-                        </h1>
-                    )}
-                </div>
-                {streak > 0 && (
-                    <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/20 anim-float">
-                        <span className="text-lg">🔥</span>
-                        <div>
-                            <p className="text-xs font-extrabold text-amber-400">{streak}-Day Streak</p>
-                            <p className="text-[10px] text-amber-600">Keep going!</p>
-                        </div>
-                    </div>
-                )}
+            {/* COMMAND BOX / GLOBAL SCAN */}
+            <div className="mb-8 relative">
+                <SmartCommandBox variant="dashboard" className="w-full bg-[#121217] border border-[#48474c]/20 rounded-2xl p-4 text-[#f3eff6] placeholder-[#48474c] focus:border-[#ff4d00]/50 shadow-[inset_0_2px_8px_rgba(0,0,0,0.5)]" />
             </div>
 
-            {/* ── 2. COMMAND BOX ── */}
-            <SmartCommandBox variant="dashboard" className="mb-5" />
-
-            {/* ── 3. MAIN GRID ── */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 pb-8">
-
+            {/* 12-COLUMN GRID CORE */}
+            <div className="max-w-6xl mx-auto grid grid-cols-12 gap-6 pb-12">
+                
                 {/* ════ LEFT COLUMN (8 cols) ════ */}
-                <div className="lg:col-span-8 space-y-4">
-
-                    {/* ── AI MISSION ── */}
+                <div className="col-span-12 lg:col-span-8 space-y-6">
+                    
+                    {/* 1. HERO INSIGHT (AI Mission Feed) */}
                     {loadingSummary ? (
-                        <div className="dash-card space-y-3 anim-up">
-                            <div className="h-3 w-20 rounded bg-white/[.04] animate-pulse" />
-                            <div className="h-6 w-3/4 rounded bg-white/[.04] animate-pulse" />
-                            <div className="h-4 w-full rounded bg-white/[.04] animate-pulse" />
-                            <div className="h-9 w-28 rounded-xl bg-white/[.04] animate-pulse" />
+                        <div className="relative overflow-hidden rounded-3xl border border-[#48474c]/20 bg-[#0e0e12] p-8 h-[200px] flex items-center justify-center">
+                            <span className="material-symbols-outlined text-[#48474c] text-3xl animate-spin">progress_activity</span>
                         </div>
                     ) : insight ? (
-                        <div className="anim-glow rounded-2xl p-5 border border-violet-500/20 anim-up"
-                            style={{ background: 'linear-gradient(135deg, rgba(139,92,246,.07) 0%, rgba(6,182,212,.06) 100%)' }}>
-                            <div className="flex items-center gap-2 mb-3">
-                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-violet-500/15 text-violet-300 font-bold uppercase tracking-widest">🤖 AI Mission</span>
-                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${insight.category === 'trend' ? 'bg-orange-500/15 text-orange-300' : insight.category === 'growth' ? 'bg-emerald-500/15 text-emerald-300' : 'bg-cyan-500/15 text-cyan-300'}`}>
-                                    {insight.category}
-                                </span>
-                            </div>
-                            <div className="flex items-start gap-4">
-                                <span className="text-3xl shrink-0 anim-float">{insight.emoji || '💡'}</span>
-                                <div className="flex-1 min-w-0">
-                                    <h3 className="text-lg font-extrabold text-white mb-1 leading-snug">{insight.title}</h3>
-                                    <p className="text-sm text-slate-300 leading-relaxed mb-4">{insight.tip}</p>
-                                    <button onClick={() => navigate(insight.actionPath || '/content-studio')}
-                                        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-white text-sm font-bold transition-all hover:scale-[1.03] active:scale-95"
-                                        style={{ background: 'linear-gradient(135deg, #8b5cf6, #06b6d4)', boxShadow: '0 4px 18px rgba(139,92,246,.3)' }}>
-                                        <span className="material-symbols-outlined text-base">rocket_launch</span>
-                                        {insight.actionLabel || 'Act Now'}
-                                    </button>
+                        <div className="relative overflow-hidden rounded-3xl border border-[#ff4d00]/20 bg-[#0e0e12] p-8 mt-[2px] shadow-[0_8px_32px_rgba(255,77,0,0.05)] group">
+                            {/* Glass overlay */}
+                            <div className="absolute inset-0 bg-gradient-to-r from-[#ff4d00]/10 to-transparent pointer-events-none"></div>
+                            {/* Ambient glow tracking group hover */}
+                            <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-[radial-gradient(circle,rgba(255,77,0,0.1)_0%,transparent_70%)] rounded-full -translate-y-1/2 translate-x-1/3 group-hover:scale-110 transition-transform duration-700 pointer-events-none blur-3xl"></div>
+                            
+                            <div className="relative z-10">
+                                <div className="flex items-center gap-3 mb-4">
+                                    <span className="material-symbols-outlined text-[#ff4d00] animate-pulse">crisis_alert</span>
+                                    <span className="text-xs font-bold uppercase tracking-widest text-[#ff4d00]">Active Objective • {insight.category}</span>
                                 </div>
+                                <h2 className="text-3xl lg:text-4xl font-['Space_Grotesk'] font-bold text-[#f3eff6] leading-tight mb-4 tracking-tighter">
+                                    {insight.title}
+                                </h2>
+                                <p className="text-[#acaab0] text-lg max-w-2xl leading-relaxed mb-8">
+                                    {insight.tip}
+                                </p>
+                                <button 
+                                    onClick={() => navigate(insight.actionPath || '/content-studio')}
+                                    className="bg-white text-black px-6 py-3 rounded-lg font-bold hover:bg-[#acaab0] transition-colors flex items-center gap-2 group/btn cursor-pointer">
+                                    <span>{insight.actionLabel || 'Initiate Scan'}</span>
+                                    <span className="material-symbols-outlined group-hover/btn:translate-x-1 transition-transform">arrow_forward</span>
+                                </button>
                             </div>
                         </div>
                     ) : null}
 
-                    {/* ── BRAND HEALTH PILLS ── */}
-                    {loadingSummary ? (
-                        <div className="dash-card anim-up">
-                            <div className="h-4 w-24 rounded bg-white/[.04] animate-pulse mb-3" />
-                            <div className="grid grid-cols-4 gap-2">
-                                {[1,2,3,4].map(i => <div key={i} className="h-16 rounded-xl bg-white/[.03] animate-pulse" />)}
+                    {/* 2. TELEMETRY GRID (Brand Health) */}
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                        {[
+                            { label: 'Content Velocity', score: health?.contentVelocity, color: '#ff4d00', icon: 'speed' },
+                            { label: 'Creative DNA', score: health?.creativeOutput, color: '#8ff5ff', icon: 'fingerprint' },
+                            { label: 'Brand Matrix', score: health?.brandCompleteness, color: '#f3eff6', icon: 'grid_view' },
+                            { label: 'Trend Alignment', score: health?.trendReadiness, color: '#ff906d', icon: 'trending_up' },
+                        ].map((m, i) => (
+                            <div key={i} className="rounded-3xl border border-[#48474c]/20 bg-[#0e0e12] p-5 relative overflow-hidden group hover:border-white/20 transition-all">
+                                <span className="material-symbols-outlined absolute top-4 right-4 text-[#48474c] text-3xl opacity-20 group-hover:text-white/10 group-hover:scale-110 transition-all duration-500">{m.icon}</span>
+                                <p className="text-[#acaab0] text-xs font-bold uppercase tracking-widest mb-1">{m.label}</p>
+                                <p className="text-4xl font-['Space_Grotesk'] font-bold text-[#f3eff6] mb-3">
+                                    {Math.round(m.score || 0)}<span className="text-lg text-[#48474c] ml-1">/100</span>
+                                </p>
+                                {/* Micro progress bar */}
+                                <div className="h-1 w-full bg-[#1e1d24] rounded-full overflow-hidden">
+                                    <div className="h-full rounded-full transition-all duration-1000 ease-out" style={{ width: `${m.score || 0}%`, background: m.color, boxShadow: `0 0 10px ${m.color}` }}></div>
+                                </div>
                             </div>
-                        </div>
-                    ) : (
-                        <div className="dash-card anim-up" style={{ animationDelay: '60ms' }}>
-                            <div className="flex items-center justify-between mb-3">
-                                <div className="flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-emerald-400 text-lg">monitoring</span>
-                                    <span className="text-sm font-bold text-white">Brand Health</span>
-                                </div>
-                                <span className="text-xl font-black text-white">{health.overallScore || 0}<span className="text-xs text-slate-500 font-medium ml-0.5">/100</span></span>
-                            </div>
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                                {[
-                                    { label: 'Content', score: health.contentVelocity, color: '#8b5cf6', icon: 'article' },
-                                    { label: 'Creative', score: health.creativeOutput, color: '#06b6d4', icon: 'image' },
-                                    { label: 'Brand DNA', score: health.brandCompleteness, color: '#f59e0b', icon: 'fingerprint' },
-                                    { label: 'Trends', score: health.trendReadiness, color: '#34d399', icon: 'trending_up' },
-                                ].map((m, i) => (
-                                    <div key={i} className="flex flex-col items-center gap-1.5 p-3 rounded-xl bg-white/[.02] border border-white/[.04] hover:bg-white/[.05] transition-all">
-                                        {/* mini progress bar */}
-                                        <div className="w-full h-1 rounded-full bg-white/[.06] overflow-hidden">
-                                            <div className="h-full rounded-full transition-all duration-700"
-                                                style={{ width: `${Math.round(m.score || 0)}%`, background: m.color }} />
-                                        </div>
-                                        <span className="text-base font-black text-white">{Math.round(m.score || 0)}</span>
-                                        <span className="text-[10px] text-slate-500 uppercase tracking-wide font-bold">{m.label}</span>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* ── PERFORMANCE SNAPSHOT (compact) ── */}
-                    {(perfData || funnelData || blendedRoas) && (
-                        <div className="dash-card anim-up" style={{ animationDelay: '100ms' }}>
-                            <div className="flex items-center justify-between mb-3">
-                                <div className="flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-rose-400 text-lg">campaign</span>
-                                    <span className="text-sm font-bold text-white">Performance</span>
-                                    {anomalies.length > 0 && (
-                                        <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 animate-pulse">
-                                            {anomalies.length} alert{anomalies.length > 1 ? 's' : ''}
-                                        </span>
-                                    )}
-                                </div>
-                                <button onClick={() => navigate('/performance-marketing')}
-                                    className="text-xs text-slate-500 hover:text-rose-400 transition-colors flex items-center gap-1">
-                                    Deep Dive <span className="material-symbols-outlined text-sm">arrow_forward</span>
-                                </button>
-                            </div>
-                            {loadingAnalytics ? (
-                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                                    {[1,2,3,4].map(i => <div key={i} className="h-14 rounded-xl bg-white/[.03] animate-pulse" />)}
-                                </div>
-                            ) : (
-                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                                    {[
-                                        { label: 'Ad Spend', value: `₹${(perfData?.stats?.totalSpend || 0).toLocaleString()}`, color: '#f59e0b', icon: 'account_balance' },
-                                        { label: 'ROAS', value: `${blendedRoas?.mer?.toFixed(1) || perfData?.stats?.avgRoas || '—'}x`, color: parseFloat(perfData?.stats?.avgRoas) >= 2 ? '#34d399' : '#f43f5e', icon: 'show_chart' },
-                                        { label: 'Funnel CVR', value: `${funnelData?.analytics?.overview?.conversionRate || 0}%`, color: '#6366f1', icon: 'filter_alt' },
-                                        { label: 'Campaigns', value: perfData?.stats?.activeCampaigns || 0, color: '#8b5cf6', icon: 'campaign' },
-                                    ].map((m, i) => (
-                                        <div key={i} className="p-3 rounded-xl bg-white/[.02] border border-white/[.04] hover:bg-white/[.04] transition-all">
-                                            <div className="flex items-center gap-1.5 mb-1">
-                                                <span className="material-symbols-outlined text-xs" style={{ color: m.color }}>{m.icon}</span>
-                                                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wide">{m.label}</span>
-                                            </div>
-                                            <p className="text-base font-black text-white">{m.value}</p>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                    {/* ── INTELLIGENCE HUB (Trends / News / Ideas) ── */}
-                    <div className="dash-card overflow-hidden !p-0 anim-up" style={{ animationDelay: '140ms' }}>
-                        {/* Tab bar */}
-                        <div className="flex border-b border-white/[.05] bg-white/[.01]">
-                            {intelTabs.map(tab => (
-                                <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-                                    className={`intel-tab flex-1 px-4 py-3 text-xs font-black cursor-pointer border-b-2 transition-all ${activeTab === tab.id ? 'active border-violet-500 text-white' : 'text-slate-500 border-transparent hover:text-white'}`}>
-                                    {tab.label}
-                                </button>
-                            ))}
-                            <button onClick={() => { loadSummary(); loadTrends() }}
-                                className="px-4 text-slate-500 hover:text-white cursor-pointer transition-colors border-l border-white/[.05]">
-                                <span className={`material-symbols-outlined text-lg ${loadingSummary ? 'animate-spin' : ''}`}>refresh</span>
-                            </button>
-                        </div>
-
-                        <div className="p-5">
-                            {/* ── TRENDS TAB ── */}
-                            {activeTab === 'trends' && (
-                                <div className="space-y-2.5">
-                                    {(trendsLoading && trendingTopics.length === 0) ? (
-                                        <div className="flex items-center gap-2 py-6 text-slate-500 text-sm">
-                                            <span className="material-symbols-outlined animate-spin">progress_activity</span>
-                                            Scanning trends…
-                                        </div>
-                                    ) : trendingTopics.length > 0 ? trendingTopics.slice(0, 5).map((trend, i) => (
-                                        <div key={i} className="flex items-center gap-3 p-3.5 rounded-xl bg-white/[.02] border border-white/[.04] hover:bg-white/[.04] hover:border-rose-500/15 transition-all group"
-                                            style={{ animation: `slide-up .35s ease-out ${i * 50}ms both` }}>
-                                            <span className={`material-symbols-outlined text-xl shrink-0 ${trend.source === 'Grok xAI' ? 'text-orange-400' : 'text-rose-400'}`}>
-                                                {trend.source === 'Grok xAI' ? 'smart_toy' : 'trending_up'}
-                                            </span>
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex items-center gap-2 mb-0.5">
-                                                    <p className="text-sm font-bold text-white truncate">{trend.title}</p>
-                                                    {trend.urgency === 'high' && <span className="text-[10px] px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-400 font-bold shrink-0">🔥</span>}
-                                                </div>
-                                                {(trend.contentIdea || trend.angle) && (
-                                                    <p className="text-xs text-slate-500 truncate">💡 {trend.contentIdea || trend.angle}</p>
-                                                )}
-                                            </div>
-                                            <button onClick={() => navigate(`/content-studio?trend=${encodeURIComponent(trend.title)}&prompt=${encodeURIComponent(trend.contentIdea || `Create content about "${trend.title}"`)}`)}
-                                                className="shrink-0 px-3 py-1.5 rounded-lg bg-rose-500/10 text-rose-400 text-xs font-bold hover:bg-rose-500/20 transition-all cursor-pointer border border-rose-500/15 opacity-60 group-hover:opacity-100 flex items-center gap-1">
-                                                <span className="material-symbols-outlined text-sm">auto_awesome</span>
-                                                <span className="hidden sm:inline">Create</span>
-                                            </button>
-                                        </div>
-                                    )) : grokTrends.slice(0, 4).map((t, i) => (
-                                        <div key={i} className="p-3.5 rounded-xl bg-white/[.02] border border-white/[.04] hover:border-orange-500/20 transition-all"
-                                            style={{ animation: `slide-up .35s ease-out ${i * 50}ms both` }}>
-                                            <div className="flex items-start justify-between gap-2 mb-1">
-                                                <p className="text-sm font-bold text-white">{t.topic}</p>
-                                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold shrink-0 ${t.urgency === 'now' ? 'bg-rose-500/15 text-rose-400' : t.urgency === 'today' ? 'bg-amber-500/15 text-amber-400' : 'bg-slate-500/10 text-slate-400'}`}>
-                                                    {t.urgency === 'now' ? '🔴 NOW' : t.urgency === 'today' ? '🟡 Today' : '📅 This week'}
-                                                </span>
-                                            </div>
-                                            {t.marketingAngle && <p className="text-xs text-emerald-400">💡 {t.marketingAngle}</p>}
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-
-                            {/* ── NEWS TAB ── */}
-                            {activeTab === 'news' && (
-                                <div className="space-y-2.5">
-                                    {loadingSummary ? (
-                                        [1,2,3].map(i => <div key={i} className="h-16 rounded-xl bg-white/[.03] animate-pulse" />)
-                                    ) : businessNews.length > 0 ? businessNews.slice(0, 5).map((n, i) => (
-                                        <div key={i} className="flex items-start gap-3 p-3.5 rounded-xl bg-white/[.02] border border-white/[.04] hover:border-emerald-500/15 transition-all"
-                                            style={{ animation: `slide-up .35s ease-out ${i * 60}ms both` }}>
-                                            <span className="text-xl shrink-0">{n.emoji || '📰'}</span>
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex items-start justify-between gap-2">
-                                                    <p className="text-sm font-bold text-white leading-snug">{n.headline}</p>
-                                                    <span className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold ${n.category === 'funding' ? 'bg-green-500/10 text-green-400' : n.category === 'competitor' ? 'bg-rose-500/10 text-rose-400' : 'bg-cyan-500/10 text-cyan-400'}`}>{n.category}</span>
-                                                </div>
-                                                <p className="text-xs text-emerald-400 mt-1">💡 {n.relevance}</p>
-                                            </div>
-                                        </div>
-                                    )) : <p className="text-sm text-slate-500 py-6 text-center">No news yet — refresh to fetch latest.</p>}
-                                </div>
-                            )}
-
-                            {/* ── IDEAS TAB ── */}
-                            {activeTab === 'ideas' && (
-                                <div className="space-y-2.5">
-                                    {loadingSummary ? (
-                                        [1,2,3,4].map(i => <div key={i} className="h-20 rounded-xl bg-white/[.03] animate-pulse" />)
-                                    ) : grokContent.length > 0 ? grokContent.slice(0, 5).map((s, i) => (
-                                        <div key={i} className="flex items-start gap-3 p-3.5 rounded-xl bg-white/[.02] border border-white/[.04] hover:bg-white/[.04] hover:border-cyan-500/20 transition-all cursor-pointer group"
-                                            onClick={() => navigate(`/content-studio?goal=write&prompt=${encodeURIComponent(s.hook || s.title)}`)}
-                                            style={{ animation: `slide-up .35s ease-out ${i * 60}ms both` }}>
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex items-center gap-2 mb-1">
-                                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${s.platform === 'instagram' ? 'bg-pink-500/10 text-pink-400' : s.platform === 'twitter' ? 'bg-sky-500/10 text-sky-400' : 'bg-slate-500/10 text-slate-400'}`}>{s.platform}</span>
-                                                    <span className="text-[10px] text-slate-600 font-bold">{s.format}</span>
-                                                    {s.viralPotential === 'high' && <span className="text-[10px] text-orange-400 font-bold ml-auto">🔥 Viral</span>}
-                                                </div>
-                                                <p className="text-sm font-bold text-white group-hover:text-cyan-400 transition-colors line-clamp-1">{s.title}</p>
-                                                <p className="text-xs text-slate-500 line-clamp-2 mt-0.5">{s.hook}</p>
-                                            </div>
-                                            <span className="material-symbols-outlined text-sm text-slate-600 group-hover:text-cyan-400 transition-colors shrink-0 mt-1">arrow_forward</span>
-                                        </div>
-                                    )) : <p className="text-sm text-slate-500 py-6 text-center">No content ideas yet — refresh to generate.</p>}
-                                </div>
-                            )}
-                        </div>
+                        ))}
                     </div>
 
-                    {/* ── UPCOMING OPPORTUNITIES ── */}
-                    {upcoming.length > 0 && (
-                        <div className="dash-card anim-up" style={{ animationDelay: '180ms' }}>
-                            <div className="flex items-center justify-between mb-4">
-                                <div className="flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-amber-400 text-lg">celebration</span>
-                                    <span className="text-sm font-bold text-white">Upcoming Opportunities</span>
+                    {/* 3. PERFORMANCE ARCHITECTURE */}
+                    {(perfData || funnelData || blendedRoas) && (
+                        <div className="rounded-3xl border border-[#48474c]/20 bg-[#0e0e12] p-6 shadow-2xl overflow-hidden relative">
+                            {/* Glass highlights */}
+                            <div className="absolute top-0 inset-x-0 h-[1px] bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
+                            
+                            <div className="flex items-center justify-between mb-8">
+                                <div className="flex items-center gap-3">
+                                    <span className="material-symbols-outlined text-[#8ff5ff]">finance</span>
+                                    <h3 className="text-lg font-bold text-[#f3eff6]">Performance Vector</h3>
                                 </div>
-                                <button onClick={() => navigate('/smart-calendar')} className="text-xs text-violet-400 hover:text-violet-300 transition-colors font-bold cursor-pointer">View All →</button>
+                                <button className="text-xs text-[#48474c] hover:text-[#f3eff6] font-bold uppercase tracking-widest transition-colors flex items-center gap-1 cursor-pointer" onClick={() => navigate('/performance-marketing')}>
+                                    Deep Dive <span className="material-symbols-outlined text-[14px]">open_in_new</span>
+                                </button>
                             </div>
-                            <div className="flex gap-3 overflow-x-auto pb-1 -mx-1 px-1" style={{ scrollbarWidth: 'none' }}>
-                                {upcoming.slice(0, 7).map((e, i) => {
-                                    const color = EVENT_COLORS[e.type] || EVENT_COLORS.global
-                                    return (
-                                        <button key={i} onClick={() => navigate(`/content-studio?occasion=${encodeURIComponent(e.name)}&tone=${e.tone}`)}
-                                            className="shrink-0 w-36 rounded-xl p-3 text-left bg-white/[.02] hover:bg-white/[.05] transition-all cursor-pointer border flex flex-col gap-2"
-                                            style={{ borderColor: color.border + '25', animation: `slide-up .35s ease-out ${i * 40}ms both` }}>
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-xl">{e.emoji}</span>
-                                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${e.daysUntil <= 3 ? 'bg-rose-500/20 text-rose-400' : e.daysUntil <= 7 ? 'bg-amber-500/20 text-amber-400' : 'bg-violet-500/15 text-violet-400'}`}>
-                                                    {e.daysUntil === 0 ? 'TODAY' : e.daysUntil === 1 ? 'TMR' : `${e.daysUntil}d`}
-                                                </span>
-                                            </div>
-                                            <p className="text-xs font-bold text-white leading-tight line-clamp-2">{e.name}</p>
-                                        </button>
-                                    )
-                                })}
+
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-y-8 gap-x-4">
+                                <div>
+                                    <p className="text-[#acaab0] text-xs font-bold uppercase tracking-widest mb-1">Total Ad Spend</p>
+                                    <p className="text-3xl font-['Space_Grotesk'] font-bold text-[#ff4d00]">₹{(perfData?.stats?.totalSpend || 0).toLocaleString()}</p>
+                                    <p className="text-[#48474c] text-[10px] uppercase font-bold mt-1 tracking-wider"><span className="text-green-500">Live</span> Meta + Google</p>
+                                </div>
+                                <div>
+                                    <p className="text-[#acaab0] text-xs font-bold uppercase tracking-widest mb-1">Blended ROAS</p>
+                                    <p className="text-3xl font-['Space_Grotesk'] font-bold text-[#8ff5ff]">{blendedRoas?.mer?.toFixed(1) || perfData?.stats?.avgRoas || '—'}x</p>
+                                    <p className="text-[#48474c] text-[10px] uppercase font-bold mt-1 tracking-wider">Across Network</p>
+                                </div>
+                                <div>
+                                    <p className="text-[#acaab0] text-xs font-bold uppercase tracking-widest mb-1">Funnel CVP</p>
+                                    <p className="text-3xl font-['Space_Grotesk'] font-bold text-[#f3eff6]">{funnelData?.analytics?.overview?.conversionRate || 0}%</p>
+                                    <p className="text-[#48474c] text-[10px] uppercase font-bold mt-1 tracking-wider">Macro Conversion</p>
+                                </div>
+                                <div>
+                                    <p className="text-[#acaab0] text-xs font-bold uppercase tracking-widest mb-1">Active Flights</p>
+                                    <p className="text-3xl font-['Space_Grotesk'] font-bold text-[#f3eff6]">{perfData?.stats?.activeCampaigns || 0}</p>
+                                    <p className="text-[#48474c] text-[10px] uppercase font-bold mt-1 tracking-wider">Campaigns Live</p>
+                                </div>
                             </div>
                         </div>
                     )}
                 </div>
 
                 {/* ════ RIGHT COLUMN (4 cols) ════ */}
-                <div className="lg:col-span-4 space-y-4">
-
-                    {/* ── STUDIOS GRID ── */}
-                    <div className="dash-card anim-up" style={{ animationDelay: '40ms' }}>
-                        <div className="flex items-center gap-2 mb-4">
-                            <span className="material-symbols-outlined text-violet-400 text-lg">apps</span>
-                            <span className="text-sm font-bold text-white">Studios</span>
-                        </div>
-                        <div className="grid grid-cols-2 gap-2">
-                            {studios.map((s, i) => (
+                <div className="col-span-12 lg:col-span-4 flex flex-col gap-6">
+                    
+                    {/* ACTIVE STUDIOS LIST */}
+                    <div className="rounded-3xl border border-[#48474c]/20 bg-[#0e0e12] p-6 relative overflow-hidden">
+                        <h3 className="text-sm font-bold text-[#f3eff6] uppercase tracking-widest mb-6">Active Studios</h3>
+                        <div className="space-y-1">
+                            {studios.slice(0, 5).map((s, i) => (
                                 <button key={i} onClick={() => navigate(s.path)}
-                                    className={`studio-btn flex items-center gap-2.5 p-3 rounded-xl bg-gradient-to-br ${s.bg} border border-white/[.04] hover:border-white/[.12] cursor-pointer active:scale-95`}
-                                    style={{ animation: `slide-up .4s ease-out ${i * 40}ms both` }}>
-                                    <span className="material-symbols-outlined text-xl" style={{ color: s.color }}>{s.icon}</span>
-                                    <span className="text-xs font-black text-white uppercase tracking-tight">{s.label}</span>
+                                    className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-[#1e1d24] transition-colors group cursor-pointer border border-transparent hover:border-[#48474c]/30">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-lg bg-[#121217] flex items-center justify-center border border-[#48474c]/20 group-hover:border-[#ff4d00]/50 transition-colors">
+                                            <span className="material-symbols-outlined text-[16px] text-[#acaab0] group-hover:text-[#ff4d00]" style={s.color === '#FF4D00' ? {color: '#FF4D00'} : {}}>{s.icon}</span>
+                                        </div>
+                                        <span className="text-sm font-medium text-[#acaab0] group-hover:text-[#f3eff6] transition-colors">{s.label}</span>
+                                    </div>
+                                    <span className="material-symbols-outlined text-[#48474c] group-hover:text-[#f3eff6] transition-colors">arrow_forward</span>
                                 </button>
                             ))}
                         </div>
                     </div>
 
-                    {/* ── ALERTS / ALL CLEAR ── */}
-                    {(() => {
-                        const alerts = []
-                        anomalies.forEach(a => alerts.push({ icon: 'warning', title: a.title || 'Anomaly Detected', desc: a.description || `${a.metric} is ${a.direction || 'abnormal'}`, color: '#f43f5e', path: '/performance-marketing' }))
-                        if (funnelData?.analytics?.overview?.conversionRate < 15 && funnelData?.analytics?.overview?.totalEntries > 5)
-                            alerts.push({ icon: 'filter_alt', title: `Low Funnel CVR: ${funnelData.analytics.overview.conversionRate}%`, desc: 'Below 15% benchmark.', color: '#6366f1', path: '/funnel-studio' })
-                        if (perfData?.stats?.totalSpend > 0 && (perfData?.stats?.avgRoas || 0) < 1)
-                            alerts.push({ icon: 'trending_down', title: 'ROAS Below 1x', desc: 'Ad spend exceeds returns.', color: '#f43f5e', path: '/performance-marketing' })
-
-                        return alerts.length > 0 ? (
-                            <div className="dash-card border border-rose-500/15 anim-up" style={{ animationDelay: '80ms' }}>
-                                <div className="flex items-center gap-2 mb-3">
-                                    <span className="material-symbols-outlined text-rose-400 text-lg">notifications_active</span>
-                                    <span className="text-sm font-bold text-white">Alerts</span>
-                                    <span className="ml-auto px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-400 text-[10px] font-black">{alerts.length}</span>
-                                </div>
-                                <div className="space-y-2">
-                                    {alerts.slice(0, 4).map((a, i) => (
-                                        <button key={i} onClick={() => navigate(a.path)}
-                                            className="w-full flex items-start gap-2.5 p-2.5 rounded-xl bg-white/[.02] border border-white/[.04] hover:border-rose-500/20 transition-all text-left cursor-pointer group">
-                                            <span className="material-symbols-outlined text-base mt-0.5 shrink-0" style={{ color: a.color }}>{a.icon}</span>
-                                            <div className="flex-1 min-w-0">
-                                                <p className="text-xs font-bold text-white">{a.title}</p>
-                                                <p className="text-[11px] text-slate-500">{a.desc}</p>
-                                            </div>
-                                            <span className="material-symbols-outlined text-sm text-slate-600 group-hover:text-rose-400 transition-colors shrink-0 mt-0.5">arrow_forward</span>
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="dash-card border border-emerald-500/10 anim-up" style={{ animationDelay: '80ms' }}>
-                                <div className="flex items-center gap-3">
-                                    <div className="size-9 rounded-xl bg-emerald-500/10 flex items-center justify-center shrink-0">
-                                        <span className="material-symbols-outlined text-emerald-400">verified</span>
-                                    </div>
-                                    <div>
-                                        <p className="text-sm font-bold text-white">All Clear</p>
-                                        <p className="text-xs text-slate-500">No alerts across your studios</p>
-                                    </div>
-                                </div>
-                            </div>
-                        )
-                    })()}
-
-                    {/* ── D2C PULSE ── */}
-                    <div className="dash-card border border-emerald-500/10 anim-up" style={{ animationDelay: '120ms' }}>
-                        <div className="flex items-center justify-between mb-3">
+                    {/* D2C PULSE */}
+                    <div className="rounded-3xl border border-[#48474c]/20 bg-[#0e0e12] p-6 relative">
+                        <div className="flex items-center justify-between mb-6">
                             <div className="flex items-center gap-2">
-                                <span className="material-symbols-outlined text-emerald-400 text-lg">storefront</span>
-                                <span className="text-sm font-bold text-white">D2C Pulse</span>
+                                <span className="material-symbols-outlined text-[#8ff5ff] text-xl">storefront</span>
+                                <h3 className="text-sm font-bold text-[#f3eff6] uppercase tracking-widest">D2C Pulse</h3>
                             </div>
-                            {d2cSnapshot?.connected && <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Live</span>}
+                            <div className="flex items-center gap-1.5">
+                                <div className={`w-2 h-2 rounded-full ${d2cSnapshot?.connected ? 'bg-[#8ff5ff] animate-pulse' : 'bg-red-500'}`}></div>
+                                <span className="text-[10px] font-bold text-[#48474c] uppercase">{d2cSnapshot?.connected ? 'Live Sync' : 'Disconnected'}</span>
+                            </div>
                         </div>
-                        {loadingD2C ? (
-                            <div className="grid grid-cols-3 gap-2">
-                                {[1,2,3].map(i => <div key={i} className="h-14 rounded-xl bg-white/[.03] animate-pulse" />)}
-                            </div>
-                        ) : d2cSnapshot?.connected ? (
-                            <>
-                                <div className="grid grid-cols-3 gap-2 mb-3">
-                                    {[
-                                        { label: 'Revenue', value: `₹${(d2cSnapshot.weeklyRevenue || 0).toLocaleString()}`, color: '#34d399' },
-                                        { label: 'Orders', value: d2cSnapshot.weeklyOrders || 0, color: '#8b5cf6' },
-                                        { label: 'AOV', value: `₹${d2cSnapshot.aov || 0}`, color: '#06b6d4' },
-                                    ].map((m, i) => (
-                                        <div key={i} className="p-2.5 rounded-xl bg-white/[.02] border border-white/[.04] text-center">
-                                            <p className="text-sm font-black text-white">{m.value}</p>
-                                            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wide">{m.label}</p>
-                                        </div>
-                                    ))}
+
+                        {d2cSnapshot?.connected ? (
+                            <div className="space-y-4">
+                                <div className="border border-[#48474c]/20 rounded-2xl p-4 bg-[#121217]">
+                                    <p className="text-[#acaab0] text-[10px] font-bold uppercase tracking-widest mb-1">Weekly Volume</p>
+                                    <p className="text-2xl font-['Space_Grotesk'] font-bold text-[#f3eff6] flex items-baseline gap-1">
+                                        ₹{(d2cSnapshot.weeklyRevenue || 0).toLocaleString()} <span className="text-xs text-[#8ff5ff]">+4.2%</span>
+                                    </p>
                                 </div>
-                                <button onClick={() => navigate('/d2c-analytics')} className="w-full py-2 rounded-xl bg-emerald-500/5 text-emerald-400 text-xs font-bold hover:bg-emerald-500/10 transition-all cursor-pointer border border-emerald-500/10">
-                                    Open D2C Studio →
-                                </button>
-                            </>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="border border-[#48474c]/20 rounded-2xl p-4 bg-[#121217]">
+                                        <p className="text-[#acaab0] text-[10px] font-bold uppercase tracking-widest mb-1">Orders</p>
+                                        <p className="text-xl font-['Space_Grotesk'] font-bold text-[#f3eff6]">{d2cSnapshot.weeklyOrders || 0}</p>
+                                    </div>
+                                    <div className="border border-[#48474c]/20 rounded-2xl p-4 bg-[#121217]">
+                                        <p className="text-[#acaab0] text-[10px] font-bold uppercase tracking-widest mb-1">Velocity</p>
+                                        <p className="text-xl font-['Space_Grotesk'] font-bold text-[#f3eff6]">High</p>
+                                    </div>
+                                </div>
+                            </div>
                         ) : (
-                            <div className="text-center py-3">
-                                <p className="text-xs text-slate-500 mb-3">Connect Shopify for real-time D2C intelligence</p>
-                                <button onClick={() => navigate('/d2c-analytics')} className="w-full py-2 rounded-xl bg-emerald-500/10 text-emerald-400 text-xs font-bold hover:bg-emerald-500/20 transition-all cursor-pointer border border-emerald-500/20 flex items-center justify-center gap-1.5">
-                                    <span className="material-symbols-outlined text-sm">link</span>Connect Store →
-                                </button>
+                            <div className="text-center py-6">
+                                <span className="material-symbols-outlined text-[#48474c] text-3xl mb-2">sync_disabled</span>
+                                <p className="text-[#acaab0] text-xs mb-4">Shopify API disconnected.</p>
+                                <button className="px-4 py-2 bg-[#121217] border border-[#48474c]/30 rounded-lg text-xs font-bold text-[#f3eff6] hover:bg-[#48474c]/20 transition-colors" onClick={() => navigate('/d2c-analytics')}>Configure Source</button>
                             </div>
                         )}
                     </div>
 
-                    {/* ── TRENDING KEYWORDS ── */}
-                    {grokSeo?.risingKeywords?.length > 0 && (
-                        <div className="dash-card border border-amber-500/10 anim-up" style={{ animationDelay: '160ms' }}>
-                            <div className="flex items-center gap-2 mb-3">
-                                <span className="material-symbols-outlined text-amber-400 text-lg">search</span>
-                                <span className="text-sm font-bold text-white">Trending Keywords</span>
-                            </div>
-                            <div className="space-y-2">
-                                {grokSeo.risingKeywords.slice(0, 5).map((k, i) => (
-                                    <div key={i} className="flex items-center justify-between p-2.5 rounded-lg bg-white/[.02] hover:bg-white/[.04] transition-all">
-                                        <div className="min-w-0 flex-1">
-                                            <p className="text-xs font-medium text-white truncate">"{k.keyword}"</p>
-                                            <p className="text-[10px] text-slate-500">{k.intent} intent</p>
-                                        </div>
-                                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold shrink-0 ml-2 ${k.trend === 'breakout' ? 'bg-rose-500/10 text-rose-400' : 'bg-emerald-500/10 text-emerald-400'}`}>{k.growthRate}</span>
-                                    </div>
-                                ))}
-                            </div>
-                            <button onClick={() => navigate('/seo-studio')} className="w-full mt-3 py-2 rounded-xl bg-amber-500/5 text-amber-400 text-xs font-bold hover:bg-amber-500/10 transition-all cursor-pointer border border-amber-500/10">
-                                Open SEO Studio →
-                            </button>
+                    {/* SYSTEM STATUS */}
+                    <div className="rounded-3xl border border-[#48474c]/20 bg-[#0e0e12] p-6 relative overflow-hidden">
+                        <div className="flex items-center gap-2 mb-6">
+                            <span className="material-symbols-outlined text-[#acaab0] text-xl">router</span>
+                            <h3 className="text-sm font-bold text-[#f3eff6] uppercase tracking-widest">System Matrix</h3>
                         </div>
-                    )}
 
-                    {/* ── QUICK WIN (next event) ── */}
-                    {upcoming.length > 0 && (
-                        <div className="dash-card bg-gradient-to-br from-amber-500/5 to-orange-500/5 border border-amber-500/10 anim-up" style={{ animationDelay: '200ms' }}>
-                            <div className="flex items-center gap-2 mb-2">
-                                <span className="material-symbols-outlined text-amber-400 text-lg">tips_and_updates</span>
-                                <span className="text-sm font-bold text-white">Quick Win</span>
+                        <div className="space-y-4">
+                            {/* Threat / Alerts */}
+                            {anomalies.length > 0 ? (
+                                <div className="flex items-start gap-3 p-3 bg-red-500/10 border border-red-500/20 rounded-xl">
+                                    <span className="material-symbols-outlined text-red-500 text-sm mt-0.5">warning</span>
+                                    <div>
+                                        <p className="text-xs font-bold text-red-400">Anomaly Detected</p>
+                                        <p className="text-[10px] text-red-500/80">{anomalies[0]?.metric || 'Data drift'} threshold breached</p>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="flex items-center justify-between">
+                                    <span className="text-[#acaab0] text-xs font-bold">Network Anomalies</span>
+                                    <span className="text-[#8ff5ff] text-xs font-bold px-2 py-0.5 bg-[#8ff5ff]/10 rounded border border-[#8ff5ff]/20">0 Threats</span>
+                                </div>
+                            )}
+
+                            <div className="flex items-center justify-between">
+                                <span className="text-[#acaab0] text-xs font-bold">API Router</span>
+                                <span className="text-xs font-bold text-[#f3eff6]">Optimal</span>
                             </div>
-                            <p className="text-sm text-slate-300 mb-3">
-                                <span className="text-base mr-1">{upcoming[0].emoji}</span>
-                                <strong>{upcoming[0].name}</strong> is {upcoming[0].daysUntil === 0 ? 'today' : upcoming[0].daysUntil === 1 ? 'tomorrow' : `in ${upcoming[0].daysUntil} days`}
-                            </p>
-                            <button onClick={() => navigate(`/content-studio?occasion=${encodeURIComponent(upcoming[0].name)}&tone=${upcoming[0].tone}`)}
-                                className="w-full py-2 rounded-xl bg-amber-500/10 text-amber-300 text-xs font-bold hover:bg-amber-500/20 transition-all cursor-pointer flex items-center justify-center gap-1.5 border border-amber-500/20">
-                                <span className="material-symbols-outlined text-sm">auto_awesome</span>Generate Content
-                            </button>
+                            
+                            <div className="flex items-center justify-between">
+                                <span className="text-[#acaab0] text-xs font-bold text-nowrap">Local Context</span>
+                                <span className="text-[10px] font-mono text-[#48474c] bg-[#121217] px-2 py-0.5 rounded border border-[#48474c]/20">0x{activeBrand?._id?.slice(-6) || 'a82f3'}</span>
+                            </div>
+                            
+                            {/* Visual Divider */}
+                            <div className="h-[1px] w-full bg-[#48474c]/20 my-2"></div>
+                            
+                            <div className="flex items-center justify-between">
+                                <span className="text-xs font-bold text-[#48474c]">System Check</span>
+                                <span className="text-[#48474c] text-[10px] font-bold tracking-widest uppercase">Pass</span>
+                            </div>
                         </div>
-                    )}
+                    </div>
+
                 </div>
             </div>
 

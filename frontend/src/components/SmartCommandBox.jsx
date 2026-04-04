@@ -354,7 +354,7 @@ export default function SmartCommandBox({ variant = 'dashboard', className = '' 
         <div className={`relative ${className}`}>
             <div className={`rounded-2xl border transition-all duration-300 overflow-hidden ${expanded
                 ? 'border-primary/30 bg-gradient-to-b from-[#1a1f2e] to-[#141820] shadow-xl shadow-primary/5'
-                : 'border-white/10 bg-gradient-to-r from-primary/[0.06] to-purple-500/[0.04] hover:border-primary/20'
+                : 'border-white/10 bg-gradient-to-r from-primary/[0.06] to-[#FF7A00]/[0.04] hover:border-primary/20'
                 }`}>
 
                 {/* Header — only when expanded */}
@@ -417,11 +417,11 @@ export default function SmartCommandBox({ variant = 'dashboard', className = '' 
                                                         <span className="material-symbols-outlined text-xs">content_copy</span> Copy Text
                                                     </button>
                                                     <button onClick={() => openInContentStudio(msg.data.content)}
-                                                        className="flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 cursor-pointer transition-all font-medium">
+                                                        className="flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-lg bg-[#FF4D00]/10 text-[#FF4D00] hover:bg-[#FF4D00]/20 cursor-pointer transition-all font-medium">
                                                         <span className="material-symbols-outlined text-xs">edit</span> Refine in Studio
                                                     </button>
                                                     <button onClick={() => openInCreativeStudio(msg.data.content)}
-                                                        className="flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-lg bg-violet-500/10 text-violet-400 hover:bg-violet-500/20 cursor-pointer transition-all font-medium">
+                                                        className="flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-lg bg-[#FF4D00]/10 text-[#FF4D00] hover:bg-[#FF4D00]/20 cursor-pointer transition-all font-medium">
                                                         <span className="material-symbols-outlined text-xs">palette</span> Make Visual
                                                     </button>
                                                 </div>
@@ -440,39 +440,39 @@ export default function SmartCommandBox({ variant = 'dashboard', className = '' 
                                                 )}
 
                                                 {/* Structured prompt breakdown — user can see what went into the image */}
-                                                <div className="p-3.5 rounded-xl bg-violet-500/[0.06] border border-violet-500/15 space-y-2">
+                                                <div className="p-3.5 rounded-xl bg-[#FF4D00]/[0.06] border border-[#FF4D00]/15 space-y-2">
                                                     {msg.data.textOverlay && (
                                                         <div className="flex items-start gap-2">
-                                                            <span className="material-symbols-outlined text-violet-400 text-xs mt-0.5">edit_note</span>
+                                                            <span className="material-symbols-outlined text-[#FF4D00] text-xs mt-0.5">edit_note</span>
                                                             <div>
-                                                                <span className="text-[10px] font-bold text-violet-400/70 uppercase tracking-wider">Text on Image</span>
+                                                                <span className="text-[10px] font-bold text-[#FF4D00]/70 uppercase tracking-wider">Text on Image</span>
                                                                 <p className="text-sm text-white font-medium">{msg.data.textOverlay}</p>
                                                             </div>
                                                         </div>
                                                     )}
                                                     {msg.data.style && (
                                                         <div className="flex items-start gap-2">
-                                                            <span className="material-symbols-outlined text-violet-400 text-xs mt-0.5">palette</span>
+                                                            <span className="material-symbols-outlined text-[#FF4D00] text-xs mt-0.5">palette</span>
                                                             <div>
-                                                                <span className="text-[10px] font-bold text-violet-400/70 uppercase tracking-wider">Style</span>
+                                                                <span className="text-[10px] font-bold text-[#FF4D00]/70 uppercase tracking-wider">Style</span>
                                                                 <p className="text-xs text-slate-300">{msg.data.style}</p>
                                                             </div>
                                                         </div>
                                                     )}
                                                     {msg.data.tagline && (
                                                         <div className="flex items-start gap-2">
-                                                            <span className="material-symbols-outlined text-violet-400 text-xs mt-0.5">format_quote</span>
+                                                            <span className="material-symbols-outlined text-[#FF4D00] text-xs mt-0.5">format_quote</span>
                                                             <div>
-                                                                <span className="text-[10px] font-bold text-violet-400/70 uppercase tracking-wider">Brand Tagline</span>
+                                                                <span className="text-[10px] font-bold text-[#FF4D00]/70 uppercase tracking-wider">Brand Tagline</span>
                                                                 <p className="text-xs text-slate-400 italic">"{msg.data.tagline}"</p>
                                                             </div>
                                                         </div>
                                                     )}
                                                     {msg.data.productMention && (
                                                         <div className="flex items-start gap-2">
-                                                            <span className="material-symbols-outlined text-violet-400 text-xs mt-0.5">inventory_2</span>
+                                                            <span className="material-symbols-outlined text-[#FF4D00] text-xs mt-0.5">inventory_2</span>
                                                             <div>
-                                                                <span className="text-[10px] font-bold text-violet-400/70 uppercase tracking-wider">Product</span>
+                                                                <span className="text-[10px] font-bold text-[#FF4D00]/70 uppercase tracking-wider">Product</span>
                                                                 <p className="text-xs text-slate-300">{msg.data.productMention}</p>
                                                             </div>
                                                         </div>
@@ -493,7 +493,7 @@ export default function SmartCommandBox({ variant = 'dashboard', className = '' 
                                                                 <span className="material-symbols-outlined text-xs">refresh</span> Regenerate
                                                             </button>
                                                             <button onClick={() => openInCreativeStudio(msg.data.imagePrompt)}
-                                                                className="flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-lg bg-violet-500/10 text-violet-400 hover:bg-violet-500/20 cursor-pointer transition-all font-medium">
+                                                                className="flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-lg bg-[#FF4D00]/10 text-[#FF4D00] hover:bg-[#FF4D00]/20 cursor-pointer transition-all font-medium">
                                                                 <span className="material-symbols-outlined text-xs">tune</span> Edit in Studio
                                                             </button>
                                                         </>
@@ -522,14 +522,14 @@ export default function SmartCommandBox({ variant = 'dashboard', className = '' 
                                         {msg.intent === 'brainstorm' && msg.data?.ideas?.length > 0 && (
                                             <div className="mb-3 space-y-2">
                                                 {msg.data.ideas.map((idea, j) => (
-                                                    <div key={j} className="p-3 rounded-xl bg-violet-500/[0.06] border border-violet-500/15">
-                                                        <p className="text-xs font-bold text-violet-300 mb-1">💡 {idea.title}</p>
+                                                    <div key={j} className="p-3 rounded-xl bg-[#FF4D00]/[0.06] border border-[#FF4D00]/15">
+                                                        <p className="text-xs font-bold text-[#FF7A00] mb-1">💡 {idea.title}</p>
                                                         <p className="text-[11px] text-slate-300 leading-relaxed">{idea.description}</p>
                                                     </div>
                                                 ))}
                                                 <div className="flex gap-2 mt-2">
                                                     <button onClick={openInBrainstormStudio}
-                                                        className="flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-lg bg-violet-500/10 text-violet-400 hover:bg-violet-500/20 cursor-pointer transition-all font-medium">
+                                                        className="flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-lg bg-[#FF4D00]/10 text-[#FF4D00] hover:bg-[#FF4D00]/20 cursor-pointer transition-all font-medium">
                                                         <span className="material-symbols-outlined text-xs">psychology</span> Deep Dive in Brainstorm Studio
                                                     </button>
                                                 </div>

@@ -346,7 +346,7 @@ export default function CreditsPage() {
                     <span className="material-symbols-outlined text-2xl animate-pulse">local_fire_department</span>
                     <div>
                         <p className="font-bold text-sm">{dailyToast.message}</p>
-                        <p className="text-xs opacity-80">🔥 Streak: {dailyToast.streak} days</p>
+                        <p className="text-xs opacity-80"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">local_fire_department</span> Streak: {dailyToast.streak} days</p>
                     </div>
                     <button onClick={() => setDailyToast(null)} className="ml-2 opacity-60 hover:opacity-100">✕</button>
                 </div>
@@ -716,7 +716,7 @@ export default function CreditsPage() {
                                     {/* Referral */}
                                     <div className="glass-panel rounded-2xl border border-white/[0.08] p-6">
                                         <h3 className="text-base font-bold text-white flex items-center gap-2 mb-4">
-                                            <span className="material-symbols-outlined text-lg text-purple-400">group_add</span>
+                                            <span className="material-symbols-outlined text-lg text-[#FF4D00]">group_add</span>
                                             Referral Program
                                         </h3>
                                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

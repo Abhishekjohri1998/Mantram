@@ -33,6 +33,7 @@ import { getMuApiGenerationStatus, resubmitMuApiTask } from './muapiClient.js';
 import { getPastProjects } from './selfLearning.js';
 import { callMultimodalAgent } from '../shared/agentUtils.js';
 import Product from '../../models/Product.js';
+import { inferBrandLanguage, buildLanguageDirective } from '../../utils/brandLanguage.js';
 
 // ── Helper: Parse JSON from any AI response ──
 function parseAgentJSON(text) {
@@ -90,13 +91,20 @@ async function callFastAgent(systemPrompt, userPrompt, temperature = 0.3, maxTok
     return parseAgentJSON(result.text || '');
 }
 
-// ── Helper: Load brand + past projects for context injection ──
+// ── Helper: Load brand + past projects + language directive for context injection ──
 async function loadContext(brandId, userId) {
     const brand = await Brand.findById(brandId).lean();
     const pastProjects = await getPastProjects(brandId, userId);
     const brandContext = buildBrandContext(brand);
     const styleMemory = buildStyleMemory(pastProjects);
-    return { brand, brandContext, styleMemory };
+    // Language inference — brand-aware regional language enforcement
+    const langInfo = inferBrandLanguage(brand);
+    const languageDirective = buildLanguageDirective(
+        langInfo,
+        brand?.name || '',
+        brand?.dna?.targetAudience || ''
+    );
+    return { brand, brandContext, styleMemory, langInfo, languageDirective };
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -156,7 +164,11 @@ export async function videoVisualGroundingNode(state) {
 export async function brainstormNode(state) {
     console.log('🧠 Node: Brainstorm — generating concepts...');
 
-    const { brandContext, styleMemory } = await loadContext(state.brandId, state.userId);
+    const { brandContext, styleMemory, langInfo, languageDirective } = await loadContext(state.brandId, state.userId);
+
+    if (langInfo.isRegional) {
+        console.log(`🌍 Video Brainstorm: Language directive active — ${langInfo.displayName} (${langInfo.source})`);
+    }
 
     // Build detailed image descriptions
     let imageContext = '';
@@ -194,8 +206,13 @@ export async function brainstormNode(state) {
         groundingContext,
     ].filter(Boolean).join('\n');
 
+    // Inject language directive into system prompt (prepend to BRAINSTORM_PROMPT)
+    const systemPrompt = languageDirective
+        ? `${languageDirective}\n\n${BRAINSTORM_PROMPT(brandContext, styleMemory)}`
+        : BRAINSTORM_PROMPT(brandContext, styleMemory);
+
     const result = await callAgent(
-        BRAINSTORM_PROMPT(brandContext, styleMemory),
+        systemPrompt,
         userPrompt,
         0.8 // Higher creativity for brainstorming
     );
@@ -203,6 +220,7 @@ export async function brainstormNode(state) {
     return {
         ...state,
         concepts: result.concepts || [],
+        detectedLanguage: langInfo,
         status: 'brainstorm',
     };
 }
@@ -213,10 +231,14 @@ export async function brainstormNode(state) {
 export async function scriptDirectorNode(state) {
     console.log('🎬 Node: Script Director — writing script...');
 
-    const { brandContext, styleMemory } = await loadContext(state.brandId, state.userId);
+    const { brandContext, styleMemory, langInfo, languageDirective } = await loadContext(state.brandId, state.userId);
 
     const selectedConcept = state.concepts[state.selectedConceptIndex];
     if (!selectedConcept) throw new Error('No concept selected');
+
+    if (langInfo.isRegional) {
+        console.log(`🌍 Video Script: Language directive active — ${langInfo.displayName} (${langInfo.source})`);
+    }
 
     // Build detailed image context
     let imageContext = '';
@@ -256,12 +278,20 @@ export async function scriptDirectorNode(state) {
         state.brief ? `ORIGINAL BRIEF: ${state.brief}` : '',
         imageContext,
         groundingContext,
+        // Reinforce language in user prompt too for script dialogue
+        langInfo.isRegional ? `\nCRITICAL: All dialogue, voiceover text, and onscreen text in this script MUST be written in ${langInfo.displayName}. The backend prompt for the video model can remain in English for technical accuracy.` : '',
     ].filter(Boolean).join('\n');
 
     // Pass the model that will actually render this script — prompts are structurally different per model
     const targetModel = state.routing?.selectedModel || 'seedance-2.0';
+
+    // Inject language directive into system prompt (prepend to SCRIPT_DIRECTOR_PROMPT)
+    const systemPrompt = languageDirective
+        ? `${languageDirective}\n\n${SCRIPT_DIRECTOR_PROMPT(brandContext, styleMemory, targetModel)}`
+        : SCRIPT_DIRECTOR_PROMPT(brandContext, styleMemory, targetModel);
+
     const result = await callAgent(
-        SCRIPT_DIRECTOR_PROMPT(brandContext, styleMemory, targetModel),
+        systemPrompt,
         userPrompt,
         0.6
     );
@@ -275,6 +305,7 @@ export async function scriptDirectorNode(state) {
         },
         backendPrompt: result.backendPrompt || '',
         title: selectedConcept.title,
+        detectedLanguage: langInfo,
         status: 'script',
     };
 }

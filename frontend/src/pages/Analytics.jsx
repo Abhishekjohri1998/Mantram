@@ -129,7 +129,7 @@ export default function Analytics() {
             <div className="glass-panel rounded-2xl p-6 mb-6 border border-white/[0.06] overflow-hidden">
                 <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center gap-3">
-                        <div className="size-10 rounded-xl bg-gradient-to-br from-rose-500/20 to-violet-500/20 flex items-center justify-center border border-rose-500/20">
+                        <div className="size-10 rounded-xl bg-gradient-to-br from-rose-500/20 to-[#FF7A00]/20 flex items-center justify-center border border-rose-500/20">
                             <span className="material-symbols-outlined text-rose-400">radar</span>
                         </div>
                         <div>
@@ -138,7 +138,7 @@ export default function Analytics() {
                         </div>
                     </div>
                     <button onClick={generateStrategy} disabled={strategyLoading || !radar}
-                        className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-primary/20 to-violet-500/20 border border-primary/30 text-primary font-medium text-sm hover:from-primary/30 hover:to-violet-500/30 transition-all cursor-pointer disabled:opacity-50">
+                        className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-primary/20 to-[#FF7A00]/20 border border-primary/30 text-primary font-medium text-sm hover:from-primary/30 hover:to-[#FF7A00]/30 transition-all cursor-pointer disabled:opacity-50">
                         <span className="material-symbols-outlined text-sm">{strategyLoading ? 'progress_activity' : 'auto_awesome'}</span>
                         {strategyLoading ? 'Analyzing...' : 'Generate AI Strategy'}
                     </button>
@@ -284,8 +284,8 @@ export default function Analytics() {
                                         </div>
                                     </div>
                                     <div className="flex flex-col gap-4">
-                                        <div className="p-5 rounded-xl bg-gradient-to-br from-violet-500/5 to-cyan-500/5 border border-violet-500/10">
-                                            <h4 className="text-sm font-bold text-violet-400 flex items-center gap-2 mb-3">
+                                        <div className="p-5 rounded-xl bg-gradient-to-br from-[#FF4D00]/5 to-cyan-500/5 border border-[#FF4D00]/10">
+                                            <h4 className="text-sm font-bold text-[#FF4D00] flex items-center gap-2 mb-3">
                                                 <span className="material-symbols-outlined text-sm">lightbulb</span>Location Insights
                                             </h4>
                                             <div className="space-y-2 text-sm text-slate-300 leading-relaxed">
@@ -295,7 +295,7 @@ export default function Analytics() {
                                             </div>
                                         </div>
                                         <div className="p-5 rounded-xl bg-white/[0.02] border border-white/[0.04]">
-                                            <h4 className="text-sm font-bold text-white mb-3">🎯 Recommendation</h4>
+                                            <h4 className="text-sm font-bold text-white mb-3"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">ads_click</span> Recommendation</h4>
                                             <p className="text-sm text-slate-400 leading-relaxed">Strengthen presence in <strong className="text-primary">{radar.locations?.[3]?.name || 'emerging cities'}</strong> and <strong className="text-primary">{radar.locations?.[4]?.name || 'beyond'}</strong> — these regions show growth potential with existing brand awareness.</p>
                                         </div>
                                     </div>
@@ -332,8 +332,8 @@ export default function Analytics() {
                                         </div>
                                     </div>
                                     <div className="flex flex-col gap-4">
-                                        <div className="p-5 rounded-xl bg-gradient-to-br from-pink-500/5 to-blue-500/5 border border-pink-500/10">
-                                            <h4 className="text-sm font-bold text-pink-400 flex items-center gap-2 mb-3">
+                                        <div className="p-5 rounded-xl bg-gradient-to-br from-[#FF4D00]/5 to-[#FF7A00]/5 border border-[#FF4D00]/10">
+                                            <h4 className="text-sm font-bold text-[#FF7A00] flex items-center gap-2 mb-3">
                                                 <span className="material-symbols-outlined text-sm">psychology</span>Demographic Insights
                                             </h4>
                                             <div className="space-y-2 text-sm text-slate-300 leading-relaxed">
@@ -373,7 +373,7 @@ export default function Analytics() {
                                         ))}
                                     </div>
                                     <div className="flex flex-col gap-4">
-                                        <div className="p-5 rounded-xl bg-gradient-to-br from-cyan-500/5 to-violet-500/5 border border-cyan-500/10">
+                                        <div className="p-5 rounded-xl bg-gradient-to-br from-cyan-500/5 to-[#FF7A00]/5 border border-cyan-500/10">
                                             <h4 className="text-sm font-bold text-cyan-400 flex items-center gap-2 mb-3">
                                                 <span className="material-symbols-outlined text-sm">analytics</span>Device Insights
                                             </h4>
@@ -415,9 +415,9 @@ export default function Analytics() {
 
             {/* ═══════════ AI STRATEGY ═══════════ */}
             {aiStrategy && (
-                <div className="glass-panel rounded-2xl p-6 mb-6 border border-primary/20 bg-gradient-to-br from-primary/5 to-violet-500/5">
+                <div className="glass-panel rounded-2xl p-6 mb-6 border border-primary/20 bg-gradient-to-br from-primary/5 to-[#FF7A00]/5">
                     <div className="flex items-center gap-3 mb-5">
-                        <div className="size-10 rounded-xl bg-gradient-to-br from-primary/30 to-violet-500/30 flex items-center justify-center border border-primary/30">
+                        <div className="size-10 rounded-xl bg-gradient-to-br from-primary/30 to-[#FF7A00]/30 flex items-center justify-center border border-primary/30">
                             <span className="material-symbols-outlined text-primary">auto_awesome</span>
                         </div>
                         <div>
@@ -457,7 +457,7 @@ export default function Analytics() {
                     <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
                         {[
                             { label: 'Total Content', value: totalContent, icon: 'article', color: 'text-primary' },
-                            { label: 'Total Creatives', value: totalCreatives, icon: 'image', color: 'text-purple-400' },
+                            { label: 'Total Creatives', value: totalCreatives, icon: 'image', color: 'text-[#FF4D00]' },
                             { label: 'Published', value: published, icon: 'publish', color: 'text-emerald-400' },
                             { label: 'Drafts', value: drafts, icon: 'edit_note', color: 'text-amber-400' },
                             { label: 'Brand Alignment', value: avgScore ? `${avgScore}%` : '—', icon: 'verified', color: 'text-primary' },
@@ -511,8 +511,8 @@ export default function Analytics() {
                                         <p className="text-sm text-slate-500 mt-1">Feedback Signals</p>
                                     </div>
                                 </div>
-                                <div className="p-4 rounded-xl bg-gradient-to-r from-primary/5 to-purple-500/5 border border-primary/10">
-                                    <p className="text-sm text-primary font-bold mb-1">📈 AI Improvement</p>
+                                <div className="p-4 rounded-xl bg-gradient-to-r from-primary/5 to-[#FF7A00]/5 border border-primary/10">
+                                    <p className="text-sm text-primary font-bold mb-1"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">trending_up</span> AI Improvement</p>
                                     <p className="text-sm text-slate-400 leading-relaxed">
                                         {(activeBrand?.aiContext?.totalFeedback || 0) > 10
                                             ? 'AI has enough feedback to produce brand-aligned content.'

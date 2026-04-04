@@ -47,17 +47,17 @@ export default function VerifyEmail() {
     };
 
     return (
-        <div className="min-h-screen bg-[#050510] flex items-center justify-center p-6 relative overflow-hidden">
+        <div className="min-h-screen bg-[#08080C] flex items-center justify-center p-6 relative overflow-hidden">
             <SEOHead title="Verify Email | Mantram AI" />
             
             {/* Background Aesthetics */}
             <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/20 rounded-full blur-[120px] animate-pulse" />
-            <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-indigo-500/10 rounded-full blur-[120px] animate-pulse delay-700" />
+            <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-[#FF4D00]/10 rounded-full blur-[120px] animate-pulse delay-700" />
             
             <div className="w-full max-w-md relative z-10 text-center">
                 <div className="glass-panel p-10 rounded-[32px] border border-white/[0.08] shadow-2xl backdrop-blur-xl">
                     <div className="mb-8">
-                        <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-gradient-to-tr from-primary/20 to-indigo-500/20 border border-white/10 mb-6 group">
+                        <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-gradient-to-tr from-primary/20 to-[#FF7A00]/20 border border-white/10 mb-6 group">
                             {status === 'verifying' && (
                                 <span className="material-symbols-outlined text-4xl text-primary animate-spin">sync</span>
                             )}
@@ -84,7 +84,7 @@ export default function VerifyEmail() {
                     {status === 'success' && (
                         <Link 
                             to="/dashboard"
-                            className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-primary to-indigo-600 text-white font-bold text-lg hover:shadow-[0_0_30px_rgba(99,102,241,0.4)] hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2 group"
+                            className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-primary to-[#FF7A00] text-white font-bold text-lg hover:shadow-[0_0_30px_rgba(99,102,241,0.4)] hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2 group"
                         >
                             Get Started Now
                             <span className="material-symbols-outlined text-xl group-hover:translate-x-1 transition-transform">arrow_forward</span>

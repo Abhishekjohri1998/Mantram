@@ -8,11 +8,11 @@ import { useAuth } from '../context/AuthContext'
 
 // ── Topic quick-starts ────────────────────────────────────────────────────────
 const TOPICS = [
-  { id: 'ad-film',        icon: '🎬', label: 'Ad Film',        hint: "let's make an ad film" },
+  { id: 'ad-film',        icon: 'movie', label: 'Ad Film',        hint: "let's make an ad film" },
   { id: 'campaign',       icon: '🎯', label: 'Campaign',       hint: "help me plan a marketing campaign" },
-  { id: 'product-launch', icon: '🚀', label: 'Product Launch', hint: "I'm launching a new product" },
+  { id: 'product-launch', icon: 'rocket_launch', label: 'Product Launch', hint: "I'm launching a new product" },
   { id: 'naming',         icon: '🏷',  label: 'Naming',         hint: "I need help naming something" },
-  { id: 'brand-strategy', icon: '📈', label: 'Brand Strategy', hint: "let's build a brand strategy" },
+  { id: 'brand-strategy', icon: 'trending_up', label: 'Brand Strategy', hint: "let's build a brand strategy" },
   { id: 'festival',       icon: '🎪', label: 'Festival',       hint: "I want a festival campaign" },
   { id: 'offer',          icon: '💰', label: 'Offer Strategy', hint: "help me design an offer" },
   { id: 'custom',         icon: '💡', label: 'Something Else', hint: "I have an idea I want to brainstorm" },
@@ -36,7 +36,7 @@ const PHASES = {
   explore:   { label: 'Exploring',  icon: '🔍', color: '#8b5cf6' },
   ideate:    { label: 'Ideating',   icon: '💡', color: '#f59e0b' },
   scripting: { label: 'Scripting',  icon: '✍️',  color: '#06b6d4' },
-  deliver:   { label: 'Delivered',  icon: '🎯', color: '#22c55e' },
+  deliver:   { label: 'Delivered',  icon: 'ads_click', color: '#22c55e' },
 }
 
 // ── Thinking dots ─────────────────────────────────────────────────────────────
@@ -58,7 +58,7 @@ function ReasoningPanel({ steps, citations, visible }) {
   return (
     <div className={`bs-reasoning-panel ${collapsed ? 'collapsed' : ''}`}>
       <button className="bs-reasoning-toggle" onClick={() => setCollapsed(c => !c)}>
-        <span className="bs-reasoning-icon">🧠</span>
+        <span className="bs-reasoning-icon"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">psychology</span></span>
         <span className="bs-reasoning-title">Fidato is thinking...</span>
         <span className="bs-reasoning-count">{steps.length} steps</span>
         <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
@@ -80,7 +80,7 @@ function ReasoningPanel({ steps, citations, visible }) {
 
           {citations.length > 0 && (
             <div className="bs-citations">
-              <div className="bs-citations-label">🔗 Sources</div>
+              <div className="bs-citations-label"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">link</span> Sources</div>
               <div className="bs-citations-list">
                 {citations.map((c, i) => (
                   <a key={i} className="bs-citation-chip" href={c.url || c.uri || '#'}
@@ -218,7 +218,7 @@ function ScreenplayView({ screenplay }) {
     <div className="bs-screenplay">
       <div className="bs-screenplay-header">
         <div>
-          <div className="bs-sp-title">🎬 {screenplay.title || 'Screenplay'}</div>
+          <div className="bs-sp-title"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">movie</span> {screenplay.title || 'Screenplay'}</div>
           <div className="bs-sp-sub">{screenplay.format} · {screenplay.totalScenes} scenes</div>
         </div>
         <button className="bs-ghost-btn" onClick={() => setCollapsed(c => !c)}>
@@ -289,7 +289,7 @@ function StrategyView({ strategy }) {
   return (
     <div className="bs-strategy">
       <div className="bs-strategy-header">
-        <div className="bs-sp-title">📈 {strategy.title}</div>
+        <div className="bs-sp-title"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">trending_up</span> {strategy.title}</div>
         <div className="bs-sp-sub">{strategy.duration} · {strategy.budget_total}</div>
       </div>
       {strategy.executive_summary && (
@@ -365,7 +365,7 @@ function NamingView({ namingIdeas }) {
       })}
       {namingIdeas.taglines?.length > 0 && (
         <div className="bs-naming-section">
-          <div className="bs-naming-label">💬 Taglines</div>
+          <div className="bs-naming-label"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">chat</span> Taglines</div>
           {namingIdeas.taglines.map((t, i) => (
             <div key={i} className="bs-tagline-row">"{t}"</div>
           ))}
@@ -595,7 +595,7 @@ export default function BrainstormStudio() {
     ].filter(Boolean).join(', ')
 
     const greeting = insights
-      ? `Hey ${firstName}! 👋 I'm Fidato — your brand strategist for ${activeBrand.name}. I've studied your brand deeply — you're a ${insights}.${langInfo ? ` All campaign copy, taglines \      ? `Hey ${firstName}! 👋 I'm Fidato — your brand strategist for ${activeBrand.name}. I've studied your brand deeply — you’re a ${insights}. Let’s brainstorm something brilliant together. What are we building today? 🚀` scripts will be in **${langInfo.label}** — the language of your audience. 🌍` : ''} Let's brainstorm something brilliant together. What are we building today? 🚀`
+      ? `Hey ${firstName}! 👋 I'm Fidato — your brand strategist for ${activeBrand.name}. I've studied your brand deeply — you're a ${insights}.${langInfo ? ` All campaign copy, taglines & scripts will be in **${langInfo.label}** — the language of your audience. 🌍` : ''} Let's brainstorm something brilliant together. What are we building today? `
       : `Hey ${firstName}! 👋 Fidato here — let’s brainstorm for **${activeBrand.name}** today. What are we working on?`
 
     setMessages([{ id: 'welcome', role: 'fidato', content: greeting, timestamp: Date.now() }])
@@ -670,7 +670,7 @@ export default function BrainstormStudio() {
             thinkingShown = true
           },
           onReasoningStep: (step, icon) => {
-            setReasoningSteps(prev => [...prev, { text: step, icon: icon || '🧠' }])
+            setReasoningSteps(prev => [...prev, { text: step, icon: icon || 'psychology' }])
           },
           onCitations: (newCitations) => {
             setCitations(prev => [...prev, ...(newCitations || [])])
@@ -768,8 +768,8 @@ export default function BrainstormStudio() {
     setSessionState({ intent: null, collectedAnswers: {}, ideasGenerated: false, screenplayGenerated: false, lastIdeas: null, lastScreenplay: null })
     setPhase('explore')
     const greeting = brandName
-      ? `Fresh start! What should we brainstorm for ${brandName} today? 🚀`
-      : `Fresh start! What are we building today? 🚀`
+      ? `Fresh start! What should we brainstorm for ${brandName} today? `
+      : `Fresh start! What are we building today? `
     setMessages([{ id: `w-${Date.now()}`, role: 'fidato', content: greeting, timestamp: Date.now() }])
     setInput('')
     setError(null)

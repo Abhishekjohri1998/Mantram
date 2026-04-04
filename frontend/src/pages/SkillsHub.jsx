@@ -36,9 +36,9 @@ const CATEGORIES = [
 
 const COLOR_MAP = {
     emerald: { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/20', ring: 'ring-emerald-500/30' },
-    blue: { bg: 'bg-blue-500/10', text: 'text-blue-400', border: 'border-blue-500/20', ring: 'ring-blue-500/30' },
+    blue: { bg: 'bg-[#FF4D00]/10', text: 'text-[#FF4D00]', border: 'border-[#FF4D00]/20', ring: 'ring-[#FF4D00]/30' },
     amber: { bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/20', ring: 'ring-amber-500/30' },
-    violet: { bg: 'bg-violet-500/10', text: 'text-violet-400', border: 'border-violet-500/20', ring: 'ring-violet-500/30' },
+    violet: { bg: 'bg-[#FF4D00]/10', text: 'text-[#FF4D00]', border: 'border-[#FF4D00]/20', ring: 'ring-[#FF4D00]/30' },
     rose: { bg: 'bg-rose-500/10', text: 'text-rose-400', border: 'border-rose-500/20', ring: 'ring-rose-500/30' },
     cyan: { bg: 'bg-cyan-500/10', text: 'text-cyan-400', border: 'border-cyan-500/20', ring: 'ring-cyan-500/30' },
     orange: { bg: 'bg-orange-500/10', text: 'text-orange-400', border: 'border-orange-500/20', ring: 'ring-orange-500/30' },
@@ -487,10 +487,10 @@ export default function SkillsHub() {
 
                             {/* Active Skills Banner */}
                             {activeSkillIds.size > 0 && (
-                                <div className="mt-4 p-3 rounded-xl bg-violet-500/5 border border-violet-500/15">
+                                <div className="mt-4 p-3 rounded-xl bg-[#FF4D00]/5 border border-[#FF4D00]/15">
                                     <div className="flex items-center gap-2 mb-2">
-                                        <span className="material-symbols-outlined text-violet-400 text-sm">bolt</span>
-                                        <span className="text-xs font-bold text-violet-300">{activeSkillIds.size}/{activeSkillsMax} Active Skills</span>
+                                        <span className="material-symbols-outlined text-[#FF4D00] text-sm">bolt</span>
+                                        <span className="text-xs font-bold text-[#FF7A00]">{activeSkillIds.size}/{activeSkillsMax} Active Skills</span>
                                         <span className="text-[10px] text-slate-500">— Instructions injected into every Fidato conversation</span>
                                     </div>
                                     <div className="flex flex-wrap gap-1.5">
@@ -569,8 +569,8 @@ export default function SkillsHub() {
                                                         title={activeSkillIds.has(skill._id) ? 'Deactivate (remove from persistent instructions)' : 'Activate (inject into Fidato as persistent instruction)'}
                                                         className={`size-7 rounded-lg flex items-center justify-center transition-all cursor-pointer ${
                                                             activeSkillIds.has(skill._id)
-                                                                ? 'bg-violet-500/20 text-violet-400 ring-1 ring-violet-500/30'
-                                                                : 'bg-white/[0.04] text-slate-600 hover:text-violet-400 hover:bg-violet-500/10'
+                                                                ? 'bg-[#FF4D00]/20 text-[#FF4D00] ring-1 ring-[#FF4D00]/30'
+                                                                : 'bg-white/[0.04] text-slate-600 hover:text-[#FF4D00] hover:bg-[#FF4D00]/10'
                                                         }`}>
                                                         {togglingSkill === skill._id
                                                             ? <span className="material-symbols-outlined text-xs animate-spin">progress_activity</span>
@@ -718,8 +718,8 @@ export default function SkillsHub() {
                                                             </div>
                                                         ) : (
                                                             <button onClick={() => { setLibraryOpen(field.name); loadLibraryImages() }}
-                                                                className="w-full py-6 rounded-xl border-2 border-dashed border-white/10 bg-white/[0.02] flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-violet-500/40 hover:bg-violet-500/5 transition-all">
-                                                                <span className="material-symbols-outlined text-3xl text-violet-400">photo_library</span>
+                                                                className="w-full py-6 rounded-xl border-2 border-dashed border-white/10 bg-white/[0.02] flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-[#FF4D00]/40 hover:bg-[#FF4D00]/5 transition-all">
+                                                                <span className="material-symbols-outlined text-3xl text-[#FF4D00]">photo_library</span>
                                                                 <p className="text-xs text-slate-400 font-medium">Select from Creative Library</p>
                                                                 <p className="text-[10px] text-slate-600">Choose from your generated images</p>
                                                             </button>
@@ -731,7 +731,7 @@ export default function SkillsHub() {
                                                                 <div className="bg-[#0c0e1a] rounded-2xl border border-white/10 w-full max-w-2xl max-h-[80vh] overflow-hidden" onClick={e => e.stopPropagation()}>
                                                                     <div className="flex items-center justify-between p-5 border-b border-white/[0.06]">
                                                                         <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                                                                            <span className="material-symbols-outlined text-violet-400 text-lg">photo_library</span>
+                                                                            <span className="material-symbols-outlined text-[#FF4D00] text-lg">photo_library</span>
                                                                             Select Image — {field.label}
                                                                         </h3>
                                                                         <button onClick={() => setLibraryOpen(null)} className="text-slate-500 hover:text-white cursor-pointer transition-all">
@@ -884,7 +884,7 @@ export default function SkillsHub() {
                                         <button
                                             onClick={() => routeToContentStudio(result.executionId)}
                                             disabled={routing === result.executionId || (routeSuccess && routeSuccess.executionId === result.executionId)}
-                                            className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-primary/15 to-violet-500/10 border border-primary/20 text-primary text-sm font-bold hover:from-primary/25 hover:to-violet-500/20 cursor-pointer transition-all flex items-center gap-2 disabled:opacity-40">
+                                            className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-primary/15 to-[#FF7A00]/10 border border-primary/20 text-primary text-sm font-bold hover:from-primary/25 hover:to-[#FF7A00]/20 cursor-pointer transition-all flex items-center gap-2 disabled:opacity-40">
                                             {routing === result.executionId
                                                 ? <><span className="material-symbols-outlined text-sm animate-spin">progress_activity</span> Saving...</>
                                                 : (routeSuccess && routeSuccess.executionId === result.executionId)
@@ -957,7 +957,7 @@ export default function SkillsHub() {
                                                     </div>
                                                     <p className="text-[11px] text-slate-500 mt-0.5">
                                                         {date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} at {date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
-                                                        {exec.rating && <span className="ml-2">{'⭐'.repeat(exec.rating)}</span>}
+                                                        {exec.rating && <span className="ml-2">{'star'.repeat(exec.rating)}</span>}
                                                     </p>
                                                 </div>
                                                 <div className="flex gap-1.5 shrink-0">
@@ -1013,8 +1013,8 @@ export default function SkillsHub() {
                         {/* AI Generator */}
                         <div className="glass-panel rounded-2xl p-5 mb-6">
                             <h3 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
-                                <span className="material-symbols-outlined text-violet-400 text-sm">psychology</span> AI Skill Generator
-                                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-violet-500/10 text-violet-400 font-bold">BETA</span>
+                                <span className="material-symbols-outlined text-[#FF4D00] text-sm">psychology</span> AI Skill Generator
+                                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#FF4D00]/10 text-[#FF4D00] font-bold">BETA</span>
                             </h3>
                             <div className="flex gap-2">
                                 <input type="text" value={aiPrompt} onChange={e => setAiPrompt(e.target.value)}
@@ -1022,7 +1022,7 @@ export default function SkillsHub() {
                                     placeholder='Describe the skill, e.g. "Create a skill for generating WhatsApp broadcast messages with Hinglish tone"'
                                     className="flex-1 px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-sm text-white focus:border-primary focus:outline-none" />
                                 <button onClick={generateSkill} disabled={generating || !aiPrompt.trim()}
-                                    className="px-4 py-3 rounded-xl bg-violet-500/10 text-violet-400 text-xs font-bold hover:bg-violet-500/20 cursor-pointer transition-all flex items-center gap-1 disabled:opacity-30">
+                                    className="px-4 py-3 rounded-xl bg-[#FF4D00]/10 text-[#FF4D00] text-xs font-bold hover:bg-[#FF4D00]/20 cursor-pointer transition-all flex items-center gap-1 disabled:opacity-30">
                                     {generating ? <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span> : <span className="material-symbols-outlined text-sm">auto_awesome</span>}
                                     Generate
                                 </button>
@@ -1058,7 +1058,7 @@ export default function SkillsHub() {
                                     placeholder="Write detailed instructions for the AI: what to produce, how to structure the output, what tone to use, quality rules..."
                                     rows={8} className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-sm text-white focus:border-primary focus:outline-none resize-none font-mono" />
                                 <button onClick={enhanceInstructions} disabled={enhancingInstructions || !buildForm.instructions.trim()}
-                                    className="mt-2 px-4 py-2 rounded-xl bg-gradient-to-r from-violet-500/15 to-cyan-500/10 border border-violet-500/30 text-violet-300 text-xs font-bold hover:from-violet-500/25 hover:to-cyan-500/20 cursor-pointer transition-all flex items-center gap-1.5 disabled:opacity-30">
+                                    className="mt-2 px-4 py-2 rounded-xl bg-gradient-to-r from-[#FF4D00]/15 to-cyan-500/10 border border-[#FF4D00]/30 text-[#FF7A00] text-xs font-bold hover:from-[#FF4D00]/25 hover:to-cyan-500/20 cursor-pointer transition-all flex items-center gap-1.5 disabled:opacity-30">
                                     {enhancingInstructions
                                         ? <><span className="material-symbols-outlined text-sm animate-spin">progress_activity</span> Enhancing...</>
                                         : <><span className="material-symbols-outlined text-sm">auto_awesome</span> Enhance with AI</>}
@@ -1204,11 +1204,11 @@ const SKILLS_HELP_SECTIONS = [
 ]
 
 const SKILLS_PRO_TIPS = [
-    { icon: '🎯', tip: 'Start by running built-in skills to understand how they work, then clone and customize them for your brand.' },
+    { icon: 'ads_click', tip: 'Start by running built-in skills to understand how they work, then clone and customize them for your brand.' },
     { icon: '✍️', tip: 'The more detailed your Instructions, the better the output. Include format rules, quality checks, and examples.' },
-    { icon: '🤖', tip: 'Use the AI Skill Generator for quick skill creation — it handles 80% of the setup automatically.' },
+    { icon: 'smart_toy', tip: 'Use the AI Skill Generator for quick skill creation — it handles 80% of the setup automatically.' },
     { icon: '⚡', tip: 'Use "Enhance with AI" to upgrade rough instructions into professional prompt engineering.' },
-    { icon: '📊', tip: 'Set output format to "Structured JSON" for data you want to reuse in other tools.' },
+    { icon: 'bar_chart', tip: 'Set output format to "Structured JSON" for data you want to reuse in other tools.' },
     { icon: '🌡️', tip: 'Lower temperature (0.3-0.5) for factual/analytical output, higher (0.8-1.2) for creative/brainstorming.' },
 ]
 
@@ -1324,7 +1324,7 @@ function SkillsHelpView({ onBack }) {
 
             <div className="text-center mt-6 py-6">
                 <p className="text-slate-500 text-sm mb-3">Ready to explore?</p>
-                <button onClick={onBack} className="px-6 py-3 rounded-xl text-sm font-bold bg-gradient-to-r from-primary to-purple-500 text-white cursor-pointer hover:shadow-lg hover:shadow-primary/20 transition-all flex items-center gap-2 mx-auto">
+                <button onClick={onBack} className="px-6 py-3 rounded-xl text-sm font-bold bg-gradient-to-r from-primary to-[#FF7A00] text-white cursor-pointer hover:shadow-lg hover:shadow-primary/20 transition-all flex items-center gap-2 mx-auto">
                     <span className="material-symbols-outlined text-sm">apps</span> Browse Skills
                 </button>
             </div>

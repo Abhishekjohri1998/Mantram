@@ -40,7 +40,7 @@ const css = `
 .vm-modes { display: flex; border-bottom: 1px solid rgba(255,255,255,0.06); }
 .vm-mode-btn { flex: 1; padding: 14px; text-align: center; font-size: 14px; font-weight: 600; color: #64748b; cursor: pointer; border: none; background: none; transition: all .2s; display: flex; align-items: center; justify-content: center; gap: 8px; }
 .vm-mode-btn:hover { color: #94a3b8; background: rgba(255,255,255,0.02); }
-.vm-mode-btn.active { color: #e2e8f0; background: rgba(139,92,246,0.08); border-bottom: 2px solid #7c3aed; }
+.vm-mode-btn.active { color: #e2e8f0; background: rgba(255, 77, 0,0.08); border-bottom: 2px solid #7c3aed; }
 .vm-mode-btn .badge { font-size: 9px; font-weight: 800; padding: 2px 6px; border-radius: 6px; background: linear-gradient(135deg, #f59e0b, #ef4444); color: #fff; text-transform: uppercase; }
 
 /* Prompt area */
@@ -49,15 +49,15 @@ const css = `
 .vm-textarea::placeholder { color: rgba(148,163,184,0.3); }
 
 /* I2V upload zone */
-.vm-i2v-zone { margin: 0 24px 16px; border: 2px dashed rgba(139,92,246,0.2); border-radius: 16px; padding: 32px 20px; display: flex; flex-direction: column; align-items: center; gap: 10px; cursor: pointer; transition: all .2s; background: rgba(139,92,246,0.02); }
-.vm-i2v-zone:hover { border-color: rgba(139,92,246,0.5); background: rgba(139,92,246,0.05); }
+.vm-i2v-zone { margin: 0 24px 16px; border: 2px dashed rgba(255, 77, 0,0.2); border-radius: 16px; padding: 32px 20px; display: flex; flex-direction: column; align-items: center; gap: 10px; cursor: pointer; transition: all .2s; background: rgba(255, 77, 0,0.02); }
+.vm-i2v-zone:hover { border-color: rgba(255, 77, 0,0.5); background: rgba(255, 77, 0,0.05); }
 .vm-i2v-zone.has { border-style: solid; border-color: rgba(34,197,94,0.3); background: rgba(34,197,94,0.02); padding: 12px; position: relative; }
 .vm-i2v-zone img { width: 100%; max-height: 220px; object-fit: contain; border-radius: 12px; }
 .vm-i2v-remove { position: absolute; top: 8px; right: 8px; width: 28px; height: 28px; border-radius: 50%; background: rgba(0,0,0,0.6); border: none; color: #f87171; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; }
 
 /* Asset tags row (below prompt) */
 .vm-tags { display: flex; gap: 6px; flex-wrap: wrap; padding: 10px 24px 0; }
-.vm-tag { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px 3px 3px; border-radius: 8px; background: rgba(139,92,246,0.08); border: 1px solid rgba(139,92,246,0.18); font-size: 12px; color: #c4b5fd; font-weight: 600; transition: all .15s; }
+.vm-tag { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px 3px 3px; border-radius: 8px; background: rgba(255, 77, 0,0.08); border: 1px solid rgba(255, 77, 0,0.18); font-size: 12px; color: #c4b5fd; font-weight: 600; transition: all .15s; }
 .vm-tag.linked { border-color: rgba(34,197,94,0.4); background: rgba(34,197,94,0.06); color: #4ade80; }
 .vm-tag img { width: 22px; height: 22px; border-radius: 5px; object-fit: cover; }
 .vm-tag .icon { width: 22px; height: 22px; border-radius: 5px; background: rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: center; font-size: 12px; }
@@ -65,18 +65,18 @@ const css = `
 .vm-tag .uploading { font-size: 10px; color: #64748b; font-style: italic; }
 
 /* @ Autocomplete popup */
-.vm-autocomplete { position: absolute; bottom: 100%; left: 16px; right: 16px; background: #1e1e26; border: 1px solid rgba(139,92,246,0.3); border-radius: 12px; padding: 8px; display: flex; gap: 6px; flex-wrap: wrap; z-index: 20; box-shadow: 0 8px 24px rgba(0,0,0,0.5); }
+.vm-autocomplete { position: absolute; bottom: 100%; left: 16px; right: 16px; background: #1e1e26; border: 1px solid rgba(255, 77, 0,0.3); border-radius: 12px; padding: 8px; display: flex; gap: 6px; flex-wrap: wrap; z-index: 20; box-shadow: 0 8px 24px rgba(0,0,0,0.5); }
 .vm-ac-item { display: flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 8px; cursor: pointer; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); font-size: 12px; color: #c4b5fd; font-weight: 600; }
-.vm-ac-item:hover { border-color: rgba(139,92,246,0.4); background: rgba(139,92,246,0.08); }
+.vm-ac-item:hover { border-color: rgba(255, 77, 0,0.4); background: rgba(255, 77, 0,0.08); }
 .vm-ac-item img { width: 28px; height: 28px; border-radius: 6px; object-fit: cover; }
 .vm-ac-item .icon { width: 28px; height: 28px; border-radius: 6px; background: rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: center; font-size: 14px; }
 
 /* Asset dock (compact icon row) */
 .vm-dock { display: flex; align-items: center; gap: 6px; padding: 10px 20px; border-top: 1px solid rgba(255,255,255,0.04); }
 .vm-dock-btn { display: flex; align-items: center; gap: 4px; padding: 6px 10px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; border: 1px solid rgba(255,255,255,0.06); background: rgba(255,255,255,0.02); color: #64748b; transition: all .15s; white-space: nowrap; }
-.vm-dock-btn:hover { border-color: rgba(139,92,246,0.3); color: #c4b5fd; background: rgba(139,92,246,0.04); }
+.vm-dock-btn:hover { border-color: rgba(255, 77, 0,0.3); color: #c4b5fd; background: rgba(255, 77, 0,0.04); }
 .vm-dock-btn.has { color: #4ade80; border-color: rgba(34,197,94,0.3); background: rgba(34,197,94,0.04); }
-.vm-dock-btn.ai { background: linear-gradient(135deg, rgba(124,58,237,0.1), rgba(6,182,212,0.1)); color: #c4b5fd; border-color: rgba(139,92,246,0.2); }
+.vm-dock-btn.ai { background: linear-gradient(135deg, rgba(124,58,237,0.1), rgba(6,182,212,0.1)); color: #c4b5fd; border-color: rgba(255, 77, 0,0.2); }
 .vm-dock-btn.ai:disabled { opacity: 0.5; }
 .vm-dock-btn .material-symbols-outlined { font-size: 16px; }
 .vm-dock-sep { width: 1px; height: 20px; background: rgba(255,255,255,0.06); margin: 0 4px; flex-shrink: 0; }
@@ -86,23 +86,23 @@ const css = `
 .vm-config-item { position: relative; }
 .vm-config-trigger { display: flex; align-items: center; gap: 5px; padding: 7px 12px; border-radius: 10px; font-size: 13px; font-weight: 600; cursor: pointer; border: 1px solid rgba(255,255,255,0.06); background: rgba(255,255,255,0.03); color: #e2e8f0; transition: all .15s; white-space: nowrap; }
 .vm-config-trigger:hover { border-color: rgba(255,255,255,0.15); background: rgba(255,255,255,0.06); }
-.vm-config-trigger.open { border-color: rgba(139,92,246,0.4); background: rgba(139,92,246,0.08); }
+.vm-config-trigger.open { border-color: rgba(255, 77, 0,0.4); background: rgba(255, 77, 0,0.08); }
 .vm-config-trigger .material-symbols-outlined { font-size: 14px; color: #64748b; }
-.vm-config-menu { position: absolute; bottom: calc(100% + 6px); left: 0; min-width: 140px; max-height: 220px; overflow-y: auto; background: #1e1e26; border: 1px solid rgba(139,92,246,0.25); border-radius: 12px; padding: 4px; z-index: 50; box-shadow: 0 10px 30px rgba(0,0,0,0.6); }
+.vm-config-menu { position: absolute; bottom: calc(100% + 6px); left: 0; min-width: 140px; max-height: 220px; overflow-y: auto; background: #1e1e26; border: 1px solid rgba(255, 77, 0,0.25); border-radius: 12px; padding: 4px; z-index: 50; box-shadow: 0 10px 30px rgba(0,0,0,0.6); }
 .vm-config-menu::-webkit-scrollbar { width: 5px; }
 .vm-config-menu::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
 .vm-config-opt { display: flex; align-items: center; gap: 6px; width: 100%; padding: 8px 10px; border: none; background: transparent; color: #94a3b8; font-size: 13px; font-weight: 500; cursor: pointer; border-radius: 8px; text-align: left; transition: all .12s; }
 .vm-config-opt:hover { background: rgba(255,255,255,0.05); color: #e2e8f0; }
-.vm-config-opt.sel { background: rgba(139,92,246,0.15); color: #c4b5fd; font-weight: 600; }
+.vm-config-opt.sel { background: rgba(255, 77, 0,0.15); color: #c4b5fd; font-weight: 600; }
 .vm-quality-pill { padding: 7px 14px; border-radius: 10px; font-size: 13px; font-weight: 600; cursor: pointer; border: 1px solid rgba(255,255,255,0.06); background: rgba(255,255,255,0.02); color: #64748b; transition: all .15s; }
 .vm-quality-pill:hover { border-color: rgba(255,255,255,0.12); color: #94a3b8; }
-.vm-quality-pill.active { background: rgba(139,92,246,0.12); color: #c4b5fd; border-color: rgba(139,92,246,0.3); }
+.vm-quality-pill.active { background: rgba(255, 77, 0,0.12); color: #c4b5fd; border-color: rgba(255, 77, 0,0.3); }
 
 /* Bottom bar (enhance + generate) */
 .vm-bottom { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 24px; border-top: 1px solid rgba(255,255,255,0.06); background: rgba(255,255,255,0.015); }
 @media (max-width: 560px) { .vm-bottom { flex-direction: column; } }
-.vm-enhance { display: flex; align-items: center; gap: 6px; padding: 10px 18px; border-radius: 12px; font-size: 13px; font-weight: 600; cursor: pointer; border: 1px solid rgba(139,92,246,0.25); background: rgba(139,92,246,0.06); color: #c4b5fd; transition: all .15s; }
-.vm-enhance:hover { border-color: rgba(139,92,246,0.5); background: rgba(139,92,246,0.12); }
+.vm-enhance { display: flex; align-items: center; gap: 6px; padding: 10px 18px; border-radius: 12px; font-size: 13px; font-weight: 600; cursor: pointer; border: 1px solid rgba(255, 77, 0,0.25); background: rgba(255, 77, 0,0.06); color: #c4b5fd; transition: all .15s; }
+.vm-enhance:hover { border-color: rgba(255, 77, 0,0.5); background: rgba(255, 77, 0,0.12); }
 .vm-enhance:disabled { opacity: 0.4; cursor: default; }
 .vm-generate { flex: 1; max-width: 320px; padding: 12px 24px; border-radius: 14px; font-weight: 700; font-size: 15px; cursor: pointer; border: none; display: flex; align-items: center; justify-content: center; gap: 8px; color: #fff; background: linear-gradient(135deg, #7c3aed 0%, #06b6d4 100%); box-shadow: 0 4px 20px rgba(124,58,237,0.2); transition: all .2s; }
 .vm-generate:hover { transform: translateY(-1px); box-shadow: 0 6px 24px rgba(124,58,237,0.3); }
@@ -116,7 +116,7 @@ const css = `
 .vm-library-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; max-height: 140px; overflow-y: auto; }
 @media (max-width: 640px) { .vm-library-grid { grid-template-columns: repeat(3, 1fr); } }
 .vm-library-grid img { width: 100%; height: 56px; border-radius: 8px; object-fit: cover; cursor: pointer; border: 1px solid rgba(255,255,255,0.05); display: block; transition: border-color .12s; }
-.vm-library-grid img:hover { border-color: rgba(139,92,246,0.4); }
+.vm-library-grid img:hover { border-color: rgba(255, 77, 0,0.4); }
 
 /* Error */
 .vm-err { margin: 12px 24px; padding: 10px 14px; border-radius: 10px; background: rgba(239,68,68,0.06); border: 1px solid rgba(239,68,68,0.12); color: #fca5a5; font-size: 13px; display: flex; align-items: center; gap: 8px; }
@@ -135,13 +135,13 @@ const css = `
 .vm-done-card { max-width: 680px; margin: 0 auto; background: rgba(255,255,255,0.025); border: 1px solid rgba(255,255,255,0.06); border-radius: 20px; overflow: hidden; margin-bottom: 20px; }
 .vm-done-card video { width: 100%; display: block; }
 .vm-done-btns { display: flex; gap: 12px; max-width: 680px; margin: 0 auto; flex-wrap: wrap; }
-.vm-btn-sec { flex: 1; padding: 12px; border-radius: 12px; font-weight: 600; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; border: 1px solid rgba(139,92,246,0.2); background: rgba(139,92,246,0.08); color: #c4b5fd; transition: all .15s; }
-.vm-btn-sec:hover { background: rgba(139,92,246,0.14); }
+.vm-btn-sec { flex: 1; padding: 12px; border-radius: 12px; font-weight: 600; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; border: 1px solid rgba(255, 77, 0,0.2); background: rgba(255, 77, 0,0.08); color: #c4b5fd; transition: all .15s; }
+.vm-btn-sec:hover { background: rgba(255, 77, 0,0.14); }
 .vm-btn-pri { padding: 12px 20px; border-radius: 12px; font-weight: 600; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; border: none; background: linear-gradient(135deg, #7c3aed, #06b6d4); color: #fff; text-decoration: none; transition: all .15s; }
 .vm-btn-pri:hover { transform: translateY(-1px); }
 
 /* Extend */
-.vm-extend { padding: 16px; border-radius: 14px; background: rgba(139,92,246,0.05); border: 1px solid rgba(139,92,246,0.18); margin-top: 16px; max-width: 680px; margin-left: auto; margin-right: auto; }
+.vm-extend { padding: 16px; border-radius: 14px; background: rgba(255, 77, 0,0.05); border: 1px solid rgba(255, 77, 0,0.18); margin-top: 16px; max-width: 680px; margin-left: auto; margin-right: auto; }
 .vm-extend h4 { font-size: 13px; font-weight: 700; color: #c4b5fd; margin-bottom: 12px; display: flex; align-items: center; gap: 6px; }
 .vm-extend-row { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
 .vm-extend-input { flex: 1; min-width: 160px; padding: 10px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08); background: rgba(0,0,0,0.2); color: #e2e8f0; font-size: 13px; }
@@ -514,7 +514,7 @@ export default function AdvancedMode({ activeBrand, initialData }) {
                         <div className="vm-gen-preview">
                             {(firstFrame?.url || i2vImage?.url) && <img src={i2vImage?.url || firstFrame?.url} alt="" />}
                             <div className="badges">
-                                <span className="vm-gen-badge" style={{ background: 'rgba(139,92,246,0.85)', color: '#fff' }}>{generation?.progress || 5}%</span>
+                                <span className="vm-gen-badge" style={{ background: 'rgba(255, 77, 0,0.85)', color: '#fff' }}>{generation?.progress || 5}%</span>
                                 <span className="vm-gen-badge" style={{ background: 'rgba(0,0,0,0.5)', color: '#ccc' }}>{videoMode === 'i2v' ? 'I2V' : m.name}</span>
                             </div>
                         </div>
@@ -537,7 +537,7 @@ export default function AdvancedMode({ activeBrand, initialData }) {
                                     <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>edit</span> Edit & Retry
                                 </button>
                                 {generation?.provider === 'piapi' && (
-                                    <button className="vm-btn-sec" onClick={() => setShowExtendPanel(v => !v)} style={showExtendPanel ? { borderColor: 'rgba(139,92,246,0.4)' } : {}}>
+                                    <button className="vm-btn-sec" onClick={() => setShowExtendPanel(v => !v)} style={showExtendPanel ? { borderColor: 'rgba(255, 77, 0,0.4)' } : {}}>
                                         <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>add_circle</span> Extend
                                     </button>
                                 )}

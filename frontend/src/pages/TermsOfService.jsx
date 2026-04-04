@@ -3,7 +3,7 @@ import SEOHead from '../components/SEOHead'
 
 export default function TermsOfService() {
     return (
-        <div className="min-h-screen bg-slate-950 text-slate-300 py-12 px-4 sm:px-6 lg:px-8">
+        <div className="min-h-screen bg-[#08080C] text-slate-300 py-12 px-4 sm:px-6 lg:px-8">
             <SEOHead
                 title="Terms of Service — Mantram AI"
                 description="Mantram AI terms of service: AI content ownership, subscriptions & credits, social publishing rules, third-party integrations, intellectual property & acceptable use policy."

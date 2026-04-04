@@ -65,7 +65,7 @@ export default function AdminDashboard() {
                 {[
                     { label: 'Total Users', value: stats?.totalUsers || totalUsers, icon: 'group', color: 'text-primary' },
                     { label: 'Total Brands', value: stats?.totalBrands || 0, icon: 'storefront', color: 'text-emerald-400' },
-                    { label: 'Content Created', value: stats?.totalContent || 0, icon: 'article', color: 'text-purple-400' },
+                    { label: 'Content Created', value: stats?.totalContent || 0, icon: 'article', color: 'text-[#FF4D00]' },
                     { label: 'Creatives Made', value: stats?.totalCreatives || 0, icon: 'image', color: 'text-amber-400' },
                 ].map((s, i) => (
                     <div key={i} className="glass-panel rounded-2xl p-5 animate-fade-in" style={{ animationDelay: `${i * 80}ms` }}>
@@ -101,7 +101,7 @@ export default function AdminDashboard() {
                                     <div key={u._id} className="grid grid-cols-12 items-center p-4 rounded-xl bg-white/[0.02] border border-white/[0.05] hover:bg-white/[0.04] transition-all animate-fade-in"
                                         style={{ animationDelay: `${i * 40}ms` }}>
                                         <div className="col-span-4 flex items-center gap-3">
-                                            <div className="size-8 rounded-full bg-gradient-to-br from-primary to-purple-500 flex items-center justify-center text-white text-xs font-bold">
+                                            <div className="size-8 rounded-full bg-gradient-to-br from-primary to-[#FF7A00] flex items-center justify-center text-white text-xs font-bold">
                                                 {u.name?.charAt(0)?.toUpperCase() || '?'}
                                             </div>
                                             <div>

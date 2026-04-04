@@ -96,7 +96,7 @@ export default function Nexus() {
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                         {[
                             { label: 'Content', value: contentCount, icon: 'article', color: 'text-emerald-400' },
-                            { label: 'Creatives', value: creativeCount, icon: 'image', color: 'text-purple-400' },
+                            { label: 'Creatives', value: creativeCount, icon: 'image', color: 'text-[#FF4D00]' },
                             { label: 'AI Learnings', value: brand.aiContext?.totalFeedback || 0, icon: 'psychology', color: 'text-primary' },
                             { label: 'Brand Score', value: brand.aiContext?.avgRating ? `${(brand.aiContext.avgRating * 100).toFixed(0)}%` : '—', icon: 'trending_up', color: 'text-amber-400' },
                         ].map((s, i) => (
@@ -114,7 +114,7 @@ export default function Nexus() {
                         <div className="col-span-12 lg:col-span-8 grid grid-cols-1 sm:grid-cols-2 gap-4">
                             {[
                                 { icon: 'edit_note', label: 'Create Content', desc: 'Generate brand-aligned text', path: '/content-studio', color: 'from-primary/20 to-primary/5' },
-                                { icon: 'brush', label: 'Create Visual', desc: 'Generate brand visuals', path: '/creative-studio', color: 'from-purple-500/20 to-purple-500/5' },
+                                { icon: 'brush', label: 'Create Visual', desc: 'Generate brand visuals', path: '/creative-studio', color: 'from-[#FF4D00]/20 to-[#FF7A00]/5' },
                                 { icon: 'analytics', label: 'Analytics', desc: 'Content performance', path: '/analytics', color: 'from-emerald-400/20 to-emerald-400/5' },
                                 { icon: 'language', label: 'Re-scan Website', desc: 'Update brand DNA', path: '/onboarding', color: 'from-amber-400/20 to-amber-400/5' },
                             ].map((a, i) => (

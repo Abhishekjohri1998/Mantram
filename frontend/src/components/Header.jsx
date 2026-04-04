@@ -142,15 +142,15 @@ export default function Header({ title, subtitle, onMenuToggle }) {
 
             {/* Resume Banner — shown when switching back to a brand with in-progress jobs */}
             {resumeJobs.length > 0 && (
-                <div className="bg-violet-500/10 border-b border-violet-500/20 py-2 px-4 animate-fade-in flex items-center justify-center gap-3 backdrop-blur-md">
-                    <span className="animate-spin material-symbols-outlined text-violet-400 text-lg">refresh</span>
-                    <p className="text-violet-200 text-xs sm:text-sm font-medium">
+                <div className="bg-[#FF4D00]/10 border-b border-[#FF4D00]/20 py-2 px-4 animate-fade-in flex items-center justify-center gap-3 backdrop-blur-md">
+                    <span className="animate-spin material-symbols-outlined text-[#FF4D00] text-lg">refresh</span>
+                    <p className="text-orange-50 text-xs sm:text-sm font-medium">
                         <span className="font-bold">{resumeJobs.length}</span> job{resumeJobs.length > 1 ? 's are' : ' is'} still processing for <span className="font-bold">{activeBrand?.name}</span>.
                     </p>
                     {resumeJobs[0]?.page && (
                         <button
                             onClick={() => navigate(resumeJobs[0].page)}
-                            className="px-3 py-1 bg-violet-500 text-white text-[10px] font-black uppercase rounded-lg hover:bg-violet-400 transition-all cursor-pointer"
+                            className="px-3 py-1 bg-[#FF4D00] text-white text-[10px] font-black uppercase rounded-lg hover:bg-[#FF4D00] transition-all cursor-pointer"
                         >
                             Resume
                         </button>
@@ -158,24 +158,24 @@ export default function Header({ title, subtitle, onMenuToggle }) {
                 </div>
             )}
 
-            <header className="glass-panel border-b border-white/[0.06] px-3 sm:px-5 lg:px-8 py-3 lg:py-4 flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+            <header className="fixed top-0 w-full flex justify-between items-center px-6 md:px-8 py-4 h-16 bg-[#08080c]/80 backdrop-blur-xl border-b border-outline-variant/20 z-50 shadow-[0_24px_48px_rgba(0,0,0,0.8)]">
+                <div className="flex items-center gap-8 min-w-0">
+                    <div className="font-headline tracking-tighter text-2xl font-black italic text-primary-fixed uppercase hidden lg:block">Mantram.AI</div>
                     {/* Hamburger — visible on mobile/tablet */}
                     <button
                         onClick={onMenuToggle}
-                        className="lg:hidden p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/[0.06] transition-all cursor-pointer flex-shrink-0"
+                        className="lg:hidden p-2 rounded-lg heavy-in-soft-out transition-all cursor-pointer flex-shrink-0 text-outline-variant hover:text-primary-fixed hover:bg-primary-fixed/8"
                     >
                         <span className="material-symbols-outlined text-xl">menu</span>
                     </button>
 
                     {title && (
-                        <div className="min-w-0">
-                            <h1 className="text-base sm:text-lg lg:text-xl font-bold truncate bg-gradient-to-r from-violet-400 via-primary to-cyan-400 bg-clip-text text-transparent">{title}</h1>
-                            {subtitle && <p className="text-xs sm:text-sm text-slate-500 truncate">{subtitle}</p>}
+                        <div className="hidden md:block min-w-0 border-l border-white/10 pl-6 space-y-0.5">
+                            <h1 className="text-sm font-bold truncate tracking-tight text-[#f3eff6] uppercase leading-none">{title}</h1>
+                            {subtitle && <p className="text-[10px] uppercase tracking-widest text-[#acaab0] leading-none">{subtitle}</p>}
                         </div>
                     )}
                 </div>
-
                 <div className="flex items-center gap-1.5 sm:gap-3 flex-shrink-0">
                     {/* Global Brand Switcher */}
                     {brands.length > 0 && (
@@ -208,22 +208,23 @@ export default function Header({ title, subtitle, onMenuToggle }) {
                                                     onClick={() => handleBrandSelect(brand)}
                                                     className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-all cursor-pointer ${
                                                         activeBrand?._id === brand._id
-                                                            ? 'bg-primary/10 text-white'
-                                                            : 'text-slate-300 hover:bg-white/[0.05] hover:text-white'
-                                                    }`}>
+                                                            ? 'text-white'
+                                                            : 'text-slate-300 hover:text-white'
+                                                    }`}
+                                                    style={activeBrand?._id === brand._id ? { background: 'rgba(255,77,0,0.1)', border: '1px solid rgba(255,77,0,0.15)' } : { border: '1px solid transparent' }}>
                                                     <div className="w-6 h-6 rounded-md flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
                                                         style={{ background: brand.dna?.colors?.[0]?.hex || '#8b5cf6' }}>
                                                         {brand.name?.charAt(0)}
                                                     </div>
                                                     <span className="text-sm font-medium truncate flex-1">{brand.name}</span>
                                                     {activeBrand?._id === brand._id && (
-                                                        <span className="material-symbols-outlined text-primary text-sm">check_circle</span>
+                                                        <span className="material-symbols-outlined text-sm" style={{ color: '#FF4D00' }}>check_circle</span>
                                                     )}
                                                     {/* Show active job indicator per brand */}
                                                     {brandJobs.length > 0 && (
                                                         <span className="flex h-2 w-2">
-                                                            <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-violet-400 opacity-75" />
-                                                            <span className="relative inline-flex rounded-full h-2 w-2 bg-violet-400" />
+                                                            <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-[#FF4D00] opacity-75" />
+                                                            <span className="relative inline-flex rounded-full h-2 w-2 bg-[#FF4D00]" />
                                                         </span>
                                                     )}
                                                 </button>
@@ -274,12 +275,14 @@ export default function Header({ title, subtitle, onMenuToggle }) {
                     )}
 
                     {/* Notifications */}
-                    <button className="p-2 text-slate-400 hover:text-white transition-colors relative rounded-xl hover:bg-white/[0.04]">
+                    <button className="p-2 transition-colors relative rounded-xl cursor-pointer" style={{ color: 'rgba(255,255,255,0.35)' }}
+                        onMouseEnter={e => { e.currentTarget.style.color = '#FF4D00'; e.currentTarget.style.background = 'rgba(255,77,0,0.06)' }}
+                        onMouseLeave={e => { e.currentTarget.style.color = 'rgba(255,255,255,0.35)'; e.currentTarget.style.background = 'transparent' }}>
                         <span className="material-symbols-outlined text-xl">notifications</span>
-                        <span className="absolute top-2 right-2 w-2 h-2 bg-primary rounded-full border-2 border-[#080a14]"></span>
+                        <span className="absolute top-2 right-2 w-2 h-2 rounded-full border-2" style={{ background: '#FF4D00', borderColor: '#08080C' }}></span>
                     </button>
 
-                    {/* Agent Fidato INTEL */}
+                    {/* Agent Fidato INTEL — Antigravity orange */}
                     <button
                         onClick={toggleFidato}
                         className="relative cursor-pointer group"
@@ -287,16 +290,17 @@ export default function Header({ title, subtitle, onMenuToggle }) {
                         style={{ padding: 0, background: 'none', border: 'none' }}
                     >
                         <div className="absolute -inset-1 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"
-                            style={{ background: 'radial-gradient(circle, rgba(139,92,246,0.25) 0%, transparent 70%)', filter: 'blur(8px)' }} />
+                            style={{ background: 'radial-gradient(circle, rgba(255,77,0,0.2) 0%, transparent 70%)', filter: 'blur(8px)' }} />
                         <div className="relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl transition-all duration-300 group-hover:scale-[1.03]"
                             style={{
-                                background: 'linear-gradient(135deg, rgba(139,92,246,0.12) 0%, rgba(16,185,129,0.08) 100%)',
-                                border: '1px solid rgba(139,92,246,0.35)',
-                                boxShadow: '0 0 12px rgba(139,92,246,0.15), inset 0 1px 0 rgba(255,255,255,0.04)',
+                                background: 'linear-gradient(135deg, rgba(255,77,0,0.1) 0%, rgba(255,112,67,0.06) 100%)',
+                                border: '1px solid rgba(255,77,0,0.3)',
+                                borderTopColor: 'rgba(255,77,0,0.45)',
+                                boxShadow: '0 0 12px rgba(255,77,0,0.12), inset 0 1px 0 rgba(255,77,0,0.08)',
                             }}>
                             <div className="relative">
                                 <span className="material-symbols-outlined text-lg group-hover:scale-110 transition-transform duration-300"
-                                    style={{ color: '#a78bfa', filter: 'drop-shadow(0 0 4px rgba(139,92,246,0.4))' }}>shield</span>
+                                    style={{ color: '#FF7043', filter: 'drop-shadow(0 0 4px rgba(255,77,0,0.5))' }}>shield</span>
                                 {intelMissionCount > 0 && (
                                     <span className="absolute -top-0.5 -right-0.5 flex h-2 w-2">
                                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
@@ -305,15 +309,15 @@ export default function Header({ title, subtitle, onMenuToggle }) {
                                 )}
                             </div>
                             <span className="text-[10px] font-extrabold tracking-[0.15em] hidden sm:inline"
-                                style={{ color: '#a78bfa', textShadow: '0 0 8px rgba(139,92,246,0.3)' }}>
+                                style={{ color: '#FF7043', textShadow: '0 0 8px rgba(255,77,0,0.4)' }}>
                                 INTEL
                             </span>
                             {intelMissionCount > 0 && (
                                 <span className="text-[9px] font-black rounded-full min-w-[16px] h-[16px] flex items-center justify-center"
                                     style={{
-                                        background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)',
+                                        background: 'linear-gradient(135deg, #FF4D00, #CC3D00)',
                                         color: 'white',
-                                        boxShadow: '0 0 8px rgba(139,92,246,0.4)',
+                                        boxShadow: '0 0 8px rgba(255,77,0,0.5)',
                                     }}>
                                     {intelMissionCount}
                                 </span>
@@ -338,7 +342,13 @@ export default function Header({ title, subtitle, onMenuToggle }) {
                                     {user?.role === 'superadmin' ? 'Super Admin' : user?.role === 'admin' ? 'Admin' : user?.plan || 'Starter'}
                                 </p>
                             </div>
-                            <div className="size-9 sm:size-10 rounded-full bg-gradient-to-br from-primary to-purple-500 flex items-center justify-center text-white font-bold text-sm border-2 border-primary/30 flex-shrink-0">
+                            <div className="size-9 sm:size-10 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
+                                style={{
+                                    background: 'linear-gradient(135deg, #FF4D00, #FF7043)',
+                                    border: '2px solid rgba(255,77,0,0.4)',
+                                    boxShadow: '0 0 15px rgba(255,77,0,0.3)',
+                                    fontFamily: "'Space Grotesk', sans-serif"
+                                }}>
                                 {initials}
                             </div>
                             <span className="material-symbols-outlined text-slate-500 text-sm hidden sm:block">expand_more</span>

@@ -79,9 +79,9 @@ export default function IntelReportViewer({ mission, findings, onClose }) {
                 <defs>
                     <linearGradient id="scanGrad" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="0%" stopColor="transparent" />
-                        <stop offset="45%" stopColor="rgba(139,92,246,0.03)" />
-                        <stop offset="50%" stopColor="rgba(139,92,246,0.5)" />
-                        <stop offset="55%" stopColor="rgba(139,92,246,0.03)" />
+                        <stop offset="45%" stopColor="rgba(255, 77, 0,0.03)" />
+                        <stop offset="50%" stopColor="rgba(255, 77, 0,0.5)" />
+                        <stop offset="55%" stopColor="rgba(255, 77, 0,0.03)" />
                         <stop offset="100%" stopColor="transparent" />
                     </linearGradient>
                 </defs>
@@ -91,8 +91,8 @@ export default function IntelReportViewer({ mission, findings, onClose }) {
                 </rect>
                 {/* Grid overlay */}
                 <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-                    <line x1="0" y1="0" x2="40" y2="0" stroke="rgba(139,92,246,0.06)" strokeWidth="0.5" />
-                    <line x1="0" y1="0" x2="0" y2="40" stroke="rgba(139,92,246,0.06)" strokeWidth="0.5" />
+                    <line x1="0" y1="0" x2="40" y2="0" stroke="rgba(255, 77, 0,0.06)" strokeWidth="0.5" />
+                    <line x1="0" y1="0" x2="0" y2="40" stroke="rgba(255, 77, 0,0.06)" strokeWidth="0.5" />
                 </pattern>
                 <rect width="100%" height="100%" fill="url(#grid)" />
             </svg>
@@ -109,26 +109,26 @@ export default function IntelReportViewer({ mission, findings, onClose }) {
                         position: 'absolute', animation: 'intel-crosshair-appear 0.6s ease-out',
                     }}>
                         {/* Rings */}
-                        <circle cx="150" cy="150" r="120" fill="none" stroke="rgba(139,92,246,0.2)" strokeWidth="1" />
-                        <circle cx="150" cy="150" r="80" fill="none" stroke="rgba(139,92,246,0.15)" strokeWidth="1" />
-                        <circle cx="150" cy="150" r="40" fill="none" stroke="rgba(139,92,246,0.3)" strokeWidth="1.5" />
+                        <circle cx="150" cy="150" r="120" fill="none" stroke="rgba(255, 77, 0,0.2)" strokeWidth="1" />
+                        <circle cx="150" cy="150" r="80" fill="none" stroke="rgba(255, 77, 0,0.15)" strokeWidth="1" />
+                        <circle cx="150" cy="150" r="40" fill="none" stroke="rgba(255, 77, 0,0.3)" strokeWidth="1.5" />
                         {/* Crosshair lines */}
-                        <line x1="150" y1="10" x2="150" y2="290" stroke="rgba(139,92,246,0.3)" strokeWidth="0.5" strokeDasharray="4 4" />
-                        <line x1="10" y1="150" x2="290" y2="150" stroke="rgba(139,92,246,0.3)" strokeWidth="0.5" strokeDasharray="4 4" />
+                        <line x1="150" y1="10" x2="150" y2="290" stroke="rgba(255, 77, 0,0.3)" strokeWidth="0.5" strokeDasharray="4 4" />
+                        <line x1="10" y1="150" x2="290" y2="150" stroke="rgba(255, 77, 0,0.3)" strokeWidth="0.5" strokeDasharray="4 4" />
                         {/* Rotating sweep */}
                         <g style={{ transformOrigin: '150px 150px', animation: 'intel-sweep 2s linear infinite' }}>
                             <defs>
                                 <linearGradient id="sweepG" gradientTransform="rotate(90)">
-                                    <stop offset="0%" stopColor="rgba(139,92,246,0.4)" />
+                                    <stop offset="0%" stopColor="rgba(255, 77, 0,0.4)" />
                                     <stop offset="100%" stopColor="transparent" />
                                 </linearGradient>
                             </defs>
                             <path d="M150,150 L150,30 A120,120 0 0,1 254,90 Z" fill="url(#sweepG)" />
-                            <line x1="150" y1="150" x2="150" y2="30" stroke="rgba(139,92,246,0.8)" strokeWidth="1.5" />
+                            <line x1="150" y1="150" x2="150" y2="30" stroke="rgba(255, 77, 0,0.8)" strokeWidth="1.5" />
                         </g>
                         {/* Center */}
-                        <circle cx="150" cy="150" r="4" fill="#8b5cf6" />
-                        <circle cx="150" cy="150" r="8" fill="none" stroke="#8b5cf6" strokeWidth="1" opacity="0.5" />
+                        <circle cx="150" cy="150" r="4" fill="#FF4D00" />
+                        <circle cx="150" cy="150" r="8" fill="none" stroke="#FF4D00" strokeWidth="1" opacity="0.5" />
                     </svg>
 
                     {/* CONFIDENTIAL stamp */}
@@ -171,7 +171,7 @@ export default function IntelReportViewer({ mission, findings, onClose }) {
                     <div style={{
                         background: 'linear-gradient(180deg, rgba(10,12,22,0.98) 0%, rgba(10,12,22,0.95) 100%)',
                         backdropFilter: 'blur(20px)',
-                        borderBottom: '1px solid rgba(139,92,246,0.15)',
+                        borderBottom: '1px solid rgba(255, 77, 0,0.15)',
                         padding: '20px 28px', position: 'relative', zIndex: 2,
                     }}>
                         {/* Top bar */}
@@ -179,7 +179,7 @@ export default function IntelReportViewer({ mission, findings, onClose }) {
                             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                 <div style={{
                                     width: '36px', height: '36px', borderRadius: '10px',
-                                    background: 'linear-gradient(135deg, rgba(139,92,246,0.25), rgba(16,185,129,0.15))',
+                                    background: 'linear-gradient(135deg, rgba(255, 77, 0,0.25), rgba(16,185,129,0.15))',
                                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                                 }}>
                                     <span className="material-symbols-outlined" style={{ color: '#a78bfa', fontSize: '20px' }}>
@@ -292,7 +292,7 @@ export default function IntelReportViewer({ mission, findings, onClose }) {
                         {/* Scan line overlay on content */}
                         <div style={{
                             position: 'absolute', inset: 0, pointerEvents: 'none',
-                            background: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(139,92,246,0.015) 2px, rgba(139,92,246,0.015) 4px)',
+                            background: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255, 77, 0,0.015) 2px, rgba(255, 77, 0,0.015) 4px)',
                         }} />
 
                         {totalFindings === 0 && phase >= 3 && (
@@ -380,7 +380,7 @@ export default function IntelReportViewer({ mission, findings, onClose }) {
                     <div style={{
                         padding: '12px 28px',
                         background: 'rgba(6,8,16,0.98)',
-                        borderTop: '1px solid rgba(139,92,246,0.1)',
+                        borderTop: '1px solid rgba(255, 77, 0,0.1)',
                         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                         zIndex: 2, position: 'relative',
                     }}>
@@ -406,8 +406,8 @@ export default function IntelReportViewer({ mission, findings, onClose }) {
                     {/* Rounded border with glow */}
                     <div style={{
                         position: 'absolute', inset: 0, borderRadius: '16px',
-                        border: '1px solid rgba(139,92,246,0.2)',
-                        boxShadow: '0 0 80px rgba(139,92,246,0.08), inset 0 0 60px rgba(0,0,0,0.3)',
+                        border: '1px solid rgba(255, 77, 0,0.2)',
+                        boxShadow: '0 0 80px rgba(255, 77, 0,0.08), inset 0 0 60px rgba(0,0,0,0.3)',
                         pointerEvents: 'none', zIndex: 3,
                     }} />
                 </div>

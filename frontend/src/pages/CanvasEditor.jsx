@@ -51,11 +51,11 @@ const COLOR_PALETTE = [
     // Row 5 – Teals
     '#14b8a6','#0d9488','#0f766e','#115e59',
     // Row 6 – Blues
-    '#3b82f6','#2563eb','#1d4ed8','#1e40af',
+    '#FF4D00','#2563eb','#CC3D00','#1e40af',
     // Row 7 – Indigos
     '#6366f1','#4f46e5','#4338ca','#3730a3',
     // Row 8 – Purples
-    '#a855f7','#9333ea','#7c3aed','#6d28d9',
+    '#FF4D00','#9333ea','#7c3aed','#6d28d9',
     // Row 9 – Pinks
     '#ec4899','#db2777','#be185d','#9d174d',
     // Row 10 – Neutrals
@@ -1329,7 +1329,7 @@ function CanvasEditorInner() {
             fc.setActiveObject(group)
             fc.renderAll()
             saveHistory()
-            showToast(`✨ Icon added`)
+            showToast(` Icon added`)
         } catch (err) {
             console.error('Icon load error:', err)
             showToast('❌ Failed to load icon')
@@ -1413,7 +1413,7 @@ function CanvasEditorInner() {
             fc.setActiveObject(group)
             fc.renderAll()
             saveHistory()
-            showToast(`🎨 Sticker added`)
+            showToast(` Sticker added`)
         } catch (err) {
             console.error('Sticker load error:', err)
             showToast('❌ Failed to load sticker')
@@ -1573,7 +1573,7 @@ function CanvasEditorInner() {
             fc.setActiveObject(img)
             fc.renderAll()
             saveHistory()
-            showToast(`🎨 Texture overlay added (opacity: 40%)`)
+            showToast(` Texture overlay added (opacity: 40%)`)
         } catch (err) {
             console.error('Texture load error:', err)
             showToast('❌ Failed to load texture')
@@ -1637,7 +1637,7 @@ function CanvasEditorInner() {
             }
             fc.renderAll()
             saveHistory()
-            showToast(`✅ ${asset.name} added`)
+            showToast(` ${asset.name} added`)
         } catch (err) {
             console.error('Brand asset error:', err)
             showToast('❌ Failed to load asset')
@@ -1656,7 +1656,7 @@ function CanvasEditorInner() {
         fc.setActiveObject(rect)
         fc.renderAll()
         saveHistory()
-        showToast(`🎨 Color block added`)
+        showToast(` Color block added`)
     }, [])
 
     // ══════════════════════════════════════════════════════════════════════
@@ -2041,7 +2041,7 @@ function CanvasEditorInner() {
             fc.add(img)
             fc.renderAll()
             saveHistory()
-            showToast(`✨ Background ${bgAction === 'remove' ? 'removed' : 'replaced'} successfully`)
+            showToast(` Background ${bgAction === 'remove' ? 'removed' : 'replaced'} successfully`)
         } catch (err) { setAiError(err.message) }
         setAiLoading(false)
     }, [bgAction, bgPrompt, aiPrompt])
@@ -2106,7 +2106,7 @@ function CanvasEditorInner() {
         fc.setActiveObject(textObj)
         fc.renderAll()
         saveHistory()
-        showToast(`✨ ${isHeading ? 'Headline' : 'Copy'} added`)
+        showToast(` ${isHeading ? 'Headline' : 'Copy'} added`)
     }, [activeBrand])
 
     // ── Handle replacement image upload for Retouch tool ──
@@ -2235,7 +2235,7 @@ function CanvasEditorInner() {
             fc.setActiveObject(headObj)
             fc.renderAll()
             saveHistory()
-            showToast(`✨ Font combo: ${combo.style}`)
+            showToast(` Font combo: ${combo.style}`)
         }, 300)
     }, [loadGoogleFont, saveHistory, showToast])
 
@@ -2464,7 +2464,7 @@ function CanvasEditorInner() {
             }
         }
         fc.renderAll(); updateLayers(); saveHistory()
-        showToast(`✨ Template "${template.name}" applied with ${elements.length} elements!`)
+        showToast(` Template "${template.name}" applied with ${elements.length} elements!`)
     }, [loadGoogleFont, saveHistory, showToast, updateLayers])
 
     // ── Add SVG Design Element ──
@@ -2483,7 +2483,7 @@ function CanvasEditorInner() {
             id: `svg-${Date.now()}-${Math.random().toString(36).substring(7)}`,
         })
         fc.add(pathObj); fc.setActiveObject(pathObj); fc.renderAll(); saveHistory()
-        showToast(`✨ ${svgEl.label} added`)
+        showToast(` ${svgEl.label} added`)
     }, [saveHistory, showToast])
 
     // ── Add Curved Text (Arc) ──
@@ -2582,7 +2582,7 @@ function CanvasEditorInner() {
                 }
             })
             fc.renderAll(); saveHistory()
-            showToast(`🎨 Brand kit applied to ${count} text elements`)
+            showToast(` Brand kit applied to ${count} text elements`)
         }, 300)
     }, [activeBrand, loadGoogleFont, saveHistory, showToast])
 
@@ -2861,7 +2861,7 @@ function CanvasEditorInner() {
             fc.setActiveObject(textObj)
             fc.renderAll()
             saveHistory()
-            showToast(`✨ ${preset.label} added`)
+            showToast(` ${preset.label} added`)
         }, 200)
     }, [loadGoogleFont, saveHistory, showToast])
 
@@ -3018,7 +3018,7 @@ function CanvasEditorInner() {
             fc.renderAll()
             updateLayers()
             saveHistory()
-            showToast(`✨ Design created with ${elements.length} editable elements!`)
+            showToast(` Design created with ${elements.length} editable elements!`)
         } catch (err) {
             console.error('AI creative generate error:', err)
             const msg = err.message || 'AI generation failed. Please try again.'
@@ -3061,7 +3061,7 @@ function CanvasEditorInner() {
             img._customName = 'AI Generated'
             fc.add(img); fc.setActiveObject(img); fc.renderAll(); saveHistory()
             setShowGenPanel(false); setGenPrompt(''); setGenRefs([])
-            showToast(`✨ Image generated${data.refsUsed ? ` (${data.refsUsed} refs used)` : ''} and added to canvas`)
+            showToast(` Image generated${data.refsUsed ? ` (${data.refsUsed} refs used)` : ''} and added to canvas`)
         } catch (err) { showToast('Error: ' + err.message) }
         setGenLoading(false)
     }, [genPrompt, genEnhance, genRatio, genLoading, genRefs])
@@ -3274,7 +3274,7 @@ function CanvasEditorInner() {
 
                 case 'generate_image': {
                     const brandName = activeBrand?.name || 'Brand'
-                    setFidatoMessages(prev => [...prev, { role: 'assistant', content: `🎨 Generating: "${args.prompt?.substring(0, 50)}..."` }])
+                    setFidatoMessages(prev => [...prev, { role: 'assistant', content: ` Generating: "${args.prompt?.substring(0, 50)}..."` }])
                     try {
                         const data = await canvasAssets.aiGenerate({ prompt: args.prompt, size: args.size || '1024x1024', brandId: activeBrand?._id || undefined })
                         if (data.imageUrl) {
@@ -3333,14 +3333,14 @@ function CanvasEditorInner() {
                             id: `scene-head-${scene.sceneNumber}-${Date.now()}`,
                             _nodeType: 'script',
                         })
-                        const visual = new fabric.Textbox(`🎬 ${scene.visualDescription}`, {
+                        const visual = new fabric.Textbox(` ${scene.visualDescription}`, {
                             left: startX + 14, top: curY + 28, width: cardW - 28,
                             fontSize: 11, fontFamily: 'Inter', fill: '#94a3b8',
                             selectable: false, evented: false,
                             id: `scene-vis-${scene.sceneNumber}-${Date.now()}`,
                             _nodeType: 'script',
                         })
-                        const vo = new fabric.Textbox(`🎙️ "${scene.voiceover}"`, {
+                        const vo = new fabric.Textbox(` "${scene.voiceover}"`, {
                             left: startX + 14, top: curY + 58, width: cardW - 28,
                             fontSize: 11, fontFamily: 'Inter', fontStyle: 'italic', fill: '#64748b',
                             selectable: false, evented: false,
@@ -3594,10 +3594,10 @@ function CanvasEditorInner() {
                     
                     if (!sourceImageUrl && sceneRef && ctx.scenes && ctx.scenes[sceneRef - 1]?.imageUrl) {
                         sourceImageUrl = ctx.scenes[sceneRef - 1].imageUrl;
-                        console.log(`🎬 Dynamically resolved sceneRef=${sceneRef} to image URL`);
+                        console.log(` Dynamically resolved sceneRef=${sceneRef} to image URL`);
                     }
 
-                    setFidatoMessages(prev => [...prev, { role: 'assistant', content: `🎬 Generating video: "${prompt?.substring(0, 50)}..."` }])
+                    setFidatoMessages(prev => [...prev, { role: 'assistant', content: ` Generating video: "${prompt?.substring(0, 50)}..."` }])
                     try {
                         const data = await canvasAssets.generateVideo({
                             prompt, duration: duration || 5,
@@ -3625,7 +3625,7 @@ function CanvasEditorInner() {
                                 _provider: data.provider,
                             })
                             fc.add(bg)
-                            const icon = new fabric.Textbox('🎬', {
+                            const icon = new fabric.Textbox('movie', {
                                 left: x + cardW / 2 - 20, top: y + cardH / 2 - 30,
                                 width: 40, fontSize: 36, textAlign: 'center',
                                 selectable: false, evented: false,
@@ -3649,7 +3649,7 @@ function CanvasEditorInner() {
 
                 case 'generate_voiceover': {
                     const { text, language, speaker, speed, sceneRef } = args
-                    setFidatoMessages(prev => [...prev, { role: 'assistant', content: `🎙️ Generating voiceover (${speaker || 'anushka'})...` }])
+                    setFidatoMessages(prev => [...prev, { role: 'assistant', content: ` Generating voiceover (${speaker || 'anushka'})...` }])
                     try {
                         const data = await canvasAssets.generateVoiceover({
                             text, language: language || 'en-IN',
@@ -3666,14 +3666,14 @@ function CanvasEditorInner() {
                             const bg = new fabric.Rect({
                                 left: x, top: y, width: cardW, height: cardH,
                                 rx: 10, ry: 10,
-                                fill: 'rgba(168,85,247,0.08)',
-                                stroke: 'rgba(168,85,247,0.25)', strokeWidth: 1,
+                                fill: 'rgba(255, 77, 0,0.08)',
+                                stroke: 'rgba(255, 77, 0,0.25)', strokeWidth: 1,
                                 selectable: true, evented: true,
                                 id: `vo-bg-${Date.now()}`, _nodeType: 'voiceover',
                                 _audioUrl: data.audioUrl,
                             })
                             fc.add(bg)
-                            const voLabel = new fabric.Textbox(`🎙️ Voiceover${sceneRef ? ` • Scene ${sceneRef}` : ''}\n${text.substring(0, 60)}...`, {
+                            const voLabel = new fabric.Textbox(` Voiceover${sceneRef ? ` • Scene ${sceneRef}` : ''}\n${text.substring(0, 60)}...`, {
                                 left: x + 10, top: y + 10, width: cardW - 20,
                                 fontSize: 11, fontFamily: 'Inter', fill: '#a78bfa',
                                 selectable: false, evented: false,
@@ -3837,7 +3837,7 @@ function CanvasEditorInner() {
 
                     if (finalClips.length === 0) return 'Compilation aborted: All video generations failed.'
 
-                    setFidatoMessages(prev => [...prev, { role: 'assistant', content: `🎬 Compiling Final Ad Film "${title}" with FFmpeg...` }])
+                    setFidatoMessages(prev => [...prev, { role: 'assistant', content: ` Compiling Final Ad Film "${title}" with FFmpeg...` }])
 
                     // 3. POST to FFmpeg Compilation Route
                     try {
@@ -3865,7 +3865,7 @@ function CanvasEditorInner() {
                                 _videoUrl: compileData.videoUrl
                             })
                             fc.add(bg)
-                            const icon = new fabric.Textbox('🎥', {
+                            const icon = new fabric.Textbox('videocam', {
                                 left: 60 + cardW / 2 - 30, top: 400 + cardH / 2 - 40,
                                 width: 60, fontSize: 48, textAlign: 'center', selectable: false
                             })
@@ -3999,7 +3999,7 @@ function CanvasEditorInner() {
                     const updated = [...prev];
                     const last = { ...updated[updated.length - 1] };
                     last.thinking = false;
-                    last.content = `🔍 **Research Complete** for "${result.productName || 'product'}"\n\n${imgCount > 0 ? `✅ Found ${imgCount} product image(s)` : '⚠️ No product images found'}\n\n📄 ${researchPreview}${researchPreview.length >= 300 ? '...' : ''}`;
+                    last.content = `🔍 **Research Complete** for "${result.productName || 'product'}"\n\n${imgCount > 0 ? `<span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">check_circle</span> Found ${imgCount} product image(s)` : '⚠️ No product images found'}\n\n📄 ${researchPreview}${researchPreview.length >= 300 ? '...' : ''}`;
                     last.referenceImages = result.referenceImages || [];
                     updated[updated.length - 1] = last;
                     return updated;
@@ -4084,7 +4084,7 @@ function CanvasEditorInner() {
                 
                 for (let ti = 0; ti < totalTools; ti++) {
                     const tc = result.toolCalls[ti]
-                    console.log(`🎨 Executing tool: ${tc.name}`, tc.args)
+                    console.log(` Executing tool: ${tc.name}`, tc.args)
                     const startTime = Date.now();
                     
                     addLog(`[TaskRunner] Executing ${tc.name}...`);
@@ -4136,7 +4136,7 @@ function CanvasEditorInner() {
                             return updated;
                         });
                         
-                        toolResults.push(`✅ ${text}`)
+                        toolResults.push(` ${text}`)
                         addLog(`[Success] Call returned ok in ${Date.now() - startTime}ms.`);
                     } catch (err) {
                         console.error('Tool execution error:', err);
@@ -4157,7 +4157,7 @@ function CanvasEditorInner() {
                             return updated;
                         });
                         
-                        toolResults.push(`❌ Failed ${tc.name}`);
+                        toolResults.push(` Failed ${tc.name}`);
                     }
                 }
                 
@@ -4220,9 +4220,9 @@ function CanvasEditorInner() {
                 const updated = [...prev]
                 const lastIdx = updated.length - 1
                 if (lastIdx >= 0 && (updated[lastIdx].thinking || updated[lastIdx].content?.includes('thinking'))) {
-                    updated[lastIdx] = { role: 'assistant', content: `❌ Error: ${err.message}` }
+                    updated[lastIdx] = { role: 'assistant', content: ` Error: ${err.message}` }
                 } else {
-                    updated.push({ role: 'assistant', content: `❌ Error: ${err.message}` })
+                    updated.push({ role: 'assistant', content: ` Error: ${err.message}` })
                 }
                 return updated
             })
@@ -4998,7 +4998,7 @@ function CanvasEditorInner() {
                                                 {['bar', 'pie'].map(t => (
                                                     <button key={t} className={`ce-category-pill ${chartType === t ? 'active' : ''}`}
                                                         onClick={() => setChartType(t)} style={{ flex: 1, textTransform: 'capitalize' }}>
-                                                        {t === 'bar' ? '📊' : '🥧'} {t} Chart
+                                                        {t === 'bar' ? 'bar_chart' : '🥧'} {t} Chart
                                                     </button>
                                                 ))}
                                             </div>
@@ -5257,7 +5257,7 @@ function CanvasEditorInner() {
                                             return (
                                                 <button key={font} className="ce-font-preview" onClick={() => applyFontToSelected(font)}>
                                                     <span className="ce-font-sample" style={{ fontFamily: font }}>{font}</span>
-                                                    <span className="ce-font-label">{font.includes('Noto Sans') ? '🌐' : ''}</span>
+                                                    <span className="ce-font-label">{font.includes('Noto Sans') ? 'language' : ''}</span>
                                                 </button>
                                             )
                                         })}
@@ -5616,7 +5616,7 @@ function CanvasEditorInner() {
                             const groupTag = `sb-${Date.now()}`
 
                             if (storyBrief?.title) {
-                                fc.add(new fabric.Textbox(`🎬 ${storyBrief.title}`, {
+                                fc.add(new fabric.Textbox(` ${storyBrief.title}`, {
                                     left: startX, top: startY - 36, width: cols * (cardW + gap) - gap,
                                     fontSize: 18, fontWeight: '800', fontFamily: 'Inter',
                                     fill: '#c4b5fd', selectable: true, evented: true,
@@ -6326,7 +6326,7 @@ function CanvasEditorInner() {
                             <div style={{ marginBottom: 8 }}>
                                 <p style={{ fontSize: 10, color: '#475569', marginBottom: 4, fontWeight: 600 }}>STROKE COLOR</p>
                                 <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
-                                    {['#ffffff','#000000','#ef4444','#f97316','#f59e0b','#22c55e','#3b82f6','#6366f1','#a855f7','#ec4899','transparent'].map(c => (
+                                    {['#ffffff','#000000','#ef4444','#f97316','#f59e0b','#22c55e','#FF4D00','#6366f1','#FF4D00','#ec4899','transparent'].map(c => (
                                         <div key={`stroke-${c}`} className="ce-color-swatch" style={{ background: c === 'transparent' ? 'repeating-conic-gradient(#ccc 0% 25%, transparent 0% 50%) 50% / 10px 10px' : c, border: (c === '#000000' || c === 'transparent') ? '1px solid rgba(255,255,255,0.2)' : 'none' }}
                                             onClick={() => {
                                                 const fc = fabricRef.current; const obj = fc?.getActiveObject()
@@ -6583,7 +6583,7 @@ function CanvasEditorInner() {
                                 <button onClick={() => { addText(textInput || 'Your Heading', true); setShowTextModal(false); setTextInput('') }}
                                     style={{
                                         flex: 1, padding: '10px', borderRadius: 10, border: 'none',
-                                        background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: '#fff', fontWeight: 700,
+                                        background: 'linear-gradient(135deg, #6366f1, #FF4D00)', color: '#fff', fontWeight: 700,
                                         cursor: 'pointer', fontSize: 13,
                                     }}>
                                     Heading

@@ -10,10 +10,10 @@ import { automations as automationsAPI } from '../services/api'
 // ═══════════════════════════════════════════════════════════════
 
 const NODE_STYLES = {
-    send_message: { icon: 'chat_bubble', color: '#6366f1', bg: 'bg-indigo-500/10', border: 'border-indigo-500/30' },
+    send_message: { icon: 'chat_bubble', color: '#6366f1', bg: 'bg-[#FF4D00]/10', border: 'border-[#FF4D00]/30' },
     quick_replies: { icon: 'touch_app', color: '#f59e0b', bg: 'bg-amber-500/10', border: 'border-amber-500/30' },
     ask_question: { icon: 'help', color: '#10b981', bg: 'bg-emerald-500/10', border: 'border-emerald-500/30' },
-    condition: { icon: 'call_split', color: '#8b5cf6', bg: 'bg-purple-500/10', border: 'border-purple-500/30' },
+    condition: { icon: 'call_split', color: '#8b5cf6', bg: 'bg-[#FF4D00]/10', border: 'border-[#FF4D00]/30' },
     tag_user: { icon: 'label', color: '#06b6d4', bg: 'bg-cyan-500/10', border: 'border-cyan-500/30' },
     delay: { icon: 'timer', color: '#64748b', bg: 'bg-slate-500/10', border: 'border-slate-500/30' },
     action: { icon: 'webhook', color: '#f97316', bg: 'bg-orange-500/10', border: 'border-orange-500/30' },
@@ -22,10 +22,10 @@ const NODE_STYLES = {
 }
 
 const RECIPE_ICONS = {
-    faq_auto_reply: { icon: 'help_center', gradient: 'from-indigo-500 to-purple-500' },
+    faq_auto_reply: { icon: 'help_center', gradient: 'from-[#FF4D00] to-[#FF7A00]' },
     lead_capture: { icon: 'person_add', gradient: 'from-emerald-500 to-teal-500' },
     comment_to_dm: { icon: 'mode_comment', gradient: 'from-amber-500 to-orange-500' },
-    product_recommendation: { icon: 'recommend', gradient: 'from-pink-500 to-rose-500' },
+    product_recommendation: { icon: 'recommend', gradient: 'from-[#FF4D00] to-rose-500' },
 }
 
 export default function Automations() {
@@ -380,7 +380,7 @@ export default function Automations() {
                                 <button className="flex items-center gap-1 px-3 py-2 rounded-xl border border-dashed border-primary/30 text-sm text-primary/60 hover:text-primary hover:border-primary/50 transition-all cursor-pointer">
                                     <span className="material-symbols-outlined text-xs">add</span> Add Trigger
                                 </button>
-                                <div className="absolute top-full left-0 mt-1 bg-slate-800 border border-slate-700 rounded-xl shadow-xl p-1 hidden group-hover:block z-20 min-w-[200px]">
+                                <div className="absolute top-full left-0 mt-1 bg-[#121217] border border-slate-700 rounded-xl shadow-xl p-1 hidden group-hover:block z-20 min-w-[200px]">
                                     {['dm_received', 'keyword_match', 'comment_keyword', 'comment_any', 'story_reply', 'intent_detected'].map(type => (
                                         <button key={type} onClick={() => addTrigger(type)}
                                             className="w-full text-left px-3 py-2 rounded-lg text-sm text-slate-300 hover:bg-primary/10 hover:text-white transition-all cursor-pointer flex items-center gap-2">
@@ -458,7 +458,7 @@ export default function Automations() {
                                         {/* Collapsed Preview */}
                                         {!isEditing && (
                                             <div className="px-4 pb-3 -mt-1">
-                                                {node.type === 'send_message' && <p className="text-sm text-slate-400 line-clamp-1">💬 {node.config.messageText || 'Empty message'}</p>}
+                                                {node.type === 'send_message' && <p className="text-sm text-slate-400 line-clamp-1"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">chat</span> {node.config.messageText || 'Empty message'}</p>}
                                                 {node.type === 'quick_replies' && (
                                                     <div className="flex flex-wrap gap-1">
                                                         {(node.config.buttons || []).map((b, bi) => <span key={bi} className="px-2 py-0.5 rounded-md bg-white/[0.06] text-sm text-white">{b.label}</span>)}
@@ -802,7 +802,7 @@ function CreateCustomModal({ onSubmit, onClose, creating }) {
                 {/* Header */}
                 <div style={{ padding: '1.25rem', borderBottom: '1px solid #334155', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
-                        <h3 style={{ margin: 0, color: '#e2e8f0', fontSize: '1.1rem', fontWeight: 700 }}>✨ Create Custom Automation</h3>
+                        <h3 style={{ margin: 0, color: '#e2e8f0', fontSize: '1.1rem', fontWeight: 700 }}><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">auto_awesome</span> Create Custom Automation</h3>
                         <p style={{ color: '#64748b', margin: '0.25rem 0 0', fontSize: '0.75rem' }}>Build a custom flow with your own triggers and steps</p>
                     </div>
                     <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '1.5rem' }}>&times;</button>

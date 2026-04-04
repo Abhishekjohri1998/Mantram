@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, Fragment, memo, useLayoutEffect, useMemo } from 'react'
+import { useState, useEffect, useRef, useCallback, Fragment } from 'react'
 import SEOHead from '../components/SEOHead'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import DashboardLayout from '../components/DashboardLayout'
@@ -9,19 +9,318 @@ import VoiceInput from '../components/VoiceInput'
 import PublishModal from '../components/PublishModal'
 import GlobalLoader from '../components/GlobalLoader'
 
-// ── Modularized Imports ──
-import { 
-    ASPECT_RATIOS, creativeTypes, styles, quickStartCards, templateCategories, 
-    CAMERA_SHOT_PRESETS, IMAGE_MODELS, ANIMATE_MODELS 
-} from './CreativeStudio/constants'
-import { getTimeAgo, uploadToS3, compositeLogoOnImage } from './CreativeStudio/utils'
-import PromptArea from './CreativeStudio/components/PromptArea'
-import GalleryItem from './CreativeStudio/components/GalleryItem'
-import StudioNavItem from './CreativeStudio/components/StudioNavItem'
-import CreateToolsPanel from './CreativeStudio/components/CreateToolsPanel'
-import GalleryPanel from './CreativeStudio/components/GalleryPanel'
+// ── Helper: Time Ago ──
 
+function getTimeAgo(dateStr) {
+    if (!dateStr) return '';
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    const days = Math.floor(hrs / 24);
+    if (days < 7) return `${days}d ago`;
+    return new Date(dateStr).toLocaleDateString();
+}
+ 
+async function uploadToS3(base64Data, folder = 'uploads') {
+    try {
+        if (base64Data.startsWith('http')) return base64Data;
+        const data = await mediaAPI.upload({ imageData: base64Data, folder });
+        if (data.success && data.url) return data.url;
+        console.warn('[uploadToS3] S3 upload failed, using base64 fallback:', data.error);
+        return base64Data;
+    } catch (err) {
+        console.warn('[uploadToS3] Upload error, using base64 fallback:', err.message);
+        return base64Data;
+    }
+}
 
+// ── Aspect Ratio Options ──
+const ASPECT_RATIOS = [
+    { ratio: '1:1', label: 'Square', icon: 'crop_square' },
+    { ratio: '16:9', label: 'Widescreen', icon: 'crop_16_9' },
+    { ratio: '9:16', label: 'Social Story', icon: 'smartphone' },
+    { ratio: '2:3', label: 'Portrait', icon: 'crop_portrait' },
+    { ratio: '3:4', label: 'Traditional', icon: 'crop_3_2' },
+    { ratio: '4:5', label: 'Social Post', icon: 'crop_5_4' },
+    { ratio: '3:2', label: 'Standard', icon: 'crop_landscape' },
+    { ratio: '4:3', label: 'Classic', icon: 'crop_7_5' },
+]
+
+// ── Creative Formats ──
+const creativeTypes = [
+    { id: 'instagram-post', icon: 'photo_camera', label: 'Instagram Post', size: '1080×1350', aspectRatio: '4:5' },
+    { id: 'instagram-story', icon: 'smartphone', label: 'Story / Reel', size: '1080×1920', aspectRatio: '9:16' },
+    { id: 'facebook-ad', icon: 'ads_click', label: 'Facebook Ad', size: '1080×1350', aspectRatio: '4:5' },
+    { id: 'linkedin-post', icon: 'work', label: 'LinkedIn Post', size: '1200×1200', aspectRatio: '1:1' },
+    { id: 'youtube-thumb', icon: 'smart_display', label: 'YouTube Thumb', size: '1280×720', aspectRatio: '16:9' },
+    { id: 'banner', icon: 'web', label: 'Banner', size: '1920×600', aspectRatio: '16:9' },
+    { id: 'film-poster', icon: 'movie', label: 'Film Poster', size: '2000×3000', aspectRatio: '2:3', w: 2000, h: 3000 },
+    { id: 'hd-wide', icon: 'monitor', label: 'HD 16:9', size: '1920×1080', aspectRatio: '16:9', w: 1920, h: 1080 },
+    { id: 'a4-portrait', icon: 'description', label: 'A4 Portrait', size: '2480×3508', aspectRatio: '2:3', w: 2480, h: 3508 },
+    { id: 'square-hd', icon: 'crop_square', label: 'Square HD', size: '1200×1200', aspectRatio: '1:1', w: 1200, h: 1200 },
+    { id: 'custom-size', icon: 'tune', label: 'Custom Size', size: 'Custom', aspectRatio: null },
+]
+
+// ── Design Styles ──
+const styles = [
+    { id: 'modern', label: 'Modern', icon: 'auto_awesome' },
+    { id: 'minimal', label: 'Minimal', icon: 'format_shapes' },
+    { id: 'bold', label: 'Bold', icon: 'bolt' },
+    { id: 'elegant', label: 'Elegant', icon: 'diamond' },
+    { id: 'playful', label: 'Playful', icon: 'mood' },
+    { id: 'corporate', label: 'Corporate', icon: 'business' },
+]
+
+// ── Quick-start categories ──
+const quickStartCards = [
+    { id: 'social', icon: 'share', label: 'Social Media Post', desc: 'Instagram, Facebook, LinkedIn', color: '#6366f1' },
+    { id: 'product', icon: 'inventory_2', label: 'Product Showcase', desc: 'Feature your product or service', color: '#f59e0b' },
+    { id: 'promo', icon: 'local_offer', label: 'Promotional Offer', desc: 'Sales, discounts, special deals', color: '#ef4444' },
+    { id: 'quote', icon: 'format_quote', label: 'Customer Quote', desc: 'Reviews and testimonials', color: '#10b981' },
+    { id: 'announce', icon: 'campaign', label: 'Announcement', desc: 'Launches, updates, news', color: '#FF4D00' },
+    { id: 'story', icon: 'auto_stories', label: 'Brand Story', desc: 'Tell your brand narrative', color: '#ec4899' },
+]
+
+// ── Template Categories with Sub-Templates ──
+const templateCategories = [
+    {
+        id: 'sales', icon: 'local_offer', label: 'Sales & Offers', color: '#ef4444',
+        desc: 'Promotional offers, discounts, festive & seasonal sales',
+        subTemplates: [
+            {
+                id: 'general-sale', label: 'General Sale', icon: 'sell',
+                desc: 'All-purpose sale/offer design',
+                fields: [
+                    { key: 'offerText', label: 'Offer Details', type: 'text', placeholder: 'e.g. FLAT 50% OFF' },
+                    { key: 'validTill', label: 'Valid Till', type: 'text', placeholder: 'e.g. This Weekend Only' },
+                    { key: 'cta', label: 'Call to Action', type: 'text', placeholder: 'e.g. Order Now', default: 'Order Now' },
+                    { key: 'mood', label: 'Design Mood', type: 'select', options: ['Urgency/Bold', 'Elegant Luxury', 'Minimalist', 'Playful/Fun'] },
+                ],
+                buildPrompt: (brand, vals) => {
+                    const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
+                    return `Create a promotional sale creative for ${brand.name}.\nOFFER: ${vals.offerText || 'SPECIAL OFFER'}\nVALID TILL: ${vals.validTill || 'Limited Time'}\nCTA: "${vals.cta || 'Order Now'}"\nMOOD: ${vals.mood || 'Urgency/Bold'}\nBRAND COLORS: ${colors}\nMake the offer text LARGE and prominent. Eye-catching, bold, impossible to scroll past. Include ${brand.name} branding.`
+                }
+            },
+            {
+                id: 'diwali-sale', label: 'Diwali Sale', icon: 'celebration',
+                desc: 'Festival of lights themed sale',
+                fields: [
+                    { key: 'offerText', label: 'Offer', type: 'text', placeholder: 'e.g. Diwali Mega Sale - Up to 60% OFF' },
+                    { key: 'productName', label: 'Product/Category', type: 'text', placeholder: 'e.g. on all Electronics' },
+                    { key: 'cta', label: 'CTA', type: 'text', placeholder: 'e.g. Shop the Festive Sale', default: 'Shop Now' },
+                ],
+                buildPrompt: (brand, vals) => {
+                    const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
+                    return `Create a Diwali sale creative for ${brand.name}.\nOFFER: ${vals.offerText || 'Diwali Special Offer'}\nPRODUCT: ${vals.productName || ''}\nCTA: "${vals.cta || 'Shop Now'}"\nTHEME: Diwali — diyas, rangoli, lanterns, golden sparkles, warm festive lighting\nBRAND COLORS: ${colors}\nFestive and joyful but still on-brand. Include ${brand.name} logo. Traditional+modern design.`
+                }
+            },
+            {
+                id: 'republic-sale', label: 'Republic Day Sale', icon: 'flag',
+                desc: 'Patriotic themed sale',
+                fields: [
+                    { key: 'offerText', label: 'Offer', type: 'text', placeholder: 'e.g. Republic Day Sale – 26% OFF' },
+                    { key: 'productName', label: 'Product', type: 'text', placeholder: 'e.g. on all categories' },
+                    { key: 'cta', label: 'CTA', type: 'text', placeholder: 'e.g. Celebrate & Save', default: 'Shop Now' },
+                ],
+                buildPrompt: (brand, vals) => {
+                    const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
+                    return `Create a Republic Day sale creative for ${brand.name}.\nOFFER: ${vals.offerText || 'Republic Day Special'}\nPRODUCT: ${vals.productName || ''}\nCTA: "${vals.cta || 'Shop Now'}"\nTHEME: Republic Day — tricolor (saffron, white, green), patriotic, flag elements, Ashoka Chakra subtle\nBRAND COLORS: ${colors}\nPatriotic + brand identity blend. Include ${brand.name} logo.`
+                }
+            },
+        ]
+    },
+    {
+        id: 'product', icon: 'shopping_bag', label: 'Product Showcase', color: '#f59e0b',
+        desc: 'Feature products with professional brand styling',
+        subTemplates: [
+            {
+                id: 'product-hero', label: 'Hero Shot', icon: 'star',
+                desc: 'Full product hero with brand styling',
+                fields: [
+                    { key: 'productName', label: 'Product Name', type: 'text', placeholder: 'e.g. Premium Leather Bag' },
+                    { key: 'tagline', label: 'Tagline', type: 'text', placeholder: 'e.g. Crafted for Excellence' },
+                    { key: 'cta', label: 'CTA', type: 'text', placeholder: 'e.g. Shop Now', default: 'Shop Now' },
+                    { key: 'layout', label: 'Layout', type: 'select', options: ['Centered', 'Lifestyle', 'Flat Lay', 'Minimal White', 'Dark Luxury'] },
+                    { key: 'image', label: 'Product Image', type: 'image', hint: 'Upload product photo' },
+                ],
+                buildPrompt: (brand, vals) => {
+                    const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
+                    const font = brand.dna?.fonts?.heading?.family || 'modern sans-serif'
+                    return `Create a premium product showcase for ${brand.name}.\nPRODUCT: ${vals.productName || 'a product'}\nTAGLINE: "${vals.tagline || 'Quality You Deserve'}"\nCTA: "${vals.cta || 'Shop Now'}"\nLAYOUT: ${vals.layout || 'Centered'}\nBRAND COLORS: ${colors}\nFONT: ${font}\nClean background, brand color accents, product as hero element, professional.`
+                }
+            },
+            {
+                id: 'product-comparison', label: 'Product Comparison', icon: 'compare',
+                desc: 'Side-by-side product comparison',
+                fields: [
+                    { key: 'product1', label: 'Product 1', type: 'text', placeholder: 'e.g. Basic Plan' },
+                    { key: 'product2', label: 'Product 2', type: 'text', placeholder: 'e.g. Premium Plan' },
+                    { key: 'highlight', label: 'What to Highlight', type: 'text', placeholder: 'e.g. Premium = Best Value' },
+                ],
+                buildPrompt: (brand, vals) => {
+                    const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
+                    return `Create a product comparison visual for ${brand.name}.\nLEFT: ${vals.product1 || 'Option A'}\nRIGHT: ${vals.product2 || 'Option B'}\nHIGHLIGHT: ${vals.highlight || 'Choose the best'}\nBRAND COLORS: ${colors}\nClean split layout, easy to compare, ${brand.name} branding applied.`
+                }
+            },
+        ]
+    },
+    {
+        id: 'quotes', icon: 'format_quote', label: 'Quotes & Testimonials', color: '#10b981',
+        desc: 'Customer reviews, brand quotes, motivational content',
+        subTemplates: [
+            {
+                id: 'testimonial', label: 'Customer Testimonial', icon: 'reviews',
+                desc: 'Customer review card',
+                fields: [
+                    { key: 'quote', label: 'Quote Text', type: 'textarea', placeholder: 'Type the quote...' },
+                    { key: 'author', label: 'Author Name', type: 'text', placeholder: 'e.g. Rahul Sharma, CEO' },
+                    { key: 'bgStyle', label: 'Background', type: 'select', options: ['Solid Brand Color', 'Gradient', 'Texture', 'Photo (Blurred)', 'Dark/Moody'] },
+                ],
+                buildPrompt: (brand, vals) => {
+                    const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
+                    return `Create a testimonial card for ${brand.name}.\nQUOTE: "${vals.quote || 'Great experience!'}"\nAUTHOR: ${vals.author || 'Happy Customer'}\nBG: ${vals.bgStyle || 'Solid Brand Color'}\nBRAND COLORS: ${colors}\nElegant, large quotation marks, ${brand.name} logo subtle in corner.`
+                }
+            },
+            {
+                id: 'motivational', label: 'Motivational Quote', icon: 'lightbulb',
+                desc: 'Inspirational brand quote',
+                fields: [
+                    { key: 'quote', label: 'Quote', type: 'textarea', placeholder: 'e.g. Dream big, start small...' },
+                    { key: 'bgStyle', label: 'Background', type: 'select', options: ['Gradient', 'Nature Photo', 'Abstract', 'Minimal', 'Dark'] },
+                ],
+                buildPrompt: (brand, vals) => {
+                    const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
+                    return `Create a motivational quote post for ${brand.name}.\nQUOTE: "${vals.quote || 'Success starts with a single step'}"\nBG: ${vals.bgStyle || 'Gradient'}\nUSE brand colors: ${colors}\nInspirational, visually stunning, ${brand.name} branding.`
+                }
+            },
+        ]
+    },
+    {
+        id: 'announcement', icon: 'campaign', label: 'Announcements', color: '#FF4D00',
+        desc: 'Launches, updates, news, and alerts',
+        subTemplates: [
+            {
+                id: 'launch', label: 'Product Launch', icon: 'rocket_launch',
+                desc: 'New product/service launch',
+                fields: [
+                    { key: 'headline', label: 'Headline', type: 'text', placeholder: 'e.g. Introducing Our Latest Innovation' },
+                    { key: 'details', label: 'Details', type: 'textarea', placeholder: 'Brief details...' },
+                    { key: 'tone', label: 'Tone', type: 'select', options: ['Exciting', 'Professional', 'Teaser/Mystery', 'Celebratory'] },
+                ],
+                buildPrompt: (brand, vals) => {
+                    const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
+                    return `Create a product launch announcement for ${brand.name}.\nHEADLINE: "${vals.headline || 'Something Big is Coming!'}"\nDETAILS: ${vals.details || ''}\nTONE: ${vals.tone || 'Exciting'}\nBRAND COLORS: ${colors}\nBold, shareable, ${brand.name} branding prominent.`
+                }
+            },
+            {
+                id: 'news-update', label: 'News/Update', icon: 'newspaper',
+                desc: 'Brand news or company update',
+                fields: [
+                    { key: 'headline', label: 'Headline', type: 'text', placeholder: 'e.g. We just hit 10K customers!' },
+                    { key: 'details', label: 'Details', type: 'textarea', placeholder: 'More info...' },
+                ],
+                buildPrompt: (brand, vals) => {
+                    const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
+                    return `Create a news update post for ${brand.name}.\nHEADLINE: "${vals.headline || 'Exciting Update'}"\nDETAILS: ${vals.details || ''}\nBRAND COLORS: ${colors}\nProfessional, newsworthy, ${brand.name} identity applied.`
+                }
+            },
+        ]
+    },
+    {
+        id: 'events', icon: 'event', label: 'Events', color: '#ec4899',
+        desc: 'Event promotions, invitations, and recaps',
+        subTemplates: [
+            {
+                id: 'event-promo', label: 'Event Promotion', icon: 'calendar_month',
+                desc: 'Promote an upcoming event',
+                fields: [
+                    { key: 'eventName', label: 'Event Name', type: 'text', placeholder: 'e.g. Annual Tech Summit 2026' },
+                    { key: 'date', label: 'Date & Time', type: 'text', placeholder: 'e.g. March 15 | 10AM' },
+                    { key: 'venue', label: 'Venue', type: 'text', placeholder: 'e.g. Taj Hotel, Mumbai' },
+                    { key: 'cta', label: 'CTA', type: 'text', placeholder: 'e.g. Register Now', default: 'Register Now' },
+                ],
+                buildPrompt: (brand, vals) => {
+                    const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
+                    return `Create an event promo for ${brand.name}.\nEVENT: ${vals.eventName || 'Event'}\nDATE: ${vals.date || 'Coming Soon'}\nVENUE: ${vals.venue || 'TBA'}\nCTA: "${vals.cta || 'Register Now'}"\nBRAND COLORS: ${colors}\nClear hierarchy: Name > Date > Venue > CTA. ${brand.name} branding prominent.`
+                }
+            },
+            {
+                id: 'birthday', label: 'Birthday Post', icon: 'cake',
+                desc: 'Birthday greetings for team/clients',
+                fields: [
+                    { key: 'personName', label: 'Person\'s Name', type: 'text', placeholder: 'e.g. Amit Kumar' },
+                    { key: 'message', label: 'Birthday Message', type: 'textarea', placeholder: 'e.g. Wishing you a wonderful birthday!' },
+                    { key: 'image', label: 'Photo', type: 'image', hint: 'Upload their photo (optional)' },
+                ],
+                buildPrompt: (brand, vals) => {
+                    const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
+                    return `Create a birthday greeting post for ${brand.name}.\nNAME: ${vals.personName || 'Team Member'}\nMESSAGE: "${vals.message || 'Happy Birthday!'}"\nBRAND COLORS: ${colors}\nFestive, warm, celebration vibes. Cake/balloons/confetti elements. Brand logo included.`
+                }
+            },
+            {
+                id: 'anniversary', label: 'Anniversary', icon: 'favorite',
+                desc: 'Work anniversary or milestone celebration',
+                fields: [
+                    { key: 'personName', label: 'Person\'s Name', type: 'text', placeholder: 'e.g. Priya Patel' },
+                    { key: 'years', label: 'Years / Milestone', type: 'text', placeholder: 'e.g. 5 Years' },
+                    { key: 'message', label: 'Message', type: 'textarea', placeholder: 'e.g. Thank you for your dedication!' },
+                ],
+                buildPrompt: (brand, vals) => {
+                    const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
+                    return `Create a work anniversary celebration post for ${brand.name}.\nNAME: ${vals.personName || 'Team Member'}\nMILESTONE: ${vals.years || 'Anniversary'}\nMESSAGE: "${vals.message || 'Thank you for your incredible journey with us!'}"\nBRAND COLORS: ${colors}\nCelebratory, professional, warm. ${brand.name} branding applied.`
+                }
+            },
+        ]
+    },
+    {
+        id: 'content', icon: 'analytics', label: 'Content & Info', color: '#0ea5e9',
+        desc: 'Infographics, tips, educational content',
+        subTemplates: [
+            {
+                id: 'infographic', label: 'Infographic', icon: 'bar_chart',
+                desc: 'Data-driven visual content',
+                fields: [
+                    { key: 'topic', label: 'Topic', type: 'text', placeholder: 'e.g. 5 Benefits of Organic Products' },
+                    { key: 'points', label: 'Key Points (one per line)', type: 'textarea', placeholder: 'Point 1\nPoint 2\nPoint 3' },
+                    { key: 'style', label: 'Style', type: 'select', options: ['Numbered List', 'Icon Grid', 'Flowchart', 'Statistics'] },
+                ],
+                buildPrompt: (brand, vals) => {
+                    const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
+                    return `Create an infographic for ${brand.name}.\nTOPIC: ${vals.topic || 'Key Facts'}\nPOINTS: ${vals.points || '1. Point one\n2. Point two'}\nSTYLE: ${vals.style || 'Numbered List'}\nBRAND COLORS: ${colors}\nIcons for each point, visually digestible, ${brand.name} branding.`
+                }
+            },
+            {
+                id: 'service-post', label: 'Service Highlight', icon: 'design_services',
+                desc: 'Highlight a service offering',
+                fields: [
+                    { key: 'serviceName', label: 'Service Name', type: 'text', placeholder: 'e.g. Interior Design Consultation' },
+                    { key: 'headline', label: 'Headline', type: 'text', placeholder: 'e.g. Expert Design, Made Simple' },
+                    { key: 'style', label: 'Visual Style', type: 'select', options: ['Corporate Clean', 'Modern Gradient', 'Illustrated', 'Geometric'] },
+                ],
+                buildPrompt: (brand, vals) => {
+                    const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
+                    return `Create a service highlight post for ${brand.name}.\nSERVICE: ${vals.serviceName || 'our service'}\nHEADLINE: "${vals.headline || 'Expert Service'}"\nSTYLE: ${vals.style || 'Corporate Clean'}\nBRAND COLORS: ${colors}\nInformative, visually appealing, ${brand.name} identity.`
+                }
+            },
+            {
+                id: 'behind-scenes', label: 'Behind the Scenes', icon: 'videocam',
+                desc: 'Show process and culture',
+                fields: [
+                    { key: 'scene', label: 'What\'s Happening?', type: 'text', placeholder: 'e.g. Team brainstorming' },
+                    { key: 'vibe', label: 'Vibe', type: 'select', options: ['Authentic', 'Professional', 'Fun/Playful', 'Creative'] },
+                    { key: 'image', label: 'Photo', type: 'image', hint: 'Upload a BTS photo' },
+                ],
+                buildPrompt: (brand, vals) => {
+                    const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
+                    return `Create a behind-the-scenes story for ${brand.name}.\nSCENE: ${vals.scene || 'Team at work'}\nVIBE: ${vals.vibe || 'Authentic'}\nBRAND COLORS: ${colors} as accent overlays\nAuthentic, warm, ${brand.name} brand identity maintained.`
+                }
+            },
+        ]
+    },
+]
 
 export default function CreativeStudio() {
 
@@ -59,10 +358,130 @@ export default function CreativeStudio() {
     const [selectedShot, setSelectedShot] = useState(null)      // Camera shot preset for AI Create
     const [psSelectedShot, setPsSelectedShot] = useState(null)  // Camera shot preset for Photo Studio
 
+    // ── Camera Shot Presets ── (professional directive injected into prompt)
+    const CAMERA_SHOT_PRESETS = [
+        {
+            id: 'worms-eye-hero',
+            label: "Worm's Eye",
+            icon: 'south',
+            emoji: 'south',
+            color: '#f97316',
+            description: 'Camera flat on ground, subject towers above, open sky fills the frame',
+            injection: 'SHOT TYPE: extreme worm\'s-eye view. Camera is placed flat on the ground pointing straight up. The subject stands directly over the camera lens, legs straddling it, body filling the full vertical frame from bottom to top. The product or hand is thrust downward toward the lens and appears enormous in the near foreground — 3× to 5× larger than life. The subject\'s face looks down at the camera with confidence. Open blue sky, clouds, or clean studio ceiling fills the top 60% of the frame behind them. Ultra-wide 14mm lens, strong forced perspective, feet and legs massive at bottom, torso receding, face small at top. Shot style: Maxi / Pepsi commercial worm\'s-eye street photography.',
+        },
+        {
+            id: 'high-action',
+            label: 'High Action',
+            icon: 'bolt',
+            emoji: 'bolt',
+            color: '#ef4444',
+            description: 'Mid-air jump, product thrust toward lens, motion-blurred background',
+            injection: 'SHOT TYPE: low-angle action freeze shot. Camera is positioned at waist height or below, angled upward. Subject is caught mid-jump or mid-leap, body airborne, at least one foot off or near the ground. The product (can, bottle, sneaker, or box) is gripped in one hand and thrust aggressively toward the camera — it appears massive and sharp in the foreground while the subject\'s body is in focus behind it. Background is a real urban street or concrete wall with horizontal motion blur streaks from passing cars or environmental movement. Sky fills the top of frame. 1/2000s freeze shutter. 24mm wide-angle. Shot style: Red Bull / Nike action advertising.',
+        },
+        {
+            id: 'fisheye-lean',
+            label: 'Fisheye Flex',
+            icon: 'lens',
+            emoji: 'lens',
+            color: '#FF4D00',
+            description: 'Extreme fisheye, ground level, buildings bow outward around the subject',
+            injection: 'SHOT TYPE: extreme ground-level fisheye distortion shot. Camera is placed at or below ankle height with a super-wide 8mm fisheye lens. Subject crouches or squats low to the ground, filling the center frame. Their sneakers, feet, or lower body are enormous and occupying the bottom third of the frame. Surrounding skyscrapers, buildings, or walls bow dramatically outward in a barrel-distortion curve — bending away from the center like the frame is wrapping around the subject. The ground curves downward at the edges. Everything except the subject is distorted. Sky at top. Shot style: Supreme / streetwear fisheye skate photography, girl-in-city crouch pose.',
+        },
+        {
+            id: 'fashion-low',
+            label: 'Low Editorial',
+            icon: 'camera_enhance',
+            emoji: 'camera_enhance',
+            color: '#06b6d4',
+            description: 'Ground-level, sole/product massive in foreground, model crouches over the lens',
+            injection: 'SHOT TYPE: ultra-low ground editorial shot. Camera is positioned at floor level, lens pointing upward at roughly 45 degrees. Subject crouches or leans dramatically toward the camera, one leg extended toward the lens so the shoe sole or sneaker sole fills the extreme bottom foreground in sharp focus — appearing as large as the subject\'s entire torso. The model\'s face is visible above, looking down into the lens with editorial attitude. Studio background with strong directional rim lighting. The sole detail, tread, and texture are razor-sharp in macro foreground while the body is also in focus. Shot style: Midjourney sneaker editorial — sole-forward crouch shot, fashion magazine.',
+        },
+        {
+            id: 'dutch-tilt',
+            label: 'Dutch Tilt',
+            icon: 'rotate_90_degrees_cw',
+            emoji: 'rotate_90_degrees_cw',
+            color: '#ec4899',
+            description: 'Camera tilted 20–30°, horizon diagonal, cinematic psychological tension',
+            injection: 'SHOT TYPE: Dutch angle / canted camera shot. The entire frame is rotated approximately 25 degrees clockwise or counter-clockwise. The horizon line is a strong diagonal. Subject is positioned off-center in the frame, their body aligned with the tilt so they appear to defy gravity. Strong negative space on one side. The product is held prominently. Background shows a cityscape, hallway, or editorial studio that also participates in the tilt creating visual disorientation. Anamorphic lens with slight oval bokeh. Shot style: cinematic editorial, fashion campaign, psychological tension photography — Vogue editorial.',
+        },
+        {
+            id: 'overhead-flatlay',
+            label: 'Overhead',
+            icon: 'arrow_downward',
+            emoji: 'arrow_downward',
+            color: '#22c55e',
+            description: 'Dead overhead flat lay — product styled on surface with dramatic shadows',
+            injection: 'SHOT TYPE: dead-overhead flat lay. Camera is mounted directly above, pointing straight down at 90 degrees to the surface. The product is the hero — beautifully styled and placed on a clean surface (marble, concrete, white seamless, or textured paper). Supporting props are arranged symmetrically or artistically around the product. A single strong light source from one side casts crisp, long geometric shadows that become a design element. The product label or face is perfectly oriented toward the viewer. Top-down. Nothing in the frame except product, surface, and intentional props. Shot style: commercial product flat lay, Kinfolk magazine, Apple product photography.',
+        },
+        {
+            id: 'dramatic-close',
+            label: 'Extreme Close',
+            icon: 'search',
+            emoji: 'search',
+            color: '#eab308',
+            description: 'Macro close-up, product texture as hero, silky bokeh surrounds it',
+            injection: 'SHOT TYPE: extreme macro close-up. Camera is at macro range — lens nearly touching the product or face. Subject or product fills and overflows the entire frame — we see nothing but texture, material, and surface detail. The label, fabric weave, skin pore, condensation droplet, or material finish becomes the visual universe. Shot on 105mm macro lens, f/2.8, razor-thin depth of field — only a 2mm slice is perfectly sharp while everything behind and in front dissolves into smooth creamy bokeh. Studio lighting rakes at a low angle to reveal every micro-texture as relief. Shot style: watch advertisement close-up, perfume flask, sneaker material close.',
+        },
+        {
+            id: 'cinematic-wide',
+            label: 'Cinematic Wide',
+            icon: 'panorama_wide_angle',
+            emoji: 'movie',
+            color: '#FF4D00',
+            description: 'Epic 2.39:1 anamorphic wide, subject small in vast landscape, cinematic haze',
+            injection: 'SHOT TYPE: anamorphic cinematic wide shot. Ultra-wide establishing frame in 2.39:1 letterbox widescreen ratio. The subject and product are positioned confidently in the lower third of the frame — intentionally small relative to the sweeping landscape, architecture, or environment around them. The scene has multiple depth layers: sharp foreground element, subject in mid-ground, atmospheric haze or fog in the distance. Anamorphic lens flare visible on light sources. Golden hour or dramatic mixed light. Cinematic color grade — teal shadows, warm highlights. Shot style: Denis Villeneuve / Christopher Nolan commercial — the environment is as important as the subject.',
+        },
+        {
+            id: 'freeze-motion',
+            label: 'Freeze Frame',
+            icon: 'shutter_speed',
+            emoji: 'shutter_speed',
+            color: '#67e8f9',
+            description: 'Ultra-fast shutter: liquid splash, fabric fan, or flying product — all suspended',
+            injection: 'SHOT TYPE: high-speed strobe freeze. Camera set to 1/8000s shutter speed or strobe-frozen at that equivalent. A physically impossible moment is captured: liquid bursting outward from a shaken bottle, fabric billowing and suspended mid-flow, the product thrown into the air with trajectory particles around it, or water droplets exploding upward from a surface hit. Every droplet, thread, and particle is individually sharp and frozen — arrested mid-physics. Background is a clean studio or gradient. The product is at the center of the explosive energy. Shot style: Milk splash advertisement, Absolut Vodka frozen moment, fashion water spray editorial.',
+        },
+        {
+            id: 'shoulder-candid',
+            label: 'Street Candid',
+            icon: 'photo_camera_back',
+            emoji: 'photo_camera_back',
+            color: '#a3e635',
+            description: 'Handheld 35mm film, authentic unposed street energy, real-life moment',
+            injection: 'SHOT TYPE: candid street documentary. Handheld camera with natural shake, shot on 35mm film equivalent (Kodak Portra 400 or Fuji 400H color science). The subject is NOT posed — they are caught mid-laugh, mid-walk, mid-sip, or mid-conversation, fully immersed in their own world. The product appears naturally in the scene (in their hand, on a table, in a bag). Composition is slightly off-center, breathing room on one side. Natural available light — golden hour sunlight, neon bounce, or soft overcast. Film grain at ISO 1600 visible. Slight vignette. No studio feel whatsoever. Shot style: Leica street photography, Tyler Mitchell, Nan Goldin — real moment, real life.',
+        },
+        {
+            id: 'birds-eye-social',
+            label: "Bird's Eye",
+            icon: 'north',
+            emoji: 'north',
+            color: '#f59e0b',
+            description: "Directly overhead, subject looks tiny within bold graphic ground geometry",
+            injection: "SHOT TYPE: high aerial bird's-eye view. Camera is positioned directly above, 10–30 feet high, pointing straight down. The subject lies, sits, or stands on a graphic surface — bold geometric tiles, painted road markings, a colorful rug, or a patterned floor. The geometric ground pattern creates a strong graphic composition that the subject is deliberately placed within — like a human element in an abstract diagram. The subject and product are seen from directly above, face visible looking up at the camera (if portrait) or artfully arranged (if flatlay). Negative space is used intentionally. Shot style: aerial fashion Instagram, Cosmo flat lay, Alex Prager overhead.",
+        },
+        {
+            id: 'over-shoulder',
+            label: 'Over Shoulder',
+            icon: 'switch_camera',
+            emoji: 'switch_camera',
+            color: '#FF4D00',
+            description: "Camera behind subject's shoulder \u2014 immersive POV, we see what they see",
+            injection: "SHOT TYPE: over-the-shoulder POV shot. Camera is positioned just behind and above the subject's right or left shoulder — we see the back of their head, neck, and one shoulder blurred in the immediate foreground. The subject is reaching toward the product, looking at it, interacting with it — and we are right behind them, inhabiting their perspective. The product is in sharp focus in the mid-ground. If another person is present, we see their face reacting to our subject. 85mm lens, shallow depth of field, shoulder is soft bokeh at screen edge. Intimate, cinematic, first-person narrative. Shot style: fashion film, perfume campaign — immersive editorial storytelling.",
+        },
+    ];
 
 
 
 
+    const IMAGE_MODELS = [
+        { id: 'nanobanana-2', name: 'NanoBanana 2', icon: 'auto_awesome', desc: 'Default • Fast • Best with references', provider: 'LaoZhang', badge: 'bolt', color: '#FF4D00' },
+        { id: 'nanobanana-pro', name: 'NanoBanana Pro', icon: 'diamond', desc: 'Premium quality • Better details', provider: 'LaoZhang', badge: 'diamond', color: '#ec4899' },
+        { id: 'flux-pro-v1.1', name: 'Flux Pro v1.1', icon: 'bolt', desc: 'Photorealistic • Great anatomy', provider: 'LaoZhang', badge: 'local_fire_department', color: '#f97316' },
+        { id: 'flux-2-pro', name: 'Flux 2 Pro', icon: 'stars', desc: 'Latest Flux • Premium photorealism', provider: 'LaoZhang', badge: 'auto_awesome', color: '#eab308' },
+        { id: 'seedream-5', name: 'Seedream 5', icon: 'park', desc: 'Creative • Artistic style', provider: 'LaoZhang', badge: 'eco', color: '#22c55e' },
+        { id: 'ideogram', name: 'Ideogram v3', icon: 'text_fields', desc: 'Best for text in images', provider: 'LaoZhang', badge: 'palette', color: '#06b6d4' },
+        { id: 'grok-imagen', name: 'Grok Imagen', icon: 'smart_toy', desc: 'xAI • High quality generation', provider: 'xAI', badge: 'smart_toy', color: '#ef4444' },
+    ]
 
     // ── Animate State ──
     const [animateModalOpen, setAnimateModalOpen] = useState(false)
@@ -79,6 +498,14 @@ export default function CreativeStudio() {
     const animatePollRef = useRef(null)
     const animateImageRef = useRef(null) // Stores the image URL being animated (avoids stale closure)
 
+    // Synced with backend MODEL_CAPABILITIES (falClient.js) + xAI/fal.ai/PiAPI API docs
+    const ANIMATE_MODELS = {
+        'grok-imagine': { name: 'Grok Imagine', icon: 'smart_toy', dur: [1, 15], ratios: ['1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3'], firstFrame: true, refImages: false, nativeAudio: true, desc: 'Fast, affordable, image-to-video' },
+        'seedance-2.0': { name: 'Seedance 2.0', icon: 'movie', dur: [4, 15], ratios: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'], firstFrame: true, refImages: true, nativeAudio: true, desc: 'Cinematic, camera control' },
+        'kling-3.0': { name: 'Kling 3.0', icon: 'videocam', dur: [3, 15], ratios: ['16:9', '9:16', '1:1'], firstFrame: true, refImages: false, nativeAudio: true, desc: 'Best motion & physics' },
+        'veo-3.1': { name: 'Veo 3.1', icon: 'theaters', dur: [4, 8], ratios: ['16:9', '9:16'], firstFrame: true, refImages: true, nativeAudio: true, desc: 'Premium cinematic quality' },
+        'seedance-1.0': { name: 'Seedance 1.0', icon: 'eco', dur: [5, 10], ratios: ['16:9', '9:16', '1:1', '4:3', '3:4'], firstFrame: true, refImages: false, nativeAudio: false, desc: 'Fast & affordable' },
+    }
 
     // ── Animate: AI Prompt Suggestion ──
     // Accepts an optional imageItem so gallery buttons can pass the specific
@@ -180,7 +607,6 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
                     resolution: '1080p',
                     aspectRatio: animateAspectRatio,
                     firstImageUrl: imageUrl,
-                    referenceImages: imageUrl ? [imageUrl] : [], // Pass as @image1
                     generateAudio: true,
                     qualityMode: 'fast',
                     brandId: activeBrand?._id || null,
@@ -424,6 +850,9 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
     const [galleryFilter, setGalleryFilter] = useState('All')
     const [viewMode, setViewMode] = useState('list')
     const [showAdvanced, setShowAdvanced] = useState(false)
+    const [floatingTray, setFloatingTray] = useState(null) // null | 'format' | 'camera' | 'references' | 'text' | 'advanced'
+    const [psTray, setPsTray] = useState(null) // null | 'product' | 'camera' | 'scene' | 'ratio' | 'refs'
+    const [carouselTray, setCarouselTray] = useState(null) // null | 'format' | 'genre' | 'style' | 'products' | 'slides'
     const [agenticQuality, setAgenticQuality] = useState('fast') // 'fast' | 'quality'
     const [generateCopy, setGenerateCopy] = useState(false) // Opt-in: render text on image
     const [customHeadline, setCustomHeadline] = useState('')  // Headline (pre-filled by AI, editable by user)
@@ -588,67 +1017,76 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
     }, [])
 
 
-
-    // ── Consolidated Brand Change & Mode Controller ──
     useEffect(() => {
-        if (!activeBrand?._id) {
-            setBrandImages([]);
-            return;
+        if (!activeBrand?._id) { setBrandImages([]); return }
+        if (activeBrand.dna?.brandImages?.length > 0) {
+            setBrandImages(activeBrand.dna.brandImages)
+            return
         }
+        (async () => {
+            try {
+                const data = await brandsAPI.get(activeBrand._id)
+                if (data?.brand?.dna?.brandImages?.length > 0) {
+                    setBrandImages(data.brand.dna.brandImages)
+                } else {
+                    console.log('🖼️ No brand images for', activeBrand.name)
+                }
+            } catch (e) { console.warn('🖼️ Could not fetch brand images:', e.message) }
+        })()
+    }, [activeBrand?._id])
 
-        // 1. Abort previous processing on brand change
-        if (activeBrand._id !== activeBrandIdRef.current) {
-            console.log('Brand changed, aborting creative processing...');
-            aiCreateAbortRef.current?.abort();
-            psAbortRef.current?.abort();
-            campAbortRef.current?.abort();
-            activeBrandIdRef.current = activeBrand._id;
-            
+    useEffect(() => {
+        if (activeBrand?._id !== activeBrandIdRef.current) {
+            console.log('Brand changed, aborting creative processing...')
+            aiCreateAbortRef.current?.abort()
+            psAbortRef.current?.abort()
+            campAbortRef.current?.abort()
+            activeBrandIdRef.current = activeBrand?._id
             if (activeGenerations.length > 0 || enhancing || templateGenerating) {
-                setActiveGenerations([]);
-                setEnhancing(false);
-                setTemplateGenerating(false);
+                setActiveGenerations([]); setEnhancing(false); setTemplateGenerating(false)
             }
         }
-
-        // 2. Fetch Brand Images (Conditional)
-        if (activeBrand.dna?.brandImages?.length > 0) {
-            setBrandImages(activeBrand.dna.brandImages);
-        } else {
-            brandsAPI.get(activeBrand._id)
-                .then(data => {
-                    if (data?.brand?.dna?.brandImages?.length > 0) {
-                        setBrandImages(data.brand.dna.brandImages);
-                    }
-                })
-                .catch(e => console.warn('🖼️ Could not fetch brand images:', e.message));
+    }, [activeBrand?._id, activeGenerations.length, enhancing, templateGenerating])
+    useEffect(() => {
+        if (autoGenerate && activeBrand && prompt.trim() && activeGenerations.length === 0) {
+            setAutoGenerate(false)
+            handleGenerate()
         }
+    }, [autoGenerate, activeBrand, prompt, activeGenerations.length, handleGenerate]) // eslint-disable-line react-hooks/exhaustive-deps
 
-        // 3. Load Image Bank and History
-        loadImageBank();
-        if (!historyLoaded) {
-            creativesAPI.list({ brandId: activeBrand._id, limit: 30, sort: '-createdAt' })
-                .then(data => {
-                    const creatives = (data.creatives || []).filter(c => c.imageUrl);
-                    if (creatives.length > 0 && generationHistory.length === 0) {
-                        setGenerationHistory(creatives.map(c => ({
-                            ...c,
-                            _prompt: c.prompt || c.title || '',
-                            _timestamp: new Date(c.createdAt).getTime(),
-                        })));
-                    }
-                    setHistoryLoaded(true);
-                })
-                .catch(() => setHistoryLoaded(true));
+    useEffect(() => {
+        if (activeBrand?._id) {
+            loadImageBank()
+            // Load previous generation history from server (persists across refresh)
+            if (!historyLoaded) {
+                creativesAPI.list({ brandId: activeBrand._id, limit: 30, sort: '-createdAt' })
+                    .then(data => {
+                        const creatives = (data.creatives || []).filter(c => c.imageUrl)
+                        if (creatives.length > 0 && generationHistory.length === 0) {
+                            setGenerationHistory(creatives.map(c => ({
+                                ...c,
+                                _prompt: c.prompt || c.title || '',
+                                _timestamp: new Date(c.createdAt).getTime(),
+                            })))
+                        }
+                        setHistoryLoaded(true)
+                    })
+                    .catch(() => setHistoryLoaded(true))
+            }
         }
+    }, [activeBrand?._id]) // eslint-disable-line react-hooks/exhaustive-deps
 
-        // 4. Load Templates/Categories only when in template mode
-        if (studioMode === 'templates') {
-            loadCustomTemplates();
-            loadCustomCategories();
+    useEffect(() => {
+        if (studioMode === 'templates' && activeBrand?._id) loadCustomTemplates()
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [studioMode, activeBrand?._id])
+
+    useEffect(() => {
+        if (studioMode === 'templates' && activeBrand?._id) {
+            loadCustomCategories()
         }
-    }, [activeBrand?._id, studioMode]); // merged dependencies for fewer re-renders
-
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [studioMode, activeBrand?._id])
 
     useEffect(() => {
         if (prompt.trim()) {
@@ -799,6 +1237,55 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
 
 
 
+
+
+    // ── Client-side logo compositing (pixel-perfect, uses actual brand logo) ──
+    function compositeLogoOnImage(imageUrl, logoUrl, position, size) {
+        return new Promise((resolve) => {
+            const img = new window.Image()
+            img.crossOrigin = 'anonymous'
+            img.onload = () => {
+                const canvas = document.createElement('canvas')
+                canvas.width = img.width
+                canvas.height = img.height
+                const ctx = canvas.getContext('2d')
+                ctx.drawImage(img, 0, 0)
+ 
+                const logo = new window.Image()
+                logo.crossOrigin = 'anonymous'
+                logo.onload = () => {
+                    // Calculate logo size
+                    const pct = size === 'small' ? 0.08 : size === 'large' ? 0.2 : 0.12
+                    const maxW = canvas.width * pct
+                    const scale = maxW / logo.width
+                    const lw = logo.width * scale
+                    const lh = logo.height * scale
+                    const pad = canvas.width * 0.03 // 3% padding from edges
+ 
+                    // Position mapping
+                    const posMap = {
+                        'top-left': [pad, pad],
+                        'top-center': [(canvas.width - lw) / 2, pad],
+                        'top-right': [canvas.width - lw - pad, pad],
+                        'center-left': [pad, (canvas.height - lh) / 2],
+                        'center': [(canvas.width - lw) / 2, (canvas.height - lh) / 2],
+                        'center-right': [canvas.width - lw - pad, (canvas.height - lh) / 2],
+                        'bottom-left': [pad, canvas.height - lh - pad],
+                        'bottom-center': [(canvas.width - lw) / 2, canvas.height - lh - pad],
+                        'bottom-right': [canvas.width - lw - pad, canvas.height - lh - pad],
+                    }
+                    const [x, y] = posMap[position] || posMap['bottom-right']
+ 
+                    ctx.drawImage(logo, x, y, lw, lh)
+                    resolve(canvas.toDataURL('image/png'))
+                }
+                logo.onerror = () => resolve(imageUrl) // fallback to original if logo fails
+                logo.src = logoUrl
+            }
+            img.onerror = () => resolve(imageUrl)
+            img.src = imageUrl
+        })
+    }
 
 
     async function handleEnhancePrompt() {
@@ -981,7 +1468,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
                 })
             } else if (errMsg.includes('timeout') || errMsg.includes('timed out') || errMsg.includes('network') || errMsg.includes('fetch failed') || errMsg.includes('econnreset')) {
                 setError({
-                    message: '⏱️ Request timed out. The server might be under heavy load. Please try again.',
+                    message: 'Request timed out. The server might be under heavy load. Please try again.',
                     isProviderError: true,
                     provider: 'Network',
                     isRetryable: true,
@@ -1036,6 +1523,121 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
         }
     }
 
+    // ── Photoshoot: generate handler ──
+    const handlePhotoshoot = async () => {
+        if (!productImage || !activeBrand) return
+        setPhotoshootGenerating(true)
+        setPhotoshootError('')
+        setPhotoshootSaved(false)
+        try {
+            const brandColors = activeBrand?.dna?.colors?.map(c => c.hex).join(', ') || ''
+            const data = await agentsAPI.aiPhotoshoot({
+                image: productImage,
+                brief: photoshootBrief,
+                brandName: activeBrand?.name,
+                brandColors,
+                fidelity,
+                aspectRatio,
+                imageModel,
+                styleRef: referenceImages.style || null,
+                characterRef: referenceImages.character || null,
+                cameraAngle,
+                lens,
+                lightingStyle,
+                lightDirection,
+                surface,
+                modelPresence,
+                mood,
+                cameraShot: psSelectedShot ? (() => {
+                    const s = CAMERA_SHOT_PRESETS.find(x => x.id === psSelectedShot)
+                    return s ? s.injection : null
+                })() : null,
+            })
+            if (data.success) {
+                setPhotoshootResult(data)
+                setPsHistory(prev => [{ ...data, _brief: photoshootBrief, _timestamp: Date.now() }, ...prev])
+                saveToImageBank(data)
+            } else if (data.modelBusy) {
+                setPhotoshootError(data.errorMessage || 'Model is busy — try switching to a different model using the selector above.')
+            } else {
+                setPhotoshootError({
+                    message: data.error || 'Generation failed',
+                    isProviderError: data.isProviderError,
+                    provider: data.provider
+                })
+            }
+        } catch (err) {
+            setPhotoshootError({
+                message: err.message,
+                isProviderError: err.isProviderError,
+                provider: err.provider
+            })
+        } finally {
+            setPhotoshootGenerating(false)
+        }
+    }
+
+    // ── Carousel: generate handler ──
+    const handleCarouselGenerate = async () => {
+        if (!activeBrand || !carouselPrompt.trim() || carouselGenerating) return
+        setCarouselGenerating(true)
+        setCarouselError(null)
+        setCarouselResult(null)
+        try {
+            const data = await creativesAPI.generateCarousel({
+                prompt: carouselPrompt,
+                slideCount: carouselSlides,
+                slideRatio: carouselSlideFormat,
+                brandId: activeBrand._id,
+                selectedModel: imageModel || 'nanobanana-2',
+                productImages: carouselProductImages.filter(Boolean),
+                brandLogo: activeBrand?.dna?.logo || null,
+                style: carouselStyle,
+                themeImageUrl: carouselThemeImage || null,
+                themeAnalysis: carouselThemeAnalysis ? { ...carouselThemeAnalysis, genre: carouselGenre } : { genre: carouselGenre },
+            })
+            if (data.success) {
+                setCarouselResult({
+                    panoramicUrl: data.panoramicUrl,
+                    carouselId: data.carouselId,
+                    provider: data.provider,
+                    panels: [],
+                })
+                setCarouselPolling(true)
+                const pollId = data.carouselId
+                let retries = 0
+                const poll = setInterval(async () => {
+                    try {
+                        const status = await creativesAPI.getCarousel(pollId)
+                        if (status.error) {
+                            setCarouselError(`Panel processing failed: ${status.error}`)
+                            setCarouselPolling(false)
+                            clearInterval(poll)
+                            return
+                        }
+                        if (status.panels?.length > 0) {
+                            setCarouselResult(prev => ({
+                                ...prev,
+                                panels: status.panels,
+                                panoramicUrl: status.panoramicUrl || prev?.panoramicUrl,
+                            }))
+                        }
+                        if (status.status === 'ready' || status.status === 'done') {
+                            setCarouselPolling(false)
+                            clearInterval(poll)
+                        }
+                        retries++
+                        if (retries > 100) { clearInterval(poll); setCarouselPolling(false); setCarouselError('Generation is taking too long — panels may still be processing.') }
+                    } catch { retries++; if (retries > 100) { clearInterval(poll); setCarouselPolling(false) } }
+                }, 3000)
+            } else {
+                setCarouselError(data.error || 'Generation failed')
+            }
+        } catch (err) {
+            setCarouselError(err.message || 'Generation failed')
+        }
+        setCarouselGenerating(false)
+    }
 
     // ── Photoshoot AI Editing: mask helpers ──
     function setupPsMaskCanvas() {
@@ -1564,8 +2166,10 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                 canonical="/creative-studio"
             />
 
-            {/* ══ Unified Studio Navigation ══ */}
-            <div className="flex items-center gap-1.5 p-1 rounded-2xl glass-panel mb-6 fade-up overflow-x-auto scrollbar-hide whitespace-nowrap">
+            {/* ══ Unified Studio Navigation (sticky — tabs + optional gallery sub-bar) ══ */}
+            <div className="flex flex-col gap-0 rounded-2xl mb-4 mx-2 sticky z-40" style={{ top: '4rem', background: '#12121a', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 6px 32px rgba(0,0,0,0.6), 0 1px 0 rgba(255,255,255,0.05) inset' }}>
+                {/* ── Row 1: Tab Buttons ── */}
+                <div className="flex items-center gap-1.5 p-2 overflow-x-auto scrollbar-hide whitespace-nowrap">
                 {[
                     { id: 'create', icon: 'auto_awesome', label: 'AI Create' },
                     { id: 'photoshoot', icon: 'photo_camera', label: 'Photoshoot' },
@@ -1578,20 +2182,68 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                     { id: 'imagebank', icon: 'photo_library', label: 'Image Bank', badge: bankTotal > 0 ? bankTotal : null },
                     { id: 'canvas', icon: 'draw', label: 'AI Canvas', isNav: true },
                 ].map(tab => (
-                    <StudioNavItem
-                        key={tab.id}
-                        id={tab.id}
-                        activeId={studioMode}
-                        icon={tab.icon}
-                        label={tab.label}
-                        badge={tab.badge}
-                        onClick={(id) => {
+                    <button key={tab.id}
+                        onClick={() => {
                             if (tab.isNav) { navigate('/ai-canvas'); return }
-                            setStudioMode(id)
-                            if (id === 'imagebank') loadImageBank()
+                            setStudioMode(tab.id)
+                            if (tab.id === 'imagebank') loadImageBank()
+                            requestAnimationFrame(() => {
+                                document.querySelector('main')?.scrollTo({ top: 0, behavior: 'instant' })
+                            })
                         }}
-                    />
+                        className={`flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-300 cursor-pointer ${
+                            studioMode === tab.id
+                                ? 'studio-nav-pill text-white font-bold'
+                                : 'studio-nav-tab-inactive'
+                        }`}>
+                        <span className={`material-symbols-outlined ${studioMode === tab.id ? 'text-lg' : 'text-base opacity-70'}`}>{tab.icon}</span>
+                        <span>{tab.label}</span>
+                        {tab.badge && <span className="bg-primary-fixed/15 text-primary-fixed text-[11px] font-bold px-1.5 py-0.5 rounded-full">{tab.badge}</span>}
+                    </button>
                 ))}
+                </div>
+
+                {/* ── Row 2: Gallery Toolbar (only in AI Create mode) ── */}
+                {studioMode === 'create' && (
+                    <div className="flex items-center justify-between px-3 pb-2 pt-0 border-t border-white/[0.06]">
+                        <div className="flex items-center gap-3">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.12em] flex items-center gap-1.5 flex-shrink-0">
+                                <span className="material-symbols-outlined text-[12px] text-[#FF4D00]">history</span>
+                                {generationHistory.length > 0 ? `Generations (${generationHistory.length})` : 'Generations'}
+                            </span>
+                            <span className="w-px h-3 bg-white/[0.12] flex-shrink-0" />
+                            <div className="flex items-center gap-0.5">
+                                {['All', 'Social', 'Product', 'Promo', 'Quote', 'Event'].map(cat => (
+                                    <button key={cat}
+                                        onClick={() => setGalleryFilter(cat)}
+                                        className={`px-2.5 py-1 rounded text-[11px] font-medium transition-all cursor-pointer ${
+                                            galleryFilter === cat
+                                                ? 'bg-[#FF4D00]/15 text-[#FF7A00]'
+                                                : 'text-slate-500 hover:text-slate-300'
+                                        }`}
+                                    >
+                                        {cat}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            {generationHistory.length > 0 && (
+                                <button onClick={() => setGenerationHistory([])} className="text-[10px] text-slate-600 hover:text-rose-400 cursor-pointer transition-all">Clear</button>
+                            )}
+                            <div className="flex rounded-md border border-white/[0.08] overflow-hidden">
+                                <button onClick={() => setViewMode('list')}
+                                    className={`p-1 cursor-pointer transition-all ${viewMode === 'list' ? 'bg-white/[0.08] text-white' : 'text-slate-600 hover:text-slate-400'}`} title="List view">
+                                    <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>view_list</span>
+                                </button>
+                                <button onClick={() => setViewMode('grid')}
+                                    className={`p-1 cursor-pointer transition-all ${viewMode === 'grid' ? 'bg-white/[0.08] text-white' : 'text-slate-600 hover:text-slate-400'}`} title="Grid view">
+                                    <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>grid_view</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* ── Cross-Tab Generation Indicator ── */}
@@ -1603,8 +2255,8 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                 if (studioMode !== 'carousel' && (carouselGenerating || carouselPolling)) bgTasks.push({ label: 'Carousel', mode: 'carousel', icon: 'view_carousel' })
                 if (bgTasks.length === 0) return null
                 return (
-                    <div className="mb-3 px-3 py-2 rounded-xl bg-gradient-to-r from-blue-500/10 via-violet-500/10 to-purple-500/10 border border-white/[0.06] flex items-center gap-3 animate-fade-in">
-                        <span className="material-symbols-outlined text-blue-400 text-sm animate-spin">progress_activity</span>
+                    <div className="mb-3 px-3 py-2 rounded-xl bg-gradient-to-r from-[#FF4D00]/10 via-violet-500/10 to-[#FF7A00]/10 border border-white/[0.06] flex items-center gap-3 animate-fade-in">
+                        <span className="material-symbols-outlined text-[#FF4D00] text-sm animate-spin">progress_activity</span>
                         <span className="text-xs text-slate-300 flex-1">{bgTasks.length} generation{bgTasks.length > 1 ? 's' : ''} running in background</span>
                         {bgTasks.map(t => (
                             <button key={t.mode} onClick={() => setStudioMode(t.mode)}
@@ -1619,160 +2271,1464 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
 
             {/* ====================== UNIFIED CREATE MODE — SPLIT PANEL ====================== */}
             {studioMode === 'create' && (
-                <div id="creative-split" className="flex-1 flex flex-col md:flex-row overflow-hidden relative">
-                    {/* ═══════════ LEFT TOOLS PANEL ═══════════ */}
-                    <div className="w-full md:w-[380px] lg:w-[420px] flex-shrink-0 flex flex-col h-full bg-[#050505] border-r border-white/[0.05] relative z-20">
-                        <CreateToolsPanel 
-                            fromContent={fromContent} setFromContent={setFromContent}
-                            designBaseImage={designBaseImage} setDesignBaseImage={setDesignBaseImage}
-                            selectedProduct={selectedProduct} setSelectedProduct={setSelectedProduct}
-                            selectedType={selectedType} setSelectedType={setSelectedType}
-                            selectedTypeInfo={selectedTypeInfo}
-                            customWidth={customWidth} setCustomWidth={setCustomWidth}
-                            customHeight={customHeight} setCustomHeight={setCustomHeight}
-                            style={style} setStyle={setStyle}
-                            referenceImages={referenceImages} setReferenceImages={setReferenceImages}
-                            setRefPickerSlot={setRefPickerSlot} setRefPickerTab={setRefPickerTab}
-                            characters={characters} setCharacters={setCharacters}
-                            setShowCharTags={setShowCharTags}
-                            selectedShot={selectedShot} setSelectedShot={setSelectedShot}
-                            generateCopy={generateCopy} setGenerateCopy={setGenerateCopy}
-                            customHeadline={customHeadline} setCustomHeadline={setCustomHeadline}
-                            customCtaText={customCtaText} setCustomCtaText={setCustomCtaText}
-                            copyRationale={copyRationale} copyLoading={copyLoading}
-                            copyIsAiSuggested={copyIsAiSuggested}
-                            showAdvanced={showAdvanced} setShowAdvanced={setShowAdvanced}
-                            imageModel={imageModel} setImageModel={setImageModel}
-                            activeBrand={activeBrand}
-                            agenticQuality={agenticQuality} setAgenticQuality={setAgenticQuality}
-                            addLogo={addLogo} setAddLogo={setAddLogo}
-                            logoPosition={logoPosition} setLogoPosition={setLogoPosition}
-                            logoSize={logoSize} setLogoSize={setLogoSize}
-                            aspectRatio={aspectRatio} setAspectRatio={setAspectRatio}
-                            enhancing={enhancing}
-                            handleEnhancePrompt={handleEnhancePrompt}
-                            handleGenerate={handleGenerate}
-                        />
-                    </div>
+                <>
+                <div className="creative-split fade-up">
+
+
+                    {/* ═══════════ GALLERY (full-width — settings moved to floating bar) ═══════════ */}
+                    <div className="creative-gallery">
 
 
 
-
-
-                    {/* ── Inline Template Form (when a quickstart card with fields is active) ── */}
-                    {activeQuickTemplate && (
-                        <div className="studio-card p-5 mb-6 fade-up border border-primary/10">
-                            <div className="flex items-center justify-between mb-4">
-                                <div className="flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-primary">{activeQuickTemplate.icon}</span>
-                                    <h4 className="text-sm font-bold text-white">{activeQuickTemplate.label}</h4>
-                                    <span className="text-xs text-slate-500">— fill in the details below</span>
-                                </div>
-                                <button onClick={() => { setActiveQuickTemplate(null); setTemplateFields({}) }}
-                                    className="text-slate-500 hover:text-white cursor-pointer">
-                                    <span className="material-symbols-outlined text-sm">close</span>
-                                </button>
-                            </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                {activeQuickTemplate.fields?.filter(f => f.type !== 'image').map(field => (
-                                    <div key={field.key}>
-                                        <label className="text-xs font-bold text-slate-400 mb-1 block">{field.label}</label>
-                                        {field.type === 'select' ? (
-                                            <select value={templateFields[field.key] || ''} onChange={e => setTemplateFields(prev => ({ ...prev, [field.key]: e.target.value }))}
-                                                className="input-glass w-full py-2 text-sm">
-                                                <option value="">Choose...</option>
-                                                {field.options?.map(o => <option key={o} value={o}>{o}</option>)}
-                                            </select>
-                                        ) : field.type === 'textarea' ? (
-                                            <textarea value={templateFields[field.key] || ''} onChange={e => setTemplateFields(prev => ({ ...prev, [field.key]: e.target.value }))}
-                                                placeholder={field.placeholder} className="input-glass w-full py-2 text-sm resize-none" rows={2} />
-                                        ) : (
-                                            <input value={templateFields[field.key] || ''} onChange={e => setTemplateFields(prev => ({ ...prev, [field.key]: e.target.value }))}
-                                                placeholder={field.placeholder} className="input-glass w-full py-2 text-sm" />
-                                        )}
+                        {/* ── AI Provider Warnings ── */}
+                        {aiWarnings.length > 0 && (
+                            <div className="space-y-2 mb-4">
+                                {aiWarnings.map((warn, i) => (
+                                    <div key={i} className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs flex items-center gap-2 animate-fade-in">
+                                        <span className="material-symbols-outlined text-sm">warning</span>
+                                        <span>{warn}</span>
                                     </div>
                                 ))}
                             </div>
+                        )}
+
+                        {/* ── Error ── */}
+                        {error && (
+                            <div className={`mb-4 p-4 rounded-xl border ${error.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'}`}>
+                                <div className="flex items-start gap-2">
+                                    <span className="material-symbols-outlined text-lg mt-0.5">{error.isProviderError ? 'warning' : 'error'}</span>
+                                    <div className="flex-1">
+                                        <span className="font-bold mr-1">{error.isProviderError ? `${error.provider || 'AI Provider'} Notice:` : 'Error:'}</span>
+                                        {error.message}
+                                    </div>
+                                </div>
+                                {error.isRetryable && (
+                                    <div className="flex gap-2 mt-3 ml-7">
+                                        <button onClick={() => { setError(null); handleGenerate() }}
+                                            className="px-4 py-1.5 text-xs font-semibold rounded-lg bg-white/10 hover:bg-white/20 transition text-white border border-white/10">
+                                            🔄 Try Again
+                                        </button>
+                                        <button onClick={() => setError(null)}
+                                            className="px-4 py-1.5 text-xs font-semibold rounded-lg bg-white/5 hover:bg-white/10 transition text-white/60 border border-white/5">
+                                            Dismiss
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* ── Current Result (newest generation, highlighted) ── */}
+                        {result && activeGenerations.length === 0 && (
+                            <div className="generation-card generation-card--new mb-5">
+                                {/* Prompt text */}
+                                <p className="text-xs text-slate-400 mb-2.5 line-clamp-2 leading-relaxed">
+                                    {prompt || 'Generated creative'}
+                                </p>
+
+                                {/* Generated Image */}
+                                <div className="relative rounded-xl overflow-hidden border border-white/[0.08] bg-black/20 cursor-pointer group mb-3"
+                                    style={{ maxHeight: '500px' }}
+                                    onClick={() => result.imageUrl && setZoomImage(result.imageUrl)}>
+                                    {result.imageUrl ? (
+                                        <>
+                                            <img src={result.imageUrl} alt={result.title || 'Generated creative'} loading="eager" decoding="async"
+                                                className="w-full h-auto object-contain"
+                                                style={{ maxHeight: '500px' }}
+                                                onError={(e) => {
+                                                    // Retry once after a short delay (base64 images can be slow to decode)
+                                                    if (!e.target.dataset.retried) {
+                                                        e.target.dataset.retried = 'true'
+                                                        setTimeout(() => { e.target.src = result.imageUrl }, 1500)
+                                                    } else {
+                                                        e.target.style.display = 'none'
+                                                    }
+                                                }} />
+                                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100">
+                                                <span className="material-symbols-outlined text-3xl text-white bg-black/50 rounded-full p-2">zoom_in</span>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <div className="flex flex-col items-center justify-center p-8 text-center"
+                                            style={{ aspectRatio: aspectRatio?.replace(':', '/') || '1/1', background: `linear-gradient(135deg, ${activeBrand?.dna?.colors?.[0]?.hex || '#2B4BEE'}40, ${activeBrand?.dna?.colors?.[1]?.hex || '#FF4D00'}40)` }}>
+                                            <span className="material-symbols-outlined text-6xl text-white/20 mb-4 block">image</span>
+                                            <p className="text-white font-bold text-lg mb-2">{textOverlay || result.title || prompt.substring(0, 40)}</p>
+                                            <p className="text-sm text-white/50">{activeBrand?.name}</p>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Metadata Row */}
+                                <div className="flex items-center gap-2 mb-3 flex-wrap">
+                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-primary/15 text-primary border border-primary/20">
+                                        {selectedTypeInfo?.label || 'Creative'}
+                                    </span>
+                                    <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-white/[0.04] text-slate-500">
+                                        {style}
+                                    </span>
+                                    <span className="text-[10px] text-slate-600">Just now</span>
+                                </div>
+
+                                {/* Action Bar */}
+                                <div className="flex items-center gap-1.5 pt-2 border-t border-white/[0.05]">
+                                    <button onClick={() => handleFeedback('accept')}
+                                        className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${feedbackState === 'accepted' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'text-slate-400 hover:text-emerald-400 hover:bg-emerald-400/10'}`}>
+                                        <span className="material-symbols-outlined text-sm">{feedbackState === 'accepted' ? 'check_circle' : 'check'}</span>
+                                        {feedbackState === 'accepted' ? 'Accepted' : 'Accept'}
+                                    </button>
+                                    <button onClick={() => handleDownloadImage(result?.imageUrl, `${result?.title || 'creative'}.png`)}
+                                        className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-white/[0.06] cursor-pointer transition-all" title="Download Original (1K)">
+                                        <span className="material-symbols-outlined text-sm">download</span>
+                                    </button>
+                                    <div className="relative">
+                                        <button onClick={(e) => { e.stopPropagation(); setUpscaleMenu(upscaleMenu ? null : { url: result?.imageUrl, filename: `${result?.title || 'creative'}.png` }) }}
+                                            className="p-1.5 rounded-lg text-slate-500 hover:text-amber-400 hover:bg-amber-400/10 cursor-pointer transition-all" title="Download HD / 4K">
+                                            {upscalingState ? <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span> : <span className="material-symbols-outlined text-sm">high_quality</span>}
+                                        </button>
+                                        {upscaleMenu && upscaleMenu.url === result?.imageUrl && (
+                                            <div ref={upscaleMenuRef} className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-[#121217]/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl p-1.5 min-w-[180px] z-50 animate-in fade-in slide-in-from-bottom-2 duration-200">
+                                                <div className="text-[10px] text-slate-500 px-2 pt-1 pb-1.5 font-semibold uppercase tracking-wider">Download Quality</div>
+                                                <button onClick={() => handleDownloadWithUpscale(upscaleMenu.url, upscaleMenu.filename, '1k')}
+                                                    className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs text-slate-300 hover:bg-white/[0.08] hover:text-white transition-all cursor-pointer">
+                                                    <span className="material-symbols-outlined text-sm text-slate-500">image</span>
+                                                    <div><div className="font-semibold">1K Original</div><div className="text-[10px] text-slate-500">1024px • Instant</div></div>
+                                                </button>
+                                                <button onClick={() => handleDownloadWithUpscale(upscaleMenu.url, upscaleMenu.filename, '2k')}
+                                                    disabled={upscalingState === '2k'}
+                                                    className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs text-slate-300 hover:bg-emerald-500/10 hover:text-emerald-400 transition-all cursor-pointer disabled:opacity-50">
+                                                    <span className="material-symbols-outlined text-sm text-emerald-500">hd</span>
+                                                    <div><div className="font-semibold">2K HD{upscalingState === '2k' ? ' — Upscaling...' : ''}</div><div className="text-[10px] text-slate-500">2048px • ~1s • Free</div></div>
+                                                    {upscalingState === '2k' && <span className="material-symbols-outlined text-sm animate-spin ml-auto text-emerald-400">progress_activity</span>}
+                                                </button>
+                                                <button onClick={() => handleDownloadWithUpscale(upscaleMenu.url, upscaleMenu.filename, '4k')}
+                                                    disabled={upscalingState === '4k'}
+                                                    className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs text-slate-300 hover:bg-amber-500/10 hover:text-amber-400 transition-all cursor-pointer disabled:opacity-50">
+                                                    <span className="material-symbols-outlined text-sm text-amber-500">4k</span>
+                                                    <div><div className="font-semibold">4K Ultra HD{upscalingState === '4k' ? ' — AI Upscaling...' : ''}</div><div className="text-[10px] text-slate-500">4096px • ~5s • AI Enhanced</div></div>
+                                                    {upscalingState === '4k' && <span className="material-symbols-outlined text-sm animate-spin ml-auto text-amber-400">progress_activity</span>}
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <button onClick={() => setPublishData({ image: result?.imageUrl, text: result?.copy?.caption || result?.title || '' })}
+                                        className="p-1.5 rounded-lg text-slate-500 hover:text-[#1877F2] hover:bg-[#1877F2]/10 cursor-pointer transition-all" title="Publish">
+                                        <span className="material-symbols-outlined text-sm">share</span>
+                                    </button>
+                                    <button onClick={handleAnimateClick}
+                                        className="p-1.5 rounded-lg text-slate-500 hover:text-[#FF4D00] hover:bg-[#FF4D00]/10 cursor-pointer transition-all" title="Animate">
+                                        <span className="material-symbols-outlined text-sm">animation</span>
+                                    </button>
+                                    <button onClick={() => {
+                                        if (!result?.imageUrl) return
+                                        const params = new URLSearchParams({ fromCreative: 'true', imageUrl: result.imageUrl })
+                                        navigate(`/content-studio?${params.toString()}`)
+                                    }}
+                                        className="p-1.5 rounded-lg text-slate-500 hover:text-cyan-400 hover:bg-cyan-400/10 cursor-pointer transition-all" title="Get Caption in Content Studio">
+                                        <span className="material-symbols-outlined text-sm">edit_note</span>
+                                    </button>
+                                    <button onClick={handleGenerate}
+                                        className="ml-auto p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-white/[0.06] cursor-pointer transition-all" title="Regenerate">
+                                        <span className="material-symbols-outlined text-sm">refresh</span>
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* ── Text on Image Card ── */}
+                        {result?.copy?.headline && (
+                            <div className="studio-card p-0 mb-5 overflow-hidden border border-[#FF4D00]/20 animate-in fade-in slide-in-from-bottom-3 duration-500" style={{ animationDelay: '200ms' }}>
+                                {/* Header */}
+                                <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-[#FF4D00]/10 to-[#FF7A00]/10 border-b border-white/[0.06]">
+                                    <div className="flex items-center gap-2">
+                                        <span className="material-symbols-outlined text-sm text-[#FF4D00]">title</span>
+                                        <h4 className="text-xs font-bold text-white">Text on Image</h4>
+                                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[#FF4D00]/20 text-[#FF7A00] border border-[#FF4D00]/30">RENDERED ON IMAGE</span>
+                                    </div>
+                                    <button onClick={() => {
+                                        const c = result.copy;
+                                        const full = [c.headline, c.subtext, c.ctaText].filter(Boolean).join('\n');
+                                        navigator.clipboard.writeText(full);
+                                        setCopiedField('all');
+                                        setTimeout(() => setCopiedField(null), 2000);
+                                    }} className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${copiedField === 'all' ? 'bg-emerald-500/20 text-emerald-400' : 'text-slate-400 hover:text-white hover:bg-white/[0.06]'}`}>
+                                        <span className="material-symbols-outlined text-xs">{copiedField === 'all' ? 'check' : 'content_copy'}</span>
+                                        {copiedField === 'all' ? 'Copied!' : 'Copy All'}
+                                    </button>
+                                </div>
+
+                                {/* Visual preview mockup */}
+                                <div className="mx-4 mt-4 rounded-xl bg-gradient-to-br from-slate-900/80 to-slate-800/60 border border-white/[0.06] p-4 text-center space-y-1.5">
+                                    <p className="text-lg font-black text-white leading-tight tracking-tight">{result.copy.headline}</p>
+                                    {result.copy.subtext && (
+                                        <p className="text-xs text-slate-300 font-medium">{result.copy.subtext}</p>
+                                    )}
+                                    {result.copy.ctaText && (
+                                        <div className="pt-1">
+                                            <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-gradient-to-r from-[#FF4D00] to-[#FF7A00] text-white text-[10px] font-bold">
+                                                {result.copy.ctaText}
+                                                <span className="material-symbols-outlined text-[10px]">arrow_forward</span>
+                                            </span>
+                                        </div>
+                                    )}
+                                    {result.copy.textStyle && (
+                                        <p className="text-[9px] text-slate-600 italic pt-1">Style: {result.copy.textStyle}</p>
+                                    )}
+                                </div>
+
+                                {/* Copy fields */}
+                                <div className="p-4 space-y-3">
+                                    {/* Headline */}
+                                    <div className="group flex items-center justify-between">
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-0.5">Headline</p>
+                                            <p className="text-sm font-bold text-white">{result.copy.headline}</p>
+                                        </div>
+                                        <button onClick={() => { navigator.clipboard.writeText(result.copy.headline); setCopiedField('headline'); setTimeout(() => setCopiedField(null), 1500); }}
+                                            className={`ml-3 opacity-0 group-hover:opacity-100 transition-all text-[10px] px-1.5 py-0.5 rounded cursor-pointer ${copiedField === 'headline' ? 'text-emerald-400' : 'text-slate-500 hover:text-white'}`}>
+                                            {copiedField === 'headline' ? '✓' : 'Copy'}
+                                        </button>
+                                    </div>
+
+                                    {/* Subtext */}
+                                    {result.copy.subtext && (
+                                        <div className="group flex items-center justify-between">
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-0.5">Subtext</p>
+                                                <p className="text-xs text-slate-300">{result.copy.subtext}</p>
+                                            </div>
+                                            <button onClick={() => { navigator.clipboard.writeText(result.copy.subtext); setCopiedField('subtext'); setTimeout(() => setCopiedField(null), 1500); }}
+                                                className={`ml-3 opacity-0 group-hover:opacity-100 transition-all text-[10px] px-1.5 py-0.5 rounded cursor-pointer ${copiedField === 'subtext' ? 'text-emerald-400' : 'text-slate-500 hover:text-white'}`}>
+                                                {copiedField === 'subtext' ? '✓' : 'Copy'}
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    {/* CTA */}
+                                    {result.copy.ctaText && (
+                                        <div className="group flex items-center justify-between">
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-0.5">CTA Button Text</p>
+                                                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-gradient-to-r from-[#FF4D00]/20 to-[#FF7A00]/20 border border-[#FF4D00]/30">
+                                                    <span className="text-xs font-bold text-[#FF7A00]">{result.copy.ctaText}</span>
+                                                </div>
+                                            </div>
+                                            <button onClick={() => { navigator.clipboard.writeText(result.copy.ctaText); setCopiedField('cta'); setTimeout(() => setCopiedField(null), 1500); }}
+                                                className={`ml-3 opacity-0 group-hover:opacity-100 transition-all text-[10px] px-1.5 py-0.5 rounded cursor-pointer ${copiedField === 'cta' ? 'text-emerald-400' : 'text-slate-500 hover:text-white'}`}>
+                                                {copiedField === 'cta' ? '✓' : 'Copy'}
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    {/* Design rationale */}
+                                    {result.copy.designRationale && (
+                                        <div className="pt-2 border-t border-white/[0.04]">
+                                            <p className="text-[10px] text-slate-600 italic">
+                                                <span className="material-symbols-outlined text-[10px] align-middle mr-1">lightbulb</span>
+                                                {result.copy.designRationale}
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+
+                        {/* ── Generating Indicators (one per active job) ── */}
+                        {activeGenerations.map((job, idx) => (
+                            <GlobalLoader
+                                key={job.jobId}
+                                isActive={true}
+                                title={activeGenerations.length > 1 ? `Creating visual ${idx + 1}/${activeGenerations.length}...` : 'Creating your visual...'}
+                                pipelineSteps={idx === 0 ? pipelineSteps : []}
+                                currentStage={`${job.prompt}${job.prompt.length >= 60 ? '...' : ''}`}
+                                icon="photo_camera"
+                                estimatedDuration={60}
+                            />
+                        ))}
+
+                        {/* ── Session Generation Gallery (persistent + viewMode-aware) ── */}
+                        {generationHistory.length > 0 && (
+                            <div className="mb-5">
+
+                                {viewMode === 'grid' ? (
+                                    /* ── Grid / Tiled View ── */
+                                    <div className="grid grid-cols-3 gap-2 max-h-[700px] overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.1) transparent' }}>
+                                        {generationHistory.map((item, idx) => (
+                                            <div key={item._id || idx} className={`group relative rounded-xl overflow-hidden border ${idx === 0 ? 'border-[#FF4D00]/30 ring-1 ring-[#FF4D00]/20' : 'border-white/[0.06]'} bg-black/20 cursor-pointer transition-all hover:border-white/[0.12] hover:scale-[1.02]`}
+                                                onClick={() => setZoomImage(item.imageUrl)}>
+                                                <img src={item.imageUrl} alt={item._prompt || 'Creative'} loading="lazy" decoding="async" className="w-full aspect-square object-cover" />
+                                                {idx === 0 && <span className="absolute top-1.5 left-1.5 text-[8px] font-bold text-[#FF7A00] bg-[#FF4D00]/30 px-1.5 py-0.5 rounded-md backdrop-blur-sm">Latest</span>}
+                                                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-all flex flex-col justify-end p-2">
+                                                    <p className="text-[9px] text-white/80 line-clamp-2 mb-1.5 leading-tight">{item._prompt || 'AI Generated'}</p>
+                                                    <div className="flex gap-1">
+                                                        <button onClick={(e) => { e.stopPropagation(); handleDownloadImage(item.imageUrl, `creative-${idx}.png`) }}
+                                                            className="p-1 rounded-md bg-white/10 text-white hover:bg-white/20 transition-all" title="Download">
+                                                            <span className="material-symbols-outlined text-xs">download</span>
+                                                        </button>
+                                                        <button onClick={(e) => { e.stopPropagation(); setDesignBaseImage(item.imageUrl); setPrompt(item._prompt || ''); }}
+                                                            className="p-1 rounded-md bg-white/10 text-white hover:bg-primary/40 transition-all" title="Edit">
+                                                            <span className="material-symbols-outlined text-xs">edit</span>
+                                                        </button>
+                                                        <button onClick={(e) => { e.stopPropagation(); handleAnimateClick(item); }}
+                                                            className="p-1 rounded-md bg-white/10 text-white hover:bg-[#FF4D00]/40 transition-all" title="Animate">
+                                                            <span className="material-symbols-outlined text-xs">movie</span>
+                                                        </button>
+                                                        <button onClick={(e) => { e.stopPropagation(); setResult(item); }}
+                                                            className="p-1 rounded-md bg-white/10 text-white hover:bg-emerald-500/40 transition-all" title="View full">
+                                                            <span className="material-symbols-outlined text-xs">open_in_full</span>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    /* ── List View — grouped by prompt, full image on left ── */
+                                    <div className="space-y-4 max-h-[700px] overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.1) transparent' }}>
+                                        {(() => {
+                                            // Group items by prompt (normalized) so regenerations appear side by side
+                                            const groups = [];
+                                            const promptMap = new Map();
+                                            generationHistory.forEach((item, idx) => {
+                                                const key = (item._prompt || '').trim().toLowerCase().slice(0, 80);
+                                                if (promptMap.has(key)) {
+                                                    promptMap.get(key).items.push({ ...item, _idx: idx });
+                                                } else {
+                                                    const group = { prompt: item._prompt || 'AI Generated', items: [{ ...item, _idx: idx }] };
+                                                    promptMap.set(key, group);
+                                                    groups.push(group);
+                                                }
+                                            });
+
+                                            return groups.map((group, gIdx) => (
+                                                <div key={gIdx} className={`rounded-xl border ${gIdx === 0 ? 'border-[#FF4D00]/20 bg-[#FF4D00]/[0.03]' : 'border-white/[0.06] bg-white/[0.02]'} overflow-hidden transition-all hover:border-white/[0.12]`}>
+                                                    <div className="flex flex-col md:flex-row">
+                                                        {/* Left: Image(s) — full size, no crop */}
+                                                        <div className="flex-shrink-0 overflow-hidden" style={{ width: '45%', maxWidth: '45%' }}>
+                                                            {group.items.length === 1 ? (
+                                                                <div className="relative cursor-pointer group/img" onClick={() => setZoomImage(group.items[0].imageUrl)}>
+                                                                    <img src={group.items[0].imageUrl} alt={group.prompt} loading="lazy" decoding="async"
+                                                                        className="w-full h-auto object-contain" />
+                                                                    {group.items[0]._idx === 0 && <span className="absolute top-2 left-2 text-[9px] font-bold text-[#FF7A00] bg-[#FF4D00]/30 px-2 py-0.5 rounded-md backdrop-blur-sm">Latest</span>}
+                                                                    <div className="absolute inset-0 bg-black/0 group-hover/img:bg-black/20 transition-all flex items-center justify-center opacity-0 group-hover/img:opacity-100">
+                                                                        <span className="material-symbols-outlined text-xl text-white bg-black/50 rounded-full p-1.5">zoom_in</span>
+                                                                    </div>
+                                                                </div>
+                                                            ) : (
+                                                                <div className="grid gap-1 p-1" style={{ gridTemplateColumns: `repeat(${Math.min(group.items.length, 2)}, 1fr)` }}>
+                                                                    {group.items.map((item, iIdx) => (
+                                                                        <div key={item._id || iIdx} className="relative cursor-pointer group/img rounded-lg overflow-hidden"
+                                                                            onClick={() => setZoomImage(item.imageUrl)}>
+                                                                            <img src={item.imageUrl} alt={group.prompt} loading="lazy" decoding="async"
+                                                                                className="w-full h-auto object-contain" />
+                                                                            {item._idx === 0 && <span className="absolute top-1.5 left-1.5 text-[8px] font-bold text-[#FF7A00] bg-[#FF4D00]/30 px-1.5 py-0.5 rounded-md backdrop-blur-sm">Latest</span>}
+                                                                            <div className="absolute inset-0 bg-black/0 group-hover/img:bg-black/20 transition-all flex items-center justify-center opacity-0 group-hover/img:opacity-100">
+                                                                                <span className="material-symbols-outlined text-lg text-white bg-black/50 rounded-full p-1">zoom_in</span>
+                                                                            </div>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                        </div>
+
+                                                        {/* Right: Prompt + metadata + actions */}
+                                                        <div className="flex-1 p-3 flex flex-col justify-between min-w-0">
+                                                            <div>
+                                                                <p className="text-xs text-slate-300 mb-2 leading-relaxed">{group.prompt}</p>
+
+                                                                {/* Metadata badges */}
+                                                                <div className="flex items-center gap-1.5 mb-2.5 flex-wrap">
+                                                                    {group.items.length > 1 && (
+                                                                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-[#FF4D00]/15 text-[#FF4D00]">{group.items.length} variations</span>
+                                                                    )}
+                                                                    {group.items[0].aspectRatio && (
+                                                                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-white/[0.06] text-slate-400">{group.items[0].aspectRatio}</span>
+                                                                    )}
+                                                                    {group.items[0].model && (
+                                                                        <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-md bg-white/[0.04] text-slate-500">{group.items[0].model}</span>
+                                                                    )}
+                                                                    {group.items[0].createdAt && (
+                                                                        <span className="text-[9px] text-slate-600">{getTimeAgo(group.items[0].createdAt)}</span>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Actions row */}
+                                                            <div className="flex items-center gap-1 flex-wrap">
+                                                                <button onClick={() => { setPrompt(group.prompt); }}
+                                                                    className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold text-[#FF4D00] bg-[#FF4D00]/10 hover:bg-[#FF4D00]/20 cursor-pointer transition-all" title="Reuse this prompt">
+                                                                    <span className="material-symbols-outlined text-xs">replay</span>
+                                                                    Reuse
+                                                                </button>
+                                                                <button onClick={() => { navigator.clipboard.writeText(group.prompt); setFeedbackToast('Prompt copied!'); setTimeout(() => setFeedbackToast(''), 2000); }}
+                                                                    className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold text-slate-400 bg-white/[0.04] hover:bg-white/[0.08] cursor-pointer transition-all" title="Copy prompt">
+                                                                    <span className="material-symbols-outlined text-xs">content_copy</span>
+                                                                    Copy
+                                                                </button>
+                                                                <button onClick={() => handleAnimateClick(group.items[0])}
+                                                                    className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold text-[#FF7A00] bg-[#FF4D00]/10 hover:bg-[#FF4D00]/20 cursor-pointer transition-all" title="Animate this image">
+                                                                    <span className="material-symbols-outlined text-xs">movie</span>
+                                                                    Animate
+                                                                </button>
+                                                                <button onClick={() => handleDownloadImage(group.items[0].imageUrl, `creative-${gIdx}.png`)}
+                                                                    className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-white/[0.06] cursor-pointer transition-all" title="Download">
+                                                                    <span className="material-symbols-outlined text-sm">download</span>
+                                                                </button>
+                                                                <button onClick={() => { setDesignBaseImage(group.items[0].imageUrl); setPrompt(group.prompt); }}
+                                                                    className="p-1.5 rounded-lg text-slate-500 hover:text-primary hover:bg-primary/10 cursor-pointer transition-all" title="Edit / Remix">
+                                                                    <span className="material-symbols-outlined text-sm">edit</span>
+                                                                </button>
+                                                                <button onClick={() => setPublishData({ image: group.items[0].imageUrl, text: group.prompt })}
+                                                                    className="p-1.5 rounded-lg text-slate-500 hover:text-[#1877F2] hover:bg-[#1877F2]/10 cursor-pointer transition-all" title="Publish">
+                                                                    <span className="material-symbols-outlined text-sm">share</span>
+                                                                </button>
+                                                                <button onClick={() => { setResult(group.items[0]); }}
+                                                                    className="p-1.5 rounded-lg text-slate-500 hover:text-emerald-400 hover:bg-emerald-500/10 cursor-pointer transition-all" title="View full">
+                                                                    <span className="material-symbols-outlined text-sm">open_in_full</span>
+                                                                </button>
+                                                            </div>
+
+                                                            {/* ── MCoT Thinking Mode Toggle (Session) ── */}
+                                                            {group.items[0]?.aiMeta?.mcotReasoning && (
+                                                                <button
+                                                                    onClick={() => setExpandedReasoning(expandedReasoning === (group.items[0]._id || `g${gIdx}`) ? null : (group.items[0]._id || `g${gIdx}`))}
+                                                                    className={`flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer border ${
+                                                                        expandedReasoning === (group.items[0]._id || `g${gIdx}`)
+                                                                            ? 'bg-[#FF4D00]/15 text-[#FF7A00] border-[#FF4D00]/30'
+                                                                            : 'bg-white/[0.02] text-slate-500 hover:text-[#FF4D00] border-white/[0.06] hover:border-[#FF4D00]/20'
+                                                                    }`}
+                                                                >
+                                                                    <span className="material-symbols-outlined text-xs" style={{ fontSize: '12px' }}>psychology</span>
+                                                                    {expandedReasoning === (group.items[0]._id || `g${gIdx}`) ? 'Hide Reasoning' : 'Thinking Mode'}
+                                                                    <span className="material-symbols-outlined text-xs" style={{ fontSize: '10px', transition: 'transform 0.2s', transform: expandedReasoning === (group.items[0]._id || `g${gIdx}`) ? 'rotate(180deg)' : 'rotate(0deg)' }}>expand_more</span>
+                                                                </button>
+                                                            )}
+
+                                                            {/* ── MCoT Reasoning Chain (Session) ── */}
+                                                            {expandedReasoning === (group.items[0]._id || `g${gIdx}`) && group.items[0]?.aiMeta?.mcotReasoning && (() => {
+                                                                const r = group.items[0].aiMeta.mcotReasoning;
+                                                                return (
+                                                                    <div className="mt-2 rounded-xl border border-[#FF4D00]/15 bg-gradient-to-b from-black/40 to-black/30 overflow-hidden animate-fade-in">
+                                                                        <div className="px-3 py-2 bg-[#FF4D00]/[0.06] border-b border-[#FF4D00]/10 flex items-center gap-2">
+                                                                            <span className="material-symbols-outlined text-[#FF4D00]" style={{ fontSize: '14px' }}>neurology</span>
+                                                                            <span className="text-[10px] font-bold text-[#FF7A00] uppercase tracking-wider">MCoT Reasoning Chain</span>
+                                                                            {group.items[0].aiMeta?.pipelineTimeMs && (
+                                                                                <span className="text-[9px] text-[#FF4D00] ml-auto">{(group.items[0].aiMeta.pipelineTimeMs / 1000).toFixed(1)}s</span>
+                                                                            )}
+                                                                        </div>
+                                                                        <div className="p-3 space-y-2.5">
+                                                                            {r.brandInsight?.name && (
+                                                                                <div className="flex gap-2">
+                                                                                    <div className="w-5 h-5 rounded-md bg-[#FF4D00]/15 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                                                                        <span className="material-symbols-outlined text-[#FF4D00]" style={{ fontSize: '11px' }}>corporate_fare</span>
+                                                                                    </div>
+                                                                                    <div className="flex-1 min-w-0">
+                                                                                        <p className="text-[9px] font-bold text-[#FF4D00] uppercase tracking-wider mb-0.5">Brand Intel</p>
+                                                                                        <p className="text-[10px] text-slate-300"><span className="text-white font-semibold">{r.brandInsight.name}</span>{r.brandInsight.industry && <span className="text-slate-500"> · {r.brandInsight.industry}</span>}</p>
+                                                                                    </div>
+                                                                                </div>
+                                                                            )}
+                                                                            {r.visualGrounding && (
+                                                                                <div className="flex gap-2">
+                                                                                    <div className="w-5 h-5 rounded-md bg-emerald-500/15 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                                                                        <span className="material-symbols-outlined text-emerald-400" style={{ fontSize: '11px' }}>visibility</span>
+                                                                                    </div>
+                                                                                    <div className="flex-1 min-w-0">
+                                                                                        <p className="text-[9px] font-bold text-emerald-400 uppercase tracking-wider mb-0.5">Visual Grounding {r.visualGrounding.confidence && <span className={`ml-1 px-1 py-0.5 rounded text-[8px] font-bold ${r.visualGrounding.confidence === 'high' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-yellow-500/20 text-yellow-300'}`}>{r.visualGrounding.confidence}</span>}</p>
+                                                                                        {r.visualGrounding.productAnalysis && <p className="text-[10px] text-slate-300 leading-relaxed">{r.visualGrounding.productAnalysis}</p>}
+                                                                                    </div>
+                                                                                </div>
+                                                                            )}
+                                                                            {r.artDirection && (
+                                                                                <div className="flex gap-2">
+                                                                                    <div className="w-5 h-5 rounded-md bg-[#FF4D00]/15 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                                                                        <span className="material-symbols-outlined text-[#FF7A00]" style={{ fontSize: '11px' }}>palette</span>
+                                                                                    </div>
+                                                                                    <div className="flex-1 min-w-0">
+                                                                                        <p className="text-[9px] font-bold text-[#FF7A00] uppercase tracking-wider mb-0.5">Art Direction</p>
+                                                                                        <p className="text-[10px] text-slate-300">{r.artDirection.mood && <span>Mood: {r.artDirection.mood} · </span>}{r.artDirection.visualStyle && <span>Style: {r.artDirection.visualStyle}</span>}</p>
+                                                                                    </div>
+                                                                                </div>
+                                                                            )}
+                                                                            {r.styleCritique && (
+                                                                                <div className="flex gap-2">
+                                                                                    <div className="w-5 h-5 rounded-md bg-cyan-500/15 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                                                                        <span className="material-symbols-outlined text-cyan-400" style={{ fontSize: '11px' }}>verified</span>
+                                                                                    </div>
+                                                                                    <div className="flex-1 min-w-0">
+                                                                                        <p className="text-[9px] font-bold text-cyan-400 uppercase tracking-wider mb-0.5">Brand Alignment</p>
+                                                                                        <div className="flex items-center gap-2">
+                                                                                            <div className="flex-1 h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
+                                                                                                <div className="h-full rounded-full" style={{ width: `${r.styleCritique.brandAlignmentScore || 0}%`, background: (r.styleCritique.brandAlignmentScore || 0) >= 80 ? '#34d399' : '#fbbf24' }} />
+                                                                                            </div>
+                                                                                            <span className="text-[10px] font-bold text-white">{r.styleCritique.brandAlignmentScore || 0}%</span>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            })()}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ));
+                                        })()}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* ── Generation History (from Image Bank) ── */}
+                        {(() => {
+                            const allGenerated = bankImages.filter(img => img.source === 'ai-generated' || img.category === 'generated' || img.type !== 'uploaded');
+                            const filtered = galleryFilter === 'All' ? allGenerated : allGenerated.filter(img => {
+                                const tags = (img.tags || []).map(t => t.toLowerCase());
+                                const title = (img.title || '').toLowerCase();
+                                const prmpt = (img.prompt || '').toLowerCase();
+                                const filterLower = galleryFilter.toLowerCase();
+                                return tags.some(t => t.includes(filterLower)) || title.includes(filterLower) || prmpt.includes(filterLower) || (img.type || '').toLowerCase().includes(filterLower);
+                            });
+                            if (filtered.length === 0 && allGenerated.length > 0) {
+                                return (
+                                    <div className="text-center py-10">
+                                        <span className="material-symbols-outlined text-4xl text-slate-700 mb-2 block">filter_alt_off</span>
+                                        <p className="text-sm text-slate-500">No results matching "{galleryFilter}"</p>
+                                        <button onClick={() => setGalleryFilter('All')} className="mt-2 text-xs text-primary hover:text-primary-light cursor-pointer">Show all</button>
+                                    </div>
+                                );
+                            }
+                            if (filtered.length === 0) return null;
+
+                            {/* ── Grid View ── */}
+                            if (viewMode === 'grid') {
+                                return (
+                                    <div className="grid grid-cols-3 gap-2">
+                                        {filtered.map(img => (
+                                            <div key={img._id} className="group relative rounded-xl overflow-hidden border border-white/[0.06] bg-black/20 cursor-pointer transition-all hover:border-white/[0.12]"
+                                                onClick={() => setZoomImage(img.imageUrl || img.thumbnailUrl)}>
+                                                <img src={img.imageUrl || img.thumbnailUrl} alt={img.title || 'Creative'}
+                                                    loading="lazy" decoding="async"
+                                                    className="w-full aspect-square object-cover" />
+                                                {/* Hover overlay with actions */}
+                                                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent opacity-0 group-hover:opacity-100 transition-all flex flex-col justify-end p-2">
+                                                    <p className="text-[9px] text-white/80 line-clamp-2 mb-1.5 leading-tight">{img.prompt || img.title || 'AI Generated'}</p>
+                                                    <div className="flex gap-1">
+                                                        <button onClick={(e) => { e.stopPropagation(); handleDownloadImage(img.imageUrl || img.thumbnailUrl, `${img.title || 'creative'}.png`) }}
+                                                            className="p-1 rounded-md bg-white/10 text-white hover:bg-white/20 transition-all" title="Download">
+                                                            <span className="material-symbols-outlined text-xs">download</span>
+                                                        </button>
+                                                        <button onClick={(e) => { e.stopPropagation(); setDesignBaseImage(img.imageUrl || img.thumbnailUrl); setPrompt(img.prompt || ''); }}
+                                                            className="p-1 rounded-md bg-white/10 text-white hover:bg-primary/40 transition-all" title="Edit">
+                                                            <span className="material-symbols-outlined text-xs">edit</span>
+                                                        </button>
+                                                        <button onClick={(e) => { e.stopPropagation(); setPublishData({ image: img.imageUrl || img.thumbnailUrl, text: img.title || '' }) }}
+                                                            className="p-1 rounded-md bg-white/10 text-white hover:bg-[#1877F2]/40 transition-all" title="Publish">
+                                                            <span className="material-symbols-outlined text-xs">share</span>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                {/* Time ago badge */}
+                                                <span className="absolute top-1.5 right-1.5 text-[8px] text-white/60 bg-black/50 px-1.5 py-0.5 rounded-md opacity-0 group-hover:opacity-100 transition-all">{getTimeAgo(img.createdAt)}</span>
+                                                {/* MCoT badge */}
+                                                {img.aiMeta?.mcotReasoning && (
+                                                    <button onClick={(e) => { e.stopPropagation(); setViewMode('list'); setExpandedReasoning(img._id); }}
+                                                        className="absolute top-1.5 left-1.5 text-[8px] text-[#FF7A00] bg-[#08080C]/60 backdrop-blur-sm px-1.5 py-0.5 rounded-md opacity-0 group-hover:opacity-100 transition-all flex items-center gap-0.5 hover:bg-[#CC3D00]/60 cursor-pointer border border-[#FF4D00]/20"
+                                                        title="View MCoT Reasoning">
+                                                        <span className="material-symbols-outlined" style={{ fontSize: '10px' }}>psychology</span>
+                                                        MCoT
+                                                    </button>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                );
+                            }
+
+                            {/* ── List View (default) ── */}
+                            return (
+                                <div className="space-y-4">
+                                    {filtered.map(img => (
+                                    <div key={img._id} className="generation-card">
+                                        {/* Prompt */}
+                                        <p className="text-xs text-slate-400 mb-2 line-clamp-2 leading-relaxed">
+                                            {img.prompt || img.title || 'AI Generated'}
+                                        </p>
+
+                                        {/* Image */}
+                                        <div className="relative rounded-xl overflow-hidden border border-white/[0.06] bg-black/20 cursor-pointer group mb-2.5"
+                                            onClick={() => setZoomImage(img.imageUrl || img.thumbnailUrl)}>
+                                            <img src={img.imageUrl || img.thumbnailUrl} alt={img.title || 'Creative'}
+                                                loading="lazy" decoding="async"
+                                                className="w-full h-full object-cover"
+                                                style={{ maxHeight: '400px' }} />
+                                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100">
+                                                <span className="material-symbols-outlined text-2xl text-white bg-black/50 rounded-full p-2">zoom_in</span>
+                                            </div>
+                                        </div>
+
+                                        {/* Metadata */}
+                                        <div className="flex items-center gap-2 mb-2 flex-wrap">
+                                            {img.aspectRatio && (
+                                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-white/[0.06] text-slate-300">
+                                                    {img.aspectRatio}
+                                                </span>
+                                            )}
+                                            {img.model && (
+                                                <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-white/[0.04] text-slate-500">
+                                                    {img.model}
+                                                </span>
+                                            )}
+                                            <span className="text-[10px] text-slate-600">{getTimeAgo(img.createdAt)}</span>
+                                        </div>
+
+                                        {/* Actions */}
+                                        <div className="flex items-center gap-1">
+                                            <button onClick={() => { setPrompt(img.prompt || ''); }}
+                                                className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold text-[#FF4D00] bg-[#FF4D00]/10 hover:bg-[#FF4D00]/20 cursor-pointer transition-all" title="Reuse this prompt">
+                                                <span className="material-symbols-outlined text-xs">replay</span>
+                                                Reuse
+                                            </button>
+                                            <button onClick={() => { navigator.clipboard.writeText(img.prompt || img.title || ''); setFeedbackToast('Prompt copied!'); setTimeout(() => setFeedbackToast(''), 2000); }}
+                                                className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold text-slate-400 bg-white/[0.04] hover:bg-white/[0.08] cursor-pointer transition-all" title="Copy prompt">
+                                                <span className="material-symbols-outlined text-xs">content_copy</span>
+                                                Copy
+                                            </button>
+                                            <button onClick={() => handleAnimateClick(img)}
+                                                className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold text-[#FF7A00] bg-[#FF4D00]/10 hover:bg-[#FF4D00]/20 cursor-pointer transition-all" title="Animate this image">
+                                                <span className="material-symbols-outlined text-xs">movie</span>
+                                                Animate
+                                            </button>
+                                            <button onClick={() => handleDownloadImage(img.imageUrl || img.thumbnailUrl, `${img.title || 'creative'}.png`)}
+                                                className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-white/[0.06] cursor-pointer transition-all" title="Download">
+                                                <span className="material-symbols-outlined text-sm">download</span>
+                                            </button>
+                                            <button onClick={() => { setDesignBaseImage(img.imageUrl || img.thumbnailUrl); setPrompt(img.prompt || ''); }}
+                                                className="p-1.5 rounded-lg text-slate-500 hover:text-primary hover:bg-primary/10 cursor-pointer transition-all" title="Edit">
+                                                <span className="material-symbols-outlined text-sm">edit</span>
+                                            </button>
+                                            <button onClick={() => setPublishData({ image: img.imageUrl || img.thumbnailUrl, text: img.title || '' })}
+                                                className="p-1.5 rounded-lg text-slate-500 hover:text-[#1877F2] hover:bg-[#1877F2]/10 cursor-pointer transition-all" title="Publish">
+                                                <span className="material-symbols-outlined text-sm">share</span>
+                                            </button>
+                                            <button onClick={() => { setResult(img); }}
+                                                className="p-1.5 rounded-lg text-slate-500 hover:text-emerald-400 hover:bg-emerald-500/10 cursor-pointer transition-all" title="View full">
+                                                <span className="material-symbols-outlined text-sm">open_in_full</span>
+                                            </button>
+                                        </div>
+
+                                        {/* ── MCoT Thinking Mode Toggle ── */}
+                                        {img.aiMeta?.mcotReasoning && (
+                                            <button
+                                                onClick={() => setExpandedReasoning(expandedReasoning === img._id ? null : img._id)}
+                                                className={`flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer border ${
+                                                    expandedReasoning === img._id
+                                                        ? 'bg-[#FF4D00]/15 text-[#FF7A00] border-[#FF4D00]/30'
+                                                        : 'bg-white/[0.02] text-slate-500 hover:text-[#FF4D00] border-white/[0.06] hover:border-[#FF4D00]/20'
+                                                }`}
+                                            >
+                                                <span className="material-symbols-outlined text-xs" style={{ fontSize: '12px' }}>psychology</span>
+                                                {expandedReasoning === img._id ? 'Hide Reasoning' : 'Thinking Mode'}
+                                                <span className="material-symbols-outlined text-xs" style={{ fontSize: '10px', transition: 'transform 0.2s', transform: expandedReasoning === img._id ? 'rotate(180deg)' : 'rotate(0deg)' }}>expand_more</span>
+                                            </button>
+                                        )}
+
+                                        {/* ── MCoT Reasoning Chain Panel ── */}
+                                        {expandedReasoning === img._id && img.aiMeta?.mcotReasoning && (() => {
+                                            const r = img.aiMeta.mcotReasoning
+                                            return (
+                                                <div className="mt-2 rounded-xl border border-[#FF4D00]/15 bg-gradient-to-b from-black/40 to-black/30 overflow-hidden animate-fade-in">
+                                                    {/* Header */}
+                                                    <div className="px-3 py-2 bg-[#FF4D00]/[0.06] border-b border-[#FF4D00]/10 flex items-center gap-2">
+                                                        <span className="material-symbols-outlined text-[#FF4D00]" style={{ fontSize: '14px' }}>neurology</span>
+                                                        <span className="text-[10px] font-bold text-[#FF7A00] uppercase tracking-wider">MCoT Reasoning Chain</span>
+                                                        {img.aiMeta?.pipelineTimeMs && (
+                                                            <span className="text-[9px] text-[#FF4D00] ml-auto">{(img.aiMeta.pipelineTimeMs / 1000).toFixed(1)}s</span>
+                                                        )}
+                                                    </div>
+
+                                                    <div className="p-3 space-y-2.5">
+                                                        {/* Step 1: Brand Intelligence */}
+                                                        {r.brandInsight?.name && (
+                                                            <div className="flex gap-2">
+                                                                <div className="w-5 h-5 rounded-md bg-[#FF4D00]/15 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                                                    <span className="material-symbols-outlined text-[#FF4D00]" style={{ fontSize: '11px' }}>corporate_fare</span>
+                                                                </div>
+                                                                <div className="flex-1 min-w-0">
+                                                                    <p className="text-[9px] font-bold text-[#FF4D00] uppercase tracking-wider mb-0.5">Brand Intel</p>
+                                                                    <p className="text-[10px] text-slate-300 leading-relaxed">
+                                                                        <span className="text-white font-semibold">{r.brandInsight.name}</span>
+                                                                        {r.brandInsight.industry && <span className="text-slate-500"> · {r.brandInsight.industry}</span>}
+                                                                        {r.brandInsight.brandType && <span className="text-slate-500"> · {r.brandInsight.brandType}</span>}
+                                                                    </p>
+                                                                    {r.brandInsight.targetAudience && (
+                                                                        <p className="text-[9px] text-slate-500 mt-0.5"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">ads_click</span> {r.brandInsight.targetAudience}</p>
+                                                                    )}
+                                                                    {r.brandInsight.colors?.length > 0 && (
+                                                                        <div className="flex gap-1 mt-1">
+                                                                            {r.brandInsight.colors.map((c, i) => (
+                                                                                <span key={i} className="text-[8px] px-1.5 py-0.5 rounded bg-white/[0.05] text-slate-400">{c}</span>
+                                                                            ))}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        )}
+
+                                                        {/* Step 2: Product Match */}
+                                                        {r.matchedProduct?.title && (
+                                                            <div className="flex gap-2">
+                                                                <div className="w-5 h-5 rounded-md bg-amber-500/15 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                                                    <span className="material-symbols-outlined text-amber-400" style={{ fontSize: '11px' }}>inventory_2</span>
+                                                                </div>
+                                                                <div className="flex-1 min-w-0">
+                                                                    <p className="text-[9px] font-bold text-amber-400 uppercase tracking-wider mb-0.5">Matched Product</p>
+                                                                    <p className="text-[10px] text-slate-300">
+                                                                        <span className="text-white font-semibold">{r.matchedProduct.title}</span>
+                                                                        {r.matchedProduct.category && <span className="text-slate-500"> · {r.matchedProduct.category}</span>}
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+                                                        )}
+
+                                                        {/* Step 3: Visual Grounding (MCoT Stage 1) */}
+                                                        {r.visualGrounding && (
+                                                            <div className="flex gap-2">
+                                                                <div className="w-5 h-5 rounded-md bg-emerald-500/15 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                                                    <span className="material-symbols-outlined text-emerald-400" style={{ fontSize: '11px' }}>visibility</span>
+                                                                </div>
+                                                                <div className="flex-1 min-w-0">
+                                                                    <p className="text-[9px] font-bold text-emerald-400 uppercase tracking-wider mb-0.5">
+                                                                        Visual Grounding
+                                                                        {r.visualGrounding.confidence && (
+                                                                            <span className={`ml-1.5 px-1 py-0.5 rounded text-[8px] font-bold ${
+                                                                                r.visualGrounding.confidence === 'high' ? 'bg-emerald-500/20 text-emerald-300' :
+                                                                                r.visualGrounding.confidence === 'medium' ? 'bg-yellow-500/20 text-yellow-300' :
+                                                                                'bg-red-500/20 text-red-300'}`}
+                                                                            >{r.visualGrounding.confidence}</span>
+                                                                        )}
+                                                                    </p>
+                                                                    {r.visualGrounding.productAnalysis && (
+                                                                        <p className="text-[10px] text-slate-300 leading-relaxed">{r.visualGrounding.productAnalysis}</p>
+                                                                    )}
+                                                                    {r.visualGrounding.colorPalette?.length > 0 && (
+                                                                        <div className="flex gap-1 mt-1 flex-wrap">
+                                                                            <span className="text-[8px] text-slate-500">Colors:</span>
+                                                                            {r.visualGrounding.colorPalette.map((c, i) => (
+                                                                                <span key={i} className="text-[8px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-300/70">{c}</span>
+                                                                            ))}
+                                                                        </div>
+                                                                    )}
+                                                                    {r.visualGrounding.materialFinish && (
+                                                                        <p className="text-[9px] text-slate-500 mt-0.5"><span className="material-symbols-outlined text-[9px] align-middle mr-0.5">build</span> {r.visualGrounding.materialFinish}</p>
+                                                                    )}
+                                                                    {r.visualGrounding.avoidList?.length > 0 && (
+                                                                        <p className="text-[9px] text-rose-400/60 mt-0.5"><span className="material-symbols-outlined text-[9px] align-middle mr-0.5">warning</span> Avoid: {r.visualGrounding.avoidList.join(', ')}</p>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        )}
+
+                                                        {/* Step 4: Art Direction */}
+                                                        {r.artDirection && (
+                                                            <div className="flex gap-2">
+                                                                <div className="w-5 h-5 rounded-md bg-[#FF4D00]/15 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                                                    <span className="material-symbols-outlined text-[#FF7A00]" style={{ fontSize: '11px' }}>palette</span>
+                                                                </div>
+                                                                <div className="flex-1 min-w-0">
+                                                                    <p className="text-[9px] font-bold text-[#FF7A00] uppercase tracking-wider mb-0.5">Art Direction</p>
+                                                                    <p className="text-[10px] text-slate-300 leading-relaxed">
+                                                                        {r.artDirection.mood && <span><span className="text-white font-semibold">Mood:</span> {r.artDirection.mood} · </span>}
+                                                                        {r.artDirection.visualStyle && <span><span className="text-white font-semibold">Style:</span> {r.artDirection.visualStyle}</span>}
+                                                                    </p>
+                                                                    {r.artDirection.lighting && (
+                                                                        <p className="text-[9px] text-slate-500 mt-0.5"><span className="material-symbols-outlined text-[9px] align-middle mr-0.5">lightbulb</span> {r.artDirection.lighting}</p>
+                                                                    )}
+                                                                    {r.artDirection.composition && (
+                                                                        <p className="text-[9px] text-slate-500 mt-0.5"><span className="material-symbols-outlined text-[9px] align-middle mr-0.5">straighten</span> {r.artDirection.composition}</p>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        )}
+
+                                                        {/* Step 5: Style Critique */}
+                                                        {r.styleCritique && (
+                                                            <div className="flex gap-2">
+                                                                <div className="w-5 h-5 rounded-md bg-cyan-500/15 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                                                    <span className="material-symbols-outlined text-cyan-400" style={{ fontSize: '11px' }}>verified</span>
+                                                                </div>
+                                                                <div className="flex-1 min-w-0">
+                                                                    <p className="text-[9px] font-bold text-cyan-400 uppercase tracking-wider mb-0.5">Brand Alignment</p>
+                                                                    <div className="flex items-center gap-2">
+                                                                        <div className="flex-1 h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
+                                                                            <div className="h-full rounded-full transition-all"
+                                                                                style={{
+                                                                                    width: `${r.styleCritique.brandAlignmentScore || 0}%`,
+                                                                                    background: (r.styleCritique.brandAlignmentScore || 0) >= 80 ? '#34d399' : (r.styleCritique.brandAlignmentScore || 0) >= 60 ? '#fbbf24' : '#f87171',
+                                                                                }}
+                                                                            />
+                                                                        </div>
+                                                                        <span className="text-[10px] font-bold text-white">{r.styleCritique.brandAlignmentScore || 0}%</span>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        )}
+
+                                                        {/* Post-Gen Critique Score (if available — populated async) */}
+                                                        {img.aiMeta?.mcotScore && (
+                                                            <div className="flex gap-2">
+                                                                <div className="w-5 h-5 rounded-md bg-[#FF4D00]/15 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                                                    <span className="material-symbols-outlined text-[#FF4D00]" style={{ fontSize: '11px' }}>auto_awesome</span>
+                                                                </div>
+                                                                <div className="flex-1 min-w-0">
+                                                                    <p className="text-[9px] font-bold text-[#FF4D00] uppercase tracking-wider mb-0.5">Quality Score</p>
+                                                                    <div className="flex items-center gap-2">
+                                                                        <div className="flex-1 h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
+                                                                            <div className="h-full rounded-full transition-all"
+                                                                                style={{
+                                                                                    width: `${img.aiMeta.mcotScore}%`,
+                                                                                    background: img.aiMeta.mcotScore >= 75 ? '#a78bfa' : img.aiMeta.mcotScore >= 50 ? '#fbbf24' : '#f87171',
+                                                                                }}
+                                                                            />
+                                                                        </div>
+                                                                        <span className="text-[10px] font-bold text-white">{img.aiMeta.mcotScore}/100</span>
+                                                                    </div>
+                                                                    {img.aiMeta.mcotCritique?.verdict && (
+                                                                        <span className={`inline-block mt-1 text-[8px] font-bold px-1.5 py-0.5 rounded ${
+                                                                            img.aiMeta.mcotCritique.verdict === 'approved' ? 'bg-emerald-500/15 text-emerald-300' :
+                                                                            img.aiMeta.mcotCritique.verdict === 'improve' ? 'bg-amber-500/15 text-amber-300' :
+                                                                            'bg-rose-500/15 text-rose-300'
+                                                                        }`}>{img.aiMeta.mcotCritique.verdict.toUpperCase()}</span>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            )
+                                        })()}
+                                    </div>
+                                    ))}
+                                </div>
+                            );
+                        })()}
+
+                        {/* ── Empty State with Inline Suggestions ── */}
+                        {!result && activeGenerations.length === 0 && bankImages.filter(img => img.source === 'ai-generated' || img.category === 'generated' || img.type === 'creative').length === 0 && (
+                            <div className="flex flex-col items-center justify-center py-12 px-4">
+                                <div className="w-16 h-16 rounded-2xl bg-white/[0.03] border border-white/[0.06] flex items-center justify-center mb-4">
+                                    <span className="material-symbols-outlined text-3xl text-slate-600">palette</span>
+                                </div>
+                                <h3 className="text-base font-bold text-white mb-1">No generations yet</h3>
+                                <p className="text-sm text-slate-500 max-w-xs text-center mb-6">Describe your vision in the prompt panel and hit Generate to create your first brand visual.</p>
+
+                                <p className="text-[11px] text-slate-600 uppercase tracking-wider font-bold mb-3">Try a quick prompt</p>
+                                <div className="flex flex-wrap justify-center gap-2">
+                                    {[
+                                        { icon: 'share', label: 'Social Post', color: '#6366f1', prompt: `Create a visually stunning social media post for ${activeBrand?.name || 'the brand'}. Make it eye-catching, on-brand, and shareable.` },
+                                        { icon: 'inventory_2', label: 'Product Shot', color: '#f59e0b', prompt: `Create a premium product showcase for ${activeBrand?.name || 'the brand'}. Feature the product prominently with brand colors.` },
+                                        { icon: 'local_offer', label: 'Sale / Offer', color: '#ef4444', template: templateCategories.find(c => c.id === 'sales')?.subTemplates?.[0] },
+                                        { icon: 'format_quote', label: 'Quote', color: '#10b981', template: templateCategories.find(c => c.id === 'quotes')?.subTemplates?.[0] },
+                                        { icon: 'campaign', label: 'Announcement', color: '#FF4D00', template: templateCategories.find(c => c.id === 'announcement')?.subTemplates?.[0] },
+                                        { icon: 'auto_stories', label: 'Brand Story', color: '#f97316', prompt: `Create a compelling brand story visual for ${activeBrand?.name || 'the brand'}. Tell the brand narrative through imagery.` },
+                                    ].map(chip => (
+                                        <button key={chip.label} onClick={() => {
+                                            if (chip.template && chip.template.fields?.length > 0) { setActiveQuickTemplate(chip.template); setTemplateFields({}); }
+                                            else if (chip.prompt) setPrompt(chip.prompt);
+                                        }}
+                                            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer hover:scale-[1.03] border border-white/[0.06] hover:border-white/[0.12]"
+                                            style={{ background: `linear-gradient(135deg, ${chip.color}08, ${chip.color}04)` }}>
+                                            <span className="material-symbols-outlined text-sm" style={{ color: chip.color }}>{chip.icon}</span>
+                                            <span className="text-slate-300">{chip.label}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                    </div>{/* ═══════════ END RIGHT GALLERY PANEL ═══════════ */}
+
+                </div>
+
+                    {/* ═══════════ FLOATING COMMAND BAR WITH SETTINGS ═══════════ */}
+                    <div className="creative-floating-bar">
+
+                        {/* ── Settings Tray (slides up when a setting icon is clicked) ── */}
+                        {floatingTray === 'format' && (
+                            <div className="floating-tray" key="format-tray">
+                                <div className="flex items-center justify-between mb-2">
+                                    <span className="text-[11px] text-slate-400 uppercase tracking-widest font-bold flex items-center gap-1.5">
+                                        <span className="material-symbols-outlined text-sm text-primary">crop</span>
+                                        Format & Size
+                                    </span>
+                                    <div className="flex items-center gap-2">
+                                        {selectedTypeInfo && selectedType !== 'custom-size' && (
+                                            <span className="text-[10px] text-slate-500 font-mono bg-white/[0.04] px-2 py-0.5 rounded">{selectedTypeInfo.size} · {selectedTypeInfo.aspectRatio}</span>
+                                        )}
+                                        {selectedType === 'custom-size' && customWidth && customHeight && (
+                                            <span className="text-[10px] text-emerald-500 font-mono bg-emerald-500/10 px-2 py-0.5 rounded">{customWidth}×{customHeight}px</span>
+                                        )}
+                                        <button onClick={() => setFloatingTray(null)} className="text-slate-500 hover:text-white cursor-pointer">
+                                            <span className="material-symbols-outlined text-sm">close</span>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 gap-1.5">
+                                    {creativeTypes.map(ct => (
+                                        <button key={ct.id} onClick={() => { setSelectedType(ct.id); if (ct.id !== 'custom-size') setFloatingTray(null) }}
+                                            className={`px-2.5 py-2 rounded-lg text-[11px] font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                                                selectedType === ct.id
+                                                ? 'bg-primary/15 text-primary border border-primary/30'
+                                                : 'bg-white/[0.03] text-slate-400 hover:text-slate-200 border border-white/[0.05] hover:border-white/[0.1] hover:bg-white/[0.06]'
+                                            }`}>
+                                            <span className="material-symbols-outlined text-xs">{ct.icon}</span>
+                                            <span className="truncate">{ct.label}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                                {selectedType === 'custom-size' && (
+                                    <div className="mt-2 flex items-center gap-2">
+                                        <span className="material-symbols-outlined text-xs text-emerald-400">straighten</span>
+                                        <input type="number" value={customWidth} onChange={e => setCustomWidth(e.target.value)}
+                                            placeholder="W" min="100" max="4096"
+                                            className="w-20 px-2 py-1.5 rounded-lg bg-white/5 border border-white/10 text-xs text-white focus:border-primary focus:outline-none text-center" />
+                                        <span className="text-slate-500 text-xs font-bold">×</span>
+                                        <input type="number" value={customHeight} onChange={e => setCustomHeight(e.target.value)}
+                                            placeholder="H" min="100" max="4096"
+                                            className="w-20 px-2 py-1.5 rounded-lg bg-white/5 border border-white/10 text-xs text-white focus:border-primary focus:outline-none text-center" />
+                                        <span className="text-[10px] text-slate-500">px</span>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {floatingTray === 'camera' && (
+                            <div className="floating-tray" key="camera-tray">
+                                <div className="flex items-center justify-between mb-2">
+                                    <span className="text-[11px] text-slate-400 uppercase tracking-widest font-bold flex items-center gap-1.5">
+                                        <span className="material-symbols-outlined text-sm text-primary">movie</span>
+                                        Camera Shot
+                                    </span>
+                                    <div className="flex items-center gap-2">
+                                        {selectedShot && (
+                                            <button onClick={() => setSelectedShot(null)}
+                                                className="text-[10px] text-slate-500 hover:text-rose-400 transition-colors cursor-pointer flex items-center gap-0.5">
+                                                <span className="material-symbols-outlined text-[10px]">close</span> Clear
+                                            </button>
+                                        )}
+                                        <button onClick={() => setFloatingTray(null)} className="text-slate-500 hover:text-white cursor-pointer">
+                                            <span className="material-symbols-outlined text-sm">close</span>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-12 gap-1.5">
+                                    {CAMERA_SHOT_PRESETS.map(shot => (
+                                        <button key={shot.id}
+                                            onClick={() => { setSelectedShot(prev => prev === shot.id ? null : shot.id) }}
+                                            title={shot.description}
+                                            className={`relative px-2 py-2 rounded-lg text-[10px] font-semibold transition-all cursor-pointer flex flex-col items-center gap-0.5 ${
+                                                selectedShot === shot.id
+                                                ? 'border text-white shadow-lg'
+                                                : 'bg-white/[0.03] text-slate-400 hover:text-slate-200 border border-white/[0.05] hover:border-white/[0.1] hover:bg-white/[0.06]'
+                                            }`}
+                                            style={selectedShot === shot.id ? {
+                                                backgroundColor: `${shot.color}18`,
+                                                borderColor: `${shot.color}50`,
+                                                color: shot.color,
+                                            } : {}}>
+                                            <span className="material-symbols-outlined text-base leading-none">{shot.emoji}</span>
+                                            <span className="leading-tight text-center">{shot.label}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                                {selectedShot && (() => {
+                                    const s = CAMERA_SHOT_PRESETS.find(x => x.id === selectedShot)
+                                    return s ? (
+                                        <p className="text-[10px] mt-1.5 flex items-center gap-1" style={{ color: s.color }}>
+                                            <span className="material-symbols-outlined text-xs">info</span>
+                                            {s.description}
+                                        </p>
+                                    ) : null
+                                })()}
+                            </div>
+                        )}
+
+                        {floatingTray === 'references' && (
+                            <div className="floating-tray" key="refs-tray">
+                                <div className="flex items-center justify-between mb-2">
+                                    <span className="text-[11px] text-slate-400 uppercase tracking-widest font-bold flex items-center gap-1.5">
+                                        <span className="material-symbols-outlined text-sm text-primary">collections</span>
+                                        References
+                                    </span>
+                                    <button onClick={() => setFloatingTray(null)} className="text-slate-500 hover:text-white cursor-pointer">
+                                        <span className="material-symbols-outlined text-sm">close</span>
+                                    </button>
+                                </div>
+                                <div className="flex items-center gap-3 flex-wrap">
+                                    {/* Style Ref */}
+                                    {referenceImages.style ? (
+                                        <div className="relative flex-shrink-0 group">
+                                            <div className="w-12 h-12 rounded-lg overflow-hidden border border-amber-500/40">
+                                                <img src={referenceImages.style} alt="Style" className="w-full h-full object-cover" />
+                                            </div>
+                                            <button onClick={() => setReferenceImages(prev => ({ ...prev, style: null }))}
+                                                className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-500 text-white text-[8px] flex items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity">×</button>
+                                            <span className="text-[8px] text-amber-400 font-bold text-center block mt-0.5">Style</span>
+                                        </div>
+                                    ) : (
+                                        <button onClick={() => { setRefPickerSlot('style'); setRefPickerTab('upload') }}
+                                            className="flex-shrink-0 w-12 h-12 rounded-lg border border-dashed border-white/10 hover:border-amber-500/40 flex flex-col items-center justify-center cursor-pointer transition-all bg-white/[0.02] group" title="Add style reference">
+                                            <span className="material-symbols-outlined text-sm text-slate-500 group-hover:text-amber-400">brush</span>
+                                            <span className="text-[8px] text-slate-500 group-hover:text-amber-400 font-bold leading-none">Style</span>
+                                        </button>
+                                    )}
+
+                                    {/* Characters */}
+                                    {characters.map((char, idx) => (
+                                        <div key={idx} className="relative flex-shrink-0 group">
+                                            <div className="w-12 h-12 rounded-lg overflow-hidden border border-[#FF4D00]/40">
+                                                <img src={char.image} alt={char.name} className="w-full h-full object-cover" />
+                                            </div>
+                                            <button onClick={() => setCharacters(prev => prev.filter((_, i) => i !== idx))}
+                                                className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-500 text-white text-[8px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">×</button>
+                                            <input value={char.name}
+                                                onChange={e => setCharacters(prev => prev.map((c, i) => i === idx ? { ...c, name: e.target.value } : c))}
+                                                className="w-12 mt-0.5 text-[8px] text-center bg-transparent text-[#FF7A00] outline-none font-bold truncate"
+                                                placeholder="Name" />
+                                        </div>
+                                    ))}
+                                    {characters.length < 5 && (
+                                        <button onClick={() => { setRefPickerSlot(`character-${characters.length}`); setRefPickerTab('upload') }}
+                                            className="flex-shrink-0 w-12 h-12 rounded-lg border border-dashed border-white/10 hover:border-[#FF4D00]/40 flex flex-col items-center justify-center cursor-pointer transition-all bg-white/[0.02] group" title="Add character">
+                                            <span className="material-symbols-outlined text-sm text-slate-500 group-hover:text-[#FF4D00]">person_add</span>
+                                            <span className="text-[8px] text-slate-500 group-hover:text-[#FF4D00] font-bold leading-none">Person</span>
+                                        </button>
+                                    )}
+
+                                    {/* Upload Ref */}
+                                    {referenceImages.upload ? (
+                                        <div className="relative flex-shrink-0 group">
+                                            <div className="w-12 h-12 rounded-lg overflow-hidden border border-cyan-500/40">
+                                                <img src={referenceImages.upload} alt="Ref" className="w-full h-full object-cover" />
+                                            </div>
+                                            <button onClick={() => setReferenceImages(prev => ({ ...prev, upload: null }))}
+                                                className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-500 text-white text-[8px] flex items-center justify-center cursor-pointer z-10 opacity-0 group-hover:opacity-100 transition-opacity">×</button>
+                                            <button onClick={() => { setCharacters(prev => [...prev, { name: `Char ${prev.length + 1}`, image: referenceImages.upload }]); setReferenceImages(prev => ({ ...prev, upload: null })) }}
+                                                className="absolute -bottom-1 -left-1 w-4 h-4 rounded-full bg-[#FF4D00] text-white text-[8px] flex items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity z-10" title="Use as Character">
+                                                <span className="material-symbols-outlined text-[8px]">person_add</span>
+                                            </button>
+                                            <span className="text-[8px] text-cyan-400 font-bold text-center block mt-0.5">Upload</span>
+                                        </div>
+                                    ) : (
+                                        <button onClick={() => { setRefPickerSlot('upload'); setRefPickerTab('upload') }}
+                                            className="flex-shrink-0 w-12 h-12 rounded-lg border border-dashed border-white/10 hover:border-cyan-500/40 flex flex-col items-center justify-center cursor-pointer transition-all bg-white/[0.02] group" title="Upload reference">
+                                            <span className="material-symbols-outlined text-sm text-slate-500 group-hover:text-cyan-400">add_photo_alternate</span>
+                                            <span className="text-[8px] text-slate-500 group-hover:text-cyan-400 font-bold leading-none">Upload</span>
+                                        </button>
+                                    )}
+
+                                    {characters.length > 0 && (
+                                        <span className="text-[10px] text-[#FF4D00]/60 flex items-center gap-1 ml-2">
+                                            <span className="material-symbols-outlined text-[10px]">info</span>
+                                            Type <span className="font-bold text-[#FF4D00]">@name</span> in prompt to tag
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {floatingTray === 'text' && (
+                            <div className="floating-tray" key="text-tray">
+                                <div className="flex items-center justify-between mb-2">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[11px] text-slate-400 uppercase tracking-widest font-bold flex items-center gap-1.5">
+                                            <span className="material-symbols-outlined text-sm text-primary">title</span>
+                                            Add Text to Image
+                                        </span>
+                                        <button onClick={() => setGenerateCopy(!generateCopy)}
+                                            className={`w-9 h-5 rounded-full transition-all cursor-pointer flex-shrink-0 ${generateCopy ? 'bg-[#FF4D00]' : 'bg-white/[0.1]'}`}>
+                                            <div className={`w-3.5 h-3.5 rounded-full bg-white shadow transition-transform ${generateCopy ? 'translate-x-4.5' : 'translate-x-0.5'}`} />
+                                        </button>
+                                    </div>
+                                    <button onClick={() => setFloatingTray(null)} className="text-slate-500 hover:text-white cursor-pointer">
+                                        <span className="material-symbols-outlined text-sm">close</span>
+                                    </button>
+                                </div>
+                                {generateCopy ? (
+                                    <div className="flex items-center gap-3 flex-wrap">
+                                        <div className="relative flex-1 min-w-[200px]">
+                                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 material-symbols-outlined text-xs text-slate-500 pointer-events-none">format_size</span>
+                                            <input type="text" value={customHeadline}
+                                                onChange={e => { setCustomHeadline(e.target.value); setCopyIsAiSuggested(false); }}
+                                                maxLength={40}
+                                                placeholder={copyLoading ? 'AI is writing...' : 'Headline text'}
+                                                disabled={copyLoading}
+                                                className={`w-full pl-7 pr-8 py-2 text-xs rounded-lg text-white placeholder-slate-600 focus:outline-none transition-all ${
+                                                    copyLoading ? 'bg-[#FF4D00]/5 border border-[#FF4D00]/10 opacity-50' :
+                                                    'bg-white/[0.05] border border-white/[0.08] focus:border-[#FF4D00]/50'
+                                                }`} />
+                                            {customHeadline && !copyLoading && (
+                                                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] text-slate-600">{customHeadline.length}/40</span>
+                                            )}
+                                        </div>
+                                        <div className="relative flex-1 min-w-[150px]">
+                                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 material-symbols-outlined text-xs text-slate-500 pointer-events-none">ads_click</span>
+                                            <input type="text" value={customCtaText}
+                                                onChange={e => { setCustomCtaText(e.target.value); setCopyIsAiSuggested(false); }}
+                                                maxLength={20}
+                                                placeholder={copyLoading ? 'AI is writing...' : 'CTA (e.g. Shop Now)'}
+                                                disabled={copyLoading}
+                                                className={`w-full pl-7 pr-3 py-2 text-xs rounded-lg text-white placeholder-slate-600 focus:outline-none transition-all ${
+                                                    copyLoading ? 'bg-[#FF4D00]/5 border border-[#FF4D00]/10 opacity-50' :
+                                                    'bg-white/[0.05] border border-white/[0.08] focus:border-[#FF4D00]/50'
+                                                }`} />
+                                        </div>
+                                        {!copyLoading && prompt?.trim().length > 5 && (
+                                            <button onClick={() => suggestCopy(prompt)}
+                                                className="flex items-center gap-1 px-2.5 py-2 rounded-lg text-[10px] text-slate-400 hover:text-[#FF4D00] bg-white/[0.03] hover:bg-[#FF4D00]/10 transition-all cursor-pointer border border-white/[0.06]">
+                                                <span className="material-symbols-outlined text-xs">auto_awesome</span>
+                                                AI Suggest
+                                            </button>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <p className="text-[10px] text-slate-500">Toggle ON to add AI-generated headline + CTA text directly on your image</p>
+                                )}
+                            </div>
+                        )}
+
+                        {floatingTray === 'advanced' && (
+                            <div className="floating-tray" key="adv-tray">
+                                <div className="flex items-center justify-between mb-3">
+                                    <span className="text-[11px] text-slate-400 uppercase tracking-widest font-bold flex items-center gap-1.5">
+                                        <span className="material-symbols-outlined text-sm text-primary">tune</span>
+                                        Advanced Options
+                                    </span>
+                                    <button onClick={() => setFloatingTray(null)} className="text-slate-500 hover:text-white cursor-pointer">
+                                        <span className="material-symbols-outlined text-sm">close</span>
+                                    </button>
+                                </div>
+                                <div className="flex items-center gap-4 flex-wrap">
+                                    {/* AI Mode */}
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[10px] text-slate-500 font-bold">AI Mode</span>
+                                        <div className="flex gap-0.5 bg-white/[0.04] rounded-lg p-0.5">
+                                            <button onClick={() => setAgenticQuality('fast')}
+                                                className={`px-2.5 py-1.5 rounded-md text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1 ${agenticQuality === 'fast' ? 'bg-amber-500/20 text-amber-400' : 'text-slate-500 hover:text-white'}`}>
+                                                <span className="material-symbols-outlined text-xs">bolt</span> Fast
+                                            </button>
+                                            <button onClick={() => setAgenticQuality('quality')}
+                                                className={`px-2.5 py-1.5 rounded-md text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1 ${agenticQuality === 'quality' ? 'bg-[#FF4D00]/20 text-[#FF4D00]' : 'text-slate-500 hover:text-white'}`}>
+                                                <span className="material-symbols-outlined text-xs">target</span> Quality
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Style */}
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[10px] text-slate-500 font-bold">Style</span>
+                                        <div className="flex flex-wrap gap-1">
+                                            {styles.map(s => (
+                                                <button key={s.id} onClick={() => setStyle(s.id)}
+                                                    className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${style === s.id
+                                                        ? 'bg-primary/20 text-primary border border-primary/30'
+                                                        : 'bg-white/[0.04] text-slate-400 hover:text-white border border-transparent'}`}>
+                                                    <span className="material-symbols-outlined text-xs">{s.icon}</span>
+                                                    {s.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Text Overlay */}
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[10px] text-slate-500 font-bold">Overlay</span>
+                                        <input value={textOverlay} onChange={e => setTextOverlay(e.target.value)}
+                                            placeholder="Text on creative..."
+                                            className="input-glass py-1.5 px-2.5 text-[11px] w-40 rounded-lg" />
+                                    </div>
+
+                                    {/* Logo */}
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[10px] text-slate-500 font-bold">Logo</span>
+                                        <button onClick={() => setAddLogo(!addLogo)}
+                                            className={`w-8 h-4 rounded-full transition-all cursor-pointer ${addLogo ? 'bg-primary' : 'bg-white/[0.1]'}`}>
+                                            <div className={`w-3 h-3 rounded-full bg-white shadow transition-transform ${addLogo ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                        </button>
+                                        {addLogo && (
+                                            <div className="flex gap-0.5">
+                                                {['S', 'M', 'L'].map((s, i) => (
+                                                    <button key={s} onClick={() => setLogoSize(['small', 'medium', 'large'][i])}
+                                                        className={`px-1.5 py-0.5 rounded text-[9px] font-bold cursor-pointer ${logoSize === ['small', 'medium', 'large'][i] ? 'bg-primary text-white' : 'bg-white/[0.04] text-slate-500'}`}>
+                                                        {s}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Brand Colors */}
+                                    {activeBrand?.dna?.colors?.length > 0 && (
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-[10px] text-slate-500 font-bold">Colors</span>
+                                            <div className="flex gap-1">
+                                                {activeBrand.dna.colors.slice(0, 6).map((c, i) => (
+                                                    <div key={i} className="w-5 h-5 rounded border border-white/[0.1]" style={{ background: c.hex }} title={c.hex} />
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* ── Context Chips Row ── */}
+                        {(fromContent || designBaseImage || selectedProduct) && (
+                            <div className="flex items-center gap-2 px-3 py-1.5 border-b border-white/[0.05] overflow-x-auto scrollbar-hide">
+                                {fromContent && (
+                                    <div className="floating-context-chip text-primary border-primary/20">
+                                        <span className="material-symbols-outlined text-[10px]">link</span>
+                                        Content Studio linked
+                                        <button onClick={() => setFromContent(false)} className="text-slate-500 hover:text-white cursor-pointer ml-1">
+                                            <span className="material-symbols-outlined text-[10px]">close</span>
+                                        </button>
+                                    </div>
+                                )}
+                                {designBaseImage && (
+                                    <div className="floating-context-chip text-amber-400 border-amber-500/20">
+                                        <img src={designBaseImage} alt="" className="w-4 h-4 rounded object-cover" />
+                                        Editing template
+                                        <button onClick={() => setDesignBaseImage(null)} className="text-slate-500 hover:text-white cursor-pointer ml-1">
+                                            <span className="material-symbols-outlined text-[10px]">close</span>
+                                        </button>
+                                    </div>
+                                )}
+                                {selectedProduct && (
+                                    <div className="floating-context-chip text-cyan-400 border-cyan-500/20">
+                                        {selectedProduct.images?.[0]?.url && <img src={selectedProduct.images[0].url} alt="" className="w-4 h-4 rounded object-cover" />}
+                                        {selectedProduct.title?.substring(0, 20)}
+                                        <button onClick={() => setSelectedProduct(null)} className="text-slate-500 hover:text-white cursor-pointer ml-1">
+                                            <span className="material-symbols-outlined text-[10px]">close</span>
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* ── Main Prompt Row ── */}
+                        <div className="floating-prompt-row">
+
+                            {/* Setting icon buttons */}
+                            <button onClick={() => setFloatingTray(prev => prev === 'format' ? null : 'format')}
+                                className={`floating-setting-btn ${floatingTray === 'format' ? 'active' : ''}`} title="Format & Size">
+                                <span className="material-symbols-outlined text-sm">crop</span>
+                                {selectedType !== 'instagram-post' && <span className="setting-dot" />}
+                            </button>
+                            <button onClick={() => setFloatingTray(prev => prev === 'camera' ? null : 'camera')}
+                                className={`floating-setting-btn ${floatingTray === 'camera' ? 'active' : ''}`} title="Camera Shot">
+                                <span className="material-symbols-outlined text-sm">movie</span>
+                                {selectedShot && <span className="setting-dot" />}
+                            </button>
+                            <button onClick={() => setFloatingTray(prev => prev === 'references' ? null : 'references')}
+                                className={`floating-setting-btn ${floatingTray === 'references' ? 'active' : ''}`} title="References">
+                                <span className="material-symbols-outlined text-sm">collections</span>
+                                {(referenceImages.style || referenceImages.upload || characters.length > 0) && <span className="setting-dot" />}
+                            </button>
+                            <button onClick={() => setFloatingTray(prev => prev === 'text' ? null : 'text')}
+                                className={`floating-setting-btn ${floatingTray === 'text' ? 'active' : ''}`} title="Text on Image">
+                                <span className="material-symbols-outlined text-sm">title</span>
+                                {generateCopy && <span className="setting-dot" />}
+                            </button>
+                            <button onClick={() => setFloatingTray(prev => prev === 'advanced' ? null : 'advanced')}
+                                className={`floating-setting-btn ${floatingTray === 'advanced' ? 'active' : ''}`} title="Advanced">
+                                <span className="material-symbols-outlined text-sm">tune</span>
+                            </button>
+
+                            {/* Divider */}
+                            <div className="w-px h-6 bg-white/[0.08] flex-shrink-0 mx-1" />
+
+                            {/* Prompt textarea */}
+                            <div className="relative flex-1 min-w-0">
+                                <textarea
+                                    value={prompt}
+                                    onChange={e => {
+                                        const val = e.target.value
+                                        setPrompt(val)
+                                        e.target.style.height = 'auto'
+                                        e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px'
+                                        const cursor = e.target.selectionStart
+                                        const textBefore = val.substring(0, cursor)
+                                        const atMatch = textBefore.match(/@(\w*)$/)
+                                        if (atMatch && (characters.length > 0 || referenceImages.upload)) {
+                                            setShowCharTags(true)
+                                            setCharTagFilter(atMatch[1].toLowerCase())
+                                        } else {
+                                            setShowCharTags(false)
+                                        }
+                                    }}
+                                    onKeyDown={e => {
+                                        if (e.key === 'Enter' && !e.shiftKey && !showCharTags) { e.preventDefault(); handleGenerate() }
+                                        if (e.key === 'Escape') { setShowCharTags(false); setFloatingTray(null) }
+                                    }}
+                                    placeholder={activeBrand
+                                        ? `Describe your visual for ${activeBrand.name}...`
+                                        : "Create a brand first to start generating visuals"}
+                                    disabled={!activeBrand || activeGenerations.length >= 3}
+                                    className="input-glass w-full resize-none py-2.5 px-4 pr-24 disabled:opacity-30 text-on-surface text-sm leading-relaxed rounded-xl overflow-hidden"
+                                    rows={1}
+                                    style={{ minHeight: '44px', maxHeight: '120px', overflowY: 'auto' }}
+                                    ref={promptTextareaRef}
+                                />
+
+                                {/* @character tag autocomplete */}
+                                {showCharTags && (characters.length > 0 || referenceImages.upload) && (
+                                    <div className="absolute left-4 bottom-full mb-2 glass-panel rounded-xl shadow-2xl shadow-black/30 p-2 z-50 min-w-[200px] animate-fade-in">
+                                        <p className="text-[10px] text-on-surface-variant/50 mb-1.5 px-2">Tag a character</p>
+                                        {characters
+                                            .filter(c => !charTagFilter || c.name.toLowerCase().includes(charTagFilter))
+                                            .map((char, idx) => (
+                                                <button key={idx} onClick={() => {
+                                                    const textarea = promptTextareaRef.current
+                                                    if (!textarea) return
+                                                    const cursor = textarea.selectionStart
+                                                    const before = prompt.substring(0, cursor)
+                                                    const after = prompt.substring(cursor)
+                                                    const cleaned = before.replace(/@\w*$/, '')
+                                                    const tagName = char.name.replace(/\s/g, '')
+                                                    setPrompt(cleaned + `@${tagName} ` + after)
+                                                    setShowCharTags(false)
+                                                    setTimeout(() => textarea.focus(), 50)
+                                                }}
+                                                    className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-white/[0.06] transition-all text-left cursor-pointer">
+                                                    <img src={char.image} alt="" className="w-6 h-6 rounded-full object-cover border border-white/10" />
+                                                    <div>
+                                                        <p className="text-xs font-bold text-on-surface">@{char.name}</p>
+                                                        <p className="text-[9px] text-on-surface-variant/40">Character reference</p>
+                                                    </div>
+                                                </button>
+                                            ))}
+                                        {referenceImages.upload && (
+                                            <button onClick={() => {
+                                                const textarea = promptTextareaRef.current
+                                                if (!textarea) return
+                                                const cursor = textarea.selectionStart
+                                                const before = prompt.substring(0, cursor)
+                                                const after = prompt.substring(cursor)
+                                                const cleaned = before.replace(/@\w*$/, '')
+                                                setPrompt(cleaned + '@Upload ' + after)
+                                                setShowCharTags(false)
+                                                setTimeout(() => textarea.focus(), 50)
+                                            }}
+                                                className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-white/[0.06] transition-all text-left cursor-pointer">
+                                                <img src={referenceImages.upload} alt="" className="w-6 h-6 rounded-full object-cover border border-cyan-500/30" />
+                                                <div>
+                                                    <p className="text-xs font-bold text-cyan-400">@Upload</p>
+                                                    <p className="text-[9px] text-on-surface-variant/40">Your uploaded image</p>
+                                                </div>
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* Inline enhance + voice */}
+                                <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                                    {prompt.trim() && (
+                                        <CreditTooltipWrapper action="promptEnhance">
+                                            <button onClick={handleEnhancePrompt} disabled={enhancing || !activeBrand}
+                                                className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${enhancing
+                                                    ? 'bg-amber-500/20 text-amber-400'
+                                                    : 'bg-white/[0.06] text-slate-400 hover:text-amber-400 hover:bg-amber-500/10'}`}>
+                                                <span className={`material-symbols-outlined text-xs ${enhancing ? 'animate-spin' : ''}`}>
+                                                    {enhancing ? 'progress_activity' : 'auto_awesome'}
+                                                </span>
+                                                {enhancing ? '...' : 'Enhance'}
+                                            </button>
+                                        </CreditTooltipWrapper>
+                                    )}
+                                    <VoiceInput
+                                        onResult={(text) => setPrompt(prev => prev ? prev + ' ' + text : text)}
+                                        size="small"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Model selector */}
+                            <div className="relative flex-shrink-0">
+                                <button onClick={() => setShowModelMenu(!showModelMenu)}
+                                    className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-[11px] font-bold glass-panel text-on-surface-variant hover:text-on-surface transition-all duration-300 cursor-pointer whitespace-nowrap">
+                                    <span className="material-symbols-outlined text-xs" style={{ color: IMAGE_MODELS.find(m => m.id === imageModel)?.color || '#FF4D00' }}>
+                                        {IMAGE_MODELS.find(m => m.id === imageModel)?.icon || 'auto_awesome'}
+                                    </span>
+                                    <span className="hidden md:inline">{IMAGE_MODELS.find(m => m.id === imageModel)?.name || 'NanoBanana 2'}</span>
+                                    <span className="material-symbols-outlined text-[10px] text-slate-600">{showModelMenu ? 'expand_less' : 'expand_more'}</span>
+                                </button>
+                                {showModelMenu && (
+                                    <div className="absolute left-0 right-0 bottom-full mb-1 glass-panel rounded-xl shadow-2xl z-50 overflow-hidden min-w-[260px]" style={{ animation: 'fadeUp 0.15s ease-out' }}>
+                                        <div className="p-1.5 space-y-0.5 max-h-[280px] overflow-y-auto">
+                                            {IMAGE_MODELS.map(m => (
+                                                <button key={m.id} onClick={() => { setImageModel(m.id); setShowModelMenu(false) }}
+                                                    className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-left transition-all cursor-pointer ${imageModel === m.id ? 'bg-white/10 text-white' : 'text-slate-400 hover:bg-white/[0.06] hover:text-white'}`}>
+                                                    <span className="material-symbols-outlined text-sm" style={{ color: m.color }}>{m.icon}</span>
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span className="text-[11px] font-bold truncate">{m.name}</span>
+                                                            {m.id === 'nanobanana-2' && <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-[#FF4D00]/20 text-[#FF7A00] font-bold">DEFAULT</span>}
+                                                        </div>
+                                                        <span className="text-[9px] text-slate-500 block truncate">{m.desc}</span>
+                                                    </div>
+                                                    {imageModel === m.id && <span className="material-symbols-outlined text-xs text-primary">check_circle</span>}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Generate button */}
+                            <CreditTooltipWrapper action="creative">
+                                <button onClick={handleGenerate} disabled={!prompt.trim() || !activeBrand || activeGenerations.length >= 3}
+                                    className="btn-primary py-2.5 px-5 rounded-xl disabled:opacity-30 text-sm font-bold cursor-pointer flex items-center gap-2 whitespace-nowrap flex-shrink-0">
+                                    {activeGenerations.length > 0 ? (
+                                        <><span className="material-symbols-outlined animate-spin text-sm">progress_activity</span>
+                                        <span className="hidden sm:inline">{activeGenerations.length >= 3 ? 'Queue Full' : `Generating ${activeGenerations.length}/3`}</span></>
+                                    ) : (
+                                        <><span className="material-symbols-outlined text-sm">auto_awesome</span> Generate <CreditBadge action="creative" /></>
+                                    )}
+                                </button>
+                            </CreditTooltipWrapper>
+
+                            {/* Product picker */}
                             <button onClick={() => {
-                                const built = activeQuickTemplate.buildPrompt(activeBrand, templateFields)
-                                setPrompt(built)
-                                setActiveQuickTemplate(null)
+                                if (activeBrand?._id) {
+                                    productsAPI.list({ brandId: activeBrand._id, limit: 50 })
+                                        .then(res => setProductsList(res.products || []))
+                                        .catch(() => { })
+                                }
+                                setShowProductPicker(true)
                             }}
-                                className="mt-4 btn-primary py-2.5 px-5 rounded-xl text-sm font-bold cursor-pointer w-full justify-center">
-                                <span className="material-symbols-outlined text-sm">auto_awesome</span>
-                                Apply to Prompt
+                                className="floating-setting-btn" title="Select product">
+                                <span className="material-symbols-outlined text-sm">inventory_2</span>
+                                {selectedProduct && <span className="setting-dot" />}
                             </button>
                         </div>
-                    )}
-
-
-                    {/* ═══════════ RIGHT GALLERY PANEL ═══════════ */}
-
-                    <div className="flex-1 h-full overflow-hidden relative bg-[#020202]">
-                        <GalleryPanel 
-                            galleryFilter={galleryFilter}
-                            setGalleryFilter={setGalleryFilter}
-                            viewMode={viewMode}
-                            setViewMode={setViewMode}
-                            aiWarnings={aiWarnings}
-                            error={error}
-                            setError={setError}
-                            handleGenerate={handleGenerate}
-                            result={result}
-                            setResult={setResult}
-                            activeGenerations={activeGenerations}
-                            prompt={prompt}
-                            activeBrand={activeBrand}
-                            selectedTypeInfo={selectedTypeInfo}
-                            style={style}
-                            feedbackState={feedbackState}
-                            handleFeedback={handleFeedback}
-                            handleDownloadImage={handleDownloadImage}
-                            upscaleMenu={upscaleMenu}
-                            setUpscaleMenu={setUpscaleMenu}
-                            upscalingState={upscalingState}
-                            handleDownloadWithUpscale={handleDownloadWithUpscale}
-                            upscaleMenuRef={upscaleMenuRef}
-                            setPublishData={setPublishData}
-                            handleAnimateClick={handleAnimateClick}
-                            navigate={navigate}
-                            textOverlay={textOverlay}
-                            aspectRatio={aspectRatio}
-                            copiedField={copiedField}
-                            setCopiedField={setCopiedField}
-                            pipelineSteps={pipelineSteps}
-                            generationHistory={generationHistory}
-                            setGenerationHistory={setGenerationHistory}
-                            setZoomImage={setZoomImage}
-                            setDesignBaseImage={setDesignBaseImage}
-                            setPrompt={setPrompt}
-                            expandedReasoning={expandedReasoning}
-                            setExpandedReasoning={setExpandedReasoning}
-                            getTimeAgo={getTimeAgo}
-                            bankImages={bankImages}
-                            setActiveQuickTemplate={setActiveQuickTemplate}
-                            setTemplateFields={setTemplateFields}
-                            setFeedbackToast={setFeedbackToast}
-                        />
                     </div>
-                </div>
+
+            </>
             )}
-
-
 
 
 
 
             {/* =================== AI PHOTOSHOOT MODE =================== */}
             {studioMode === 'photoshoot' && (
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 fade-up">
+                <div className="fade-up flex flex-col" style={{ minHeight: 'calc(100vh - 200px)', paddingBottom: '9rem' }}>
 
                     {/* Recent Photoshoots */}
                     {(() => {
                         const recentPhotoshoots = bankImages.filter(i => i.type === 'ai-photoshoot' || i.type === 'photoshoot').slice(0, 8);
                         if (recentPhotoshoots.length === 0) return null;
                         return (
-                            <div className="col-span-12 studio-card p-5 mb-1 fade-up-1">
+                            <div className="studio-card p-5 mb-4 fade-up-1">
                                 <div className="flex items-center justify-between mb-3">
                                     <h4 className="text-sm font-bold text-white flex items-center gap-2">
                                         <span className="material-symbols-outlined text-amber-400 text-lg">history</span>
@@ -1805,81 +3761,10 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             </div>
                         )
                     })()}
-                    {/* Left — Photoshoot Controls */}
-                    <div className="col-span-12 lg:col-span-5 space-y-5 fade-up-2">
-                        {/* Product Image Upload */}
-                        <div className="studio-card p-5">
-                            <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-4">
-                                <span className="material-symbols-outlined text-primary text-xl">add_a_photo</span>
-                                Product Image
-                            </h3>
 
-                            {!productImage ? (
-                                <div>
-                                    {/* Clean drop zone */}
-                                    <div onDrop={(e) => {
-                                        e.preventDefault()
-                                        const file = e.dataTransfer?.files?.[0]
-                                        if (file && file.type.startsWith('image/')) {
-                                            setProductFile(file)
-                                            const reader = new FileReader()
-                                            reader.onload = async (ev) => {
-                                                const s3Url = await uploadToS3(ev.target.result, 'products')
-                                                setProductImage(s3Url)
-                                            }
-                                            reader.readAsDataURL(file)
-                                        }
-                                    }} onDragOver={e => e.preventDefault()}
-                                        className="border-2 border-dashed border-white/[0.1] rounded-2xl p-5 text-center hover:border-primary/40 transition-colors mb-3">
-                                        <span className="material-symbols-outlined text-3xl text-slate-600 mb-1 block">add_photo_alternate</span>
-                                        <p className="text-slate-400 text-xs">Drag & drop product image here</p>
-                                    </div>
-                                    {/* 3 action buttons */}
-                                    <div className="grid grid-cols-3 gap-2">
-                                        <button onClick={() => { setProductPickerTab('brand'); setProductPickerOpen(true) }}
-                                            className="flex flex-col items-center gap-1 p-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] hover:border-emerald-400/40 hover:bg-emerald-500/5 transition-all cursor-pointer group">
-                                            <span className="material-symbols-outlined text-base text-emerald-400 group-hover:scale-110 transition-transform">domain</span>
-                                            <span className="text-[10px] text-slate-400 font-medium">Brand Photos</span>
-                                        </button>
-                                        <label className="flex flex-col items-center gap-1 p-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] hover:border-primary/40 hover:bg-primary/5 transition-all cursor-pointer group">
-                                            <span className="material-symbols-outlined text-base text-primary group-hover:scale-110 transition-transform">upload</span>
-                                            <span className="text-[10px] text-slate-400 font-medium">Upload</span>
-                                            <input type="file" className="hidden" onChange={(e) => {
-                                                const file = e.target.files?.[0]
-                                                if (file && file.type.startsWith('image/')) {
-                                                    setProductFile(file)
-                                                    const reader = new FileReader()
-                                                    reader.onload = async (ev) => {
-                                                        const s3Url = await uploadToS3(ev.target.result, 'products')
-                                                        setProductImage(s3Url)
-                                                    }
-                                                    reader.readAsDataURL(file)
-                                                }
-                                            }} accept="image/*" />
-                                        </label>
-                                        <button onClick={() => { setProductPickerTab('link'); setProductPickerOpen(true) }}
-                                            className="flex flex-col items-center gap-1 p-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] hover:border-violet-400/40 hover:bg-violet-500/5 transition-all cursor-pointer group">
-                                            <span className="material-symbols-outlined text-base text-violet-400 group-hover:scale-110 transition-transform">link</span>
-                                            <span className="text-[10px] text-slate-400 font-medium">Paste Link</span>
-                                        </button>
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="relative rounded-2xl overflow-hidden">
-                                    <img src={productImage} alt="Product" className="w-full max-h-48 object-contain bg-black/20 rounded-2xl" />
-                                    <button onClick={() => { setProductImage(null); setProductFile(null); setPhotoshootResult(null) }}
-                                        className="absolute top-2 right-2 p-1.5 rounded-lg bg-black/60 text-white hover:bg-rose-500/80 transition-colors cursor-pointer">
-                                        <span className="material-symbols-outlined text-sm">close</span>
-                                    </button>
-                                    {productFile && (
-                                        <div className="absolute bottom-2 left-2 bg-black/60 rounded-lg px-2 py-1">
-                                            <span className="text-sm text-white">{productFile.name}</span>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-                        </div>
 
+                    {/* ═══ Full-Width Photoshoot Result ═══ */}
+                    <div className="flex-1 flex flex-col">
                         {/* ══ Product Image Picker Modal ══ */}
                         {productPickerOpen && (
                             <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setProductPickerOpen(false)}>
@@ -1896,7 +3781,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                         {[
                                             { id: 'brand', icon: 'domain', label: 'Brand Photos', color: 'text-emerald-400' },
                                             { id: 'upload', icon: 'upload', label: 'Upload', color: 'text-primary' },
-                                            { id: 'link', icon: 'link', label: 'Paste Link', color: 'text-violet-400' },
+                                            { id: 'link', icon: 'link', label: 'Paste Link', color: 'text-[#FF4D00]' },
                                         ].map(tab => (
                                             <button key={tab.id} onClick={() => setProductPickerTab(tab.id)}
                                                 className={`flex-1 py-2.5 text-xs font-medium flex items-center justify-center gap-1.5 transition-all cursor-pointer ${productPickerTab === tab.id ? `${tab.color} border-b-2 border-current bg-white/[0.03]` : 'text-slate-500 hover:text-slate-300'}`}>
@@ -2035,512 +3920,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             </div>
                         )}
 
-                        {/* ── Style & Character References (for Photoshoot) ── */}
-                        <div className="studio-card p-5">
-                            <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3">
-                                <span className="material-symbols-outlined text-primary text-xl">image_search</span>
-                                Style & Character
-                                <span className="text-xs text-slate-500 bg-white/[0.05] px-2 py-0.5 rounded-full ml-auto">Optional</span>
-                            </h3>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                {[
-                                    { key: 'style', icon: 'brush', label: 'Style Reference', hint: 'Match this visual style' },
-                                    { key: 'character', icon: 'face', label: 'Character', hint: 'Include this person/mascot' },
-                                ].map(ref => (
-                                    <div key={ref.key}>
-                                        {referenceImages[ref.key] ? (
-                                            <div className="relative rounded-xl overflow-hidden aspect-video border border-primary/30">
-                                                <img src={referenceImages[ref.key]} alt={ref.label} className="w-full h-full object-cover" />
-                                                <button onClick={() => setReferenceImages(prev => ({ ...prev, [ref.key]: null }))}
-                                                    className="absolute top-1 right-1 p-0.5 rounded-full bg-black/70 text-white hover:bg-rose-500 cursor-pointer">
-                                                    <span className="material-symbols-outlined text-xs">close</span>
-                                                </button>
-                                                <span className="absolute bottom-0 inset-x-0 text-center text-[8px] font-bold bg-black/70 text-white py-0.5">{ref.label}</span>
-                                            </div>
-                                        ) : (
-                                            <button onClick={() => { setRefPickerSlot(ref.key); setRefPickerTab('upload') }}
-                                                className="w-full flex flex-col items-center justify-center aspect-video rounded-xl border-2 border-dashed border-white/[0.08] hover:border-primary/40 cursor-pointer transition-colors bg-white/[0.02] group">
-                                                <span className="material-symbols-outlined text-lg text-slate-600 group-hover:text-primary mb-0.5">{ref.icon}</span>
-                                                <span className="text-sm text-slate-500 font-medium">{ref.label}</span>
-                                                <span className="text-[8px] text-slate-600">{ref.hint}</span>
-                                                <span className="text-[8px] text-slate-600 mt-1 flex items-center gap-1">
-                                                    <span className="material-symbols-outlined text-[8px]">upload</span> Upload
-                                                    <span className="material-symbols-outlined text-[8px] ml-1">photo_library</span> Library
-                                                    <span className="material-symbols-outlined text-[8px] ml-1">domain</span> Brand
-                                                </span>
-                                            </button>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
-                            <p className="text-xs text-slate-600 mt-2">Upload, pick from library, or use brand images to guide the photoshoot look</p>
-                        </div>
-
-                        {/* ═══════════════ PHOTO STUDIO PRO ═══════════════ */}
-
-                        {/* ── Aspect Ratio ── */}
-                        <div className="studio-card p-4">
-                            <div className="flex items-center gap-2">
-                                <span className="text-xs text-slate-400 uppercase tracking-widest font-bold whitespace-nowrap">Ratio</span>
-                                <div className="flex gap-1.5 flex-1 justify-center">
-                                    {[
-                                        { id: '1:1', w: 16, h: 16, label: '1:1' },
-                                        { id: '4:5', w: 13, h: 16, label: '4:5' },
-                                        { id: '3:4', w: 12, h: 16, label: '3:4' },
-                                        { id: '9:16', w: 9, h: 16, label: '9:16' },
-                                        { id: '16:9', w: 16, h: 9, label: '16:9' },
-                                        { id: '3:2', w: 16, h: 11, label: '3:2' },
-                                    ].map(r => (
-                                        <button key={r.id} onClick={() => setAspectRatio(r.id)}
-                                            className={`flex flex-col items-center gap-1 px-2 py-1.5 rounded-lg transition-all cursor-pointer border ${aspectRatio === r.id
-                                                ? 'bg-primary/20 border-primary/50 text-primary'
-                                                : 'bg-transparent border-transparent text-slate-500 hover:text-slate-300'}`}>
-                                            <div className={`rounded-[2px] transition-all ${aspectRatio === r.id ? 'bg-primary' : 'bg-slate-600'}`}
-                                                style={{ width: r.w, height: r.h }} />
-                                            <span className="text-[10px] font-bold">{r.label}</span>
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* ── Tab Navigation ── */}
-                        <div className="flex rounded-2xl overflow-hidden border border-white/[0.06] bg-white/[0.02]">
-                            {[
-                                { id: 'shot', icon: 'photo_camera', label: 'Shot' },
-                                { id: 'light', icon: 'light_mode', label: 'Light' },
-                                { id: 'scene', icon: 'view_in_ar', label: 'Scene' },
-                                { id: 'style', icon: 'palette', label: 'Style' },
-                            ].map(t => (
-                                <button key={t.id} onClick={() => setPsTab(t.id)}
-                                    className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-bold transition-all cursor-pointer ${psTab === t.id
-                                        ? 'bg-gradient-to-r from-primary/15 to-accent-purple/10 text-white border-b-2 border-primary shadow-inner'
-                                        : 'text-slate-500 hover:text-slate-300 hover:bg-white/[0.03]'}`}>
-                                    <span className="material-symbols-outlined text-base">{t.icon}</span>
-                                    {t.label}
-                                </button>
-                            ))}
-                        </div>
-
-                        {/* ── Tab Content ── */}
-                        <div className="studio-card p-5 min-h-[180px]">
-
-                            {/* 📐 SHOT TAB */}
-                            {psTab === 'shot' && (
-                                <div className="space-y-4">
-                                    <div>
-                                        <p className="text-[9px] text-slate-500 uppercase tracking-widest font-bold mb-2">Camera Angle</p>
-                                        <div className="flex flex-wrap gap-1.5">
-                                            {[
-                                                { id: 'eye-level', label: '👁️ Eye Level' },
-                                                { id: 'hero', label: '⬆ Low Angle' },
-                                                { id: '45deg', label: '📐 3/4 View' },
-                                                { id: 'overhead', label: '⬇ Overhead' },
-                                                { id: 'macro', label: '🔍 Macro' },
-                                                { id: 'dutch', label: '↗ Dutch Tilt' },
-                                                { id: 'tilt-down', label: '↘ Tilt Down' },
-                                                { id: 'worms-eye', label: '🐛 Worm\'s Eye' },
-                                                { id: 'birds-eye', label: '🦅 Bird\'s Eye' },
-                                                { id: 'profile', label: '👤 Profile' },
-                                            ].map(a => (
-                                                <button key={a.id} onClick={() => setCameraAngle(a.id)}
-                                                    className={`px-2.5 py-1 rounded-full text-[10px] font-medium transition-all cursor-pointer border ${cameraAngle === a.id
-                                                        ? 'bg-amber-500/20 border-amber-500/50 text-amber-300'
-                                                        : 'bg-white/[0.03] border-white/[0.06] text-slate-400 hover:bg-white/[0.06]'
-                                                    }`}>{a.label}</button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <p className="text-[9px] text-slate-500 uppercase tracking-widest font-bold mb-2">Lens</p>
-                                        <div className="flex flex-wrap gap-1.5">
-                                            {[
-                                                { id: 'fisheye', label: '🐟 Fish Eye' },
-                                                { id: 'ultra-wide', label: '🌐 14mm' },
-                                                { id: '24mm', label: '📸 24mm' },
-                                                { id: '35mm', label: '🎞️ 35mm' },
-                                                { id: '50mm', label: '⭐ 50mm' },
-                                                { id: '85mm', label: '🌸 85mm' },
-                                                { id: '105mm', label: '🔬 105mm' },
-                                                { id: '200mm', label: '🔭 200mm' },
-                                                { id: 'tilt-shift', label: '🏙️ Tilt-Shift' },
-                                            ].map(l => (
-                                                <button key={l.id} onClick={() => setLens(l.id)}
-                                                    className={`px-2.5 py-1 rounded-full text-[10px] font-medium transition-all cursor-pointer border ${lens === l.id
-                                                        ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300'
-                                                        : 'bg-white/[0.03] border-white/[0.06] text-slate-400 hover:bg-white/[0.06]'
-                                                    }`}>{l.label}</button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* 💡 LIGHT TAB */}
-                            {psTab === 'light' && (
-                                <div className="space-y-4">
-                                    <div>
-                                        <p className="text-[9px] text-slate-500 uppercase tracking-widest font-bold mb-2">Style</p>
-                                        <div className="flex flex-wrap gap-1.5">
-                                            {[
-                                                { id: 'softbox', label: '☁️ Softbox' },
-                                                { id: 'natural', label: '🪟 Window' },
-                                                { id: 'golden', label: '🌅 Golden Hour' },
-                                                { id: 'dramatic', label: '🎭 Dramatic' },
-                                                { id: 'neon', label: '💜 Neon' },
-                                                { id: 'rim', label: '✨ Rim' },
-                                                { id: 'highkey', label: '⬜ High Key' },
-                                            ].map(l => (
-                                                <button key={l.id} onClick={() => setLightingStyle(l.id)}
-                                                    className={`px-2.5 py-1 rounded-full text-[10px] font-medium transition-all cursor-pointer border ${lightingStyle === l.id
-                                                        ? 'bg-yellow-500/20 border-yellow-500/50 text-yellow-300'
-                                                        : 'bg-white/[0.03] border-white/[0.06] text-slate-400 hover:bg-white/[0.06]'
-                                                    }`}>{l.label}</button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <p className="text-[9px] text-slate-500 uppercase tracking-widest font-bold mb-2">Direction</p>
-                                        <div className="inline-grid grid-cols-3 gap-1 p-1 rounded-xl bg-white/[0.02] border border-white/[0.04]">
-                                            {[
-                                                { id: 'front-left', label: '↖', pos: '0' },
-                                                { id: 'front', label: '⬆', pos: '1' },
-                                                { id: 'front-right', label: '↗', pos: '2' },
-                                                { id: 'left', label: '←', pos: '3' },
-                                                { id: 'top', label: '●', pos: '4' },
-                                                { id: 'right', label: '→', pos: '5' },
-                                                { id: 'back', label: '', pos: '6' },
-                                                { id: '_label', label: '⬇', pos: '7', isBack: true },
-                                                { id: '_empty', label: '', pos: '8' },
-                                            ].filter(d => d.id !== '_empty' && d.id !== '_label').map(d => (
-                                                <button key={d.id} onClick={() => d.id !== '_empty' && setLightDirection(d.id === '_label' ? 'back' : d.id)}
-                                                    className={`w-9 h-9 rounded-lg text-sm flex items-center justify-center transition-all cursor-pointer ${
-                                                        lightDirection === d.id || (d.isBack && lightDirection === 'back')
-                                                            ? 'bg-yellow-500/25 text-yellow-300 shadow-md shadow-yellow-500/10'
-                                                            : d.id === 'top' ? 'bg-white/[0.04] text-slate-400' : 'text-slate-500 hover:bg-white/[0.05]'
-                                                    }`}>{d.label}</button>
-                                            ))}
-                                        </div>
-                                        <p className="text-[8px] text-slate-600 mt-1.5">
-                                            Light from: {{'front-left':'Front Left','front':'Front','front-right':'Front Right','left':'Left Side','right':'Right Side','top':'Top Down','back':'Backlit'}[lightDirection]}
-                                        </p>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* 🎬 SCENE TAB */}
-                            {psTab === 'scene' && (
-                                <div className="space-y-4">
-                                    <div>
-                                        <p className="text-[9px] text-slate-500 uppercase tracking-widest font-bold mb-2">Surface & Placement</p>
-                                        <div className="flex flex-wrap gap-1.5">
-                                            {[
-                                                { id: 'white', label: '⬜ White' },
-                                                { id: 'marble', label: '🤍 Marble' },
-                                                { id: 'stone', label: '🪨 Stone' },
-                                                { id: 'wood', label: '🪵 Wood' },
-                                                { id: 'concrete', label: '🏗️ Concrete' },
-                                                { id: 'fabric', label: '🧶 Silk' },
-                                                { id: 'podium', label: '🏛️ Podium' },
-                                                { id: 'glass', label: '🪞 Glass' },
-                                                { id: 'sand', label: '🏖️ Sand' },
-                                                { id: 'foliage', label: '🌿 Foliage' },
-                                            ].map(s => (
-                                                <button key={s.id} onClick={() => setSurface(s.id)}
-                                                    className={`px-2.5 py-1 rounded-full text-[10px] font-medium transition-all cursor-pointer border ${surface === s.id
-                                                        ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300'
-                                                        : 'bg-white/[0.03] border-white/[0.06] text-slate-400 hover:bg-white/[0.06]'
-                                                    }`}>{s.label}</button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <p className="text-[9px] text-slate-500 uppercase tracking-widest font-bold mb-2">Model</p>
-                                        <div className="flex gap-2">
-                                            {[
-                                                { id: 'none', label: '🚫 None' },
-                                                { id: 'hands', label: '🤲 Hands' },
-                                                { id: 'model-woman', label: '👩 Woman' },
-                                                { id: 'model-man', label: '👨 Man' },
-                                            ].map(m => (
-                                                <button key={m.id} onClick={() => setModelPresence(m.id)}
-                                                    className={`flex-1 py-2 rounded-xl text-[10px] font-medium text-center transition-all cursor-pointer border ${modelPresence === m.id
-                                                        ? 'bg-violet-500/20 border-violet-500/50 text-violet-300'
-                                                        : 'bg-white/[0.03] border-white/[0.06] text-slate-400 hover:bg-white/[0.06]'
-                                                    }`}>{m.label}</button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* 🎨 STYLE TAB */}
-                            {psTab === 'style' && (
-                                <div className="space-y-4">
-                                    <div>
-                                        <p className="text-[9px] text-slate-500 uppercase tracking-widest font-bold mb-2">Mood <span className="text-slate-600 normal-case">(multi-select)</span></p>
-                                        <div className="flex flex-wrap gap-1.5">
-                                            {[
-                                                { id: 'editorial', label: '📰 Editorial' },
-                                                { id: 'commercial', label: '🛍️ Commercial' },
-                                                { id: 'lifestyle', label: '☕ Lifestyle' },
-                                                { id: 'luxury', label: '💎 Luxury' },
-                                                { id: 'minimal', label: '◻️ Minimal' },
-                                                { id: 'moody', label: '🌑 Moody' },
-                                                { id: 'vibrant', label: '🌈 Vibrant' },
-                                                { id: 'vintage', label: '📷 Vintage' },
-                                            ].map(m => {
-                                                const active = mood.includes(m.id)
-                                                return (
-                                                    <button key={m.id} onClick={() => setMood(prev => active ? prev.filter(x => x !== m.id) : [...prev, m.id])}
-                                                        className={`px-2.5 py-1 rounded-full text-[10px] font-medium transition-all cursor-pointer border ${active
-                                                            ? 'bg-pink-500/20 border-pink-500/50 text-pink-300'
-                                                            : 'bg-white/[0.03] border-white/[0.06] text-slate-400 hover:bg-white/[0.06]'
-                                                        }`}>{m.label}</button>
-                                                )
-                                            })}
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <p className="text-[9px] text-slate-500 uppercase tracking-widest font-bold mb-2">Fidelity — <span className="text-amber-400">{fidelity}%</span></p>
-                                        <input type="range" min={0} max={100} step={5} value={fidelity}
-                                            onChange={e => setFidelity(Number(e.target.value))}
-                                            className="w-full h-1.5 rounded-full appearance-none cursor-pointer"
-                                            style={{ background: `linear-gradient(to right, #f59e0b ${fidelity}%, rgba(255,255,255,0.06) ${fidelity}%)` }}
-                                        />
-                                        <div className="flex justify-between mt-1">
-                                            <span className="text-[8px] text-slate-600">🎨 Creative</span>
-                                            <span className="text-[8px] text-slate-600">🔒 Exact</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* ── Director's Brief ── always visible */}
-                        <div className="rounded-xl p-2.5 bg-gradient-to-r from-amber-500/[0.04] to-transparent border border-amber-500/10">
-                            <p className="text-[10px] text-slate-400/80 leading-relaxed">
-                                <span className="text-amber-400/60 font-bold">📋</span>{' '}
-                                {(() => {
-                                    const a = {'eye-level':'Eye-level','hero':'Low-angle','45deg':'3/4','overhead':'Overhead','macro':'Macro','dutch':'Dutch tilt','tilt-down':'Tilt-down','worms-eye':"Worm's eye",'birds-eye':"Bird's eye",'profile':'Profile'}
-                                    const l = {'fisheye':'8mm fish-eye','ultra-wide':'14mm','24mm':'24mm','35mm':'35mm','50mm':'50mm','85mm':'85mm','105mm':'105mm','200mm':'200mm','tilt-shift':'tilt-shift'}
-                                    const lt = {'softbox':'softbox','natural':'window','golden':'golden hour','dramatic':'dramatic','neon':'neon','rim':'rim','highkey':'high-key'}
-                                    const s = {'white':'white bg','marble':'marble','stone':'stone','wood':'wood','concrete':'concrete','fabric':'silk','podium':'podium','glass':'glass','sand':'sand','foliage':'foliage'}
-                                    const md = {'none':'','hands':' · hands','model-woman':' · woman model','model-man':' · man model'}
-                                    return `${a[cameraAngle]||cameraAngle} · ${l[lens]||lens} · ${lt[lightingStyle]||lightingStyle} · ${s[surface]||surface}${md[modelPresence]||''} · ${mood.map(m=>m[0].toUpperCase()+m.slice(1)).join('+')} · ${aspectRatio}`
-                                })()}
-                            </p>
-                        </div>
-
-                        {/* ── Camera Shot Preset (Photo Studio) ── */}
-                        <div className="mb-3">
-                            <div className="flex items-center justify-between mb-2">
-                                <span className="text-[10px] text-slate-500 uppercase tracking-widest font-bold flex items-center gap-1">
-                                    <span className="material-symbols-outlined text-[11px]">movie</span>
-                                    Camera Shot
-                                </span>
-                                {psSelectedShot && (
-                                    <button onClick={() => setPsSelectedShot(null)}
-                                        className="text-[9px] text-slate-500 hover:text-rose-400 transition-colors cursor-pointer flex items-center gap-0.5">
-                                        <span className="material-symbols-outlined text-[10px]">close</span> Clear
-                                    </button>
-                                )}
-                            </div>
-                            <div className="grid grid-cols-4 gap-1">
-                                {CAMERA_SHOT_PRESETS.map(shot => (
-                                    <button key={shot.id}
-                                        onClick={() => setPsSelectedShot(prev => prev === shot.id ? null : shot.id)}
-                                        title={shot.description}
-                                        className={`relative px-1.5 py-2 rounded-lg text-[9px] font-semibold transition-all cursor-pointer flex flex-col items-center gap-0.5 ${
-                                            psSelectedShot === shot.id
-                                            ? 'border text-white shadow-lg'
-                                            : 'bg-white/[0.03] text-slate-500 hover:text-slate-300 border border-white/[0.05] hover:border-white/[0.1] hover:bg-white/[0.05]'
-                                        }`}
-                                        style={psSelectedShot === shot.id ? {
-                                            backgroundColor: `${shot.color}18`,
-                                            borderColor: `${shot.color}50`,
-                                            color: shot.color,
-                                        } : {}}
-                                    >
-                                        <span className="text-sm leading-none">{shot.emoji}</span>
-                                        <span className="leading-tight text-center">{shot.label}</span>
-                                    </button>
-                                ))}
-                            </div>
-                            {psSelectedShot && (() => {
-                                const s = CAMERA_SHOT_PRESETS.find(x => x.id === psSelectedShot)
-                                return s ? (
-                                    <p className="text-[9px] mt-1.5 flex items-center gap-1" style={{ color: s.color }}>
-                                        <span className="material-symbols-outlined" style={{ fontSize: '10px' }}>info</span>
-                                        {s.description}
-                                    </p>
-                                ) : null
-                            })()}
-                        </div>
-
-                        {/* ── Extra Notes ── */}
-
-                        <div className="relative">
-                            <textarea value={photoshootBrief}
-                                onChange={e => setPhotoshootBrief(e.target.value)}
-                                placeholder="Extra details: water droplets, steam, brand packaging, props..."
-                                className="input-glass w-full py-2.5 px-3 pr-10 resize-none text-xs rounded-xl" rows={2}
-                            />
-                            <div className="absolute right-1.5 top-1.5">
-                                <VoiceInput onResult={(text) => setPhotoshootBrief(prev => prev ? prev + ' ' + text : text)} size="small" />
-                            </div>
-                        </div>
-                        {photoshootBrief.trim() && (
-                            <div className="flex items-center gap-2 -mt-1">
-                                <CreditTooltipWrapper action="promptEnhance">
-                                    <button onClick={async () => {
-                                        if (!photoshootBrief.trim() || !activeBrand || enhancing) return
-                                        setEnhancing(true)
-                                        try {
-                                            const data = await creativesAPI.enhancePrompt({
-                                                brandId: activeBrand._id,
-                                                prompt: `Photoshoot scene: ${photoshootBrief.trim()}`,
-                                                style: 'photorealistic',
-                                                format: 'photoshoot',
-                                                aspectRatio,
-                                            })
-                                            if (data.enhancedPrompt) setPhotoshootBrief(data.enhancedPrompt)
-                                        } catch (err) { console.error('Enhance failed:', err) }
-                                        finally { setEnhancing(false) }
-                                    }}
-                                        disabled={enhancing || !activeBrand}
-                                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${enhancing
-                                            ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                                            : 'bg-gradient-to-r from-amber-500/15 to-orange-500/10 text-amber-400 hover:from-amber-500/25 hover:to-orange-500/20 border border-amber-500/20 hover:border-amber-500/40'}`}>
-                                        <span className={`material-symbols-outlined text-sm ${enhancing ? 'animate-spin' : ''}`}>
-                                            {enhancing ? 'progress_activity' : 'auto_awesome'}
-                                        </span>
-                                        {enhancing ? 'Enhancing...' : '✨ Enhance'}
-                                    </button>
-                                </CreditTooltipWrapper>
-                            </div>
-                        )}
-
-                        {/* Model Selector for Photoshoot */}
-                        <div className="relative mb-2">
-                            <button onClick={() => setShowModelMenu(!showModelMenu)}
-                                className="flex items-center gap-2 w-full px-3 py-2 rounded-xl text-[11px] font-bold bg-white/[0.04] text-slate-300 hover:text-white border border-white/[0.06] hover:border-white/10 transition-all cursor-pointer">
-                                <span className="material-symbols-outlined text-xs" style={{ color: IMAGE_MODELS.find(m => m.id === imageModel)?.color || '#a855f7' }}>
-                                    {IMAGE_MODELS.find(m => m.id === imageModel)?.icon || 'auto_awesome'}
-                                </span>
-                                <span>{IMAGE_MODELS.find(m => m.id === imageModel)?.name || 'NanoBanana 2'}</span>
-                                <span className="text-[9px] text-slate-500 ml-0.5">{IMAGE_MODELS.find(m => m.id === imageModel)?.provider}</span>
-                                <span className="material-symbols-outlined text-[10px] text-slate-600 ml-auto">{showModelMenu ? 'expand_less' : 'expand_more'}</span>
-                            </button>
-                            {showModelMenu && (
-                                <div className="absolute left-0 right-0 bottom-full mb-1 bg-[#1a1a2e]/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden" style={{ animation: 'fadeUp 0.15s ease-out' }}>
-                                    <div className="p-1.5 space-y-0.5 max-h-[280px] overflow-y-auto">
-                                        {IMAGE_MODELS.map(m => (
-                                            <button key={m.id} onClick={() => { setImageModel(m.id); setShowModelMenu(false) }}
-                                                className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-left transition-all cursor-pointer ${imageModel === m.id ? 'bg-white/10 text-white' : 'text-slate-400 hover:bg-white/[0.06] hover:text-white'}`}>
-                                                <span className="material-symbols-outlined text-sm" style={{ color: m.color }}>{m.icon}</span>
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="flex items-center gap-1.5">
-                                                        <span className="text-[11px] font-bold truncate">{m.name}</span>
-                                                        {m.id === 'nanobanana-2' && <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 font-bold">DEFAULT</span>}
-                                                    </div>
-                                                    <span className="text-[9px] text-slate-500 block truncate">{m.desc}</span>
-                                                </div>
-                                                {imageModel === m.id && <span className="material-symbols-outlined text-xs text-primary">check_circle</span>}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Generate Button */}
-                        <CreditTooltipWrapper action="photoshoot">
-                            <button
-                                onClick={async () => {
-                                    if (!productImage || !activeBrand) return
-                                    setPhotoshootGenerating(true)
-                                    setPhotoshootError('')
-                                    setPhotoshootSaved(false)
-                                    try {
-                                        const brandColors = activeBrand?.dna?.colors?.map(c => c.hex).join(', ') || ''
-
-                                        const data = await agentsAPI.aiPhotoshoot({
-                                            image: productImage,
-                                            brief: photoshootBrief,
-                                            brandName: activeBrand?.name,
-                                            brandColors,
-                                            fidelity,
-                                            aspectRatio,
-                                            imageModel,
-                                            // Reference images
-                                            styleRef: referenceImages.style || null,
-                                            characterRef: referenceImages.character || null,
-                                            // Professional Photography Controls
-                                            cameraAngle,
-                                            lens,
-                                            lightingStyle,
-                                            lightDirection,
-                                            surface,
-                                            modelPresence,
-                                            mood,
-                                            // Camera shot preset injection
-                                            cameraShot: psSelectedShot ? (() => {
-                                                const s = CAMERA_SHOT_PRESETS.find(x => x.id === psSelectedShot)
-                                                return s ? s.injection : null
-                                            })() : null,
-                                        })
-
-                                        if (data.success) {
-                                            setPhotoshootResult(data)
-                                            // Accumulate into in-session photoshoot gallery
-                                            setPsHistory(prev => [{ ...data, _brief: photoshootBrief, _timestamp: Date.now() }, ...prev])
-                                            // Auto-save to image bank
-                                            saveToImageBank(data)
-                                        } else if (data.modelBusy) {
-                                            setPhotoshootError(data.errorMessage || `⚡ Model is busy — try switching to a different model using the selector above.`)
-                                        } else {
-                                            setPhotoshootError({
-                                                message: data.error || 'Generation failed',
-                                                isProviderError: data.isProviderError,
-                                                provider: data.provider
-                                            })
-                                        }
-                                    } catch (err) {
-                                        setPhotoshootError({
-                                            message: err.message,
-                                            isProviderError: err.isProviderError,
-                                            provider: err.provider
-                                        })
-                                    } finally {
-                                        setPhotoshootGenerating(false)
-                                    }
-                                }}
-                                disabled={!productImage || !activeBrand || photoshootGenerating}
-                                className="btn-primary w-full py-4 rounded-2xl text-sm font-bold disabled:opacity-30"
-                            >
-                                {photoshootGenerating ? (
-                                    <><span className="material-symbols-outlined animate-spin text-sm">progress_activity</span> Generating Photoshoot...</>
-                                ) : (
-                                    <><span className="material-symbols-outlined text-sm">auto_awesome</span> Generate AI Photoshoot <CreditBadge action="photoshoot" /></>
-                                )}
-                            </button>
-                        </CreditTooltipWrapper>
-
-                        {photoshootError && (
-                            <div className={`p-3 rounded-xl border flex items-center gap-2 ${photoshootError.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'}`}>
-                                <span className="material-symbols-outlined text-sm">{photoshootError.isProviderError ? 'warning' : 'error'}</span>
-                                <div className="flex-1 text-sm">
-                                    <span className="font-bold mr-1">{photoshootError.isProviderError ? `${photoshootError.provider || 'AI Provider'} Notice:` : 'Error:'}</span>
-                                    {photoshootError.message}
-                                </div>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Right — Photoshoot Result */}
-                    <div className="col-span-12 lg:col-span-7">
-                        <div className="studio-card p-6 min-h-[500px] flex items-center justify-center">
+                        <div className="studio-card p-6 flex-1 flex items-center justify-center">
                             {!photoshootResult && !photoshootGenerating && (
                                 <div className="text-center">
                                     <span className="material-symbols-outlined text-6xl text-slate-700 mb-4 block">photo_camera</span>
@@ -2585,8 +3965,8 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                         {/* AI Edit Toggle */}
                                         <button onClick={() => { setPsEditMode(!psEditMode); if (psEditMode) { teardownPsMaskCanvas(); setPsMaskMode(false) } }}
                                             className={`py-2.5 px-5 rounded-xl text-xs font-bold cursor-pointer transition-all ${psEditMode
-                                                ? 'bg-violet-500/20 text-violet-400 border border-violet-500/30'
-                                                : 'bg-violet-500/10 text-violet-400 hover:bg-violet-500/20'}`}>
+                                                ? 'bg-[#FF4D00]/20 text-[#FF4D00] border border-[#FF4D00]/30'
+                                                : 'bg-[#FF4D00]/10 text-[#FF4D00] hover:bg-[#FF4D00]/20'}`}>
                                             <span className="material-symbols-outlined text-sm">auto_fix_high</span>
                                             {psEditMode ? 'Close AI Editor' : 'Edit with AI'}
                                         </button>
@@ -2613,9 +3993,9 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
 
                                     {/* ═══ AI IMAGE EDITOR PANEL ═══ */}
                                     {psEditMode && (
-                                        <div className="mt-5 studio-card p-5 border border-violet-500/20 fade-up">
+                                        <div className="mt-5 studio-card p-5 border border-[#FF4D00]/20 fade-up">
                                             <h4 className="font-bold text-white text-sm flex items-center gap-2 mb-4">
-                                                <span className="material-symbols-outlined text-violet-400">auto_fix_high</span>
+                                                <span className="material-symbols-outlined text-[#FF4D00]">auto_fix_high</span>
                                                 AI Image Editor
                                             </h4>
 
@@ -2636,7 +4016,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                         }
                                                     }}
                                                         className={`p-3 rounded-xl text-center transition-all cursor-pointer ${psEditTool === t.id
-                                                            ? 'bg-violet-500/20 border border-violet-500/40 text-white'
+                                                            ? 'bg-[#FF4D00]/20 border border-[#FF4D00]/40 text-white'
                                                             : 'bg-white/[0.03] border border-white/[0.06] text-slate-400 hover:bg-white/[0.05]'}`}>
                                                         <span className="material-symbols-outlined text-lg block mb-1">{t.icon}</span>
                                                         <p className="text-[11px] font-bold">{t.label}</p>
@@ -2670,7 +4050,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                                 if (psMaskCtxRef.current) psMaskCtxRef.current.lineWidth = val
                                                             }}
                                                             className="flex-1 h-1.5 rounded-full appearance-none cursor-pointer"
-                                                            style={{ background: `linear-gradient(to right, #8b5cf6 ${((psMaskBrushSize - 5) / 75) * 100}%, rgba(255,255,255,0.06) ${((psMaskBrushSize - 5) / 75) * 100}%)` }} />
+                                                            style={{ background: `linear-gradient(to right, #FF4D00 ${((psMaskBrushSize - 5) / 75) * 100}%, rgba(255,255,255,0.06) ${((psMaskBrushSize - 5) / 75) * 100}%)` }} />
                                                         <span className="text-sm text-slate-400 min-w-[30px]">{psMaskBrushSize}px</span>
                                                     </div>
                                                 </div>
@@ -2685,7 +4065,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                     ].map(a => (
                                                         <button key={a.id} onClick={() => setPsBgAction(a.id)}
                                                             className={`flex-1 py-2.5 px-4 rounded-xl text-xs font-bold flex items-center justify-center gap-2 cursor-pointer transition-all ${psBgAction === a.id
-                                                                ? 'bg-violet-500/20 text-violet-400 border border-violet-500/30'
+                                                                ? 'bg-[#FF4D00]/20 text-[#FF4D00] border border-[#FF4D00]/30'
                                                                 : 'glass-panel text-slate-400 hover:text-white'}`}>
                                                             <span className="material-symbols-outlined text-sm">{a.icon}</span>
                                                             {a.label}
@@ -2785,13 +4165,291 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             )}
                         </div>
                     </div>
+
+                    {/* ═══ PHOTOSHOOT FLOATING COMMAND BAR ═══ */}
+                    <div className="creative-floating-bar">
+
+                        {/* ── Product Tray ── */}
+                        {psTray === 'product' && (
+                            <div className="floating-tray" key="ps-product-tray">
+                                <div className="flex items-center justify-between mb-2">
+                                    <span className="text-[11px] text-slate-400 uppercase tracking-widest font-bold flex items-center gap-1.5">
+                                        <span className="material-symbols-outlined text-xs text-primary">add_a_photo</span>
+                                        Product Image
+                                    </span>
+                                    <button onClick={() => setPsTray(null)} className="text-slate-500 hover:text-white cursor-pointer"><span className="material-symbols-outlined text-sm">close</span></button>
+                                </div>
+                                {!productImage ? (
+                                    <div>
+                                        <div onDrop={(e) => { e.preventDefault(); const file = e.dataTransfer?.files?.[0]; if (file && file.type.startsWith('image/')) { setProductFile(file); const reader = new FileReader(); reader.onload = async (ev) => { const s3Url = await uploadToS3(ev.target.result, 'products'); setProductImage(s3Url) }; reader.readAsDataURL(file) } }} onDragOver={e => e.preventDefault()}
+                                            className="border-2 border-dashed border-white/[0.1] rounded-xl p-4 text-center hover:border-primary/40 transition-colors mb-3">
+                                            <span className="material-symbols-outlined text-2xl text-slate-600 mb-1 block">add_photo_alternate</span>
+                                            <p className="text-slate-400 text-xs">Drag & drop product image</p>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <button onClick={() => { setProductPickerTab('brand'); setProductPickerOpen(true) }} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] hover:border-emerald-400/40 text-slate-400 hover:text-white text-[10px] font-semibold cursor-pointer transition-all">
+                                                <span className="material-symbols-outlined text-xs text-emerald-400">domain</span> Brand Photos
+                                            </button>
+                                            <label className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] hover:border-primary/40 text-slate-400 hover:text-white text-[10px] font-semibold cursor-pointer transition-all">
+                                                <span className="material-symbols-outlined text-xs text-primary">upload</span> Upload
+                                                <input type="file" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file && file.type.startsWith('image/')) { setProductFile(file); const reader = new FileReader(); reader.onload = async (ev) => { const s3Url = await uploadToS3(ev.target.result, 'products'); setProductImage(s3Url) }; reader.readAsDataURL(file) } }} accept="image/*" />
+                                            </label>
+                                            <button onClick={() => { setProductPickerTab('link'); setProductPickerOpen(true) }} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] hover:border-[#FF4D00]/40 text-slate-400 hover:text-white text-[10px] font-semibold cursor-pointer transition-all">
+                                                <span className="material-symbols-outlined text-xs text-[#FF4D00]">link</span> Paste Link
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="flex items-center gap-3">
+                                        <img src={productImage} alt="Product" className="w-16 h-16 rounded-xl object-cover border border-white/10" />
+                                        <div className="flex-1">
+                                            <p className="text-xs text-white font-medium">{productFile?.name || 'Product image loaded'}</p>
+                                            <p className="text-[10px] text-emerald-400">✓ Ready for photoshoot</p>
+                                        </div>
+                                        <button onClick={() => { setProductImage(null); setProductFile(null); setPhotoshootResult(null) }}
+                                            className="p-1.5 rounded-lg bg-white/[0.06] text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 cursor-pointer transition-all">
+                                            <span className="material-symbols-outlined text-sm">delete</span>
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* ── Camera Tray (Shot + Light combined) ── */}
+                        {psTray === 'camera' && (
+                            <div className="floating-tray" key="ps-camera-tray">
+                                <div className="flex items-center justify-between mb-2">
+                                    <span className="text-[11px] text-slate-400 uppercase tracking-widest font-bold flex items-center gap-1.5">
+                                        <span className="material-symbols-outlined text-xs text-amber-400">photo_camera</span>
+                                        Camera & Lighting
+                                    </span>
+                                    <button onClick={() => setPsTray(null)} className="text-slate-500 hover:text-white cursor-pointer"><span className="material-symbols-outlined text-sm">close</span></button>
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <p className="text-[9px] text-slate-500 uppercase tracking-widest font-bold mb-1.5">Camera Angle</p>
+                                        <div className="flex flex-wrap gap-1">
+                                            {[{id:'eye-level',label:'Eye Level',ms:'visibility'},{id:'hero',label:'Low Angle',ms:'arrow_upward'},{id:'45deg',label:'3/4 View',ms:'view_in_ar'},{id:'overhead',label:'Overhead',ms:'arrow_downward'},{id:'macro',label:'Macro',ms:'search'},{id:'dutch',label:'Dutch Tilt',ms:'rotate_90_degrees_cw'}].map(a => (
+                                                <button key={a.id} onClick={() => setCameraAngle(a.id)} className={`px-2 py-0.5 rounded-full text-[9px] font-medium transition-all cursor-pointer border flex items-center gap-0.5 ${cameraAngle === a.id ? 'bg-amber-500/20 border-amber-500/50 text-amber-300' : 'bg-white/[0.03] border-white/[0.06] text-slate-400 hover:bg-white/[0.06]'}`}><span className="material-symbols-outlined text-[9px]">{a.ms}</span>{a.label}</button>
+                                            ))}
+                                        </div>
+                                        <p className="text-[9px] text-slate-500 uppercase tracking-widest font-bold mb-1.5 mt-3">Lens</p>
+                                        <div className="flex flex-wrap gap-1">
+                                            {[{id:'24mm',label:'24mm',ms:'photo_camera'},{id:'35mm',label:'35mm',ms:'camera'},{id:'50mm',label:'50mm',ms:'center_focus_strong'},{id:'85mm',label:'85mm',ms:'portrait'},{id:'105mm',label:'105mm',ms:'biotech'},{id:'200mm',label:'200mm',ms:'telescope'}].map(l => (
+                                                <button key={l.id} onClick={() => setLens(l.id)} className={`px-2 py-0.5 rounded-full text-[9px] font-medium transition-all cursor-pointer border flex items-center gap-0.5 ${lens === l.id ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300' : 'bg-white/[0.03] border-white/[0.06] text-slate-400 hover:bg-white/[0.06]'}`}><span className="material-symbols-outlined text-[9px]">{l.ms}</span>{l.label}</button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <p className="text-[9px] text-slate-500 uppercase tracking-widest font-bold mb-1.5">Lighting Style</p>
+                                        <div className="flex flex-wrap gap-1">
+                                            {[{id:'softbox',label:'Softbox',ms:'cloud'},{id:'natural',label:'Window',ms:'window'},{id:'golden',label:'Golden Hr',ms:'wb_twilight'},{id:'dramatic',label:'Dramatic',ms:'theater_comedy'},{id:'neon',label:'Neon',ms:'fluorescent'},{id:'rim',label:'Rim',ms:'flare'},{id:'highkey',label:'High Key',ms:'light_mode'}].map(l => (
+                                                <button key={l.id} onClick={() => setLightingStyle(l.id)} className={`px-2 py-0.5 rounded-full text-[9px] font-medium transition-all cursor-pointer border flex items-center gap-0.5 ${lightingStyle === l.id ? 'bg-yellow-500/20 border-yellow-500/50 text-yellow-300' : 'bg-white/[0.03] border-white/[0.06] text-slate-400 hover:bg-white/[0.06]'}`}><span className="material-symbols-outlined text-[9px]">{l.ms}</span>{l.label}</button>
+                                            ))}
+                                        </div>
+                                        <p className="text-[9px] text-slate-500 uppercase tracking-widest font-bold mb-1.5 mt-3">Camera Shot Preset</p>
+                                        <div className="flex flex-wrap gap-1">
+                                            {CAMERA_SHOT_PRESETS.slice(0, 8).map(shot => (
+                                                <button key={shot.id} onClick={() => setPsSelectedShot(prev => prev === shot.id ? null : shot.id)}
+                                                    className={`px-2 py-0.5 rounded-full text-[9px] font-medium transition-all cursor-pointer border ${psSelectedShot === shot.id ? 'border text-white' : 'bg-white/[0.03] border-white/[0.06] text-slate-400 hover:bg-white/[0.06]'}`}
+                                                    style={psSelectedShot === shot.id ? { backgroundColor: `${shot.color}18`, borderColor: `${shot.color}50`, color: shot.color } : {}}>
+                                                    <span className="material-symbols-outlined text-[9px] align-middle mr-0.5">{shot.icon}</span> {shot.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* ── Scene Tray (Surface + Model + Style combined) ── */}
+                        {psTray === 'scene' && (
+                            <div className="floating-tray" key="ps-scene-tray">
+                                <div className="flex items-center justify-between mb-2">
+                                    <span className="text-[11px] text-slate-400 uppercase tracking-widest font-bold flex items-center gap-1.5">
+                                        <span className="material-symbols-outlined text-xs text-emerald-400">landscape</span>
+                                        Scene & Style
+                                    </span>
+                                    <button onClick={() => setPsTray(null)} className="text-slate-500 hover:text-white cursor-pointer"><span className="material-symbols-outlined text-sm">close</span></button>
+                                </div>
+                                <div className="grid grid-cols-3 gap-4">
+                                    <div>
+                                        <p className="text-[9px] text-slate-500 uppercase tracking-widest font-bold mb-1.5">Surface</p>
+                                        <div className="flex flex-wrap gap-1">
+                                            {[{id:'white',label:'White',ms:'crop_square'},{id:'marble',label:'Marble',ms:'grid_on'},{id:'stone',label:'Stone',ms:'texture'},{id:'wood',label:'Wood',ms:'park'},{id:'concrete',label:'Concrete',ms:'domain'},{id:'fabric',label:'Silk',ms:'checkroom'},{id:'podium',label:'Podium',ms:'account_balance'},{id:'glass',label:'Glass',ms:'blur_on'},{id:'sand',label:'Sand',ms:'beach_access'},{id:'foliage',label:'Foliage',ms:'eco'}].map(s => (
+                                                <button key={s.id} onClick={() => setSurface(s.id)} className={`px-2 py-0.5 rounded-full text-[9px] font-medium transition-all cursor-pointer border flex items-center gap-0.5 ${surface === s.id ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300' : 'bg-white/[0.03] border-white/[0.06] text-slate-400 hover:bg-white/[0.06]'}`}><span className="material-symbols-outlined text-[9px]">{s.ms}</span>{s.label}</button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <p className="text-[9px] text-slate-500 uppercase tracking-widest font-bold mb-1.5">Model</p>
+                                        <div className="flex flex-wrap gap-1">
+                                            {[{id:'none',label:'None',ms:'block'},{id:'hands',label:'Hands',ms:'pan_tool'},{id:'model-woman',label:'Woman',ms:'face_3'},{id:'model-man',label:'Man',ms:'face_6'}].map(m => (
+                                                <button key={m.id} onClick={() => setModelPresence(m.id)} className={`px-2 py-0.5 rounded-full text-[9px] font-medium transition-all cursor-pointer border flex items-center gap-0.5 ${modelPresence === m.id ? 'bg-[#FF4D00]/20 border-[#FF4D00]/50 text-[#FF7A00]' : 'bg-white/[0.03] border-white/[0.06] text-slate-400 hover:bg-white/[0.06]'}`}><span className="material-symbols-outlined text-[9px]">{m.ms}</span>{m.label}</button>
+                                            ))}
+                                        </div>
+                                        <p className="text-[9px] text-slate-500 uppercase tracking-widest font-bold mb-1.5 mt-3">Mood <span className="text-slate-600 normal-case">(multi)</span></p>
+                                        <div className="flex flex-wrap gap-1">
+                                            {[{id:'editorial',label:'Editorial',ms:'article'},{id:'commercial',label:'Commercial',ms:'shopping_bag'},{id:'lifestyle',label:'Lifestyle',ms:'coffee'},{id:'luxury',label:'Luxury',ms:'diamond'},{id:'minimal',label:'Minimal',ms:'check_box_outline_blank'},{id:'moody',label:'Moody',ms:'dark_mode'},{id:'vibrant',label:'Vibrant',ms:'palette'}].map(m => {
+                                                const active = mood.includes(m.id)
+                                                return <button key={m.id} onClick={() => setMood(prev => active ? prev.filter(x => x !== m.id) : [...prev, m.id])} className={`px-2 py-0.5 rounded-full text-[9px] font-medium transition-all cursor-pointer border flex items-center gap-0.5 ${active ? 'bg-[#FF4D00]/20 border-[#FF4D00]/50 text-[#FF7A00]' : 'bg-white/[0.03] border-white/[0.06] text-slate-400 hover:bg-white/[0.06]'}`}><span className="material-symbols-outlined text-[9px]">{m.ms}</span>{m.label}</button>
+                                            })}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <p className="text-[9px] text-slate-500 uppercase tracking-widest font-bold mb-1.5">Fidelity — <span className="text-amber-400">{fidelity}%</span></p>
+                                        <input type="range" min={0} max={100} step={5} value={fidelity} onChange={e => setFidelity(Number(e.target.value))}
+                                            className="w-full h-1.5 rounded-full appearance-none cursor-pointer" style={{ background: `linear-gradient(to right, #f59e0b ${fidelity}%, rgba(255,255,255,0.06) ${fidelity}%)` }} />
+                                        <div className="flex justify-between mt-1">
+                                            <span className="text-[8px] text-slate-600 flex items-center gap-0.5"><span className="material-symbols-outlined text-[8px]">palette</span> Creative</span>
+                                            <span className="text-[8px] text-slate-600 flex items-center gap-0.5"><span className="material-symbols-outlined text-[8px]">lock</span> Exact</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* ── Ratio Tray ── */}
+                        {psTray === 'ratio' && (
+                            <div className="floating-tray" key="ps-ratio-tray">
+                                <div className="flex items-center justify-between mb-2">
+                                    <span className="text-[11px] text-slate-400 uppercase tracking-widest font-bold flex items-center gap-1.5">
+                                        <span className="material-symbols-outlined text-xs text-cyan-400">aspect_ratio</span>
+                                        Aspect Ratio
+                                    </span>
+                                    <button onClick={() => setPsTray(null)} className="text-slate-500 hover:text-white cursor-pointer"><span className="material-symbols-outlined text-sm">close</span></button>
+                                </div>
+                                <div className="flex gap-2 justify-center">
+                                    {[{id:'1:1',w:16,h:16,label:'1:1'},{id:'4:5',w:13,h:16,label:'4:5'},{id:'3:4',w:12,h:16,label:'3:4'},{id:'9:16',w:9,h:16,label:'9:16'},{id:'16:9',w:16,h:9,label:'16:9'},{id:'3:2',w:16,h:11,label:'3:2'}].map(r => (
+                                        <button key={r.id} onClick={() => setAspectRatio(r.id)}
+                                            className={`flex flex-col items-center gap-1 px-3 py-2 rounded-xl cursor-pointer transition-all border ${aspectRatio === r.id ? 'bg-orange-500/15 border-orange-500/40 text-white' : 'bg-white/[0.03] border-white/[0.06] text-slate-400 hover:bg-white/[0.06]'}`}>
+                                            <div className="border border-current rounded-sm" style={{ width: r.w, height: r.h }} />
+                                            <span className="text-[10px] font-bold">{r.label}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* ── References Tray ── */}
+                        {psTray === 'refs' && (
+                            <div className="floating-tray" key="ps-refs-tray">
+                                <div className="flex items-center justify-between mb-2">
+                                    <span className="text-[11px] text-slate-400 uppercase tracking-widest font-bold flex items-center gap-1.5">
+                                        <span className="material-symbols-outlined text-xs text-violet-400">image_search</span>
+                                        Style & Character References
+                                    </span>
+                                    <button onClick={() => setPsTray(null)} className="text-slate-500 hover:text-white cursor-pointer"><span className="material-symbols-outlined text-sm">close</span></button>
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    {[{key:'style',icon:'brush',label:'Style Reference',hint:'Match this visual style'},{key:'character',icon:'face',label:'Character',hint:'Include this person/mascot'}].map(ref => (
+                                        <div key={ref.key}>
+                                            {referenceImages[ref.key] ? (
+                                                <div className="relative rounded-xl overflow-hidden aspect-video border border-primary/30">
+                                                    <img src={referenceImages[ref.key]} alt={ref.label} className="w-full h-full object-cover" />
+                                                    <button onClick={() => setReferenceImages(prev => ({...prev,[ref.key]:null}))} className="absolute top-1 right-1 p-0.5 rounded-full bg-black/70 text-white hover:bg-rose-500 cursor-pointer"><span className="material-symbols-outlined text-xs">close</span></button>
+                                                    <span className="absolute bottom-0 inset-x-0 text-center text-[8px] font-bold bg-black/70 text-white py-0.5">{ref.label}</span>
+                                                </div>
+                                            ) : (
+                                                <button onClick={() => { setRefPickerSlot(ref.key); setRefPickerTab('upload') }} className="w-full flex flex-col items-center justify-center aspect-video rounded-xl border-2 border-dashed border-white/[0.08] hover:border-primary/40 cursor-pointer transition-colors bg-white/[0.02] group">
+                                                    <span className="material-symbols-outlined text-lg text-slate-600 group-hover:text-primary mb-0.5">{ref.icon}</span>
+                                                    <span className="text-[10px] text-slate-500 font-medium">{ref.label}</span>
+                                                </button>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* ── Prompt Row ── */}
+                        <div className="floating-prompt-row">
+                            {/* Setting Icons */}
+                            <div className="flex items-center gap-1 mr-1">
+                                <button onClick={() => setPsTray(psTray === 'product' ? null : 'product')}
+                                    className={`floating-setting-btn ${psTray === 'product' ? 'active' : ''}`} title="Product Image">
+                                    <span className="material-symbols-outlined text-sm">add_a_photo</span>
+                                    {productImage && <span className="setting-dot" />}
+                                </button>
+                                <button onClick={() => setPsTray(psTray === 'camera' ? null : 'camera')}
+                                    className={`floating-setting-btn ${psTray === 'camera' ? 'active' : ''}`} title="Camera & Lighting">
+                                    <span className="material-symbols-outlined text-sm">photo_camera</span>
+                                </button>
+                                <button onClick={() => setPsTray(psTray === 'scene' ? null : 'scene')}
+                                    className={`floating-setting-btn ${psTray === 'scene' ? 'active' : ''}`} title="Scene & Style">
+                                    <span className="material-symbols-outlined text-sm">landscape</span>
+                                </button>
+                                <button onClick={() => setPsTray(psTray === 'ratio' ? null : 'ratio')}
+                                    className={`floating-setting-btn ${psTray === 'ratio' ? 'active' : ''}`} title="Aspect Ratio">
+                                    <span className="material-symbols-outlined text-sm">aspect_ratio</span>
+                                </button>
+                                <button onClick={() => setPsTray(psTray === 'refs' ? null : 'refs')}
+                                    className={`floating-setting-btn ${psTray === 'refs' ? 'active' : ''}`} title="References">
+                                    <span className="material-symbols-outlined text-sm">image_search</span>
+                                    {(referenceImages.style || referenceImages.character) && <span className="setting-dot" />}
+                                </button>
+                            </div>
+
+                            {/* Prompt */}
+                            <div className="flex-1 relative">
+                                <textarea value={photoshootBrief} onChange={e => setPhotoshootBrief(e.target.value)}
+                                    placeholder="Describe your photoshoot scene... e.g. 'Luxury marble countertop, golden hour lighting, editorial style'"
+                                    rows={1} className="w-full px-4 py-2.5 pr-20 rounded-xl bg-white/[0.05] border border-white/[0.1] text-sm text-white placeholder-slate-500 focus:border-[#FF4D00]/50 focus:outline-none resize-none transition-all" />
+                                <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                                    <VoiceInput onResult={(text) => setPhotoshootBrief(prev => prev ? prev + ' ' + text : text)} size="small" />
+                                </div>
+                            </div>
+
+                            {/* Model selector */}
+                            <div className="relative flex-shrink-0">
+                                <button onClick={() => setShowModelMenu(!showModelMenu)}
+                                    className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-[11px] font-bold glass-panel text-on-surface-variant hover:text-on-surface transition-all duration-300 cursor-pointer whitespace-nowrap">
+                                    <span className="material-symbols-outlined text-xs" style={{ color: IMAGE_MODELS.find(m => m.id === imageModel)?.color || '#FF4D00' }}>
+                                        {IMAGE_MODELS.find(m => m.id === imageModel)?.icon || 'auto_awesome'}
+                                    </span>
+                                    <span className="hidden md:inline">{IMAGE_MODELS.find(m => m.id === imageModel)?.name || 'NanoBanana 2'}</span>
+                                    <span className="material-symbols-outlined text-[10px] text-slate-600">{showModelMenu ? 'expand_less' : 'expand_more'}</span>
+                                </button>
+                                {showModelMenu && (
+                                    <div className="absolute left-0 right-0 bottom-full mb-1 glass-panel rounded-xl shadow-2xl z-50 overflow-hidden min-w-[260px]" style={{ animation: 'fadeUp 0.15s ease-out' }}>
+                                        <div className="p-1.5 space-y-0.5 max-h-[280px] overflow-y-auto">
+                                            {IMAGE_MODELS.map(m => (
+                                                <button key={m.id} onClick={() => { setImageModel(m.id); setShowModelMenu(false) }}
+                                                    className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-left transition-all cursor-pointer ${imageModel === m.id ? 'bg-white/10 text-white' : 'text-slate-400 hover:bg-white/[0.06] hover:text-white'}`}>
+                                                    <span className="material-symbols-outlined text-sm" style={{ color: m.color }}>{m.icon}</span>
+                                                    <div className="flex-1 min-w-0">
+                                                        <span className="text-[11px] font-bold truncate block">{m.name}</span>
+                                                        <span className="text-[9px] text-slate-500 block truncate">{m.desc}</span>
+                                                    </div>
+                                                    {imageModel === m.id && <span className="material-symbols-outlined text-xs text-primary">check_circle</span>}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Generate */}
+                            <CreditTooltipWrapper action="creative">
+                                <button onClick={handlePhotoshoot} disabled={!productImage || photoshootGenerating}
+                                    className="btn-primary py-2.5 px-5 rounded-xl disabled:opacity-30 text-sm font-bold cursor-pointer flex items-center gap-2 whitespace-nowrap flex-shrink-0">
+                                    {photoshootGenerating ? (
+                                        <><span className="material-symbols-outlined animate-spin text-sm">progress_activity</span> Generating...</>
+                                    ) : (
+                                        <><span className="material-symbols-outlined text-sm">photo_camera</span> Shoot <CreditBadge action="creative" /></>
+                                    )}
+                                </button>
+                            </CreditTooltipWrapper>
+                        </div>
+                    </div>
+
                 </div>
             )}
 
             {/* =================== CAMPAIGN LOGO GENERATOR =================== */}
             {studioMode === 'campaignlogo' && (
-                <div className="max-w-6xl mx-auto fade-up">
-                    <div className="glow-border rounded-2xl p-6 mb-6 relative overflow-hidden" style={{ background: 'linear-gradient(135deg, rgba(245,158,11,0.06), rgba(239,68,68,0.04), rgba(168,85,247,0.03))' }}>
+                <div className="max-w-6xl mx-auto fade-up pt-6">
+                    <div className="glow-border rounded-2xl p-6 mb-6 relative overflow-hidden" style={{ background: 'linear-gradient(135deg, rgba(245,158,11,0.06), rgba(239,68,68,0.04), rgba(255, 77, 0,0.03))' }}>
                         <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(circle at 80% 20%, rgba(245,158,11,0.08) 0%, transparent 50%)' }} />
                         <div className="relative">
                             <h2 className="text-xl font-bold text-white flex items-center gap-3 mb-1">
@@ -2816,11 +4474,11 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             {/* Style */}
                             <div className="studio-card p-5">
                                 <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3">
-                                    <span className="material-symbols-outlined text-violet-400 text-lg">palette</span>Style
+                                    <span className="material-symbols-outlined text-[#FF4D00] text-lg">palette</span>Style
                                 </h3>
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                                     {[{id:'2d-flat',l:'2D Flat'},{id:'3d-render',l:'3D Rendered'},{id:'isometric',l:'Isometric'},{id:'hand-drawn',l:'Hand-drawn'},{id:'neon',l:'Neon Glow'},{id:'metallic',l:'Metallic'},{id:'gradient',l:'Gradient'},{id:'pixel',l:'Pixel Art'}].map(s=>(
-                                        <button key={s.id} onClick={()=>setClgStyle(s.id)} className={`px-2 py-1.5 rounded-lg text-[11px] font-medium border transition-all cursor-pointer ${clgStyle===s.id?'border-violet-400/40 bg-violet-500/10 text-white':'border-white/[0.06] bg-white/[0.02] text-slate-400 hover:text-slate-200'}`}>{s.l}</button>
+                                        <button key={s.id} onClick={()=>setClgStyle(s.id)} className={`px-2 py-1.5 rounded-lg text-[11px] font-medium border transition-all cursor-pointer ${clgStyle===s.id?'border-[#FF4D00]/40 bg-[#FF4D00]/10 text-white':'border-white/[0.06] bg-white/[0.02] text-slate-400 hover:text-slate-200'}`}>{s.l}</button>
                                     ))}
                                 </div>
                             </div>
@@ -2843,8 +4501,8 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     <span className="material-symbols-outlined text-cyan-400 text-lg">interests</span>Icon Theme <span className="text-xs text-slate-600 font-normal">(optional)</span>
                                 </h3>
                                 <div className="flex flex-wrap gap-1.5">
-                                    {[{id:'sparkles',l:'✨ Sparkles'},{id:'fireworks',l:'🎆 Fireworks'},{id:'shopping',l:'🛍️ Shopping'},{id:'hearts',l:'❤️ Hearts'},{id:'stars',l:'⭐ Stars'},{id:'trophy',l:'🏆 Trophy'},{id:'gift',l:'🎁 Gift'},{id:'fire',l:'🔥 Fire'},{id:'ribbon',l:'🎀 Ribbon'},{id:'none',l:'None'}].map(i=>(
-                                        <button key={i.id} onClick={()=>setClgIcon(i.id==='none'?'':i.id)} className={`px-2 py-1 rounded-lg text-[11px] font-medium border transition-all cursor-pointer ${clgIcon===i.id||(i.id==='none'&&!clgIcon)?'border-cyan-400/30 bg-cyan-500/10 text-white':'border-white/[0.06] bg-white/[0.02] text-slate-400 hover:text-slate-200'}`}>{i.l}</button>
+                                    {[{id:'sparkles',l:'Sparkles',ms:'auto_awesome'},{id:'fireworks',l:'Fireworks',ms:'celebration'},{id:'shopping',l:'Shopping',ms:'shopping_bag'},{id:'hearts',l:'Hearts',ms:'favorite'},{id:'stars',l:'Stars',ms:'star'},{id:'trophy',l:'Trophy',ms:'emoji_events'},{id:'gift',l:'Gift',ms:'redeem'},{id:'fire',l:'Fire',ms:'local_fire_department'},{id:'ribbon',l:'Ribbon',ms:'card_giftcard'},{id:'none',l:'None',ms:'block'}].map(i=>(
+                                        <button key={i.id} onClick={()=>setClgIcon(i.id==='none'?'':i.id)} className={`px-2 py-1 rounded-lg text-[11px] font-medium border transition-all cursor-pointer flex items-center gap-1 ${clgIcon===i.id||(i.id==='none'&&!clgIcon)?'border-cyan-400/30 bg-cyan-500/10 text-white':'border-white/[0.06] bg-white/[0.02] text-slate-400 hover:text-slate-200'}`}><span className="material-symbols-outlined text-[11px]">{i.ms}</span>{i.l}</button>
                                     ))}
                                 </div>
                             </div>
@@ -2861,18 +4519,18 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     {clgColorMode==='brand'&&activeBrand?.dna?.colors?.length>0&&<div className="flex gap-1">{activeBrand.dna.colors.slice(0,6).map((c,i)=><div key={i} className="w-6 h-6 rounded-full border border-white/10" title={c} style={{backgroundColor:c}} />)}</div>}
                                 </div>
                                 <div>
-                                    <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-2"><span className="material-symbols-outlined text-blue-400 text-lg">layers</span>Background</h3>
+                                    <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-2"><span className="material-symbols-outlined text-[#FF4D00] text-lg">layers</span>Background</h3>
                                     <div className="flex flex-wrap gap-1.5">
                                         {['transparent','white','black','gradient'].map(b=>(
-                                            <button key={b} onClick={()=>setClgBg(b)} className={`px-2.5 py-1 rounded-lg text-[11px] font-medium border transition-all cursor-pointer capitalize ${clgBg===b?'border-blue-400/30 bg-blue-500/10 text-white':'border-white/[0.06] text-slate-400'}`}>{b}</button>
+                                            <button key={b} onClick={()=>setClgBg(b)} className={`px-2.5 py-1 rounded-lg text-[11px] font-medium border transition-all cursor-pointer capitalize ${clgBg===b?'border-[#FF4D00]/30 bg-[#FF4D00]/10 text-white':'border-white/[0.06] text-slate-400'}`}>{b}</button>
                                         ))}
                                     </div>
                                 </div>
                                 <div>
-                                    <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-2"><span className="material-symbols-outlined text-pink-400 text-lg">shape_line</span>Shape</h3>
+                                    <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-2"><span className="material-symbols-outlined text-[#FF7A00] text-lg">shape_line</span>Shape</h3>
                                     <div className="flex flex-wrap gap-1.5">
                                         {['freeform','circular badge','ribbon banner','diamond','shield','stamp'].map(sh=>(
-                                            <button key={sh} onClick={()=>setClgShape(sh)} className={`px-2.5 py-1 rounded-lg text-[11px] font-medium border transition-all cursor-pointer capitalize ${clgShape===sh?'border-pink-400/30 bg-pink-500/10 text-white':'border-white/[0.06] text-slate-400'}`}>{sh}</button>
+                                            <button key={sh} onClick={()=>setClgShape(sh)} className={`px-2.5 py-1 rounded-lg text-[11px] font-medium border transition-all cursor-pointer capitalize ${clgShape===sh?'border-[#FF4D00]/30 bg-[#FF4D00]/10 text-white':'border-white/[0.06] text-slate-400'}`}>{sh}</button>
                                         ))}
                                     </div>
                                 </div>
@@ -2984,509 +4642,44 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
 
             {/* =================== CAROUSEL GENERATOR =================== */}
             {studioMode === 'carousel' && (
-                <div className="max-w-5xl mx-auto fade-up">
-                    {/* Header */}
-                    <div className="glow-border rounded-2xl p-6 mb-6 relative overflow-hidden" style={{ background: 'linear-gradient(135deg, rgba(234,88,12,0.06), rgba(249,115,22,0.04), rgba(251,146,60,0.03))' }}>
-                        <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(circle at 20% 80%, rgba(249,115,22,0.08) 0%, transparent 50%)' }} />
-                        <div className="relative">
-                            <h2 className="text-xl font-bold text-white flex items-center gap-3 mb-1">
-                                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center shadow-lg">
-                                    <span className="material-symbols-outlined text-white text-xl">view_carousel</span>
-                                </div>
-                                Carousel Generator
-                                <span className="ml-2 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-400">Beta</span>
-                            </h2>
-                            <p className="text-sm text-slate-400 ml-[52px]">
-                                AI generates a panoramic background → auto-splits into seamless carousel panels → composites your product images
-                            </p>
-                        </div>
-                    </div>
+                <div className="fade-up flex flex-col" style={{ minHeight: 'calc(100vh - 200px)', paddingBottom: '9rem' }}>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-                        {/* ─── LEFT: Config Panel ─── */}
-                        <div className="lg:col-span-2 space-y-4">
+                    {/* ═══ Full-Width Carousel Result ═══ */}
+                    <div className="flex-1 flex flex-col">
+                        <div className="studio-card p-6 flex-1 flex items-center justify-center">
+                            {/* ── Loading State ── */}
+                            <GlobalLoader 
+                                isActive={carouselGenerating} 
+                                title="Generating Carousel" 
+                                currentStage="AI is creating a seamless panoramic background and splitting into panels..."
+                                icon="view_carousel"
+                                estimatedDuration={30}
+                            />
 
-                            {/* Prompt + Theme Inspiration — unified card */}
-                            <div className="glass-panel rounded-xl p-4">
-                                {/* Header row */}
-                                <div className="flex items-center justify-between mb-2">
-                                    <label className="text-[10px] text-slate-500 uppercase tracking-widest font-bold flex items-center gap-1">
-                                        <span className="material-symbols-outlined text-[11px]">edit_note</span>
-                                        Background Scene
-                                    </label>
-                                    {/* Inline theme inspiration uploader — compact */}
-                                    <div className="flex items-center gap-1.5">
-                                        {carouselThemeImage ? (
-                                            <div className="flex items-center gap-1.5">
-                                                {/* Thumbnail */}
-                                                <div className="relative group">
-                                                    <img
-                                                        src={carouselThemeImage}
-                                                        alt="Theme ref"
-                                                        className="w-8 h-8 rounded-lg object-cover border border-violet-500/30 cursor-pointer"
-                                                        onClick={() => { setCarouselThemeImage(null); setCarouselThemeAnalysis(null); setCarouselThemeError(null); }}
-                                                        title="Click to remove"
-                                                    />
-                                                    {carouselAnalyzing && (
-                                                        <div className="absolute inset-0 bg-black/70 rounded-lg flex items-center justify-center">
-                                                            <span className="material-symbols-outlined text-violet-400 text-[14px] animate-spin">progress_activity</span>
-                                                        </div>
-                                                    )}
-                                                    {carouselThemeAnalysis && !carouselAnalyzing && (
-                                                        <div className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-emerald-500 border border-black flex items-center justify-center">
-                                                            <span className="material-symbols-outlined text-white" style={{fontSize:'9px'}}>check</span>
-                                                        </div>
-                                                    )}
-                                                </div>
-
-                                                {/* Status pill */}
-                                                {carouselAnalyzing ? (
-                                                    <span className="text-[9px] font-semibold text-violet-400 animate-pulse">Analyzing...</span>
-                                                ) : carouselThemeAnalysis ? (
-                                                    <button
-                                                        onClick={() => { setCarouselThemeAnalysis(null); setCarouselThemeError(null); }}
-                                                        className="text-[9px] font-semibold text-emerald-400 hover:text-rose-400 transition-colors cursor-pointer"
-                                                        title="Click to re-analyze"
-                                                    >
-                                                        DNA ✓ re-run?
-                                                    </button>
-                                                ) : carouselThemeError ? (
-                                                    <button
-                                                        onClick={async () => {
-                                                            setCarouselThemeError(null)
-                                                            setCarouselAnalyzing(true)
-                                                            try {
-                                                                const res = await creativesAPI.analyzeCarouselTheme({
-                                                                    themeImageUrl: carouselThemeImage,
-                                                                    brandId: activeBrand?._id,
-                                                                    slideCount: carouselSlides,
-                                                                })
-                                                                if (res.success && res.theme) {
-                                                                    setCarouselThemeAnalysis(res.theme)
-                                                                    if (res.theme.panoramicPrompt) setCarouselPrompt(res.theme.panoramicPrompt)
-                                                                    if (res.theme.suggestedStyle) setCarouselStyle(res.theme.suggestedStyle)
-                                                                    if (res.theme.genre) setCarouselGenre(res.theme.genre)
-                                                                } else {
-                                                                    setCarouselThemeError('Analysis failed — try again')
-                                                                }
-                                                            } catch (err) {
-                                                                setCarouselThemeError(err.message || 'Analysis failed')
-                                                            }
-                                                            setCarouselAnalyzing(false)
-                                                        }}
-                                                        className="text-[9px] font-semibold text-rose-400 hover:text-rose-300 cursor-pointer transition-colors"
-                                                    >
-                                                        Failed — retry
-                                                    </button>
-                                                ) : (
-                                                    <button
-                                                        onClick={async () => {
-                                                            setCarouselThemeError(null)
-                                                            setCarouselAnalyzing(true)
-                                                            try {
-                                                                const res = await creativesAPI.analyzeCarouselTheme({
-                                                                    themeImageUrl: carouselThemeImage,
-                                                                    brandId: activeBrand?._id,
-                                                                    slideCount: carouselSlides,
-                                                                })
-                                                                if (res.success && res.theme) {
-                                                                    setCarouselThemeAnalysis(res.theme)
-                                                                    if (res.theme.panoramicPrompt) setCarouselPrompt(res.theme.panoramicPrompt)
-                                                                    if (res.theme.suggestedStyle) setCarouselStyle(res.theme.suggestedStyle)
-                                                                    if (res.theme.genre) setCarouselGenre(res.theme.genre)
-                                                                } else {
-                                                                    setCarouselThemeError('Analysis failed — try again')
-                                                                }
-                                                            } catch (err) {
-                                                                setCarouselThemeError(err.message || 'Analysis failed')
-                                                            }
-                                                            setCarouselAnalyzing(false)
-                                                        }}
-                                                        className="text-[9px] font-semibold text-violet-400 hover:text-violet-300 cursor-pointer transition-colors flex items-center gap-0.5"
-                                                    >
-                                                        <span className="material-symbols-outlined" style={{fontSize:'11px'}}>psychology</span>
-                                                        Analyze
-                                                    </button>
-                                                )}
-                                            </div>
-                                        ) : (
-                                            /* Upload button — compact chip */
-                                            <label className="flex items-center gap-1 px-2 py-1 rounded-lg border border-dashed border-violet-500/30 hover:border-violet-500/60 bg-violet-500/[0.05] hover:bg-violet-500/[0.08] cursor-pointer transition-all group">
-                                                <span className="material-symbols-outlined text-violet-500 group-hover:text-violet-400 transition-colors" style={{fontSize:'13px'}}>add_photo_alternate</span>
-                                                <span className="text-[9px] font-semibold text-violet-500 group-hover:text-violet-300 transition-colors whitespace-nowrap">Add Inspo</span>
-                                                <span className="text-[8px] px-1 py-0.5 rounded-full bg-violet-500/20 text-violet-400 font-bold">AI</span>
-                                                <input
-                                                    type="file"
-                                                    accept="image/*"
-                                                    className="hidden"
-                                                    onChange={async e => {
-                                                        const file = e.target.files?.[0]
-                                                        if (!file) return
-                                                        setCarouselThemeError(null)
-                                                        // Resize to max 800px to keep data URI small for API transport
-                                                        const dataUrl = await new Promise(resolve => {
-                                                            const img = new Image()
-                                                            const objectUrl = URL.createObjectURL(file)
-                                                            img.onload = () => {
-                                                                URL.revokeObjectURL(objectUrl)
-                                                                const MAX = 800
-                                                                let { width, height } = img
-                                                                if (width > MAX || height > MAX) {
-                                                                    if (width > height) { height = Math.round(height * MAX / width); width = MAX; }
-                                                                    else { width = Math.round(width * MAX / height); height = MAX; }
-                                                                }
-                                                                const canvas = document.createElement('canvas')
-                                                                canvas.width = width; canvas.height = height
-                                                                canvas.getContext('2d').drawImage(img, 0, 0, width, height)
-                                                                resolve(canvas.toDataURL('image/jpeg', 0.82))
-                                                            }
-                                                            img.src = objectUrl
-                                                        })
-                                                        setCarouselThemeImage(dataUrl)
-                                                        setCarouselThemeAnalysis(null)
-                                                        // Auto-trigger analysis
-                                                        setCarouselAnalyzing(true)
-                                                        try {
-                                                            const res = await creativesAPI.analyzeCarouselTheme({
-                                                                themeImageUrl: dataUrl,
-                                                                brandId: activeBrand?._id,
-                                                                slideCount: carouselSlides,
-                                                            })
-                                                            if (res.success && res.theme) {
-                                                                setCarouselThemeAnalysis(res.theme)
-                                                                if (res.theme.panoramicPrompt) setCarouselPrompt(res.theme.panoramicPrompt)
-                                                                if (res.theme.suggestedStyle) setCarouselStyle(res.theme.suggestedStyle)
-                                                                if (res.theme.genre) setCarouselGenre(res.theme.genre)
-                                                            } else {
-                                                                setCarouselThemeError('Analysis failed — click Analyze to retry')
-                                                            }
-                                                        } catch (err) {
-                                                            setCarouselThemeError(err.message || 'Analysis failed')
-                                                        }
-                                                        setCarouselAnalyzing(false)
-                                                    }}
-                                                />
-                                            </label>
-                                        )}
+                            {/* ── Empty State ── */}
+                            {!carouselResult && !carouselGenerating && (
+                                <div className="text-center">
+                                    <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-orange-500/20 to-amber-500/10 flex items-center justify-center mb-4 mx-auto">
+                                        <span className="material-symbols-outlined text-orange-400 text-4xl">view_carousel</span>
                                     </div>
-                                </div>
-
-                                {/* Textarea */}
-                                <textarea
-                                    value={carouselPrompt}
-                                    onChange={e => setCarouselPrompt(e.target.value)}
-                                    placeholder={carouselThemeImage && !carouselThemeAnalysis ? 'Analyzing inspiration image...' : "Describe the background scene... e.g. 'Luxurious marble countertop with soft golden lighting, bokeh background'"}
-                                    rows={carouselThemeAnalysis ? 5 : 4}
-                                    className="w-full px-3 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-sm text-white placeholder-slate-600 focus:border-orange-500/50 focus:outline-none resize-none transition-all"
-                                />
-
-                                {/* Analysis result — inline below textarea */}
-                                {carouselThemeAnalysis && (
-                                    <div className="mt-2 p-2.5 rounded-xl bg-violet-500/[0.06] border border-violet-500/20">
-                                        <div className="flex items-center gap-2 flex-wrap">
-                                            <span className="material-symbols-outlined text-emerald-400" style={{fontSize:'13px'}}>check_circle</span>
-                                            <span className="text-[10px] text-emerald-400 font-semibold">Visual DNA extracted</span>
-                                            {carouselThemeAnalysis.genre && (
-                                                <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-300 border border-orange-500/30 capitalize flex items-center gap-0.5">
-                                                    <span className="material-symbols-outlined" style={{fontSize:'9px'}}>movie</span>
-                                                    {carouselThemeAnalysis.genre}
-                                                </span>
-                                            )}
-                                            {carouselThemeAnalysis.mood && (
-                                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-violet-500/15 text-violet-300 border border-violet-500/20 capitalize">✦ {carouselThemeAnalysis.mood}</span>
-                                            )}
-                                            {carouselThemeAnalysis.colorPalette?.length > 0 && (
-                                                <div className="flex gap-0.5 ml-auto">
-                                                    {carouselThemeAnalysis.colorPalette.slice(0, 5).map((c, i) => (
-                                                        <div key={i} className="w-3.5 h-3.5 rounded-full border border-white/10" style={{backgroundColor:c}} title={c} />
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
-                                        {carouselThemeAnalysis.lighting && (
-                                            <p className="text-[9px] text-slate-500 mt-1 leading-relaxed">
-                                                <span className="material-symbols-outlined text-amber-400/70 mr-0.5" style={{fontSize:'10px', verticalAlign:'text-bottom'}}>light_mode</span>
-                                                {carouselThemeAnalysis.lighting}
-                                            </p>
-                                        )}
+                                    <h3 className="text-lg font-bold text-slate-500 mb-2">AI Carousel Generator</h3>
+                                    <p className="text-xs text-slate-600 max-w-sm mx-auto mb-4">
+                                        Describe a scene and we'll generate a seamless panoramic background, auto-split it into carousel panels, and composite your products on top.
+                                    </p>
+                                    <div className="flex flex-wrap gap-2 justify-center">
+                                        {['Luxury marble kitchen', 'Tropical beach sunset', 'Modern tech workspace', 'Botanical garden'].map(ex => (
+                                            <button key={ex} onClick={() => setCarouselPrompt(ex)}
+                                                className="text-[10px] px-3 py-1.5 rounded-full bg-white/[0.04] border border-white/[0.08] text-slate-400 hover:text-orange-400 hover:border-orange-500/30 cursor-pointer transition-all">
+                                                {ex}
+                                            </button>
+                                        ))}
                                     </div>
-                                )}
-
-                                {/* Error state */}
-                                {carouselThemeError && !carouselAnalyzing && (
-                                    <div className="mt-2 flex items-center gap-1.5 text-[10px] text-rose-400">
-                                        <span className="material-symbols-outlined" style={{fontSize:'13px'}}>error</span>
-                                        {carouselThemeError}
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Image Model */}
-                            <div className="glass-panel rounded-xl p-4">
-                                <label className="text-[10px] text-slate-500 uppercase tracking-widest font-bold mb-2 block flex items-center gap-1">
-                                    <span className="material-symbols-outlined text-[11px]">model_training</span>
-                                    AI Model
-                                </label>
-                                <div className="grid grid-cols-2 gap-1.5">
-                                    {IMAGE_MODELS.map(m => (
-                                        <button key={m.id} onClick={() => setImageModel(m.id)}
-                                            className={`px-2.5 py-2 rounded-lg text-[10px] font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
-                                                imageModel === m.id
-                                                    ? 'text-white border shadow-md'
-                                                    : 'bg-white/[0.03] text-slate-500 border border-white/[0.06] hover:bg-white/[0.06]'
-                                            }`}
-                                            style={imageModel === m.id ? { backgroundColor: `${m.color}18`, borderColor: `${m.color}50`, color: m.color } : {}}>
-                                            <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>{m.icon}</span>
-                                            <span className="truncate">{m.name}</span>
-                                            {imageModel === m.id && <span className="material-symbols-outlined text-[10px] ml-auto">check_circle</span>}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* Slide Format / Size */}
-                            <div className="glass-panel rounded-xl p-4">
-                                <label className="text-[10px] text-slate-500 uppercase tracking-widest font-bold mb-2 block flex items-center gap-1">
-                                    <span className="material-symbols-outlined text-[11px]">aspect_ratio</span>
-                                    Slide Format
-                                </label>
-                                <div className="grid grid-cols-3 gap-1.5">
-                                    {[
-                                        { id: '1:1', label: 'Square', size: '1080×1080', icon: 'crop_square', desc: 'Instagram Feed' },
-                                        { id: '4:5', label: 'Portrait', size: '1080×1350', icon: 'crop_portrait', desc: 'Instagram Best' },
-                                        { id: '9:16', label: 'Story', size: '1080×1920', icon: 'smartphone', desc: 'Stories / Reels' },
-                                        { id: '16:9', label: 'Landscape', size: '1920×1080', icon: 'crop_landscape', desc: 'YouTube / LinkedIn' },
-                                        { id: '3:4', label: 'Classic', size: '1080×1440', icon: 'photo', desc: 'Classic Portrait' },
-                                        { id: '2:3', label: 'Tall', size: '1080×1620', icon: 'view_agenda', desc: 'Pinterest' },
-                                    ].map(f => (
-                                        <button key={f.id} onClick={() => setCarouselSlideFormat(f.id)}
-                                            className={`px-2 py-2 rounded-lg text-[10px] font-semibold transition-all cursor-pointer flex flex-col items-center gap-0.5 ${
-                                                carouselSlideFormat === f.id
-                                                    ? 'bg-orange-500/15 text-orange-400 border border-orange-500/30'
-                                                    : 'bg-white/[0.03] text-slate-500 border border-white/[0.06] hover:bg-white/[0.06] hover:text-white'
-                                            }`}>
-                                            <span className="material-symbols-outlined text-sm">{f.icon}</span>
-                                            <span className="font-bold">{f.label}</span>
-                                            <span className="text-[8px] opacity-60">{f.size}</span>
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* Slide Count */}
-                            <div className="glass-panel rounded-xl p-4">
-                                <label className="text-[10px] text-slate-500 uppercase tracking-widest font-bold mb-2 block">Number of Slides</label>
-                                <div className="flex gap-2">
-                                    {[2, 3, 4, 5].map(n => (
-                                        <button key={n} onClick={() => { setCarouselSlides(n); setCarouselProductImages(prev => { const a = [...prev]; a.length = n; return a.fill(null, prev.length) }) }}
-                                            className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all cursor-pointer ${
-                                                carouselSlides === n
-                                                    ? 'bg-orange-500/15 text-orange-400 border border-orange-500/30'
-                                                    : 'bg-white/[0.03] text-slate-500 border border-white/[0.06] hover:bg-white/[0.06] hover:text-white'
-                                            }`}>
-                                            {n} slides
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* Genre — Cinematic Theme Treatment */}
-                            <div className="glass-panel rounded-xl p-4">
-                                <div className="flex items-center justify-between mb-2">
-                                    <label className="text-[10px] text-slate-500 uppercase tracking-widest font-bold flex items-center gap-1">
-                                        <span className="material-symbols-outlined text-[11px]">movie</span>
-                                        Genre / Mood
-                                    </label>
-                                    {carouselThemeAnalysis?.genre && (
-                                        <span className="text-[8px] text-violet-400 font-semibold px-1.5 py-0.5 rounded-full bg-violet-500/10 border border-violet-500/20">AI detected</span>
-                                    )}
-                                </div>
-                                <div className="grid grid-cols-4 gap-1">
-                                    {[
-                                        { id: 'drama',         label: 'Drama',    msIcon: 'theater_comedy',   color: '#dc2626' },
-                                        { id: 'thriller',      label: 'Thriller', msIcon: 'experiment',       color: '#7c3aed' },
-                                        { id: 'romance',       label: 'Romance',  msIcon: 'favorite',         color: '#ec4899' },
-                                        { id: 'comedy',        label: 'Comedy',   msIcon: 'sentiment_excited',color: '#f97316' },
-                                        { id: 'horror',        label: 'Horror',   msIcon: 'dark_mode',        color: '#14532d' },
-                                        { id: 'action',        label: 'Action',   msIcon: 'bolt',             color: '#0284c7' },
-                                        { id: 'inspirational', label: 'Inspire',  msIcon: 'emoji_objects',    color: '#f59e0b' },
-                                        { id: 'luxury',        label: 'Luxury',   msIcon: 'diamond',          color: '#d4af37' },
-                                        { id: 'nature',        label: 'Nature',   msIcon: 'eco',              color: '#22c55e' },
-                                        { id: 'tech',          label: 'Tech',     msIcon: 'memory',           color: '#06b6d4' },
-                                        { id: 'modern',        label: 'Modern',   msIcon: 'apartment',        color: '#64748b' },
-                                    ].map(g => (
-                                        <button key={g.id} onClick={() => setCarouselGenre(g.id)}
-                                            title={g.label}
-                                            className={`py-2.5 px-1 rounded-lg text-[9px] font-bold transition-all cursor-pointer flex flex-col items-center gap-1 ${
-                                                carouselGenre === g.id
-                                                    ? 'border shadow-md'
-                                                    : 'bg-white/[0.03] text-slate-500 border border-white/[0.05] hover:bg-white/[0.06]'
-                                            }`}
-                                            style={carouselGenre === g.id ? { backgroundColor: `${g.color}20`, borderColor: `${g.color}50`, color: g.color } : {}}>
-                                            <span className="material-symbols-outlined" style={{ fontSize: '18px', lineHeight: 1 }}>{g.msIcon}</span>
-                                            <span className="leading-none">{g.label}</span>
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* Style Presets — visual aesthetic */}
-                            <div className="glass-panel rounded-xl p-4">
-                                <label className="text-[10px] text-slate-500 uppercase tracking-widest font-bold mb-2 block flex items-center gap-1">
-                                    <span className="material-symbols-outlined text-[11px]">palette</span>
-                                    Visual Style
-                                </label>
-                                <div className="grid grid-cols-3 gap-1.5">
-                                    {[
-                                        { id: 'modern',  label: 'Modern',  icon: 'auto_awesome', color: '#f97316' },
-                                        { id: 'minimal', label: 'Minimal', icon: 'crop_square',  color: '#64748b' },
-                                        { id: 'vibrant', label: 'Vibrant', icon: 'palette',       color: '#ec4899' },
-                                        { id: 'luxury',  label: 'Luxury',  icon: 'diamond',       color: '#f59e0b' },
-                                        { id: 'nature',  label: 'Nature',  icon: 'park',          color: '#22c55e' },
-                                        { id: 'tech',    label: 'Tech',    icon: 'devices',       color: '#06b6d4' },
-                                    ].map(s => (
-                                        <button key={s.id} onClick={() => setCarouselStyle(s.id)}
-                                            className={`px-2 py-2 rounded-lg text-[10px] font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
-                                                carouselStyle === s.id
-                                                    ? 'text-white border shadow-md'
-                                                    : 'bg-white/[0.03] text-slate-500 border border-white/[0.06] hover:bg-white/[0.06]'
-                                            }`}
-                                            style={carouselStyle === s.id ? { backgroundColor: `${s.color}18`, borderColor: `${s.color}50`, color: s.color } : {}}>
-                                            <span className="material-symbols-outlined" style={{fontSize:'12px'}}>{s.icon}</span>
-                                            {s.label}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* Product Images per Slide */}
-                            <div className="glass-panel rounded-xl p-4">
-                                <label className="text-[10px] text-slate-500 uppercase tracking-widest font-bold mb-2 block flex items-center gap-1">
-                                    <span className="material-symbols-outlined text-[11px]">shopping_bag</span>
-                                    Product Images (Optional)
-                                </label>
-                                <p className="text-[10px] text-slate-600 mb-3">Add product images to overlay on each carousel panel</p>
-                                <div className="grid grid-cols-3 gap-2">
-                                    {Array.from({ length: carouselSlides }).map((_, i) => (
-                                        <div key={i} className="relative">
-                                            <span className="absolute -top-1 -left-1 z-10 w-4 h-4 rounded-full bg-orange-500 text-white text-[8px] font-bold flex items-center justify-center">{i + 1}</span>
-                                            {carouselProductImages[i] ? (
-                                                <div className="relative group">
-                                                    <img src={carouselProductImages[i]} alt={`Slide ${i + 1}`} className="w-full aspect-square rounded-lg object-cover border border-orange-500/30" />
-                                                    <button onClick={() => setCarouselProductImages(prev => { const a = [...prev]; a[i] = null; return a })}
-                                                        className="absolute top-0 right-0 w-5 h-5 rounded-full bg-rose-500 text-white text-[10px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">×</button>
-                                                </div>
-                                            ) : (
-                                                <label className="w-full aspect-square rounded-lg border border-dashed border-white/10 hover:border-orange-500/30 flex flex-col items-center justify-center cursor-pointer bg-white/[0.02] transition-all">
-                                                    <span className="material-symbols-outlined text-slate-600 text-lg">add_photo_alternate</span>
-                                                    <span className="text-[8px] text-slate-600 mt-0.5">Slide {i + 1}</span>
-                                                    <input type="file" accept="image/*" className="hidden" onChange={async e => {
-                                                        const file = e.target.files?.[0]
-                                                        if (!file) return
-                                                        const reader = new FileReader()
-                                                        reader.onload = () => setCarouselProductImages(prev => { const a = [...prev]; a[i] = reader.result; return a })
-                                                        reader.readAsDataURL(file)
-                                                    }} />
-                                                </label>
-                                            )}
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* Generate Button */}
-                            <button
-                                onClick={async () => {
-                                    if (!activeBrand || !carouselPrompt.trim() || carouselGenerating) return
-                                    setCarouselGenerating(true)
-                                    setCarouselError(null)
-                                    setCarouselResult(null)
-                                    try {
-                                        const data = await creativesAPI.generateCarousel({
-                                            prompt: carouselPrompt,
-                                            slideCount: carouselSlides,
-                                            slideRatio: carouselSlideFormat,
-                                            brandId: activeBrand._id,
-                                            selectedModel: imageModel || 'nanobanana-2',
-                                            productImages: carouselProductImages.filter(Boolean),
-                                            brandLogo: activeBrand?.dna?.logo || null,
-                                            style: carouselStyle,
-                                            themeImageUrl: carouselThemeImage || null,
-                                            themeAnalysis: carouselThemeAnalysis ? { ...carouselThemeAnalysis, genre: carouselGenre } : { genre: carouselGenre },
-                                        })
-                                        if (data.success) {
-                                            setCarouselResult({
-                                                panoramicUrl: data.panoramicUrl,
-                                                carouselId: data.carouselId,
-                                                provider: data.provider,
-                                                panels: [],
-                                            })
-                                            // Start polling for panels
-                                            setCarouselPolling(true)
-                                            const pollId = data.carouselId
-                                            let retries = 0
-                                            const poll = setInterval(async () => {
-                                                try {
-                                                    const status = await creativesAPI.getCarousel(pollId)
-                                                    // Show error from backend
-                                                    if (status.error) {
-                                                        setCarouselError(`Panel processing failed: ${status.error}`)
-                                                        setCarouselPolling(false)
-                                                        clearInterval(poll)
-                                                        return
-                                                    }
-                                                    // Show panels as they arrive (partial results)
-                                                    if (status.panels?.length > 0) {
-                                                        setCarouselResult(prev => ({
-                                                            ...prev,
-                                                            panels: status.panels,
-                                                            panoramicUrl: status.panoramicUrl || prev?.panoramicUrl,
-                                                        }))
-                                                    }
-                                                    // Stop polling when all panels are ready
-                                                    if (status.status === 'ready' || status.status === 'done') {
-                                                        setCarouselPolling(false)
-                                                        clearInterval(poll)
-                                                    }
-                                                    retries++
-                                                    if (retries > 100) { clearInterval(poll); setCarouselPolling(false); setCarouselError('Generation is taking too long — panels may still be processing. Check back in a minute.') }
-                                                } catch { retries++; if (retries > 100) { clearInterval(poll); setCarouselPolling(false) } }
-                                            }, 3000)
-                                        } else {
-                                            setCarouselError(data.error || 'Generation failed')
-                                        }
-                                    } catch (err) {
-                                        setCarouselError(err.message || 'Generation failed')
-                                    }
-                                    setCarouselGenerating(false)
-                                }}
-                                disabled={carouselGenerating || !carouselPrompt.trim() || !activeBrand}
-                                className={`w-full py-3.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                                    carouselGenerating
-                                        ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30 animate-pulse'
-                                        : !carouselPrompt.trim()
-                                            ? 'bg-white/[0.04] text-slate-600 border border-white/[0.06] cursor-not-allowed'
-                                            : 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-lg hover:shadow-orange-500/20 hover:scale-[1.01]'
-                                }`}>
-                                {carouselGenerating ? (
-                                    <><span className="material-symbols-outlined text-lg animate-spin">progress_activity</span> Generating Panoramic...</>
-                                ) : (
-                                    <><span className="material-symbols-outlined text-lg">view_carousel</span> Generate {carouselSlides}-Slide Carousel</>
-                                )}
-                            </button>
-
-                            {carouselError && (
-                                <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-sm">error</span>
-                                    {carouselError}
                                 </div>
                             )}
-                        </div>
 
-                        {/* ─── RIGHT: Preview Panel ─── */}
-                        <div className="lg:col-span-3">
-                            {carouselResult ? (
-                                <div className="space-y-4">
+                            {/* ── Result State ── */}
+                            {carouselResult && !carouselGenerating && (
+                                <div className="w-full space-y-4">
                                     {/* Panoramic Preview */}
                                     {carouselResult.panoramicUrl && (
                                         <div className="glass-panel rounded-xl p-3">
@@ -3503,7 +4696,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                         </div>
                                     )}
 
-                                    {/* Carousel Panels */}
+                                    {/* Polling state */}
                                     {carouselPolling && !carouselResult.panels?.length && (
                                         <div className="glass-panel rounded-xl p-6 flex flex-col items-center gap-3 animate-pulse">
                                             <span className="material-symbols-outlined text-3xl text-orange-400 animate-spin">progress_activity</span>
@@ -3512,6 +4705,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                         </div>
                                     )}
 
+                                    {/* Carousel Panels */}
                                     {carouselResult.panels?.length > 0 && (
                                         <div className="glass-panel rounded-xl p-4">
                                             <div className="flex items-center justify-between mb-3">
@@ -3543,7 +4737,6 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                         className="w-full rounded-xl shadow-lg transition-all duration-300"
                                                     />
                                                 </div>
-                                                {/* Navigation arrows */}
                                                 {carouselCurrentSlide > 0 && (
                                                     <button onClick={() => setCarouselCurrentSlide(prev => prev - 1)}
                                                         className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/50 backdrop-blur text-white flex items-center justify-center cursor-pointer hover:bg-black/70 transition-all">
@@ -3582,42 +4775,334 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                         </div>
                                     )}
                                 </div>
-                            ) : (
-                                /* Empty state */
-                                <div className="glass-panel rounded-xl p-10 flex flex-col items-center justify-center text-center min-h-[400px]">
-                                    <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-orange-500/20 to-amber-500/10 flex items-center justify-center mb-4">
-                                        <span className="material-symbols-outlined text-orange-400 text-4xl">view_carousel</span>
-                                    </div>
-                                    <h3 className="text-lg font-bold text-white mb-2">AI Carousel Generator</h3>
-                                    <p className="text-sm text-slate-400 max-w-sm mb-4">
-                                        Describe a scene and we'll generate a seamless panoramic background, auto-split it into carousel panels, and composite your products on top.
-                                    </p>
-                                    <div className="flex flex-wrap gap-2 justify-center">
-                                        {['Luxury marble kitchen', 'Tropical beach sunset', 'Modern tech workspace', 'Botanical garden'].map(ex => (
-                                            <button key={ex} onClick={() => setCarouselPrompt(ex)}
-                                                className="text-[10px] px-3 py-1.5 rounded-full bg-white/[0.04] border border-white/[0.08] text-slate-400 hover:text-orange-400 hover:border-orange-500/30 cursor-pointer transition-all">
-                                                {ex}
-                                            </button>
-                                        ))}
-                                    </div>
+                            )}
+
+                            {/* ── Error State ── */}
+                            {carouselError && (
+                                <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs flex items-center gap-2 mt-4">
+                                    <span className="material-symbols-outlined text-sm">error</span>
+                                    {carouselError}
                                 </div>
                             )}
+                        </div>
+                    </div>
+
+                    {/* ═══ CAROUSEL FLOATING COMMAND BAR ═══ */}
+                    <div className="creative-floating-bar">
+
+                        {/* ── Scene Tray (Prompt + Theme Inspiration) ── */}
+                        {carouselTray === 'scene' && (
+                            <div className="floating-tray" key="car-scene-tray">
+                                <div className="flex items-center justify-between mb-2">
+                                    <span className="text-[11px] text-slate-400 uppercase tracking-widest font-bold flex items-center gap-1.5">
+                                        <span className="material-symbols-outlined text-xs text-orange-400">landscape</span>
+                                        Background Scene
+                                    </span>
+                                    <div className="flex items-center gap-2">
+                                        {/* Theme inspiration inline */}
+                                        {carouselThemeImage ? (
+                                            <div className="flex items-center gap-1.5">
+                                                <div className="relative group">
+                                                    <img src={carouselThemeImage} alt="Theme ref" className="w-7 h-7 rounded-lg object-cover border border-[#FF4D00]/30 cursor-pointer"
+                                                        onClick={() => { setCarouselThemeImage(null); setCarouselThemeAnalysis(null); setCarouselThemeError(null); }} title="Click to remove" />
+                                                    {carouselAnalyzing && <div className="absolute inset-0 bg-black/70 rounded-lg flex items-center justify-center"><span className="material-symbols-outlined text-[#FF4D00] text-[12px] animate-spin">progress_activity</span></div>}
+                                                    {carouselThemeAnalysis && !carouselAnalyzing && <div className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-emerald-500 border border-black flex items-center justify-center"><span className="material-symbols-outlined text-white" style={{fontSize:'8px'}}>check</span></div>}
+                                                </div>
+                                                {carouselAnalyzing ? (
+                                                    <span className="text-[9px] font-semibold text-[#FF4D00] animate-pulse">Analyzing...</span>
+                                                ) : carouselThemeAnalysis ? (
+                                                    <span className="text-[9px] font-semibold text-emerald-400">DNA ✓</span>
+                                                ) : null}
+                                            </div>
+                                        ) : (
+                                            <label className="flex items-center gap-1 px-2 py-1 rounded-lg border border-dashed border-[#FF4D00]/30 hover:border-[#FF4D00]/60 bg-[#FF4D00]/[0.05] cursor-pointer transition-all text-[9px] font-semibold text-[#FF4D00]">
+                                                <span className="material-symbols-outlined" style={{fontSize:'12px'}}>add_photo_alternate</span>
+                                                Inspo
+                                                <input type="file" accept="image/*" className="hidden" onChange={async e => {
+                                                    const file = e.target.files?.[0]
+                                                    if (!file) return
+                                                    setCarouselThemeError(null)
+                                                    const dataUrl = await new Promise(resolve => {
+                                                        const img = new Image()
+                                                        const objectUrl = URL.createObjectURL(file)
+                                                        img.onload = () => {
+                                                            URL.revokeObjectURL(objectUrl)
+                                                            const MAX = 800
+                                                            let { width, height } = img
+                                                            if (width > MAX || height > MAX) {
+                                                                if (width > height) { height = Math.round(height * MAX / width); width = MAX; }
+                                                                else { width = Math.round(width * MAX / height); height = MAX; }
+                                                            }
+                                                            const canvas = document.createElement('canvas')
+                                                            canvas.width = width; canvas.height = height
+                                                            canvas.getContext('2d').drawImage(img, 0, 0, width, height)
+                                                            resolve(canvas.toDataURL('image/jpeg', 0.82))
+                                                        }
+                                                        img.src = objectUrl
+                                                    })
+                                                    setCarouselThemeImage(dataUrl)
+                                                    setCarouselThemeAnalysis(null)
+                                                    setCarouselAnalyzing(true)
+                                                    try {
+                                                        const res = await creativesAPI.analyzeCarouselTheme({ themeImageUrl: dataUrl, brandId: activeBrand?._id, slideCount: carouselSlides })
+                                                        if (res.success && res.theme) {
+                                                            setCarouselThemeAnalysis(res.theme)
+                                                            if (res.theme.panoramicPrompt) setCarouselPrompt(res.theme.panoramicPrompt)
+                                                            if (res.theme.suggestedStyle) setCarouselStyle(res.theme.suggestedStyle)
+                                                            if (res.theme.genre) setCarouselGenre(res.theme.genre)
+                                                        } else { setCarouselThemeError('Analysis failed — click Analyze to retry') }
+                                                    } catch (err) { setCarouselThemeError(err.message || 'Analysis failed') }
+                                                    setCarouselAnalyzing(false)
+                                                }} />
+                                            </label>
+                                        )}
+                                        <button onClick={() => setCarouselTray(null)} className="text-slate-500 hover:text-white cursor-pointer"><span className="material-symbols-outlined text-sm">close</span></button>
+                                    </div>
+                                </div>
+                                {/* Analysis result badge */}
+                                {carouselThemeAnalysis && (
+                                    <div className="mb-2 p-2 rounded-lg bg-[#FF4D00]/[0.06] border border-[#FF4D00]/20 flex items-center gap-2 flex-wrap">
+                                        <span className="material-symbols-outlined text-emerald-400" style={{fontSize:'12px'}}>check_circle</span>
+                                        <span className="text-[9px] text-emerald-400 font-semibold">Visual DNA extracted</span>
+                                        {carouselThemeAnalysis.genre && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-orange-500/20 text-orange-300 capitalize">{carouselThemeAnalysis.genre}</span>}
+                                        {carouselThemeAnalysis.mood && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-[#FF4D00]/15 text-[#FF7A00] capitalize">✦ {carouselThemeAnalysis.mood}</span>}
+                                        {carouselThemeAnalysis.colorPalette?.length > 0 && (
+                                            <div className="flex gap-0.5 ml-auto">{carouselThemeAnalysis.colorPalette.slice(0,5).map((c,i) => <div key={i} className="w-3 h-3 rounded-full border border-white/10" style={{backgroundColor:c}} />)}</div>
+                                        )}
+                                    </div>
+                                )}
+                                {carouselThemeError && !carouselAnalyzing && (
+                                    <div className="mb-2 flex items-center gap-1 text-[9px] text-rose-400"><span className="material-symbols-outlined" style={{fontSize:'11px'}}>error</span>{carouselThemeError}</div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* ── Format Tray (Slide Format + Count) ── */}
+                        {carouselTray === 'format' && (
+                            <div className="floating-tray" key="car-format-tray">
+                                <div className="flex items-center justify-between mb-2">
+                                    <span className="text-[11px] text-slate-400 uppercase tracking-widest font-bold flex items-center gap-1.5">
+                                        <span className="material-symbols-outlined text-xs text-orange-400">aspect_ratio</span>
+                                        Slide Format & Count
+                                    </span>
+                                    <button onClick={() => setCarouselTray(null)} className="text-slate-500 hover:text-white cursor-pointer"><span className="material-symbols-outlined text-sm">close</span></button>
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <span className="text-[9px] text-slate-500 uppercase tracking-wider font-bold mb-1.5 block">Format</span>
+                                        <div className="grid grid-cols-3 gap-1">
+                                            {[
+                                                { id: '1:1', label: 'Square', icon: 'crop_square' },
+                                                { id: '4:5', label: 'Portrait', icon: 'crop_portrait' },
+                                                { id: '9:16', label: 'Story', icon: 'smartphone' },
+                                                { id: '16:9', label: 'Wide', icon: 'crop_landscape' },
+                                                { id: '3:4', label: 'Classic', icon: 'photo' },
+                                                { id: '2:3', label: 'Tall', icon: 'view_agenda' },
+                                            ].map(f => (
+                                                <button key={f.id} onClick={() => setCarouselSlideFormat(f.id)}
+                                                    className={`px-1.5 py-1.5 rounded-lg text-[9px] font-semibold transition-all cursor-pointer flex flex-col items-center gap-0.5 ${
+                                                        carouselSlideFormat === f.id ? 'bg-orange-500/15 text-orange-400 border border-orange-500/30' : 'bg-white/[0.03] text-slate-500 border border-white/[0.06] hover:text-white'
+                                                    }`}>
+                                                    <span className="material-symbols-outlined text-xs">{f.icon}</span>
+                                                    {f.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <span className="text-[9px] text-slate-500 uppercase tracking-wider font-bold mb-1.5 block">Slides</span>
+                                        <div className="flex gap-1.5">
+                                            {[2, 3, 4, 5].map(n => (
+                                                <button key={n} onClick={() => { setCarouselSlides(n); setCarouselProductImages(prev => { const a = [...prev]; a.length = n; return a.fill(null, prev.length) }) }}
+                                                    className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                                        carouselSlides === n ? 'bg-orange-500/15 text-orange-400 border border-orange-500/30' : 'bg-white/[0.03] text-slate-500 border border-white/[0.06] hover:text-white'
+                                                    }`}>{n}</button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* ── Genre Tray ── */}
+                        {carouselTray === 'genre' && (
+                            <div className="floating-tray" key="car-genre-tray">
+                                <div className="flex items-center justify-between mb-2">
+                                    <span className="text-[11px] text-slate-400 uppercase tracking-widest font-bold flex items-center gap-1.5">
+                                        <span className="material-symbols-outlined text-xs text-orange-400">movie</span>
+                                        Genre / Mood
+                                        {carouselThemeAnalysis?.genre && <span className="text-[8px] text-[#FF4D00] font-semibold px-1.5 py-0.5 rounded-full bg-[#FF4D00]/10 border border-[#FF4D00]/20">AI detected</span>}
+                                    </span>
+                                    <button onClick={() => setCarouselTray(null)} className="text-slate-500 hover:text-white cursor-pointer"><span className="material-symbols-outlined text-sm">close</span></button>
+                                </div>
+                                <div className="grid grid-cols-4 gap-1">
+                                    {[
+                                        { id: 'drama',         label: 'Drama',    msIcon: 'theater_comedy',   color: '#dc2626' },
+                                        { id: 'thriller',      label: 'Thriller', msIcon: 'experiment',       color: '#7c3aed' },
+                                        { id: 'romance',       label: 'Romance',  msIcon: 'favorite',         color: '#ec4899' },
+                                        { id: 'sci-fi',        label: 'Sci-Fi',   msIcon: 'rocket_launch',    color: '#06b6d4' },
+                                        { id: 'fantasy',       label: 'Fantasy',  msIcon: 'auto_awesome',     color: '#a855f7' },
+                                        { id: 'documentary',   label: 'Docu',     msIcon: 'documentary',      color: '#78716c' },
+                                        { id: 'noir',          label: 'Noir',     msIcon: 'contrast',         color: '#334155' },
+                                        { id: 'action',        label: 'Action',   msIcon: 'local_fire_department', color: '#ef4444' },
+                                        { id: 'comedy',        label: 'Comedy',   msIcon: 'mood',             color: '#facc15' },
+                                        { id: 'horror',        label: 'Horror',   msIcon: 'skull',            color: '#1e293b' },
+                                        { id: 'fashion-editorial', label: 'Fashion', msIcon: 'styler',        color: '#f59e0b' },
+                                        { id: 'none',          label: 'None',     msIcon: 'block',            color: '#64748b' },
+                                    ].map(g => (
+                                        <button key={g.id} onClick={() => setCarouselGenre(g.id)} title={g.label}
+                                            className={`py-2 px-1 rounded-lg text-[9px] font-bold transition-all cursor-pointer flex flex-col items-center gap-1 ${
+                                                carouselGenre === g.id ? 'border shadow-md' : 'bg-white/[0.03] text-slate-500 border border-white/[0.05] hover:bg-white/[0.06]'
+                                            }`}
+                                            style={carouselGenre === g.id ? { backgroundColor: `${g.color}20`, borderColor: `${g.color}50`, color: g.color } : {}}>
+                                            <span className="material-symbols-outlined" style={{ fontSize: '16px', lineHeight: 1 }}>{g.msIcon}</span>
+                                            <span className="leading-none">{g.label}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* ── Style Tray ── */}
+                        {carouselTray === 'style' && (
+                            <div className="floating-tray" key="car-style-tray">
+                                <div className="flex items-center justify-between mb-2">
+                                    <span className="text-[11px] text-slate-400 uppercase tracking-widest font-bold flex items-center gap-1.5">
+                                        <span className="material-symbols-outlined text-xs text-orange-400">palette</span>
+                                        Visual Style
+                                    </span>
+                                    <button onClick={() => setCarouselTray(null)} className="text-slate-500 hover:text-white cursor-pointer"><span className="material-symbols-outlined text-sm">close</span></button>
+                                </div>
+                                <div className="grid grid-cols-6 gap-1.5">
+                                    {[
+                                        { id: 'modern',  label: 'Modern',  icon: 'auto_awesome', color: '#f97316' },
+                                        { id: 'minimal', label: 'Minimal', icon: 'crop_square',  color: '#64748b' },
+                                        { id: 'vibrant', label: 'Vibrant', icon: 'palette',       color: '#ec4899' },
+                                        { id: 'luxury',  label: 'Luxury',  icon: 'diamond',       color: '#f59e0b' },
+                                        { id: 'nature',  label: 'Nature',  icon: 'park',          color: '#22c55e' },
+                                        { id: 'tech',    label: 'Tech',    icon: 'devices',       color: '#06b6d4' },
+                                    ].map(s => (
+                                        <button key={s.id} onClick={() => setCarouselStyle(s.id)}
+                                            className={`px-2 py-2 rounded-lg text-[10px] font-semibold transition-all cursor-pointer flex flex-col items-center gap-1 ${
+                                                carouselStyle === s.id ? 'text-white border shadow-md' : 'bg-white/[0.03] text-slate-500 border border-white/[0.06] hover:bg-white/[0.06]'
+                                            }`}
+                                            style={carouselStyle === s.id ? { backgroundColor: `${s.color}18`, borderColor: `${s.color}50`, color: s.color } : {}}>
+                                            <span className="material-symbols-outlined" style={{fontSize:'14px'}}>{s.icon}</span>
+                                            {s.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* ── Products Tray ── */}
+                        {carouselTray === 'products' && (
+                            <div className="floating-tray" key="car-products-tray">
+                                <div className="flex items-center justify-between mb-2">
+                                    <span className="text-[11px] text-slate-400 uppercase tracking-widest font-bold flex items-center gap-1.5">
+                                        <span className="material-symbols-outlined text-xs text-orange-400">shopping_bag</span>
+                                        Product Images (Optional)
+                                    </span>
+                                    <button onClick={() => setCarouselTray(null)} className="text-slate-500 hover:text-white cursor-pointer"><span className="material-symbols-outlined text-sm">close</span></button>
+                                </div>
+                                <p className="text-[9px] text-slate-600 mb-2">Add product images to overlay on each carousel panel</p>
+                                <div className="grid grid-cols-5 gap-2">
+                                    {Array.from({ length: carouselSlides }).map((_, i) => (
+                                        <div key={i} className="relative">
+                                            <span className="absolute -top-1 -left-1 z-10 w-4 h-4 rounded-full bg-orange-500 text-white text-[8px] font-bold flex items-center justify-center">{i + 1}</span>
+                                            {carouselProductImages[i] ? (
+                                                <div className="relative group">
+                                                    <img src={carouselProductImages[i]} alt={`Slide ${i + 1}`} className="w-full aspect-square rounded-lg object-cover border border-orange-500/30" />
+                                                    <button onClick={() => setCarouselProductImages(prev => { const a = [...prev]; a[i] = null; return a })}
+                                                        className="absolute top-0 right-0 w-5 h-5 rounded-full bg-rose-500 text-white text-[10px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">×</button>
+                                                </div>
+                                            ) : (
+                                                <label className="w-full aspect-square rounded-lg border border-dashed border-white/10 hover:border-orange-500/30 flex flex-col items-center justify-center cursor-pointer bg-white/[0.02] transition-all">
+                                                    <span className="material-symbols-outlined text-slate-600 text-lg">add_photo_alternate</span>
+                                                    <span className="text-[8px] text-slate-600 mt-0.5">Slide {i + 1}</span>
+                                                    <input type="file" accept="image/*" className="hidden" onChange={async e => {
+                                                        const file = e.target.files?.[0]
+                                                        if (!file) return
+                                                        const reader = new FileReader()
+                                                        reader.onload = () => setCarouselProductImages(prev => { const a = [...prev]; a[i] = reader.result; return a })
+                                                        reader.readAsDataURL(file)
+                                                    }} />
+                                                </label>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* ── Icon Row + Prompt + Generate ── */}
+                        <div className="floating-prompt-row">
+                            {/* Tray toggle icons */}
+                            <div className="flex items-center gap-1 mr-1">
+                                {[
+                                    { key: 'scene',    icon: 'landscape',     tip: 'Background Scene' },
+                                    { key: 'format',   icon: 'aspect_ratio',  tip: 'Format & Slides' },
+                                    { key: 'genre',    icon: 'movie',         tip: 'Genre / Mood' },
+                                    { key: 'style',    icon: 'palette',       tip: 'Visual Style' },
+                                    { key: 'products', icon: 'shopping_bag',  tip: 'Product Images' },
+                                ].map(t => (
+                                    <button key={t.key} title={t.tip}
+                                        onClick={() => setCarouselTray(carouselTray === t.key ? null : t.key)}
+                                        className={`floating-setting-btn ${carouselTray === t.key ? 'active' : ''}`}>
+                                        <span className="material-symbols-outlined text-sm">{t.icon}</span>
+                                    </button>
+                                ))}
+                            </div>
+
+                            {/* Prompt */}
+                            <div className="flex-1 relative">
+                                <textarea 
+                                    value={carouselPrompt}
+                                    onChange={e => setCarouselPrompt(e.target.value)}
+                                    placeholder="Describe the background scene... e.g. 'Luxurious marble countertop with soft golden lighting'"
+                                    rows={1}
+                                    className="w-full px-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-sm text-white placeholder-slate-600 focus:border-orange-500/40 focus:outline-none resize-none"
+                                    onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleCarouselGenerate() } }}
+                                />
+                            </div>
+
+                            {/* Model selector */}
+                            <div className="relative">
+                                <button onClick={() => setShowModelMenu(!showModelMenu)}
+                                    className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-xs font-medium text-slate-300 hover:bg-white/[0.08] cursor-pointer transition-all whitespace-nowrap">
+                                    <span className="material-symbols-outlined text-sm text-orange-400">auto_awesome</span>
+                                    {IMAGE_MODELS.find(m => m.id === imageModel)?.name || 'Model'}
+                                    <span className="material-symbols-outlined text-xs text-slate-500">expand_more</span>
+                                </button>
+                            </div>
+
+                            {/* Generate */}
+                            <button onClick={handleCarouselGenerate} disabled={!carouselPrompt.trim() || !activeBrand || carouselGenerating}
+                                className="btn-primary py-2.5 px-5 rounded-xl disabled:opacity-30 text-sm font-bold cursor-pointer flex items-center gap-2 whitespace-nowrap flex-shrink-0">
+                                {carouselGenerating ? (
+                                    <><span className="material-symbols-outlined animate-spin text-sm">progress_activity</span> Generating...</>
+                                ) : (
+                                    <><span className="material-symbols-outlined text-sm">view_carousel</span> Generate</>
+                                )}
+                            </button>
                         </div>
                     </div>
                 </div>
             )}
 
+
+
             {/* =================== CAMPAIGN CREATIVES WIZARD =================== */}
             {studioMode === 'campaigns' && (
-                <div className="max-w-6xl mx-auto fade-up">
+                <div className="max-w-6xl mx-auto fade-up pt-6">
                     {/* Header */}
-                    <div className="glow-border rounded-2xl p-6 mb-6 relative overflow-hidden" style={{ background: 'linear-gradient(135deg, rgba(59,130,246,0.06), rgba(168,85,247,0.04), rgba(6,182,212,0.03))' }}>
-                        <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(circle at 80% 20%, rgba(59,130,246,0.08) 0%, transparent 50%)' }} />
+                    <div className="glow-border rounded-2xl p-6 mb-6 relative overflow-hidden" style={{ background: 'linear-gradient(135deg, rgba(255, 77, 0,0.06), rgba(255, 77, 0,0.04), rgba(6,182,212,0.03))' }}>
+                        <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(circle at 80% 20%, rgba(255, 77, 0,0.08) 0%, transparent 50%)' }} />
                         <div className="relative">
                             <h2 className="text-xl font-bold text-white flex items-center gap-3 mb-1">
-                                <span className="material-symbols-outlined text-2xl text-blue-400">campaign</span>
+                                <span className="material-symbols-outlined text-2xl text-[#FF4D00]">campaign</span>
                                 Campaign Creatives
-                                <span className="text-xs font-medium bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded-full">AI Wizard</span>
+                                <span className="text-xs font-medium bg-[#FF4D00]/20 text-[#FF7A00] px-2 py-0.5 rounded-full">AI Wizard</span>
                             </h2>
                             <p className="text-sm text-slate-400">Build coordinated campaign batches — trend-powered, AI-driven</p>
                         </div>
@@ -3627,8 +5112,8 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                     <div className="flex items-center gap-2 mb-6 overflow-x-auto scrollbar-hide pb-2">
                         {[{n:1,l:'Intelligence Brief',icon:'psychology'},{n:2,l:'Copy & Style',icon:'palette'},{n:3,l:'Generate',icon:'auto_awesome'}].map((s,i)=>(
                             <Fragment key={s.n}>
-                                <button onClick={()=>s.n<campStep&&setCampStep(s.n)} className={`flex-shrink-0 flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${campStep===s.n?'bg-blue-500/20 text-blue-300 border border-blue-400/30':campStep>s.n?'bg-emerald-500/10 text-emerald-300 border border-emerald-400/20 cursor-pointer':'bg-white/[0.03] text-slate-600 border border-white/[0.05]'}`}>
-                                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${campStep===s.n?'bg-blue-500 text-white':campStep>s.n?'bg-emerald-500 text-white':'bg-white/10 text-slate-600'}`}>{campStep>s.n?'✓':s.n}</span>{s.l}
+                                <button onClick={()=>s.n<campStep&&setCampStep(s.n)} className={`flex-shrink-0 flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${campStep===s.n?'bg-[#FF4D00]/20 text-[#FF7A00] border border-[#FF4D00]/30':campStep>s.n?'bg-emerald-500/10 text-emerald-300 border border-emerald-400/20 cursor-pointer':'bg-white/[0.03] text-slate-600 border border-white/[0.05]'}`}>
+                                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${campStep===s.n?'bg-[#FF4D00] text-white':campStep>s.n?'bg-emerald-500 text-white':'bg-white/10 text-slate-600'}`}>{campStep>s.n?'✓':s.n}</span>{s.l}
                                 </button>
                                 {i<2&&<div className={`flex-1 min-w-[20px] h-px ${campStep>s.n?'bg-emerald-500/30':'bg-white/[0.06]'}`}/>}
                             </Fragment>
@@ -3643,8 +5128,8 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 <div className="studio-card p-5">
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div>
-                                            <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-2"><span className="material-symbols-outlined text-blue-400 text-lg">badge</span>Campaign Name</h3>
-                                            <input type="text" value={campName} onChange={e=>setCampName(e.target.value)} placeholder="Auto-generated from keyword..." className="w-full px-3 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm placeholder:text-slate-600 focus:outline-none focus:border-blue-400/30" />
+                                            <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-2"><span className="material-symbols-outlined text-[#FF4D00] text-lg">badge</span>Campaign Name</h3>
+                                            <input type="text" value={campName} onChange={e=>setCampName(e.target.value)} placeholder="Auto-generated from keyword..." className="w-full px-3 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm placeholder:text-slate-600 focus:outline-none focus:border-[#FF4D00]/30" />
                                         </div>
                                         <div>
                                             <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-2"><span className="material-symbols-outlined text-emerald-400 text-lg">flag</span>Campaign Goal</h3>
@@ -3661,7 +5146,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 <div className="studio-card p-5">
                                     <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3"><span className="material-symbols-outlined text-amber-400 text-lg">psychology</span>Keyword Intelligence <span className="text-[10px] text-amber-400/60 font-normal bg-amber-500/10 px-2 py-0.5 rounded-full">AI Agent</span></h3>
                                     <div className="flex gap-2 mb-4">
-                                        {[{id:'product-trends',l:'🧠 Product Trends',icon:'trending_up'},{id:'trending',l:'🔥 Social Trends',icon:'whatshot'},{id:'seo',l:'🔍 SEO Keywords',icon:'search'},{id:'custom',l:'✍️ Custom',icon:'edit'}].map(t=>(
+                                        {[{id:'product-trends',l:'Product Trends',icon:'trending_up'},{id:'trending',l:'Social Trends',icon:'whatshot'},{id:'seo',l:'SEO Keywords',icon:'search'},{id:'custom',l:'Custom',icon:'edit'}].map(t=>(
                                             <button key={t.id} onClick={async()=>{
                                                 setCampKeywordSource(t.id);
                                                 if(t.id==='product-trends'&&!campProductIntel){
@@ -3687,7 +5172,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                     try{const r=await trendsAPI.grokSeo({brandId:activeBrand?._id});setCampSeoKws(r.risingKeywords||r.keywords||[])}catch(e){console.error(e)}
                                                     finally{setCampTrendsLoading(false)}
                                                 }
-                                            }} className={`px-3 py-1.5 rounded-xl text-[11px] font-semibold border transition-all cursor-pointer ${campKeywordSource===t.id?'border-amber-400/30 bg-amber-500/10 text-amber-300':'border-white/[0.06] text-slate-400 hover:text-slate-200'}`}>{t.l}</button>
+                                            }} className={`px-3 py-1.5 rounded-xl text-[11px] font-semibold border transition-all cursor-pointer flex items-center gap-1 ${campKeywordSource===t.id?'border-amber-400/30 bg-amber-500/10 text-amber-300':'border-white/[0.06] text-slate-400 hover:text-slate-200'}`}><span className="material-symbols-outlined text-xs">{t.icon}</span>{t.l}</button>
                                         ))}
                                     </div>
 
@@ -3733,9 +5218,9 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                                 }
                                                             }} className={`group relative px-3 py-2 rounded-xl text-xs font-medium border transition-all cursor-pointer ${campKeyword===f.feature?'border-amber-400/40 bg-amber-500/15 text-white ring-1 ring-amber-400/20':'border-white/[0.06] text-slate-300 hover:border-amber-400/20 hover:bg-amber-500/5'}`}>
                                                                 <div className="flex items-center gap-1.5">
-                                                                    <span className="text-amber-400 text-[10px]">🔥{f.trendScore||'—'}</span>
+                                                                    <span className="text-amber-400 text-[10px]"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">local_fire_department</span>{f.trendScore||'—'}</span>
                                                                     <span>{f.feature}</span>
-                                                                    {matchCount>0&&<span className="text-[9px] bg-violet-500/20 text-violet-300 px-1.5 py-0.5 rounded-full font-bold">{matchCount} product{matchCount>1?'s':''}</span>}
+                                                                    {matchCount>0&&<span className="text-[9px] bg-[#FF4D00]/20 text-[#FF7A00] px-1.5 py-0.5 rounded-full font-bold">{matchCount} product{matchCount>1?'s':''}</span>}
                                                                 </div>
                                                                 {f.whyTrending&&<p className="text-[9px] text-slate-500 mt-0.5 text-left max-w-[200px] line-clamp-1">{f.whyTrending}</p>}
                                                             </button>
@@ -3794,14 +5279,14 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     {campKeywordSource==='custom'&&<input type="text" value={campKeyword} onChange={e=>{setCampKeyword(e.target.value);if(!campName)setCampName(`${e.target.value} Campaign`)}} placeholder="Type your keyword or campaign topic..." className="w-full px-3 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm placeholder:text-slate-600 focus:outline-none focus:border-amber-400/30" />}
 
                                     {/* Selected Keyword Badge */}
-                                    {campKeyword&&<div className="mt-3 px-3 py-1.5 rounded-lg bg-blue-500/10 border border-blue-400/20 text-blue-300 text-xs inline-flex items-center gap-1"><span className="material-symbols-outlined text-sm">check_circle</span>Selected: <strong>{campKeyword}</strong></div>}
+                                    {campKeyword&&<div className="mt-3 px-3 py-1.5 rounded-lg bg-[#FF4D00]/10 border border-[#FF4D00]/20 text-[#FF7A00] text-xs inline-flex items-center gap-1"><span className="material-symbols-outlined text-sm">check_circle</span>Selected: <strong>{campKeyword}</strong></div>}
                                 </div>
 
                                 {/* ── Suggested Products (inline — appears after keyword selection) ── */}
                                 {campKeyword && (
                                     <div className="studio-card p-5">
                                         <div className="flex items-center justify-between mb-3">
-                                            <h3 className="font-bold text-white text-sm flex items-center gap-2"><span className="material-symbols-outlined text-violet-400 text-lg">inventory_2</span>Matching Products {campProducts.length>0&&<span className="text-[10px] bg-violet-500/15 text-violet-300 px-2 py-0.5 rounded-full font-bold">{campProducts.length} selected</span>}</h3>
+                                            <h3 className="font-bold text-white text-sm flex items-center gap-2"><span className="material-symbols-outlined text-[#FF4D00] text-lg">inventory_2</span>Matching Products {campProducts.length>0&&<span className="text-[10px] bg-[#FF4D00]/15 text-[#FF7A00] px-2 py-0.5 rounded-full font-bold">{campProducts.length} selected</span>}</h3>
                                             {campProducts.length>0&&<button onClick={()=>setCampProducts([])} className="text-[10px] text-red-400 hover:text-red-300 cursor-pointer">Clear all</button>}
                                         </div>
 
@@ -3814,7 +5299,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                 {campProducts.length>0&&(
                                                     <div className="flex flex-wrap gap-2 mb-2">
                                                         {campProducts.map((p,i)=>(
-                                                            <div key={i} className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-violet-500/10 border border-violet-500/20">
+                                                            <div key={i} className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-[#FF4D00]/10 border border-[#FF4D00]/20">
                                                                 {p.image&&<img src={p.image} alt="" className="w-6 h-6 rounded object-cover" />}
                                                                 <span className="text-xs text-white font-medium">{p.title}</span>
                                                                 {p.price?.amount&&<span className="text-[10px] text-emerald-400">₹{p.price.amount.toLocaleString('en-IN')}</span>}
@@ -3835,7 +5320,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                                     <button key={prod._id} onClick={()=>{
                                                                         if(isSelected){setCampProducts(prev=>prev.filter(p=>p.productId!==prod._id))}
                                                                         else{setCampProducts(prev=>[...prev,{productId:prod._id,title:prod.title,image:prod.images?.[0]?.url||'',features:prod.features||[],price:prod.price,source:'catalog'}])}
-                                                                    }} className={`flex items-center gap-2 p-2 rounded-lg text-left text-xs border transition-all cursor-pointer ${isSelected?'border-violet-400/30 bg-violet-500/10 text-white':'border-white/[0.06] text-slate-400 hover:border-violet-400/20'}`}>
+                                                                    }} className={`flex items-center gap-2 p-2 rounded-lg text-left text-xs border transition-all cursor-pointer ${isSelected?'border-[#FF4D00]/30 bg-[#FF4D00]/10 text-white':'border-white/[0.06] text-slate-400 hover:border-[#FF4D00]/20'}`}>
                                                                         {prod.images?.[0]?.url?<img src={prod.images[0].url} alt="" className="w-8 h-8 rounded object-cover flex-shrink-0"/>:<div className="w-8 h-8 rounded bg-white/[0.05] flex items-center justify-center flex-shrink-0"><span className="material-symbols-outlined text-sm text-slate-600">inventory_2</span></div>}
                                                                         <div className="min-w-0">
                                                                             <p className="truncate font-medium">{prod.title}</p>
@@ -3850,7 +5335,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                 ):(
                                                     <button onClick={()=>{
                                                         if(activeBrand?._id){setCampBrandProductsLoading(true);productsAPI.list({brandId:activeBrand._id,limit:50}).then(r=>setCampBrandProducts(r.products||[])).catch(()=>{}).finally(()=>setCampBrandProductsLoading(false))}
-                                                    }} className="w-full py-2.5 rounded-xl border border-dashed border-white/[0.1] text-slate-500 text-xs hover:border-violet-400/20 hover:text-slate-300 cursor-pointer flex items-center justify-center gap-1.5">
+                                                    }} className="w-full py-2.5 rounded-xl border border-dashed border-white/[0.1] text-slate-500 text-xs hover:border-[#FF4D00]/20 hover:text-slate-300 cursor-pointer flex items-center justify-center gap-1.5">
                                                         <span className="material-symbols-outlined text-sm">add</span>Load product catalog
                                                     </button>
                                                 )}
@@ -3882,12 +5367,12 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             <div className="col-span-12 lg:col-span-5 space-y-4">
                                 {/* Number of Creatives */}
                                 <div className="studio-card p-5">
-                                    <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3"><span className="material-symbols-outlined text-violet-400 text-lg">grid_view</span>Number of Creatives</h3>
+                                    <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3"><span className="material-symbols-outlined text-[#FF4D00] text-lg">grid_view</span>Number of Creatives</h3>
                                     <div className="flex items-center gap-3">
                                         <input type="range" min={1} max={10} value={campCount} onChange={e=>setCampCount(Number(e.target.value))} className="flex-1 accent-violet-500" />
                                         <span className="text-2xl font-bold text-white w-8 text-center">{campCount}</span>
                                     </div>
-                                    <div className="flex gap-1 mt-2">{[1,3,5,8,10].map(n=><button key={n} onClick={()=>setCampCount(n)} className={`px-2 py-0.5 rounded text-[10px] font-medium border transition-all cursor-pointer ${campCount===n?'border-violet-400/30 bg-violet-500/10 text-white':'border-white/[0.06] text-slate-500'}`}>{n}</button>)}</div>
+                                    <div className="flex gap-1 mt-2">{[1,3,5,8,10].map(n=><button key={n} onClick={()=>setCampCount(n)} className={`px-2 py-0.5 rounded text-[10px] font-medium border transition-all cursor-pointer ${campCount===n?'border-[#FF4D00]/30 bg-[#FF4D00]/10 text-white':'border-white/[0.06] text-slate-500'}`}>{n}</button>)}</div>
                                 </div>
                                 {/* Sizes */}
                                 <div className="studio-card p-5">
@@ -3920,7 +5405,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     if(campProducts.length>1)setCampProductStrategy('different');
                                     // Load products if not loaded for fallback
                                     if(!campBrandProducts.length&&activeBrand?._id){setCampBrandProductsLoading(true);productsAPI.list({brandId:activeBrand._id,limit:50}).then(r=>setCampBrandProducts(r.products||[])).catch(()=>{}).finally(()=>setCampBrandProductsLoading(false))}
-                                }} className="w-full py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-400 hover:to-indigo-400 text-white disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer">
+                                }} className="w-full py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 bg-gradient-to-r from-[#FF4D00] to-[#FF7A00] hover:from-[#FF4D00] hover:to-[#FF7A00] text-white disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer">
                                     Next: Copy & Style <span className="material-symbols-outlined text-lg">arrow_forward</span>
                                 </button>
                             </div>
@@ -4008,9 +5493,9 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                         <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1" style={{scrollbarWidth:'thin',scrollbarColor:'rgba(255,255,255,0.1) transparent'}}>
                                             {campCopies.map((c,i)=>(
                                                 <div key={i} className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
-                                                    <div className="flex items-center gap-2 mb-1 flex-wrap"><span className="text-[10px] font-bold text-blue-300 bg-blue-500/20 px-1.5 py-0.5 rounded">#{i+1}</span>{c.product&&<span className="text-[9px] text-cyan-300 bg-cyan-500/15 px-1.5 py-0.5 rounded font-medium">📦 {c.product}</span>}{c.feature&&<span className="text-[9px] text-orange-300 bg-orange-500/15 px-1.5 py-0.5 rounded font-medium">⭐ {c.feature}</span>}</div>
-                                                    <input value={c.headline||''} onChange={e=>{const u=[...campCopies];u[i]={...u[i],headline:e.target.value};setCampCopies(u)}} className="w-full px-2 py-1 mb-1 rounded-lg bg-white/[0.04] border border-white/[0.06] text-white text-xs font-semibold focus:outline-none focus:border-blue-400/30" placeholder="Headline" />
-                                                    <textarea value={c.body||''} onChange={e=>{const u=[...campCopies];u[i]={...u[i],body:e.target.value};setCampCopies(u)}} rows={2} className="w-full px-2 py-1 rounded-lg bg-white/[0.04] border border-white/[0.06] text-white text-[11px] focus:outline-none focus:border-blue-400/30 resize-none" placeholder="Body copy" />
+                                                    <div className="flex items-center gap-2 mb-1 flex-wrap"><span className="text-[10px] font-bold text-[#FF7A00] bg-[#FF4D00]/20 px-1.5 py-0.5 rounded">#{i+1}</span>{c.product&&<span className="text-[9px] text-cyan-300 bg-cyan-500/15 px-1.5 py-0.5 rounded font-medium">📦 {c.product}</span>}{c.feature&&<span className="text-[9px] text-orange-300 bg-orange-500/15 px-1.5 py-0.5 rounded font-medium"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">star</span> {c.feature}</span>}</div>
+                                                    <input value={c.headline||''} onChange={e=>{const u=[...campCopies];u[i]={...u[i],headline:e.target.value};setCampCopies(u)}} className="w-full px-2 py-1 mb-1 rounded-lg bg-white/[0.04] border border-white/[0.06] text-white text-xs font-semibold focus:outline-none focus:border-[#FF4D00]/30" placeholder="Headline" />
+                                                    <textarea value={c.body||''} onChange={e=>{const u=[...campCopies];u[i]={...u[i],body:e.target.value};setCampCopies(u)}} rows={2} className="w-full px-2 py-1 rounded-lg bg-white/[0.04] border border-white/[0.06] text-white text-[11px] focus:outline-none focus:border-[#FF4D00]/30 resize-none" placeholder="Body copy" />
                                                 </div>
                                             ))}
                                         </div>
@@ -4032,8 +5517,8 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                         <input value={campFeatureInput} onChange={e=>setCampFeatureInput(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&campFeatureInput.trim()){setCampFeatures(p=>[...p,campFeatureInput.trim()]);setCampFeatureInput('')}}} className="flex-1 px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.06] text-white text-xs focus:outline-none focus:border-orange-400/30 placeholder:text-slate-600" placeholder="e.g. Noise cancellation, 40hr battery..." />
                                         <button disabled={!campFeatureInput.trim()} onClick={()=>{if(campFeatureInput.trim()){setCampFeatures(p=>[...p,campFeatureInput.trim()]);setCampFeatureInput('')}}} className="px-3 py-2 rounded-lg bg-orange-500/10 border border-orange-500/20 text-orange-300 text-xs font-medium hover:bg-orange-500/20 transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed">+ Add</button>
                                     </div>
-                                    {campFeatures.length>0&&campFeatures.length<campCount&&<p className="text-yellow-400/60 text-[10px] mt-1.5">💡 {campFeatures.length} features for {campCount} creatives — features will cycle. Add {campCount-campFeatures.length} more for unique features per creative.</p>}
-                                    {campFeatures.length>=campCount&&campFeatures.length>0&&<p className="text-emerald-400/60 text-[10px] mt-1.5">✅ {campFeatures.length} features for {campCount} creatives — each creative gets a unique feature!</p>}
+                                    {campFeatures.length>0&&campFeatures.length<campCount&&<p className="text-yellow-400/60 text-[10px] mt-1.5 flex items-center gap-0.5"><span className="material-symbols-outlined text-[10px]">lightbulb</span> {campFeatures.length} features for {campCount} creatives — features will cycle. Add {campCount-campFeatures.length} more for unique features per creative.</p>}
+                                    {campFeatures.length>=campCount&&campFeatures.length>0&&<p className="text-emerald-400/60 text-[10px] mt-1.5"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">check_circle</span> {campFeatures.length} features for {campCount} creatives — each creative gets a unique feature!</p>}
                                 </div>
                                 {/* Price Point */}
                                 <div className="studio-card p-5">
@@ -4061,10 +5546,10 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             <div className="col-span-12 lg:col-span-5 space-y-4">
                                 {/* Style */}
                                 <div className="studio-card p-5">
-                                    <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3"><span className="material-symbols-outlined text-violet-400 text-lg">palette</span>Style</h3>
+                                    <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3"><span className="material-symbols-outlined text-[#FF4D00] text-lg">palette</span>Style</h3>
                                     <div className="grid grid-cols-2 gap-2">
                                         {['Minimal','Bold','Elegant','Vibrant','Dark Luxury','Retro','Gradient Pop','Corporate'].map(st=>(
-                                            <button key={st} onClick={()=>setCampStyle(st.toLowerCase())} className={`px-3 py-2 rounded-xl text-xs font-medium border transition-all cursor-pointer ${campStyle===st.toLowerCase()?'border-violet-400/40 bg-violet-500/10 text-white':'border-white/[0.06] bg-white/[0.02] text-slate-400 hover:text-slate-200'}`}>{st}</button>
+                                            <button key={st} onClick={()=>setCampStyle(st.toLowerCase())} className={`px-3 py-2 rounded-xl text-xs font-medium border transition-all cursor-pointer ${campStyle===st.toLowerCase()?'border-[#FF4D00]/40 bg-[#FF4D00]/10 text-white':'border-white/[0.06] bg-white/[0.02] text-slate-400 hover:text-slate-200'}`}>{st}</button>
                                         ))}
                                     </div>
                                 </div>
@@ -4072,8 +5557,8 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 <div className="studio-card p-5">
                                     <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3"><span className="material-symbols-outlined text-amber-400 text-lg">crop_free</span>Logo Placement</h3>
                                     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-1.5">
-                                        {[{id:'top-left',l:'↖ TL'},{id:'top-center',l:'↑ TC'},{id:'top-right',l:'↗ TR'},{id:'bottom-left',l:'↙ BL'},{id:'bottom-center',l:'↓ BC'},{id:'bottom-right',l:'↘ BR'},{id:'none',l:'None'}].map(p=>(
-                                            <button key={p.id} onClick={()=>setCampLogoPlacement(p.id)} className={`px-2 py-1.5 rounded-lg text-[11px] font-medium border transition-all cursor-pointer ${campLogoPlacement===p.id?'border-amber-400/40 bg-amber-500/10 text-white':'border-white/[0.06] text-slate-400'}`}>{p.l}</button>
+                                        {[{id:'top-left',l:'TL',ms:'north_west'},{id:'top-center',l:'TC',ms:'north'},{id:'top-right',l:'TR',ms:'north_east'},{id:'bottom-left',l:'BL',ms:'south_west'},{id:'bottom-center',l:'BC',ms:'south'},{id:'bottom-right',l:'BR',ms:'south_east'},{id:'none',l:'None',ms:'block'}].map(p=>(
+                                            <button key={p.id} onClick={()=>setCampLogoPlacement(p.id)} className={`px-2 py-1.5 rounded-lg text-[11px] font-medium border transition-all cursor-pointer flex items-center gap-0.5 ${campLogoPlacement===p.id?'border-amber-400/40 bg-amber-500/10 text-white':'border-white/[0.06] text-slate-400'}`}><span className="material-symbols-outlined text-[11px]">{p.ms}</span>{p.l}</button>
                                         ))}
                                     </div>
                                 </div>
@@ -4082,20 +5567,20 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3"><span className="material-symbols-outlined text-teal-400 text-lg">photo_camera</span>Creative Scene</h3>
                                     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-1.5">
                                         {[
-                                            {id:'auto',l:'🎲 Auto',d:'AI picks best scene'},
-                                            {id:'studio',l:'📸 Studio',d:'Clean studio backdrop'},
-                                            {id:'outdoor',l:'🌿 Outdoor',d:'Natural outdoor setting'},
-                                            {id:'indoor',l:'🏠 Indoor',d:'Styled interior'},
-                                            {id:'podium',l:'🏆 Podium',d:'Product on pedestal'},
-                                            {id:'hands',l:'🤲 Hands',d:'Product held in hands'},
-                                            {id:'model',l:'👤 Model',d:'Person using product'},
-                                            {id:'flatlay',l:'📐 Flat Lay',d:'Top-down arrangement'},
-                                            {id:'lifestyle',l:'🏡 Lifestyle',d:'Real-life context'},
-                                            {id:'urban',l:'🏙️ Urban',d:'City/street background'},
-                                            {id:'nature',l:'🌊 Nature',d:'Natural landscape'},
-                                            {id:'minimal',l:'✨ Minimal',d:'Clean, simple backdrop'},
+                                            {id:'auto',l:'Auto',ms:'auto_awesome',d:'AI picks best scene'},
+                                            {id:'studio',l:'Studio',ms:'photo_camera',d:'Clean studio backdrop'},
+                                            {id:'outdoor',l:'Outdoor',ms:'park',d:'Natural outdoor setting'},
+                                            {id:'indoor',l:'Indoor',ms:'home',d:'Styled interior'},
+                                            {id:'podium',l:'Podium',ms:'emoji_events',d:'Product on pedestal'},
+                                            {id:'hands',l:'Hands',ms:'pan_tool',d:'Product held in hands'},
+                                            {id:'model',l:'Model',ms:'person',d:'Person using product'},
+                                            {id:'flatlay',l:'Flat Lay',ms:'grid_view',d:'Top-down arrangement'},
+                                            {id:'lifestyle',l:'Lifestyle',ms:'cottage',d:'Real-life context'},
+                                            {id:'urban',l:'Urban',ms:'location_city',d:'City/street background'},
+                                            {id:'nature',l:'Nature',ms:'water',d:'Natural landscape'},
+                                            {id:'minimal',l:'Minimal',ms:'crop_square',d:'Clean, simple backdrop'},
                                         ].map(s=>(
-                                            <button key={s.id} onClick={()=>setCampScene(s.id)} title={s.d} className={`px-2 py-1.5 rounded-lg text-[11px] font-medium border transition-all cursor-pointer ${campScene===s.id?'border-teal-400/40 bg-teal-500/10 text-white':'border-white/[0.06] text-slate-400 hover:text-slate-200'}`}>{s.l}</button>
+                                            <button key={s.id} onClick={()=>setCampScene(s.id)} title={s.d} className={`px-2 py-1.5 rounded-lg text-[11px] font-medium border transition-all cursor-pointer flex items-center gap-0.5 ${campScene===s.id?'border-teal-400/40 bg-teal-500/10 text-white':'border-white/[0.06] text-slate-400 hover:text-slate-200'}`}><span className="material-symbols-outlined text-[11px]">{s.ms}</span>{s.l}</button>
                                         ))}
                                     </div>
                                 </div>
@@ -4158,7 +5643,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 {/* Nav */}
                                 <div className="flex flex-col sm:flex-row gap-3">
                                     <button onClick={()=>setCampStep(1)} className="flex-1 py-2.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] text-white text-sm font-medium flex items-center justify-center gap-2 transition-all cursor-pointer"><span className="material-symbols-outlined text-lg">arrow_back</span>Back</button>
-                                    <button onClick={()=>setCampStep(3)} className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-400 hover:to-indigo-400 text-white text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer">Next: Generate<span className="material-symbols-outlined text-lg">arrow_forward</span></button>
+                                    <button onClick={()=>setCampStep(3)} className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-[#FF4D00] to-[#FF7A00] hover:from-[#FF4D00] hover:to-[#FF7A00] text-white text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer">Next: Generate<span className="material-symbols-outlined text-lg">arrow_forward</span></button>
                                 </div>
                             </div>
                         </div>
@@ -4169,7 +5654,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                         <div className="space-y-4">
                             {/* Summary */}
                             <div className="studio-card p-5">
-                                <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3"><span className="material-symbols-outlined text-blue-400 text-lg">summarize</span>Campaign Summary</h3>
+                                <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3"><span className="material-symbols-outlined text-[#FF4D00] text-lg">summarize</span>Campaign Summary</h3>
                                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
                                     <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06] text-center"><p className="text-slate-500 text-[10px] mb-0.5">Keyword</p><p className="text-white text-xs font-semibold truncate">{campKeyword}</p></div>
                                     <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06] text-center"><p className="text-slate-500 text-[10px] mb-0.5">Goal</p><p className="text-white text-xs font-semibold">{campGoal}</p></div>
@@ -4251,7 +5736,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                     }catch(retryErr){
                                                         if(attempt===0){console.warn(`⚠️ Creative #${i+1} attempt 1 failed, retrying...`,retryErr.message);await new Promise(r=>setTimeout(r,1500))}
                                                         else{
-                                                            console.error(`❌ Creative #${i+1} failed after 2 attempts:`,retryErr.message);
+                                                            console.error(` Creative #${i+1} failed after 2 attempts:`,retryErr.message);
                                                             if (retryErr.name === 'AbortError' || retryErr.message?.toLowerCase().includes('timeout') || retryErr.message?.toLowerCase().includes('failed to fetch') || retryErr.status === 504) {
                                                                 setCampError({
                                                                     message: 'Generation is taking longer than usual. Your images are likely still processing — please check the Image Bank in a minute.',
@@ -4287,11 +5772,11 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                         }
                                     }
                                     finally{setCampGenerating(false)}
-                                }} className="w-full py-4 rounded-xl font-bold text-base transition-all flex items-center justify-center gap-2 bg-gradient-to-r from-blue-500 via-indigo-500 to-violet-500 hover:from-blue-400 hover:via-indigo-400 hover:to-violet-400 text-white disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer">
+                                }} className="w-full py-4 rounded-xl font-bold text-base transition-all flex items-center justify-center gap-2 bg-gradient-to-r from-[#FF4D00] via-indigo-500 to-[#FF7A00] hover:from-[#FF4D00] hover:via-indigo-400 hover:to-[#FF7A00] text-white disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer">
                                     {campGenerating?(<><span className="material-symbols-outlined animate-spin text-lg">progress_activity</span>Generating... {Math.round(campProgress)}%</>):(<><span className="material-symbols-outlined text-lg">rocket_launch</span>Generate All {campCount * campSizes.length} Creatives<span className="text-xs opacity-60 ml-1">~₹{(campCount*campSizes.length*0.25).toFixed(2)}</span></>)}
                                 </button>
                             )}
-                            {campGenerating&&<div className="w-full bg-white/[0.06] rounded-full h-2 mt-4"><div className="bg-gradient-to-r from-blue-500 to-violet-500 h-2 rounded-full transition-all" style={{width:`${campProgress}%`}}/></div>}
+                            {campGenerating&&<div className="w-full bg-white/[0.06] rounded-full h-2 mt-4"><div className="bg-gradient-to-r from-[#FF4D00] to-[#FF7A00] h-2 rounded-full transition-all" style={{width:`${campProgress}%`}}/></div>}
 
                             {aiWarnings.length > 0 && (
                                 <div className="space-y-2 mt-4">
@@ -4329,7 +5814,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                 const bestCopy=copies[0]||'';
                                                 const caption=`${heroLine}\n\n${uniqueHeadlines?uniqueHeadlines+'\n\n':''}${bestCopy}${campCTA?'\n\n'+campCTA:''}\n\n#${heroLine.replace(/\s+/g,'')} #Campaign #${campKeyword?.replace(/\s+/g,'')||'trending'}`;
                                                 setPublishData({images:allUrls,text:caption});
-                                            }} className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-blue-500/20 to-violet-500/20 border border-blue-500/30 text-blue-200 text-xs font-bold hover:from-blue-500/30 hover:to-violet-500/30 transition-all cursor-pointer flex items-center gap-1.5"><span className="material-symbols-outlined text-sm">view_carousel</span>Publish as Carousel</button>
+                                            }} className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-[#FF4D00]/20 to-[#FF7A00]/20 border border-[#FF4D00]/30 text-orange-50 text-xs font-bold hover:from-[#FF4D00]/30 hover:to-[#FF7A00]/30 transition-all cursor-pointer flex items-center gap-1.5"><span className="material-symbols-outlined text-sm">view_carousel</span>Publish as Carousel</button>
                                             <button onClick={()=>{setCampResults([]);setCampStep(2)}} className="px-3 py-1.5 rounded-lg bg-white/[0.06] text-white text-xs font-medium hover:bg-white/[0.1] transition-all cursor-pointer">Regenerate All</button>
                                         </div>
                                     </div>
@@ -4340,10 +5825,10 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                     <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                                                         <a href={r.url} download={`campaign-${i+1}.png`} target="_blank" rel="noreferrer" className="px-2 py-1 rounded-lg bg-white/20 text-white text-[10px] font-medium backdrop-blur-sm hover:bg-white/30 transition-all cursor-pointer"><span className="material-symbols-outlined text-xs align-middle">download</span></a>
                                                         <button onClick={()=>{setDesignBaseImage(r.url);setPrompt(r.copy?.headline||campName||campKeyword||'Edit this creative');setStudioMode('create');setShowQuickStart(false)}} className="px-2 py-1 rounded-lg bg-amber-500/30 text-amber-200 text-[10px] font-medium backdrop-blur-sm hover:bg-amber-500/50 transition-all cursor-pointer"><span className="material-symbols-outlined text-xs align-middle">edit</span></button>
-                                                        <button onClick={()=>setPublishData({image:r.url,text:r.copy?.body||''})} className="px-2 py-1 rounded-lg bg-blue-500/30 text-blue-200 text-[10px] font-medium backdrop-blur-sm hover:bg-blue-500/50 transition-all cursor-pointer"><span className="material-symbols-outlined text-xs align-middle">share</span></button>
+                                                        <button onClick={()=>setPublishData({image:r.url,text:r.copy?.body||''})} className="px-2 py-1 rounded-lg bg-[#FF4D00]/30 text-orange-50 text-[10px] font-medium backdrop-blur-sm hover:bg-[#FF4D00]/50 transition-all cursor-pointer"><span className="material-symbols-outlined text-xs align-middle">share</span></button>
                                                     </div>
                                                 </div>
-                                                <div className="p-2"><p className="text-white text-[10px] font-semibold truncate">{r.copy?.headline||''}</p><div className="flex flex-wrap gap-1 mt-0.5">{r.product&&<span className="inline-block text-[8px] text-cyan-300 bg-cyan-500/15 px-1.5 py-0.5 rounded">📦 {r.product}</span>}{r.feature&&<span className="inline-block text-[8px] text-orange-300 bg-orange-500/15 px-1.5 py-0.5 rounded">⭐ {r.feature}</span>}{r.price&&<span className="inline-block text-[8px] text-green-300 bg-green-500/15 px-1.5 py-0.5 rounded">💰 {r.price}</span>}</div><p className="text-slate-500 text-[9px]">{r.size}</p></div>
+                                                <div className="p-2"><p className="text-white text-[10px] font-semibold truncate">{r.copy?.headline||''}</p><div className="flex flex-wrap gap-1 mt-0.5">{r.product&&<span className="inline-block text-[8px] text-cyan-300 bg-cyan-500/15 px-1.5 py-0.5 rounded">📦 {r.product}</span>}{r.feature&&<span className="inline-block text-[8px] text-orange-300 bg-orange-500/15 px-1.5 py-0.5 rounded"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">star</span> {r.feature}</span>}{r.price&&<span className="inline-block text-[8px] text-green-300 bg-green-500/15 px-1.5 py-0.5 rounded">💰 {r.price}</span>}</div><p className="text-slate-500 text-[9px]">{r.size}</p></div>
                                             </div>
                                         ))}
                                     </div>
@@ -4465,7 +5950,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                 <h4 className="text-base font-bold text-white mb-1 group-hover:text-amber-400 transition-colors">{cc.label}</h4>
                                                 <p className="text-sm text-slate-500 leading-relaxed mb-3">{cc.description || 'Custom category'}</p>
                                                 <div className="flex items-center gap-2">
-                                                    <span className="text-sm text-amber-500/70 bg-amber-500/[0.08] px-2 py-0.5 rounded">✨ Custom</span>
+                                                    <span className="text-sm text-amber-500/70 bg-amber-500/[0.08] px-2 py-0.5 rounded"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">auto_awesome</span> Custom</span>
                                                     <span className="text-xs text-slate-600 bg-white/[0.03] px-2 py-0.5 rounded">
                                                         {savedTemplates.filter(st => st.category === cc.categoryId).length} templates
                                                     </span>
@@ -4609,7 +6094,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                 </div>
                                                 <h4 className="text-sm font-bold text-white mb-1 group-hover:text-amber-400 transition-colors">{ct.label}</h4>
                                                 <p className="text-sm text-slate-500 leading-relaxed truncate">{ct.description || 'Custom template'}</p>
-                                                <span className="text-sm text-amber-500/70 bg-amber-500/[0.08] px-2 py-0.5 rounded mt-2 inline-block">✨ Custom</span>
+                                                <span className="text-sm text-amber-500/70 bg-amber-500/[0.08] px-2 py-0.5 rounded mt-2 inline-block"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">auto_awesome</span> Custom</span>
                                             </div>
                                         ))}
 
@@ -4760,7 +6245,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                 onChange={e => setNewTmpl(p => ({ ...p, promptFormula: e.target.value }))}
                                                 placeholder={`e.g. Create a ${newTmpl.label || 'festive sale'} post for ${activeBrand?.name || 'brand'}.\nKeep the same layout and design elements as reference.\nOnly change: {{HEADLINE}}, {{DETAILS}}`}
                                                 className="input-glass w-full py-3 text-sm resize-none font-mono" rows={5} />
-                                            <p className="text-xs text-slate-600 mt-1 italic">💡 Use {'{{HEADLINE}}'}, {'{{PRODUCT}}'}, {'{{MESSAGE}}'} as placeholders — only these change, the design stays consistent.</p>
+                                            <p className="text-xs text-slate-600 mt-1 italic flex items-center gap-1"><span className="material-symbols-outlined text-xs">lightbulb</span> Use {'{{HEADLINE}}'}, {'{{PRODUCT}}'}, {'{{MESSAGE}}'} as placeholders — only these change, the design stays consistent.</p>
                                         </div>
 
                                         {/* ═══ Simple / Advanced Mode Toggle ═══ */}
@@ -4802,7 +6287,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                 <div className="space-y-4">
                                                     {/* Layout & Color info (from AI analysis) */}
                                                     {(analyzedMeta.layoutDescription || analyzedMeta.colorPalette.length > 0) && (
-                                                        <div className="p-3 rounded-xl bg-indigo-500/[0.04] border border-indigo-500/10 flex items-center gap-3">
+                                                        <div className="p-3 rounded-xl bg-[#FF4D00]/[0.04] border border-[#FF4D00]/10 flex items-center gap-3">
                                                             {analyzedMeta.colorPalette.length > 0 && (
                                                                 <div className="flex gap-1">
                                                                     {analyzedMeta.colorPalette.map((c, i) => (
@@ -4879,8 +6364,8 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                                     const url = prompt('Enter image URL:')
                                                                     if (url) setNewTmpl(p => ({ ...p, _simpleImage: url }))
                                                                 }}
-                                                                    className="flex flex-col items-center gap-1.5 p-4 rounded-xl border-2 border-dashed border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04] hover:border-blue-500/30 cursor-pointer transition-all text-center">
-                                                                    <span className="material-symbols-outlined text-lg text-blue-500/60">link</span>
+                                                                    className="flex flex-col items-center gap-1.5 p-4 rounded-xl border-2 border-dashed border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04] hover:border-[#FF4D00]/30 cursor-pointer transition-all text-center">
+                                                                    <span className="material-symbols-outlined text-lg text-[#FF4D00]/60">link</span>
                                                                     <span className="text-[10px] text-slate-500 font-medium">URL</span>
                                                                 </button>
                                                             </div>
@@ -4906,7 +6391,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                     </div>
 
                                                     <p className="text-[10px] text-slate-600 italic">
-                                                        💡 Simple mode — set the main text and image. Switch to Advanced for full AI-detected element control.
+                                                        <span className="flex items-center gap-1"><span className="material-symbols-outlined text-xs">lightbulb</span> Simple mode — set the main text and image. Switch to Advanced for full AI-detected element control.</span>
                                                     </p>
                                                 </div>
                                             )}
@@ -4916,7 +6401,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                 <div>
                                                     {/* Layout & Color info */}
                                                     {(analyzedMeta.layoutDescription || analyzedMeta.colorPalette.length > 0) && (
-                                                        <div className="mb-3 p-3 rounded-xl bg-indigo-500/[0.04] border border-indigo-500/10 flex items-center gap-3">
+                                                        <div className="mb-3 p-3 rounded-xl bg-[#FF4D00]/[0.04] border border-[#FF4D00]/10 flex items-center gap-3">
                                                             {analyzedMeta.colorPalette.length > 0 && (
                                                                 <div className="flex gap-1">
                                                                     {analyzedMeta.colorPalette.map((c, i) => (
@@ -4939,11 +6424,11 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                     )}
 
                                                     {(newTmpl.fields || []).map((f, i) => {
-                                                        const typeBadge = { text: '📝', textarea: '📝', image: '🖼️', color: '🎨', select: '📋' }[f.type] || '📝'
+                                                        const typeBadge = { text: 'edit_note', textarea: 'edit_note', image: 'image', color: 'palette', select: 'list' }[f.type] || 'edit_note'
                                                         return (
                                                             <div key={i} className={`mb-2 p-3 rounded-xl border transition-all ${f._detected ? 'border-emerald-500/15 bg-emerald-500/[0.02]' : 'border-white/[0.06] bg-white/[0.02]'}`}>
                                                                 <div className="flex items-center gap-2">
-                                                                    <span className="text-sm" title={f.type}>{typeBadge}</span>
+                                                                    <span className="material-symbols-outlined text-sm" title={f.type}>{typeBadge}</span>
                                                                     <input type="text" value={f.label}
                                                                         onChange={e => {
                                                                             const updated = [...newTmpl.fields]
@@ -5026,7 +6511,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                                                         setNewTmpl(p => ({ ...p, fields: updated }))
                                                                                     }
                                                                                 }}
-                                                                                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white/[0.03] border border-white/[0.06] hover:border-blue-500/30 cursor-pointer transition-all text-[9px] text-slate-500">
+                                                                                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white/[0.03] border border-white/[0.06] hover:border-[#FF4D00]/30 cursor-pointer transition-all text-[9px] text-slate-500">
                                                                                     <span className="material-symbols-outlined text-[11px]">link</span> URL
                                                                                 </button>
                                                                             </div>
@@ -5136,7 +6621,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                             <div>
                                                 <label className="text-xs font-bold text-slate-400 mb-1.5 block">Color</label>
                                                 <div className="flex gap-2 flex-wrap">
-                                                    {['#ef4444', '#f59e0b', '#10b981', '#8b5cf6', '#ec4899', '#0ea5e9', '#f97316', '#14b8a6'].map(c => (
+                                                    {['#ef4444', '#f59e0b', '#10b981', '#FF4D00', '#ec4899', '#0ea5e9', '#f97316', '#14b8a6'].map(c => (
                                                         <button key={c} onClick={() => setNewCat(p => ({ ...p, color: c }))}
                                                             className={`w-8 h-8 rounded-xl border-2 cursor-pointer transition-all ${newCat.color === c ? 'border-white scale-110 shadow-lg' : 'border-transparent hover:scale-105'}`}
                                                             style={{ background: c }} />
@@ -5504,7 +6989,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                     <div className="flex items-center justify-between cursor-pointer"
                                         onClick={() => setTemplateFields(prev => ({ ...prev, _showExtraInstructions: !prev._showExtraInstructions }))}>
                                         <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                                            <span className="material-symbols-outlined text-fuchsia-400 text-sm">magic_exchange</span>
+                                            <span className="material-symbols-outlined text-[#FF4D00] text-sm">magic_exchange</span>
                                             Additional Changes
                                             <span className="text-xs text-slate-600 bg-white/[0.04] px-1.5 py-0.5 rounded">Optional</span>
                                         </h4>
@@ -5520,24 +7005,24 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                             {/* Smart suggestion chips */}
                                             <div className="flex flex-wrap gap-1.5">
                                                 {[
-                                                    { label: '👨 Make model male', value: 'Change the model to a male with similar pose and expression' },
-                                                    { label: '👩 Make model female', value: 'Change the model to a female with similar pose and expression' },
-                                                    { label: '👔 Formal outfit', value: 'Change outfit to a formal business suit' },
-                                                    { label: '👕 Casual outfit', value: 'Change outfit to casual streetwear' },
-                                                    { label: '🌿 Outdoor background', value: 'Change background to an outdoor natural environment' },
-                                                    { label: '🏢 Studio background', value: 'Change background to a clean studio environment' },
-                                                    { label: '🌙 Dark theme', value: 'Make the overall design darker with a premium dark theme' },
-                                                    { label: '☀️ Light theme', value: 'Make the overall design lighter with a clean light theme' },
-                                                    { label: '🇮🇳 Indian model', value: 'Change the model to an Indian person with similar pose' },
-                                                    { label: '😊 Smiling pose', value: 'Change the expression to a warm natural smile' },
+                                                    { label: 'Make model male', value: 'Change the model to a male with similar pose and expression', ms: 'face_6' },
+                                                    { label: 'Make model female', value: 'Change the model to a female with similar pose and expression', ms: 'face_3' },
+                                                    { label: 'Formal outfit', value: 'Change outfit to a formal business suit', ms: 'checkroom' },
+                                                    { label: 'Casual outfit', value: 'Change outfit to casual streetwear', ms: 'styler' },
+                                                    { label: 'Outdoor background', value: 'Change background to an outdoor natural environment', ms: 'park' },
+                                                    { label: 'Studio background', value: 'Change background to a clean studio environment', ms: 'domain' },
+                                                    { label: 'Dark theme', value: 'Make the overall design darker with a premium dark theme', ms: 'dark_mode' },
+                                                    { label: 'Light theme', value: 'Make the overall design lighter with a clean light theme', ms: 'light_mode' },
+                                                    { label: 'Indian model', value: 'Change the model to an Indian person with similar pose', ms: 'person' },
+                                                    { label: 'Smiling pose', value: 'Change the expression to a warm natural smile', ms: 'sentiment_satisfied' },
                                                 ].map((chip, i) => (
                                                     <button key={i} onClick={() => {
                                                         const current = templateFields._additionalInstructions || ''
                                                         const sep = current ? '. ' : ''
                                                         setTemplateFields(prev => ({ ...prev, _additionalInstructions: current + sep + chip.value }))
                                                     }}
-                                                        className="px-2.5 py-1 rounded-lg text-[10px] font-medium bg-white/[0.03] border border-white/[0.06] text-slate-400 hover:bg-fuchsia-500/10 hover:border-fuchsia-500/20 hover:text-fuchsia-300 cursor-pointer transition-all">
-                                                        {chip.label}
+                                                        className="px-2.5 py-1 rounded-lg text-[10px] font-medium bg-white/[0.03] border border-white/[0.06] text-slate-400 hover:bg-[#FF4D00]/10 hover:border-[#FF4D00]/20 hover:text-[#FF7A00] cursor-pointer transition-all flex items-center gap-1">
+                                                        <span className="material-symbols-outlined text-[10px]">{chip.ms}</span>{chip.label}
                                                     </button>
                                                 ))}
                                             </div>
@@ -5575,7 +7060,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                             <span className={`material-symbols-outlined text-sm ${enhancing ? 'animate-spin' : ''}`}>
                                                                 {enhancing ? 'progress_activity' : 'auto_awesome'}
                                                             </span>
-                                                            {enhancing ? 'Enhancing...' : '✨ Enhance'}
+                                                            {enhancing ? 'Enhancing...' : 'Enhance'}
                                                         </button>
                                                     </CreditTooltipWrapper>
                                                     <span className="text-xs text-emerald-400 flex items-center gap-1">
@@ -5681,7 +7166,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                 sessionStorage.setItem('canvasEditorImage', templateResult.imageUrl)
                                                 navigate('/ai-canvas')
                                             }}
-                                                className="py-2.5 px-5 rounded-xl text-xs font-bold bg-violet-500/10 text-violet-400 hover:bg-violet-500/20 cursor-pointer">
+                                                className="py-2.5 px-5 rounded-xl text-xs font-bold bg-[#FF4D00]/10 text-[#FF4D00] hover:bg-[#FF4D00]/20 cursor-pointer">
                                                 <span className="material-symbols-outlined text-sm">edit</span>
                                                 Open in Canvas
                                             </button>
@@ -5800,7 +7285,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                         </div>
                                     ))}
                                 </div>
-                                <p className="text-xs text-slate-600 mt-3 italic">💡 These images can be used as reference for templates, AI photoshoots, and creative generation.</p>
+                                <p className="text-xs text-slate-600 mt-3 italic flex items-center gap-1"><span className="material-symbols-outlined text-xs">lightbulb</span> These images can be used as reference for templates, AI photoshoots, and creative generation.</p>
                             </div>
                         ) : (
                             <div className="studio-card p-12 text-center">
@@ -5909,7 +7394,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                     <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${isPhotoshoot ? 'bg-amber-500/15 text-amber-400' :
                                                         isUploaded ? 'bg-slate-500/15 text-slate-400' :
                                                             'bg-primary/15 text-primary'}`}>
-                                                        {isPhotoshoot ? '📸 Photoshoot' : isUploaded ? '📁 Uploaded' : '🎨 Design'}
+                                                        <span className="flex items-center gap-0.5">{isPhotoshoot ? <><span className="material-symbols-outlined text-[10px]">photo_camera</span> Photoshoot</> : isUploaded ? <><span className="material-symbols-outlined text-[10px]">upload_file</span> Uploaded</> : <><span className="material-symbols-outlined text-[10px]">palette</span> Design</>}</span>
                                                     </span>
                                                     {img.designData?.style && (
                                                         <span className="text-[10px] text-slate-600">{img.designData.style}</span>
@@ -5929,7 +7414,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                 )}
                                                 {img.prompt && (
                                                     <button onClick={(e) => { e.stopPropagation(); handleCopyImagePrompt(img.prompt, img._id) }}
-                                                        className={`p-1.5 rounded-lg transition-all cursor-pointer ${bankCopiedId === img._id ? 'text-emerald-400 bg-emerald-500/10' : 'text-slate-500 hover:text-blue-400 hover:bg-blue-500/10'}`}
+                                                        className={`p-1.5 rounded-lg transition-all cursor-pointer ${bankCopiedId === img._id ? 'text-emerald-400 bg-emerald-500/10' : 'text-slate-500 hover:text-[#FF4D00] hover:bg-[#FF4D00]/10'}`}
                                                         title={bankCopiedId === img._id ? 'Copied!' : 'Copy prompt'}>
                                                         <span className="material-symbols-outlined text-base">{bankCopiedId === img._id ? 'check' : 'content_copy'}</span>
                                                     </button>
@@ -5944,7 +7429,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                     sessionStorage.setItem('canvasEditorImage', img.imageUrl);
                                                     navigate('/ai-canvas')
                                                 }}
-                                                    className="p-1.5 rounded-lg text-slate-500 hover:text-violet-400 hover:bg-violet-500/10 transition-all cursor-pointer"
+                                                    className="p-1.5 rounded-lg text-slate-500 hover:text-[#FF4D00] hover:bg-[#FF4D00]/10 transition-all cursor-pointer"
                                                     title="Edit in Canvas">
                                                     <span className="material-symbols-outlined text-base">edit</span>
                                                 </button>
@@ -5998,7 +7483,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                                 <span className="material-symbols-outlined text-xs">replay</span>
                                                             </button>
                                                             <button onClick={(e) => { e.stopPropagation(); handleCopyImagePrompt(img.prompt, img._id) }}
-                                                                className={`p-1.5 rounded-lg transition-all cursor-pointer ${bankCopiedId === img._id ? 'bg-emerald-500/20 text-emerald-400' : 'bg-blue-500/20 text-blue-400 hover:bg-blue-500/30'}`}
+                                                                className={`p-1.5 rounded-lg transition-all cursor-pointer ${bankCopiedId === img._id ? 'bg-emerald-500/20 text-emerald-400' : 'bg-[#FF4D00]/20 text-[#FF4D00] hover:bg-[#FF4D00]/30'}`}
                                                                 title={bankCopiedId === img._id ? 'Copied!' : 'Copy prompt'}>
                                                                 <span className="material-symbols-outlined text-xs">{bankCopiedId === img._id ? 'check' : 'content_copy'}</span>
                                                             </button>
@@ -6009,7 +7494,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                         <span className="material-symbols-outlined text-xs">download</span>
                                                     </button>
                                                     <button onClick={(e) => { e.stopPropagation(); sessionStorage.setItem('canvasEditorImage', img.imageUrl); navigate('/ai-canvas') }}
-                                                        className="p-1.5 rounded-lg bg-violet-500/20 text-violet-400 hover:bg-violet-500/30 transition-all cursor-pointer" title="Edit">
+                                                        className="p-1.5 rounded-lg bg-[#FF4D00]/20 text-[#FF4D00] hover:bg-[#FF4D00]/30 transition-all cursor-pointer" title="Edit">
                                                         <span className="material-symbols-outlined text-xs">edit</span>
                                                     </button>
                                                     <button onClick={async (e) => {
@@ -6027,7 +7512,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                             {/* Source badge */}
                                             <div className="absolute top-2 left-2">
                                                 <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full backdrop-blur-sm ${isPhotoshoot ? 'bg-amber-500/30 text-amber-300' : isUploaded ? 'bg-slate-500/30 text-slate-300' : 'bg-primary/30 text-primary-light'}`}>
-                                                    {isPhotoshoot ? '📸' : isUploaded ? '📁' : '🎨'}
+                                                    <span className="material-symbols-outlined" style={{fontSize:'9px'}}>{isPhotoshoot ? 'photo_camera' : isUploaded ? 'upload_file' : 'palette'}</span>
                                                 </span>
                                             </div>
                                             {/* Time badge */}
@@ -6096,7 +7581,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                             <div>
                                                 <p className="text-white font-bold text-sm">{img.title || 'AI Generated Image'}</p>
                                                 <p className="text-slate-400 text-[11px]">
-                                                    {img.type === 'ai-photoshoot' ? '📸 AI Photoshoot' : '🎨 Design Studio'} •{' '}
+                                                    <span className="flex items-center gap-1">{img.type === 'ai-photoshoot' ? <><span className="material-symbols-outlined text-[11px]">photo_camera</span>AI Photoshoot</> : <><span className="material-symbols-outlined text-[11px]">palette</span>Design Studio</>}</span> •{' '}
                                                     {new Date(img.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                                                 </p>
                                             </div>
@@ -6117,7 +7602,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                 setLightboxIdx(null)
                                                 navigate('/ai-canvas')
                                             }}
-                                                className="py-2.5 px-4 rounded-xl text-xs font-bold bg-violet-500/15 text-violet-400 hover:bg-violet-500/25 flex items-center gap-2 cursor-pointer transition-colors">
+                                                className="py-2.5 px-4 rounded-xl text-xs font-bold bg-[#FF4D00]/15 text-[#FF4D00] hover:bg-[#FF4D00]/25 flex items-center gap-2 cursor-pointer transition-colors">
                                                 <span className="material-symbols-outlined text-sm">edit</span>
                                                 Open in Canvas
                                             </button>
@@ -6176,7 +7661,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                     {upscalingState ? <span className="material-symbols-outlined text-lg animate-spin">progress_activity</span> : <span className="material-symbols-outlined text-lg">high_quality</span>}
                                 </button>
                                 {upscaleMenu && upscaleMenu.url === zoomImage && (
-                                    <div ref={upscaleMenuRef} className="absolute top-full mt-2 right-0 bg-slate-800/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl p-1.5 min-w-[200px] z-50">
+                                    <div ref={upscaleMenuRef} className="absolute top-full mt-2 right-0 bg-[#121217]/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl p-1.5 min-w-[200px] z-50">
                                         <div className="text-[10px] text-slate-500 px-2 pt-1 pb-1.5 font-semibold uppercase tracking-wider">Download Quality</div>
                                         <button onClick={() => handleDownloadWithUpscale(upscaleMenu.url, upscaleMenu.filename, '1k')}
                                             className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm text-slate-300 hover:bg-white/[0.08] hover:text-white transition-all cursor-pointer">
@@ -6237,8 +7722,8 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                         {/* Header */}
                         <div className="flex items-center justify-between p-5 border-b border-white/[0.06]">
                             <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-xl bg-purple-500/15 flex items-center justify-center">
-                                    <span className="material-symbols-outlined text-purple-400">animation</span>
+                                <div className="w-10 h-10 rounded-xl bg-[#FF4D00]/15 flex items-center justify-center">
+                                    <span className="material-symbols-outlined text-[#FF4D00]">animation</span>
                                 </div>
                                 <div>
                                     <h3 className="text-sm font-bold text-white">Animate Image</h3>
@@ -6265,9 +7750,9 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                             <div>
                                 <label className="text-xs font-bold text-slate-400 mb-1.5 block">Animation Prompt</label>
                                 {animateAnalyzing ? (
-                                    <div className="flex items-center gap-2 p-3 rounded-xl bg-purple-500/10 border border-purple-500/20">
-                                        <div className="w-4 h-4 border-2 border-purple-400 border-t-transparent rounded-full" style={{ animation: 'spin 0.8s linear infinite' }} />
-                                        <span className="text-xs text-purple-400">AI analyzing image for motion...</span>
+                                    <div className="flex items-center gap-2 p-3 rounded-xl bg-[#FF4D00]/10 border border-[#FF4D00]/20">
+                                        <div className="w-4 h-4 border-2 border-[#FF4D00] border-t-transparent rounded-full" style={{ animation: 'spin 0.8s linear infinite' }} />
+                                        <span className="text-xs text-[#FF4D00]">AI analyzing image for motion...</span>
                                     </div>
                                 ) : (
                                     <textarea value={animatePrompt} onChange={e => setAnimatePrompt(e.target.value)}
@@ -6284,7 +7769,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                         <button key={id} onClick={() => setAnimateModel(id)}
                                             className={`p-2.5 rounded-xl text-left text-xs transition-all cursor-pointer border ${
                                                 animateModel === id
-                                                    ? 'bg-purple-500/15 border-purple-500/30 text-white'
+                                                    ? 'bg-[#FF4D00]/15 border-[#FF4D00]/30 text-white'
                                                     : 'bg-white/[0.03] border-white/[0.06] text-slate-400 hover:border-white/[0.12]'
                                             }`}>
                                             <span className="text-sm mr-1">{m.icon}</span>
@@ -6331,11 +7816,11 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                             {animateGenerating && (
                                 <div className="space-y-2">
                                     <div className="flex items-center justify-between text-xs">
-                                        <span className="text-purple-400 font-bold">Generating animation...</span>
+                                        <span className="text-[#FF4D00] font-bold">Generating animation...</span>
                                         <span className="text-slate-500">{animateProgress}%</span>
                                     </div>
                                     <div className="progress-bar">
-                                        <div className="progress-bar-fill" style={{ width: `${animateProgress}%`, background: 'linear-gradient(90deg, #8b5cf6, #a78bfa)' }} />
+                                        <div className="progress-bar-fill" style={{ width: `${animateProgress}%`, background: 'linear-gradient(90deg, #FF4D00, #a78bfa)' }} />
                                     </div>
                                 </div>
                             )}
@@ -6364,7 +7849,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                     className={`w-full py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 cursor-pointer transition-all ${
                                         animateGenerating || animateAnalyzing || !animatePrompt.trim()
                                             ? 'bg-white/[0.06] text-slate-600 cursor-not-allowed'
-                                            : 'bg-gradient-to-r from-purple-500 to-violet-500 text-white hover:from-purple-400 hover:to-violet-400 shadow-lg shadow-purple-500/20'
+                                            : 'bg-gradient-to-r from-[#FF4D00] to-[#FF7A00] text-white hover:from-[#FF4D00] hover:to-[#FF7A00] shadow-lg shadow-[#FF4D00]/20'
                                     }`}>
                                     {animateGenerating ? (
                                         <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full" style={{ animation: 'spin 0.8s linear infinite' }} /> Generating...</>
@@ -6383,7 +7868,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
             {refPickerSlot && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm animate-fade-in"
                     onClick={() => setRefPickerSlot(null)}>
-                    <div className="bg-[#1a1a2e] rounded-2xl shadow-2xl overflow-hidden animate-scale-in flex flex-col md:flex-row"
+                    <div className="bg-[#1A1A26] rounded-2xl shadow-2xl overflow-hidden animate-scale-in flex flex-col md:flex-row"
                         style={{ width: '720px', maxWidth: '92vw', height: '520px', maxHeight: '85vh' }}
                         onClick={e => e.stopPropagation()}>
 
@@ -6674,15 +8159,15 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
 
             {/* ====================== VIRTUAL TRY-ON MODE ====================== */}
             {studioMode === 'tryon' && (
-                <div className="max-w-5xl mx-auto fade-up">
+                <div className="max-w-5xl mx-auto fade-up pt-6">
                     {/* Hero Header */}
-                    <div className="glow-border rounded-2xl p-6 mb-6 relative overflow-hidden" style={{ background: 'linear-gradient(135deg, rgba(236,72,153,0.06), rgba(139,92,246,0.04), rgba(6,182,212,0.03))' }}>
-                        <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(circle at 80% 20%, rgba(236,72,153,0.08) 0%, transparent 50%), radial-gradient(circle at 20% 80%, rgba(139,92,246,0.06) 0%, transparent 50%)' }} />
+                    <div className="glow-border rounded-2xl p-6 mb-6 relative overflow-hidden" style={{ background: 'linear-gradient(135deg, rgba(236,72,153,0.06), rgba(255, 77, 0,0.04), rgba(6,182,212,0.03))' }}>
+                        <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(circle at 80% 20%, rgba(236,72,153,0.08) 0%, transparent 50%), radial-gradient(circle at 20% 80%, rgba(255, 77, 0,0.06) 0%, transparent 50%)' }} />
                         <div className="relative">
                             <h2 className="text-xl font-bold text-white flex items-center gap-3 mb-1">
-                                <span className="material-symbols-outlined text-2xl text-pink-400">checkroom</span>
+                                <span className="material-symbols-outlined text-2xl text-[#FF7A00]">checkroom</span>
                                 Virtual Try-On
-                                <span className="text-xs font-medium bg-pink-500/20 text-pink-300 px-2 py-0.5 rounded-full">AI Powered</span>
+                                <span className="text-xs font-medium bg-[#FF4D00]/20 text-[#FF7A00] px-2 py-0.5 rounded-full">AI Powered</span>
                             </h2>
                             <p className="text-sm text-slate-400">Upload a person photo + clothing item — see them wearing it instantly</p>
                         </div>
@@ -6694,12 +8179,12 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                             {/* Person Photo Upload */}
                             <div className="studio-card p-5">
                                 <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3">
-                                    <span className="material-symbols-outlined text-pink-400 text-lg">person</span>
+                                    <span className="material-symbols-outlined text-[#FF7A00] text-lg">person</span>
                                     Person Photo
                                 </h3>
                                 {!vtoPersonImage ? (
-                                    <label className="flex flex-col items-center justify-center h-40 rounded-xl border-2 border-dashed border-white/10 hover:border-pink-400/30 bg-white/[0.02] cursor-pointer transition-all group">
-                                        <span className="material-symbols-outlined text-3xl text-slate-600 group-hover:text-pink-400 transition-colors mb-2">add_a_photo</span>
+                                    <label className="flex flex-col items-center justify-center h-40 rounded-xl border-2 border-dashed border-white/10 hover:border-[#FF4D00]/30 bg-white/[0.02] cursor-pointer transition-all group">
+                                        <span className="material-symbols-outlined text-3xl text-slate-600 group-hover:text-[#FF7A00] transition-colors mb-2">add_a_photo</span>
                                         <span className="text-sm text-slate-500 group-hover:text-slate-300">Upload person photo</span>
                                         <span className="text-xs text-slate-600 mt-1">Full body or half body</span>
                                         <input type="file" accept="image/*" className="hidden" onChange={(e) => {
@@ -6725,12 +8210,12 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                             {/* Garment Upload */}
                             <div className="studio-card p-5">
                                 <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3">
-                                    <span className="material-symbols-outlined text-violet-400 text-lg">checkroom</span>
+                                    <span className="material-symbols-outlined text-[#FF4D00] text-lg">checkroom</span>
                                     Clothing / Garment
                                 </h3>
                                 {!vtoGarmentImage ? (
-                                    <label className="flex flex-col items-center justify-center h-40 rounded-xl border-2 border-dashed border-white/10 hover:border-violet-400/30 bg-white/[0.02] cursor-pointer transition-all group">
-                                        <span className="material-symbols-outlined text-3xl text-slate-600 group-hover:text-violet-400 transition-colors mb-2">upload</span>
+                                    <label className="flex flex-col items-center justify-center h-40 rounded-xl border-2 border-dashed border-white/10 hover:border-[#FF4D00]/30 bg-white/[0.02] cursor-pointer transition-all group">
+                                        <span className="material-symbols-outlined text-3xl text-slate-600 group-hover:text-[#FF4D00] transition-colors mb-2">upload</span>
                                         <span className="text-sm text-slate-500 group-hover:text-slate-300">Upload clothing item</span>
                                         <span className="text-xs text-slate-600 mt-1">T-shirt, dress, jacket, etc.</span>
                                         <input type="file" accept="image/*" className="hidden" onChange={(e) => {
@@ -6800,7 +8285,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                 finally { setVtoLoading(false) }
                                             }}
                                             className={`p-2 rounded-xl border text-left transition-all cursor-pointer flex items-center gap-2
-                                                border-white/[0.06] bg-white/[0.02] text-slate-400 hover:border-pink-400/30 hover:text-slate-200
+                                                border-white/[0.06] bg-white/[0.02] text-slate-400 hover:border-[#FF4D00]/30 hover:text-slate-200
                                                 disabled:opacity-40 disabled:cursor-not-allowed`}>
                                             <span className="material-symbols-outlined text-base">{m.icon}</span>
                                             <div>
@@ -6841,7 +8326,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                         finally { setVtoLoading(false) }
                                     }}
                                     className="w-full py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2
-                                        bg-gradient-to-r from-pink-500 to-violet-500 hover:from-pink-400 hover:to-violet-400 text-white
+                                        bg-gradient-to-r from-[#FF4D00] to-[#FF7A00] hover:from-[#FF4D00] hover:to-[#FF7A00] text-white
                                         disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer">
                                     {vtoLoading ? (
                                         <><span className="material-symbols-outlined animate-spin text-lg">progress_activity</span> Generating Preview...</>
@@ -6893,7 +8378,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                             }
                                         }}
                                         className="w-full py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2
-                                            bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white
+                                            bg-gradient-to-r from-[#FF4D00] to-[#FF7A00] hover:from-[#FF4D00] hover:to-[#FF7A00] text-white
                                             disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer">
                                         {vtoHdLoading ? (
                                             <><span className="material-symbols-outlined animate-spin text-lg">progress_activity</span> Rendering HD... ~30s</>
@@ -6921,8 +8406,8 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                 <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-4">
                                     <span className="material-symbols-outlined text-cyan-400 text-lg">image</span>
                                     Try-On Result
-                                    {vtoHdResult && <span className="text-xs font-medium bg-violet-500/20 text-violet-300 px-2 py-0.5 rounded-full">HD</span>}
-                                    {vtoPreviewResult && !vtoHdResult && <span className="text-xs font-medium bg-pink-500/20 text-pink-300 px-2 py-0.5 rounded-full">Preview</span>}
+                                    {vtoHdResult && <span className="text-xs font-medium bg-[#FF4D00]/20 text-[#FF7A00] px-2 py-0.5 rounded-full">HD</span>}
+                                    {vtoPreviewResult && !vtoHdResult && <span className="text-xs font-medium bg-[#FF4D00]/20 text-[#FF7A00] px-2 py-0.5 rounded-full">Preview</span>}
                                 </h3>
                                 {(vtoHdResult || vtoPreviewResult) ? (
                                     <div className="flex-1 flex flex-col">
@@ -6942,8 +8427,8 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                     </div>
                                 ) : (
                                     <div className="flex-1 flex flex-col items-center justify-center text-center py-12">
-                                        <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-pink-500/10 to-violet-500/10 flex items-center justify-center mb-4">
-                                            <span className="material-symbols-outlined text-4xl text-pink-400/40">checkroom</span>
+                                        <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-[#FF4D00]/10 to-[#FF7A00]/10 flex items-center justify-center mb-4">
+                                            <span className="material-symbols-outlined text-4xl text-[#FF7A00]/40">checkroom</span>
                                         </div>
                                         <p className="text-slate-400 text-sm font-medium mb-1">No result yet</p>
                                         <p className="text-slate-600 text-xs">Upload a person photo and clothing item, then generate</p>
@@ -6957,10 +8442,10 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
 
             {/* ====================== LIFESTYLE MOCKUPS MODE ====================== */}
             {studioMode === 'mockups' && (
-                <div className="max-w-5xl mx-auto fade-up">
+                <div className="max-w-5xl mx-auto fade-up pt-6">
                     {/* Hero Header */}
-                    <div className="glow-border rounded-2xl p-6 mb-6 relative overflow-hidden" style={{ background: 'linear-gradient(135deg, rgba(6,182,212,0.06), rgba(59,130,246,0.04), rgba(139,92,246,0.03))' }}>
-                        <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(circle at 80% 20%, rgba(6,182,212,0.08) 0%, transparent 50%), radial-gradient(circle at 20% 80%, rgba(59,130,246,0.06) 0%, transparent 50%)' }} />
+                    <div className="glow-border rounded-2xl p-6 mb-6 relative overflow-hidden" style={{ background: 'linear-gradient(135deg, rgba(6,182,212,0.06), rgba(255, 77, 0,0.04), rgba(255, 77, 0,0.03))' }}>
+                        <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(circle at 80% 20%, rgba(6,182,212,0.08) 0%, transparent 50%), radial-gradient(circle at 20% 80%, rgba(255, 77, 0,0.06) 0%, transparent 50%)' }} />
                         <div className="relative">
                             <h2 className="text-xl font-bold text-white flex items-center gap-3 mb-2">
                                 <span className="material-symbols-outlined text-2xl text-cyan-400">landscape</span>
@@ -7031,14 +8516,14 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                             {/* Reference Scene Template */}
                             <div className="studio-card p-5">
                                 <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3">
-                                    <span className="material-symbols-outlined text-violet-400 text-lg">photo_library</span>
+                                    <span className="material-symbols-outlined text-[#FF4D00] text-lg">photo_library</span>
                                     Reference Scene
-                                    <span className="text-[10px] font-medium bg-violet-500/20 text-violet-300 px-1.5 py-0.5 rounded-full ml-auto">Optional</span>
+                                    <span className="text-[10px] font-medium bg-[#FF4D00]/20 text-[#FF7A00] px-1.5 py-0.5 rounded-full ml-auto">Optional</span>
                                 </h3>
                                 <p className="text-xs text-slate-500 mb-3 leading-relaxed">Upload a reference scene image — the product will be placed into this exact setting</p>
                                 {!mockupTemplateImage ? (
-                                    <label className="flex flex-col items-center justify-center h-28 rounded-xl border-2 border-dashed border-white/10 hover:border-violet-400/30 bg-white/[0.02] cursor-pointer transition-all group">
-                                        <span className="material-symbols-outlined text-2xl text-slate-600 group-hover:text-violet-400 transition-colors mb-1">add_photo_alternate</span>
+                                    <label className="flex flex-col items-center justify-center h-28 rounded-xl border-2 border-dashed border-white/10 hover:border-[#FF4D00]/30 bg-white/[0.02] cursor-pointer transition-all group">
+                                        <span className="material-symbols-outlined text-2xl text-slate-600 group-hover:text-[#FF4D00] transition-colors mb-1">add_photo_alternate</span>
                                         <span className="text-xs text-slate-500 group-hover:text-slate-300">Upload scene template</span>
                                         <span className="text-[10px] text-slate-600 mt-0.5">e.g. a lifestyle photo, store shelf, ad layout</span>
                                         <input type="file" accept="image/*" className="hidden" onChange={(e) => {
@@ -7058,7 +8543,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                             className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
                                             <span className="material-symbols-outlined text-sm">close</span>
                                         </button>
-                                        <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded bg-violet-500/80 text-white text-[10px] font-bold">Template Active</div>
+                                        <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded bg-[#FF4D00]/80 text-white text-[10px] font-bold">Template Active</div>
                                     </div>
                                 )}
                             </div>
@@ -7349,7 +8834,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                             {/* Aspect Ratio */}
                             <div className="studio-card p-5">
                                 <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3">
-                                    <span className="material-symbols-outlined text-blue-400 text-lg">aspect_ratio</span>
+                                    <span className="material-symbols-outlined text-[#FF4D00] text-lg">aspect_ratio</span>
                                     Aspect Ratio
                                 </h3>
                                 <div className="flex flex-wrap gap-2">
@@ -7358,7 +8843,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                             onClick={() => setMockupAspectRatio(r)}
                                             className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
                                                 mockupAspectRatio === r
-                                                    ? 'bg-blue-500/20 text-blue-300 border border-blue-400/30'
+                                                    ? 'bg-[#FF4D00]/20 text-[#FF7A00] border border-[#FF4D00]/30'
                                                     : 'bg-white/[0.04] text-slate-400 border border-white/[0.06] hover:text-slate-200'
                                             }`}>{r}</button>
                                     ))}
@@ -7395,7 +8880,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                     finally { setMockupLoading(false) }
                                 }}
                                 className="w-full py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2
-                                    bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white
+                                    bg-gradient-to-r from-cyan-500 to-[#FF7A00] hover:from-cyan-400 hover:to-[#FF7A00] text-white
                                     disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer">
                                 {mockupLoading ? (
                                     <><span className="material-symbols-outlined animate-spin text-lg">progress_activity</span> Generating Mockup...</>
@@ -7440,7 +8925,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                     </div>
                                 ) : (
                                     <div className="flex-1 flex flex-col items-center justify-center text-center py-12">
-                                        <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-cyan-500/10 to-blue-500/10 flex items-center justify-center mb-4">
+                                        <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-cyan-500/10 to-[#FF7A00]/10 flex items-center justify-center mb-4">
                                             <span className="material-symbols-outlined text-4xl text-cyan-400/40">landscape</span>
                                         </div>
                                         <p className="text-slate-400 text-sm font-medium mb-1">No mockup yet</p>
@@ -7615,12 +9100,12 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                             {/* Style Reference (optional) */}
                             <div className="studio-card p-5">
                                 <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3">
-                                    <span className="material-symbols-outlined text-violet-400 text-lg">style</span>
+                                    <span className="material-symbols-outlined text-[#FF4D00] text-lg">style</span>
                                     Style Reference <span className="text-xs text-slate-600 font-normal">(optional)</span>
                                 </h3>
                                 {!logoStyleRef ? (
-                                    <label className="flex flex-col items-center justify-center h-24 rounded-xl border-2 border-dashed border-white/10 hover:border-violet-400/30 bg-white/[0.02] cursor-pointer transition-all group">
-                                        <span className="material-symbols-outlined text-2xl text-slate-600 group-hover:text-violet-400 transition-colors mb-1">add_photo_alternate</span>
+                                    <label className="flex flex-col items-center justify-center h-24 rounded-xl border-2 border-dashed border-white/10 hover:border-[#FF4D00]/30 bg-white/[0.02] cursor-pointer transition-all group">
+                                        <span className="material-symbols-outlined text-2xl text-slate-600 group-hover:text-[#FF4D00] transition-colors mb-1">add_photo_alternate</span>
                                         <span className="text-xs text-slate-500 group-hover:text-slate-300">Upload a reference mockup style</span>
                                         <input type="file" accept="image/*" className="hidden" onChange={(e) => {
                                             const file = e.target.files?.[0]
@@ -7665,7 +9150,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                             {/* Aspect Ratio */}
                             <div className="studio-card p-5">
                                 <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3">
-                                    <span className="material-symbols-outlined text-blue-400 text-lg">aspect_ratio</span>
+                                    <span className="material-symbols-outlined text-[#FF4D00] text-lg">aspect_ratio</span>
                                     Aspect Ratio
                                 </h3>
                                 <div className="flex flex-wrap gap-2">
@@ -7673,7 +9158,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                         <button key={r} onClick={() => setLogoAspectRatio(r)}
                                             className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
                                                 logoAspectRatio === r
-                                                    ? 'bg-blue-500/20 text-blue-300 border border-blue-400/30'
+                                                    ? 'bg-[#FF4D00]/20 text-[#FF7A00] border border-[#FF4D00]/30'
                                                     : 'bg-white/[0.04] text-slate-400 border border-white/[0.06] hover:text-slate-200'
                                             }`}>{r}</button>
                                     ))}

@@ -435,7 +435,7 @@ function SeoStudioInner({ activeBrand, activeSection, setActiveSection }) {
         if (type === 'health-check') {
             body += `<div class="scores">`
             const td = data.trendDelta || {}
-            ;[['SEO Health', data.seoHealthScore, '🏥', td.scoreChange], ['AI Visibility', data.aiVisibilityScore, '🤖', null], ['Technical', data.technicalScore, '⚙️', td.technicalChange], ['Content', data.contentScore, '📝', td.contentChange], ['Authority', data.authorityScore, '🏛️', td.authorityChange]].forEach(([l, s, icon, delta]) => {
+            ;[['SEO Health', data.seoHealthScore, '🏥', td.scoreChange], ['AI Visibility', data.aiVisibilityScore, 'smart_toy', null], ['Technical', data.technicalScore, '', td.technicalChange], ['Content', data.contentScore, '📝', td.contentChange], ['Authority', data.authorityScore, '🏛️', td.authorityChange]].forEach(([l, s, icon, delta]) => {
                 if (s !== undefined) {
                     const c = scoreColor(s)
                     const trendArrow = delta ? (delta > 0 ? `<span class="trend-up">▲${Math.abs(delta)}</span>` : delta < 0 ? `<span class="trend-down">▼${Math.abs(delta)}</span>` : '') : ''
@@ -453,7 +453,7 @@ function SeoStudioInner({ activeBrand, activeSection, setActiveSection }) {
             // Strategic Brief
             if (data.strategicBrief) {
                 body += `<div class="strategic-brief">
-                    <div class="brief-header"><span class="brief-icon">📊</span> Strategic Brief</div>
+                    <div class="brief-header"><span class="brief-icon"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">bar_chart</span></span> Strategic Brief</div>
                     <p>${data.strategicBrief}</p>
                 </div>`
             }
@@ -467,30 +467,30 @@ function SeoStudioInner({ activeBrand, activeSection, setActiveSection }) {
                     ['Avg Response', `${stats.responseTimeAvg || 0}ms`, '⏱️'],
                     ['Avg Page Size', `${stats.pageSizeAvg || 0}KB`, '📦'],
                     ['Thin Pages', stats.thinPageCount || 0, '📃'],
-                    ['Orphan Pages', stats.orphanPageCount || 0, '🔗'],
+                    ['Orphan Pages', stats.orphanPageCount || 0, 'link'],
                     ['Security', stats.securityHeaderScore || '0/7', '🔒'],
                     ['Avg Words', stats.avgWordCount || 0, '📝'],
                     ['Mixed Content', stats.mixedContentCount || 0, '⚠️'],
                     ['Redirect Chains', stats.redirectChainCount || 0, '🔀'],
                     ['Duplicates', stats.duplicateContentCount || 0, '📋'],
                     ['Noindex', stats.noindexPageCount || 0, '🚫'],
-                    ['Long URLs', stats.urlTooLongCount || 0, '🔗'],
+                    ['Long URLs', stats.urlTooLongCount || 0, 'link'],
                     ['Broken External', stats.brokenExternalCount || 0, '💔'],
                     ['Empty Anchors', stats.emptyAnchorCount || 0, '⚓'],
                     ['Nofollow Internal', stats.nofollowInternalCount || 0, '🔇'],
                     ['Canon. Conflicts', stats.conflictingCanonicalCount || 0, '⚡'],
                     ['Browser Cache', stats.cacheControlPresent ? '✅ Yes' : '❌ No', '💾'],
-                    ['llms.txt', stats.llmsTxtFound ? '✅ Found' : '❌ Missing', '🤖'],
+                    ['llms.txt', stats.llmsTxtFound ? '✅ Found' : '❌ Missing', 'smart_toy'],
                     // Moz Domain Authority
                     ...(stats.mozAvailable ? [
                         ['Domain Auth.', stats.domainAuthority || 0, '🏛️'],
                         ['Page Auth.', stats.pageAuthority || 0, '📄'],
-                        ['Spam Score', `${stats.spamScore || 0}%`, '🛡️'],
+                        ['Spam Score', `${stats.spamScore || 0}%`, ''],
                     ] : []),
                     // DataForSEO Backlinks
                     ...(stats.backlinkDataAvailable ? [
-                        ['Total Backlinks', (stats.totalBacklinks || 0).toLocaleString(), '🔗'],
-                        ['Referring Domains', (stats.referringDomains || 0).toLocaleString(), '🌐'],
+                        ['Total Backlinks', (stats.totalBacklinks || 0).toLocaleString(), 'link'],
+                        ['Referring Domains', (stats.referringDomains || 0).toLocaleString(), 'language'],
                     ] : []),
                 ].forEach(([l, v, icon]) => {
                     const isAlert = (typeof v === 'number' && v > 0 && ['Thin Pages', 'Orphan Pages', 'Mixed Content', 'Duplicates', 'Broken External', 'Empty Anchors', 'Long URLs', 'Canon. Conflicts', 'Nofollow Internal'].includes(l))
@@ -527,7 +527,7 @@ function SeoStudioInner({ activeBrand, activeSection, setActiveSection }) {
             if (stats.securityHeaders?.length) {
                 body += `<h2><span class="h2-icon">🔒</span> Security Headers</h2><div class="stats-grid">`
                 stats.securityHeaders.forEach(h => {
-                    body += `<div class="stat-card" style="background:${h.present ? '#f0fdf4' : '#fef2f2'}"><div class="stat-value" style="font-size:20px">${h.present ? '✅' : '❌'}</div><div class="stat-label">${h.name}</div></div>`
+                    body += `<div class="stat-card" style="background:${h.present ? '#f0fdf4' : '#fef2f2'}"><div class="stat-value" style="font-size:20px">${h.present ? '' : ''}</div><div class="stat-label">${h.name}</div></div>`
                 })
                 body += `</div>`
             }
@@ -535,14 +535,14 @@ function SeoStudioInner({ activeBrand, activeSection, setActiveSection }) {
             // Action Buckets
             const hasActions = data.fixNow?.length || data.createNext?.length || data.monitor?.length
             if (hasActions) {
-                body += `<div class="section-break"></div><h2><span class="h2-icon">🎯</span> Action Plan</h2><div class="action-grid">`
+                body += `<div class="section-break"></div><h2><span class="h2-icon"></span> Action Plan</h2><div class="action-grid">`
                 if (data.fixNow?.length) {
-                    body += `<div class="action-card action-fix"><div class="action-header"><span>🔧</span> Fix Now</div><ul>`
+                    body += `<div class="action-card action-fix"><div class="action-header"><span></span> Fix Now</div><ul>`
                     data.fixNow.forEach(f => { body += `<li><strong>${typeof f === 'string' ? f : f.title}</strong>${f.description ? `<br><small>${f.description}</small>` : ''}</li>` })
                     body += `</ul></div>`
                 }
                 if (data.createNext?.length) {
-                    body += `<div class="action-card action-create"><div class="action-header"><span>✏️</span> Create Next</div><ul>`
+                    body += `<div class="action-card action-create"><div class="action-header"><span></span> Create Next</div><ul>`
                     data.createNext.forEach(c => { body += `<li><strong>${typeof c === 'string' ? c : c.title}</strong>${c.reason ? `<br><small>${c.reason}</small>` : ''}</li>` })
                     body += `</ul></div>`
                 }
@@ -570,7 +570,7 @@ function SeoStudioInner({ activeBrand, activeSection, setActiveSection }) {
                     if (p.wordCount < 300 && p.wordCount > 0) issues.push('Thin')
                     if (p.responseTimeMs > 3000) issues.push('Slow')
                     const statusClass = (p.statusCode || 200) >= 400 ? 'status-4xx' : (p.statusCode || 200) >= 300 ? 'status-3xx' : 'status-2xx'
-                    body += `<tr class="${i % 2 ? 'alt-row' : ''}"><td><strong>${(p.title || 'Untitled').substring(0, 45)}</strong><br><a href="${p.url || '#'}" target="_blank" style="color:#6366f1;text-decoration:none;font-size:10px;word-break:break-all">${(p.url || '').substring(0, 75)}</a></td><td><span class="status-pill ${statusClass}">${p.statusCode || 200}</span></td><td>${p.responseTimeMs}ms</td><td>${p.pageSizeKB}KB</td><td>${p.wordCount}</td><td>${issues.length ? `<span class="issue-pill">${issues.join(', ')}</span>` : '<span class="ok-pill">✅ OK</span>'}</td></tr>`
+                    body += `<tr class="${i % 2 ? 'alt-row' : ''}"><td><strong>${(p.title || 'Untitled').substring(0, 45)}</strong><br><a href="${p.url || '#'}" target="_blank" style="color:#6366f1;text-decoration:none;font-size:10px;word-break:break-all">${(p.url || '').substring(0, 75)}</a></td><td><span class="status-pill ${statusClass}">${p.statusCode || 200}</span></td><td>${p.responseTimeMs}ms</td><td>${p.pageSizeKB}KB</td><td>${p.wordCount}</td><td>${issues.length ? `<span class="issue-pill">${issues.join(', ')}</span>` : '<span class="ok-pill"> OK</span>'}</td></tr>`
                 })
                 body += `</tbody></table>`
             }
@@ -578,7 +578,7 @@ function SeoStudioInner({ activeBrand, activeSection, setActiveSection }) {
             // All Crawled URLs — Full list with clickable links
             const crawledUrls = data.crawledUrls || data.researchSources || []
             if (crawledUrls.length > 0) {
-                body += `<div class="section-break"></div><h2><span class="h2-icon">🔗</span> All Crawled URLs <span class="count-badge">${crawledUrls.length} pages</span></h2>
+                body += `<div class="section-break"></div><h2><span class="h2-icon"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">link</span></span> All Crawled URLs <span class="count-badge">${crawledUrls.length} pages</span></h2>
                 <p style="font-size:11px;color:#64748b;margin-bottom:12px">Every URL below was discovered from your sitemap.xml, robots.txt, and internal links — then actually fetched by our crawler. Click any URL to verify it exists.</p>
                 <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;max-height:600px;overflow-y:auto">
                 <ol style="padding-left:28px;margin:0">`
@@ -586,7 +586,7 @@ function SeoStudioInner({ activeBrand, activeSection, setActiveSection }) {
                     // Find matching page report for status
                     const pageData = pr.find(p => p.url === url)
                     const status = pageData?.statusCode || 200
-                    const statusIcon = status >= 400 ? '❌' : status >= 300 ? '⚠️' : '✅'
+                    const statusIcon = status >= 400 ? 'cancel' : status >= 300 ? '⚠️' : 'check_circle'
                     body += `<li style="margin:3px 0;font-size:10px;line-height:1.6"><span style="margin-right:4px">${statusIcon}</span><a href="${url}" target="_blank" style="color:#6366f1;text-decoration:none;word-break:break-all">${url}</a>${status !== 200 ? ` <span class="status-pill ${status >= 400 ? 'status-4xx' : 'status-3xx'}" style="font-size:8px;padding:1px 6px">${status}</span>` : ''}</li>`
                 })
                 body += `</ol></div>`
@@ -661,7 +661,7 @@ function SeoStudioInner({ activeBrand, activeSection, setActiveSection }) {
             // AI Insights
             const ai = data.aiInsights
             if (ai && (ai.trendSummary || ai.fixPriorities?.length || ai.duplicateValidation)) {
-                body += `<div class="section-break"></div><h2><span class="h2-icon">🤖</span> AI Insights <span class="ai-badge">Mantram AI Exclusive</span></h2>`
+                body += `<div class="section-break"></div><h2><span class="h2-icon"></span> AI Insights <span class="ai-badge">Mantram AI Exclusive</span></h2>`
                 if (ai.trendSummary) body += `<div class="ai-card"><div class="ai-card-label">Trend Analysis</div><p>${ai.trendSummary}</p></div>`
                 if (ai.fixPriorities?.length) {
                     body += `<div class="ai-card"><div class="ai-card-label">Top Fixes by Traffic Impact</div><ol>`
@@ -683,7 +683,7 @@ function SeoStudioInner({ activeBrand, activeSection, setActiveSection }) {
                 body += `</tbody></table>`
             }
             if (data.keywordClusters?.length) {
-                body += `<div class="section-break"></div><h2><span class="h2-icon">🎯</span> Keyword Clusters</h2>`
+                body += `<div class="section-break"></div><h2><span class="h2-icon"></span> Keyword Clusters</h2>`
                 data.keywordClusters.forEach(c => {
                     body += `<div class="cluster-card"><div class="cluster-header"><strong>${c.clusterName}</strong> <span class="badge">${c.difficulty}</span> <span class="badge">${c.intent}</span> <span class="badge">${c.estimatedMonthlySearches || '?'}/mo</span></div>`
                     body += `<p class="cluster-kws">${(c.keywords || []).map(k => typeof k === 'string' ? k : k.keyword).join(' • ')}</p>`
@@ -710,7 +710,7 @@ function SeoStudioInner({ activeBrand, activeSection, setActiveSection }) {
                 })
             }
             if (data.outrankPlan?.length) {
-                body += `<div class="section-break"></div><h2><span class="h2-icon">🏆</span> Outrank Plan</h2><ol class="outrank-list">`
+                body += `<div class="section-break"></div><h2><span class="h2-icon"></span> Outrank Plan</h2><ol class="outrank-list">`
                 data.outrankPlan.forEach(p => { body += `<li><strong>${p.action}</strong> — ${p.timeline} <span class="badge">${p.effort}</span><br><small>${p.expectedOutcome || ''}</small></li>` })
                 body += `</ol>`
             }
@@ -727,7 +727,7 @@ function SeoStudioInner({ activeBrand, activeSection, setActiveSection }) {
 
         // 30-day plan
         if (data.thirtyDayPlan?.length) {
-            body += `<div class="section-break"></div><h2><span class="h2-icon">📅</span> 30-Day Plan</h2><div class="week-grid">`
+            body += `<div class="section-break"></div><h2><span class="h2-icon"></span> 30-Day Plan</h2><div class="week-grid">`
             data.thirtyDayPlan.forEach(w => {
                 body += `<div class="week-card"><div class="week-badge">Week ${w.week}</div><div class="week-theme">${w.theme || ''}</div><ul>${(w.actions || []).map(a => `<li>${a}</li>`).join('')}</ul>${w.expectedOutcome ? `<p class="week-outcome">Expected: ${w.expectedOutcome}</p>` : ''}</div>`
             })
@@ -1050,13 +1050,13 @@ small{color:#94a3b8;font-size:10px}
                                                 <button onClick={addCompetitor} disabled={!newCompUrl.trim()} className="px-1.5 py-1 rounded text-[9px] font-bold bg-white/[0.04] text-slate-500 cursor-pointer disabled:opacity-30">+</button>
                                             </div>
                                             <button onClick={discoverCompetitors} disabled={compLoading}
-                                                className="mt-1 w-full flex items-center justify-center gap-1 px-2 py-1 rounded text-[9px] font-bold cursor-pointer transition-all disabled:opacity-30 text-violet-400 bg-violet-500/10 hover:bg-violet-500/15">
+                                                className="mt-1 w-full flex items-center justify-center gap-1 px-2 py-1 rounded text-[9px] font-bold cursor-pointer transition-all disabled:opacity-30 text-[#FF4D00] bg-[#FF4D00]/10 hover:bg-[#FF4D00]/15">
                                                 {compLoading ? <span className="material-symbols-outlined text-[10px] animate-spin">sync</span> : <span className="material-symbols-outlined text-[10px]">auto_awesome</span>}
                                                 Auto-Discover
                                             </button>
                                             {showComparePrompt && (
                                                 <button onClick={() => { setActiveSection('competitors'); setShowSetup(false); setShowComparePrompt(false); }}
-                                                    className="mt-2 w-full flex items-center justify-center gap-1 px-2 py-1.5 rounded text-[9px] font-bold cursor-pointer transition-all text-white bg-gradient-to-r from-violet-600 to-indigo-600 hover:shadow-lg hover:shadow-violet-500/20">
+                                                    className="mt-2 w-full flex items-center justify-center gap-1 px-2 py-1.5 rounded text-[9px] font-bold cursor-pointer transition-all text-white bg-gradient-to-r from-[#FF4D00] to-[#FF7A00] hover:shadow-lg hover:shadow-[#FF4D00]/20">
                                                     <span className="material-symbols-outlined text-[10px]">compare_arrows</span>
                                                     Compare Performance Now
                                                 </button>
@@ -1070,7 +1070,7 @@ small{color:#94a3b8;font-size:10px}
                                                 </div>
                                             ) : (
                                                 <button onClick={() => navigate('/integrations')}
-                                                    className="w-full flex items-center justify-center gap-1 px-2 py-1.5 rounded text-[9px] font-bold cursor-pointer text-blue-400 bg-blue-500/10 hover:bg-blue-500/15 transition-all">
+                                                    className="w-full flex items-center justify-center gap-1 px-2 py-1.5 rounded text-[9px] font-bold cursor-pointer text-[#FF4D00] bg-[#FF4D00]/10 hover:bg-[#FF4D00]/15 transition-all">
                                                     <span className="material-symbols-outlined text-[10px]">link</span> Connect GA
                                                 </button>
                                             )}
@@ -1114,7 +1114,7 @@ small{color:#94a3b8;font-size:10px}
                                 )}
                             </div>
                             <div className="flex-1 flex items-center gap-2 rounded-xl px-3 py-2" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                                <span className="material-symbols-outlined text-violet-400 text-sm">auto_awesome</span>
+                                <span className="material-symbols-outlined text-[#FF4D00] text-sm">auto_awesome</span>
                                 <input type="text" value={askQuery} onChange={e => setAskQuery(e.target.value)} onKeyDown={e => e.key === 'Enter' && runAsk()}
                                     placeholder="Ask anything about SEO..." className="flex-1 text-xs bg-transparent text-white placeholder:text-slate-600 outline-none border-none" />
                                 <button onClick={runAsk} disabled={askLoading || !askQuery.trim()}
@@ -1263,7 +1263,7 @@ small{color:#94a3b8;font-size:10px}
                                             </>
                                         )}
                                         {results.peopleAlsoAsk?.length > 0 && (
-                                            <span className="text-[10px] px-2 py-1 rounded-full font-bold bg-blue-500/10 text-blue-400">
+                                            <span className="text-[10px] px-2 py-1 rounded-full font-bold bg-[#FF4D00]/10 text-[#FF4D00]">
                                                 {results.peopleAlsoAsk.length} PAA questions
                                             </span>
                                         )}
@@ -1280,12 +1280,12 @@ small{color:#94a3b8;font-size:10px}
                                 {/* PAA Questions Panel */}
                                 {results.peopleAlsoAsk?.length > 0 && (
                                     <div className="glass-panel rounded-xl p-4 mb-4">
-                                        <h4 className="text-xs font-bold text-blue-400 mb-2 flex items-center gap-1.5">
+                                        <h4 className="text-xs font-bold text-[#FF4D00] mb-2 flex items-center gap-1.5">
                                             <span className="material-symbols-outlined text-sm">quiz</span> People Also Ask (from Google)
                                         </h4>
                                         <div className="flex flex-wrap gap-2">
                                             {results.peopleAlsoAsk.map((q, i) => (
-                                                <span key={i} className="text-[11px] px-3 py-1 rounded-full bg-blue-500/8 border border-blue-500/12 text-slate-300">{q}</span>
+                                                <span key={i} className="text-[11px] px-3 py-1 rounded-full bg-[#FF4D00]/8 border border-[#FF4D00]/12 text-slate-300">{q}</span>
                                             ))}
                                         </div>
                                         {results.relatedSearches?.length > 0 && (
@@ -1558,8 +1558,8 @@ function HealthCheckResults({ results }) {
         {stats.securityHeaders?.length > 0 && (
             <div className="glass-panel rounded-2xl p-5 mb-6">
                 <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
-                    <span className="material-symbols-outlined text-sm text-violet-400">shield</span> Security Headers
-                    <span className="text-[9px] text-violet-400 bg-violet-500/10 px-1.5 py-0.5 rounded-full ml-auto">★ Unique to Mantram AI</span>
+                    <span className="material-symbols-outlined text-sm text-[#FF4D00]">shield</span> Security Headers
+                    <span className="text-[9px] text-[#FF4D00] bg-[#FF4D00]/10 px-1.5 py-0.5 rounded-full ml-auto">★ Unique to Mantram AI</span>
                 </h4>
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
                     {stats.securityHeaders.map((h, i) => (
@@ -1579,14 +1579,14 @@ function HealthCheckResults({ results }) {
 
         {/* ── AI Insights Panel (Competitive Moat — only Mantram has this) ── */}
         {results.aiInsights && results.aiInsights.poweredBy?.length > 0 && (
-            <div className="glass-panel rounded-2xl p-5 mb-6 border border-violet-500/15">
+            <div className="glass-panel rounded-2xl p-5 mb-6 border border-[#FF4D00]/15">
                 <div className="flex items-center justify-between mb-4">
-                    <h4 className="text-xs font-bold text-violet-400 uppercase tracking-wider flex items-center gap-2">
+                    <h4 className="text-xs font-bold text-[#FF4D00] uppercase tracking-wider flex items-center gap-2">
                         <span className="material-symbols-outlined text-sm">auto_awesome</span> AI Insights
-                        <span className="text-[8px] text-violet-400/60 bg-violet-500/10 px-1.5 py-0.5 rounded-full ml-1">★ Mantram AI Exclusive</span>
+                        <span className="text-[8px] text-[#FF4D00]/60 bg-[#FF4D00]/10 px-1.5 py-0.5 rounded-full ml-1">★ Mantram AI Exclusive</span>
                     </h4>
                     <button onClick={() => setShowAiInsights(!showAiInsights)}
-                        className="text-[10px] font-bold text-violet-400 px-2 py-1 rounded-lg bg-violet-500/10 hover:bg-violet-500/15 cursor-pointer transition-all flex items-center gap-1">
+                        className="text-[10px] font-bold text-[#FF4D00] px-2 py-1 rounded-lg bg-[#FF4D00]/10 hover:bg-[#FF4D00]/15 cursor-pointer transition-all flex items-center gap-1">
                         <span className="material-symbols-outlined text-xs">{showAiInsights ? 'expand_less' : 'expand_more'}</span>
                         {showAiInsights ? 'Hide' : 'Show'}
                     </button>
@@ -1632,7 +1632,7 @@ function HealthCheckResults({ results }) {
                         {results.aiInsights.duplicateValidation && (
                             <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
                                 <p className="text-[10px] font-bold text-slate-400 uppercase mb-1.5 flex items-center gap-1">
-                                    <span className="material-symbols-outlined text-xs text-blue-400">content_copy</span> AI Duplicate Validation
+                                    <span className="material-symbols-outlined text-xs text-[#FF4D00]">content_copy</span> AI Duplicate Validation
                                 </p>
                                 <p className="text-xs text-slate-300 mb-2">{results.aiInsights.duplicateValidation.summary}</p>
                                 <div className="flex gap-3">
@@ -1650,7 +1650,7 @@ function HealthCheckResults({ results }) {
                         <div className="flex items-center gap-2 pt-2 border-t border-white/[0.04]">
                             <span className="text-[8px] text-slate-600 uppercase font-bold">Powered by</span>
                             {results.aiInsights.poweredBy.map((model, i) => (
-                                <span key={i} className="text-[8px] text-violet-400/60 bg-violet-500/8 px-1.5 py-0.5 rounded-full">{model}</span>
+                                <span key={i} className="text-[8px] text-[#FF4D00]/60 bg-[#FF4D00]/8 px-1.5 py-0.5 rounded-full">{model}</span>
                             ))}
                         </div>
                     </div>
@@ -1660,8 +1660,8 @@ function HealthCheckResults({ results }) {
 
         {/* Action Board */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-            <ActionBucket title="🔧 Fix Now" items={results.fixNow} color="rose" />
-            <ActionBucket title="✏️ Create Next" items={results.createNext} color="emerald" />
+            <ActionBucket title="Fix Now" items={results.fixNow} color="rose" />
+            <ActionBucket title="Create Next" items={results.createNext} color="emerald" />
             <ActionBucket title="👁️ Monitor" items={results.monitor} color="blue" />
         </div>
 
@@ -1670,7 +1670,7 @@ function HealthCheckResults({ results }) {
             <div className="glass-panel rounded-2xl p-5 mb-6">
                 <div className="flex items-center justify-between mb-3">
                     <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-                        <span className="material-symbols-outlined text-sm text-blue-400">analytics</span> Per-Page Report ({pageReports.length} pages)
+                        <span className="material-symbols-outlined text-sm text-[#FF4D00]">analytics</span> Per-Page Report ({pageReports.length} pages)
                     </h4>
                     <button onClick={() => setShowPageCards(!showPageCards)}
                         className="text-[10px] font-bold text-primary px-2 py-1 rounded-lg bg-primary/10 hover:bg-primary/15 cursor-pointer transition-all flex items-center gap-1">
@@ -1732,7 +1732,7 @@ function HealthCheckResults({ results }) {
                 {[
                     { key: 'errors', label: 'Errors', items: groupedIssues?.errors || [], color: '#f43f5e', bg: 'bg-rose-500', icon: 'error' },
                     { key: 'warnings', label: 'Warnings', items: groupedIssues?.warnings || [], color: '#f59e0b', bg: 'bg-amber-500', icon: 'warning' },
-                    { key: 'notices', label: 'Notices', items: groupedIssues?.notices || [], color: '#3b82f6', bg: 'bg-blue-500', icon: 'info' },
+                    { key: 'notices', label: 'Notices', items: groupedIssues?.notices || [], color: '#3b82f6', bg: 'bg-[#FF4D00]', icon: 'info' },
                 ].filter(g => g.items.length > 0).map(group => (
                     <details key={group.key} open={group.key === 'errors'} className="glass-panel rounded-2xl overflow-hidden">
                         <summary className="cursor-pointer p-4 flex items-center gap-3 hover:bg-white/[0.02] transition-all">
@@ -1838,7 +1838,7 @@ function TrafficResults({ results }) {
                             <h4 className="text-sm font-bold text-white">{cluster.clusterName}</h4>
                             <div className="flex items-center gap-2">
                                 <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${cluster.difficulty === 'easy' ? 'bg-emerald-500/10 text-emerald-400' : cluster.difficulty === 'medium' ? 'bg-amber-500/10 text-amber-400' : 'bg-rose-500/10 text-rose-400'}`}>{cluster.difficulty}</span>
-                                <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 font-bold">{cluster.intent}</span>
+                                <span className="text-xs px-2 py-0.5 rounded-full bg-[#FF4D00]/10 text-[#FF4D00] font-bold">{cluster.intent}</span>
                                 <span className="text-sm text-primary font-bold">{cluster.opportunityScore}/100</span>
                             </div>
                         </div>
@@ -1855,7 +1855,7 @@ function TrafficResults({ results }) {
         <div className="grid grid-cols-2 gap-4 mb-6">
             {results.risingKeywords?.length > 0 && (
                 <div className="glass-panel rounded-2xl p-6">
-                    <h3 className="text-base font-bold text-white mb-3">📈 Rising Keywords</h3>
+                    <h3 className="text-base font-bold text-white mb-3"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">trending_up</span> Rising Keywords</h3>
                     <div className="space-y-2">{results.risingKeywords.map((k, i) => (
                         <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-white/3">
                             <span className="text-sm text-white font-medium">{k.keyword}</span>
@@ -1880,7 +1880,7 @@ function TrafficResults({ results }) {
         {/* 30-day plan */}
         {results.thirtyDayPlan?.length > 0 && (
             <div className="glass-panel rounded-2xl p-6">
-                <h3 className="text-base font-bold text-white mb-4">📅 30-Day Traffic Plan</h3>
+                <h3 className="text-base font-bold text-white mb-4"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">calendar_month</span> 30-Day Traffic Plan</h3>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">{results.thirtyDayPlan.map((w, i) => (
                     <div key={i} className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
                         <p className="text-sm text-primary font-bold mb-2">Week {w.week}</p>
@@ -1933,7 +1933,7 @@ function CompetitorResults({ results }) {
         {/* Why They Win + Outrank Plan */}
         <div className="grid grid-cols-2 gap-4 mb-6">
             <div className="glass-panel rounded-2xl p-6">
-                <h3 className="text-base font-bold text-white mb-3">❌ Why They Win</h3>
+                <h3 className="text-base font-bold text-white mb-3"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">cancel</span> Why They Win</h3>
                 <div className="space-y-3">{(results.whyTheyWin || []).map((w, i) => (
                     <div key={i} className="p-3 rounded-xl bg-rose-500/5 border border-rose-500/10">
                         <p className="text-xs font-bold text-rose-400 mb-1">{w.reason}</p>
@@ -1943,7 +1943,7 @@ function CompetitorResults({ results }) {
                 ))}</div>
             </div>
             <div className="glass-panel rounded-2xl p-6">
-                <h3 className="text-base font-bold text-white mb-3">🎯 Outrank Plan</h3>
+                <h3 className="text-base font-bold text-white mb-3"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">ads_click</span> Outrank Plan</h3>
                 <div className="space-y-2">{(results.outrankPlan || []).map((p, i) => (
                     <div key={i} className="flex items-start gap-3 p-2 rounded-lg bg-white/3">
                         <span className="text-xs font-black text-primary w-5">{p.priority}</span>
@@ -1974,9 +1974,9 @@ function AIVisibilityResults({ results }) {
     const sections = [
         { key: 'schemaReadiness', icon: '🏗️', label: 'Schema Readiness' },
         { key: 'qnaPresence', icon: '❓', label: 'Q&A Presence' },
-        { key: 'entityCoverage', icon: '🔗', label: 'Entity Coverage' },
+        { key: 'entityCoverage', icon: 'link', label: 'Entity Coverage' },
         { key: 'snippetStructure', icon: '📋', label: 'Snippet Structure' },
-        { key: 'trustSignals', icon: '🛡️', label: 'Trust Signals' },
+        { key: 'trustSignals', icon: '', label: 'Trust Signals' },
     ]
     return (<>
         <div className="glass-panel rounded-2xl p-6 mb-6">
@@ -1994,11 +1994,11 @@ function AIVisibilityResults({ results }) {
 
         {/* ═══ Live AI Probe Results (Real LLM Data) ═══ */}
         {results.geoProbe && (
-            <div className="glass-panel rounded-2xl p-5 mb-6 border border-violet-500/10">
-                <h4 className="text-xs font-bold text-violet-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+            <div className="glass-panel rounded-2xl p-5 mb-6 border border-[#FF4D00]/10">
+                <h4 className="text-xs font-bold text-[#FF4D00] uppercase tracking-wider mb-4 flex items-center gap-2">
                     <span className="material-symbols-outlined text-sm">smart_toy</span> Live AI Probe — Real LLM Responses
-                    {results.geoProbe.samplesPerPrompt > 1 && <span className="ml-auto text-[9px] px-2 py-0.5 rounded-full bg-violet-500/15 text-violet-300 font-medium">{results.geoProbe.samplesPerPrompt}x Multi-Sample</span>}
-                    {results.geoProbe.sentimentMethod === 'llm' && <span className="text-[9px] px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-300 font-medium">LLM Sentiment</span>}
+                    {results.geoProbe.samplesPerPrompt > 1 && <span className="ml-auto text-[9px] px-2 py-0.5 rounded-full bg-[#FF4D00]/15 text-[#FF7A00] font-medium">{results.geoProbe.samplesPerPrompt}x Multi-Sample</span>}
+                    {results.geoProbe.sentimentMethod === 'llm' && <span className="text-[9px] px-2 py-0.5 rounded-full bg-[#FF4D00]/15 text-[#FF7A00] font-medium">LLM Sentiment</span>}
                 </h4>
 
                 {/* Probe Stats */}
@@ -2041,7 +2041,7 @@ function AIVisibilityResults({ results }) {
                 {results.geoProbe.sentimentDistribution && (
                     <div className="mb-4">
                         <p className="text-[10px] text-slate-500 font-bold uppercase mb-2">Sentiment Distribution</p>
-                        <div className="h-3 rounded-full overflow-hidden flex bg-slate-800">
+                        <div className="h-3 rounded-full overflow-hidden flex bg-[#121217]">
                             {(() => { const sd = results.geoProbe.sentimentDistribution; const total = Math.max(1, (sd.positive || 0) + (sd.neutral || 0) + (sd.negative || 0)); return (<>
                                 {sd.positive > 0 && <div className="bg-emerald-500 transition-all" style={{ width: `${(sd.positive / total) * 100}%` }} />}
                                 {sd.neutral > 0 && <div className="bg-slate-500 transition-all" style={{ width: `${(sd.neutral / total) * 100}%` }} />}
@@ -2064,8 +2064,8 @@ function AIVisibilityResults({ results }) {
                             {Object.entries(results.geoProbe.shareOfVoice).sort((a, b) => b[1] - a[1]).map(([name, pct]) => (
                                 <div key={name} className="flex items-center gap-2">
                                     <span className="text-[10px] text-slate-400 w-24 truncate">{name}</span>
-                                    <div className="flex-1 h-2 bg-slate-800 rounded-full overflow-hidden">
-                                        <div className="h-full rounded-full bg-violet-500 transition-all" style={{ width: `${pct}%` }} />
+                                    <div className="flex-1 h-2 bg-[#121217] rounded-full overflow-hidden">
+                                        <div className="h-full rounded-full bg-[#FF4D00] transition-all" style={{ width: `${pct}%` }} />
                                     </div>
                                     <span className="text-[10px] text-white font-bold w-8 text-right">{pct}%</span>
                                 </div>
@@ -2102,8 +2102,8 @@ function AIVisibilityResults({ results }) {
                         <p className="text-[10px] text-slate-500 font-bold uppercase mb-2">What AI Models Say About Your Brand</p>
                         <div className="space-y-2">
                             {results.geoProbe.topSnippets.map((s, i) => (
-                                <div key={i} className="p-3 rounded-lg bg-violet-500/5 border border-violet-500/10">
-                                    <p className="text-[9px] text-violet-400 font-bold mb-1">{s.model} — "{s.prompt}"</p>
+                                <div key={i} className="p-3 rounded-lg bg-[#FF4D00]/5 border border-[#FF4D00]/10">
+                                    <p className="text-[9px] text-[#FF4D00] font-bold mb-1">{s.model} — "{s.prompt}"</p>
                                     <p className="text-[11px] text-slate-300 italic leading-relaxed">"{s.snippet}"</p>
                                 </div>
                             ))}
@@ -2146,7 +2146,7 @@ function AIVisibilityResults({ results }) {
                         <p className="text-[10px] text-slate-500 font-bold uppercase mb-2">Citation Sources ({results.geoProbe.citations.length})</p>
                         <div className="space-y-1 max-h-24 overflow-y-auto">
                             {results.geoProbe.citations.map((url, i) => (
-                                <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="block text-[10px] text-violet-400 hover:text-violet-300 truncate">{url.replace(/^https?:\/\//, '')}</a>
+                                <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="block text-[10px] text-[#FF4D00] hover:text-[#FF7A00] truncate">{url.replace(/^https?:\/\//, '')}</a>
                             ))}
                         </div>
                     </div>
@@ -2197,7 +2197,7 @@ function AIVisibilityResults({ results }) {
                                     {typeof r === 'string' ? <p>{r}</p> : (
                                         <>
                                             <p className="font-bold text-white text-sm mb-1">{r.title || r.description}</p>
-                                            {r.aiImpact && <p className="text-violet-400 text-[10px] mb-2">{r.aiImpact}</p>}
+                                            {r.aiImpact && <p className="text-[#FF4D00] text-[10px] mb-2">{r.aiImpact}</p>}
                                             {r.codeSnippet && (
                                                 <div className="relative group mt-3">
                                                     <p className="text-[9px] font-bold text-slate-500 uppercase mb-1">Generated Fix Code</p>
@@ -2229,8 +2229,8 @@ function AIVisibilityResults({ results }) {
             <div className="glass-panel rounded-2xl p-6 mb-6">
                 <h3 className="text-base font-bold text-white mb-4">📝 AI-Ready Templates</h3>
                 <div className="space-y-3">{results.aiReadyTemplates.map((t, i) => (
-                    <div key={i} className="p-4 rounded-xl bg-violet-500/5 border border-violet-500/10">
-                        <p className="text-xs font-bold text-violet-400 mb-1">{t.name}</p>
+                    <div key={i} className="p-4 rounded-xl bg-[#FF4D00]/5 border border-[#FF4D00]/10">
+                        <p className="text-xs font-bold text-[#FF4D00] mb-1">{t.name}</p>
                         <p className="text-sm text-slate-500 mb-2">{t.description}</p>
                         <pre className="text-sm text-slate-300 bg-black/30 rounded-lg p-3 overflow-x-auto whitespace-pre-wrap">{t.template}</pre>
                         {t.example && <div className="mt-2"><p className="text-xs text-slate-600 font-bold">EXAMPLE:</p><p className="text-sm text-slate-400 italic">{t.example}</p></div>}
@@ -2242,7 +2242,7 @@ function AIVisibilityResults({ results }) {
         {/* Priority Actions */}
         {results.priorityActions?.length > 0 && (
             <div className="glass-panel rounded-2xl p-6">
-                <h3 className="text-base font-bold text-white mb-3">🎯 Priority Actions</h3>
+                <h3 className="text-base font-bold text-white mb-3"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">ads_click</span> Priority Actions</h3>
                 <div className="space-y-2">{results.priorityActions.map((p, i) => (
                     <div key={i} className="flex items-start gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
                         <span className="text-xs font-black text-primary w-5">{p.priority}</span>
@@ -2349,7 +2349,7 @@ function IssueCard({ issue, brandId, url }) {
                     <div className="mt-4 pt-3 border-t border-white/[0.04]">
                         {!fixData && !fixing ? (
                             <button onClick={handleAutoFix}
-                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-primary/20 to-violet-500/20 border border-primary/30 text-primary text-[11px] font-bold hover:from-primary/30 transition-all cursor-pointer">
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-primary/20 to-[#FF7A00]/20 border border-primary/30 text-primary text-[11px] font-bold hover:from-primary/30 transition-all cursor-pointer">
                                 <span className="material-symbols-outlined text-[14px]">auto_awesome</span>
                                 Auto-Fix Issue with AI
                             </button>
@@ -2480,7 +2480,7 @@ function WarRoomResults({ results }) {
 
             {/* Defensive Playbook */}
             {r.defensivePlaybook?.length > 0 && (
-                <ActionBucket title="🛡️ Defensive Playbook" items={r.defensivePlaybook.map(a => ({
+                <ActionBucket title="Defensive Playbook" items={r.defensivePlaybook.map(a => ({
                     title: a.risk, description: `Defense: ${a.defense} | Urgency: ${a.urgency}`
                 }))} color="amber" />
             )}
@@ -2552,14 +2552,14 @@ function LLMProbeResults({ results }) {
             {/* Strategic Analysis */}
             {r.strategicAnalysis && (
                 <div className="glass-panel rounded-2xl p-6">
-                    <h3 className="text-base font-bold text-white mb-3 flex items-center gap-2"><span className="material-symbols-outlined text-sm text-violet-400">strategy</span> Strategic Analysis</h3>
+                    <h3 className="text-base font-bold text-white mb-3 flex items-center gap-2"><span className="material-symbols-outlined text-sm text-[#FF4D00]">strategy</span> Strategic Analysis</h3>
                     <p className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap">{r.strategicAnalysis}</p>
                 </div>
             )}
 
             {/* Improvement Actions */}
             {r.improvementActions?.length > 0 && (
-                <ActionBucket title="🎯 How to Get Cited" items={r.improvementActions.map(a => ({
+                <ActionBucket title="How to Get Cited" items={r.improvementActions.map(a => ({
                     title: `#${a.priority} ${a.action}`, description: `${a.why} → ${a.expectedOutcome}`
                 }))} color="cyan" />
             )}
@@ -2622,7 +2622,7 @@ function AutoFixResults({ results }) {
             {r.combinedSchemaBlock && (
                 <div className="glass-panel rounded-2xl p-6">
                     <div className="flex items-center justify-between mb-3">
-                        <h3 className="text-base font-bold text-white flex items-center gap-2"><span className="material-symbols-outlined text-sm text-violet-400">data_object</span> Combined Schema Block</h3>
+                        <h3 className="text-base font-bold text-white flex items-center gap-2"><span className="material-symbols-outlined text-sm text-[#FF4D00]">data_object</span> Combined Schema Block</h3>
                         <button onClick={() => copyCode(r.combinedSchemaBlock, 'combined')} className="px-3 py-1 rounded-lg bg-primary/10 text-primary text-xs font-bold hover:bg-primary/20 cursor-pointer transition-all">
                             {copiedIdx === 'combined' ? '✓ Copied!' : 'Copy All Schema'}
                         </button>
@@ -2654,8 +2654,8 @@ function AutoFixResults({ results }) {
                     </div>
 
                     <div className="flex items-center gap-4 text-[11px] text-slate-500">
-                        <span>📍 {fix.implementationGuide}</span>
-                        <span>📈 {fix.expectedImpact}</span>
+                        <span><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">location_on</span> {fix.implementationGuide}</span>
+                        <span><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">trending_up</span> {fix.expectedImpact}</span>
                     </div>
                 </div>
             ))}
@@ -2731,9 +2731,9 @@ function PromptMiningResults({ results }) {
                                         </span>
                                     </div>
                                     <div className="flex flex-wrap gap-2 mb-2">
-                                        {p.category && <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-400/10 text-indigo-400 font-bold">{p.category}</span>}
+                                        {p.category && <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#FF4D00]/10 text-[#FF4D00] font-bold">{p.category}</span>}
                                         {p.searchVolume && <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/[0.05] text-slate-400 font-bold">Vol: {p.searchVolume}</span>}
-                                        {p.contentFormat && <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-400/10 text-blue-400 font-bold">{p.contentFormat}</span>}
+                                        {p.contentFormat && <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#FF4D00]/10 text-[#FF4D00] font-bold">{p.contentFormat}</span>}
                                         <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${p.currentlyCited ? 'bg-emerald-400/10 text-emerald-400' : 'bg-rose-400/10 text-rose-400'}`}>
                                             {p.currentlyCited ? '✓ Cited' : '✗ Not Cited'}
                                         </span>
@@ -2770,7 +2770,7 @@ function PromptMiningResults({ results }) {
             {/* Content Calendar */}
             {r.contentCalendar?.length > 0 && (
                 <div className="glass-panel rounded-2xl p-6">
-                    <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2"><span className="material-symbols-outlined text-sm text-blue-400">event</span> Content Calendar</h3>
+                    <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2"><span className="material-symbols-outlined text-sm text-[#FF4D00]">event</span> Content Calendar</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {r.contentCalendar.map((w, i) => (
                             <div key={i} className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06]">
@@ -2806,7 +2806,7 @@ function PromptMiningResults({ results }) {
             {r.optimizations?.length > 0 && (
                 <div className="glass-panel rounded-2xl p-6">
                     <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2">
-                        <span className="material-symbols-outlined text-sm text-indigo-400">trending_up</span> Strategic Optimizations
+                        <span className="material-symbols-outlined text-sm text-[#FF4D00]">trending_up</span> Strategic Optimizations
                     </h3>
                     <div className="space-y-4">
                         {r.optimizations.map((opt, i) => (
@@ -3061,12 +3061,12 @@ const SEO_PRO_TIPS = [
     { icon: '🏥', tip: 'Day 1 workflow: Health Check → Auto-Fix → implement code → re-run to verify. This alone can boost your SEO score 10-20 points.' },
     { icon: '🔍', tip: 'Use the Ask Bar for quick questions before running full workflows — it analyzes your site and often has the answer in seconds.' },
     { icon: '⚔️', tip: 'Map at least 3-5 competitors before running Beat Competitors or War Room. More competitors = richer competitive intelligence.' },
-    { icon: '🤖', tip: 'AI Search is the future: run LLM Probe → see how AI sees you → run Prompt Mining → create content to fix gaps → re-run in 90 days.' },
+    { icon: 'smart_toy', tip: 'AI Search is the future: run LLM Probe → see how AI sees you → run Prompt Mining → create content to fix gaps → re-run in 90 days.' },
     { icon: '🔧', tip: 'Auto-Fix Code turns audit findings into copy-paste HTML. Run Health Check → Auto-Fix → paste code into your site. No developer needed.' },
-    { icon: '📊', tip: 'Connect GA & Search Console to ground AI analysis in real data. Estimates are helpful; real traffic data is the truth.' },
+    { icon: 'bar_chart', tip: 'Connect GA & Search Console to ground AI analysis in real data. Estimates are helpful; real traffic data is the truth.' },
     { icon: '⛏️', tip: 'Prompt Mining is keyword research for AI search. Re-run every 60-90 days — your citation score should improve as you publish.' },
     { icon: '📋', tip: 'The optimal sequence: Health Check → Auto-Fix → Map Competitors → Get Traffic → AI Visibility → Prompt Mining → Content Gaps → Repeat.' },
-    { icon: '🎯', tip: 'Keywords tool clusters keywords by topic. Build "pillar pages" for each cluster — Google rewards topical authority over isolated articles.' },
+    { icon: 'ads_click', tip: 'Keywords tool clusters keywords by topic. Build "pillar pages" for each cluster — Google rewards topical authority over isolated articles.' },
     { icon: '🌐', tip: 'GEO combines AI Visibility + LLM Probe + Prompt Mining into one view. Use it for the big picture after individual tools give details.' },
 ]
 
@@ -3183,7 +3183,7 @@ function SeoHelpView({ onBack }) {
 
             <div className="text-center mt-6 py-6">
                 <p className="text-slate-500 text-sm mb-3">Ready to optimize?</p>
-                <button onClick={onBack} className="px-6 py-3 rounded-xl text-sm font-bold bg-gradient-to-r from-primary to-purple-500 text-white cursor-pointer hover:shadow-lg hover:shadow-primary/20 transition-all flex items-center gap-2 mx-auto">
+                <button onClick={onBack} className="px-6 py-3 rounded-xl text-sm font-bold bg-gradient-to-r from-primary to-[#FF7A00] text-white cursor-pointer hover:shadow-lg hover:shadow-primary/20 transition-all flex items-center gap-2 mx-auto">
                     <span className="material-symbols-outlined text-sm">travel_explore</span> Go to SEO Studio
                 </button>
             </div>
