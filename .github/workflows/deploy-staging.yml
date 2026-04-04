@@ -197,23 +197,30 @@ jobs:
             fi
             ln -sfn $RELEASE_DIR $CURRENT_LINK
 
-            # 5. Restart PM2
-            # ecosystem.config.cjs is at backend/deploy/ (same as production)
+            # 5. Restart PM2 with new ecosystem
             echo "🔄 Restarting staging backend..."
             cd $CURRENT_LINK
-
             pm2 delete mantram-staging || true
-            NODE_OPTIONS="--max-old-space-size=2048" pm2 start backend/deploy/ecosystem.config.cjs \
-              --update-env
+            NODE_OPTIONS="--max-old-space-size=2048" pm2 start backend/deploy/ecosystem.config.cjs --update-env
             pm2 save
 
-            # 6. Health Check on port 3002
+            # 6. Dump PM2 logs early so crash reason is always visible
+            echo "📝 PM2 status after start:"
+            pm2 list
+            sleep 3
+            echo "📝 PM2 out log (last 20 lines):"
+            pm2 logs mantram-staging --lines 20 --out --nostream || true
+            echo "📝 PM2 err log (last 20 lines):"
+            pm2 logs mantram-staging --lines 20 --err --nostream || true
+
+            # 7. Health Check on port 3002
             echo "🏥 Health check on port 3002..."
             success=false
-            for i in {1..60}; do
+            for i in {1..30}; do
               echo "Attempt $i: Checking http://127.0.0.1:3002/api/health"
-              if curl -sf http://127.0.0.1:3002/api/health; then
-                echo "✅ Staging backend is UP"
+              RESPONSE=$(curl -sf http://127.0.0.1:3002/api/health 2>/dev/null || true)
+              if [ -n "$RESPONSE" ]; then
+                echo "✅ Staging backend is UP: $RESPONSE"
                 success=true
                 break
               fi
@@ -222,12 +229,14 @@ jobs:
             done
 
             if [ "$success" = false ]; then
-              echo "❌ Staging health check failed! PM2 Logs:"
-              pm2 logs mantram-staging --lines 50 --no-daemon --raw & sleep 10 && kill $!
+              echo "❌ Staging health check failed after 150s! Full PM2 logs:"
+              pm2 logs mantram-staging --lines 100 --nostream || true
+              echo "❌ Port check:"
+              ss -tlnp | grep -E '3002|3001|3000' || true
               exit 1
             fi
 
-            # 7. Cleanup old staging releases (keep last 3)
+            # 8. Cleanup old staging releases (keep last 3)
             cd $BASE_DIR
             ls -1t | tail -n +4 | xargs rm -rf || true
             echo "🧹 Old staging releases cleaned up"
