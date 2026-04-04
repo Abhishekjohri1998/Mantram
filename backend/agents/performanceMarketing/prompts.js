@@ -56,7 +56,7 @@ Respond in valid JSON with exactly these keys: competitorProfiles, adPatterns, g
 /**
  * Strategy Agent — Builds a multi-platform performance marketing strategy
  */
-export const STRATEGY_PROMPT = (brandContext, currency = 'INR') => {
+export function STRATEGY_PROMPT(brandContext, currency = 'INR') {
 const currencySymbol = { INR: '₹', AED: 'د.إ', USD: '$', EUR: '€', GBP: '£', SAR: '﷼', SGD: 'S$', AUD: 'A$' }[currency] || currency;
 return `
 You are a WAR ROOM of 5 senior performance marketing experts — a Media Strategist, a Google Ads Specialist, a Meta Ads Specialist, a Data Analyst, and a Creative Director — at a tier-1 agency billing $500/hr.
@@ -234,7 +234,7 @@ Before responding, verify:
 - [ ] ALL monetary values use ${currencySymbol} not ₹ (unless INR)
 
 Respond in valid JSON with keys: goals, channelAllocation, platformBreakout, keywordStrategy, competitiveEdge, locationStrategy, audiences, timeline, kpis, creativeStrategy, achievabilityAudit.
-`; };
+`; }
 
 /**
  * Budget Planner Agent — Allocates budget across platforms and campaigns
