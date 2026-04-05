@@ -41,7 +41,7 @@ export const PROVIDER_PRICING = {
     'anthropic': {
         provider: 'Anthropic', icon: '🟠',
         models: {
-            'claude-3-5-sonnet-20240620': {
+            'Claude Opus 4.6': {
                 name: 'Claude Sonnet 4', type: 'text',
                 inputPer1M: 3.00, outputPer1M: 15.00, unit: 'USD/1M tokens',
                 pricingUrl: 'https://docs.anthropic.com/en/docs/about-claude/pricing',

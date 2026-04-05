@@ -66,7 +66,7 @@ const ROUTING_RULES = [
     {
         match: (ctx) => (!ctx.language || ctx.language === 'english') &&
             ['educate', 'brand', 'blog', 'seo', 'email'].includes(ctx.taskType),
-        route: { provider: 'anthropic', model: 'claude-3-5-sonnet-20240620', reason: 'Best for long-form English' },
+        route: { provider: 'anthropic', model: 'Claude Opus 4.6', reason: 'Best for long-form English' },
         icon: '📝',
     },
 
@@ -196,7 +196,7 @@ class SmartLanguageRouter {
                     'api-subscription-key': apiKey,
                 },
                 body: JSON.stringify({
-                    model: 'sarvam-m',
+                    model: 'sarvam-2b',
                     messages: [
                         { role: 'system', content: systemPrompt },
                         { role: 'user', content: userPrompt },
@@ -227,7 +227,7 @@ class SmartLanguageRouter {
             return {
                 text,
                 tokensUsed: data.usage?.total_tokens || 0,
-                model: 'sarvam-m',
+                model: 'sarvam-2b',
                 provider: 'sarvam',
                 generationTime: 0,
             };

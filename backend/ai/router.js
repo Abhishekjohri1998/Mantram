@@ -35,7 +35,7 @@ class ModelRouter {
         });
         this.providers.anthropic = new AnthropicProvider({
             apiKey: providerConfigs.anthropic?.apiKey,
-            defaultModel: config.ai.defaultAnthropicModel || 'claude-3-5-sonnet-20240620',
+            defaultModel: config.ai.defaultAnthropicModel || 'Claude Opus 4.6',
         });
 
 

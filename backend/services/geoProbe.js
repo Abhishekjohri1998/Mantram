@@ -163,7 +163,7 @@ async function probeClaude(prompt, signal = null) {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
             body: JSON.stringify({
-                model: 'claude-3-5-sonnet-20240620', max_tokens: 1024,
+                model: 'Claude Opus 4.6', max_tokens: 1024,
                 messages: [{ role: 'user', content: prompt }], temperature: 0.4,
             }),
             signal: controller.signal,

@@ -377,7 +377,8 @@ let MODEL_COSTS = {
     'gemini-1.5-pro-latest': { input: 0.125, output: 0.50 },
     'gemini-2.5-flash': { input: 0.015, output: 0.06 },
     'gemini-2.5-pro': { input: 0.125, output: 0.50 },
-    'claude-3-5-sonnet-20240620': { input: 0.3, output: 1.5 },
+    'Claude Opus 4.6': { input: 0.3, output: 1.5 },
+    'Claude Opus 4.6': { input: 1.5, output: 7.5 },
     'sarvam-m': { input: 0.02, output: 0.08 },
     // ── Image models (flat cost per image in USD cents) ──
     'gemini-3.1-flash-image-preview': { flatCost: 4.0, type: 'image' },
