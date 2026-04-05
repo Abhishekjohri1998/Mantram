@@ -545,10 +545,10 @@ export default function VideoStudio() {
                 <div className="studio-tab-bar">
                     <div className="studio-tab-row">
                         {[
-                            { id: 'storyboard', icon: 'view_timeline', label: 'Storyboard' },
                             { id: 'advanced', icon: 'terminal', label: 'Advanced' },
                             { id: 'ugc', icon: 'person_play', label: 'UGC Creator' },
                             { id: 'agent', icon: 'smart_display', label: 'Video Agent' },
+                            { id: 'storyboard', icon: 'view_timeline', label: 'Storyboard' },
                         ].map(tab => (
                             <button key={tab.id} onClick={() => setStudioMode(tab.id)}
                                 className={`flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-300 cursor-pointer ${studioMode === tab.id ? 'studio-nav-pill text-white font-bold' : 'studio-nav-tab-inactive'}`}>
@@ -862,21 +862,27 @@ export default function VideoStudio() {
                     {step === 0 && (
                         <div className="space-y-6">
                             {/* Video Type Selector */}
-                            <div>
-                                <h3 className="text-base font-bold text-white mb-3 flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-[#FF4D00]">category</span>
+                            <div className="glass-panel rounded-2xl p-5 border border-white/[0.08]">
+                                <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-[#FF4D00] text-[15px]">category</span>
                                     What kind of video?
                                 </h3>
-                                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                                <div className="flex flex-wrap gap-2.5">
                                     {VIDEO_TYPES.map(vt => (
                                         <button key={vt.id} onClick={() => setVideoType(vt.id)}
-                                            className={`p-4 rounded-xl text-center transition-all cursor-pointer ${videoType === vt.id
-                                                ? 'bg-[#FF4D00]/15 border-2 border-[#FF4D00]/40 shadow-lg shadow-[#FF4D00]/10'
-                                                : 'bg-white/[0.02] border border-white/[0.06] hover:border-white/[0.12]'
+                                            className={`flex-1 min-w-[180px] max-w-[240px] flex items-center gap-3 p-3 rounded-xl transition-all duration-300 cursor-pointer border text-left ${videoType === vt.id
+                                                ? 'bg-[#FF4D00]/15 border-[#FF4D00]/40 shadow-md shadow-[#FF4D00]/10'
+                                                : 'bg-white/[0.02] border-white/[0.06] hover:border-white/[0.15] hover:bg-white/[0.04]'
                                                 }`}>
-                                            <span className="text-2xl block mb-2">{vt.icon}</span>
-                                            <p className="text-sm font-bold text-white">{vt.label}</p>
-                                            <p className="text-sm text-slate-500 mt-1">{vt.desc}</p>
+                                            <div className={`shrink-0 flex items-center justify-center size-9 rounded-lg ${videoType === vt.id ? 'bg-[#FF4D00]/20' : 'bg-white/[0.05]'}`}>
+                                                <span className={`material-symbols-outlined text-[19px] ${videoType === vt.id ? 'text-[#FF4D00]' : 'text-slate-400'}`}>
+                                                    {vt.icon}
+                                                </span>
+                                            </div>
+                                            <div>
+                                                <p className={`text-[13px] font-bold ${videoType === vt.id ? 'text-white' : 'text-slate-300'}`}>{vt.label}</p>
+                                                <p className="text-[10px] text-slate-500 mt-0.5 leading-tight">{vt.desc}</p>
+                                            </div>
                                         </button>
                                     ))}
                                 </div>
@@ -1447,9 +1453,9 @@ export default function VideoStudio() {
                                 {[
                                     { id: 'kling-3.0', name: 'Kling 3.0', icon: 'videocam', desc: 'Multi-shot storyboards, native audio + voice IDs, 3-15s', bestFor: 'Product demos, action shots, storyboard videos', features: ['multi-shot', 'native-audio', 'voice-ids', '3-15s'], available: true, recommended: true },
                                     { id: 'veo-3.1', name: 'Google Veo 3.1', icon: 'movie', desc: 'Cinematic quality with native audio + extend-video', bestFor: 'Premium brand films, cinematic ads', features: ['native-audio', 'cinematic', 'extend-video', '5-8s'], available: true, recommended: false },
-                                    { id: 'veo-3.1-fast', name: 'Veo 3.1 Fast', icon: '⚡', desc: 'Faster & cheaper Veo 3.1 — great for prototyping', bestFor: 'Quick iterations, content series, social video', features: ['native-audio', 'fast', '5-8s', 'cost-efficient'], available: true, recommended: false },
-                                    { id: 'seedance-2.0', name: 'Seedance 2.0 Pro', icon: '🎞️', desc: 'Cinematic video with native audio, camera control & physics', bestFor: 'Premium ads, product showcases, brand films', features: ['native-audio', 'camera-control', 'cinematic', '4-15s'], available: true, recommended: false },
-                                    { id: 'seedance-1.0', name: 'Seedance 1.0 Lite', icon: '🌱', desc: 'Fast & affordable video generation', bestFor: 'Quick prototypes, social content, UGC', features: ['fast', 'affordable', '5-10s'], available: true, recommended: false },
+                                    { id: 'veo-3.1-fast', name: 'Veo 3.1 Fast', icon: 'bolt', desc: 'Faster & cheaper Veo 3.1 — great for prototyping', bestFor: 'Quick iterations, content series, social video', features: ['native-audio', 'fast', '5-8s', 'cost-efficient'], available: true, recommended: false },
+                                    { id: 'seedance-2.0', name: 'Seedance 2.0 Pro', icon: 'local_movies', desc: 'Cinematic video with native audio, camera control & physics', bestFor: 'Premium ads, product showcases, brand films', features: ['native-audio', 'camera-control', 'cinematic', '4-15s'], available: true, recommended: false },
+                                    { id: 'seedance-1.0', name: 'Seedance 1.0 Lite', icon: 'speed', desc: 'Fast & affordable video generation', bestFor: 'Quick prototypes, social content, UGC', features: ['fast', 'affordable', '5-10s'], available: true, recommended: false },
                                 ].map(m => (
                                     <button key={m.id}
                                         onClick={() => {
@@ -1464,17 +1470,17 @@ export default function VideoStudio() {
                                                 : 'bg-white/[0.01] border border-white/[0.05] opacity-50 cursor-not-allowed'
                                             }`}>
                                         {m.recommended && (
-                                            <span className="absolute -top-2 right-3 text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold border border-emerald-500/30">
-                                                ⭐ Recommended
+                                            <span className="absolute -top-2 right-3 text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold border border-emerald-500/30 flex items-center gap-1">
+                                                <span className="material-symbols-outlined text-[10px]">star</span> Recommended
                                             </span>
                                         )}
                                         {!m.available && (
-                                            <span className="absolute -top-2 right-3 text-xs px-2 py-0.5 rounded-full bg-slate-500/20 text-slate-400 font-bold border border-slate-500/30">
-                                                🔒 Coming Soon
+                                            <span className="absolute -top-2 right-3 text-xs px-2 py-0.5 rounded-full bg-slate-500/20 text-slate-400 font-bold border border-slate-500/30 flex items-center gap-1">
+                                                <span className="material-symbols-outlined text-[10px]">lock</span> Coming Soon
                                             </span>
                                         )}
                                         <div className="flex items-center gap-2 mb-2">
-                                            <span className="text-2xl">{m.icon}</span>
+                                            <span className="material-symbols-outlined text-2xl" style={{ color: '#FF4D00' }}>{m.icon}</span>
                                             <h3 className="text-base font-bold text-white">{m.name}</h3>
                                         </div>
                                         <p className="text-sm text-slate-400 mb-2">{m.desc}</p>

@@ -297,10 +297,10 @@ Return JSON:
                         }],
                         search_mode: 'auto',
                         temperature: 0.5,
-                        max_tokens: 2000,
+                        max_tokens: 1500,
                         response_format: { type: 'json_object' },
                     }),
-                    signal: AbortSignal.timeout(12000),
+                    signal: AbortSignal.timeout(8000), // ⚡ was 12s
                 });
                 const data = await resp.json();
                 let text = data.choices?.[0]?.message?.content || '{}';
@@ -362,8 +362,8 @@ export async function scrapeCompetitor(brandId) {
         // Dynamically import crawlPage from web-research.js
         const { crawlPage } = await import('../../utils/web-research.js');
 
-        // Crawl up to 3 competitor homepages (with timeout)
-        const urlsToCrawl = competitors.slice(0, 3).map(url => {
+        // Crawl up to 2 competitor homepages (with tight timeout for speed)
+        const urlsToCrawl = competitors.slice(0, 2).map(url => {
             if (!url.startsWith('http')) url = 'https://' + url;
             return url;
         });
@@ -376,7 +376,7 @@ export async function scrapeCompetitor(brandId) {
             urlsToCrawl.map(url =>
                 Promise.race([
                     crawlPage(url),
-                    new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 10000))
+                    new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 4000)) // ⚡ was 10s
                 ])
             )
         );
@@ -773,35 +773,66 @@ export async function fetchGA4ContentPerformance(userId, brandId) {
 // MASTER: GATHER INTELLIGENCE — Runs all relevant tools in parallel
 // ══════════════════════════════════════════════════════════════════════════════
 export async function gatherIntelligence(state) {
+    const t0 = Date.now();
     console.log(`\n🧠 ═══ Content Intelligence Gatherer ═══`);
-    console.log(`   Brief: "${(state.brief || '').substring(0, 80)}..."`);
+    console.log(`   Brief: "${(state.brief || '').substring(0, 80)}"`);
     console.log(`   Brand: ${state.brandId || 'none'}, Platform: ${state.platform || 'general'}`);
     console.log(`   Research Depth: ${state.researchDepth || 'quick'}`);
 
     const searchMode = state.researchDepth || 'quick';
+    const contentType = state.contentType || 'social';
+
+    // ── FAST PATH: Non-blog/non-YouTube social content skips slow tools ──
+    // Frontend sends contentType = goal name: 'promote','engage','brand','educate','celebrate',
+    // 'launch','hijack','product_content' etc. NEVER the literal string 'social'.
+    // Blog, YouTube, press_release need full research. Everything else → fast path.
+    const BLOG_TYPES = ['blog', 'seo_blog', 'long_form', 'listicle', 'case_study', 'comparison', 'pillar_content'];
+    const DEEP_RESEARCH_TYPES = ['blog', 'youtube_content', 'youtube_seo', 'press_release', ...BLOG_TYPES];
+    const isBlog = BLOG_TYPES.includes(contentType);
+    const needsDeepResearch = DEEP_RESEARCH_TYPES.includes(contentType) || searchMode === 'deep';
+    const isSocialQuick = !needsDeepResearch && searchMode !== 'deep';
+
+    console.log(`   Mode: ${isSocialQuick ? '⚡ FAST-PATH (skip competitor+GA4)' : isBlog ? '📝 BLOG DEEP RESEARCH' : '🔍 FULL RESEARCH'} | contentType: ${contentType}`);
 
     // Build search query from brief + brand context
     const searchQuery = state.brief;
 
-    // Run ALL tools in parallel for speed (7 tools now)
-    const [webData, seoData, historyData, trendingData, competitorData, performanceData, ga4Data] = await Promise.allSettled([
-        webSearch(searchQuery, searchMode),
-        fetchSEOAudit(state.brandId),
-        fetchContentHistory(state.brandId, state.platform),
-        fetchTrending(state.brandId),
-        scrapeCompetitor(state.brandId),
-        fetchPerformanceLearnings(state.brandId),
-        fetchGA4ContentPerformance(state.userId, state.brandId),
+    // ── Decide which tools to run ──
+    const toolPromises = [
+        webSearch(searchQuery, searchMode),                                  // [0] always
+        fetchSEOAudit(state.brandId),                                        // [1] always
+        fetchContentHistory(state.brandId, state.platform),                  // [2] always
+        fetchTrending(state.brandId),                                        // [3] always
+        isSocialQuick ? Promise.resolve({ success: false, skipped: true })   // [4] skip for social
+            : scrapeCompetitor(state.brandId),
+        fetchPerformanceLearnings(state.brandId),                            // [5] always
+        isSocialQuick ? Promise.resolve({ success: false, skipped: true })   // [6] skip for social
+            : fetchGA4ContentPerformance(state.userId, state.brandId),
+    ];
+
+    // ⚡ Adaptive timeout: 5s cap for social fast-path, 9s for deep research
+    const GATHER_TIMEOUT_MS = isSocialQuick ? 5000 : 9000;
+    const withTimeout = (p, idx) => Promise.race([
+        p,
+        new Promise(resolve =>
+            setTimeout(() => resolve({ success: false, timedOut: true, toolIdx: idx }), GATHER_TIMEOUT_MS)
+        ),
     ]);
 
+    const results = await Promise.allSettled(
+        toolPromises.map((p, i) => withTimeout(p, i))
+    );
+
+    const [webData, seoData, historyData, trendingData, competitorData, performanceData, ga4Data] = results;
+
     const intelligence = {
-        web: webData.status === 'fulfilled' ? webData.value : { success: false },
-        seo: seoData.status === 'fulfilled' ? seoData.value : { success: false },
-        contentHistory: historyData.status === 'fulfilled' ? historyData.value : { success: false },
-        trending: trendingData.status === 'fulfilled' ? trendingData.value : { success: false },
-        competitors: competitorData.status === 'fulfilled' ? competitorData.value : { success: false },
+        web:                webData.status         === 'fulfilled' ? webData.value         : { success: false },
+        seo:                seoData.status         === 'fulfilled' ? seoData.value         : { success: false },
+        contentHistory:     historyData.status     === 'fulfilled' ? historyData.value     : { success: false },
+        trending:           trendingData.status    === 'fulfilled' ? trendingData.value    : { success: false },
+        competitors:        competitorData.status  === 'fulfilled' ? competitorData.value  : { success: false },
         performanceLearnings: performanceData.status === 'fulfilled' ? performanceData.value : { success: false },
-        ga4: ga4Data.status === 'fulfilled' ? ga4Data.value : { success: false },
+        ga4:                ga4Data.status         === 'fulfilled' ? ga4Data.value         : { success: false },
         researchDepth: searchMode,
         gatheredAt: new Date().toISOString(),
     };
@@ -815,7 +846,7 @@ export async function gatherIntelligence(state) {
     if (intelligence.competitors.success) sources.push(`Competitors(${intelligence.competitors.data?.competitorsAnalyzed || 0})`);
     if (intelligence.performanceLearnings.success) sources.push(`Playbook(${intelligence.performanceLearnings.data?.totalPieces || 0})`);
     if (intelligence.ga4.success) sources.push(`GA4(${intelligence.ga4.data?.pagesTracked || 0} pages)`);
-    console.log(`   ✅ Intelligence gathered from: ${sources.join(', ') || 'none'}`);
+    console.log(`   ✅ Intelligence gathered in ${Date.now() - t0}ms from: ${sources.join(', ') || 'none'}`);
     console.log(`═══════════════════════════════════════\n`);
 
     return intelligence;

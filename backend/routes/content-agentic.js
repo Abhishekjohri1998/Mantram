@@ -34,6 +34,70 @@ import {
 
 const router = Router();
 
+// ════════════════════════════════════════════════════════════════════════════════
+// POST /api/content/agentic/assist — Smart writing assist for Custom Blog Writer
+// ⚡ Ultra-fast: uses grok-3-mini-fast with 4s timeout
+// Supports: synonyms | grammar | rephrase | expand
+// ════════════════════════════════════════════════════════════════════════════════
+router.post('/assist', protect, async (req, res) => {
+    try {
+        const { type, text, context } = req.body;
+        if (!text?.trim()) return res.status(400).json({ success: false, error: 'text is required' });
+
+        const grokKey = process.env.GROK_API_KEY || process.env.XAI_API_KEY;
+        if (!grokKey) return res.status(500).json({ success: false, error: 'API key not configured' });
+
+        const PROMPTS = {
+            synonyms: `You are a vocabulary assistant. For the word "${text}", return exactly 5 contextual synonyms suitable for blog writing. Context: "${context || 'general blog'}". Return ONLY a JSON array of strings: ["word1","word2","word3","word4","word5"]`,
+            grammar: `You are a grammar and spelling proofreader. Check this text for grammar, spelling, and punctuation errors. Text: "${text}". Return JSON: { "hasErrors": true/false, "suggestions": [{"original": "...", "corrected": "...", "reason": "..."}], "cleanedText": "full corrected text" }. If no errors, return {"hasErrors":false,"suggestions":[],"cleanedText":"${text}"}`,
+            rephrase: `You are a professional copywriter. Rephrase this text in 3 different ways to be more engaging, clear, and impactful. Keep the same meaning. Text: "${text}". Return JSON array: [{"version":1,"text":"...","style":"concise"},{"version":2,"text":"...","style":"vivid"},{"version":3,"text":"...","style":"professional"}]`,
+            expand: `You are a blog writer. Expand this sentence/paragraph into 2-3 detailed, engaging sentences while maintaining the same tone and topic. Text: "${text}". Context: "${context || ''}". Return JSON: {"expanded": "the expanded version"}`,
+        };
+
+        const prompt = PROMPTS[type];
+        if (!prompt) return res.status(400).json({ success: false, error: `Unknown assist type: ${type}` });
+
+        const resp = await fetch('https://api.x.ai/v1/chat/completions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${grokKey}` },
+            body: JSON.stringify({
+                model: 'grok-3-mini-fast',
+                messages: [{ role: 'user', content: prompt }],
+                temperature: 0.4,
+                max_tokens: 800,
+                // NOTE: No response_format here — Grok's json_object mode rejects array-starting responses
+            }),
+            signal: AbortSignal.timeout(10000), // 10s — grok-3-mini needs time for think+respond
+        });
+
+        const data = await resp.json();
+        let raw = data.choices?.[0]?.message?.content || '{}';
+        // Strip <think>...</think> reasoning blocks (grok-3-mini emits these)
+        raw = raw.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+        // Find the first JSON structure (array or object) in the response
+        let result;
+        try {
+            // Try extracting JSON array first (for synonyms, rephrase)
+            const arrMatch = raw.match(/\[[\s\S]*\]/);
+            const objMatch = raw.match(/\{[\s\S]*\}/);
+            if (arrMatch) {
+                result = JSON.parse(arrMatch[0]);
+            } else if (objMatch) {
+                result = JSON.parse(objMatch[0]);
+            } else {
+                result = JSON.parse(raw);
+            }
+        } catch {
+            result = { raw };
+        }
+
+        res.json({ success: true, type, result });
+    } catch (err) {
+        console.warn('[Content Assist] Error:', err.message);
+        res.json({ success: false, error: err.message });
+    }
+});
+
 // ══════════════════════════════════════════════════════════════════════════════
 // POST /api/content/agentic/parse-intent — AI-powered natural language parsing
 // ══════════════════════════════════════════════════════════════════════════════
@@ -129,7 +193,8 @@ router.post('/start', protect, requireCredits('content'), async (req, res) => {
         const { brandId, brief, contentType, platform, tone, language, targetAudience, researchDepth } = req.body;
         if (!brief) return res.status(400).json({ success: false, error: 'Brief is required' });
 
-        // Step 1: Research (with real intelligence gathering)
+        // Step 1: Research + MCoT Visual Grounding IN PARALLEL
+        // ⚡ MCoT used to run sequentially AFTER research — now runs concurrently
         let state = {
             userId: req.user._id.toString(),
             brandId: brandId || null,
@@ -139,29 +204,37 @@ router.post('/start', protect, requireCredits('content'), async (req, res) => {
             tone: tone || '',
             language: language || '',
             targetAudience: targetAudience || '',
-            researchDepth: researchDepth || 'quick', // 'quick' = Grok (cheap), 'deep' = Perplexity (premium)
+            researchDepth: researchDepth || 'quick',
         };
 
+        // Detect if this is a social fast-path request (non-blog, non-YT, non-PR)
+        const DEEP_CONTENT = ['blog', 'seo_blog', 'long_form', 'listicle', 'case_study', 'comparison', 'pillar_content', 'youtube_content', 'youtube_seo', 'press_release'];
+        const isSocialFastPath = !DEEP_CONTENT.includes(contentType) && (researchDepth || 'quick') !== 'deep';
+
+        // Run research, then parallelize MCoT + Strategist
         state = await researchNode(state);
 
-        // Step 1.5: MCoT Visual Grounding (non-blocking — runs concurrently with research results)
-        // Analyzes brand/product images to produce copywriting context for the Writer Agent
-        if (brandId) {
-            try {
-                state = await contentVisualGroundingNode(state);
-            } catch (gErr) {
+        // Step 1.5 + Step 2: MCoT Visual Grounding AND Content Strategist run in PARALLEL
+        // ⚡ For social fast-path: skip Strategist (saves 8-12s — unnecessary for short posts)
+        const [mcotResult, strategyResult] = await Promise.allSettled([
+            brandId ? contentVisualGroundingNode(state).catch(gErr => {
                 console.warn('[Content MCoT] Visual grounding failed (non-critical):', gErr.message);
-            }
-        }
+                return state; // return state unchanged on failure
+            }) : Promise.resolve(state),
+            isSocialFastPath
+                ? Promise.resolve(state) // Skip strategist for social posts
+                : contentStrategistNode(state),
+        ]);
 
-        // Step 2: Content Strategist (turns research into strategic plan)
-        state = await contentStrategistNode(state);
+        // Merge both results into state
+        const mcotState = mcotResult.status === 'fulfilled' ? mcotResult.value : state;
+        const stratState = strategyResult.status === 'fulfilled' ? strategyResult.value : state;
+        state = { ...state, ...mcotState, ...stratState };
 
-        // Step 3: Writer (auto-chains from strategy, enriched with real data + visual grounding)
+        // Step 3: Writer (enriched with real data + visual grounding + strategy)
         state = await writerNode(state);
 
         // Save initial content
-        const brand = brandId ? await Brand.findById(brandId) : null;
         const content = await Content.create({
             user: req.user._id,
             brand: brandId || undefined,
@@ -698,13 +771,25 @@ router.post('/blog/generate', protect, requireCredits('content'), async (req, re
 // ══════════════════════════════════════════════════════════════════════════════
 router.post('/blog/:id/generate-image', protect, async (req, res) => {
     try {
-        const { sectionIndex, customPrompt, imageStyle, brandImageUrl, brandImageRef } = req.body;
+        const { sectionIndex, customPrompt, imageStyle, brandImageUrl, brandImageRef, aspectRatio: reqAR } = req.body;
         // brandImageUrl = Use brand image directly (no AI generation)
         // brandImageRef = Use brand image as reference for NanoBanana 2 AI generation
         const content = await Content.findOne({ _id: req.params.id, user: req.user._id });
         if (!content) return res.status(404).json({ success: false, error: 'Content not found' });
 
         const isHero = sectionIndex === -1 || sectionIndex === undefined;
+
+        // Aspect ratio: hero default 16:9, sections default 9:16
+        const aspectRatio = reqAR || (isHero ? '16:9' : '9:16');
+        const AR_SIZE_MAP = {
+            '16:9': { lz: '1792x1024', geminiInstruction: 'wide landscape 16:9 horizontal format' },
+            '9:16': { lz: '1024x1792', geminiInstruction: 'tall portrait 9:16 vertical format' },
+            '1:1':  { lz: '1024x1024', geminiInstruction: 'square 1:1 format' },
+            '4:3':  { lz: '1365x1024', geminiInstruction: 'standard landscape 4:3 format' },
+            '3:2':  { lz: '1536x1024', geminiInstruction: 'standard landscape 3:2 format' },
+        };
+        const arConfig = AR_SIZE_MAP[aspectRatio] || AR_SIZE_MAP['9:16'];
+        console.log(`🖼️ Blog image AR: ${aspectRatio} → ${arConfig.lz}`);
 
         // ── Mode 1: Use brand image DIRECTLY (no AI) ──
         if (brandImageUrl && !brandImageRef) {
@@ -777,10 +862,8 @@ router.post('/blog/:id/generate-image', protect, async (req, res) => {
         // LZ doesn't support inline reference images, only plain text prompts
         if (!brandImageRef && isLaozhangAvailable()) {
             try {
-                const blogAR = isHero ? '16:9' : '3:2';
-                const AR_SIZE_MAP = { '16:9': '1792x1024', '3:2': '1536x1024', '1:1': '1024x1024' };
-                const lzSize = AR_SIZE_MAP[blogAR] || '1024x1024';
-                console.log(`🏷️ [LaoZhang-First] Blog image via LZ (${lzSize})...`);
+                const lzSize = arConfig.lz;
+                console.log(`🏷️ [LaoZhang-First] Blog image via LZ (${lzSize}, AR=${aspectRatio})...`);
                 const lzResult = await laozhangImageGenerate(imagePrompt, { model: 'gemini-3.1-flash-image-preview', size: lzSize });
                 if (lzResult?.imageUrl) {
                     console.log(`✅ [LaoZhang] Blog image generated successfully`);
@@ -810,7 +893,7 @@ router.post('/blog/:id/generate-image', protect, async (req, res) => {
                     }
                     content.markModified('blogMeta');
                     await content.save();
-                    return res.json({ success: true, imageUrl, altText: seoAltText, sectionIndex: isHero ? -1 : sectionIndex, model: 'NanoBanana 2 (LaoZhang)' });
+                    return res.json({ success: true, imageUrl, altText: seoAltText, sectionIndex: isHero ? -1 : sectionIndex, aspectRatio, model: 'NanoBanana 2 (LaoZhang)' });
                 }
             } catch (lzErr) {
                 console.warn(`⚠️ [LaoZhang] Blog image failed (${lzErr.message?.substring(0, 80)}), falling through to Gemini direct...`);
@@ -823,8 +906,7 @@ router.post('/blog/:id/generate-image', protect, async (req, res) => {
 
         const baseUrl = 'https://generativelanguage.googleapis.com/v1beta';
         const modelId = 'gemini-3.1-flash-image-preview'; // NanoBanana 2
-        const aspectRatio = isHero ? '16:9' : '3:2';
-        const arInstruction = `Generate this image in ${aspectRatio} aspect ratio (${aspectRatio === '16:9' ? 'landscape/horizontal' : 'standard landscape'}). `;
+        const arInstruction = `Generate this image in ${aspectRatio} aspect ratio (${arConfig.geminiInstruction}). `;
 
         // Build parts array — optionally include brand reference image
         const contentParts = [];
@@ -911,7 +993,7 @@ router.post('/blog/:id/generate-image', protect, async (req, res) => {
         content.markModified('blogMeta');
         await content.save();
 
-        res.json({ success: true, imageUrl, altText: seoAltText, sectionIndex: isHero ? -1 : sectionIndex, model: 'NanoBanana 2' });
+        res.json({ success: true, imageUrl, altText: seoAltText, sectionIndex: isHero ? -1 : sectionIndex, aspectRatio, model: 'NanoBanana 2' });
     } catch (error) {
         console.error('Blog image generation error:', error);
         res.status(500).json({ success: false, error: safeErrorMessage(error) });

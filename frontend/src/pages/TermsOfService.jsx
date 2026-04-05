@@ -3,7 +3,7 @@ import SEOHead from '../components/SEOHead'
 
 export default function TermsOfService() {
     return (
-        <div className="min-h-screen bg-[#08080C] text-slate-300 py-12 px-4 sm:px-6 lg:px-8">
+        <div className="min-h-screen bg-slate-950 text-slate-300 py-12 px-4 sm:px-6 lg:px-8">
             <SEOHead
                 title="Terms of Service — Mantram AI"
                 description="Mantram AI terms of service: AI content ownership, subscriptions & credits, social publishing rules, third-party integrations, intellectual property & acceptable use policy."
@@ -231,7 +231,7 @@ export default function TermsOfService() {
                     <section className="pt-6 border-t border-white/[0.05]">
                         <h2 className="text-xl font-bold text-white mb-3">17. Contact Us</h2>
                         <p className="leading-relaxed mb-3">For questions about these Terms of Service, contact us:</p>
-                        <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+                        <div className="p-4 rounded-xl bg-white/[0.02] border border-[#48474c]/30">
                             <p className="text-sm"><strong className="text-white">Mantram AI</strong></p>
                             <p className="text-sm">Email: <a href="mailto:legal@mantram.ai" className="text-primary hover:underline">legal@mantram.ai</a></p>
                             <p className="text-sm">Support: <a href="mailto:support@mantram.ai" className="text-primary hover:underline">support@mantram.ai</a></p>

@@ -344,6 +344,7 @@ export default function CreativeStudio() {
     const [error, setError] = useState(null)
     const [feedbackState, setFeedbackState] = useState(null)  // 'liked' | 'disliked' | 'accepted'
     const [feedbackToast, setFeedbackToast] = useState('')
+    const [agenticMatchedProduct, setAgenticMatchedProduct] = useState(null) // Product auto-matched by Enhance pipeline
     const [style, setStyle] = useState('modern')
     const [textOverlay, setTextOverlay] = useState('')
     const [fromContent, setFromContent] = useState(false)
@@ -364,7 +365,7 @@ export default function CreativeStudio() {
             id: 'worms-eye-hero',
             label: "Worm's Eye",
             icon: 'south',
-            emoji: 'south',
+            emoji: '🐛',
             color: '#f97316',
             description: 'Camera flat on ground, subject towers above, open sky fills the frame',
             injection: 'SHOT TYPE: extreme worm\'s-eye view. Camera is placed flat on the ground pointing straight up. The subject stands directly over the camera lens, legs straddling it, body filling the full vertical frame from bottom to top. The product or hand is thrust downward toward the lens and appears enormous in the near foreground — 3× to 5× larger than life. The subject\'s face looks down at the camera with confidence. Open blue sky, clouds, or clean studio ceiling fills the top 60% of the frame behind them. Ultra-wide 14mm lens, strong forced perspective, feet and legs massive at bottom, torso receding, face small at top. Shot style: Maxi / Pepsi commercial worm\'s-eye street photography.',
@@ -373,7 +374,7 @@ export default function CreativeStudio() {
             id: 'high-action',
             label: 'High Action',
             icon: 'bolt',
-            emoji: 'bolt',
+            emoji: '⚡',
             color: '#ef4444',
             description: 'Mid-air jump, product thrust toward lens, motion-blurred background',
             injection: 'SHOT TYPE: low-angle action freeze shot. Camera is positioned at waist height or below, angled upward. Subject is caught mid-jump or mid-leap, body airborne, at least one foot off or near the ground. The product (can, bottle, sneaker, or box) is gripped in one hand and thrust aggressively toward the camera — it appears massive and sharp in the foreground while the subject\'s body is in focus behind it. Background is a real urban street or concrete wall with horizontal motion blur streaks from passing cars or environmental movement. Sky fills the top of frame. 1/2000s freeze shutter. 24mm wide-angle. Shot style: Red Bull / Nike action advertising.',
@@ -382,7 +383,7 @@ export default function CreativeStudio() {
             id: 'fisheye-lean',
             label: 'Fisheye Flex',
             icon: 'lens',
-            emoji: 'lens',
+            emoji: '🐟',
             color: '#FF4D00',
             description: 'Extreme fisheye, ground level, buildings bow outward around the subject',
             injection: 'SHOT TYPE: extreme ground-level fisheye distortion shot. Camera is placed at or below ankle height with a super-wide 8mm fisheye lens. Subject crouches or squats low to the ground, filling the center frame. Their sneakers, feet, or lower body are enormous and occupying the bottom third of the frame. Surrounding skyscrapers, buildings, or walls bow dramatically outward in a barrel-distortion curve — bending away from the center like the frame is wrapping around the subject. The ground curves downward at the edges. Everything except the subject is distorted. Sky at top. Shot style: Supreme / streetwear fisheye skate photography, girl-in-city crouch pose.',
@@ -391,7 +392,7 @@ export default function CreativeStudio() {
             id: 'fashion-low',
             label: 'Low Editorial',
             icon: 'camera_enhance',
-            emoji: 'camera_enhance',
+            emoji: '👟',
             color: '#06b6d4',
             description: 'Ground-level, sole/product massive in foreground, model crouches over the lens',
             injection: 'SHOT TYPE: ultra-low ground editorial shot. Camera is positioned at floor level, lens pointing upward at roughly 45 degrees. Subject crouches or leans dramatically toward the camera, one leg extended toward the lens so the shoe sole or sneaker sole fills the extreme bottom foreground in sharp focus — appearing as large as the subject\'s entire torso. The model\'s face is visible above, looking down into the lens with editorial attitude. Studio background with strong directional rim lighting. The sole detail, tread, and texture are razor-sharp in macro foreground while the body is also in focus. Shot style: Midjourney sneaker editorial — sole-forward crouch shot, fashion magazine.',
@@ -400,7 +401,7 @@ export default function CreativeStudio() {
             id: 'dutch-tilt',
             label: 'Dutch Tilt',
             icon: 'rotate_90_degrees_cw',
-            emoji: 'rotate_90_degrees_cw',
+            emoji: '↗️',
             color: '#ec4899',
             description: 'Camera tilted 20–30°, horizon diagonal, cinematic psychological tension',
             injection: 'SHOT TYPE: Dutch angle / canted camera shot. The entire frame is rotated approximately 25 degrees clockwise or counter-clockwise. The horizon line is a strong diagonal. Subject is positioned off-center in the frame, their body aligned with the tilt so they appear to defy gravity. Strong negative space on one side. The product is held prominently. Background shows a cityscape, hallway, or editorial studio that also participates in the tilt creating visual disorientation. Anamorphic lens with slight oval bokeh. Shot style: cinematic editorial, fashion campaign, psychological tension photography — Vogue editorial.',
@@ -409,7 +410,7 @@ export default function CreativeStudio() {
             id: 'overhead-flatlay',
             label: 'Overhead',
             icon: 'arrow_downward',
-            emoji: 'arrow_downward',
+            emoji: '⬇️',
             color: '#22c55e',
             description: 'Dead overhead flat lay — product styled on surface with dramatic shadows',
             injection: 'SHOT TYPE: dead-overhead flat lay. Camera is mounted directly above, pointing straight down at 90 degrees to the surface. The product is the hero — beautifully styled and placed on a clean surface (marble, concrete, white seamless, or textured paper). Supporting props are arranged symmetrically or artistically around the product. A single strong light source from one side casts crisp, long geometric shadows that become a design element. The product label or face is perfectly oriented toward the viewer. Top-down. Nothing in the frame except product, surface, and intentional props. Shot style: commercial product flat lay, Kinfolk magazine, Apple product photography.',
@@ -418,7 +419,7 @@ export default function CreativeStudio() {
             id: 'dramatic-close',
             label: 'Extreme Close',
             icon: 'search',
-            emoji: 'search',
+            emoji: '🔍',
             color: '#eab308',
             description: 'Macro close-up, product texture as hero, silky bokeh surrounds it',
             injection: 'SHOT TYPE: extreme macro close-up. Camera is at macro range — lens nearly touching the product or face. Subject or product fills and overflows the entire frame — we see nothing but texture, material, and surface detail. The label, fabric weave, skin pore, condensation droplet, or material finish becomes the visual universe. Shot on 105mm macro lens, f/2.8, razor-thin depth of field — only a 2mm slice is perfectly sharp while everything behind and in front dissolves into smooth creamy bokeh. Studio lighting rakes at a low angle to reveal every micro-texture as relief. Shot style: watch advertisement close-up, perfume flask, sneaker material close.',
@@ -427,7 +428,7 @@ export default function CreativeStudio() {
             id: 'cinematic-wide',
             label: 'Cinematic Wide',
             icon: 'panorama_wide_angle',
-            emoji: 'movie',
+            emoji: '🎬',
             color: '#FF4D00',
             description: 'Epic 2.39:1 anamorphic wide, subject small in vast landscape, cinematic haze',
             injection: 'SHOT TYPE: anamorphic cinematic wide shot. Ultra-wide establishing frame in 2.39:1 letterbox widescreen ratio. The subject and product are positioned confidently in the lower third of the frame — intentionally small relative to the sweeping landscape, architecture, or environment around them. The scene has multiple depth layers: sharp foreground element, subject in mid-ground, atmospheric haze or fog in the distance. Anamorphic lens flare visible on light sources. Golden hour or dramatic mixed light. Cinematic color grade — teal shadows, warm highlights. Shot style: Denis Villeneuve / Christopher Nolan commercial — the environment is as important as the subject.',
@@ -436,7 +437,7 @@ export default function CreativeStudio() {
             id: 'freeze-motion',
             label: 'Freeze Frame',
             icon: 'shutter_speed',
-            emoji: 'shutter_speed',
+            emoji: '❄️',
             color: '#67e8f9',
             description: 'Ultra-fast shutter: liquid splash, fabric fan, or flying product — all suspended',
             injection: 'SHOT TYPE: high-speed strobe freeze. Camera set to 1/8000s shutter speed or strobe-frozen at that equivalent. A physically impossible moment is captured: liquid bursting outward from a shaken bottle, fabric billowing and suspended mid-flow, the product thrown into the air with trajectory particles around it, or water droplets exploding upward from a surface hit. Every droplet, thread, and particle is individually sharp and frozen — arrested mid-physics. Background is a clean studio or gradient. The product is at the center of the explosive energy. Shot style: Milk splash advertisement, Absolut Vodka frozen moment, fashion water spray editorial.',
@@ -445,7 +446,7 @@ export default function CreativeStudio() {
             id: 'shoulder-candid',
             label: 'Street Candid',
             icon: 'photo_camera_back',
-            emoji: 'photo_camera_back',
+            emoji: '📸',
             color: '#a3e635',
             description: 'Handheld 35mm film, authentic unposed street energy, real-life moment',
             injection: 'SHOT TYPE: candid street documentary. Handheld camera with natural shake, shot on 35mm film equivalent (Kodak Portra 400 or Fuji 400H color science). The subject is NOT posed — they are caught mid-laugh, mid-walk, mid-sip, or mid-conversation, fully immersed in their own world. The product appears naturally in the scene (in their hand, on a table, in a bag). Composition is slightly off-center, breathing room on one side. Natural available light — golden hour sunlight, neon bounce, or soft overcast. Film grain at ISO 1600 visible. Slight vignette. No studio feel whatsoever. Shot style: Leica street photography, Tyler Mitchell, Nan Goldin — real moment, real life.',
@@ -454,7 +455,7 @@ export default function CreativeStudio() {
             id: 'birds-eye-social',
             label: "Bird's Eye",
             icon: 'north',
-            emoji: 'north',
+            emoji: '🦅',
             color: '#f59e0b',
             description: "Directly overhead, subject looks tiny within bold graphic ground geometry",
             injection: "SHOT TYPE: high aerial bird's-eye view. Camera is positioned directly above, 10–30 feet high, pointing straight down. The subject lies, sits, or stands on a graphic surface — bold geometric tiles, painted road markings, a colorful rug, or a patterned floor. The geometric ground pattern creates a strong graphic composition that the subject is deliberately placed within — like a human element in an abstract diagram. The subject and product are seen from directly above, face visible looking up at the camera (if portrait) or artfully arranged (if flatlay). Negative space is used intentionally. Shot style: aerial fashion Instagram, Cosmo flat lay, Alex Prager overhead.",
@@ -463,7 +464,7 @@ export default function CreativeStudio() {
             id: 'over-shoulder',
             label: 'Over Shoulder',
             icon: 'switch_camera',
-            emoji: 'switch_camera',
+            emoji: '👁️',
             color: '#FF4D00',
             description: "Camera behind subject's shoulder \u2014 immersive POV, we see what they see",
             injection: "SHOT TYPE: over-the-shoulder POV shot. Camera is positioned just behind and above the subject's right or left shoulder — we see the back of their head, neck, and one shoulder blurred in the immediate foreground. The subject is reaching toward the product, looking at it, interacting with it — and we are right behind them, inhabiting their perspective. The product is in sharp focus in the mid-ground. If another person is present, we see their face reacting to our subject. 85mm lens, shallow depth of field, shoulder is soft bokeh at screen edge. Intimate, cinematic, first-person narrative. Shot style: fashion film, perfume campaign — immersive editorial storytelling.",
@@ -1305,10 +1306,27 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
                 style,
                 format: selectedType,
                 aspectRatio,
+                imageModel, // ← Pass selected model so pipeline applies model-specific prompt language
                 referenceDescriptions: refDescs.length > 0 ? refDescs.join('. ') : '',
             }, { signal })
+
             if (data.enhancedPrompt) {
                 setPrompt(data.enhancedPrompt)
+
+                // If the full agentic pipeline ran, surface what the AI decided
+                if (data.agenticEnhanced) {
+                    const parts = []
+                    if (data.designTrend) parts.push(`🎨 ${data.designTrend}`)
+                    if (data.productMatched) {
+                        parts.push(`📦 Featuring: ${data.productMatched}`)
+                        setAgenticMatchedProduct(data.productMatched) // Show product chip in sidebar
+                    }
+                    if (data.mood) parts.push(`✨ ${data.mood}`)
+                    if (parts.length > 0) {
+                        setFeedbackToast(parts.join(' · '))
+                        setTimeout(() => setFeedbackToast(''), 5000)
+                    }
+                }
             }
         } catch (err) {
             if (err.name === 'AbortError') return
@@ -1317,6 +1335,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
             setEnhancing(false)
         }
     }
+
 
     async function handleGenerate() {
         if (!prompt.trim() || !activeBrand) return
@@ -3157,407 +3176,385 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
 
                     </div>{/* ═══════════ END RIGHT GALLERY PANEL ═══════════ */}
 
-                </div>
+                    {/* ═══════════ SIDEBAR COMMAND PANEL WITH SETTINGS ═══════════ */}
+                    <div className="creative-tools-panel">
 
-                    {/* ═══════════ FLOATING COMMAND BAR WITH SETTINGS ═══════════ */}
-                    <div className="creative-floating-bar">
-
-                        {/* ── Settings Tray (slides up when a setting icon is clicked) ── */}
-                        {floatingTray === 'format' && (
-                            <div className="floating-tray" key="format-tray">
-                                <div className="flex items-center justify-between mb-2">
-                                    <span className="text-[11px] text-slate-400 uppercase tracking-widest font-bold flex items-center gap-1.5">
-                                        <span className="material-symbols-outlined text-sm text-primary">crop</span>
-                                        Format & Size
-                                    </span>
-                                    <div className="flex items-center gap-2">
-                                        {selectedTypeInfo && selectedType !== 'custom-size' && (
-                                            <span className="text-[10px] text-slate-500 font-mono bg-white/[0.04] px-2 py-0.5 rounded">{selectedTypeInfo.size} · {selectedTypeInfo.aspectRatio}</span>
-                                        )}
-                                        {selectedType === 'custom-size' && customWidth && customHeight && (
-                                            <span className="text-[10px] text-emerald-500 font-mono bg-emerald-500/10 px-2 py-0.5 rounded">{customWidth}×{customHeight}px</span>
-                                        )}
-                                        <button onClick={() => setFloatingTray(null)} className="text-slate-500 hover:text-white cursor-pointer">
-                                            <span className="material-symbols-outlined text-sm">close</span>
-                                        </button>
-                                    </div>
+                        {/* ── Panel Header ── */}
+                        <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-white/[0.06]">
+                            <div className="flex items-center gap-2">
+                                <div className="w-5 h-5 rounded-md bg-[#FF4D00]/15 flex items-center justify-center">
+                                    <span className="material-symbols-outlined text-[#FF4D00]" style={{ fontSize: '12px' }}>tune</span>
                                 </div>
-                                <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 gap-1.5">
-                                    {creativeTypes.map(ct => (
-                                        <button key={ct.id} onClick={() => { setSelectedType(ct.id); if (ct.id !== 'custom-size') setFloatingTray(null) }}
-                                            className={`px-2.5 py-2 rounded-lg text-[11px] font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
-                                                selectedType === ct.id
-                                                ? 'bg-primary/15 text-primary border border-primary/30'
-                                                : 'bg-white/[0.03] text-slate-400 hover:text-slate-200 border border-white/[0.05] hover:border-white/[0.1] hover:bg-white/[0.06]'
-                                            }`}>
-                                            <span className="material-symbols-outlined text-xs">{ct.icon}</span>
-                                            <span className="truncate">{ct.label}</span>
-                                        </button>
-                                    ))}
-                                </div>
-                                {selectedType === 'custom-size' && (
-                                    <div className="mt-2 flex items-center gap-2">
-                                        <span className="material-symbols-outlined text-xs text-emerald-400">straighten</span>
-                                        <input type="number" value={customWidth} onChange={e => setCustomWidth(e.target.value)}
-                                            placeholder="W" min="100" max="4096"
-                                            className="w-20 px-2 py-1.5 rounded-lg bg-white/5 border border-white/10 text-xs text-white focus:border-primary focus:outline-none text-center" />
-                                        <span className="text-slate-500 text-xs font-bold">×</span>
-                                        <input type="number" value={customHeight} onChange={e => setCustomHeight(e.target.value)}
-                                            placeholder="H" min="100" max="4096"
-                                            className="w-20 px-2 py-1.5 rounded-lg bg-white/5 border border-white/10 text-xs text-white focus:border-primary focus:outline-none text-center" />
-                                        <span className="text-[10px] text-slate-500">px</span>
-                                    </div>
-                                )}
+                                <span className="text-[11px] font-bold text-white uppercase tracking-widest">Settings</span>
                             </div>
-                        )}
-
-                        {floatingTray === 'camera' && (
-                            <div className="floating-tray" key="camera-tray">
-                                <div className="flex items-center justify-between mb-2">
-                                    <span className="text-[11px] text-slate-400 uppercase tracking-widest font-bold flex items-center gap-1.5">
-                                        <span className="material-symbols-outlined text-sm text-primary">movie</span>
-                                        Camera Shot
-                                    </span>
-                                    <div className="flex items-center gap-2">
-                                        {selectedShot && (
-                                            <button onClick={() => setSelectedShot(null)}
-                                                className="text-[10px] text-slate-500 hover:text-rose-400 transition-colors cursor-pointer flex items-center gap-0.5">
-                                                <span className="material-symbols-outlined text-[10px]">close</span> Clear
-                                            </button>
-                                        )}
-                                        <button onClick={() => setFloatingTray(null)} className="text-slate-500 hover:text-white cursor-pointer">
-                                            <span className="material-symbols-outlined text-sm">close</span>
-                                        </button>
-                                    </div>
-                                </div>
-                                <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-12 gap-1.5">
-                                    {CAMERA_SHOT_PRESETS.map(shot => (
-                                        <button key={shot.id}
-                                            onClick={() => { setSelectedShot(prev => prev === shot.id ? null : shot.id) }}
-                                            title={shot.description}
-                                            className={`relative px-2 py-2 rounded-lg text-[10px] font-semibold transition-all cursor-pointer flex flex-col items-center gap-0.5 ${
-                                                selectedShot === shot.id
-                                                ? 'border text-white shadow-lg'
-                                                : 'bg-white/[0.03] text-slate-400 hover:text-slate-200 border border-white/[0.05] hover:border-white/[0.1] hover:bg-white/[0.06]'
-                                            }`}
-                                            style={selectedShot === shot.id ? {
-                                                backgroundColor: `${shot.color}18`,
-                                                borderColor: `${shot.color}50`,
-                                                color: shot.color,
-                                            } : {}}>
-                                            <span className="material-symbols-outlined text-base leading-none">{shot.emoji}</span>
-                                            <span className="leading-tight text-center">{shot.label}</span>
-                                        </button>
-                                    ))}
-                                </div>
-                                {selectedShot && (() => {
-                                    const s = CAMERA_SHOT_PRESETS.find(x => x.id === selectedShot)
-                                    return s ? (
-                                        <p className="text-[10px] mt-1.5 flex items-center gap-1" style={{ color: s.color }}>
-                                            <span className="material-symbols-outlined text-xs">info</span>
-                                            {s.description}
-                                        </p>
-                                    ) : null
-                                })()}
+                            <div className="flex items-center gap-1.5">
+                                {/* Tag Product */}
+                                <button onClick={() => {
+                                    if (activeBrand?._id) {
+                                        productsAPI.list({ brandId: activeBrand._id, limit: 50 }).then(res => setProductsList(res.products || [])).catch(() => {})
+                                    }
+                                    setShowProductPicker(true)
+                                }} className="flex items-center gap-1 text-[10px] text-slate-400 hover:text-white px-2 py-1 cursor-pointer bg-white/[0.03] border border-white/[0.06] rounded-lg hover:border-white/[0.12] transition-all">
+                                    <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>inventory_2</span>
+                                    {selectedProduct ? <span className="text-cyan-400 max-w-[60px] truncate">{selectedProduct.title?.split(' ')[0]}</span> : 'Tag Product'}
+                                </button>
                             </div>
-                        )}
+                        </div>
 
-                        {floatingTray === 'references' && (
-                            <div className="floating-tray" key="refs-tray">
-                                <div className="flex items-center justify-between mb-2">
-                                    <span className="text-[11px] text-slate-400 uppercase tracking-widest font-bold flex items-center gap-1.5">
-                                        <span className="material-symbols-outlined text-sm text-primary">collections</span>
-                                        References
-                                    </span>
-                                    <button onClick={() => setFloatingTray(null)} className="text-slate-500 hover:text-white cursor-pointer">
-                                        <span className="material-symbols-outlined text-sm">close</span>
-                                    </button>
-                                </div>
-                                <div className="flex items-center gap-3 flex-wrap">
-                                    {/* Style Ref */}
-                                    {referenceImages.style ? (
-                                        <div className="relative flex-shrink-0 group">
-                                            <div className="w-12 h-12 rounded-lg overflow-hidden border border-amber-500/40">
-                                                <img src={referenceImages.style} alt="Style" className="w-full h-full object-cover" />
-                                            </div>
-                                            <button onClick={() => setReferenceImages(prev => ({ ...prev, style: null }))}
-                                                className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-500 text-white text-[8px] flex items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity">×</button>
-                                            <span className="text-[8px] text-amber-400 font-bold text-center block mt-0.5">Style</span>
-                                        </div>
-                                    ) : (
-                                        <button onClick={() => { setRefPickerSlot('style'); setRefPickerTab('upload') }}
-                                            className="flex-shrink-0 w-12 h-12 rounded-lg border border-dashed border-white/10 hover:border-amber-500/40 flex flex-col items-center justify-center cursor-pointer transition-all bg-white/[0.02] group" title="Add style reference">
-                                            <span className="material-symbols-outlined text-sm text-slate-500 group-hover:text-amber-400">brush</span>
-                                            <span className="text-[8px] text-slate-500 group-hover:text-amber-400 font-bold leading-none">Style</span>
-                                        </button>
-                                    )}
-
-                                    {/* Characters */}
-                                    {characters.map((char, idx) => (
-                                        <div key={idx} className="relative flex-shrink-0 group">
-                                            <div className="w-12 h-12 rounded-lg overflow-hidden border border-[#FF4D00]/40">
-                                                <img src={char.image} alt={char.name} className="w-full h-full object-cover" />
-                                            </div>
-                                            <button onClick={() => setCharacters(prev => prev.filter((_, i) => i !== idx))}
-                                                className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-500 text-white text-[8px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">×</button>
-                                            <input value={char.name}
-                                                onChange={e => setCharacters(prev => prev.map((c, i) => i === idx ? { ...c, name: e.target.value } : c))}
-                                                className="w-12 mt-0.5 text-[8px] text-center bg-transparent text-[#FF7A00] outline-none font-bold truncate"
-                                                placeholder="Name" />
-                                        </div>
-                                    ))}
-                                    {characters.length < 5 && (
-                                        <button onClick={() => { setRefPickerSlot(`character-${characters.length}`); setRefPickerTab('upload') }}
-                                            className="flex-shrink-0 w-12 h-12 rounded-lg border border-dashed border-white/10 hover:border-[#FF4D00]/40 flex flex-col items-center justify-center cursor-pointer transition-all bg-white/[0.02] group" title="Add character">
-                                            <span className="material-symbols-outlined text-sm text-slate-500 group-hover:text-[#FF4D00]">person_add</span>
-                                            <span className="text-[8px] text-slate-500 group-hover:text-[#FF4D00] font-bold leading-none">Person</span>
-                                        </button>
-                                    )}
-
-                                    {/* Upload Ref */}
-                                    {referenceImages.upload ? (
-                                        <div className="relative flex-shrink-0 group">
-                                            <div className="w-12 h-12 rounded-lg overflow-hidden border border-cyan-500/40">
-                                                <img src={referenceImages.upload} alt="Ref" className="w-full h-full object-cover" />
-                                            </div>
-                                            <button onClick={() => setReferenceImages(prev => ({ ...prev, upload: null }))}
-                                                className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-500 text-white text-[8px] flex items-center justify-center cursor-pointer z-10 opacity-0 group-hover:opacity-100 transition-opacity">×</button>
-                                            <button onClick={() => { setCharacters(prev => [...prev, { name: `Char ${prev.length + 1}`, image: referenceImages.upload }]); setReferenceImages(prev => ({ ...prev, upload: null })) }}
-                                                className="absolute -bottom-1 -left-1 w-4 h-4 rounded-full bg-[#FF4D00] text-white text-[8px] flex items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity z-10" title="Use as Character">
-                                                <span className="material-symbols-outlined text-[8px]">person_add</span>
-                                            </button>
-                                            <span className="text-[8px] text-cyan-400 font-bold text-center block mt-0.5">Upload</span>
-                                        </div>
-                                    ) : (
-                                        <button onClick={() => { setRefPickerSlot('upload'); setRefPickerTab('upload') }}
-                                            className="flex-shrink-0 w-12 h-12 rounded-lg border border-dashed border-white/10 hover:border-cyan-500/40 flex flex-col items-center justify-center cursor-pointer transition-all bg-white/[0.02] group" title="Upload reference">
-                                            <span className="material-symbols-outlined text-sm text-slate-500 group-hover:text-cyan-400">add_photo_alternate</span>
-                                            <span className="text-[8px] text-slate-500 group-hover:text-cyan-400 font-bold leading-none">Upload</span>
-                                        </button>
-                                    )}
-
-                                    {characters.length > 0 && (
-                                        <span className="text-[10px] text-[#FF4D00]/60 flex items-center gap-1 ml-2">
-                                            <span className="material-symbols-outlined text-[10px]">info</span>
-                                            Type <span className="font-bold text-[#FF4D00]">@name</span> in prompt to tag
-                                        </span>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-
-                        {floatingTray === 'text' && (
-                            <div className="floating-tray" key="text-tray">
-                                <div className="flex items-center justify-between mb-2">
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-[11px] text-slate-400 uppercase tracking-widest font-bold flex items-center gap-1.5">
-                                            <span className="material-symbols-outlined text-sm text-primary">title</span>
-                                            Add Text to Image
-                                        </span>
-                                        <button onClick={() => setGenerateCopy(!generateCopy)}
-                                            className={`w-9 h-5 rounded-full transition-all cursor-pointer flex-shrink-0 ${generateCopy ? 'bg-[#FF4D00]' : 'bg-white/[0.1]'}`}>
-                                            <div className={`w-3.5 h-3.5 rounded-full bg-white shadow transition-transform ${generateCopy ? 'translate-x-4.5' : 'translate-x-0.5'}`} />
-                                        </button>
-                                    </div>
-                                    <button onClick={() => setFloatingTray(null)} className="text-slate-500 hover:text-white cursor-pointer">
-                                        <span className="material-symbols-outlined text-sm">close</span>
-                                    </button>
-                                </div>
-                                {generateCopy ? (
-                                    <div className="flex items-center gap-3 flex-wrap">
-                                        <div className="relative flex-1 min-w-[200px]">
-                                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 material-symbols-outlined text-xs text-slate-500 pointer-events-none">format_size</span>
-                                            <input type="text" value={customHeadline}
-                                                onChange={e => { setCustomHeadline(e.target.value); setCopyIsAiSuggested(false); }}
-                                                maxLength={40}
-                                                placeholder={copyLoading ? 'AI is writing...' : 'Headline text'}
-                                                disabled={copyLoading}
-                                                className={`w-full pl-7 pr-8 py-2 text-xs rounded-lg text-white placeholder-slate-600 focus:outline-none transition-all ${
-                                                    copyLoading ? 'bg-[#FF4D00]/5 border border-[#FF4D00]/10 opacity-50' :
-                                                    'bg-white/[0.05] border border-white/[0.08] focus:border-[#FF4D00]/50'
-                                                }`} />
-                                            {customHeadline && !copyLoading && (
-                                                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] text-slate-600">{customHeadline.length}/40</span>
-                                            )}
-                                        </div>
-                                        <div className="relative flex-1 min-w-[150px]">
-                                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 material-symbols-outlined text-xs text-slate-500 pointer-events-none">ads_click</span>
-                                            <input type="text" value={customCtaText}
-                                                onChange={e => { setCustomCtaText(e.target.value); setCopyIsAiSuggested(false); }}
-                                                maxLength={20}
-                                                placeholder={copyLoading ? 'AI is writing...' : 'CTA (e.g. Shop Now)'}
-                                                disabled={copyLoading}
-                                                className={`w-full pl-7 pr-3 py-2 text-xs rounded-lg text-white placeholder-slate-600 focus:outline-none transition-all ${
-                                                    copyLoading ? 'bg-[#FF4D00]/5 border border-[#FF4D00]/10 opacity-50' :
-                                                    'bg-white/[0.05] border border-white/[0.08] focus:border-[#FF4D00]/50'
-                                                }`} />
-                                        </div>
-                                        {!copyLoading && prompt?.trim().length > 5 && (
-                                            <button onClick={() => suggestCopy(prompt)}
-                                                className="flex items-center gap-1 px-2.5 py-2 rounded-lg text-[10px] text-slate-400 hover:text-[#FF4D00] bg-white/[0.03] hover:bg-[#FF4D00]/10 transition-all cursor-pointer border border-white/[0.06]">
-                                                <span className="material-symbols-outlined text-xs">auto_awesome</span>
-                                                AI Suggest
-                                            </button>
-                                        )}
-                                    </div>
-                                ) : (
-                                    <p className="text-[10px] text-slate-500">Toggle ON to add AI-generated headline + CTA text directly on your image</p>
-                                )}
-                            </div>
-                        )}
-
-                        {floatingTray === 'advanced' && (
-                            <div className="floating-tray" key="adv-tray">
-                                <div className="flex items-center justify-between mb-3">
-                                    <span className="text-[11px] text-slate-400 uppercase tracking-widest font-bold flex items-center gap-1.5">
-                                        <span className="material-symbols-outlined text-sm text-primary">tune</span>
-                                        Advanced Options
-                                    </span>
-                                    <button onClick={() => setFloatingTray(null)} className="text-slate-500 hover:text-white cursor-pointer">
-                                        <span className="material-symbols-outlined text-sm">close</span>
-                                    </button>
-                                </div>
-                                <div className="flex items-center gap-4 flex-wrap">
-                                    {/* AI Mode */}
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-[10px] text-slate-500 font-bold">AI Mode</span>
-                                        <div className="flex gap-0.5 bg-white/[0.04] rounded-lg p-0.5">
-                                            <button onClick={() => setAgenticQuality('fast')}
-                                                className={`px-2.5 py-1.5 rounded-md text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1 ${agenticQuality === 'fast' ? 'bg-amber-500/20 text-amber-400' : 'text-slate-500 hover:text-white'}`}>
-                                                <span className="material-symbols-outlined text-xs">bolt</span> Fast
-                                            </button>
-                                            <button onClick={() => setAgenticQuality('quality')}
-                                                className={`px-2.5 py-1.5 rounded-md text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1 ${agenticQuality === 'quality' ? 'bg-[#FF4D00]/20 text-[#FF4D00]' : 'text-slate-500 hover:text-white'}`}>
-                                                <span className="material-symbols-outlined text-xs">target</span> Quality
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    {/* Style */}
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-[10px] text-slate-500 font-bold">Style</span>
-                                        <div className="flex flex-wrap gap-1">
-                                            {styles.map(s => (
-                                                <button key={s.id} onClick={() => setStyle(s.id)}
-                                                    className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${style === s.id
-                                                        ? 'bg-primary/20 text-primary border border-primary/30'
-                                                        : 'bg-white/[0.04] text-slate-400 hover:text-white border border-transparent'}`}>
-                                                    <span className="material-symbols-outlined text-xs">{s.icon}</span>
-                                                    {s.label}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    {/* Text Overlay */}
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-[10px] text-slate-500 font-bold">Overlay</span>
-                                        <input value={textOverlay} onChange={e => setTextOverlay(e.target.value)}
-                                            placeholder="Text on creative..."
-                                            className="input-glass py-1.5 px-2.5 text-[11px] w-40 rounded-lg" />
-                                    </div>
-
-                                    {/* Logo */}
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-[10px] text-slate-500 font-bold">Logo</span>
-                                        <button onClick={() => setAddLogo(!addLogo)}
-                                            className={`w-8 h-4 rounded-full transition-all cursor-pointer ${addLogo ? 'bg-primary' : 'bg-white/[0.1]'}`}>
-                                            <div className={`w-3 h-3 rounded-full bg-white shadow transition-transform ${addLogo ? 'translate-x-4' : 'translate-x-0.5'}`} />
-                                        </button>
-                                        {addLogo && (
-                                            <div className="flex gap-0.5">
-                                                {['S', 'M', 'L'].map((s, i) => (
-                                                    <button key={s} onClick={() => setLogoSize(['small', 'medium', 'large'][i])}
-                                                        className={`px-1.5 py-0.5 rounded text-[9px] font-bold cursor-pointer ${logoSize === ['small', 'medium', 'large'][i] ? 'bg-primary text-white' : 'bg-white/[0.04] text-slate-500'}`}>
-                                                        {s}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {/* Brand Colors */}
-                                    {activeBrand?.dna?.colors?.length > 0 && (
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-[10px] text-slate-500 font-bold">Colors</span>
-                                            <div className="flex gap-1">
-                                                {activeBrand.dna.colors.slice(0, 6).map((c, i) => (
-                                                    <div key={i} className="w-5 h-5 rounded border border-white/[0.1]" style={{ background: c.hex }} title={c.hex} />
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* ── Context Chips Row ── */}
+                        {/* ── Active Context Chips ── */}
                         {(fromContent || designBaseImage || selectedProduct) && (
-                            <div className="flex items-center gap-2 px-3 py-1.5 border-b border-white/[0.05] overflow-x-auto scrollbar-hide">
+                            <div className="flex items-center gap-1.5 px-4 py-2 flex-wrap border-b border-white/[0.04]">
                                 {fromContent && (
                                     <div className="floating-context-chip text-primary border-primary/20">
-                                        <span className="material-symbols-outlined text-[10px]">link</span>
-                                        Content Studio linked
-                                        <button onClick={() => setFromContent(false)} className="text-slate-500 hover:text-white cursor-pointer ml-1">
-                                            <span className="material-symbols-outlined text-[10px]">close</span>
-                                        </button>
+                                        <span className="material-symbols-outlined text-[10px]">link</span> Content Studio
+                                        <button onClick={() => setFromContent(false)} className="text-slate-500 hover:text-white cursor-pointer ml-1"><span className="material-symbols-outlined text-[10px]">close</span></button>
                                     </div>
                                 )}
                                 {designBaseImage && (
                                     <div className="floating-context-chip text-amber-400 border-amber-500/20">
                                         <img src={designBaseImage} alt="" className="w-4 h-4 rounded object-cover" />
-                                        Editing template
-                                        <button onClick={() => setDesignBaseImage(null)} className="text-slate-500 hover:text-white cursor-pointer ml-1">
-                                            <span className="material-symbols-outlined text-[10px]">close</span>
-                                        </button>
+                                        Template
+                                        <button onClick={() => setDesignBaseImage(null)} className="text-slate-500 hover:text-white cursor-pointer ml-1"><span className="material-symbols-outlined text-[10px]">close</span></button>
                                     </div>
                                 )}
                                 {selectedProduct && (
                                     <div className="floating-context-chip text-cyan-400 border-cyan-500/20">
                                         {selectedProduct.images?.[0]?.url && <img src={selectedProduct.images[0].url} alt="" className="w-4 h-4 rounded object-cover" />}
-                                        {selectedProduct.title?.substring(0, 20)}
-                                        <button onClick={() => setSelectedProduct(null)} className="text-slate-500 hover:text-white cursor-pointer ml-1">
-                                            <span className="material-symbols-outlined text-[10px]">close</span>
-                                        </button>
+                                        {selectedProduct.title?.substring(0, 12)}
+                                        <button onClick={() => setSelectedProduct(null)} className="text-slate-500 hover:text-white cursor-pointer ml-1"><span className="material-symbols-outlined text-[10px]">close</span></button>
+                                    </div>
+                                )}
+                                {/* AI auto-matched product from Enhance pipeline */}
+                                {agenticMatchedProduct && !selectedProduct && (
+                                    <div className="floating-context-chip text-violet-400 border-violet-500/20">
+                                        <span className="material-symbols-outlined text-[10px]">auto_awesome</span>
+                                        AI: {agenticMatchedProduct.substring(0, 14)}
+                                        <button onClick={() => setAgenticMatchedProduct(null)} className="text-slate-500 hover:text-white cursor-pointer ml-1"><span className="material-symbols-outlined text-[10px]">close</span></button>
                                     </div>
                                 )}
                             </div>
                         )}
 
-                        {/* ── Main Prompt Row ── */}
-                        <div className="floating-prompt-row">
+                        {/* ── Model Selector Row ── */}
+                        <div className="px-4 py-2.5 border-b border-white/[0.06]">
+                            <p className="text-[9px] font-bold text-slate-600 uppercase tracking-widest mb-1.5">AI Model</p>
+                            <div className="relative">
+                                <button onClick={() => setShowModelMenu(!showModelMenu)}
+                                    className="w-full flex items-center gap-2 px-3 py-2 rounded-lg border transition-all cursor-pointer"
+                                    style={{
+                                        background: `linear-gradient(135deg, ${IMAGE_MODELS.find(m => m.id === imageModel)?.color || '#FF4D00'}10, transparent)`,
+                                        borderColor: `${IMAGE_MODELS.find(m => m.id === imageModel)?.color || '#FF4D00'}30`,
+                                    }}>
+                                    <span className="material-symbols-outlined text-base" style={{ color: IMAGE_MODELS.find(m => m.id === imageModel)?.color || '#FF4D00' }}>
+                                        {IMAGE_MODELS.find(m => m.id === imageModel)?.icon || 'auto_awesome'}
+                                    </span>
+                                    <span className="text-[12px] font-bold text-white flex-1 text-left">{IMAGE_MODELS.find(m => m.id === imageModel)?.name || 'Select Model'}</span>
+                                    <span className="material-symbols-outlined text-slate-500" style={{ fontSize: '16px' }}>{showModelMenu ? 'expand_less' : 'expand_more'}</span>
+                                </button>
+                                {showModelMenu && (
+                                    <div className="absolute left-0 right-0 top-full mt-1.5 glass-panel rounded-xl shadow-2xl z-50 overflow-hidden border border-white/[0.08]" style={{ animation: 'fadeUp 0.15s ease-out' }}>
+                                        <div className="p-1.5 space-y-0.5 max-h-[240px] overflow-y-auto">
+                                            {IMAGE_MODELS.map(m => (
+                                                <button key={m.id} onClick={() => { setImageModel(m.id); setShowModelMenu(false) }}
+                                                    className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-all cursor-pointer group ${
+                                                        imageModel === m.id
+                                                            ? 'bg-white/[0.08] text-white'
+                                                            : 'text-slate-400 hover:bg-white/[0.05] hover:text-white'
+                                                    }`}>
+                                                    <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: `${m.color}18` }}>
+                                                        <span className="material-symbols-outlined" style={{ fontSize: '15px', color: m.color }}>{m.icon}</span>
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="text-[11px] font-bold truncate">{m.name}</div>
+                                                    </div>
+                                                    {imageModel === m.id && (
+                                                        <div className="w-4 h-4 rounded-full flex items-center justify-center" style={{ background: `${m.color}25` }}>
+                                                            <span className="material-symbols-outlined" style={{ fontSize: '11px', color: m.color }}>check</span>
+                                                        </div>
+                                                    )}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
 
-                            {/* Setting icon buttons */}
-                            <button onClick={() => setFloatingTray(prev => prev === 'format' ? null : 'format')}
-                                className={`floating-setting-btn ${floatingTray === 'format' ? 'active' : ''}`} title="Format & Size">
-                                <span className="material-symbols-outlined text-sm">crop</span>
-                                {selectedType !== 'instagram-post' && <span className="setting-dot" />}
-                            </button>
-                            <button onClick={() => setFloatingTray(prev => prev === 'camera' ? null : 'camera')}
-                                className={`floating-setting-btn ${floatingTray === 'camera' ? 'active' : ''}`} title="Camera Shot">
-                                <span className="material-symbols-outlined text-sm">movie</span>
-                                {selectedShot && <span className="setting-dot" />}
-                            </button>
-                            <button onClick={() => setFloatingTray(prev => prev === 'references' ? null : 'references')}
-                                className={`floating-setting-btn ${floatingTray === 'references' ? 'active' : ''}`} title="References">
-                                <span className="material-symbols-outlined text-sm">collections</span>
-                                {(referenceImages.style || referenceImages.upload || characters.length > 0) && <span className="setting-dot" />}
-                            </button>
-                            <button onClick={() => setFloatingTray(prev => prev === 'text' ? null : 'text')}
-                                className={`floating-setting-btn ${floatingTray === 'text' ? 'active' : ''}`} title="Text on Image">
-                                <span className="material-symbols-outlined text-sm">title</span>
-                                {generateCopy && <span className="setting-dot" />}
-                            </button>
-                            <button onClick={() => setFloatingTray(prev => prev === 'advanced' ? null : 'advanced')}
-                                className={`floating-setting-btn ${floatingTray === 'advanced' ? 'active' : ''}`} title="Advanced">
-                                <span className="material-symbols-outlined text-sm">tune</span>
-                            </button>
+                        {/* 2. Scrollable Settings Body */}
+                        <div className="creative-tools-panel-body">
 
-                            {/* Divider */}
-                            <div className="w-px h-6 bg-white/[0.08] flex-shrink-0 mx-1" />
+                            {/* Accordion: Aspect Ratio */}
+                            <div className="sidebar-accordion">
+                                <div className="sidebar-accordion-header" onClick={() => setFloatingTray(prev => prev === 'format' ? null : 'format')}>
+                                    <span className="text-[11px] text-slate-200 font-bold flex items-center gap-2">
+                                        <span className="material-symbols-outlined text-[15px] text-primary">crop</span>
+                                        Format
+                                        {selectedType && (
+                                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-primary/15 text-primary font-bold">
+                                                {creativeTypes.find(ct => ct.id === selectedType)?.label?.split('(')[0].trim() || selectedType}
+                                            </span>
+                                        )}
+                                    </span>
+                                    <div className="flex items-center gap-1.5">
+                                        {selectedType && floatingTray !== 'format' && <div className="w-1.5 h-1.5 rounded-full bg-primary" />}
+                                        <span className="material-symbols-outlined text-slate-500" style={{ fontSize: '16px' }}>{floatingTray === 'format' ? 'expand_less' : 'expand_more'}</span>
+                                    </div>
+                                </div>
+                                {floatingTray === 'format' && (
+                                    <div className="sidebar-accordion-body">
+                                        <div className="sidebar-grid-2">
+                                            {creativeTypes.map(ct => (
+                                                <button key={ct.id} onClick={() => { setSelectedType(ct.id); if (ct.id !== 'custom-size') setFloatingTray(null) }}
+                                                    className={`px-2 py-2.5 rounded-lg text-[10px] font-semibold transition-all cursor-pointer flex items-center justify-start gap-2 ${
+                                                        selectedType === ct.id ? 'bg-primary/15 text-primary border border-primary/30' : 'bg-white/[0.03] text-slate-400 hover:text-slate-200 border border-white/[0.05] hover:bg-white/[0.06]'
+                                                    }`}>
+                                                    <span className="material-symbols-outlined text-[16px] flex-shrink-0">{ct.icon}</span>
+                                                    <span className="truncate w-full text-left">{ct.label.split('(')[0].trim()}</span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                        {selectedType === 'custom-size' && (
+                                            <div className="mt-2 flex items-center gap-2 bg-white/[0.02] p-2 rounded-lg border border-white/[0.05] justify-center">
+                                                <input type="number" value={customWidth} onChange={e => setCustomWidth(e.target.value)} placeholder="W" min="100" className="w-16 px-2 py-1 rounded bg-white/5 text-xs text-center focus:border-primary focus:outline-none text-white font-mono" />
+                                                <span className="text-slate-500 font-bold text-xs">×</span>
+                                                <input type="number" value={customHeight} onChange={e => setCustomHeight(e.target.value)} placeholder="H" min="100" className="w-16 px-2 py-1 rounded bg-white/5 text-xs text-center focus:border-primary focus:outline-none text-white font-mono" />
+                                                <span className="text-slate-500 text-[10px]">px</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
 
-                            {/* Prompt textarea */}
-                            <div className="relative flex-1 min-w-0">
+                            {/* Accordion: Camera Shot */}
+                            <div className="sidebar-accordion">
+                                <div className="sidebar-accordion-header" onClick={() => setFloatingTray(prev => prev === 'camera' ? null : 'camera')}>
+                                    <span className="text-[11px] text-slate-200 font-bold flex items-center gap-2">
+                                        <span className="material-symbols-outlined text-[15px] text-cyan-400">photo_camera</span>
+                                        Camera
+                                        {selectedShot && (
+                                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-cyan-500/15 text-cyan-400 font-bold">
+                                                {CAMERA_SHOT_PRESETS.find(s => s.id === selectedShot)?.label || selectedShot}
+                                            </span>
+                                        )}
+                                    </span>
+                                    <div className="flex items-center gap-1.5">
+                                        {selectedShot && floatingTray !== 'camera' && <div className="w-1.5 h-1.5 rounded-full bg-cyan-400" />}
+                                        <span className="material-symbols-outlined text-slate-500" style={{ fontSize: '16px' }}>{floatingTray === 'camera' ? 'expand_less' : 'expand_more'}</span>
+                                    </div>
+                                </div>
+                                {floatingTray === 'camera' && (
+                                    <div className="sidebar-accordion-body">
+                                        <div className="grid grid-cols-2 gap-1.5">
+                                            {CAMERA_SHOT_PRESETS.map(shot => (
+                                                <button key={shot.id}
+                                                    onClick={() => setSelectedShot(prev => prev === shot.id ? null : shot.id)}
+                                                    title={shot.description}
+                                                    className={`relative flex items-center gap-2 px-2.5 py-2 rounded-xl text-left transition-all cursor-pointer border ${
+                                                        selectedShot === shot.id
+                                                            ? 'text-white border-transparent'
+                                                            : 'bg-white/[0.02] border-white/[0.05] text-slate-400 hover:bg-white/[0.05] hover:text-slate-200 hover:border-white/[0.1]'
+                                                    }`}
+                                                    style={selectedShot === shot.id ? {
+                                                        backgroundColor: `${shot.color}18`,
+                                                        borderColor: `${shot.color}40`,
+                                                    } : {}}
+                                                >
+                                                    {/* Emoji badge */}
+                                                    <span className="flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center text-sm leading-none"
+                                                        style={{ backgroundColor: selectedShot === shot.id ? `${shot.color}25` : 'rgba(255,255,255,0.04)' }}>
+                                                        {shot.emoji}
+                                                    </span>
+                                                    <span className="truncate text-[10px] font-semibold leading-tight">{shot.label}</span>
+                                                    {selectedShot === shot.id && (
+                                                        <span className="absolute top-1 right-1 w-2 h-2 rounded-full"
+                                                            style={{ backgroundColor: shot.color }} />
+                                                    )}
+                                                </button>
+                                            ))}
+                                        </div>
+                                        {selectedShot && (() => {
+                                            const s = CAMERA_SHOT_PRESETS.find(x => x.id === selectedShot)
+                                            return s ? (
+                                                <div className="mt-2 px-2.5 py-2 rounded-xl text-[9px] text-slate-400 leading-relaxed"
+                                                    style={{ backgroundColor: `${s.color}0d`, borderLeft: `2px solid ${s.color}50` }}>
+                                                    {s.description}
+                                                </div>
+                                            ) : null
+                                        })()}
+                                        {selectedShot && (
+                                            <button onClick={() => setSelectedShot(null)}
+                                                className="w-full mt-1.5 text-[9px] text-slate-600 hover:text-rose-400 transition-colors cursor-pointer flex items-center justify-center gap-0.5 py-1">
+                                                <span className="material-symbols-outlined text-[10px]">close</span> Clear shot
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Accordion: Character & References */}
+                            <div className="sidebar-accordion">
+                                <div className="sidebar-accordion-header" onClick={() => setFloatingTray(prev => prev === 'references' ? null : 'references')}>
+                                    <span className="text-[11px] text-slate-200 font-bold flex items-center gap-2">
+                                        <span className="material-symbols-outlined text-[15px] text-[#FF4D00]">collections</span>
+                                        References
+                                        {(referenceImages.style || characters.length > 0) && (
+                                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-[#FF4D00]/15 text-[#FF7A00] font-bold">
+                                                {(referenceImages.style ? 1 : 0) + characters.length} added
+                                            </span>
+                                        )}
+                                    </span>
+                                    <div className="flex items-center gap-1.5">
+                                        {(referenceImages.style || characters.length > 0) && floatingTray !== 'references' && <div className="w-1.5 h-1.5 rounded-full bg-[#FF4D00]" />}
+                                        <span className="material-symbols-outlined text-slate-500" style={{ fontSize: '16px' }}>{floatingTray === 'references' ? 'expand_less' : 'expand_more'}</span>
+                                    </div>
+                                </div>
+                                {floatingTray === 'references' && (
+                                    <div className="sidebar-accordion-body">
+                                        <div className="flex items-center gap-3 flex-wrap">
+                                            {referenceImages.style ? (
+                                                <div className="relative flex-shrink-0 group">
+                                                    <div className="w-12 h-12 rounded-lg overflow-hidden border border-amber-500/40">
+                                                        <img src={referenceImages.style} alt="Style" className="w-full h-full object-cover" />
+                                                    </div>
+                                                    <button onClick={() => setReferenceImages(prev => ({ ...prev, style: null }))}
+                                                        className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-500 text-white text-[8px] flex items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity">×</button>
+                                                    <span className="text-[8px] text-amber-400 font-bold text-center block mt-0.5">Style</span>
+                                                </div>
+                                            ) : (
+                                                <button onClick={() => { setRefPickerSlot('style'); setRefPickerTab('upload') }}
+                                                    className="flex-shrink-0 w-12 h-12 rounded-lg border border-dashed border-white/10 hover:border-amber-500/40 flex flex-col items-center justify-center cursor-pointer transition-all bg-white/[0.02] group" title="Add style reference">
+                                                    <span className="material-symbols-outlined text-sm text-slate-500 group-hover:text-amber-400">brush</span>
+                                                    <span className="text-[8px] text-slate-500 group-hover:text-amber-400 font-bold leading-none">Style</span>
+                                                </button>
+                                            )}
+                                            {characters.map((char, idx) => (
+                                                <div key={idx} className="relative flex-shrink-0 group">
+                                                    <div className="w-12 h-12 rounded-lg overflow-hidden border border-[#FF4D00]/40">
+                                                        <img src={char.image} alt={char.name} className="w-full h-full object-cover" />
+                                                    </div>
+                                                    <button onClick={() => setCharacters(prev => prev.filter((_, i) => i !== idx))}
+                                                        className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-500 text-white text-[8px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">×</button>
+                                                    <input value={char.name}
+                                                        onChange={e => setCharacters(prev => prev.map((c, i) => i === idx ? { ...c, name: e.target.value } : c))}
+                                                        className="w-12 mt-0.5 text-[8px] text-center bg-transparent text-[#FF7A00] outline-none font-bold truncate"
+                                                        placeholder="Name" />
+                                                </div>
+                                            ))}
+                                            {characters.length < 5 && (
+                                                <button onClick={() => { setRefPickerSlot(`character-${characters.length}`); setRefPickerTab('upload') }}
+                                                    className="flex-shrink-0 w-12 h-12 rounded-lg border border-dashed border-white/10 hover:border-[#FF4D00]/40 flex flex-col items-center justify-center cursor-pointer transition-all bg-white/[0.02] group" title="Add character">
+                                                    <span className="material-symbols-outlined text-sm text-slate-500 group-hover:text-[#FF4D00]">person_add</span>
+                                                    <span className="text-[8px] text-slate-500 group-hover:text-[#FF4D00] font-bold leading-none">Person</span>
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                            {/* Accordion: Visual Style & Setup */}
+                            <div className="sidebar-accordion">
+                                <div className="sidebar-accordion-header" onClick={() => setFloatingTray(prev => prev === 'advanced' ? null : 'advanced')}>
+                                    <span className="text-[11px] text-slate-200 font-bold flex items-center gap-2">
+                                        <span className="material-symbols-outlined text-[15px] text-amber-500">palette</span>
+                                        Style
+                                        {style && (
+                                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 font-bold capitalize">{style}</span>
+                                        )}
+                                    </span>
+                                    <div className="flex items-center gap-1.5">
+                                        {style && floatingTray !== 'advanced' && <div className="w-1.5 h-1.5 rounded-full bg-amber-500" />}
+                                        <span className="material-symbols-outlined text-slate-500" style={{ fontSize: '16px' }}>{floatingTray === 'advanced' ? 'expand_less' : 'expand_more'}</span>
+                                    </div>
+                                </div>
+                                {floatingTray === 'advanced' && (
+                                    <div className="sidebar-accordion-body space-y-4 pt-1">
+                                        <div>
+                                            <p className="text-[9px] text-slate-500 uppercase tracking-widest font-bold mb-2">Aesthetic Style</p>
+                                            <div className="sidebar-grid-2">
+                                                {styles.map(s => (
+                                                    <button key={s.id} onClick={() => setStyle(s.id)}
+                                                        className={`flex items-center gap-1.5 px-2 py-2 rounded-md text-[10px] font-bold transition-all cursor-pointer border ${
+                                                            style === s.id ? 'bg-amber-500/10 text-amber-500 border-amber-500/30' : 'border-transparent text-slate-400 hover:bg-white/[0.04]'
+                                                        }`}>
+                                                        <span className="material-symbols-outlined text-[14px]">{s.icon}</span> {s.label}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <p className="text-[9px] text-slate-500 uppercase tracking-widest font-bold mb-2">Speed vs Quality</p>
+                                            <div className="flex bg-white/[0.02] p-0.5 rounded-lg border border-white/[0.05]">
+                                                <button onClick={() => setAgenticQuality('fast')} className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-[10px] font-bold rounded cursor-pointer ${agenticQuality === 'fast' ? 'bg-amber-500/20 text-amber-400 shadow-sm' : 'text-slate-500 hover:text-white'}`}>
+                                                    <span className="material-symbols-outlined text-[14px]">bolt</span> Standard
+                                                </button>
+                                                <button onClick={() => setAgenticQuality('quality')} className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-[10px] font-bold rounded cursor-pointer ${agenticQuality === 'quality' ? 'bg-[#FF4D00]/25 text-[#FF4D00] shadow-sm' : 'text-slate-500 hover:text-white'}`}>
+                                                    <span className="material-symbols-outlined text-[14px]">target</span> Max Detail
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Accordion: Typography & Layout */}
+                            <div className="sidebar-accordion">
+                                <div className="sidebar-accordion-header" onClick={() => setFloatingTray(prev => prev === 'text' ? null : 'text')}>
+                                    <span className="text-[11px] text-slate-200 font-bold flex items-center gap-2">
+                                        <span className="material-symbols-outlined text-[15px] text-pink-400">title</span>
+                                        Text Overlay
+                                        {(customHeadline || customCtaText) && (
+                                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-pink-500/15 text-pink-400 font-bold">set</span>
+                                        )}
+                                    </span>
+                                    <div className="flex items-center gap-2">
+                                        {(customHeadline || customCtaText) && floatingTray !== 'text' && <div className="w-1.5 h-1.5 rounded-full bg-pink-400" />}
+                                        <button onClick={(e) => { e.stopPropagation(); setGenerateCopy(!generateCopy) }}
+                                            className={`w-7 h-4 rounded-full transition-all cursor-pointer flex-shrink-0 relative ${generateCopy ? 'bg-pink-500' : 'bg-white/[0.1]'}`}>
+                                            <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-all ${generateCopy ? 'left-[14px]' : 'left-0.5'}`} />
+                                        </button>
+                                    </div>
+                                </div>
+                                {floatingTray === 'text' && (
+                                    <div className="sidebar-accordion-body">
+                                        <p className="text-[10px] text-slate-500 mb-3 leading-snug">Generate imagery with readable typography. Enable Ideogram or Flux for best results.</p>
+                                        <div className="space-y-2.5">
+                                            <div className="relative">
+                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-[16px] text-slate-500">short_text</span>
+                                                <input type="text" value={customHeadline} onChange={e => setCustomHeadline(e.target.value)}
+                                                    placeholder="Headline (e.g., Sale 50% Off)" className="w-full pl-9 pr-3 py-2 text-xs rounded-lg border border-white/[0.08] bg-white/[0.03] focus:border-pink-500/50 outline-none text-white transition-all shadow-inner placeholder-slate-600" />
+                                            </div>
+                                            <div className="relative">
+                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-[16px] text-slate-500">ads_click</span>
+                                                <input type="text" value={customCtaText} onChange={e => setCustomCtaText(e.target.value)}
+                                                    placeholder="Button CTA (e.g., Shop Now)" className="w-full pl-9 pr-3 py-2 text-xs rounded-lg border border-white/[0.08] bg-white/[0.03] focus:border-pink-500/50 outline-none text-white transition-all shadow-inner placeholder-slate-600" />
+                                            </div>
+                                            {!copyLoading && prompt?.trim().length > 5 && (
+                                                <button onClick={() => suggestCopy(prompt)}
+                                                    className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-[10px] text-slate-300 hover:text-pink-400 font-bold bg-white/[0.03] hover:bg-pink-500/10 transition-all cursor-pointer border border-white/[0.06]">
+                                                    <span className="material-symbols-outlined text-[14px]">auto_awesome</span>
+                                                    Auto-Suggest from Prompt
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                        </div>
+
+                        {/* 3. Bottom Pinned Controls: Prompt & Generate */}
+                        <div className="creative-tools-panel-footer">
+                            {/* Agentic Enhance Insights — shown after Enhance runs */}
+                            {feedbackToast && (
+                                <div className="flex items-center gap-1.5 mb-2 px-1 overflow-x-auto scrollbar-hide">
+                                    <span className="material-symbols-outlined text-[11px] text-amber-400 flex-shrink-0">auto_awesome</span>
+                                    <span className="text-[9px] text-amber-400/80 font-medium truncate">{feedbackToast}</span>
+                                </div>
+                            )}
+                            {/* Prompt label */}
+                            <p className="text-[9px] font-bold text-slate-600 uppercase tracking-widest mb-1.5 px-1">Prompt</p>
+
+                            <div className="relative mb-2">
                                 <textarea
                                     value={prompt}
                                     onChange={e => {
@@ -3579,19 +3576,15 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                         if (e.key === 'Enter' && !e.shiftKey && !showCharTags) { e.preventDefault(); handleGenerate() }
                                         if (e.key === 'Escape') { setShowCharTags(false); setFloatingTray(null) }
                                     }}
-                                    placeholder={activeBrand
-                                        ? `Describe your visual for ${activeBrand.name}...`
-                                        : "Create a brand first to start generating visuals"}
+                                    placeholder={activeBrand ? `Describe your visual for ${activeBrand.name}…` : "Create a brand first…"}
                                     disabled={!activeBrand || activeGenerations.length >= 3}
-                                    className="input-glass w-full resize-none py-2.5 px-4 pr-24 disabled:opacity-30 text-on-surface text-sm leading-relaxed rounded-xl overflow-hidden"
-                                    rows={1}
-                                    style={{ minHeight: '44px', maxHeight: '120px', overflowY: 'auto' }}
-                                    ref={promptTextareaRef}
+                                    className="input-glass w-full resize-none py-2.5 px-3 pr-[36px] text-sm leading-relaxed rounded-xl border border-white/[0.1] focus:border-primary/40 text-white placeholder-slate-600 focus:bg-white/[0.04] transition-all scrollbar-hide"
+                                    rows={2} style={{ minHeight: '72px', maxHeight: '130px' }} ref={promptTextareaRef}
                                 />
-
-                                {/* @character tag autocomplete */}
+                                
+                                {/* Char tag autocomplete */}
                                 {showCharTags && (characters.length > 0 || referenceImages.upload) && (
-                                    <div className="absolute left-4 bottom-full mb-2 glass-panel rounded-xl shadow-2xl shadow-black/30 p-2 z-50 min-w-[200px] animate-fade-in">
+                                    <div className="absolute left-0 bottom-full mb-2 glass-panel rounded-xl shadow-2xl shadow-black/30 p-2 z-50 min-w-[200px] animate-fade-in">
                                         <p className="text-[10px] text-on-surface-variant/50 mb-1.5 px-2">Tag a character</p>
                                         {characters
                                             .filter(c => !charTagFilter || c.name.toLowerCase().includes(charTagFilter))
@@ -3616,112 +3609,45 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                     </div>
                                                 </button>
                                             ))}
-                                        {referenceImages.upload && (
-                                            <button onClick={() => {
-                                                const textarea = promptTextareaRef.current
-                                                if (!textarea) return
-                                                const cursor = textarea.selectionStart
-                                                const before = prompt.substring(0, cursor)
-                                                const after = prompt.substring(cursor)
-                                                const cleaned = before.replace(/@\w*$/, '')
-                                                setPrompt(cleaned + '@Upload ' + after)
-                                                setShowCharTags(false)
-                                                setTimeout(() => textarea.focus(), 50)
-                                            }}
-                                                className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-white/[0.06] transition-all text-left cursor-pointer">
-                                                <img src={referenceImages.upload} alt="" className="w-6 h-6 rounded-full object-cover border border-cyan-500/30" />
-                                                <div>
-                                                    <p className="text-xs font-bold text-cyan-400">@Upload</p>
-                                                    <p className="text-[9px] text-on-surface-variant/40">Your uploaded image</p>
-                                                </div>
-                                            </button>
-                                        )}
                                     </div>
                                 )}
 
-                                {/* Inline enhance + voice */}
-                                <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                                    {prompt.trim() && (
-                                        <CreditTooltipWrapper action="promptEnhance">
-                                            <button onClick={handleEnhancePrompt} disabled={enhancing || !activeBrand}
-                                                className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${enhancing
-                                                    ? 'bg-amber-500/20 text-amber-400'
-                                                    : 'bg-white/[0.06] text-slate-400 hover:text-amber-400 hover:bg-amber-500/10'}`}>
-                                                <span className={`material-symbols-outlined text-xs ${enhancing ? 'animate-spin' : ''}`}>
-                                                    {enhancing ? 'progress_activity' : 'auto_awesome'}
-                                                </span>
-                                                {enhancing ? '...' : 'Enhance'}
-                                            </button>
-                                        </CreditTooltipWrapper>
-                                    )}
-                                    <VoiceInput
-                                        onResult={(text) => setPrompt(prev => prev ? prev + ' ' + text : text)}
-                                        size="small"
-                                    />
+                                {/* Voice input */}
+                                <div className="absolute right-2 top-2">
+                                    <VoiceInput onResult={(text) => setPrompt(prev => prev ? prev + ' ' + text : text)} size="small" />
                                 </div>
                             </div>
 
-                            {/* Model selector */}
-                            <div className="relative flex-shrink-0">
-                                <button onClick={() => setShowModelMenu(!showModelMenu)}
-                                    className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-[11px] font-bold glass-panel text-on-surface-variant hover:text-on-surface transition-all duration-300 cursor-pointer whitespace-nowrap">
-                                    <span className="material-symbols-outlined text-xs" style={{ color: IMAGE_MODELS.find(m => m.id === imageModel)?.color || '#FF4D00' }}>
-                                        {IMAGE_MODELS.find(m => m.id === imageModel)?.icon || 'auto_awesome'}
-                                    </span>
-                                    <span className="hidden md:inline">{IMAGE_MODELS.find(m => m.id === imageModel)?.name || 'NanoBanana 2'}</span>
-                                    <span className="material-symbols-outlined text-[10px] text-slate-600">{showModelMenu ? 'expand_less' : 'expand_more'}</span>
-                                </button>
-                                {showModelMenu && (
-                                    <div className="absolute left-0 right-0 bottom-full mb-1 glass-panel rounded-xl shadow-2xl z-50 overflow-hidden min-w-[260px]" style={{ animation: 'fadeUp 0.15s ease-out' }}>
-                                        <div className="p-1.5 space-y-0.5 max-h-[280px] overflow-y-auto">
-                                            {IMAGE_MODELS.map(m => (
-                                                <button key={m.id} onClick={() => { setImageModel(m.id); setShowModelMenu(false) }}
-                                                    className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-left transition-all cursor-pointer ${imageModel === m.id ? 'bg-white/10 text-white' : 'text-slate-400 hover:bg-white/[0.06] hover:text-white'}`}>
-                                                    <span className="material-symbols-outlined text-sm" style={{ color: m.color }}>{m.icon}</span>
-                                                    <div className="flex-1 min-w-0">
-                                                        <div className="flex items-center gap-1.5">
-                                                            <span className="text-[11px] font-bold truncate">{m.name}</span>
-                                                            {m.id === 'nanobanana-2' && <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-[#FF4D00]/20 text-[#FF7A00] font-bold">DEFAULT</span>}
-                                                        </div>
-                                                        <span className="text-[9px] text-slate-500 block truncate">{m.desc}</span>
-                                                    </div>
-                                                    {imageModel === m.id && <span className="material-symbols-outlined text-xs text-primary">check_circle</span>}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
+                            {/* Prompt meta row: char count + enhance */}
+                            <div className="flex items-center justify-between mb-2.5 px-0.5">
+                                <span className={`text-[9px] font-mono tabular-nums ${prompt.length > 900 ? 'text-rose-400' : 'text-slate-700'}`}>
+                                    {prompt.length} · ↵ generate
+                                </span>
+                                {prompt.trim() && (
+                                    <CreditTooltipWrapper action="promptEnhance">
+                                        <button onClick={handleEnhancePrompt} disabled={enhancing || !activeBrand}
+                                            className="flex items-center gap-1 px-2 py-0.5 rounded text-[9px] font-bold cursor-pointer bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 hover:text-amber-400 transition-all border border-amber-500/20">
+                                            <span className={`material-symbols-outlined text-[10px] ${enhancing ? 'animate-spin' : ''}`}>{enhancing ? 'progress_activity' : 'auto_awesome'}</span>
+                                            {enhancing ? 'Enhancing…' : 'Enhance'}
+                                        </button>
+                                    </CreditTooltipWrapper>
                                 )}
                             </div>
 
-                            {/* Generate button */}
                             <CreditTooltipWrapper action="creative">
                                 <button onClick={handleGenerate} disabled={!prompt.trim() || !activeBrand || activeGenerations.length >= 3}
-                                    className="btn-primary py-2.5 px-5 rounded-xl disabled:opacity-30 text-sm font-bold cursor-pointer flex items-center gap-2 whitespace-nowrap flex-shrink-0">
+                                    className="w-full btn-primary py-3 rounded-xl disabled:opacity-30 text-sm font-bold cursor-pointer flex items-center justify-center gap-2 shadow-[0_4px_20px_rgba(255,77,0,0.35)] hover:shadow-[0_6px_28px_rgba(255,77,0,0.45)] transition-all relative overflow-hidden group border border-[#FF4D00]/50">
+                                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/[0.08] to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-700" />
                                     {activeGenerations.length > 0 ? (
-                                        <><span className="material-symbols-outlined animate-spin text-sm">progress_activity</span>
-                                        <span className="hidden sm:inline">{activeGenerations.length >= 3 ? 'Queue Full' : `Generating ${activeGenerations.length}/3`}</span></>
+                                        <><span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span> Generating {activeGenerations.length}/3…</>
                                     ) : (
-                                        <><span className="material-symbols-outlined text-sm">auto_awesome</span> Generate <CreditBadge action="creative" /></>
+                                        <><span className="material-symbols-outlined text-[18px]">draw</span> Generate <CreditBadge action="creative" /></>
                                     )}
                                 </button>
                             </CreditTooltipWrapper>
-
-                            {/* Product picker */}
-                            <button onClick={() => {
-                                if (activeBrand?._id) {
-                                    productsAPI.list({ brandId: activeBrand._id, limit: 50 })
-                                        .then(res => setProductsList(res.products || []))
-                                        .catch(() => { })
-                                }
-                                setShowProductPicker(true)
-                            }}
-                                className="floating-setting-btn" title="Select product">
-                                <span className="material-symbols-outlined text-sm">inventory_2</span>
-                                {selectedProduct && <span className="setting-dot" />}
-                            </button>
                         </div>
                     </div>
-
+                </div>
             </>
             )}
 
@@ -3730,7 +3656,8 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
 
             {/* =================== AI PHOTOSHOOT MODE =================== */}
             {studioMode === 'photoshoot' && (
-                <div className="fade-up flex flex-col" style={{ minHeight: 'calc(100vh - 200px)', paddingBottom: '9rem' }}>
+                <div className="creative-split fade-up">
+                    <div className="creative-gallery">
 
                     {/* Recent Photoshoots */}
                     {(() => {
@@ -4174,11 +4101,13 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             )}
                         </div>
                     </div>
+                    </div>
 
-                    {/* ═══ PHOTOSHOOT FLOATING COMMAND BAR ═══ */}
-                    <div className="creative-floating-bar">
+                    {/* ═══ SIDEBAR COMMAND PANEL ═══ */}
+                    <div className="creative-tools-panel">
+                        {/* ── Scrollable tray body ── */}
+                        <div className="creative-tools-panel-body">
 
-                        {/* ── Product Tray ── */}
                         {psTray === 'product' && (
                             <div className="floating-tray" key="ps-product-tray">
                                 <div className="flex items-center justify-between mb-2">
@@ -4238,14 +4167,14 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     <div>
                                         <p className="text-[9px] text-slate-500 uppercase tracking-widest font-bold mb-1.5">Camera Angle</p>
                                         <div className="flex flex-wrap gap-1">
-                                            {[{id:'eye-level',label:'Eye Level',ms:'visibility'},{id:'hero',label:'Low Angle',ms:'arrow_upward'},{id:'45deg',label:'3/4 View',ms:'view_in_ar'},{id:'overhead',label:'Overhead',ms:'arrow_downward'},{id:'macro',label:'Macro',ms:'search'},{id:'dutch',label:'Dutch Tilt',ms:'rotate_90_degrees_cw'}].map(a => (
-                                                <button key={a.id} onClick={() => setCameraAngle(a.id)} className={`px-2 py-0.5 rounded-full text-[9px] font-medium transition-all cursor-pointer border flex items-center gap-0.5 ${cameraAngle === a.id ? 'bg-amber-500/20 border-amber-500/50 text-amber-300' : 'bg-white/[0.03] border-white/[0.06] text-slate-400 hover:bg-white/[0.06]'}`}><span className="material-symbols-outlined text-[9px]">{a.ms}</span>{a.label}</button>
+                                            {[{id:'eye-level',label:'Eye Level'},{id:'hero',label:'Low Angle'},{id:'45deg',label:'3/4 View'},{id:'overhead',label:'Overhead'},{id:'macro',label:'Macro'},{id:'dutch',label:'Dutch Tilt'}].map(a => (
+                                                <button key={a.id} onClick={() => setCameraAngle(a.id)} className={`px-2 py-0.5 rounded-full text-[9px] font-medium transition-all cursor-pointer border ${cameraAngle === a.id ? 'bg-amber-500/20 border-amber-500/50 text-amber-300' : 'bg-white/[0.03] border-white/[0.06] text-slate-400 hover:bg-white/[0.06]'}`}>{a.label}</button>
                                             ))}
                                         </div>
                                         <p className="text-[9px] text-slate-500 uppercase tracking-widest font-bold mb-1.5 mt-3">Lens</p>
                                         <div className="flex flex-wrap gap-1">
-                                            {[{id:'24mm',label:'24mm',ms:'photo_camera'},{id:'35mm',label:'35mm',ms:'camera'},{id:'50mm',label:'50mm',ms:'center_focus_strong'},{id:'85mm',label:'85mm',ms:'portrait'},{id:'105mm',label:'105mm',ms:'biotech'},{id:'200mm',label:'200mm',ms:'telescope'}].map(l => (
-                                                <button key={l.id} onClick={() => setLens(l.id)} className={`px-2 py-0.5 rounded-full text-[9px] font-medium transition-all cursor-pointer border flex items-center gap-0.5 ${lens === l.id ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300' : 'bg-white/[0.03] border-white/[0.06] text-slate-400 hover:bg-white/[0.06]'}`}><span className="material-symbols-outlined text-[9px]">{l.ms}</span>{l.label}</button>
+                                            {[{id:'24mm',label:'24mm'},{id:'35mm',label:'35mm'},{id:'50mm',label:'50mm'},{id:'85mm',label:'85mm'},{id:'105mm',label:'105mm'},{id:'200mm',label:'200mm'}].map(l => (
+                                                <button key={l.id} onClick={() => setLens(l.id)} className={`px-2 py-0.5 rounded-full text-[9px] font-medium transition-all cursor-pointer border ${lens === l.id ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300' : 'bg-white/[0.03] border-white/[0.06] text-slate-400 hover:bg-white/[0.06]'}`}>{l.label}</button>
                                             ))}
                                         </div>
                                     </div>
@@ -4253,7 +4182,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                         <p className="text-[9px] text-slate-500 uppercase tracking-widest font-bold mb-1.5">Lighting Style</p>
                                         <div className="flex flex-wrap gap-1">
                                             {[{id:'softbox',label:'Softbox',ms:'cloud'},{id:'natural',label:'Window',ms:'window'},{id:'golden',label:'Golden Hr',ms:'wb_twilight'},{id:'dramatic',label:'Dramatic',ms:'theater_comedy'},{id:'neon',label:'Neon',ms:'fluorescent'},{id:'rim',label:'Rim',ms:'flare'},{id:'highkey',label:'High Key',ms:'light_mode'}].map(l => (
-                                                <button key={l.id} onClick={() => setLightingStyle(l.id)} className={`px-2 py-0.5 rounded-full text-[9px] font-medium transition-all cursor-pointer border flex items-center gap-0.5 ${lightingStyle === l.id ? 'bg-yellow-500/20 border-yellow-500/50 text-yellow-300' : 'bg-white/[0.03] border-white/[0.06] text-slate-400 hover:bg-white/[0.06]'}`}><span className="material-symbols-outlined text-[9px]">{l.ms}</span>{l.label}</button>
+                                                <button key={l.id} onClick={() => setLightingStyle(l.id)} className={`px-2 py-0.5 rounded-full text-[9px] font-medium transition-all cursor-pointer border ${lightingStyle === l.id ? 'bg-yellow-500/20 border-yellow-500/50 text-yellow-300' : 'bg-white/[0.03] border-white/[0.06] text-slate-400 hover:bg-white/[0.06]'}`}>{l.label}</button>
                                             ))}
                                         </div>
                                         <p className="text-[9px] text-slate-500 uppercase tracking-widest font-bold mb-1.5 mt-3">Camera Shot Preset</p>
@@ -4262,7 +4191,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                 <button key={shot.id} onClick={() => setPsSelectedShot(prev => prev === shot.id ? null : shot.id)}
                                                     className={`px-2 py-0.5 rounded-full text-[9px] font-medium transition-all cursor-pointer border ${psSelectedShot === shot.id ? 'border text-white' : 'bg-white/[0.03] border-white/[0.06] text-slate-400 hover:bg-white/[0.06]'}`}
                                                     style={psSelectedShot === shot.id ? { backgroundColor: `${shot.color}18`, borderColor: `${shot.color}50`, color: shot.color } : {}}>
-                                                    <span className="material-symbols-outlined text-[9px] align-middle mr-0.5">{shot.icon}</span> {shot.label}
+                                                    <span className="leading-none mr-0.5">{shot.emoji}</span> {shot.label}
                                                 </button>
                                             ))}
                                         </div>
@@ -4370,8 +4299,10 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 </div>
                             </div>
                         )}
+                        </div>{/* /creative-tools-panel-body */}
 
-                        {/* ── Prompt Row ── */}
+                        {/* ── Prompt Row (always visible footer) ── */}
+                        <div className="creative-tools-panel-footer">
                         <div className="floating-prompt-row">
                             {/* Setting Icons */}
                             <div className="flex items-center gap-1 mr-1">
@@ -4449,8 +4380,9 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     )}
                                 </button>
                             </CreditTooltipWrapper>
-                        </div>
-                    </div>
+                        </div>{/* /floating-prompt-row */}
+                        </div>{/* /creative-tools-panel-footer */}
+                    </div>{/* /creative-tools-panel photoshoot */}
 
                 </div>
             )}
@@ -4651,10 +4583,8 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
 
             {/* =================== CAROUSEL GENERATOR =================== */}
             {studioMode === 'carousel' && (
-                <div className="fade-up flex flex-col" style={{ minHeight: 'calc(100vh - 200px)', paddingBottom: '9rem' }}>
-
-                    {/* ═══ Full-Width Carousel Result ═══ */}
-                    <div className="flex-1 flex flex-col">
+                <div className="creative-split fade-up">
+                    <div className="creative-gallery">
                         <div className="studio-card p-6 flex-1 flex items-center justify-center">
                             {/* ── Loading State ── */}
                             <GlobalLoader 
@@ -4796,8 +4726,10 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                         </div>
                     </div>
 
-                    {/* ═══ CAROUSEL FLOATING COMMAND BAR ═══ */}
-                    <div className="creative-floating-bar">
+                    {/* ═══ SIDEBAR COMMAND PANEL ═══ */}
+                    <div className="creative-tools-panel">
+                        {/* ── Scrollable tray body ── */}
+                        <div className="creative-tools-panel-body">
 
                         {/* ── Scene Tray (Prompt + Theme Inspiration) ── */}
                         {carouselTray === 'scene' && (
@@ -4951,11 +4883,11 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                         { id: 'romance',       label: 'Romance',  msIcon: 'favorite',         color: '#ec4899' },
                                         { id: 'sci-fi',        label: 'Sci-Fi',   msIcon: 'rocket_launch',    color: '#06b6d4' },
                                         { id: 'fantasy',       label: 'Fantasy',  msIcon: 'auto_awesome',     color: '#a855f7' },
-                                        { id: 'documentary',   label: 'Docu',     msIcon: 'documentary',      color: '#78716c' },
+                                        { id: 'documentary',   label: 'Docu',     msIcon: 'video_camera_back', color: '#78716c' },
                                         { id: 'noir',          label: 'Noir',     msIcon: 'contrast',         color: '#334155' },
                                         { id: 'action',        label: 'Action',   msIcon: 'local_fire_department', color: '#ef4444' },
                                         { id: 'comedy',        label: 'Comedy',   msIcon: 'mood',             color: '#facc15' },
-                                        { id: 'horror',        label: 'Horror',   msIcon: 'skull',            color: '#1e293b' },
+                                        { id: 'horror',        label: 'Horror',   msIcon: 'dark_mode',        color: '#1e293b' },
                                         { id: 'fashion-editorial', label: 'Fashion', msIcon: 'styler',        color: '#f59e0b' },
                                         { id: 'none',          label: 'None',     msIcon: 'block',            color: '#64748b' },
                                     ].map(g => (
@@ -5043,8 +4975,10 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 </div>
                             </div>
                         )}
+                        </div>{/* /creative-tools-panel-body */}
 
-                        {/* ── Icon Row + Prompt + Generate ── */}
+                        {/* ── Icon Row + Prompt + Generate (always-visible footer) ── */}
+                        <div className="creative-tools-panel-footer">
                         <div className="floating-prompt-row">
                             {/* Tray toggle icons */}
                             <div className="flex items-center gap-1 mr-1">
@@ -5094,8 +5028,9 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     <><span className="material-symbols-outlined text-sm">view_carousel</span> Generate</>
                                 )}
                             </button>
-                        </div>
-                    </div>
+                        </div>{/* /floating-prompt-row */}
+                        </div>{/* /creative-tools-panel-footer */}
+                    </div>{/* /creative-tools-panel carousel */}
                 </div>
             )}
 

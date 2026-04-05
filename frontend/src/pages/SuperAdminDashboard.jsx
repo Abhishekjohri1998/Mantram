@@ -415,7 +415,7 @@ export default function SuperAdminDashboard() {
     const handleDeleteCoupon = async (id) => { if (!confirm('Delete coupon?')) return; try { await API.deleteCoupon(id); showToast('Deleted'); loadCoupons() } catch { showToast('Failed', 'error') } }
     const handleToggleSetting = async (key, val) => { try { await API.updateSystemSettings({ [key]: val }); showToast('Updated'); loadSettings() } catch { showToast('Failed', 'error') } }
 
-    const platformIcons = { instagram: '📸', facebook: '📘', linkedin: '💼', twitter: '🐦', shopify: '', 'google-analytics': 'bar_chart', 'meta-ads': 'smartphone', 'google-ads': '🔍', meta: 'smartphone', google: '🔍' }
+    const platformIcons = { instagram: 'photo_camera', facebook: 'thumb_up', linkedin: 'work', twitter: 'tag', shopify: 'storefront', 'google-analytics': 'bar_chart', 'meta-ads': 'smartphone', 'google-ads': 'search', meta: 'smartphone', google: 'search' }
 
     // Impersonation search handler
     useEffect(() => {
@@ -465,18 +465,21 @@ export default function SuperAdminDashboard() {
                                     const label = (userStudioModal.studioLabels || studioLabels)[key] || key;
                                     const isHidden = portalStatus === 'hidden';
 
-                                    let statusBadge, statusColor;
-                                    if (isHidden) { statusBadge = '🔒 Hidden (global)'; statusColor = 'text-rose-400'; }
-                                    else if (hasOverride && overrideVal === true) { statusBadge = '✅ Granted'; statusColor = 'text-emerald-400'; }
-                                    else if (hasOverride && overrideVal === false) { statusBadge = '❌ Revoked'; statusColor = 'text-rose-400'; }
-                                    else if (portalStatus === 'private') { statusBadge = '🔐 Private (no access)'; statusColor = 'text-amber-400'; }
-                                    else { statusBadge = '✅ Plan (public)'; statusColor = 'text-emerald-400'; }
+                                    let statusBadge, statusColor, statusIcon;
+                                    if (isHidden) { statusBadge = 'Hidden (global)'; statusColor = 'text-rose-400'; statusIcon = 'lock'; }
+                                    else if (hasOverride && overrideVal === true) { statusBadge = 'Granted'; statusColor = 'text-emerald-400'; statusIcon = 'check_circle'; }
+                                    else if (hasOverride && overrideVal === false) { statusBadge = 'Revoked'; statusColor = 'text-rose-400'; statusIcon = 'cancel'; }
+                                    else if (portalStatus === 'private') { statusBadge = 'Private (no access)'; statusColor = 'text-amber-400'; statusIcon = 'lock_person'; }
+                                    else { statusBadge = 'Plan (public)'; statusColor = 'text-emerald-400'; statusIcon = 'public'; }
 
                                     return (
                                         <div key={key} className={`flex items-center justify-between px-4 py-3 rounded-xl ${resolved ? 'bg-white/[0.02]' : 'bg-rose-500/5'} border border-white/[0.06]`}>
                                             <div>
                                                 <p className="text-sm font-bold text-white">{label}</p>
-                                                <p className={`text-xs ${statusColor}`}>{statusBadge}</p>
+                                                <p className={`text-xs flex items-center gap-1 ${statusColor}`}>
+                                                    <span className="material-symbols-outlined text-[11px]">{statusIcon}</span>
+                                                    {statusBadge}
+                                                </p>
                                             </div>
                                             {!isHidden && (
                                                 <div className="flex gap-1">

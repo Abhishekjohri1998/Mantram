@@ -11,25 +11,25 @@ import { useBrand } from '../context/BrandContext';
 import { conversations as conversationsAPI } from '../services/api';
 
 const INTENT_LABELS = {
-    price_inquiry: { label: 'Price Inquiry', icon: '💰', color: '#f59e0b' },
-    product_inquiry: { label: 'Product Inquiry', icon: '', color: '#6366f1' },
-    order_status: { label: 'Order Status', icon: '📦', color: '#06b6d4' },
-    complaint: { label: 'Complaint', icon: '⚠️', color: '#ef4444' },
-    greeting: { label: 'Greeting', icon: '👋', color: '#10b981' },
-    support: { label: 'Support', icon: '🛟', color: '#8b5cf6' },
-    purchase_intent: { label: 'Purchase Intent', icon: '🛒', color: '#f97316' },
+    price_inquiry: { label: 'Price Inquiry', icon: 'sell', color: '#f59e0b' },
+    product_inquiry: { label: 'Product Inquiry', icon: 'inventory_2', color: '#6366f1' },
+    order_status: { label: 'Order Status', icon: 'package_2', color: '#06b6d4' },
+    complaint: { label: 'Complaint', icon: 'warning', color: '#ef4444' },
+    greeting: { label: 'Greeting', icon: 'waving_hand', color: '#10b981' },
+    support: { label: 'Support', icon: 'support_agent', color: '#8b5cf6' },
+    purchase_intent: { label: 'Purchase Intent', icon: 'shopping_cart', color: '#f97316' },
     feedback: { label: 'Feedback', icon: 'star', color: '#eab308' },
     store_location: { label: 'Store Location', icon: 'location_on', color: '#14b8a6' },
-    booking: { label: 'Booking', icon: '📅', color: '#a855f7' },
-    unknown: { label: 'Unknown', icon: '❓', color: '#64748b' },
+    booking: { label: 'Booking', icon: 'calendar_month', color: '#a855f7' },
+    unknown: { label: 'Unknown', icon: 'help', color: '#64748b' },
 };
 
 const CHANNEL_LABELS = {
-    instagram_dm: { label: 'Instagram DM', icon: '📸', color: '#e1306c' },
+    instagram_dm: { label: 'Instagram DM', icon: 'photo_camera', color: '#e1306c' },
     facebook_messenger: { label: 'Messenger', icon: 'chat', color: '#0084ff' },
-    instagram_comment: { label: 'IG Comment', icon: '💭', color: '#c13584' },
+    instagram_comment: { label: 'IG Comment', icon: 'comment', color: '#c13584' },
     instagram_story_reply: { label: 'Story Reply', icon: 'smartphone', color: '#fd8d32' },
-    instagram_mention: { label: 'Mention', icon: '@', color: '#7c3aed' },
+    instagram_mention: { label: 'Mention', icon: 'alternate_email', color: '#7c3aed' },
 };
 
 export default function Insights() {
@@ -58,7 +58,7 @@ export default function Insights() {
             <DashboardLayout title="Conversation Studio" subtitle="AI-powered inbox analytics">
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh', color: '#94a3b8' }}>
                     <div style={{ textAlign: 'center' }}>
-                        <div style={{ fontSize: '3rem', marginBottom: '1rem' }}><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">bar_chart</span></div>
+                        <span className="material-symbols-outlined" style={{ fontSize: '3rem', marginBottom: '1rem', display: 'block', color: '#6366f1' }}>bar_chart</span>
                         <h3 style={{ margin: 0, color: '#e2e8f0' }}>Select a Brand</h3>
                         <p style={{ margin: '0.5rem 0 0', fontSize: '0.875rem' }}>Choose a brand to view conversation insights</p>
                     </div>
@@ -91,7 +91,7 @@ export default function Insights() {
             {loading && !stats ? (
                 <div style={{ display: 'flex', justifyContent: 'center', padding: '4rem', color: '#64748b' }}>
                     <div style={{ textAlign: 'center' }}>
-                        <div style={{ fontSize: '2rem', marginBottom: '0.5rem', animation: 'spin 1s linear infinite' }}>⏳</div>
+                        <span className="material-symbols-outlined animate-spin" style={{ fontSize: '2rem', marginBottom: '0.5rem', display: 'block' }}>progress_activity</span>
                         Loading analytics...
                     </div>
                 </div>
@@ -99,11 +99,11 @@ export default function Insights() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                     {/* ── Row 1: KPI Cards ── */}
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.75rem' }}>
-                        <KPICard icon="📨" label="Total Conversations" value={stats.total} color="#6366f1" />
-                        <KPICard icon='chat' label="Active" value={stats.active} color="#10b981" />
-                        <KPICard icon='check_circle' label="Resolved" value={stats.resolved} color="#06b6d4" />
-                        <KPICard icon="🧑" label="Human Handled" value={stats.handedOff} color="#f59e0b" />
-                        <KPICard icon="⚡" label="Avg Response" value={stats.avgResponseTimeSec ? `${stats.avgResponseTimeSec}s` : 'N/A'} color="#8b5cf6" subtitle="response time" />
+                        <KPICard icon="forum" label="Total Conversations" value={stats.total} color="#6366f1" />
+                        <KPICard icon="chat" label="Active" value={stats.active} color="#10b981" />
+                        <KPICard icon="check_circle" label="Resolved" value={stats.resolved} color="#06b6d4" />
+                        <KPICard icon="support_agent" label="Human Handled" value={stats.handedOff} color="#f59e0b" />
+                        <KPICard icon="timer" label="Avg Response" value={stats.avgResponseTimeSec ? `${stats.avgResponseTimeSec}s` : 'N/A'} color="#8b5cf6" subtitle="response time" />
                     </div>
 
                     {/* ── Row 2: Volume Chart + Compliance ── */}
@@ -124,7 +124,7 @@ export default function Insights() {
                 </div>
             ) : (
                 <div style={{ textAlign: 'center', padding: '4rem', color: '#64748b' }}>
-                    <div style={{ fontSize: '3rem', marginBottom: '1rem' }}><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">bar_chart</span></div>
+                    <span className="material-symbols-outlined" style={{ fontSize: '3rem', marginBottom: '1rem', display: 'block', color: '#475569' }}>bar_chart</span>
                     <h3 style={{ color: '#e2e8f0' }}>No Insights Yet</h3>
                     <p style={{ fontSize: '0.875rem' }}>Start conversations to see analytics appear here</p>
                 </div>
@@ -143,7 +143,10 @@ function KPICard({ icon, label, value, color, subtitle }) {
             background: '#1e293b', borderRadius: '12px', padding: '1.25rem', border: '1px solid #334155',
             position: 'relative', overflow: 'hidden',
         }}>
-            <div style={{ position: 'absolute', top: '-8px', right: '-8px', fontSize: '3rem', opacity: 0.06 }}>{icon}</div>
+            <div style={{ position: 'absolute', top: '-4px', right: '-4px', opacity: 0.08 }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '3rem', color }}>{icon}</span>
+            </div>
+            <span className="material-symbols-outlined" style={{ fontSize: '1.1rem', color, display: 'block', marginBottom: '0.5rem' }}>{icon}</span>
             <div style={{ fontSize: '0.7rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>{label}</div>
             <div style={{ fontSize: '1.75rem', fontWeight: 700, color }}>{value}</div>
             {subtitle && <div style={{ fontSize: '0.65rem', color: '#64748b', marginTop: '0.25rem' }}>{subtitle}</div>}
@@ -157,7 +160,10 @@ function VolumeChart({ data }) {
     return (
         <div style={{ background: '#1e293b', borderRadius: '12px', border: '1px solid #334155', padding: '1.25rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                <h3 style={{ margin: 0, color: '#e2e8f0', fontSize: '0.95rem' }}><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">trending_up</span> Conversation Volume (7 Days)</h3>
+                <h3 style={{ margin: 0, color: '#e2e8f0', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: '1.1rem', verticalAlign: 'middle', color: '#6366f1' }}>trending_up</span>
+                    Conversation Volume (7 Days)
+                </h3>
                 <div style={{ display: 'flex', gap: '0.75rem' }}>
                     <LegendDot color="#6366f1" label="Total" />
                     <LegendDot color="#10b981" label="AI Handled" />
@@ -194,7 +200,10 @@ function CompliancePanel({ compliance, active }) {
 
     return (
         <div style={{ background: '#1e293b', borderRadius: '12px', border: '1px solid #334155', padding: '1.25rem' }}>
-            <h3 style={{ margin: '0 0 1rem', color: '#e2e8f0', fontSize: '0.95rem' }}><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">security</span> Meta Compliance Status</h3>
+            <h3 style={{ margin: '0 0 1rem', color: '#e2e8f0', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '1.1rem', color: '#10b981' }}>security</span>
+                Meta Compliance Status
+            </h3>
 
             {/* Gauge-style ring */}
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1rem' }}>
@@ -232,17 +241,20 @@ function CompliancePanel({ compliance, active }) {
 function IntentBreakdown({ intents, total }) {
     return (
         <div style={{ background: '#1e293b', borderRadius: '12px', border: '1px solid #334155', padding: '1.25rem' }}>
-            <h3 style={{ margin: '0 0 1rem', color: '#e2e8f0', fontSize: '0.95rem' }}><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">ads_click</span> Top Intents</h3>
+            <h3 style={{ margin: '0 0 1rem', color: '#e2e8f0', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '1.1rem', color: '#6366f1' }}>ads_click</span>
+                Top Intents
+            </h3>
             {intents.length === 0 ? (
                 <div style={{ color: '#64748b', fontSize: '0.85rem', textAlign: 'center', padding: '1rem' }}>No intent data yet</div>
             ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                     {intents.map((intent, i) => {
-                        const info = INTENT_LABELS[intent._id] || { label: intent._id || 'Unknown', icon: '❓', color: '#64748b' };
+                        const info = INTENT_LABELS[intent._id] || { label: intent._id || 'Unknown', icon: 'help', color: '#64748b' };
                         const pct = total > 0 ? Math.round((intent.count / total) * 100) : 0;
                         return (
                             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                <span style={{ fontSize: '1rem', width: '24px', textAlign: 'center' }}>{info.icon}</span>
+                                <span className="material-symbols-outlined" style={{ fontSize: '1rem', width: '24px', textAlign: 'center', color: info.color }}>{info.icon}</span>
                                 <div style={{ flex: 1 }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.2rem' }}>
                                         <span style={{ color: '#e2e8f0', fontSize: '0.8rem', fontWeight: 500 }}>{info.label}</span>
@@ -265,14 +277,17 @@ function SentimentPanel({ sentiments }) {
     const s = sentiments || { positive: 0, neutral: 0, negative: 0 };
     const total = s.positive + s.neutral + s.negative || 1;
     const data = [
-        { label: 'Positive', value: s.positive, pct: Math.round((s.positive / total) * 100), color: '#10b981', emoji: '😊' },
-        { label: 'Neutral', value: s.neutral, pct: Math.round((s.neutral / total) * 100), color: '#f59e0b', emoji: '😐' },
-        { label: 'Negative', value: s.negative, pct: Math.round((s.negative / total) * 100), color: '#ef4444', emoji: '😠' },
+        { label: 'Positive', value: s.positive, pct: Math.round((s.positive / total) * 100), color: '#10b981', icon: 'sentiment_satisfied' },
+        { label: 'Neutral', value: s.neutral, pct: Math.round((s.neutral / total) * 100), color: '#f59e0b', icon: 'sentiment_neutral' },
+        { label: 'Negative', value: s.negative, pct: Math.round((s.negative / total) * 100), color: '#ef4444', icon: 'sentiment_dissatisfied' },
     ];
 
     return (
         <div style={{ background: '#1e293b', borderRadius: '12px', border: '1px solid #334155', padding: '1.25rem' }}>
-            <h3 style={{ margin: '0 0 1rem', color: '#e2e8f0', fontSize: '0.95rem' }}><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">chat</span> Sentiment Analysis</h3>
+            <h3 style={{ margin: '0 0 1rem', color: '#e2e8f0', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '1.1rem', color: '#6366f1' }}>chat</span>
+                Sentiment Analysis
+            </h3>
 
             {/* Stacked bar */}
             <div style={{ display: 'flex', borderRadius: '6px', overflow: 'hidden', height: '24px', marginBottom: '1rem', background: '#334155' }}>
@@ -285,7 +300,7 @@ function SentimentPanel({ sentiments }) {
                 {data.map(d => (
                     <div key={d.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <span style={{ fontSize: '1.1rem' }}>{d.emoji}</span>
+                            <span className="material-symbols-outlined" style={{ fontSize: '1.1rem', color: d.color }}>{d.icon}</span>
                             <span style={{ color: '#e2e8f0', fontSize: '0.8rem' }}>{d.label}</span>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -302,17 +317,20 @@ function SentimentPanel({ sentiments }) {
 function ChannelBreakdown({ channels, total }) {
     return (
         <div style={{ background: '#1e293b', borderRadius: '12px', border: '1px solid #334155', padding: '1.25rem' }}>
-            <h3 style={{ margin: '0 0 1rem', color: '#e2e8f0', fontSize: '0.95rem' }}>📡 Channel Breakdown</h3>
+            <h3 style={{ margin: '0 0 1rem', color: '#e2e8f0', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '1.1rem', color: '#06b6d4' }}>cell_tower</span>
+                Channel Breakdown
+            </h3>
             {channels.length === 0 ? (
                 <div style={{ color: '#64748b', fontSize: '0.85rem', textAlign: 'center', padding: '1rem' }}>No channel data yet</div>
             ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
                     {channels.map((ch, i) => {
-                        const info = CHANNEL_LABELS[ch._id] || { label: ch._id || 'Unknown', icon: '📨', color: '#64748b' };
+                        const info = CHANNEL_LABELS[ch._id] || { label: ch._id || 'Unknown', icon: 'forum', color: '#64748b' };
                         const pct = total > 0 ? Math.round((ch.count / total) * 100) : 0;
                         return (
                             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                <span style={{ fontSize: '1rem', width: '24px', textAlign: 'center' }}>{info.icon}</span>
+                                <span className="material-symbols-outlined" style={{ fontSize: '1rem', width: '24px', textAlign: 'center', color: info.color }}>{info.icon}</span>
                                 <div style={{ flex: 1 }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.2rem' }}>
                                         <span style={{ color: '#e2e8f0', fontSize: '0.8rem' }}>{info.label}</span>
@@ -341,7 +359,10 @@ function AIPerformance({ replies, aiHandled, total }) {
 
     return (
         <div style={{ background: '#1e293b', borderRadius: '12px', border: '1px solid #334155', padding: '1.25rem' }}>
-            <h3 style={{ margin: '0 0 1rem', color: '#e2e8f0', fontSize: '0.95rem' }}><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">smart_toy</span> AI Performance</h3>
+            <h3 style={{ margin: '0 0 1rem', color: '#e2e8f0', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '1.1rem', color: '#6366f1' }}>smart_toy</span>
+                AI Performance
+            </h3>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem' }}>
                 <div style={{ textAlign: 'center' }}>

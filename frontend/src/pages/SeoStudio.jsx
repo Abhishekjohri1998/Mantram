@@ -965,54 +965,62 @@ small{color:#94a3b8;font-size:10px}
                     </div>
                 </div>
             ) : (
-                <div>
+                <div className="flex gap-0 min-h-0">
 
-                    {/* —— Standardized Studio Tab Bar (Nav replaces left sidebar) —— */}
-                    <div className="studio-tab-bar">
-                        <div className="studio-tab-row">
-                            {SIDEBAR_SECTIONS.map(section =>
-                                section.items.map(item => {
-                                    const isActive = activeSection === item.id
-                                    const itemTask = tasks[item.id]
-                                    const isRunning = itemTask?.status === 'running'
-                                    const isDone = itemTask?.status === 'done'
-                                    return (
-                                        <button key={item.id}
-                                            onClick={() => { setActiveSection(item.id); setError(null); if (item.type === 'workflow') { setSavedResults(null) } }}
-                                            className={`flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-300 cursor-pointer ${isActive ? 'studio-nav-pill text-white font-bold' : 'studio-nav-tab-inactive'}`}>
-                                            <span className={`material-symbols-outlined ${isActive ? 'text-lg' : 'text-base opacity-70'}`} style={isActive ? { color: item.color } : {}}>{item.icon}</span>
-                                            <span>{item.label}</span>
-                                            {isRunning && <span className="material-symbols-outlined text-xs animate-spin" style={{ color: item.color }}>sync</span>}
-                                            {isDone && !isRunning && <span className="material-symbols-outlined text-xs text-emerald-400">check_circle</span>}
-                                        </button>
-                                    )
-                                })
+                    {/* ── Left Sidebar Navigation ── */}
+                    <div className="w-52 flex-shrink-0 sticky top-[4rem] self-start h-[calc(100vh-4rem)] overflow-y-auto"
+                        style={{ borderRight: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.01)' }}>
+                        <div className="py-3 px-2 space-y-4">
+                            {/* GA Status */}
+                            {gaConnected && (
+                                <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/15 mx-1">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0" />
+                                    <span className="text-[10px] font-bold text-emerald-400 truncate">{gaEmail || 'GA Connected'}</span>
+                                </div>
                             )}
-                            {/* Quick access: Competitors + GA */}
-                            <div className="ml-auto flex-shrink-0 flex items-center gap-2">
-                                {gaConnected && (
-                                    <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/15 text-[11px] font-bold text-emerald-400">
-                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />{gaEmail || 'GA'}
-                                    </span>
-                                )}
-                                {competitors.length > 0 && (
-                                    <button onClick={() => setActiveSection('competitors')}
-                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl studio-nav-tab-inactive text-[11px] cursor-pointer">
-                                        <span className="material-symbols-outlined text-xs opacity-70">compare_arrows</span>
-                                        {competitors.length} Competitors
-                                    </button>
-                                )}
+                            {SIDEBAR_SECTIONS.map(section => (
+                                <div key={section.title}>
+                                    <p className="text-[9px] font-black text-slate-600 uppercase tracking-widest px-3 mb-1.5">{section.title}</p>
+                                    <div className="space-y-0.5">
+                                        {section.items.map(item => {
+                                            const isActive = activeSection === item.id
+                                            const itemTask = tasks[item.id]
+                                            const isRunning = itemTask?.status === 'running'
+                                            const isDone = itemTask?.status === 'done'
+                                            return (
+                                                <button key={item.id}
+                                                    onClick={() => { setActiveSection(item.id); setError(null); if (item.type === 'workflow') { setSavedResults(null) } }}
+                                                    className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[12px] font-semibold transition-all duration-200 cursor-pointer text-left ${
+                                                        isActive
+                                                            ? 'text-white'
+                                                            : 'text-slate-500 hover:text-slate-300 hover:bg-white/[0.03]'
+                                                    }`}
+                                                    style={isActive ? { background: `${item.color}15`, color: 'white' } : {}}>
+                                                    <span className="material-symbols-outlined text-[16px] flex-shrink-0"
+                                                        style={{ color: isActive ? item.color : undefined }}>{item.icon}</span>
+                                                    <span className="flex-1 truncate">{item.label}</span>
+                                                    {isRunning && <span className="material-symbols-outlined text-[12px] animate-spin flex-shrink-0" style={{ color: item.color }}>sync</span>}
+                                                    {isDone && !isRunning && <span className="material-symbols-outlined text-[12px] text-emerald-400 flex-shrink-0">check_circle</span>}
+                                                </button>
+                                            )
+                                        })}
+                                    </div>
+                                </div>
+                            ))}
+                            {/* Guide toggle */}
+                            <div>
                                 <button onClick={() => setShowGuide(!showGuide)}
-                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] cursor-pointer transition-all ${showGuide ? 'studio-nav-pill text-white' : 'studio-nav-tab-inactive'}`}>
-                                    <span className="material-symbols-outlined text-xs opacity-70">help</span>
-                                    Guide
+                                    className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[12px] font-semibold transition-all duration-200 cursor-pointer ${showGuide ? 'text-white' : 'text-slate-500 hover:text-slate-300 hover:bg-white/[0.03]'}`}
+                                    style={showGuide ? { background: 'rgba(99,102,241,0.15)', color: 'white' } : {}}>
+                                    <span className="material-symbols-outlined text-[16px]" style={{ color: showGuide ? '#6366f1' : undefined }}>menu_book</span>
+                                    <span>Guide</span>
                                 </button>
                             </div>
                         </div>
                     </div>
 
                     {/* ═══════════ MAIN CONTENT ═══════════ */}
-                    <div className="px-2 py-2">
+                    <div className="flex-1 min-w-0 px-4 py-2 overflow-y-auto">
                         {/* Compact Brand Header + Ask Bar */}
                         <div className="flex items-center gap-3 mb-4">
                             <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"

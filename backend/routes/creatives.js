@@ -289,6 +289,41 @@ export async function internalGenerateCreative({ body, user, creditsDeducted, jo
                         { $set: { 'aiMeta.processingStatus': 'ready' } }
                     );
                 }
+
+                // ── POST-GENERATION CRITIC (MCoT Stage 2) — async background ──
+                // Analyze the final image after S3 upload (so we have a stable HTTP URL)
+                // Saves quality verdict + score to aiMeta without blocking the user response
+                if (finalUrl && finalUrl.startsWith('http') && agenticMeta?.finalPrompt) {
+                    try {
+                        const { postGenerationCriticNode } = await import('../agents/creativeStudio/nodes.js');
+                        const criticState = {
+                            brief: prompt,
+                            finalPrompt: agenticMeta.finalPrompt,
+                            format: body.type || 'instagram-post',
+                            brandIntel: agenticMeta.brandIntel || null,
+                            matchedProduct: agenticMeta.matchedProduct || null,
+                            visualGrounding: agenticMeta.visualGrounding || null,
+                            generatedImageUrl: finalUrl,
+                        };
+                        const criticResult = await postGenerationCriticNode(criticState);
+                        if (criticResult?.postGenCritique) {
+                            const q = criticResult.postGenCritique;
+                            await Creative.updateOne(
+                                { _id: creative._id },
+                                { $set: {
+                                    'aiMeta.qualityScore': q.overallScore || null,
+                                    'aiMeta.qualityVerdict': q.verdict || null,
+                                    'aiMeta.qualityIssues': q.issues || [],
+                                    'aiMeta.qualitySummary': q.critiqueNotes || null,
+                                    'aiMeta.processingStatus': 'ready',
+                                }}
+                            );
+                            console.log(`🔎 [PostGenCritic] ${creative._id}: score=${q.overallScore}, verdict=${q.verdict}`);
+                        }
+                    } catch (criticErr) {
+                        console.warn(`🔎 [PostGenCritic] Non-blocking error: ${criticErr.message}`);
+                    }
+                }
             } catch (bgErr) {
                 console.error('[BG] error:', bgErr.message);
             }
@@ -1053,203 +1088,73 @@ router.post('/suggest-copy', protect, async (req, res) => {
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
-// POST /api/creatives/enhance-prompt — AI-powered AGENTIC prompt enhancement
-// Intelligently matches products, injects format-specific creative direction, and builds
-// a detailed prompt that combines the user's theme with real brand/product data.
+// POST /api/creatives/enhance-prompt — Full Agentic Prompt Enhancement
+// Uses the SAME 6-agent pipeline as generation (fast mode):
+//   brandIntelligenceNode → fastCreativeDirectorNode (with 2025 frameworks)
+// Returns the fully engineered 100-180 word image prompt + art direction notes.
+// This differentiates Mantram from competitors who do basic text expansion.
 // ══════════════════════════════════════════════════════════════════════════════
 router.post('/enhance-prompt', protect, requireCredits('promptEnhance'), async (req, res) => {
     try {
-        const { brandId, prompt, style, format, referenceDescriptions, aspectRatio } = req.body;
+        const { brandId, prompt, style, format, referenceDescriptions, aspectRatio, imageModel } = req.body;
         if (!prompt) return res.status(400).json({ success: false, error: 'Prompt is required' });
+        if (!brandId) return res.status(400).json({ success: false, error: 'Brand ID is required for enhancement' });
 
-        const brand = brandId ? await Brand.findById(brandId) : null;
-        const brandDesc = brand ? buildBrandDescription(brand) : 'a professional brand';
-        const colorPhrase = brand ? getColorPhrase(brand) : '';
-        const visualCtx = brand ? buildVisualContext(brand) : '';
-        const dna = brand?.dna || {};
+        console.log(`✨ [EnhancePrompt] Running full agentic pipeline for brief: "${prompt.substring(0, 60)}..." → format: ${format}, model: ${imageModel || 'nanobanana-2'}`);
 
-        // ── AGENTIC: Fetch products and intelligently match to the brief ──
-        let productContext = '';
-        let matchedProductName = '';
-        if (brand) {
-            const products = await Product.find(
-                { brand: brand._id, status: 'active' },
-                { title: 1, shortDescription: 1, description: 1, features: 1, category: 1, tags: 1, productType: 1 }
-            ).lean().limit(20);
+        // Import the full agentic pipeline runner
+        const { runCreativePipeline } = await import('../agents/creativeStudio/nodes.js');
 
-            if (products.length > 0) {
-                const briefLower = prompt.toLowerCase();
-                const SEMANTIC_MAP = {
-                    beat: ['earbuds', 'headphones', 'speaker', 'audio', 'music', 'sound', 'bass'],
-                    beats: ['earbuds', 'headphones', 'speaker', 'audio', 'music', 'sound', 'bass'],
-                    music: ['earbuds', 'headphones', 'speaker', 'audio', 'neckband'],
-                    sound: ['earbuds', 'headphones', 'speaker', 'audio'],
-                    listen: ['earbuds', 'headphones'],
-                    summer: ['light', 'outdoor', 'portable', 'wireless', 'sport'],
-                    winter: ['warm', 'cozy', 'premium'],
-                    travel: ['portable', 'wireless', 'powerbank'],
-                    fitness: ['sport', 'wireless', 'neckband', 'earbuds'],
-                    gaming: ['headphones', 'bass'],
-                    style: ['watch', 'earbuds', 'premium'],
-                    gift: ['watch', 'earbuds', 'powerbank'],
-                };
-                const briefWords = briefLower.split(/\s+/).filter(w => w.length > 2);
-                const expanded = new Set(briefWords);
-                for (const w of briefWords) { (SEMANTIC_MAP[w] || []).forEach(kw => expanded.add(kw)); }
-                const expandedBrief = [...expanded].join(' ');
+        // Run pipeline in FAST mode — Brand Intel + Visual Grounding + Fast Creative Director
+        // This is the same pipeline used during image generation, just without the image generation step
+        const pipelineResult = await runCreativePipeline({
+            brandId,
+            brief: prompt.trim(),
+            format: format || 'instagram-post',
+            aspectRatio: aspectRatio || '1:1',
+            style: style || '',
+            imageModel: imageModel || 'nanobanana-2',
+            mode: 'fast',        // uses fastCreativeDirectorNode (Art Director + Prompt Engineer in 1 call)
+            generateCopy: false, // no copy during enhancement
+        });
 
-                let bestScore = 0, bestProduct = null;
-                for (const p of products) {
-                    let score = 0;
-                    const titleWords = (p.title || '').toLowerCase().split(/\s+/);
-                    const descWords = (p.description || p.shortDescription || '').toLowerCase().split(/\s+/);
-                    for (const w of titleWords) { if (w.length > 2 && briefLower.includes(w)) score += 3; }
-                    for (const w of [...titleWords, ...descWords, ...(p.tags || []).map(t => t.toLowerCase())]) {
-                        if (w.length > 2 && expandedBrief.includes(w)) score += 1;
-                    }
-                    if (briefLower.includes(p.title.toLowerCase())) score += 10;
-                    if (score > bestScore) { bestScore = score; bestProduct = p; }
-                }
+        const enhancedPrompt = pipelineResult.finalPrompt || pipelineResult.engineeredPrompt?.primaryPrompt || prompt;
 
-                // ── AGENTIC DECISION: Only match when there's genuine relevance ──
-                // If bestScore < 2, the brief has no meaningful product connection.
-                // Instead of forcing a random product, give the AI the full catalog
-                // and let IT decide what fits the creative vision.
-                if (bestScore < 2) bestProduct = null;
-
-                if (bestProduct) {
-                    // Strong product match — inject as hero product
-                    matchedProductName = bestProduct.title;
-                    const features = (bestProduct.features || []).slice(0, 3).join(', ');
-                    const desc = (bestProduct.shortDescription || bestProduct.description || '').substring(0, 100);
-                    productContext = `\nSTRONGLY MATCHED PRODUCT (confidence: high): "${bestProduct.title}"${desc ? ` — ${desc}` : ''}${features ? `\nKEY FEATURES: ${features}` : ''}\nThis product directly relates to the user's brief. Feature it as the HERO visual element.`;
-                }
-
-                // Always provide the full catalog so the AI can make intelligent decisions
-                const catalogSummary = products.map(p => {
-                    const desc = (p.shortDescription || '').substring(0, 60);
-                    return `• ${p.title}${p.category ? ` [${p.category}]` : ''}${desc ? `: ${desc}` : ''}`;
-                }).join('\n');
-                productContext += `\n\nFULL PRODUCT CATALOG (${products.length} products):\n${catalogSummary}`;
-
-                if (!bestProduct) {
-                    productContext += `\n\nAGENTIC DECISION REQUIRED: No strong product match was found for this brief. As the Creative Director, YOU must decide:\n1. If the brief has ANY thematic connection to a product (e.g. "summer" → portable speaker), pick the most relevant one and integrate it naturally\n2. If the brief is purely an occasion/greeting (e.g. "happy birthday", "thank you"), create a brand-atmosphere creative that captures the brand's identity without forcing a specific product\n3. If the brief is about the brand itself (e.g. "brand launch", "about us"), showcase the brand's overall identity and values`;
-                }
-            } else {
-                // Service brand — no physical products
-                const services = (dna.servicesOffered || []).slice(0, 5);
-                const usps = (dna.uniqueSellingPoints || []).slice(0, 3);
-                if (services.length > 0 || usps.length > 0) {
-                    productContext = `\nSERVICE BRAND — KEY OFFERINGS: ${services.join(', ')}${usps.length > 0 ? `\nUNIQUE SELLING POINTS: ${usps.join(', ')}` : ''}\nWeave these services into the visual narrative where relevant to the brief.`;
-                }
-            }
+        // Sanity check — if pipeline returned something too short or failed, fall back gracefully
+        if (!enhancedPrompt || enhancedPrompt.length < 80) {
+            console.warn(`✨ [EnhancePrompt] Pipeline returned short result (${enhancedPrompt?.length || 0} chars) — using raw brief`);
+            return res.json({ success: true, enhancedPrompt: prompt, agenticEnhanced: false });
         }
 
-        // ── FORMAT-SPECIFIC INTELLIGENCE ──
-        const FORMAT_INTEL = {
-            'youtube-thumb': { label: 'YouTube Thumbnail (16:9)', needsText: true, rules: 'MUST include bold, readable headline text as the HERO visual element. Suggest a catchy 3-5 word headline that relates to the brief and product. High contrast, expressive face if relevant, rule of thirds, click-worthy composition.' },
-            'instagram-post': { label: 'Instagram Post (4:5)', needsText: false, rules: 'Optimize for feed scroll-stopping. Lifestyle-first aesthetic, center-weighted key elements.' },
-            'instagram-story': { label: 'Instagram Story (9:16)', needsText: false, rules: 'Full vertical, key content in center 60%. Story-native, raw and engaging.' },
-            'facebook-ad': { label: 'Facebook Ad (4:5)', needsText: false, rules: 'Minimal text (<20%). Single clear value proposition. CTA-ready composition.' },
-            'linkedin-post': { label: 'LinkedIn Post (1:1)', needsText: true, rules: 'Professional, clean. Can include a short thought-leadership headline. Corporate-friendly palette.' },
-            'banner': { label: 'Website Banner (16:9)', needsText: false, rules: 'Ultra-wide, leave text-safe zones on sides. Editorial quality.' },
-        };
-        const formatInfo = FORMAT_INTEL[format] || null;
-
-        const systemPrompt = `You are a world-class Visionary Creative Director and Master Prompt Engineer.
-Your mission is to transform a simple user brief into an EXTREMELY EXHAUSTIVE, cinematic, and professional image generation prompt of approximately 5,000 words.
-
-YOUR DIRECTIVE:
-You do not just "enhance" — you build an entire visual world. You will provide a microscopic level of detail for every single element of the scene. The final output must be a massive block of high-density visual information that leaves nothing to the AI's imagination.
-
-MANDATORY STRUCTURAL FRAMEWORK (Your response MUST follow this structure to hit the 5,000-word target):
-
-1. CONCEPTUAL OVERARCHING NARRATIVE (500+ words):
-   - Define the deep subtext, mood, and emotional weight of the image.
-   - Describe the "story" happening in the single frame.
-
-2. FOREGROUND: THE HERO & IMMEDIATE ELEMENTS (1,000+ words):
-   - Describe the main subject (product or person) with obsessive detail.
-   - For products: describe specific materials (brushed aluminum, micro-textured polymers, anti-fingerprint coatings, translucent sapphire glass), the exact curvature of edges, the way light refracts through surfaces.
-   - For people: skin pores, micro-hairs, the exact weave of fabric in their clothing, the moisture levels in their eyes, their subtle muscle tension.
-
-3. MIDGROUND & BACKGROUND: WORLD-BUILDING (1,000+ words):
-   - Describe the environment in 360 degrees. Detail every pebble, every blade of grass, every architectural flourish.
-   - Mention specific environmental storytelling elements (e.g., "a single drop of rain sliding down a mossy cobblestone", "shards of dust dancing in a pillar of light").
-
-4. ATMOSPHERE, LIGHTING & VOLUMETRIC EFFECTS (1,000+ words):
-   - Define the exact lighting setup (e.g., "three-point studio lighting with a warm tungsten key light from 45 degrees, a cooler blue rim light, and a soft lavender fill").
-   - Describe the air itself: humidity, volumetric fog, god-rays, floating micro-particles, heat haze, or crisp crystalline clarity.
-
-5. TECHNICAL CAMERA SPECS & COMPOSITION (500+ words):
-   - Camera: Specify name/type (e.g., ARRI Alexa 35, Hasselblad H6D).
-   - Lens: Focal length (e.g., 85mm f/1.2 for shallow DOF, 14mm for wide architectural), aperture, distortion, chromatic aberration.
-   - Composition: Rule of thirds, golden ratio, leading lines, framing-within-framing.
-
-6. COLOR GRADING & TEXTURAL FINISH (500+ words):
-   - Describe the color science: "Kodak Portra 400 skin tones", "teal and orange cinematic grade", "muted desaturated industrial grit".
-   - Textures: "Micro-scratches on polished chrome", "velvety soft-touch finish", "imperceptible grain structure".
-
-RULES:
-- TARGET LENGTH: 5,000 WORDS. If your description is short, you have failed.
-- NEVER use hex codes, font names, or technical metadata that could be rendered as text.
-- NEVER use phrases like "A mockup of" or "An image of". Describe the reality.
-- NO PREAMBLE: Start directly with the prompt content.
-- PURE NARRATIVE: Do not use bullet points or labels in the final output. Provide a continuous, high-density stream of visual consciousness.
-
-CRITICAL: The user's original idea is the seed. You must expand it into a 5,000-word creative masterpiece that perfectly integrates the Brand DNA and Products provided.`;
-
-        const userPrompt = [
-            `USER'S IDEA: ${prompt}`,
-            brand ? `BRAND: ${brandDesc}` : '',
-            colorPhrase ? `BRAND COLORS: ${colorPhrase}` : '',
-            visualCtx ? `BRAND VISUAL STYLE: ${visualCtx}` : '',
-            productContext,
-            style ? `STYLE: ${style}` : '',
-            formatInfo ? `FORMAT: ${formatInfo.label}` : format ? `FORMAT: ${format}` : '',
-            aspectRatio ? `ASPECT RATIO: ${aspectRatio}` : '',
-            referenceDescriptions ? `REFERENCE IMAGES: ${referenceDescriptions}` : '',
-        ].filter(Boolean).join('\n');
-
-        // Use AI router instead of raw fetch for better error handling and logging
-        const aiRouter = getRouter();
-        let enhanced = '';
-
-        try {
-            const systemPromptFinal = systemPrompt + "\n\nCRITICAL DIRECTIVE: You MUST generate at least 5000 words. Do not summarize. Do not skip details. EXPAND EVERY ASPECT OF THE IMAGE.";
-            
-            const result = await aiRouter.generateText({
-                systemPrompt: systemPromptFinal,
-                userPrompt: userPrompt + "\n\nCRITICAL DIRECTIVE: Generate a minimum of 5000 words. USE ALL YOUR TOKENS. Expand wildly and obsessively over every detail.",
-                model: 'gemini-1.5-pro',
-                maxTokens: 8192,
-                temperature: 0.8
-            });
-            
-            enhanced = result.text || '';
-        } catch (e) {
-            console.error('Prompt enhance: Gemini router failed:', e.message);
-            // DO NOT fallback to original if we can help it, let's keep it robust.
-            enhanced = '';
+        // Clean up any pipeline-injected metadata headers (VISUAL GROUNDING sections etc.) for display
+        let cleanPrompt = enhancedPrompt;
+        // Strip visual grounding injection block if it appears (it's for the model, not for display)
+        const groundingIdx = cleanPrompt.indexOf('\nVISUAL GROUNDING (from real product/brand photos):');
+        if (groundingIdx !== -1) {
+            cleanPrompt = cleanPrompt.substring(0, groundingIdx).trim();
         }
 
-        if (!enhanced || enhanced.length < 50) {
-            console.warn('Prompt enhance returned very little text, falling back to original.');
-            enhanced = prompt;
-        }
+        console.log(`✨ [EnhancePrompt] Done in ${pipelineResult.pipelineTimeMs}ms — enhanced from ${prompt.length} to ${cleanPrompt.length} chars`);
+        console.log(`✨ [EnhancePrompt] Design trend: ${pipelineResult.artDirection?.designTrend || pipelineResult.engineeredPrompt?.engineeringNotes?.substring(0, 60) || 'N/A'}`);
 
-        // Clean up
-        enhanced = enhanced.trim();
-        enhanced = enhanced.replace(/^["']|["']$/g, '').trim();
-        enhanced = enhanced.replace(/^(Generate|Create|Design|Prompt|Enhanced):?\s*/i, '').trim();
-
-        console.log(`✨ Enhanced prompt for "${prompt.substring(0, 30)}..." → format: ${format}, matched product: ${matchedProductName || 'none'}`);
-        res.json({ success: true, enhancedPrompt: enhanced });
+        res.json({
+            success: true,
+            enhancedPrompt: cleanPrompt,
+            agenticEnhanced: true,
+            // Surface the creative intelligence to the UI
+            designTrend: pipelineResult.artDirection?.designTrend || null,
+            mood: pipelineResult.artDirection?.mood || null,
+            productMatched: pipelineResult.matchedProduct?.title || null,
+            engineeringNotes: pipelineResult.engineeredPrompt?.engineeringNotes || null,
+            pipelineTimeMs: pipelineResult.pipelineTimeMs,
+        });
     } catch (error) {
-        console.error('Prompt enhance error:', error);
-        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+        console.error('✨ [EnhancePrompt] Error:', error);
+        // Graceful degradation — if the full pipeline fails, return original prompt
+        res.json({ success: true, enhancedPrompt: req.body.prompt, agenticEnhanced: false, error: error.message });
     }
 });
+
 
 // POST /api/creatives/generate-campaign-copy
 // Dedicated endpoint for campaign ad copy generation — NOT for image prompts.

@@ -56,15 +56,33 @@ export async function researchNode(state) {
 
     const { brandContext, brand } = await loadBrandContext(state.brandId);
 
-    // ── Language inference: detect brand's regional language ──
-    const langInfo = inferBrandLanguage(brand);
-    const languageDirective = buildLanguageDirective(
-        langInfo,
-        brand?.name || '',
-        brand?.dna?.targetAudience || ''
-    );
-    if (langInfo.isRegional) {
-        console.log(`🌍 Content Pipeline: Language directive active — ${langInfo.displayName} (${langInfo.source})`);
+    // ── Language: User-selected language ALWAYS wins over brand DNA inference ──
+    // If state.language is explicitly set (e.g. 'english'), skip regional inference entirely.
+    // Only use brand DNA inference when language = 'auto' or unset.
+    const userSelectedLang = state.language?.trim().toLowerCase();
+    const userOverridesLang = userSelectedLang && userSelectedLang !== 'auto';
+
+    let langInfo, languageDirective;
+    if (userOverridesLang) {
+        // User chose a specific language — build directive from that, NOT from brand DNA
+        if (userSelectedLang === 'english') {
+            langInfo = { lang: 'english', isRegional: false, displayName: 'English', confidence: 'user-selected' };
+            languageDirective = ''; // No directive needed — English is default
+            console.log(`🌍 Content Pipeline: Language = ENGLISH (user-selected, overrides brand DNA inference)`);
+        } else {
+            // User selected a regional language explicitly
+            const LANG_DISPLAY_MAP = { hindi: 'Hindi', marathi: 'Marathi', tamil: 'Tamil', telugu: 'Telugu', kannada: 'Kannada', malayalam: 'Malayalam', bengali: 'Bengali', punjabi: 'Punjabi', gujarati: 'Gujarati', hinglish: 'Hinglish' };
+            langInfo = { lang: userSelectedLang, isRegional: true, displayName: LANG_DISPLAY_MAP[userSelectedLang] || userSelectedLang, confidence: 'user-selected' };
+            languageDirective = buildLanguageDirective(langInfo, brand?.name || '', brand?.dna?.targetAudience || '');
+            console.log(`🌍 Content Pipeline: Language = ${langInfo.displayName} (user-selected)`);
+        }
+    } else {
+        // Auto-detect from brand DNA signals
+        langInfo = inferBrandLanguage(brand);
+        languageDirective = buildLanguageDirective(langInfo, brand?.name || '', brand?.dna?.targetAudience || '');
+        if (langInfo.isRegional) {
+            console.log(`🌍 Content Pipeline: Language directive auto-detected — ${langInfo.displayName} (${langInfo.source})`);
+        }
     }
     // Store for downstream nodes
     state.langInfo = langInfo;
@@ -165,10 +183,10 @@ Top Pages: ${(state.intelligence.ga4.data?.pages || []).slice(0, 3).map(p => `${
         `WRITE CONTENT FOR: ${state.brief}`,
         `TYPE: ${state.contentType || 'social'}`,
         `PLATFORM: ${state.platform || 'instagram'}`,
-        // Enforce detected language in user prompt too
-        langInfo.isRegional
+        // Language: respect user-selected language (confidence='user-selected') over brand auto-detection
+        (langInfo.isRegional && langInfo.confidence !== 'user-selected')
             ? `LANGUAGE: Write ENTIRELY in ${langInfo.displayName}. Do NOT output English creative copy.`
-            : (state.language ? `LANGUAGE: Write in ${state.language}` : ''),
+            : (state.language && state.language !== 'auto' ? `LANGUAGE: Write in ${state.language.charAt(0).toUpperCase() + state.language.slice(1)}` : ''),
         '',
         `RESEARCH INSIGHTS:`,
         `Key Angles: ${(state.research?.keyAngles || []).join(', ')}`,

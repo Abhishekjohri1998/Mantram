@@ -95,6 +95,12 @@ const GOALS = [
         ],
     },
     {
+        id: 'custom_blog', icon: 'draw', label: 'Write It Yourself',
+        desc: 'Smart writing pad with AI synonyms, grammar check and image generation',
+        glow: 'glow-violet', iconColor: 'text-violet-400', accent: '#8B5CF6',
+        subTypes: [],
+    },
+    {
         id: 'press_release', icon: 'newspaper', label: 'Write Press Release',
         desc: 'Professional PR for launches, announcements, events',
         glow: 'glow-rose', iconColor: 'text-rose-400', accent: '#F43F5E',
@@ -2256,6 +2262,7 @@ function StepBlogWizard({ activeBrand, blogType, onGenerate, onBack, generating 
                 </div>
             </div>
 
+
             {/* Topic */}
             <div className="glass-panel rounded-2xl p-6 mb-4">
                 <label className="text-sm font-bold text-white mb-2 block">What's your blog about?</label>
@@ -2326,6 +2333,497 @@ function StepBlogWizard({ activeBrand, blogType, onGenerate, onBack, generating 
 }
 
 // ============================================================================
+// SMART BLOG WRITER — Custom write mode with AI assistance
+// Features: Synonyms (debounced), grammar check, rephrase, expand, image gen
+// ============================================================================
+
+function SmartBlogWriter({ activeBrand, onBack, onGenerateImage }) {
+    // (React hooks are imported at the top of this file)
+    const [title, setTitle] = useState('')
+    const [sections, setSections] = useState([{ heading: '', body: '', imageUrl: '', imageAlt: '', imageRatio: '' }])
+    const [activeSection, setActiveSection] = useState(0)
+    const [synonyms, setSynonyms] = useState([])
+    const [grammarIssues, setGrammarIssues] = useState({}) // { sectionIdx: [{original, corrected, reason}] }
+    const [rephraseSuggestions, setRephraseSuggestions] = useState(null)
+    const [expandResult, setExpandResult] = useState(null)
+    const [assistLoading, setAssistLoading] = useState('')
+    const [imageStylePicker, setImageStylePicker] = useState(null) // null | -1 (hero) | sectionIdx
+    const [heroImageUrl, setHeroImageUrl] = useState('')
+    const [generatingImage, setGeneratingImage] = useState(null)
+    const [selectedImageStyle, setSelectedImageStyle] = useState('editorial')
+    const [selectedImageRatio, setSelectedImageRatio] = useState('9:16')
+    const [showAssistPanel, setShowAssistPanel] = useState(true)
+    const [assistQuery, setAssistQuery] = useState('')
+    const [copied, setCopied] = useState('')
+    const synonymTimerRef = useRef(null)
+    const lastWordRef = useRef('')
+
+    const IMAGE_STYLES = [
+        { id: 'editorial', label: 'Editorial', icon: 'photo_camera' },
+        { id: 'lifestyle', label: 'Lifestyle', icon: 'sunny' },
+        { id: '3d', label: '3D Render', icon: 'view_in_ar' },
+        { id: 'flat_illustration', label: 'Flat Art', icon: 'brush' },
+    ]
+    const IMAGE_RATIOS = [
+        { id: '9:16', label: '9:16', icon: 'crop_portrait' },
+        { id: '1:1', label: '1:1', icon: 'crop_square' },
+        { id: '16:9', label: '16:9', icon: 'crop_landscape' },
+    ]
+
+    const totalWords = useMemo(() =>
+        sections.reduce((sum, s) => sum + (s.body || '').split(/\s+/).filter(Boolean).length, 0)
+    , [sections])
+
+    const updateSection = (idx, key, val) => {
+        setSections(prev => {
+            const next = [...prev]
+            next[idx] = { ...next[idx], [key]: val }
+            return next
+        })
+    }
+
+    const addSection = () => setSections(prev => [...prev, { heading: '', body: '', imageUrl: '', imageAlt: '', imageRatio: '' }])
+    const removeSection = (idx) => setSections(prev => prev.filter((_, i) => i !== idx))
+
+    // Synonym fetch on SPACE keyup — keyup fires AFTER the space is inserted, so val has the complete word
+    const handleBodyKeyUp = (idx, e) => {
+        if (e.key !== ' ' && e.key !== 'Space') return
+        const val = e.target.value
+        // The space just got inserted — find the word right before the cursor's space
+        const cursorPos = e.target.selectionStart
+        const textBeforeCursor = val.substring(0, cursorPos).trimEnd()
+        const words = textBeforeCursor.split(/\s+/)
+        const lastWord = words[words.length - 1]?.replace(/[^a-zA-Z]/g, '')
+        if (!lastWord || lastWord.length < 3 || lastWord === lastWordRef.current) return
+        lastWordRef.current = lastWord
+        clearTimeout(synonymTimerRef.current)
+        synonymTimerRef.current = setTimeout(async () => {
+            try {
+                const data = await contentAPI.blogAssist({ type: 'synonyms', text: lastWord, context: sections[idx]?.heading || title })
+                if (data.success) {
+                    // result may be an array directly, or { words: [] }, or the array is data.result itself
+                    const arr = Array.isArray(data.result) ? data.result
+                        : Array.isArray(data.result?.words) ? data.result.words
+                        : []
+                    if (arr.length > 0) setSynonyms(arr.slice(0, 5))
+                }
+            } catch (e) { console.warn('Synonym fetch failed:', e.message) }
+        }, 50)
+    }
+
+    // Update body text on change (also clears synonyms on new typing)
+    const handleBodyChange = (idx, val) => {
+        updateSection(idx, 'body', val)
+        // Clear synonyms when user resumes typing (not on space)
+    }
+
+    const insertSynonym = (idx, synonym) => {
+        const body = sections[idx]?.body || ''
+        const words = body.trimEnd().split(/\s+/)
+        words[words.length - 1] = synonym
+        updateSection(idx, 'body', words.join(' ') + ' ')
+        setSynonyms([])
+        lastWordRef.current = ''
+    }
+
+    // Grammar check on blur — uses contentAPI.blogAssist (JWT auth)
+    const handleBodyBlur = async (idx) => {
+        const text = sections[idx]?.body?.trim()
+        if (!text || text.length < 20) return
+        try {
+            const data = await contentAPI.blogAssist({ type: 'grammar', text })
+            if (data.success && data.result?.hasErrors) {
+                setGrammarIssues(prev => ({ ...prev, [idx]: data.result.suggestions || [] }))
+            } else {
+                setGrammarIssues(prev => { const n = { ...prev }; delete n[idx]; return n })
+            }
+        } catch { /* silent */ }
+    }
+
+    const applyGrammarFix = (idx) => {
+        contentAPI.blogAssist({ type: 'grammar', text: sections[idx]?.body })
+            .then(data => {
+                if (data.success && data.result?.cleanedText) {
+                    updateSection(idx, 'body', data.result.cleanedText)
+                    setGrammarIssues(prev => { const n = { ...prev }; delete n[idx]; return n })
+                }
+            }).catch(() => {})
+    }
+
+    // Rephrase selected text — uses contentAPI.blogAssist (JWT auth)
+    const handleRephrase = async (idx) => {
+        const el = document.getElementById(`sbw-body-${idx}`)
+        const sel = el?.value?.substring(el.selectionStart, el.selectionEnd)?.trim()
+        const text = sel || sections[idx]?.body?.trim()
+        if (!text) return
+        setAssistLoading('rephrase')
+        try {
+            const data = await contentAPI.blogAssist({ type: 'rephrase', text })
+            if (data.success && Array.isArray(data.result)) setRephraseSuggestions({ idx, versions: data.result, original: text })
+        } catch { /* silent */ }
+        finally { setAssistLoading('') }
+    }
+
+    const applyRephrase = (version) => {
+        if (!rephraseSuggestions) return
+        const { idx, original } = rephraseSuggestions
+        const body = sections[idx].body.replace(original, version.text)
+        updateSection(idx, 'body', body)
+        setRephraseSuggestions(null)
+    }
+
+    // Expand section — uses contentAPI.blogAssist (JWT auth)
+    const handleExpand = async (idx) => {
+        const text = sections[idx]?.body?.trim()
+        if (!text) return
+        setAssistLoading('expand')
+        try {
+            const data = await contentAPI.blogAssist({ type: 'expand', text, context: sections[idx]?.heading || title })
+            if (data.success && data.result?.expanded) setExpandResult({ idx, expanded: data.result.expanded })
+        } catch { /* silent */ }
+        finally { setAssistLoading('') }
+    }
+
+    // Image generation
+    const handleGenerateSectionImage = async (idx) => {
+        if (!onGenerateImage) return
+        setGeneratingImage(idx)
+        setImageStylePicker(null)
+        try {
+            const isHero = idx === -1
+            const ratio = isHero ? '16:9' : selectedImageRatio
+            const result = await onGenerateImage(idx, selectedImageStyle, {}, ratio)
+            if (result?.imageUrl) {
+                if (isHero) setHeroImageUrl(result.imageUrl)
+                else updateSection(idx, 'imageUrl', result.imageUrl)
+                if (result.imageRatio || ratio) {
+                    if (!isHero) updateSection(idx, 'imageRatio', result.aspectRatio || ratio)
+                }
+            }
+        } catch (e) { console.error(e) }
+        finally { setGeneratingImage(null) }
+    }
+
+    const exportMarkdown = () => {
+        let md = `# ${title}\n\n`
+        if (heroImageUrl) md += `![Cover](${heroImageUrl})\n\n`
+        sections.forEach(s => {
+            if (s.heading) md += `## ${s.heading}\n\n`
+            if (s.imageUrl) md += `![${s.imageAlt || s.heading}](${s.imageUrl})\n\n`
+            md += `${s.body}\n\n`
+        })
+        navigator.clipboard.writeText(md)
+        setCopied('md'); setTimeout(() => setCopied(''), 2000)
+    }
+
+    return (
+        <div className="w-full animate-fade-in" style={{ padding: '0 2rem 2rem' }}>
+            {/* Header */}
+            <div className="flex items-center gap-3 mb-8">
+                <button onClick={onBack} className="size-10 rounded-xl glass-panel flex items-center justify-center hover:bg-white/[0.08] transition-colors cursor-pointer">
+                    <span className="material-symbols-outlined text-lg text-slate-400">arrow_back</span>
+                </button>
+                <div className="flex-1">
+                    <h3 className="text-xl font-extrabold text-white flex items-center gap-2">
+                        <span className="material-symbols-outlined text-xl text-emerald-400">draw</span>
+                        Smart Blog Writer
+                        <span className="text-[10px] px-2 py-0.5 rounded-full font-bold" style={{ background: 'rgba(16,185,129,0.15)', color: '#34d399', border: '1px solid rgba(16,185,129,0.2)' }}>AI Assisted</span>
+                    </h3>
+                    <p className="text-xs text-slate-500">{totalWords} words · {sections.length} sections · Real-time AI suggestions</p>
+                </div>
+                <div className="flex gap-2">
+                    <button onClick={exportMarkdown} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-colors text-slate-400 hover:text-white" style={{ background: 'rgba(255,255,255,0.04)' }}>
+                        <span className="material-symbols-outlined text-sm">{copied === 'md' ? 'check' : 'description'}</span>
+                        {copied === 'md' ? 'Copied!' : 'Export MD'}
+                    </button>
+                    <button onClick={() => setShowAssistPanel(p => !p)}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-colors ${showAssistPanel ? 'text-primary' : 'text-slate-400 hover:text-white'}`}
+                        style={{ background: showAssistPanel ? 'rgba(129,140,248,0.12)' : 'rgba(255,255,255,0.04)' }}>
+                        <span className="material-symbols-outlined text-sm">psychology</span>
+                        AI Panel
+                    </button>
+                </div>
+            </div>
+
+            {/* Hero Cover Image */}
+            <div className="mb-6 rounded-2xl overflow-hidden" style={{ border: '1px dashed rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.01)' }}>
+                {heroImageUrl ? (
+                    <div className="relative group" style={{ background: 'rgba(0,0,0,0.2)' }}>
+                        <img src={heroImageUrl} alt="Cover" style={{ width: '100%', display: 'block', objectFit: 'contain' }} />
+                        <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity bg-black/40 flex items-center justify-center gap-3">
+                            <button onClick={() => setImageStylePicker(-1)} className="px-4 py-2 rounded-xl text-xs font-bold text-white cursor-pointer" style={{ background: 'rgba(129,140,248,0.8)' }}>
+                                <span className="material-symbols-outlined text-sm align-middle mr-1">refresh</span>Regenerate
+                            </button>
+                            <button onClick={() => setHeroImageUrl('')} className="px-3 py-2 rounded-xl text-xs text-white/70 cursor-pointer" style={{ background: 'rgba(0,0,0,0.5)' }}>
+                                <span className="material-symbols-outlined text-sm">delete</span>
+                            </button>
+                        </div>
+                    </div>
+                ) : (
+                    <button onClick={() => setImageStylePicker(-1)} className="w-full py-10 flex flex-col items-center gap-2 cursor-pointer group transition-all">
+                        <span className={`material-symbols-outlined text-3xl text-slate-600 group-hover:text-primary transition-colors ${generatingImage === -1 ? 'animate-spin' : ''}`}>
+                            {generatingImage === -1 ? 'progress_activity' : 'add_photo_alternate'}
+                        </span>
+                        <span className="text-sm font-semibold text-slate-500 group-hover:text-white transition-colors">
+                            {generatingImage === -1 ? 'Generating cover image...' : 'Generate Cover Image (16:9)'}
+                        </span>
+                    </button>
+                )}
+            </div>
+
+            {/* Inline Image Picker (hero) */}
+            {imageStylePicker === -1 && (
+                <div className="mb-4 animate-fade-in rounded-2xl p-5" style={{ background: 'rgba(129,140,248,0.04)', border: '1px solid rgba(129,140,248,0.15)' }}>
+                    <div className="flex items-center justify-between mb-3">
+                        <span className="text-sm font-bold text-white">Cover Image Style</span>
+                        <button onClick={() => setImageStylePicker(null)} className="text-slate-500 hover:text-white cursor-pointer"><span className="material-symbols-outlined text-sm">close</span></button>
+                    </div>
+                    <div className="flex gap-2 mb-3">
+                        {IMAGE_STYLES.map(s => (
+                            <button key={s.id} onClick={() => setSelectedImageStyle(s.id)}
+                                className={`flex-1 py-2 rounded-xl text-center text-[11px] font-bold cursor-pointer transition-all ${selectedImageStyle === s.id ? 'ring-2 ring-primary text-white' : 'text-slate-500'}`}
+                                style={{ background: selectedImageStyle === s.id ? 'rgba(129,140,248,0.15)' : 'rgba(255,255,255,0.02)', border: '1px solid ' + (selectedImageStyle === s.id ? 'rgba(129,140,248,0.3)' : 'rgba(255,255,255,0.05)') }}>
+                                <span className="material-symbols-outlined text-base block mb-0.5">{s.icon}</span>{s.label}
+                            </button>
+                        ))}
+                    </div>
+                    <p className="text-[10px] text-slate-600 mb-3 flex items-center gap-1"><span className="material-symbols-outlined text-xs">lock</span>Hero images are always 16:9 landscape</p>
+                    <button onClick={() => handleGenerateSectionImage(-1)} disabled={generatingImage !== null}
+                        className="w-full py-3 rounded-xl text-sm font-bold text-white cursor-pointer flex items-center justify-center gap-2"
+                        style={{ background: 'linear-gradient(135deg, #818cf8, #6366f1)' }}>
+                        <span className={`material-symbols-outlined text-sm ${generatingImage === -1 ? 'animate-spin' : ''}`}>{generatingImage === -1 ? 'progress_activity' : 'auto_awesome'}</span>
+                        {generatingImage === -1 ? 'Generating...' : `Generate Cover · 16:9`}
+                    </button>
+                </div>
+            )}
+
+            {/* Title */}
+            <input value={title} onChange={e => setTitle(e.target.value)}
+                className="w-full bg-transparent text-white focus:outline-none mb-8"
+                style={{ fontSize: '2.2rem', fontWeight: 800, lineHeight: 1.2, letterSpacing: '-0.02em' }}
+                placeholder="Your blog title..." />
+
+            {/* Sections */}
+            {sections.map((section, i) => (
+                <div key={i} className="mb-6 relative group/sbw" style={{ paddingLeft: '2rem' }}>
+                    {/* Section number + remove */}
+                    <div className="absolute left-0 top-0 flex flex-col items-center gap-1 opacity-0 group-hover/sbw:opacity-100 transition-opacity">
+                        <span className="text-[9px] font-mono text-slate-600">{String(i + 1).padStart(2, '0')}</span>
+                        {sections.length > 1 && (
+                            <button onClick={() => removeSection(i)} className="p-0.5 rounded hover:bg-rose-500/20 cursor-pointer">
+                                <span className="material-symbols-outlined text-xs text-slate-600 hover:text-rose-400">close</span>
+                            </button>
+                        )}
+                    </div>
+
+                    {/* Section heading */}
+                    <input value={section.heading} onChange={e => updateSection(i, 'heading', e.target.value)}
+                        onClick={() => setActiveSection(i)}
+                        className="w-full bg-transparent text-white focus:outline-none mb-3"
+                        style={{ fontSize: '1.5rem', fontWeight: 700, lineHeight: 1.3 }}
+                        placeholder="Section heading..." />
+
+                    {/* Toolbar — visible when active */}
+                    {activeSection === i && (
+                        <div className="flex items-center gap-1 mb-2 py-1.5 px-2 rounded-lg animate-fade-in" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                            <button onMouseDown={e => e.preventDefault()} onClick={() => handleRephrase(i)} disabled={assistLoading === 'rephrase'} className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-semibold cursor-pointer transition-colors hover:bg-white/10 text-slate-400 hover:text-primary" title="Rephrase selection or full section">
+                                <span className={`material-symbols-outlined text-xs ${assistLoading === 'rephrase' ? 'animate-spin' : ''}`}>{assistLoading === 'rephrase' ? 'progress_activity' : 'autorenew'}</span>
+                                Rephrase
+                            </button>
+                            <button onMouseDown={e => e.preventDefault()} onClick={() => handleExpand(i)} disabled={assistLoading === 'expand'} className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-semibold cursor-pointer transition-colors hover:bg-white/10 text-slate-400 hover:text-emerald-400" title="Expand this section">
+                                <span className={`material-symbols-outlined text-xs ${assistLoading === 'expand' ? 'animate-spin' : ''}`}>{assistLoading === 'expand' ? 'progress_activity' : 'expand_content'}</span>
+                                Expand
+                            </button>
+                            <span className="w-px h-4 mx-1" style={{ background: 'rgba(255,255,255,0.08)' }} />
+                            <button onMouseDown={e => e.preventDefault()} onClick={() => setImageStylePicker(i)} className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-semibold cursor-pointer transition-colors hover:bg-white/10 text-slate-400 hover:text-white">
+                                <span className="material-symbols-outlined text-xs">add_photo_alternate</span>
+                                Image
+                            </button>
+                            <div className="flex-1" />
+                            {grammarIssues[i]?.length > 0 && (
+                                <button onClick={() => applyGrammarFix(i)} className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-bold cursor-pointer" style={{ background: 'rgba(234,179,8,0.15)', color: '#f59e0b', border: '1px solid rgba(234,179,8,0.2)' }}>
+                                    <span className="material-symbols-outlined text-xs">spellcheck</span>
+                                    Fix {grammarIssues[i].length} issue{grammarIssues[i].length > 1 ? 's' : ''}
+                                </button>
+                            )}
+                            <span className="text-[10px] text-slate-600 font-mono">{(section.body || '').split(/\s+/).filter(Boolean).length}w</span>
+                        </div>
+                    )}
+
+                    {/* Synonym chips */}
+                    {activeSection === i && synonyms.length > 0 && (
+                        <div className="flex items-center gap-1.5 mb-2 animate-fade-in flex-wrap">
+                            <span className="text-[10px] text-slate-600 font-medium">Synonyms:</span>
+                            {synonyms.map(syn => (
+                                <button key={syn} onClick={() => insertSynonym(i, syn)}
+                                    className="text-[11px] px-2 py-0.5 rounded-full font-semibold cursor-pointer transition-all hover:scale-105"
+                                    style={{ background: 'rgba(129,140,248,0.12)', color: '#818cf8', border: '1px solid rgba(129,140,248,0.2)' }}>
+                                    {syn}
+                                </button>
+                            ))}
+                            <button onClick={() => setSynonyms([])} className="text-[10px] text-slate-600 hover:text-white cursor-pointer">✕</button>
+                        </div>
+                    )}
+
+                    {/* Grammar issues banner */}
+                    {grammarIssues[i]?.length > 0 && activeSection !== i && (
+                        <div className="mb-2 flex items-center gap-2 text-[11px] px-3 py-1.5 rounded-lg animate-fade-in" style={{ background: 'rgba(234,179,8,0.08)', border: '1px solid rgba(234,179,8,0.2)', color: '#f59e0b' }}>
+                            <span className="material-symbols-outlined text-xs">warning</span>
+                            {grammarIssues[i].length} grammar issue{grammarIssues[i].length > 1 ? 's' : ''} detected
+                            <button onClick={() => applyGrammarFix(i)} className="ml-auto font-bold hover:text-white cursor-pointer">Fix now</button>
+                        </div>
+                    )}
+
+                    {/* Rephrase suggestions */}
+                    {rephraseSuggestions?.idx === i && (
+                        <div className="mb-3 animate-fade-in rounded-xl p-3" style={{ background: 'rgba(129,140,248,0.05)', border: '1px solid rgba(129,140,248,0.15)' }}>
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="text-xs font-bold text-primary">Rephrase options</span>
+                                <button onClick={() => setRephraseSuggestions(null)} className="text-slate-500 hover:text-white cursor-pointer"><span className="material-symbols-outlined text-xs">close</span></button>
+                            </div>
+                            {rephraseSuggestions.versions.map(v => (
+                                <div key={v.version} className="mb-2 p-2.5 rounded-lg cursor-pointer hover:bg-white/[0.06] transition-colors" onClick={() => applyRephrase(v)} style={{ border: '1px solid rgba(255,255,255,0.05)' }}>
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded" style={{ background: 'rgba(129,140,248,0.15)', color: '#818cf8' }}>{v.style}</span>
+                                    </div>
+                                    <p className="text-xs text-slate-300 leading-relaxed">{v.text}</p>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* Expand result */}
+                    {expandResult?.idx === i && (
+                        <div className="mb-3 animate-fade-in rounded-xl p-3" style={{ background: 'rgba(16,185,129,0.05)', border: '1px solid rgba(16,185,129,0.15)' }}>
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="text-xs font-bold text-emerald-400">Expanded version</span>
+                                <button onClick={() => setExpandResult(null)} className="text-slate-500 hover:text-white cursor-pointer"><span className="material-symbols-outlined text-xs">close</span></button>
+                            </div>
+                            <p className="text-xs text-slate-300 leading-relaxed mb-2">{expandResult.expanded}</p>
+                            <button onClick={() => { updateSection(i, 'body', expandResult.expanded); setExpandResult(null) }}
+                                className="text-xs font-bold px-3 py-1.5 rounded-lg cursor-pointer" style={{ background: 'rgba(16,185,129,0.2)', color: '#34d399' }}>
+                                Use this version
+                            </button>
+                        </div>
+                    )}
+
+                    {/* Body textarea — onKeyUp after Space triggers synonym lookup */}
+                    <textarea
+                        id={`sbw-body-${i}`}
+                        value={section.body}
+                        onChange={e => handleBodyChange(i, e.target.value)}
+                        onKeyUp={e => handleBodyKeyUp(i, e)}
+                        onFocus={() => setActiveSection(i)}
+                        onBlur={() => handleBodyBlur(i)}
+                        className="w-full bg-transparent resize-none focus:outline-none"
+                        style={{ fontSize: '1.05rem', lineHeight: 2, color: 'rgba(203,213,225,0.9)', minHeight: '180px' }}
+                        rows={Math.max(7, Math.ceil((section.body || '').length / 90))}
+                        placeholder="Start writing here... press Space after a word for synonym suggestions"
+                    />
+
+                    {/* Section Image */}
+                    {section.imageUrl && (
+                        <div className="relative group/img my-3 rounded-xl overflow-hidden" style={{ background: 'rgba(0,0,0,0.15)' }}>
+                            <img src={section.imageUrl} alt={section.imageAlt || section.heading} style={{ width: '100%', display: 'block', objectFit: 'contain' }} />
+                            {section.imageRatio && (
+                                <span className="absolute top-2 left-2 text-[9px] font-mono font-bold px-1.5 py-0.5 rounded" style={{ background: 'rgba(0,0,0,0.55)', color: 'rgba(129,140,248,0.9)' }}>{section.imageRatio}</span>
+                            )}
+                            <button onClick={() => setImageStylePicker(i)} className="absolute top-2 right-2 px-2.5 py-1 rounded-lg text-[11px] text-white cursor-pointer opacity-0 group-hover/img:opacity-100 transition-opacity" style={{ background: 'rgba(0,0,0,0.6)' }}>
+                                <span className="material-symbols-outlined text-xs mr-1">refresh</span>Regenerate
+                            </button>
+                        </div>
+                    )}
+
+                    {/* Inline Image Picker (per section) */}
+                    {imageStylePicker === i && (
+                        <div className="my-3 animate-fade-in rounded-2xl p-4" style={{ background: 'rgba(129,140,248,0.04)', border: '1px solid rgba(129,140,248,0.15)' }}>
+                            <div className="flex items-center justify-between mb-3">
+                                <span className="text-xs font-bold text-white">Section {i + 1} Image</span>
+                                <button onClick={() => setImageStylePicker(null)} className="text-slate-500 hover:text-white cursor-pointer"><span className="material-symbols-outlined text-xs">close</span></button>
+                            </div>
+                            {/* AR picker */}
+                            <p className="text-[10px] text-slate-500 uppercase tracking-wide font-semibold mb-2">Ratio</p>
+                            <div className="flex gap-2 mb-3">
+                                {IMAGE_RATIOS.map(r => (
+                                    <button key={r.id} onClick={() => setSelectedImageRatio(r.id)}
+                                        className={`flex-1 flex flex-col items-center py-1.5 rounded-xl cursor-pointer transition-all text-center ${selectedImageRatio === r.id ? 'ring-2 ring-primary text-white' : 'text-slate-500'}`}
+                                        style={{ background: selectedImageRatio === r.id ? 'rgba(129,140,248,0.1)' : 'rgba(255,255,255,0.02)', border: '1px solid ' + (selectedImageRatio === r.id ? 'rgba(129,140,248,0.3)' : 'rgba(255,255,255,0.05)') }}>
+                                        <span className="material-symbols-outlined text-sm">{r.icon}</span>
+                                        <span className="text-[11px] font-bold">{r.label}</span>
+                                    </button>
+                                ))}
+                            </div>
+                            {/* Style picker */}
+                            <div className="flex gap-2 mb-3">
+                                {IMAGE_STYLES.map(s => (
+                                    <button key={s.id} onClick={() => setSelectedImageStyle(s.id)}
+                                        className={`flex-1 py-1.5 rounded-xl text-center text-[11px] font-bold cursor-pointer transition-all ${selectedImageStyle === s.id ? 'ring-2 ring-primary text-white' : 'text-slate-500'}`}
+                                        style={{ background: selectedImageStyle === s.id ? 'rgba(129,140,248,0.12)' : 'rgba(255,255,255,0.02)', border: '1px solid ' + (selectedImageStyle === s.id ? 'rgba(129,140,248,0.25)' : 'rgba(255,255,255,0.05)') }}>
+                                        <span className="material-symbols-outlined text-sm block mb-0.5">{s.icon}</span>{s.label}
+                                    </button>
+                                ))}
+                            </div>
+                            <button onClick={() => handleGenerateSectionImage(i)} disabled={generatingImage !== null}
+                                className="w-full py-2.5 rounded-xl text-xs font-bold text-white cursor-pointer flex items-center justify-center gap-2"
+                                style={{ background: 'linear-gradient(135deg, #818cf8, #6366f1)' }}>
+                                <span className={`material-symbols-outlined text-xs ${generatingImage === i ? 'animate-spin' : ''}`}>{generatingImage === i ? 'progress_activity' : 'auto_awesome'}</span>
+                                {generatingImage === i ? 'Generating...' : `Generate · ${selectedImageRatio}`}
+                            </button>
+                        </div>
+                    )}
+
+                    {/* Add image button if no image */}
+                    {!section.imageUrl && imageStylePicker !== i && (
+                        <button onClick={() => setImageStylePicker(i)} className="mt-2 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-slate-500 hover:text-primary cursor-pointer transition-colors" style={{ background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.07)' }}>
+                            <span className="material-symbols-outlined text-sm">add_photo_alternate</span>
+                            Add image to section
+                        </button>
+                    )}
+
+                    {/* Section divider / add section */}
+                    <div className="relative my-4" style={{ marginLeft: '-2rem' }}>
+                        <div style={{ height: '1px', background: 'rgba(255,255,255,0.04)' }} />
+                    </div>
+                </div>
+            ))}
+
+            {/* Add Section */}
+            <button onClick={addSection} className="mb-6 flex items-center gap-2 px-4 py-2 rounded-xl text-sm text-slate-500 hover:text-white transition-colors cursor-pointer" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                <span className="material-symbols-outlined text-sm">add</span>
+                Add Section
+            </button>
+
+            {/* AI Assist Bar */}
+            {showAssistPanel && (
+                <div className="sticky bottom-0 pb-4 pt-2" style={{ background: 'linear-gradient(to top, rgba(9,9,19,1) 0%, rgba(9,9,19,0) 100%)' }}>
+                    <div className="rounded-2xl p-3 flex items-center gap-3" style={{ background: 'rgba(129,140,248,0.06)', border: '1px solid rgba(129,140,248,0.2)', backdropFilter: 'blur(8px)' }}>
+                        <span className="material-symbols-outlined text-primary text-lg">psychology</span>
+                        <input value={assistQuery} onChange={e => setAssistQuery(e.target.value)}
+                            className="flex-1 bg-transparent text-sm text-white focus:outline-none placeholder-slate-600"
+                            placeholder={`Ask AI to help with Section ${activeSection + 1}... (e.g. "make this more engaging", "add statistics")`}
+                            onKeyDown={async e => {
+                                if (e.key !== 'Enter' || !assistQuery.trim()) return
+                                setAssistLoading('expand')
+                                try {
+                                    const data = await contentAPI.blogAssist({ type: 'rephrase', text: sections[activeSection]?.body || assistQuery, context: assistQuery })
+                                    if (data.success && Array.isArray(data.result)) setRephraseSuggestions({ idx: activeSection, versions: data.result, original: sections[activeSection]?.body || '' })
+                                    setAssistQuery('')
+                                } catch { /* silent */ }
+                                finally { setAssistLoading('') }
+                            }} />
+                        {assistLoading && <span className="material-symbols-outlined text-primary animate-spin text-sm">progress_activity</span>}
+                        <div className="flex items-center gap-1 text-[10px] text-slate-600">
+                            <span className="material-symbols-outlined text-xs">keyboard_return</span>
+                            Enter
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    )
+}
+
+// ============================================================================
 // BLOG EDITOR VIEW — Medium-Style Rich Editor
 // Inline images, formatting toolbar, contentEditable, clean typography
 // Image style picker renders INLINE at each section (not at top)
@@ -2357,6 +2855,14 @@ function BlogEditorView({ content, activeBrand, onNewContent, onGenerateImage })
     // Image style picker — renders inline per section
     const [imageStylePicker, setImageStylePicker] = useState(null) // sectionIndex or -1 for hero
     const [selectedImageStyle, setSelectedImageStyle] = useState('editorial')
+    const [selectedImageRatio, setSelectedImageRatio] = useState('9:16') // default 9:16 for sections; hero uses 16:9
+
+    const IMAGE_RATIOS = [
+        { id: '9:16', label: '9:16', desc: 'Portrait', icon: 'crop_portrait' },
+        { id: '1:1',  label: '1:1',  desc: 'Square',   icon: 'crop_square' },
+        { id: '16:9', label: '16:9', desc: 'Landscape', icon: 'crop_landscape' },
+        { id: '4:3',  label: '4:3',  desc: 'Standard', icon: 'crop_54' },
+    ]
 
     const IMAGE_STYLES = [
         { id: 'editorial', label: 'Editorial', icon: 'photo_camera', desc: 'Magazine-style photography' },
@@ -2409,23 +2915,22 @@ function BlogEditorView({ content, activeBrand, onNewContent, onGenerateImage })
         setGeneratingSection(sectionIndex)
         setImageStylePicker(null)
         try {
-            const result = await onGenerateImage(sectionIndex, style || selectedImageStyle)
+            const isHero = sectionIndex === -1
+            const ratio = isHero ? '16:9' : selectedImageRatio
+            const result = await onGenerateImage(sectionIndex, style || selectedImageStyle, {}, ratio)
             if (result?.imageUrl) {
-                if (sectionIndex === -1) {
+                if (isHero) {
                     setBlogData(prev => ({ ...prev, heroImageUrl: result.imageUrl, heroImageAlt: result.altText || '' }))
                 } else {
                     setBlogData(prev => {
                         const sections = [...prev.sections]
-                        sections[sectionIndex] = { ...sections[sectionIndex], imageUrl: result.imageUrl, imageAlt: result.altText || '' }
+                        sections[sectionIndex] = { ...sections[sectionIndex], imageUrl: result.imageUrl, imageAlt: result.altText || '', imageRatio: result.aspectRatio || ratio }
                         return { ...prev, sections }
                     })
                 }
             }
-        } catch (err) {
-            console.error('Image gen failed:', err)
-        } finally {
-            setGeneratingSection(null)
-        }
+        } catch (err) { console.error('Image gen error:', err) }
+        finally { setGeneratingSection(null) }
     }
 
     const openImageStylePicker = (sectionIndex) => {
@@ -2505,14 +3010,16 @@ function BlogEditorView({ content, activeBrand, onNewContent, onGenerateImage })
         setGeneratingSection(sectionIndex)
         setImageStylePicker(null)
         try {
-            const result = await onGenerateImage(sectionIndex, 'editorial', { brandImageUrl: imgUrl })
+            const isHero = sectionIndex === -1
+            const ratio = isHero ? '16:9' : selectedImageRatio
+            const result = await onGenerateImage(sectionIndex, 'editorial', { brandImageUrl: imgUrl }, ratio)
             if (result?.imageUrl) {
                 if (sectionIndex === -1) {
                     setBlogData(prev => ({ ...prev, heroImageUrl: result.imageUrl, heroImageAlt: result.altText || '' }))
                 } else {
                     setBlogData(prev => {
                         const sections = [...prev.sections]
-                        sections[sectionIndex] = { ...sections[sectionIndex], imageUrl: result.imageUrl, imageAlt: result.altText || '' }
+                        sections[sectionIndex] = { ...sections[sectionIndex], imageUrl: result.imageUrl, imageAlt: result.altText || '', imageRatio: result.aspectRatio || ratio }
                         return { ...prev, sections }
                     })
                 }
@@ -2525,14 +3032,16 @@ function BlogEditorView({ content, activeBrand, onNewContent, onGenerateImage })
         setGeneratingSection(sectionIndex)
         setImageStylePicker(null)
         try {
-            const result = await onGenerateImage(sectionIndex, style || selectedImageStyle, { brandImageRef: imgUrl })
+            const isHero = sectionIndex === -1
+            const ratio = isHero ? '16:9' : selectedImageRatio
+            const result = await onGenerateImage(sectionIndex, style || selectedImageStyle, { brandImageRef: imgUrl }, ratio)
             if (result?.imageUrl) {
                 if (sectionIndex === -1) {
                     setBlogData(prev => ({ ...prev, heroImageUrl: result.imageUrl, heroImageAlt: result.altText || '' }))
                 } else {
                     setBlogData(prev => {
                         const sections = [...prev.sections]
-                        sections[sectionIndex] = { ...sections[sectionIndex], imageUrl: result.imageUrl, imageAlt: result.altText || '' }
+                        sections[sectionIndex] = { ...sections[sectionIndex], imageUrl: result.imageUrl, imageAlt: result.altText || '', imageRatio: result.aspectRatio || ratio }
                         return { ...prev, sections }
                     })
                 }
@@ -2541,12 +3050,14 @@ function BlogEditorView({ content, activeBrand, onNewContent, onGenerateImage })
         finally { setGeneratingSection(null) }
     }
 
-    const ImageStylePickerInline = ({ sectionIndex }) => (
+    const ImageStylePickerInline = ({ sectionIndex }) => {
+        const isHeroSection = sectionIndex === -1
+        return (
         <div className="my-4 animate-fade-in rounded-2xl p-5" style={{ background: 'rgba(129,140,248,0.04)', border: '1px solid rgba(129,140,248,0.15)' }}>
             <div className="flex items-center justify-between mb-4">
                 <h4 className="text-sm font-bold text-white flex items-center gap-2">
                     <span className="material-symbols-outlined text-sm text-primary">palette</span>
-                    {sectionIndex === -1 ? 'Hero Image' : `Section ${sectionIndex + 1} Image`}
+                    {isHeroSection ? 'Hero Image' : `Section ${sectionIndex + 1} Image`}
                 </h4>
                 <button onClick={() => setImageStylePicker(null)} className="text-slate-500 hover:text-white cursor-pointer">
                     <span className="material-symbols-outlined text-sm">close</span>
@@ -2571,6 +3082,30 @@ function BlogEditorView({ content, activeBrand, onNewContent, onGenerateImage })
             {/* AI Generate Tab */}
             {pickerTab === 'ai' && (
                 <>
+                    {/* Aspect Ratio Selector — hero is locked to 16:9, sections can change */}
+                    {!isHeroSection && (
+                        <div className="mb-4">
+                            <p className="text-[10px] text-slate-500 uppercase tracking-wide font-semibold mb-2">Image Ratio</p>
+                            <div className="flex gap-2">
+                                {IMAGE_RATIOS.map(r => (
+                                    <button key={r.id} onClick={() => setSelectedImageRatio(r.id)}
+                                        className={`flex-1 flex flex-col items-center py-2 px-1 rounded-xl cursor-pointer transition-all text-center ${selectedImageRatio === r.id ? 'ring-2 ring-primary' : 'hover:bg-white/[0.04]'}`}
+                                        style={{ background: selectedImageRatio === r.id ? 'rgba(129,140,248,0.1)' : 'rgba(255,255,255,0.02)', border: '1px solid ' + (selectedImageRatio === r.id ? 'rgba(129,140,248,0.3)' : 'rgba(255,255,255,0.05)') }}>
+                                        <span className="material-symbols-outlined text-base mb-0.5" style={{ color: selectedImageRatio === r.id ? '#818cf8' : '#64748b' }}>{r.icon}</span>
+                                        <span className="text-[11px] font-bold" style={{ color: selectedImageRatio === r.id ? 'white' : '#94a3b8' }}>{r.label}</span>
+                                        <span className="text-[9px]" style={{ color: '#475569' }}>{r.desc}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                    {isHeroSection && (
+                        <div className="mb-3 flex items-center gap-2">
+                            <span className="material-symbols-outlined text-xs text-slate-600">lock</span>
+                            <span className="text-[10px] text-slate-600">Hero images are always 16:9 landscape</span>
+                        </div>
+                    )}
+
                     <div className="grid grid-cols-4 gap-2 mb-4">
                         {IMAGE_STYLES.map(style => (
                             <button key={style.id} onClick={() => setSelectedImageStyle(style.id)}
@@ -2589,7 +3124,7 @@ function BlogEditorView({ content, activeBrand, onNewContent, onGenerateImage })
                         <span className={`material-symbols-outlined text-sm ${generatingSection !== null ? 'animate-spin' : ''}`}>
                             {generatingSection !== null ? 'progress_activity' : 'auto_awesome'}
                         </span>
-                        {generatingSection !== null ? 'Generating with NanoBanana 2...' : `Generate ${IMAGE_STYLES.find(s => s.id === selectedImageStyle)?.label} Image`}
+                        {generatingSection !== null ? 'Generating...' : `Generate ${IMAGE_STYLES.find(s => s.id === selectedImageStyle)?.label} · ${isHeroSection ? '16:9' : selectedImageRatio}`}
                     </button>
                 </>
             )}
@@ -2641,7 +3176,8 @@ function BlogEditorView({ content, activeBrand, onNewContent, onGenerateImage })
                 </>
             )}
         </div>
-    )
+        )
+    }
 
     const copyAsHtml = () => {
         let html = `<article style="max-width:720px;margin:0 auto;font-family:Georgia,serif;color:#1a1a1a;line-height:1.8">\n`
@@ -2760,8 +3296,9 @@ function BlogEditorView({ content, activeBrand, onNewContent, onGenerateImage })
             {/* Hero Image */}
             <div className="mb-8" style={{ margin: '0 -1rem 2rem -1rem' }}>
                 {blogData.heroImageUrl ? (
-                    <div className="relative group" style={{ borderRadius: '16px', overflow: 'hidden' }}>
-                        <img src={blogData.heroImageUrl} alt={blogData.heroImageAlt || blogData.title} style={{ width: '100%', maxHeight: '420px', objectFit: 'cover', display: 'block' }} />
+                    <div className="relative group" style={{ borderRadius: '16px', overflow: 'hidden', background: 'rgba(0,0,0,0.2)' }}>
+                        {/* Hero always 16:9 — full display, no crop */}
+                        <img src={blogData.heroImageUrl} alt={blogData.heroImageAlt || blogData.title} style={{ width: '100%', display: 'block', objectFit: 'contain' }} />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                         <div className="absolute bottom-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                             <button onClick={() => openImageStylePicker(-1)} disabled={generatingSection === -1}
@@ -2931,8 +3468,14 @@ function BlogEditorView({ content, activeBrand, onNewContent, onGenerateImage })
 
                     {/* Section Image — INLINE below the body text, like Medium */}
                     {section.imageUrl && (
-                        <div className="relative group/img my-4" style={{ marginLeft: '-2.5rem', marginRight: '-1rem', borderRadius: '12px', overflow: 'hidden' }}>
-                            <img src={section.imageUrl} alt={section.imageAlt || section.heading} style={{ width: '100%', maxHeight: '400px', objectFit: 'cover', display: 'block' }} />
+                        <div className="relative group/img my-4" style={{ marginLeft: '-2.5rem', marginRight: '-1rem', borderRadius: '12px', overflow: 'hidden', background: 'rgba(0,0,0,0.15)' }}>
+                            {/* Render at full natural ratio — no maxHeight crop */}
+                            <img src={section.imageUrl} alt={section.imageAlt || section.heading} style={{ width: '100%', display: 'block', objectFit: 'contain' }} />
+                            {section.imageRatio && (
+                                <div className="absolute top-2 left-2">
+                                    <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded" style={{ background: 'rgba(0,0,0,0.55)', color: 'rgba(129,140,248,0.9)' }}>{section.imageRatio}</span>
+                                </div>
+                            )}
                             <figcaption className="text-center py-2 text-xs" style={{ color: 'rgba(148,163,184,0.5)' }}>{section.imageAlt || section.heading}</figcaption>
                             <button onClick={() => openImageStylePicker(i)} disabled={generatingSection === i}
                                 className="absolute top-3 right-3 flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] text-white cursor-pointer opacity-0 group-hover/img:opacity-100 transition-opacity"
@@ -3425,9 +3968,12 @@ function ContentHistory({ brandId, onSelect, visible, onToggle }) {
     const [loading, setLoading] = useState(false)
 
     useEffect(() => {
-        if (!visible || !brandId) return
+        if (!visible) return
         setLoading(true)
-        contentAPI.list({ brandId, limit: 20 })
+        // Load all content for the active brand, or all user content as fallback
+        const params = { limit: 30 }
+        if (brandId) params.brandId = brandId
+        contentAPI.list(params)
             .then(data => setItems(data.content || []))
             .catch(() => setItems([]))
             .finally(() => setLoading(false))
@@ -3464,21 +4010,27 @@ function ContentHistory({ brandId, onSelect, visible, onToggle }) {
                             <p className="text-sm text-slate-500">No content generated yet</p>
                             <p className="text-xs text-slate-600 mt-1">Generated content will appear here</p>
                         </div>
-                    ) : items.map(item => (
+                    ) : items.map(item => {
+                        const typeLabels = { blog: '📝 Blog', social: '💬 Social', youtube: '▶️ YouTube', press_release: '📰 Press Release', product: '🛍️ Product', youtube_seo: '▶️ YT SEO' }
+                        const typeLabel = typeLabels[item.type] || item.type || 'Content'
+                        const preview = item.title || item.content || item.prompt || '(no preview)'
+                        return (
                         <button key={item._id} onClick={() => onSelect(item)}
                             className="w-full text-left glass-panel rounded-xl p-3 hover:bg-white/[0.05] transition-all cursor-pointer border border-white/[0.06] group">
-                            <div className="flex items-center gap-2 mb-1">
-                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${item.status === 'approved' ? 'bg-emerald-400/10 text-emerald-400' : 'bg-primary/10 text-primary'}`}>
-                                    {item.status === 'approved' ? '✓ Approved' : item.type}
+                            <div className="flex items-center gap-2 mb-1.5">
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${item.status === 'approved' ? 'bg-emerald-400/10 text-emerald-400' : 'bg-primary/10 text-primary'}`}>
+                                    {item.status === 'approved' ? '✓ Approved' : typeLabel}
                                 </span>
-                                {item.platform && <span className="text-sm text-slate-500">{item.platform}</span>}
+                                {item.platform && <span className="text-[10px] text-slate-500 capitalize">{item.platform}</span>}
+                                {item.brand?.name && <span className="text-[10px] text-slate-600 ml-auto truncate max-w-[80px]">{item.brand.name}</span>}
                             </div>
-                            <p className="text-sm text-white line-clamp-2 mb-1">{item.content}</p>
+                            <p className="text-sm text-white line-clamp-2 mb-1 leading-snug">{preview}</p>
                             <p className="text-xs text-slate-600">
                                 {new Date(item.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                             </p>
                         </button>
-                    ))}
+                        )
+                    })}
                 </div>
             </div>
         </>
@@ -3598,7 +4150,7 @@ export default function ContentStudio() {
     const { activeBrand } = useBrand()
     const navigate = useNavigate()
     const [searchParams, setSearchParams] = useSearchParams()
-    const [step, setStep] = useState(0)   // 0=goal, 1=subtype, 2=channel, 3=context, 4=tone, 5=result, 6=PR, 7=product, 8=youtube wizard, 9=youtube result, 10=youtube SEO wizard, 11=youtube SEO result, 12=blog wizard, 13=blog editor
+    const [step, setStep] = useState(0)   // 0=goal, 1=subtype, 2=channel, 3=context, 4=tone, 5=result, 6=PR, 7=product, 8=youtube wizard, 9=youtube result, 10=youtube SEO wizard, 11=youtube SEO result, 12=blog wizard, 13=blog editor, 14=custom blog writer
     const [goal, setGoal] = useState(null)
     const [subType, setSubType] = useState(null)
     const [channel, setChannel] = useState(null)
@@ -4116,14 +4668,50 @@ SPOKESPERSON QUOTES:`
         }
     }
 
-    // Blog image generation handler — accepts style from BlogEditorView's style picker
-    const handleBlogImageGenerate = async (sectionIndex, imageStyle, opts = {}) => {
+    // Smart Blog Writer: create a temp blog record on demand for image gen, then pass through
+    const handleSmartWriterImageGenerate = async (sectionIndex, imageStyle, opts = {}, aspectRatio) => {
+        // Use existing blogResult if already created, otherwise create a minimal placeholder
+        let targetContent = blogResult
+        if (!targetContent?._id) {
+            try {
+                const data = await contentAPI.blogGenerate({
+                    brandId: activeBrand?._id,
+                    topic: 'Smart Writer Image Placeholder',
+                    blogType: subType || 'seo_blog',
+                    targetWordCount: 500,
+                    keywords: [],
+                    targetAudience: '',
+                    tone: 'professional',
+                })
+                if (data?.content) {
+                    targetContent = data.content
+                    setBlogResult(data.content) // update state for subsequent calls
+                }
+            } catch { /* fall through silently — image gen will return null gracefully */ }
+        }
+        if (!targetContent?._id) return null
+
+        // Call image generation directly with the resolved ID (avoids stale state)
         try {
             const payload = { sectionIndex, imageStyle: imageStyle || 'editorial' }
             if (opts.brandImageUrl) payload.brandImageUrl = opts.brandImageUrl
             if (opts.brandImageRef) payload.brandImageRef = opts.brandImageRef
+            if (aspectRatio) payload.aspectRatio = aspectRatio
+            return await contentAPI.blogGenerateImage(targetContent._id, payload)
+        } catch (err) {
+            console.error('Smart writer image gen error:', err)
+            return null
+        }
+    }
+
+    const handleBlogImageGenerate = async (sectionIndex, imageStyle, opts = {}, aspectRatio) => {
+        try {
+            const payload = { sectionIndex, imageStyle: imageStyle || 'editorial' }
+            if (opts.brandImageUrl) payload.brandImageUrl = opts.brandImageUrl
+            if (opts.brandImageRef) payload.brandImageRef = opts.brandImageRef
+            if (aspectRatio) payload.aspectRatio = aspectRatio
             const data = await contentAPI.blogGenerateImage(blogResult._id, payload)
-            return data // { success, imageUrl, altText, sectionIndex, model }
+            return data // { success, imageUrl, altText, sectionIndex, aspectRatio, model }
         } catch (err) {
             console.error('Blog image gen error:', err)
             return null
@@ -4266,9 +4854,11 @@ SPOKESPERSON QUOTES:`
                         } else if (g === 'product_content') {
                             setGoal(g); setStep(7)  // Jump to product picker
                         } else if (g === 'youtube_content') {
-                            setGoal(g); setStep(1)  // Show YouTube sub-types (Script vs Publish Optimizer)
+                            setGoal(g); setStep(1)  // Show YouTube sub-types
                         } else if (g === 'blog') {
                             setGoal(g); setStep(1)  // Show blog sub-types first
+                        } else if (g === 'custom_blog') {
+                            setGoal(g); setStep(14) // Go directly to SmartBlogWriter
                         } else {
                             setGoal(g); setStep(1)
                         }
@@ -4497,6 +5087,15 @@ SPOKESPERSON QUOTES:`
                     activeBrand={activeBrand}
                     onNewContent={resetAll}
                     onGenerateImage={handleBlogImageGenerate}
+                />
+            )}
+
+            {/* Custom Blog Writer (step 14) — standalone "Write It Yourself" mode */}
+            {step === 14 && (
+                <SmartBlogWriter
+                    activeBrand={activeBrand}
+                    onBack={() => { setGoal(null); setStep(0) }}
+                    onGenerateImage={handleSmartWriterImageGenerate}
                 />
             )}
 

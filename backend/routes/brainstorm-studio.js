@@ -1498,7 +1498,8 @@ function needsWebResearch(message, intent) {
     /latest.*(?:news|update|launch)/,
     /(?:average|typical).*(?:cost|price|budget|roi)/,
   ];
-  if (intent === 'brand-strategy') return true;
+  // brand-strategy only uses web search if the user's message specifically asks for market data
+  // (Don't force web search on every turn — it slows responses and risks malformed JSON)
   return webTriggers.some(rx => rx.test(lowerMsg));
 }
 
@@ -1689,7 +1690,7 @@ STEP 3: CRAFT your response to match what THEY want, not what YOUR script says.
 - Include a "reasoning" field explaining your strategic thought process (2-3 sentences).
 - If asking a question: Write ONE sharp, contextual question that advances the brief.
 - If responding directly: Give a substantive, expert answer that addresses their request.
-- Generate 4-6 clickable option chips SPECIFIC to this brand and context.
+- Generate 4-6 SHORT ANSWER CHIPS that the user can click to quickly reply to your question.
 
 ACTIONS AVAILABLE:
 - "ask_question" — Ask a strategic question to gather info (only use when appropriate)
@@ -1701,7 +1702,9 @@ RULES:
 1. 🔴 MOST IMPORTANT: If the user asks a SPECIFIC QUESTION or makes a REQUEST, ALWAYS respond with "direct_response" — NEVER ignore their message
 2. NEVER ask generic questions when you know the brand's industry from DNA
 3. ALWAYS reference specific brand details when relevant
-4. Option chips must be CONTEXTUAL — not generic categories
+4. answerChips must be SHORT ANSWERS (2-5 words) — NOT questions. They are clickable answers the user can tap.
+   - BAD answerChips: ["What about budget?", "Who is the audience?", "What's the goal?"] — ❌ These are QUESTIONS, not answers!
+   - GOOD answerChips: ["Brand awareness", "Product launch", "₹2L–5L budget", "Instagram + YouTube"] — ✅ These are short ANSWERS
 5. Keep conversational responses concise (1-2 sentences). Keep direct_response answers detailed (3-8 sentences)
 6. DO NOT use markdown formatting
 7. Use emoji sparingly — max 1-2 per message
@@ -1717,7 +1720,7 @@ Return ONLY this JSON:
   "action": "ask_question | direct_response | generate_ideas | generate_strategy",
   "reasoning": "I know X and Y. The user is asking about Z, so I need to...",
   "fidatoResponse": "Your contextual response or answer here",
-  "questionOptions": ["Follow-up 1", "Follow-up 2", "Follow-up 3", "Follow-up 4"],
+  "answerChips": ["Short answer option 1", "Short answer option 2", "Short answer option 3", "Short answer option 4"],
   "preGenerationMessage": null
 }`;
 
@@ -1765,21 +1768,49 @@ Return ONLY this JSON:
 
       // ── DEDUP GUARD: Check if this question was already asked ─────────────
       let finalResponse = parsed.fidatoResponse;
-      let finalOptions = parsed.questionOptions || null;
+      // Support both old field name (questionOptions) and new (answerChips) for backwards compat
+      let finalOptions = parsed.answerChips || parsed.questionOptions || null;
+
+      // ── SANITY CHECK: Ensure chips are short answers, not questions ───────
+      // If the AI returned questions as chips, fall back to contextual answer chips from the library
+      if (finalOptions && finalOptions.length > 0) {
+        const chipsSanitized = finalOptions.filter(chip => {
+          const trimmed = (chip || '').trim();
+          // Reject chips that look like questions (end with ?, start with question words, or are longer than 55 chars)
+          const isQuestion = trimmed.endsWith('?') ||
+            /^(what|who|where|when|why|how|which|tell|describe|explain|do you|are you|is the|can you)/i.test(trimmed) ||
+            trimmed.length > 55;
+          return !isQuestion;
+        });
+        if (chipsSanitized.length >= 2) {
+          finalOptions = chipsSanitized;
+        } else {
+          // All chips were questions — fall back to hardcoded contextual answer chips
+          console.warn('[fidato-chat] AI returned question-style chips — using contextual fallback options');
+          const fallbackData = getContextualFallbackQuestion(userMessageCount, detectedIntent, sessionState.collectedAnswers || {}, brand);
+          finalOptions = fallbackData.options || null;
+        }
+      } else if (action === 'ask_question' && !finalOptions) {
+        // No chips at all — provide fallback options
+        const fallbackData = getContextualFallbackQuestion(userMessageCount, detectedIntent, sessionState.collectedAnswers || {}, brand);
+        finalOptions = fallbackData.options || null;
+      }
+
       const updatedAskedQuestions = [...askedQuestions];
 
       if (action === 'ask_question' && isSimilarQuestion(finalResponse, askedQuestions)) {
         console.warn('[fidato-chat] DEDUP: AI repeated a question, forcing different question');
         emitStep('Avoiding repeated question — finding new angle...', '🔄');
         const retryResult = await aiCall(
-          systemPrompt + `\n\n‼️ CRITICAL: Your previous response was rejected because it repeated a question. You MUST ask about a COMPLETELY DIFFERENT TOPIC.`,
+          systemPrompt + `\n\n‼️ CRITICAL: Your previous response was rejected because it repeated a question. You MUST ask about a COMPLETELY DIFFERENT TOPIC. Remember: answerChips must be SHORT ANSWERS (2-5 words) not questions.`,
           `Your last question was rejected as a duplicate. Ask about a DIFFERENT strategic topic. Message: "${message}"`,
           { temperature: 0.6, maxTokens: 800 }
         );
         const retryParsed = parseJSON(retryResult);
         if (retryParsed?.fidatoResponse && !isSimilarQuestion(retryParsed.fidatoResponse, askedQuestions)) {
           finalResponse = retryParsed.fidatoResponse;
-          finalOptions = retryParsed.questionOptions || finalOptions;
+          const retryChips = retryParsed.answerChips || retryParsed.questionOptions || null;
+          finalOptions = retryChips || finalOptions;
         }
       }
 
@@ -2208,7 +2239,7 @@ router.post('/fidato-chat', protect, requireStudio('brainstormStudio'), async (r
       sseEvent(res, {
         type: 'done',
         sessionState: newSessionState,
-        questionOptions: reasoning.questionOptions || null,
+        questionOptions: questionOptions || null,  // use sanitized destructured value
       });
 
     } else if (action === 'generate_ideas') {
@@ -2326,7 +2357,7 @@ router.post('/fidato-chat', protect, requireStudio('brainstormStudio'), async (r
       sseEvent(res, {
         type: 'done',
         sessionState: newSessionState,
-        questionOptions: reasoning.questionOptions || null,
+        questionOptions: questionOptions || null,  // use sanitized destructured value
       });
     }
 

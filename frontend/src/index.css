@@ -372,18 +372,13 @@
     display: flex;
     flex-direction: column;
     gap: 0;
+    margin-bottom: 1.5rem;
+    background: rgba(18, 18, 26, 0.4);
     border-radius: 1rem;
-    margin-bottom: 1rem;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    padding: 0.5rem;
     margin-left: 0.5rem;
     margin-right: 0.5rem;
-    position: sticky;
-    top: 4rem;
-    z-index: 40;
-    background: #12121a;
-    backdrop-filter: blur(24px);
-    -webkit-backdrop-filter: blur(24px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    box-shadow: 0 6px 32px rgba(0, 0, 0, 0.6), 0 1px 0 rgba(255, 255, 255, 0.05) inset;
   }
 
   .studio-tab-row {
@@ -654,50 +649,79 @@
   }
   @media (min-width: 1024px) { .responsive-container { padding-left: 2rem; padding-right: 2rem; } }
 
-  /* ═══════════ Creative Studio — Full-Width Gallery ═══════════ */
+  /* ═══════════ Creative Studio — Split Layout ═══════════ */
   .creative-split {
-    display: block;
-    min-height: calc(100vh - 140px);
-    padding-bottom: 9rem; /* Space for floating bar + tray */
+    display: flex;
+    flex-direction: row-reverse;
+    align-items: flex-start;
+    gap: 1.5rem;
+    position: relative;
+    padding-bottom: 2rem;
+  }
+
+  .creative-tools-panel {
+    flex-shrink: 0;
+    width: 336px;
+    display: flex;
+    flex-direction: column;
+    position: sticky;
+    /* top = studio tab-nav offset: pt-16 (4rem) inside main + tab-row (~3.25rem) + buffer (1.25rem) */
+    top: 8.5rem;
+    /* height = viewport minus fixed header (4rem) minus sticky top offset (8.5rem) = 12.5rem total */
+    /* This ensures the panel fits exactly in the visible viewport below the header + tab nav */
+    height: calc(100vh - 12.5rem);
+    max-height: calc(100vh - 12.5rem);
+    background: rgba(10, 10, 14, 0.97);
+    border: 1px solid rgba(72, 71, 76, 0.18);
+    border-radius: 1rem;
+    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.03) inset;
+    overflow: hidden; /* panel itself does NOT scroll — children handle scrolling */
+  }
+
+  /* Scrollable settings area (all accordions, prompt etc.) */
+  .creative-tools-panel-body {
+    flex: 1 1 0%;
+    min-height: 0; /* CRITICAL: prevents flex children from overflowing */
+    overflow-y: auto;
+    overflow-x: hidden;
+    overflow-anchor: none;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(72, 71, 76, 0.35) transparent;
+    padding-bottom: 0;
+  }
+  .creative-tools-panel-body::-webkit-scrollbar {
+    width: 3px;
+  }
+  .creative-tools-panel-body::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .creative-tools-panel-body::-webkit-scrollbar-thumb {
+    background: rgba(72, 71, 76, 0.4);
+    border-radius: 99px;
+  }
+
+  /* Always-visible footer pinned to bottom of panel */
+  .creative-tools-panel-footer {
+    flex-shrink: 0;
+    padding: 0;
+    background: rgba(10, 10, 14, 0.98);
+    border-top: 1px solid rgba(72, 71, 76, 0.18);
+    overflow: visible; /* allow model dropdown to escape upward */
   }
 
   .creative-gallery {
-    width: 100%;
+    flex-grow: 1;
     min-width: 0;
     padding: 0;
   }
 
-  /* ── Floating Creative Command Bar ── */
-  .creative-floating-bar {
-    position: fixed;
-    bottom: 0;
-    left: 256px; /* Sidebar width */
-    right: 0;
-    z-index: 45;
-    background: rgba(10, 10, 14, 0.95);
-    backdrop-filter: blur(32px);
-    -webkit-backdrop-filter: blur(32px);
-    border-top: 1px solid rgba(72, 71, 76, 0.15);
-    box-shadow: 0 -12px 48px rgba(0, 0, 0, 0.5);
-    padding-right: 60px; /* Reserve space for Fidato chat bubble */
-  }
-  .creative-floating-bar::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(255, 77, 0, 0.2), transparent);
-    pointer-events: none;
-  }
-
-  /* Prompt row */
+  /* Prompt column inside tools panel */
   .floating-prompt-row {
     display: flex;
-    align-items: center;
+    flex-direction: column;
+    align-items: stretch;
     gap: 0.5rem;
-    padding: 0.625rem 1rem;
+    padding: 0.625rem 0.875rem 0.75rem;
   }
 
   /* ── Setting icon buttons ── */
@@ -739,23 +763,66 @@
     box-shadow: 0 0 6px rgba(255, 77, 0, 0.6);
   }
 
-  /* ── Settings Tray (slides up above prompt row) ── */
-  .floating-tray {
-    border-bottom: 1px solid rgba(72, 71, 76, 0.12);
-    padding: 0.75rem 1rem;
-    max-height: 320px;
-    overflow-y: auto;
-    scrollbar-width: thin;
-    scrollbar-color: #48474c transparent;
-    animation: traySlideUp 0.2s ease-out;
+  /* ── Settings Accordion ── */
+  .sidebar-accordion {
+    border-bottom: 1px solid rgba(72, 71, 76, 0.15);
   }
-  .floating-tray::-webkit-scrollbar { width: 3px; }
-  .floating-tray::-webkit-scrollbar-track { background: transparent; }
-  .floating-tray::-webkit-scrollbar-thumb { background: #48474c; border-radius: 10px; }
+  .sidebar-accordion:last-child {
+    border-bottom: none;
+  }
+  .sidebar-accordion-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  .sidebar-accordion-header:hover {
+    background: rgba(255, 255, 255, 0.03);
+  }
+  .sidebar-accordion-body {
+    padding: 0 1rem 1rem 1rem;
+    animation: accordionSlideDown 0.2s ease-out forwards;
+  }
+  @keyframes accordionSlideDown {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .sidebar-grid-2 {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+  }
 
   @keyframes traySlideUp {
-    from { opacity: 0; transform: translateY(8px); max-height: 0; }
-    to { opacity: 1; transform: translateY(0); max-height: 320px; }
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── Floating Tray: settings panel rendered in the panel body ── */
+  .floating-tray {
+    padding: 0.875rem 1rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    animation: traySlideUp 0.18s ease-out forwards;
+    /* Prevent icon ligature text overflow */
+    overflow: hidden;
+  }
+  .floating-tray:last-child {
+    border-bottom: none;
+  }
+
+  /* Force Material Symbols inside pill chip buttons to never overflow */
+  .floating-tray button .material-symbols-outlined,
+  .floating-tray button span.material-symbols-outlined {
+    font-size: 10px !important;
+    line-height: 1 !important;
+    max-width: 12px;
+    overflow: hidden;
+    display: inline-block;
+    vertical-align: middle;
+    flex-shrink: 0;
   }
 
   /* Context chips (product, linked content, etc.) */
@@ -817,12 +884,17 @@
   /* Mobile + Tablet: stack vertically */
   @media (max-width: 1024px) {
     .creative-split {
-      flex-direction: column;
+      flex-direction: column-reverse; /* tools on top */
     }
     .creative-tools-panel {
       width: 100%;
       position: static;
+      height: auto;
       max-height: none;
+    }
+    .creative-tools-panel-body {
+      min-height: 0;
+      max-height: 50vh; /* limit on mobile so footer stays visible */
     }
   }
 
@@ -1373,7 +1445,7 @@
 }
 
 /* ── Glow accents for glass-icon containers ── */
-.glow-violet { background: rgba(255, 77, 0, 0.1); border-color: rgba(255, 77, 0, 0.2); }
+.glow-violet { background: rgba(139, 92, 246, 0.1); border-color: rgba(139, 92, 246, 0.2); }
 .glow-blue { background: rgba(143, 245, 255, 0.1); border-color: rgba(143, 245, 255, 0.2); }
 .glow-cyan { background: rgba(6, 182, 212, 0.1); border-color: rgba(6, 182, 212, 0.2); }
 .glow-emerald { background: rgba(16, 185, 129, 0.1); border-color: rgba(16, 185, 129, 0.2); }

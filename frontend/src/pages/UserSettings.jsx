@@ -324,7 +324,7 @@ export default function UserSettings() {
                     Claim Your Custom ID
                 </h4>
                 <p className="text-sm text-slate-500 mb-4">
-                    Choose a unique handle for yourself. <span className="text-amber-400 font-bold">⚠️ This is a one-time action and cannot be undone.</span>
+                    Choose a unique handle for yourself. <span className="text-amber-400 font-bold flex items-center gap-1 inline-flex"><span className="material-symbols-outlined text-xs">warning</span> This is a one-time action and cannot be undone.</span>
                 </p>
 
                 <div className="flex gap-3 max-w-lg mb-3">
@@ -341,20 +341,20 @@ export default function UserSettings() {
                         disabled={claimLoading || !validClaimInput}
                         className="px-6 py-3 rounded-xl bg-primary text-white font-bold text-sm shadow-lg shadow-primary/20 hover:bg-primary-light disabled:opacity-40 transition-all cursor-pointer whitespace-nowrap"
                     >
-                        {claimLoading ? 'Claiming...' : '🏷️ Claim Forever'}
+                        {claimLoading ? 'Claiming...' : <span className="flex items-center gap-1.5"><span className="material-symbols-outlined text-sm">sell</span>Claim Forever</span>}
                     </button>
                 </div>
 
                 {/* Validation hints */}
                 <div className="space-y-1 text-xs text-slate-600">
-                    <p className={claimInput.length >= 3 && claimInput.length <= 30 ? 'text-emerald-400' : ''}>
-                        {claimInput.length >= 3 && claimInput.length <= 30 ? '✓' : '○'} 3-30 characters ({claimInput.length}/30)
+                    <p className={claimInput.length >= 3 && claimInput.length <= 30 ? 'text-emerald-400 flex items-center gap-1' : 'flex items-center gap-1'}>
+                        <span className="material-symbols-outlined text-[11px]">{claimInput.length >= 3 && claimInput.length <= 30 ? 'check' : 'radio_button_unchecked'}</span> 3-30 characters ({claimInput.length}/30)
                     </p>
-                    <p className={claimInput && /^[a-z0-9]/.test(claimInput) && /[a-z0-9]$/.test(claimInput) ? 'text-emerald-400' : ''}>
-                        {claimInput && /^[a-z0-9]/.test(claimInput) && /[a-z0-9]$/.test(claimInput) ? '✓' : '○'} Starts and ends with a letter or number
+                    <p className={claimInput && /^[a-z0-9]/.test(claimInput) && /[a-z0-9]$/.test(claimInput) ? 'text-emerald-400 flex items-center gap-1' : 'flex items-center gap-1'}>
+                        <span className="material-symbols-outlined text-[11px]">{claimInput && /^[a-z0-9]/.test(claimInput) && /[a-z0-9]$/.test(claimInput) ? 'check' : 'radio_button_unchecked'}</span> Starts and ends with a letter or number
                     </p>
-                    <p className={claimInput && !/--/.test(claimInput) && /^[a-z0-9-]*$/.test(claimInput) ? 'text-emerald-400' : ''}>
-                        {claimInput && !/--/.test(claimInput) && /^[a-z0-9-]*$/.test(claimInput) ? '✓' : '○'} Only lowercase letters, numbers, and hyphens
+                    <p className={claimInput && !/--/.test(claimInput) && /^[a-z0-9-]*$/.test(claimInput) ? 'text-emerald-400 flex items-center gap-1' : 'flex items-center gap-1'}>
+                        <span className="material-symbols-outlined text-[11px]">{claimInput && !/--/.test(claimInput) && /^[a-z0-9-]*$/.test(claimInput) ? 'check' : 'radio_button_unchecked'}</span> Only lowercase letters, numbers, and hyphens
                     </p>
                 </div>
                 <MsgBox msg={claimMsg} />
@@ -579,10 +579,10 @@ export default function UserSettings() {
                 <div className="flex-1 bg-white/[0.02] border border-white/[0.06] rounded-xl p-4">
                     <p className="text-sm text-slate-400">
                         {(profile?.streak || 0) >= 7
-                            ? '🔥 You\'re on fire! Keep the momentum going.'
+                            ? 'On fire! Keep the momentum going.'
                             : (profile?.streak || 0) >= 3
-                            ? '💪 Great streak! Keep it up for bonus rewards.'
-                            : '✨ Log in daily to build your streak and earn bonus credits!'}
+                            ? 'Great streak! Keep it up for bonus rewards.'
+                            : 'Log in daily to build your streak and earn bonus credits!'}
                     </p>
                 </div>
             </div>

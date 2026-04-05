@@ -4,26 +4,7 @@ import SEOHead from '../components/SEOHead'
 
 /* ──────────────────────────────────────────────────────── */
 /*  MANTRAM AI — PREMIUM IMMERSIVE ABOUT PAGE              */
-/*  2026 redesign — Material Symbols + gradient glass      */
 /* ──────────────────────────────────────────────────────── */
-
-/* ── Reusable icon component with gradient glass background ── */
-function GlassIcon({ icon, color = '#4d6bff', size = 'md', className = '' }) {
-    const sizes = {
-        sm: { box: 'w-10 h-10', icon: 'text-lg' },
-        md: { box: 'w-12 h-12', icon: 'text-xl' },
-        lg: { box: 'w-16 h-16', icon: 'text-2xl' },
-        xl: { box: 'w-20 h-20', icon: 'text-3xl' },
-    }
-    const s = sizes[size] || sizes.md
-    return (
-        <div className={`${s.box} rounded-2xl flex items-center justify-center relative overflow-hidden ${className}`}
-            style={{ background: `linear-gradient(135deg, ${color}18, ${color}08)`, border: `1px solid ${color}25`, boxShadow: `0 4px 24px ${color}10` }}>
-            <div className="absolute inset-0 rounded-2xl" style={{ background: `radial-gradient(circle at 30% 30%, ${color}12, transparent 70%)` }} />
-            <span className={`material-symbols-outlined ${s.icon} relative z-10`} style={{ color }}>{icon}</span>
-        </div>
-    )
-}
 
 export default function About() {
     const [scrolled, setScrolled] = useState(false)
@@ -60,7 +41,7 @@ export default function About() {
     const orgPartners = ['Zee TV', 'Zee5', 'Cinevistas', 'Mirum', 'EPAM', 'ACwO', 'Mobilla', 'Big Trunk', 'Opportune']
 
     return (
-        <div className="min-h-screen bg-[#080a14] text-white overflow-x-hidden" style={{ fontFamily: "'Inter', sans-serif" }}>
+        <div className="min-h-screen bg-[#08080c] text-white overflow-x-hidden" style={{ fontFamily: "'Inter', sans-serif" }}>
             <SEOHead
                 title="About Mantram AI — The Operating System for Modern Brands"
                 description="Mantram AI is an AI-powered Brand Operating System. 8 AI Studios, 20+ models, built by founders with 18+ years of branding experience."
@@ -78,8 +59,14 @@ export default function About() {
                             "logo": "https://mantram.ai/vite.svg",
                             "description": "Mantram AI is an AI-powered Brand Operating System featuring 8 interconnected AI Studios.",
                             "founders": [
-                                { "@type": "Person", "name": "Arjun Kumar" },
-                                { "@type": "Person", "name": "Abhishek Johri" }
+                                {
+                                    "@type": "Person",
+                                    "name": "Arjun Kumar"
+                                },
+                                {
+                                    "@type": "Person",
+                                    "name": "Abhishek Johri"
+                                }
                             ]
                         },
                         {
@@ -87,8 +74,12 @@ export default function About() {
                             "@id": "https://mantram.ai/about/#webpage",
                             "url": "https://mantram.ai/about",
                             "name": "About Mantram AI — The Operating System for Modern Brands",
-                            "isPartOf": { "@id": "https://mantram.ai/#website" },
-                            "about": { "@id": "https://mantram.ai/#organization" }
+                            "isPartOf": {
+                                "@id": "https://mantram.ai/#website"
+                            },
+                            "about": {
+                                "@id": "https://mantram.ai/#organization"
+                            }
                         }
                     ]
                 }}
@@ -104,16 +95,16 @@ export default function About() {
             {/* ══════════════════════════════════════════════════════════ */}
             {/*  NAV BAR                                                  */}
             {/* ══════════════════════════════════════════════════════════ */}
-            <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${scrolled ? 'bg-[#080a14]/90 backdrop-blur-xl border-b border-white/[0.04] shadow-2xl' : ''}`}>
+            <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${scrolled ? 'bg-[#08080c]/90 backdrop-blur-xl border-b border-[#48474c]/20 shadow-2xl' : ''}`}>
                 <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
                     <Link to="/" className="flex items-center gap-3 group">
                         <img src="/mantram-logo.png" alt="Mantram AI" className="h-8 w-8 group-hover:scale-110 transition-transform" onError={(e) => e.target.style.display = 'none'} />
-                        <span className="text-lg font-bold tracking-tight">Mantram <span className="text-[#4d6bff]">AI</span></span>
+                        <span className="text-lg font-bold tracking-tight">Mantram <span className="text-[#ff4d00]">AI</span></span>
                     </Link>
                     <div className="flex items-center gap-6">
-                        <Link to="/" className="text-sm text-gray-400 hover:text-white transition-colors">Home</Link>
-                        <Link to="/auth" className="text-sm text-gray-400 hover:text-white transition-colors">Login</Link>
-                        <Link to="/auth" className="px-5 py-2.5 text-sm font-semibold rounded-full bg-gradient-to-r from-[#2b4bee] to-[#4d6bff] hover:shadow-lg hover:shadow-[#2b4bee]/25 transition-all hover:-translate-y-0.5">Get Started</Link>
+                        <Link to="/" className="text-sm text-[#acaab0] hover:text-white transition-colors">Home</Link>
+                        <Link to="/auth" className="text-sm text-[#acaab0] hover:text-white transition-colors">Login</Link>
+                        <Link to="/auth" className="px-5 py-2.5 text-sm font-semibold rounded-full bg-gradient-to-r from-[#ff4d00] to-[#ff7a00] hover:shadow-lg hover:shadow-[#ff4d00]/25 transition-all hover:-translate-y-0.5">Get Started</Link>
                     </div>
                 </div>
             </nav>
@@ -123,15 +114,15 @@ export default function About() {
             {/* ══════════════════════════════════════════════════════════ */}
             <section className="relative pt-40 pb-28 px-6" ref={assignRef('hero')}>
                 <div className="max-w-4xl mx-auto text-center relative z-10">
-                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/[0.04] border border-white/[0.06] mb-8 abt-fade-up" style={{ animationDelay: '0.1s' }}>
+                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/[0.04] border border-[#48474c]/30 mb-8 abt-fade-up" style={{ animationDelay: '0.1s' }}>
                         <span className="w-2 h-2 rounded-full bg-[#4d6bff] animate-pulse" />
-                        <span className="text-xs font-medium text-gray-400 tracking-widest uppercase">About Mantram AI</span>
+                        <span className="text-xs font-medium text-[#acaab0] tracking-widest uppercase">About Mantram AI</span>
                     </div>
                     <h1 className="text-5xl md:text-7xl font-black leading-[1.05] tracking-tight mb-8 abt-fade-up" style={{ animationDelay: '0.3s' }}>
                         The Operating System<br />for{' '}
                         <span className="bg-gradient-to-r from-[#4d6bff] via-[#8b5cf6] to-[#ec4899] bg-clip-text text-transparent">Modern Brands</span>
                     </h1>
-                    <p className="text-xl md:text-2xl text-gray-400 max-w-2xl mx-auto leading-relaxed abt-fade-up" style={{ animationDelay: '0.5s' }}>
+                    <p className="text-xl md:text-2xl text-[#acaab0] max-w-2xl mx-auto leading-relaxed abt-fade-up" style={{ animationDelay: '0.5s' }}>
                         Mantram AI was built on a simple belief: <strong className="text-white">Great brands aren't limited by creativity — they're limited by systems.</strong>
                     </p>
                 </div>
@@ -155,10 +146,10 @@ export default function About() {
                             <h2 className="text-3xl md:text-4xl font-bold leading-tight mb-6">
                                 Marketing is <span className="text-[#f43f5e]">fragmented</span>
                             </h2>
-                            <div className="space-y-4 text-gray-400 text-lg leading-relaxed">
+                            <div className="space-y-4 text-[#acaab0] text-lg leading-relaxed">
                                 <p>Teams juggle multiple tools, repeat workflows, and struggle to maintain consistency.</p>
                                 <p><span className="text-gray-200 font-medium">Content feels disconnected.</span><br />Design lacks cohesion.<br />AI outputs lack brand understanding.</p>
-                                <div className="pt-4 border-t border-white/[0.06]">
+                                <div className="pt-4 border-t border-[#48474c]/30">
                                     <p className="text-white font-semibold text-xl">The problem isn't effort.<br />The problem is the absence of a unified, intelligent system.</p>
                                 </div>
                             </div>
@@ -166,13 +157,13 @@ export default function About() {
                         {/* Pain points visual */}
                         <div className="grid grid-cols-2 gap-3">
                             {[
-                                { icon: 'cable', label: 'Disconnected tools', sublabel: '10+ platforms', color: '#f43f5e' },
-                                { icon: 'sync_problem', label: 'Repetitive workflows', sublabel: 'Wasted hours', color: '#f59e0b' },
-                                { icon: 'format_paint', label: 'Inconsistent branding', sublabel: 'Off-brand outputs', color: '#8b5cf6' },
-                                { icon: 'psychology_alt', label: 'AI without context', sublabel: 'Generic results', color: '#6366f1' },
+                                { icon: '🔌', label: 'Disconnected tools', sublabel: '10+ platforms' },
+                                { icon: '🔁', label: 'Repetitive workflows', sublabel: 'Wasted hours' },
+                                { icon: '🎨', label: 'Inconsistent branding', sublabel: 'Off-brand outputs' },
+                                { icon: '🤖', label: 'AI without context', sublabel: 'Generic results' },
                             ].map((p, i) => (
                                 <div key={i} className="p-5 rounded-2xl bg-white/[0.02] border border-white/[0.05] hover:border-[#f43f5e]/20 transition-all duration-500 group" style={{ transitionDelay: `${i * 100}ms` }}>
-                                    <GlassIcon icon={p.icon} color={p.color} size="md" className="mb-3" />
+                                    <div className="text-2xl mb-3">{p.icon}</div>
                                     <div className="text-sm font-semibold text-gray-200">{p.label}</div>
                                     <div className="text-xs text-gray-500 mt-1">{p.sublabel}</div>
                                 </div>
@@ -197,12 +188,12 @@ export default function About() {
             <section className="relative py-28 px-6" ref={assignRef('what')}>
                 <div className="max-w-5xl mx-auto">
                     <div className={`text-center mb-16 transition-all duration-1000 ${isVisible('what') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
-                        <span className="text-xs font-bold tracking-[0.3em] uppercase text-[#4d6bff] mb-4 block">What is Mantram AI?</span>
+                        <span className="text-xs font-bold tracking-[0.3em] uppercase text-[#ff4d00] mb-4 block">What is Mantram AI?</span>
                         <h2 className="text-3xl md:text-5xl font-black leading-tight mb-6">
                             An AI-Powered<br />
                             <span className="bg-gradient-to-r from-[#4d6bff] via-[#8b5cf6] to-[#10b981] bg-clip-text text-transparent">Brand Operating System</span>
                         </h2>
-                        <p className="text-xl text-gray-400 max-w-3xl mx-auto leading-relaxed">
+                        <p className="text-xl text-[#acaab0] max-w-3xl mx-auto leading-relaxed">
                             Mantram replaces your fragmented marketing stack with one unified platform. From content and design to ads, analytics, and automation — everything works together through a shared intelligence layer called <strong className="text-white">Brand DNA</strong>.
                         </p>
                     </div>
@@ -210,15 +201,15 @@ export default function About() {
                     {/* Three pillars */}
                     <div className={`grid md:grid-cols-3 gap-6 transition-all duration-1000 delay-200 ${isVisible('what') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
                         {[
-                            { icon: 'genetics', title: 'No repeated brand inputs', desc: 'Brand DNA captures your identity once — every studio uses it automatically.', color: '#4d6bff' },
-                            { icon: 'deployed_code', title: 'No off-brand outputs', desc: 'Every piece of content, design, and ad is aligned to your brand voice and style.', color: '#8b5cf6' },
-                            { icon: 'bolt', title: 'No disconnected workflows', desc: 'One system. All studios connected. Insights flow between them.', color: '#10b981' },
+                            { icon: '🧬', title: 'No repeated brand inputs', desc: 'Brand DNA captures your identity once — every studio uses it automatically.', color: '#4d6bff' },
+                            { icon: '✦', title: 'No off-brand outputs', desc: 'Every piece of content, design, and ad is aligned to your brand voice and style.', color: '#8b5cf6' },
+                            { icon: '⚡', title: 'No disconnected workflows', desc: 'One system. All studios connected. Insights flow between them.', color: '#10b981' },
                         ].map((item, i) => (
                             <div key={i} className="relative p-8 rounded-3xl bg-white/[0.02] border border-white/[0.05] overflow-hidden group hover:border-opacity-20 transition-all duration-500" style={{ '--accent': item.color }}>
                                 <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent" style={{ background: `linear-gradient(90deg, transparent, ${item.color}40, transparent)` }} />
-                                <GlassIcon icon={item.icon} color={item.color} size="lg" className="mb-5" />
+                                <div className="text-3xl mb-4">{item.icon}</div>
                                 <h3 className="text-lg font-bold mb-2">{item.title}</h3>
-                                <p className="text-gray-400 text-sm leading-relaxed">{item.desc}</p>
+                                <p className="text-[#acaab0] text-sm leading-relaxed">{item.desc}</p>
                             </div>
                         ))}
                     </div>
@@ -226,7 +217,7 @@ export default function About() {
                     {/* One-liner */}
                     <div className={`mt-16 text-center transition-all duration-1000 delay-500 ${isVisible('what') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
                         <div className="inline-block px-8 py-5 rounded-2xl bg-gradient-to-r from-[#4d6bff]/10 to-[#8b5cf6]/10 border border-[#4d6bff]/15">
-                            <p className="text-lg font-semibold text-gray-200">Just one system that <span className="text-[#4d6bff]">understands</span> and <span className="text-[#8b5cf6]">grows</span> with your brand.</p>
+                            <p className="text-lg font-semibold text-gray-200">Just one system that <span className="text-[#ff4d00]">understands</span> and <span className="text-[#8b5cf6]">grows</span> with your brand.</p>
                         </div>
                     </div>
                 </div>
@@ -247,20 +238,20 @@ export default function About() {
                     {/* Audience cards */}
                     <div className={`grid grid-cols-2 md:grid-cols-4 gap-4 transition-all duration-1000 delay-200 ${isVisible('purpose') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
                         {[
-                            { icon: 'rocket_launch', label: 'Founders', desc: 'Building with limited resources', color: '#f59e0b' },
-                            { icon: 'monitoring', label: 'Marketing Teams', desc: 'Scaling execution', color: '#10b981' },
-                            { icon: 'domain', label: 'Agencies', desc: 'Managing multiple brands', color: '#8b5cf6' },
-                            { icon: 'storefront', label: 'D2C Businesses', desc: 'Driving growth', color: '#ec4899' },
+                            { icon: '🚀', label: 'Founders', desc: 'Building with limited resources' },
+                            { icon: '📊', label: 'Marketing Teams', desc: 'Scaling execution' },
+                            { icon: '🏢', label: 'Agencies', desc: 'Managing multiple brands' },
+                            { icon: '🛍️', label: 'D2C Businesses', desc: 'Driving growth' },
                         ].map((a, i) => (
                             <div key={i} className="text-center p-6 rounded-2xl bg-white/[0.02] border border-white/[0.05] hover:bg-white/[0.04] transition-all duration-500 group">
-                                <GlassIcon icon={a.icon} color={a.color} size="md" className="mx-auto mb-4 group-hover:scale-110 transition-transform" />
+                                <div className="text-3xl mb-3 group-hover:scale-110 transition-transform">{a.icon}</div>
                                 <div className="font-bold text-sm mb-1">{a.label}</div>
                                 <div className="text-xs text-gray-500">{a.desc}</div>
                             </div>
                         ))}
                     </div>
 
-                    <p className={`text-center text-lg text-gray-400 mt-10 transition-all duration-1000 delay-400 ${isVisible('purpose') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+                    <p className={`text-center text-lg text-[#acaab0] mt-10 transition-all duration-1000 delay-400 ${isVisible('purpose') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
                         We simplify complexity so you can focus on what matters — <strong className="text-white">building your brand.</strong>
                     </p>
                 </div>
@@ -273,7 +264,7 @@ export default function About() {
                 <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#0c0e1a] to-transparent pointer-events-none" />
                 <div className="max-w-5xl mx-auto relative z-10">
                     <div className={`grid md:grid-cols-2 gap-16 items-center transition-all duration-1000 ${isVisible('cocreation') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
-                        {/* Visual — orbital animation */}
+                        {/* Visual */}
                         <div className="relative flex items-center justify-center">
                             <div className="relative w-72 h-72">
                                 {/* Outer ring */}
@@ -282,17 +273,19 @@ export default function About() {
                                 <div className="absolute inset-8 rounded-full border border-[#10b981]/10 abt-spin-slow" style={{ animationDuration: '25s' }} />
                                 {/* Center */}
                                 <div className="absolute inset-0 flex items-center justify-center">
-                                    <GlassIcon icon="handshake" color="#6366f1" size="xl" />
+                                    <div className="w-24 h-24 rounded-full bg-gradient-to-br from-[#4d6bff]/15 to-[#8b5cf6]/15 flex items-center justify-center border border-[#4d6bff]/20">
+                                        <span className="text-3xl">🤝</span>
+                                    </div>
                                 </div>
                                 {/* Orbiting dots */}
                                 <div className="absolute top-2 left-1/2 -translate-x-1/2 abt-spin-slow" style={{ transformOrigin: '0 142px' }}>
-                                    <GlassIcon icon="neurology" color="#4d6bff" size="sm" className="abt-spin-slow-reverse" />
+                                    <div className="w-8 h-8 rounded-full bg-[#4d6bff]/20 flex items-center justify-center text-sm abt-spin-slow-reverse">🧠</div>
                                 </div>
                                 <div className="absolute bottom-2 left-1/2 -translate-x-1/2 abt-spin-slow-reverse" style={{ transformOrigin: '0 -130px', animationDelay: '3s' }}>
-                                    <GlassIcon icon="electric_bolt" color="#8b5cf6" size="sm" className="abt-spin-slow" />
+                                    <div className="w-8 h-8 rounded-full bg-[#8b5cf6]/20 flex items-center justify-center text-sm abt-spin-slow">⚡</div>
                                 </div>
                                 <div className="absolute right-0 top-1/2 -translate-y-1/2 abt-spin-slow" style={{ transformOrigin: '-128px 0', animationDelay: '6s' }}>
-                                    <GlassIcon icon="auto_awesome" color="#10b981" size="sm" className="abt-spin-slow-reverse" />
+                                    <div className="w-8 h-8 rounded-full bg-[#10b981]/20 flex items-center justify-center text-sm abt-spin-slow-reverse">✦</div>
                                 </div>
                             </div>
                         </div>
@@ -302,20 +295,20 @@ export default function About() {
                             <h2 className="text-3xl md:text-4xl font-black leading-tight mb-6">
                                 Built for <span className="bg-gradient-to-r from-[#4d6bff] to-[#8b5cf6] bg-clip-text text-transparent">Human + AI</span> Co-Creation
                             </h2>
-                            <p className="text-lg text-gray-400 mb-8">Most platforms treat AI as a feature. Mantram is built on a different foundation: <strong className="text-white">AI is a creative partner — not just a tool.</strong></p>
+                            <p className="text-lg text-[#acaab0] mb-8">Most platforms treat AI as a feature. Mantram is built on a different foundation: <strong className="text-white">AI is a creative partner — not just a tool.</strong></p>
                             <div className="space-y-4">
                                 {[
-                                    { icon: 'strategy', label: 'Human intent and strategy', color: '#4d6bff' },
-                                    { icon: 'manufacturing', label: 'AI-powered execution', color: '#8b5cf6' },
-                                    { icon: 'trending_up', label: 'Continuous learning and improvement', color: '#10b981' },
+                                    { icon: '🎯', label: 'Human intent and strategy', color: '#4d6bff' },
+                                    { icon: '⚙️', label: 'AI-powered execution', color: '#8b5cf6' },
+                                    { icon: '📈', label: 'Continuous learning and improvement', color: '#10b981' },
                                 ].map((item, i) => (
                                     <div key={i} className="flex items-center gap-4 p-4 rounded-xl bg-white/[0.02] border border-white/[0.05]">
-                                        <GlassIcon icon={item.icon} color={item.color} size="sm" />
+                                        <div className="w-10 h-10 rounded-lg flex items-center justify-center text-lg" style={{ background: `${item.color}15` }}>{item.icon}</div>
                                         <span className="text-gray-200 font-medium">{item.label}</span>
                                     </div>
                                 ))}
                             </div>
-                            <p className="mt-6 text-gray-400">You don't just generate content. You build a system that <strong className="text-white">gets better over time.</strong></p>
+                            <p className="mt-6 text-[#acaab0]">You don't just generate content. You build a system that <strong className="text-white">gets better over time.</strong></p>
                         </div>
                     </div>
                 </div>
@@ -332,17 +325,17 @@ export default function About() {
                             Not another tool.<br />
                             A <span className="text-[#06b6d4]">system</span>.
                         </h2>
-                        <p className="text-xl text-gray-400 max-w-2xl mx-auto leading-relaxed mb-12">
+                        <p className="text-xl text-[#acaab0] max-w-2xl mx-auto leading-relaxed mb-12">
                             Mantram was built as a response to years of real-world challenges: disconnected tools, repetitive workflows, inconsistent brand communication, and AI without context.
                         </p>
 
                         {/* Statement block */}
-                        <div className="relative p-10 rounded-3xl bg-gradient-to-br from-[#06b6d4]/5 to-[#4d6bff]/5 border border-[#06b6d4]/10 overflow-hidden">
+                        <div className="relative p-10 rounded-3xl bg-gradient-to-br from-[#06b6d4]/5 to-[#ff7a00]/5 border border-[#06b6d4]/10 overflow-hidden">
                             <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#06b6d4]/30 to-transparent" />
-                            <p className="text-lg text-gray-400 mb-4">The insight was simple:</p>
+                            <p className="text-lg text-[#acaab0] mb-4">The insight was simple:</p>
                             <p className="text-2xl md:text-3xl font-black leading-tight">
                                 Marketing doesn't need more tools.<br />
-                                It needs <span className="bg-gradient-to-r from-[#06b6d4] to-[#4d6bff] bg-clip-text text-transparent">a system</span>.
+                                It needs <span className="bg-gradient-to-r from-[#06b6d4] to-[#ff7a00] bg-clip-text text-transparent">a system</span>.
                             </p>
                             <p className="mt-6 text-2xl font-bold text-[#06b6d4]">Mantram is that system.</p>
                         </div>
@@ -357,31 +350,31 @@ export default function About() {
                 <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#090b16] to-transparent pointer-events-none" />
                 <div className="max-w-6xl mx-auto relative z-10">
                     <div className={`text-center mb-20 transition-all duration-1000 ${isVisible('team') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
-                        <span className="text-xs font-bold tracking-[0.3em] uppercase text-[#4d6bff] mb-4 block">Meet The Team</span>
+                        <span className="text-xs font-bold tracking-[0.3em] uppercase text-[#ff4d00] mb-4 block">Meet The Team</span>
                         <h2 className="text-3xl md:text-5xl font-black leading-tight mb-6">
                             Built by <span className="bg-gradient-to-r from-[#4d6bff] to-[#8b5cf6] bg-clip-text text-transparent">Founders</span> who know the game
                         </h2>
-                        <p className="text-lg text-gray-400 max-w-3xl mx-auto">
+                        <p className="text-lg text-[#acaab0] max-w-3xl mx-auto">
                             Mantram AI is built by founders who have spent years working at the intersection of branding, creativity, technology, and business execution.
                         </p>
                     </div>
 
                     {/* Experience banner */}
                     <div className={`mb-16 p-8 rounded-3xl bg-white/[0.02] border border-white/[0.05] transition-all duration-1000 delay-200 ${isVisible('team') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
-                        <h3 className="text-center text-sm font-bold tracking-[0.2em] uppercase text-gray-400 mb-6">A System Built from Experience</h3>
-                        <p className="text-center text-gray-400 max-w-2xl mx-auto mb-8">
+                        <h3 className="text-center text-sm font-bold tracking-[0.2em] uppercase text-[#acaab0] mb-6">A System Built from Experience</h3>
+                        <p className="text-center text-[#acaab0] max-w-2xl mx-auto mb-8">
                             With <strong className="text-white">18+ years</strong> of experience across creativity, filmmaking, advertising, and brand building, the founding team has worked with:
                         </p>
                         {/* Brand logos */}
                         <div className="flex flex-wrap justify-center gap-3 mb-6">
                             {brandLogos.map((b, i) => (
-                                <span key={i} className="px-4 py-2 rounded-full bg-white/[0.04] border border-white/[0.06] text-sm text-gray-300 font-medium hover:bg-white/[0.06] transition-colors">{b}</span>
+                                <span key={i} className="px-4 py-2 rounded-full bg-white/[0.04] border border-[#48474c]/30 text-sm text-gray-300 font-medium hover:bg-white/[0.06] transition-colors">{b}</span>
                             ))}
                         </div>
                         <p className="text-center text-gray-500 text-sm mb-4">And collaborated with organizations including:</p>
                         <div className="flex flex-wrap justify-center gap-2">
                             {orgPartners.map((o, i) => (
-                                <span key={i} className="px-3 py-1.5 rounded-lg bg-white/[0.02] border border-white/[0.04] text-xs text-gray-500 font-medium">{o}</span>
+                                <span key={i} className="px-3 py-1.5 rounded-lg bg-white/[0.02] border border-[#48474c]/20 text-xs text-gray-500 font-medium">{o}</span>
                             ))}
                         </div>
                         <p className="text-center text-gray-500 text-sm mt-4">Supported <strong className="text-gray-300">200+ SMBs</strong> and growing brands.</p>
@@ -406,42 +399,28 @@ export default function About() {
                                     <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#4d6bff] to-[#8b5cf6] flex items-center justify-center text-2xl font-black shrink-0">DA</div>
                                     <div>
                                         <h3 className="text-xl font-black">DA Sachin</h3>
-                                        <p className="text-[#4d6bff] text-sm font-semibold">Co-Founder & CEO</p>
+                                        <p className="text-[#ff4d00] text-sm font-semibold">Co-Founder & CEO</p>
                                     </div>
                                 </div>
 
-                                <p className="text-gray-400 text-sm leading-relaxed mb-5">
+                                <p className="text-[#acaab0] text-sm leading-relaxed mb-5">
                                     Leads the vision, product philosophy, and brand intelligence behind Mantram AI. With <strong className="text-gray-200">18+ years</strong> in creativity, filmmaking, advertising, and brand building.
                                 </p>
 
                                 <div className="flex flex-wrap gap-2 mb-5">
-                                    {[
-                                        { icon: 'palette', label: 'Human Creativity', color: '#ec4899' },
-                                        { icon: 'smart_toy', label: 'AI Intelligence', color: '#8b5cf6' },
-                                        { icon: 'show_chart', label: 'Business Impact', color: '#10b981' },
-                                    ].map((tag, i) => (
-                                        <span key={i} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold" style={{ background: `${tag.color}12`, border: `1px solid ${tag.color}20`, color: `${tag.color}` }}>
-                                            <span className="material-symbols-outlined text-xs">{tag.icon}</span>
-                                            {tag.label}
-                                        </span>
+                                    {['🎨 Human Creativity', '⚙️ AI Intelligence', '📈 Business Impact'].map((tag, i) => (
+                                        <span key={i} className="px-3 py-1.5 rounded-lg bg-[#4d6bff]/8 border border-[#4d6bff]/12 text-xs font-semibold text-[#93a8ff]">{tag}</span>
                                     ))}
                                 </div>
 
-                                <div className="space-y-2 text-sm text-gray-400 mb-5">
-                                    {[
-                                        { icon: 'design_services', text: 'Designed AI-powered marketing and content systems' },
-                                        { icon: 'hub', text: 'Built frameworks for brand consistency at scale' },
-                                        { icon: 'groups', text: 'Trained teams across marketing, strategy, design & leadership' },
-                                        { icon: 'school', text: 'Consulted organizations on AI adoption and workflow transformation' },
-                                    ].map((item, i) => (
-                                        <p key={i} className="flex items-start gap-2">
-                                            <span className="material-symbols-outlined text-sm mt-0.5" style={{ color: '#4d6bff' }}>{item.icon}</span>
-                                            {item.text}
-                                        </p>
-                                    ))}
+                                <div className="space-y-2 text-sm text-[#acaab0] mb-5">
+                                    <p>✦ Designed AI-powered marketing and content systems</p>
+                                    <p>✦ Built frameworks for brand consistency at scale</p>
+                                    <p>✦ Trained teams across marketing, strategy, design & leadership</p>
+                                    <p>✦ Consulted organizations on AI adoption and workflow transformation</p>
                                 </div>
 
-                                <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.04] mb-4">
+                                <div className="p-4 rounded-xl bg-white/[0.02] border border-[#48474c]/20 mb-4">
                                     <p className="text-xs text-gray-500 mb-2">Also known as</p>
                                     <div className="flex flex-wrap gap-2">
                                         <span className="text-xs px-2 py-1 rounded bg-[#8b5cf6]/10 text-[#a78bfa]">Author — Creativity DOT AI</span>
@@ -470,14 +449,14 @@ export default function About() {
                                     </div>
                                 </div>
 
-                                <p className="text-gray-400 text-sm leading-relaxed mb-5">
+                                <p className="text-[#acaab0] text-sm leading-relaxed mb-5">
                                     Leads the technology, architecture, and engineering vision behind Mantram AI. A seasoned full-stack developer and tech entrepreneur with <strong className="text-gray-200">5+ years</strong> of experience building scalable, production-grade applications.
                                 </p>
 
-                                <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.04] mb-5">
+                                <div className="p-4 rounded-xl bg-white/[0.02] border border-[#48474c]/20 mb-5">
                                     <div className="flex items-center gap-2 mb-3">
                                         <span className="text-2xl font-black text-[#10b981]">110+</span>
-                                        <span className="text-sm text-gray-400">Projects delivered</span>
+                                        <span className="text-sm text-[#acaab0]">Projects delivered</span>
                                     </div>
                                     <div className="flex flex-wrap gap-2">
                                         {['Healthcare', 'Travel', 'Real Estate', 'Automotive', 'Enterprise'].map((d, i) => (
@@ -486,18 +465,11 @@ export default function About() {
                                     </div>
                                 </div>
 
-                                <div className="space-y-2 text-sm text-gray-400 mb-5">
-                                    {[
-                                        { icon: 'database', text: 'Backend architecture and APIs' },
-                                        { icon: 'cloud', text: 'Cloud infrastructure (AWS, GCP)' },
-                                        { icon: 'model_training', text: 'AI/ML integrations' },
-                                        { icon: 'devices', text: 'Cross-platform development' },
-                                    ].map((item, i) => (
-                                        <p key={i} className="flex items-start gap-2">
-                                            <span className="material-symbols-outlined text-sm mt-0.5" style={{ color: '#10b981' }}>{item.icon}</span>
-                                            {item.text}
-                                        </p>
-                                    ))}
+                                <div className="space-y-2 text-sm text-[#acaab0] mb-5">
+                                    <p>✦ Backend architecture and APIs</p>
+                                    <p>✦ Cloud infrastructure (AWS, GCP)</p>
+                                    <p>✦ AI/ML integrations</p>
+                                    <p>✦ Cross-platform development</p>
                                 </div>
 
                                 <div className="p-4 rounded-xl bg-gradient-to-r from-[#10b981]/6 to-[#06b6d4]/6 border border-[#10b981]/10">
@@ -509,7 +481,7 @@ export default function About() {
 
                     {/* Team philosophy */}
                     <div className={`mt-12 text-center transition-all duration-1000 delay-600 ${isVisible('team') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
-                        <p className="text-gray-400 text-lg max-w-2xl mx-auto">
+                        <p className="text-[#acaab0] text-lg max-w-2xl mx-auto">
                             Built by founders who have <strong className="text-white">worked inside the chaos of modern marketing</strong>, understood where systems fail, and designed a platform to fix it.
                         </p>
                     </div>
@@ -527,7 +499,7 @@ export default function About() {
                             More than a product.<br />
                             <span className="bg-gradient-to-r from-[#4d6bff] via-[#8b5cf6] to-[#ec4899] bg-clip-text text-transparent">The operating system</span> for modern brands.
                         </h2>
-                        <p className="text-xl text-gray-400 max-w-2xl mx-auto mb-14 leading-relaxed">
+                        <p className="text-xl text-[#acaab0] max-w-2xl mx-auto mb-14 leading-relaxed">
                             Where every action, every creation, and every decision is powered by intelligence.
                         </p>
                     </div>
@@ -535,13 +507,13 @@ export default function About() {
                     {/* Vision pillars */}
                     <div className={`grid grid-cols-2 md:grid-cols-4 gap-4 mb-16 transition-all duration-1000 delay-200 ${isVisible('future') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
                         {[
-                            { icon: 'genetics', label: 'Understands your brand', color: '#4d6bff' },
-                            { icon: 'brush', label: 'Creates with you', color: '#8b5cf6' },
-                            { icon: 'model_training', label: 'Learns from you', color: '#10b981' },
-                            { icon: 'stacked_line_chart', label: 'Scales with you', color: '#ec4899' },
+                            { icon: '🧬', label: 'Understands your brand', color: '#4d6bff' },
+                            { icon: '🎨', label: 'Creates with you', color: '#8b5cf6' },
+                            { icon: '📚', label: 'Learns from you', color: '#10b981' },
+                            { icon: '📈', label: 'Scales with you', color: '#ec4899' },
                         ].map((v, i) => (
                             <div key={i} className="p-6 rounded-2xl bg-white/[0.02] border border-white/[0.05] group hover:scale-105 transition-all duration-500" style={{ transitionDelay: `${i * 100}ms` }}>
-                                <GlassIcon icon={v.icon} color={v.color} size="md" className="mx-auto mb-4 group-hover:scale-110 transition-transform" />
+                                <div className="text-3xl mb-3 group-hover:scale-110 transition-transform">{v.icon}</div>
                                 <p className="text-sm font-semibold" style={{ color: v.color }}>{v.label}</p>
                             </div>
                         ))}
@@ -565,12 +537,12 @@ export default function About() {
                                 </p>
 
                                 <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center">
-                                    <Link to="/auth" className="inline-flex items-center gap-2 px-8 py-4 text-sm font-bold rounded-full bg-gradient-to-r from-[#2b4bee] to-[#4d6bff] hover:shadow-xl hover:shadow-[#2b4bee]/30 transition-all hover:-translate-y-1">
-                                        <span className="material-symbols-outlined text-lg">rocket_launch</span>
+                                    <Link to="/auth" className="inline-flex items-center gap-2 px-8 py-4 text-sm font-bold rounded-full bg-gradient-to-r from-[#ff4d00] to-[#ff7a00] hover:shadow-xl hover:shadow-[#2b4bee]/30 transition-all hover:-translate-y-1">
+                                        <span className="material-symbols-rounded text-lg">rocket_launch</span>
                                         Start Building
                                     </Link>
                                     <Link to="/" className="inline-flex items-center gap-2 px-8 py-4 text-sm font-bold rounded-full bg-white/[0.04] border border-white/[0.08] hover:bg-white/[0.08] transition-all hover:-translate-y-1">
-                                        <span className="material-symbols-outlined text-lg">play_circle</span>
+                                        <span className="material-symbols-rounded text-lg">play_circle</span>
                                         Explore Studios
                                     </Link>
                                 </div>
@@ -583,11 +555,11 @@ export default function About() {
             {/* ══════════════════════════════════════════════════════════ */}
             {/*  FOOTER                                                   */}
             {/* ══════════════════════════════════════════════════════════ */}
-            <footer className="border-t border-white/[0.04] py-12 px-6">
+            <footer className="border-t border-[#48474c]/20 py-12 px-6">
                 <div className="max-w-5xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
                     <div className="flex items-center gap-3">
                         <img src="/mantram-logo.png" alt="Mantram AI" className="h-6 w-6" onError={(e) => e.target.style.display = 'none'} />
-                        <span className="text-sm font-bold">Mantram <span className="text-[#4d6bff]">AI</span></span>
+                        <span className="text-sm font-bold">Mantram <span className="text-[#ff4d00]">AI</span></span>
                     </div>
                     <div className="flex gap-6 text-sm text-gray-500">
                         <Link to="/" className="hover:text-white transition-colors">Home</Link>
