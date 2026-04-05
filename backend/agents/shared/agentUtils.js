@@ -12,6 +12,11 @@ import Brand from '../../models/Brand.js';
 import Product from '../../models/Product.js';
 import { getRouter } from '../../ai/router.js';
 import { resolveTargetMarkets, getMarketContext, getRelevantFestivals } from '../../utils/globalCalendar.js';
+import redis from '../../utils/redisClient.js';
+
+// Brand context cache TTL — 5 minutes (300s)
+// Invalidated instantly on any brand update via redis.del() in brands.js
+const BRAND_CACHE_TTL = 300;
 
 /**
  * Call AI via router (auto-selects cheapest provider) and parse JSON response
@@ -147,10 +152,28 @@ export async function callAgentText(systemPrompt, userPrompt, temperature = 0.7,
 
 /**
  * Load brand + products + build context strings
+ * ⚡ Redis-first: Results cached for 5 minutes per brandId.
+ *    Cache invalidated on any brand update (brands.js routes call redis.del).
+ *    Falls back to MongoDB if Redis is unavailable — never throws.
  */
 export async function loadBrandContext(brandId) {
     if (!brandId) return { brand: null, brandContext: '<brand_bible>No brand data. Use professional style.</brand_bible>', styleMemory: '' };
 
+    // ── Try Redis cache first ──────────────────────────────────────────────
+    const cacheKey = `brand:${brandId}:context`;
+    try {
+        const cached = await redis.get(cacheKey);
+        if (cached) {
+            console.log(`⚡ Brand context cache HIT for ${brandId}`);
+            return JSON.parse(cached);
+        }
+    } catch (cacheErr) {
+        // Redis unavailable — continue to DB fetch
+        console.warn(`⚠️ Brand cache read failed: ${cacheErr.message}`);
+    }
+
+    // ── Cache MISS — load from MongoDB ────────────────────────────────────
+    console.log(`🗄️  Brand context cache MISS — loading from DB for ${brandId}`);
     const brand = await Brand.findById(brandId).lean();
 
     // Also load active products for this brand (up to 20)
@@ -165,7 +188,17 @@ export async function loadBrandContext(brandId) {
     }
 
     const brandContext = buildBrandContext(brand, products);
-    return { brand, brandContext, products };
+    const result = { brand, brandContext, products };
+
+    // ── Store in Redis for next call ───────────────────────────────────────
+    try {
+        await redis.setex(cacheKey, BRAND_CACHE_TTL, JSON.stringify(result));
+    } catch (cacheErr) {
+        // Non-fatal — system works without cache
+        console.warn(`⚠️ Brand cache write failed: ${cacheErr.message}`);
+    }
+
+    return result;
 }
 
 /**

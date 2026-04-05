@@ -11,7 +11,7 @@ import AdLearning from '../../models/AdLearning.js';
 import Integration from '../../models/Integration.js';
 import Product from '../../models/Product.js';
 import { getRouter } from '../../ai/router.js';
-import { callMultimodalAgent } from '../shared/agentUtils.js';
+import { callMultimodalAgent, loadBrandContext } from '../shared/agentUtils.js';
 import {
     COMPETITOR_RESEARCH_PROMPT,
     STRATEGY_PROMPT,
@@ -41,54 +41,6 @@ function buildBrandCtx(brand) {
         brand.competitors?.length ? `KNOWN COMPETITORS: ${brand.competitors.join(', ')}` : '',
         brand.website ? `WEBSITE: ${brand.website}` : '',
     ].filter(Boolean).join('\n');
-}
-
-// ── Helper: Call AI via router (cheapest provider) and parse JSON response ──
-async function callAgent(systemPrompt, userPrompt, temperature = 0.7) {
-    const router = getRouter();
-    const result = await router.generateText({
-        systemPrompt,
-        userPrompt,
-        temperature,
-        maxTokens: 8192,
-    }); // Router auto-selects cheapest provider
-
-    const text = result.text || '';
-    try {
-        let cleaned = text;
-        // Strip <think>...</think> tags (Gemini 2.5 Flash reasoning)
-        cleaned = cleaned.replace(/<think>[\s\S]*?<\/think>/gi, '');
-        const lastThinkIdx = cleaned.lastIndexOf('<think>');
-        if (lastThinkIdx !== -1) {
-            const before = cleaned.substring(0, lastThinkIdx).trim();
-            cleaned = before.length > 0 ? before : '';
-        }
-        // Strip markdown code fences
-        cleaned = cleaned.replace(/```(?:json)?\s*\n?/gi, '');
-        cleaned = cleaned.trim();
-        
-        if (cleaned.startsWith('{')) {
-            try { return JSON.parse(cleaned); } catch (_) { /* try next */ }
-        }
-        const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-            try { return JSON.parse(jsonMatch[0]); } catch (_) { /* try next */ }
-            const fixed = jsonMatch[0].replace(/,\s*([\]}])/g, '$1').replace(/([{,]\s*)(\w+)\s*:/g, '$1"$2":');
-            try { return JSON.parse(fixed); } catch (_) { /* give up */ }
-        }
-    } catch (e) {
-        console.warn('PM Agent JSON parse failed, raw:', text.substring(0, 300));
-    }
-
-    return { error: 'Failed to parse agent response', raw: text.substring(0, 500) };
-}
-
-// ── Helper: Load brand context ──
-async function loadBrandContext(brandId) {
-    if (!brandId) return { brandContext: '' };
-    const brand = await Brand.findById(brandId).lean();
-    const brandContext = buildBrandCtx(brand);
-    return { brand, brandContext };
 }
 
 // ══════════════════════════════════════════════════════════════════════════════

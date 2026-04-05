@@ -12,6 +12,22 @@ import { getOrchestrator } from '../agents/orchestrator.js';
 import { safeErrorMessage } from '../utils/safeError.js';
 import { mirrorBrandAssets } from '../services/assetMirror.js';
 import { uploadToS3, mirrorUrlToS3 } from '../utils/s3.js';
+import redis from '../utils/redisClient.js';
+
+/**
+ * Invalidate the Redis brand context cache for a given brand ID.
+ * Called after any brand update so the next generation gets fresh data.
+ * Non-blocking — never throws.
+ */
+async function invalidateBrandCache(brandId) {
+    if (!brandId) return;
+    try {
+        await redis.del(`brand:${brandId}:context`, `trending:${brandId}`);
+        console.log(`🗑️  Brand cache invalidated for ${brandId}`);
+    } catch (err) {
+        console.warn(`⚠️ Brand cache invalidation failed: ${err.message}`);
+    }
+}
 
 
 const router = Router();
@@ -168,6 +184,8 @@ router.put('/:id', protect, async (req, res) => {
         }
 
         res.json({ success: true, brand });
+        // Invalidate cache after response — non-blocking
+        invalidateBrandCache(req.params.id);
 
     } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
@@ -226,11 +244,11 @@ router.put('/:id/dna', protect, async (req, res) => {
         });
 
         res.json({ success: true, brand });
+        invalidateBrandCache(req.params.id);
     } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
-
 // ═══════════════════════════════════════════════════════════════
 // PUT /api/brands/:id/knowledge — dedicated knowledge update endpoint
 // Supports updating any combination of knowledge fields with full audit trail
@@ -287,6 +305,7 @@ router.put('/:id/knowledge', protect, async (req, res) => {
         });
 
         res.json({ success: true, brand });
+        invalidateBrandCache(req.params.id);
     } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
@@ -374,6 +393,7 @@ router.put('/:id/autonomy', protect, async (req, res) => {
         );
         if (!brand) return res.status(404).json({ success: false, error: 'Brand not found' });
         res.json({ success: true, brand });
+        invalidateBrandCache(req.params.id);
     } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
@@ -560,6 +580,7 @@ router.put('/:id/status', protect, requireBrandOwner, async (req, res) => {
         });
 
         res.json({ success: true, brand });
+        invalidateBrandCache(req.params.id);
     } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }

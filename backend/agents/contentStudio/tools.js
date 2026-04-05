@@ -17,6 +17,12 @@ import Content from '../../models/Content.js';
 import Brand from '../../models/Brand.js';
 import Feedback from '../../models/Feedback.js';
 import { mineAutocomplete } from '../../utils/autocomplete.js';
+import redis from '../../utils/redisClient.js';
+import crypto from 'crypto';
+
+// Cache TTLs
+const SEARCH_CACHE_TTL = 1200;   // 20 minutes — quick search results
+const TRENDING_CACHE_TTL = 1200; // 20 minutes — trending per brand
 
 // ══════════════════════════════════════════════════════════════════════════════
 // TOOL 1: WEB SEARCH — Dual-tier (Quick = Grok, Deep = Perplexity + Gemini)
@@ -25,11 +31,31 @@ export async function webSearch(query, mode = 'quick') {
     console.log(`🌐 Content Tool: webSearch (${mode}) — "${query.substring(0, 60)}..."`);
 
     if (mode === 'deep') {
-        // Premium: Perplexity Sonar (grounded web search with citations)
+        // Deep search: always fresh (blog SEO needs real-time Perplexity, never cached)
         return await deepSearch(query);
     }
-    // Default: Grok (fast, cheap, real-time from X/Twitter + web)
-    return await quickSearch(query);
+
+    // Quick search: check Redis cache first (20 min TTL)
+    const queryHash = crypto.createHash('sha256').update(query.trim().toLowerCase()).digest('hex').substring(0, 16);
+    const cacheKey = `search:quick:${queryHash}`;
+    try {
+        const cached = await redis.get(cacheKey);
+        if (cached) {
+            console.log(`⚡ Search cache HIT for query hash ${queryHash}`);
+            return JSON.parse(cached);
+        }
+    } catch (_) { /* non-fatal */ }
+
+    const result = await quickSearch(query);
+
+    // Cache successful results
+    if (result.success) {
+        try {
+            await redis.setex(cacheKey, SEARCH_CACHE_TTL, JSON.stringify(result));
+        } catch (_) { /* non-fatal */ }
+    }
+
+    return result;
 }
 
 async function quickSearch(query) {
@@ -264,6 +290,18 @@ export async function fetchContentHistory(brandId, platform = '', limit = 15) {
 export async function fetchTrending(brandId) {
     console.log(`📈 Content Tool: fetchTrending — real-time trend scan`);
 
+    // Check cache first — trending data is stable for 20 minutes
+    if (brandId) {
+        const cacheKey = `trending:${brandId}`;
+        try {
+            const cached = await redis.get(cacheKey);
+            if (cached) {
+                console.log(`⚡ Trending cache HIT for brand ${brandId}`);
+                return JSON.parse(cached);
+            }
+        } catch (_) { /* non-fatal */ }
+    }
+
     try {
         const brand = brandId ? await Brand.findById(brandId).lean() : null;
         if (!brand) return { success: false, data: null, reason: 'No brand found' };
@@ -300,12 +338,12 @@ Return JSON:
                         max_tokens: 1500,
                         response_format: { type: 'json_object' },
                     }),
-                    signal: AbortSignal.timeout(8000), // ⚡ was 12s
+                    signal: AbortSignal.timeout(8000),
                 });
                 const data = await resp.json();
                 let text = data.choices?.[0]?.message?.content || '{}';
                 text = text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
-                const jsonMatch = text.match(/\{[\s\S]*\}/);
+                const jsonMatch = text.match(/{[\s\S]*}/);
                 return JSON.parse(jsonMatch ? jsonMatch[0] : text);
             })() : Promise.resolve({}),
             mineAutocomplete(brand.name, industry, dna.targetAudience || '', country).catch(() => ({})),
@@ -324,7 +362,7 @@ Return JSON:
             });
         }
 
-        return {
+        const result = {
             success: true,
             data: {
                 trending: (scoutData.trending || []).slice(0, 8),
@@ -334,6 +372,15 @@ Return JSON:
             },
             source: 'GrokScout+Autocomplete'
         };
+
+        // Cache the result
+        if (brandId) {
+            try {
+                await redis.setex(`trending:${brandId}`, TRENDING_CACHE_TTL, JSON.stringify(result));
+            } catch (_) { /* non-fatal */ }
+        }
+
+        return result;
     } catch (err) {
         console.warn('fetchTrending error:', err.message);
         return { success: false, data: null, error: err.message };
