@@ -208,6 +208,15 @@ export async function internalGenerateCreative({ body, user, creditsDeducted, jo
 
 // POST /api/creatives/ — Create a new generation job (Queue-based)
 router.post('/', protect, requireCredits('creative'), async (req, res) => {
+    return createCreativeJob(req, res);
+});
+
+// POST /api/creatives/jobs — Explicit job creation endpoint (matches frontend)
+router.post('/jobs', protect, requireCredits('creative'), async (req, res) => {
+    return createCreativeJob(req, res);
+});
+
+async function createCreativeJob(req, res) {
     try {
         const { brandId, type, prompt, options } = req.body;
         const jobId = randomUUID();
@@ -232,7 +241,7 @@ router.post('/', protect, requireCredits('creative'), async (req, res) => {
             userId: req.user._id,
             payload: { brandId, type, prompt, options, creditsDeducted: req.creditsDeducted || 0 }
         }, {
-            jobId, // Use the same jobId as the custom jobId for Bull's own tracking
+            jobId, 
             attempts: 3,
             backoff: { type: 'exponential', delay: 10000 },
             removeOnComplete: true,
@@ -247,7 +256,7 @@ router.post('/', protect, requireCredits('creative'), async (req, res) => {
         }
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
-});
+}
 
 // ── GET /api/creatives/jobs — List recent jobs for the current user ────────────
 // Used on page load to reconnect to any in-progress or completed jobs.

@@ -240,10 +240,12 @@ export async function brandIntelligenceNode(state) {
         designRules: dna.visualDNA?.designRules || [],
         designAvoid: dna.visualDNA?.designAvoid || [],
 
-        // Colors — described by name only, NEVER hex codes
+        // Colors — passed as names or HEX codes for visual grounding
         colors: (dna.colors || []).slice(0, 5).map(c => {
             const name = c.name || '';
+            // If name is descriptive, use it. If not, use hex.
             if (name && !/^#|rgb|color/i.test(name)) return name.toLowerCase();
+            if (c.hex) return c.hex;
             return 'brand accent';
         }).filter((v, i, a) => a.indexOf(v) === i),
 
@@ -577,7 +579,7 @@ export async function promptEngineerNode(state) {
         `Brand Identity: ${intel.overview || ''}`,
         `Personality: ${intel.personality || ''}`,
         `Aesthetic Direction: ${intel.designStyle || ''}, ${intel.imageMood || ''}`,
-        intel.colors?.length > 0 ? `Brand Color Palette (VISUAL ONLY): Use ${intel.colors.join(', ')} prominently. Describe these as light, atmospheric colors and surface materials. NEVER render color names as text.` : '',
+        intel.colors?.length > 0 ? `CRITICAL BRAND COLORS: Use ${intel.colors.join(', ')} as the primary lighting and atmospheric hues. These colors MUST dominate the scene surfaces and environment. NEVER render names as text.` : '',
         '',
         `--- ART DIRECTION TO EXECUTE ---`,
         `Creative Direction: ${state.artDirection?.creativeDirection || ''}`,
