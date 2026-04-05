@@ -42,8 +42,8 @@ export const PROVIDER_PRICING = {
         provider: 'Anthropic', icon: '🟠',
         models: {
             'Claude Opus 4.6': {
-                name: 'Claude Sonnet 4', type: 'text',
-                inputPer1M: 3.00, outputPer1M: 15.00, unit: 'USD/1M tokens',
+                name: 'Claude Opus 4.6', type: 'text',
+                inputPer1M: 15.00, outputPer1M: 75.00, unit: 'USD/1M tokens',
                 pricingUrl: 'https://docs.anthropic.com/en/docs/about-claude/pricing',
             },
         },
@@ -51,13 +51,13 @@ export const PROVIDER_PRICING = {
     'gemini': {
         provider: 'Google Gemini', icon: '🔵',
         models: {
-            'gemini-2.5-flash': {
-                name: 'Gemini 2.5 Flash', type: 'text',
+            'gemini-2.0-flash': {
+                name: 'Gemini 2.0 Flash', type: 'text',
                 inputPer1M: 0.15, outputPer1M: 0.60, unit: 'USD/1M tokens',
                 pricingUrl: 'https://ai.google.dev/pricing',
             },
-            'gemini-2.5-pro': {
-                name: 'Gemini 2.5 Pro', type: 'text',
+            'gemini-2.0-pro': {
+                name: 'Gemini 2.0 Pro', type: 'text',
                 inputPer1M: 1.25, outputPer1M: 5.00, unit: 'USD/1M tokens',
                 pricingUrl: 'https://ai.google.dev/pricing',
             },
@@ -332,7 +332,7 @@ async function extractPricingFromWeb(url, modelsList, providerName) {
         const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
         
         const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
+            model: 'gemini-1.5-flash',
             contents: `You are an automated pricing extractor for Mantram AI. Extract the current pricing for these models:\n\n${modelsList.map(m => `- ${m.name}`).join('\n')}\n\nHere is the pricing page text from ${providerName}:\n\n${textContent}`,
             config: {
                 temperature: 0,
@@ -362,7 +362,8 @@ async function extractPricingFromWeb(url, modelsList, providerName) {
             }
         });
 
-        const textResponse = response.text();
+        const result = await response.response;
+        const textResponse = result.text();
         let cleanJson = textResponse.trim();
         
         // Remove Markdown wrapping if present

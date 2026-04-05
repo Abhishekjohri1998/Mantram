@@ -325,7 +325,7 @@ router.get('/jobs', protect, async (req, res) => {
         )
             .sort({ createdAt: -1 })
             .limit(20)
-            .setOptions({ allowDiskUse: true })
+            .allowDiskUse(true)
             .lean();
         res.json({ success: true, jobs });
     } catch (error) {

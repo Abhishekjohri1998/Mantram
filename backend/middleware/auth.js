@@ -58,8 +58,11 @@ export const protect = async (req, res, next) => {
             return res.status(401).json({ success: false, error: 'Shopify store not connected. Please install the app first.' });
         }
     } catch (shopifyErr) {
-        if (shopifyErr.message !== 'jwt malformed') {
+        if (shopifyErr.message !== 'jwt malformed' && shopifyErr.message !== 'invalid signature') {
             console.error(`❌ [AUTH] Token verification failed (Standard & Shopify): ${shopifyErr.message}`);
+        } else if (shopifyErr.message === 'invalid signature') {
+            // Log as warning — common when sessions expire or JWT_SECRET changes
+            console.warn(`⚠️ [AUTH] Invalid token signature recorded (User might need to re-login)`);
         }
         return res.status(401).json({ success: false, error: 'Token invalid or expired' });
     }
