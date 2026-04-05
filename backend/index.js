@@ -8,7 +8,8 @@ import mongoose from 'mongoose';
 import authRoutes from './routes/auth.js';
 import brandRoutes from './routes/brands.js';
 import contentRoutes from './routes/content.js';
-import creativeRoutes from './routes/creatives.js';
+import creativeRoutes, { internalGenerateCreative } from './routes/creatives.js';
+import { initCreativeWorker } from './utils/creativeQueue.js';
 import adminRoutes from './routes/admin.js';
 import agentRoutes from './routes/agents.js';
 import shopifyRoutes from './routes/shopify.js';
@@ -163,7 +164,8 @@ const server = app.listen(config.port, '0.0.0.0', () => {
 
 // ── DEFERRED INITIALIZATION (WAIT FOR DB) ─────────────────────
 connectDB().then(() => {
-    console.log('✅ Database connected — Initializing background agents');
+    // Initialize Image Generation Worker (Bull + Redis)
+    initCreativeWorker(internalGenerateCreative);
 
     // Start follow-up scheduler (every 4 hours — Meta Compliance)
     import('./services/autonomousAgent.js').then(({ runFollowUpCheck }) => {

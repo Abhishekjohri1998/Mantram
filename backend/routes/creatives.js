@@ -23,6 +23,9 @@ import { runCreativePipeline, postGenerationCriticNode } from '../agents/creativ
 import { startProgress, addStep, getProgress, endProgress } from '../utils/progressStore.js';
 import { laozhangImageGenerate, laozhangMultimodalImageGenerate, isLaozhangAvailable } from '../agents/videoStudio/laozhangClient.js';
 
+
+import { creativeQueue } from '../utils/creativeQueue.js';
+
 const router = Router();
 
 // In-memory job tracker for carousel async pipeline
@@ -35,7 +38,7 @@ setInterval(() => {
     }
 }, 2 * 60 * 1000);
 
-async function internalGenerateCreative({ body, user, creditsDeducted, jobId, progressId }) {
+export async function internalGenerateCreative({ body, user, creditsDeducted, jobId, progressId }) {
     try {
         const { brandId, type, prompt, options } = body;
         
@@ -203,110 +206,38 @@ async function internalGenerateCreative({ body, user, creditsDeducted, jobId, pr
 
 // ══════════════════════════════════════════════════════════════════════════════
 
-/**
- * runCreativeJobAsync — fires the creative pipeline detached from the HTTP request.
- * Makes an internal server-side fetch to the existing /generate endpoint so all
- * pipeline logic (agents, MCoT, logo overlay, S3, etc.) is fully reused.
- */
-async function runCreativeJobAsync(jobId, userId, payload) {
-    try {
-        await GenerationJob.findOneAndUpdate(
-            { jobId },
-            { status: 'processing', startedAt: new Date() }
-        );
-
-        const { brandId, type, prompt, options, creditsDeducted } = payload;
-        
-        // Find the user object needed for internalGenerateCreative
-        const user = await mongoose.model('User').findById(userId);
-        if (!user) throw new Error('User not found for background job');
-
-        // Call the internal generation logic directly (bypassing HTTP overhead)
-        const data = await internalGenerateCreative({
-            body: { brandId, type, prompt, options, jobId },
-            user,
-            creditsDeducted: creditsDeducted || 0,
-            jobId
-        });
-
-        if (data?.success && data?.creative) {
-            await GenerationJob.findOneAndUpdate(
-                { jobId },
-                {
-                    status: 'completed',
-                    completedAt: new Date(),
-                    creativeId: data.creative._id,
-                    imageUrl: data.creative.imageUrl || data.creative.thumbnailUrl,
-                    result: {
-                        creative: data.creative,
-                        warnings: data.warnings || [],
-                    },
-                }
-            );
-            console.log(`✅ JOB ${jobId}: completed — creative ${data.creative._id}`);
-        } else {
-            const errMsg = data?.error || 'Pipeline returned no creative';
-            await GenerationJob.findOneAndUpdate(
-                { jobId },
-                { status: 'failed', completedAt: new Date(), errorMessage: errMsg }
-            );
-            if (creditsDeducted > 0) {
-                await refundCredits(userId, creditsDeducted, 'creative',
-                    `Refund: Background Job ${jobId} Failed — ${errMsg}`, 'creative');
-            }
-            console.warn(`❌ JOB ${jobId}: failed — ${errMsg}`);
-        }
-    } catch (err) {
-        console.error(`❌ JOB ${jobId}: exception — ${err.message}`);
-        try {
-            await GenerationJob.findOneAndUpdate(
-                { jobId },
-                { status: 'failed', completedAt: new Date(), errorMessage: err.message }
-            );
-            if (payload.creditsDeducted > 0) {
-                await refundCredits(userId, payload.creditsDeducted, 'creative',
-                    `Refund: Background Job ${jobId} Exception`, 'creative');
-            }
-        } catch (updateErr) {
-            console.error(`Failed to update job ${jobId} on error:`, updateErr.message);
-        }
-    }
-}
-
-// ── POST /api/creatives/jobs — Create a background generation job ──────────────
-// Returns jobId in ~50ms. Pipeline runs async. Frontend polls for result.
-router.post('/jobs', protect, requireStudio('creativeStudio'), requireCredits('creative'), async (req, res) => {
+// POST /api/creatives/ — Create a new generation job (Queue-based)
+router.post('/', protect, requireCredits('creative'), async (req, res) => {
     try {
         const { brandId, type, prompt, options } = req.body;
-        if (!brandId || !prompt) {
-            return res.status(400).json({ success: false, error: 'brandId and prompt are required' });
-        }
-
         const jobId = randomUUID();
 
+        // Create the job record early so the user can see it in /jobs immediately
         await GenerationJob.create({
             jobId,
             user: req.user._id,
-            brand: brandId,
-            type: 'ai-create',
             status: 'pending',
+            type: type || 'instagram-post',
             prompt,
-            format: type,
-            options,
             creditsDeducted: req.creditsDeducted || 0,
+            options: options || {}
         });
 
-        // Return immediately — pipeline fires in background
-        res.json({ success: true, jobId, message: 'Generation queued. You can navigate freely.' });
+        // Return immediately — job added to queue
+        res.json({ success: true, jobId, message: 'Generation queued. Processing will begin shortly.' });
 
-        // Extract auth token from the original request to pass to the internal fetch
-        const authToken = (req.headers.authorization || '').replace('Bearer ', '');
-
-        // Fire and forget — completely detached from HTTP response
-        runCreativeJobAsync(jobId, req.user._id, {
-            brandId, type, prompt, options,
-            creditsDeducted: req.creditsDeducted || 0,
-        }, authToken).catch(err => console.error(`Background job ${jobId} unhandled error:`, err.message));
+        // Add to Bull queue for reliable processing & automatic retries
+        creativeQueue.add({
+            jobId,
+            userId: req.user._id,
+            payload: { brandId, type, prompt, options, creditsDeducted: req.creditsDeducted || 0 }
+        }, {
+            jobId, // Use the same jobId as the custom jobId for Bull's own tracking
+            attempts: 3,
+            backoff: { type: 'exponential', delay: 10000 },
+            removeOnComplete: true,
+            removeOnFail: false
+        }).catch(err => console.error(`🚨 Failed to add job ${jobId} to creativeQueue:`, err.message));
 
     } catch (error) {
         console.error('Create job error:', error.message);
