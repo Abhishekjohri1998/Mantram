@@ -9,11 +9,11 @@ import PublishModal from '../components/PublishModal'
 import { getEventsForMonth, getUpcomingEvents, EVENT_COLORS, COUNTRIES } from '../data/calendarData'
 
 const PLATFORMS = [
-    { id: 'instagram', label: 'Instagram', icon: '📸', color: '#E1306C', gradient: 'from-[#FF4D00] to-[#FF7A00]' },
-    { id: 'facebook', label: 'Facebook', icon: '📘', color: '#1877F2', gradient: 'from-[#FF4D00] to-[#FF7A00]' },
-    { id: 'linkedin', label: 'LinkedIn', icon: '💼', color: '#0A66C2', gradient: 'from-sky-500 to-[#FF7A00]' },
-    { id: 'twitter', label: 'Twitter / X', icon: '🐦', color: '#1DA1F2', gradient: 'from-slate-400 to-slate-600' },
-    { id: 'youtube', label: 'YouTube', icon: 'movie', color: '#FF0000', gradient: 'from-red-500 to-red-700' },
+    { id: 'instagram', label: 'Instagram', icon: 'photo_camera', color: '#E1306C', gradient: 'from-[#FF4D00] to-[#FF7A00]' },
+    { id: 'facebook', label: 'Facebook', icon: 'thumb_up', color: '#1877F2', gradient: 'from-[#FF4D00] to-[#FF7A00]' },
+    { id: 'linkedin', label: 'LinkedIn', icon: 'work', color: '#0A66C2', gradient: 'from-sky-500 to-[#FF7A00]' },
+    { id: 'twitter', label: 'Twitter / X', icon: 'tag', color: '#1DA1F2', gradient: 'from-slate-400 to-slate-600' },
+    { id: 'youtube', label: 'YouTube', icon: 'smart_display', color: '#FF0000', gradient: 'from-red-500 to-red-700' },
 ]
 
 const TABS = [
@@ -320,7 +320,7 @@ export default function SocialMediaStudio() {
                     <button key={p.id} onClick={() => togglePlatform(p.id)}
                         className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer border ${selectedPlatforms.includes(p.id) ? 'bg-white/[0.08] border-white/20 text-white shadow-lg' : 'bg-white/[0.02] border-white/[0.06] text-slate-400 hover:bg-white/[0.04]'}`}
                         style={selectedPlatforms.includes(p.id) ? { borderColor: p.color + '60', boxShadow: `0 0 20px ${p.color}15` } : {}}>
-                        <span className="text-lg">{p.icon}</span> {p.label}
+                        <span className="material-symbols-outlined text-base">{p.icon}</span> {p.label}
                         {Array.isArray(connectedAccounts) && connectedAccounts.some(a => a.platform === p.id) && <span className="w-2 h-2 rounded-full bg-emerald-400" title="Connected" />}
                     </button>
                 ))}
@@ -332,16 +332,18 @@ export default function SocialMediaStudio() {
             <SEOHead title="Social Media Studio — Mantram AI" noIndex={true} />
             <style>{`@keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}.shimmer-loading{background:linear-gradient(90deg,rgba(255,255,255,0.02) 25%,rgba(255,255,255,0.06) 50%,rgba(255,255,255,0.02) 75%);background-size:200% 100%;animation:shimmer 1.5s infinite}@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}`}</style>
 
-            {/* TAB BAR */}
-            <div className="flex gap-1 p-1.5 rounded-2xl bg-white/[0.02] border border-white/[0.06] mb-6 overflow-x-auto">
-                {TABS.map(t => (
-                    <button key={t.id} onClick={() => { setTab(t.id); setError(null) }}
-                        className={`flex-1 flex items-center justify-center gap-2 py-3 px-3 rounded-xl text-sm font-medium transition-all whitespace-nowrap cursor-pointer ${tab === t.id ? 'bg-gradient-to-r from-primary/15 to-[#FF7A00]/15 text-white border border-primary/30' : 'text-slate-500 hover:text-slate-300 hover:bg-white/[0.03]'}`}>
-                        <span className="material-symbols-outlined text-base">{t.icon}</span>
-                        <span className="hidden md:inline">{t.label}</span>
-                        {t.id === 'accounts' && connectedAccounts.length > 0 && <span className="w-2 h-2 rounded-full bg-emerald-400" />}
-                    </button>
-                ))}
+            {/* TAB BAR — Standardized Studio Nav */}
+            <div className="studio-tab-bar">
+                <div className="studio-tab-row">
+                    {TABS.map(t => (
+                        <button key={t.id} onClick={() => { setTab(t.id); setError(null) }}
+                            className={`flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-300 cursor-pointer ${tab === t.id ? 'studio-nav-pill text-white font-bold' : 'studio-nav-tab-inactive'}`}>
+                            <span className={`material-symbols-outlined ${tab === t.id ? 'text-lg' : 'text-base opacity-70'}`}>{t.icon}</span>
+                            <span>{t.label}</span>
+                            {t.id === 'accounts' && connectedAccounts.length > 0 && <span className="w-2 h-2 rounded-full bg-emerald-400 ml-1" />}
+                        </button>
+                    ))}
+                </div>
             </div>
 
             {error && (

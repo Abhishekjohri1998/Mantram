@@ -438,23 +438,50 @@ export default function SkillsHub() {
     return (
         <DashboardLayout title="Skills Hub" subtitle="Reusable AI Marketing Skills">
             <SEOHead title="Skills Hub — Mantram AI" noIndex={true} />
-            <div className="max-w-7xl mx-auto">
 
-                {/* Error */}
-                {error && (
-                    <div className={`p-4 rounded-2xl border ${error.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-300'} text-sm mb-4 flex items-center gap-2`}>
-                        <span className="material-symbols-outlined text-base">
-                            {error.isProviderError ? 'warning' : 'error'}
-                        </span>
-                        <div className="flex-1">
-                            {error.isProviderError && <span className="font-bold mr-1">[{error.provider || 'AI Provider'}]</span>}
-                            {error.message}
-                        </div>
-                        <button onClick={() => setError('')} className="ml-auto opacity-50 hover:opacity-100 cursor-pointer">
-                            <span className="material-symbols-outlined text-sm">close</span>
+            {/* ── Standardized Studio Tab Bar ── */}
+            <div className="studio-tab-bar">
+                <div className="studio-tab-row">
+                    {[
+                        { id: 'browse', icon: 'auto_awesome', label: 'Skills Library' },
+                        { id: 'build', icon: 'add_circle', label: 'Create Skill' },
+                        { id: 'history', icon: 'history', label: 'Run History' },
+                        { id: 'help', icon: 'menu_book', label: 'Guide' },
+                    ].map(tab => (
+                        <button key={tab.id}
+                            onClick={() => {
+                                setView(tab.id)
+                                if (tab.id === 'history') { loadExecutionHistory() }
+                            }}
+                            className={`flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-300 cursor-pointer ${view === tab.id ? 'studio-nav-pill text-white font-bold' : 'studio-nav-tab-inactive'}`}>
+                            <span className={`material-symbols-outlined ${view === tab.id ? 'text-lg' : 'text-base opacity-70'}`}>{tab.icon}</span>
+                            <span>{tab.label}</span>
                         </button>
+                    ))}
+                    {activeSkillIds.size > 0 && (
+                        <span className="ml-auto flex-shrink-0 flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FF4D00]/10 border border-[#FF4D00]/20 text-[11px] font-bold text-[#FF7A00]">
+                            <span className="material-symbols-outlined text-xs">bolt</span>
+                            {activeSkillIds.size}/{activeSkillsMax} Active
+                        </span>
+                    )}
+                </div>
+            </div>
+
+            {/* Error */}
+            {error && (
+                <div className={`p-4 rounded-2xl border ${error.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-300'} text-sm mb-4 mx-2 flex items-center gap-2`}>
+                    <span className="material-symbols-outlined text-base">
+                        {error.isProviderError ? 'warning' : 'error'}
+                    </span>
+                    <div className="flex-1">
+                        {error.isProviderError && <span className="font-bold mr-1">[{error.provider || 'AI Provider'}]</span>}
+                        {error.message}
                     </div>
-                )}
+                    <button onClick={() => setError('')} className="ml-auto opacity-50 hover:opacity-100 cursor-pointer">
+                        <span className="material-symbols-outlined text-sm">close</span>
+                    </button>
+                </div>
+            )}
 
                 {/* ═══ BROWSE VIEW ═══ */}
                 {view === 'browse' && (
@@ -1126,7 +1153,6 @@ export default function SkillsHub() {
                         </div>
                     </div>
                 )}
-            </div>
         </DashboardLayout>
     )
 }

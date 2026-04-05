@@ -43,10 +43,10 @@ const STEPS = [
 // ── Video type options ──
 const VIDEO_TYPES = [
     { id: 'ad-film', label: 'Ad Film', icon: 'movie', desc: 'Cinematic brand advertisement' },
-    { id: 'ugc', label: 'UGC Video', icon: '📱', desc: 'Raw, authentic user-style content' },
-    { id: 'product-demo', label: 'Product Demo', icon: '📦', desc: 'Showcase product features' },
+    { id: 'ugc', label: 'UGC Video', icon: 'smartphone', desc: 'Raw, authentic user-style content' },
+    { id: 'product-demo', label: 'Product Demo', icon: 'inventory_2', desc: 'Showcase product features' },
     { id: 'social-reel', label: 'Social Reel', icon: 'local_fire_department', desc: 'Short-form social content' },
-    { id: 'explainer', label: 'Explainer', icon: '💡', desc: 'Explain a concept or service' },
+    { id: 'explainer', label: 'Explainer', icon: 'lightbulb', desc: 'Explain a concept or service' },
 ]
 
 export default function VideoStudio() {
@@ -541,44 +541,32 @@ export default function VideoStudio() {
     return (
         <DashboardLayout title="Video Studio" subtitle="AI-powered video generation & editing">
             <SEOHead title="Video Studio — Mantram AI" noIndex={true} />
-            <div className="max-w-7xl mx-auto">
-                {/* ── Header Actions ── */}
-                <div className="flex items-center justify-end mb-6">
-                    <button onClick={() => {
-                        const opening = !showHistory
-                        setShowHistory(opening)
-                        if (opening) api('/video-studio?limit=20').then(d => setProjects(d.projects || [])).catch(() => { })
-                    }} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-slate-400 hover:text-white hover:bg-white/[0.06] transition-all text-sm cursor-pointer">
-                        <span className="material-symbols-outlined text-lg">history</span> History
-                    </button>
-                </div>
-
-                {/* ── Mode Toggle ── */}
-                <div className="flex flex-wrap items-center gap-2 mb-8 p-1.5 rounded-2xl bg-white/[0.025] border border-white/[0.05] w-fit max-w-full">
-                    <button onClick={() => setStudioMode('advanced')}
-                        className={`flex-1 sm:flex-none px-6 py-3 rounded-xl text-base font-semibold transition-all cursor-pointer flex items-center justify-center gap-2.5 ${studioMode === 'advanced'
-                            ? 'bg-gradient-to-r from-[#FF4D00] to-cyan-600 text-white shadow-lg shadow-[#FF4D00]/20'
-                            : 'text-slate-500 hover:text-white hover:bg-white/[0.03]'}`}>
-                        <span className="material-symbols-outlined text-lg">terminal</span> Advanced
-                    </button>
-                    <button onClick={() => setStudioMode('storyboard')}
-                        className={`px-6 py-3 rounded-xl text-base font-semibold transition-all cursor-pointer flex items-center gap-2.5 ${studioMode === 'storyboard'
-                            ? 'bg-gradient-to-r from-rose-600 to-amber-600 text-white shadow-lg shadow-rose-500/20'
-                            : 'text-slate-500 hover:text-white hover:bg-white/[0.03]'}`}>
-                        <span className="material-symbols-outlined text-lg">view_timeline</span> Storyboard
-                    </button>
-                    <button onClick={() => setStudioMode('ugc')}
-                        className={`px-6 py-3 rounded-xl text-base font-semibold transition-all cursor-pointer flex items-center gap-2.5 ${studioMode === 'ugc'
-                            ? 'bg-gradient-to-r from-amber-500 to-[#FF7A00] text-white shadow-lg shadow-amber-500/20'
-                            : 'text-slate-500 hover:text-white hover:bg-white/[0.03]'}`}>
-                        <span className="material-symbols-outlined text-lg">person_play</span> UGC Creator
-                    </button>
-                    <button onClick={() => setStudioMode('agent')}
-                        className={`px-6 py-3 rounded-xl text-base font-semibold transition-all cursor-pointer flex items-center gap-2.5 ${studioMode === 'agent'
-                            ? 'bg-gradient-to-r from-teal-500 to-cyan-600 text-white shadow-lg shadow-teal-500/20'
-                            : 'text-slate-500 hover:text-white hover:bg-white/[0.03]'}`}>
-                        <span className="material-symbols-outlined text-lg">smart_display</span> Video Agent
-                    </button>
+            {/* —— Studio Mode Tab Bar (standardized sticky nav) —— */}
+                <div className="studio-tab-bar">
+                    <div className="studio-tab-row">
+                        {[
+                            { id: 'storyboard', icon: 'view_timeline', label: 'Storyboard' },
+                            { id: 'advanced', icon: 'terminal', label: 'Advanced' },
+                            { id: 'ugc', icon: 'person_play', label: 'UGC Creator' },
+                            { id: 'agent', icon: 'smart_display', label: 'Video Agent' },
+                        ].map(tab => (
+                            <button key={tab.id} onClick={() => setStudioMode(tab.id)}
+                                className={`flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-300 cursor-pointer ${studioMode === tab.id ? 'studio-nav-pill text-white font-bold' : 'studio-nav-tab-inactive'}`}>
+                                <span className={`material-symbols-outlined ${studioMode === tab.id ? 'text-lg' : 'text-base opacity-70'}`}>{tab.icon}</span>
+                                <span>{tab.label}</span>
+                            </button>
+                        ))}
+                        <div className="ml-auto flex-shrink-0">
+                            <button onClick={() => {
+                                const opening = !showHistory
+                                setShowHistory(opening)
+                                if (opening) api('/video-studio?limit=20').then(d => setProjects(d.projects || [])).catch(() => {})
+                            }} className="flex items-center gap-2 px-3 py-2 rounded-xl studio-nav-tab-inactive text-[13px] cursor-pointer">
+                                <span className="material-symbols-outlined text-base opacity-70">history</span>
+                                <span>History</span>
+                            </button>
+                        </div>
+                    </div>
                 </div>
 
                 {/* ── History Panel (shown in both modes) ── */}
@@ -1749,7 +1737,6 @@ export default function VideoStudio() {
                     )}
                 </>) /* end storyboard mode */
                 }
-            </div >
         </DashboardLayout >
     )
 }

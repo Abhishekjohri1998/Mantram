@@ -946,6 +946,38 @@ export default function FunnelStudio() {
         return (
             <DashboardLayout title="Pipeline" subtitle={selectedFunnel.name}>
                 <SEOHead title={`${selectedFunnel.name} — Funnel Studio`} noIndex={true} />
+
+                {/* Standardized Studio Tab Bar */}
+                <div className="studio-tab-bar">
+                    <div className="studio-tab-row">
+                        {[
+                            { id: 'pipeline', icon: 'view_kanban', label: 'Pipeline' },
+                            { id: 'builder', icon: 'edit_note', label: 'Builder' },
+                            { id: 'nurture', icon: 'mail', label: 'Nurture' },
+                            { id: 'pages', icon: 'web', label: 'Pages' },
+                            { id: 'automations', icon: 'smart_toy', label: 'Automations' },
+                            { id: 'health', icon: 'monitor_heart', label: 'Health' },
+                            { id: 'analytics', icon: 'analytics', label: 'Analytics' },
+                            { id: 'forecast', icon: 'trending_up', label: 'Forecast' },
+                            { id: 'webhooks', icon: 'electrical_services', label: 'Webhooks' },
+                            { id: 'activity', icon: 'feed', label: 'Activity' },
+                        ].map(tab => (
+                            <button key={tab.id} onClick={() => setView(tab.id)}
+                                className={`flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-300 cursor-pointer ${view === tab.id ? 'studio-nav-pill text-white font-bold' : 'studio-nav-tab-inactive'}`}>
+                                <span className={`material-symbols-outlined ${view === tab.id ? 'text-lg' : 'text-base opacity-70'}`}>{tab.icon}</span>
+                                <span>{tab.label}</span>
+                            </button>
+                        ))}
+                        <div className="ml-auto flex-shrink-0">
+                            <button onClick={() => { setView('dashboard'); setSelectedFunnel(null) }}
+                                className="flex items-center gap-2 px-3 py-2 rounded-xl studio-nav-tab-inactive text-[13px] cursor-pointer">
+                                <span className="material-symbols-outlined text-base opacity-70">arrow_back</span>
+                                <span>All Funnels</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
                 {/* Header */}
                 <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center gap-3">
@@ -1254,8 +1286,38 @@ export default function FunnelStudio() {
     return (
         <DashboardLayout title="Funnel Studio" subtitle="Build and manage your sales funnels">
             <SEOHead title="Funnel Studio — Mantram AI" noIndex={true} />
+
+            {/* —— Standardized Studio Tab Bar —— */}
+            <div className="studio-tab-bar">
+                <div className="studio-tab-row">
+                    {[
+                        { id: 'dashboard', icon: 'filter_alt', label: 'My Funnels' },
+                        { id: 'sharing', icon: 'storefront', label: 'Templates' },
+                        { id: 'help', icon: 'menu_book', label: 'Guide' },
+                    ].map(tab => (
+                        <button key={tab.id} onClick={() => {
+                            if (tab.id === 'sharing') {
+                                shareApi.browse().then(r => setSharedTemplates(r.templates || [])).catch(() => {})
+                            }
+                            setView(tab.id)
+                        }}
+                            className={`flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-300 cursor-pointer ${view === tab.id ? 'studio-nav-pill text-white font-bold' : 'studio-nav-tab-inactive'}`}>
+                            <span className={`material-symbols-outlined ${view === tab.id ? 'text-lg' : 'text-base opacity-70'}`}>{tab.icon}</span>
+                            <span>{tab.label}</span>
+                        </button>
+                    ))}
+                    <div className="ml-auto flex-shrink-0">
+                        <button onClick={() => setShowAIModal(true)} disabled={loading}
+                            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-semibold studio-nav-pill text-white cursor-pointer disabled:opacity-50">
+                            <span className="material-symbols-outlined text-base">auto_awesome</span>
+                            AI Architect
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             {error && (
-                <div className={`mb-6 p-4 rounded-xl border ${error.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'} text-sm flex items-center gap-2`}>
+                <div className={`mb-6 p-4 rounded-xl border ${error.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'} text-sm flex items-center gap-2 mx-2`}>
                     <span className="material-symbols-outlined text-base">
                         {error.isProviderError ? 'warning' : 'error'}
                     </span>

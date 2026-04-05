@@ -965,124 +965,54 @@ small{color:#94a3b8;font-size:10px}
                     </div>
                 </div>
             ) : (
-                <div className="flex gap-0 max-w-[1400px] mx-auto" style={{ minHeight: 'calc(100vh - 140px)' }}>
+                <div>
 
-                    {/* ═══════════ LEFT SIDEBAR ═══════════ */}
-                    <div className={`flex-shrink-0 transition-all duration-300 ${sidebarCollapsed ? 'w-14' : 'w-56'}`}
-                        style={{ background: 'rgba(255,255,255,0.01)', borderRight: '1px solid rgba(255,255,255,0.04)' }}>
-                        <div className="flex items-center justify-between px-3 py-3 border-b border-white/[0.04]">
-                            {!sidebarCollapsed && <span className="text-[10px] text-slate-600 font-bold uppercase tracking-widest">Navigation</span>}
-                            <button onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-                                className="size-7 rounded-lg bg-white/[0.03] flex items-center justify-center hover:bg-white/[0.08] cursor-pointer transition-all ml-auto">
-                                <span className="material-symbols-outlined text-slate-500 text-sm">{sidebarCollapsed ? 'chevron_right' : 'chevron_left'}</span>
-                            </button>
-                        </div>
-                        <div className="py-2 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 220px)' }}>
-                            {SIDEBAR_SECTIONS.map((section, si) => (
-                                <div key={si} className="mb-1">
-                                    {!sidebarCollapsed && <p className="px-3 pt-3 pb-1 text-[9px] font-bold text-slate-600 uppercase tracking-widest">{section.title}</p>}
-                                    {sidebarCollapsed && si > 0 && <div className="mx-2 my-1 border-t border-white/[0.04]" />}
-                                    {section.items.map(item => {
-                                        const isActive = activeSection === item.id
-                                        const itemTask = tasks[item.id]
-                                        const isRunning = itemTask?.status === 'running'
-                                        const isDone = itemTask?.status === 'done'
-                                        return (
-                                            <button key={item.id}
-                                                onClick={() => { setActiveSection(item.id); setError(null); if (item.type === 'workflow') { setSavedResults(null) } }}
-                                                title={sidebarCollapsed ? item.label : undefined}
-                                                className={`w-full flex items-center gap-2.5 px-3 py-2 text-left cursor-pointer transition-all duration-200 group relative ${isActive ? 'text-white' : 'text-slate-500 hover:text-slate-300 hover:bg-white/[0.03]'}`}
-                                                style={isActive ? { background: `linear-gradient(90deg, ${item.color}12, transparent)` } : {}}>
-                                                {isActive && <div className="absolute left-0 top-1 bottom-1 w-0.5 rounded-full" style={{ background: item.color }} />}
-                                                <span className="material-symbols-outlined text-lg transition-colors" style={{ color: isActive ? item.color : undefined }}>{item.icon}</span>
-                                                {!sidebarCollapsed && (
-                                                    <div className="flex-1 min-w-0">
-                                                        <p className={`text-xs font-bold leading-tight truncate ${isActive ? 'text-white' : ''}`}>{item.label}</p>
-                                                        <p className="text-[9px] text-slate-600 leading-tight truncate">{item.desc}</p>
-                                                    </div>
-                                                )}
-                                                {!sidebarCollapsed && isRunning && (
-                                                    <span className="material-symbols-outlined text-xs animate-spin shrink-0" style={{ color: item.color }}>sync</span>
-                                                )}
-                                                {!sidebarCollapsed && isDone && !isActive && (
-                                                    <span className="material-symbols-outlined text-xs shrink-0" style={{ color: '#10b981' }}>check_circle</span>
-                                                )}
-                                                {!sidebarCollapsed && !isRunning && !isDone && item.type === 'workflow' && (
-                                                    <span className="text-[8px] px-1 py-0.5 rounded bg-white/[0.04] text-slate-600 font-bold shrink-0">AI</span>
-                                                )}
-                                            </button>
-                                        )
-                                    })}
-                                </div>
-                            ))}
-
-                            {/* Setup section */}
-                            <div className="mt-2 border-t border-white/[0.04] pt-2">
-                                {!sidebarCollapsed ? (
-                                    <button onClick={() => setShowSetup(!showSetup)}
-                                        className="w-full flex items-center gap-2 px-3 py-2 text-left cursor-pointer transition-all hover:bg-white/[0.03]">
-                                        <span className="material-symbols-outlined text-slate-600 text-lg">settings</span>
-                                        <span className="text-[9px] font-bold text-slate-600 uppercase tracking-widest flex-1">Track Competitors</span>
-                                        <span className="material-symbols-outlined text-slate-700 text-xs">{showSetup ? 'expand_less' : 'expand_more'}</span>
-                                    </button>
-                                ) : (
-                                    <button onClick={() => { setSidebarCollapsed(false); setShowSetup(true) }} title="Track Competitors"
-                                        className="w-full flex items-center justify-center py-2 cursor-pointer hover:bg-white/[0.03] transition-all">
-                                        <span className="material-symbols-outlined text-slate-600 text-lg">settings</span>
+                    {/* —— Standardized Studio Tab Bar (Nav replaces left sidebar) —— */}
+                    <div className="studio-tab-bar">
+                        <div className="studio-tab-row">
+                            {SIDEBAR_SECTIONS.map(section =>
+                                section.items.map(item => {
+                                    const isActive = activeSection === item.id
+                                    const itemTask = tasks[item.id]
+                                    const isRunning = itemTask?.status === 'running'
+                                    const isDone = itemTask?.status === 'done'
+                                    return (
+                                        <button key={item.id}
+                                            onClick={() => { setActiveSection(item.id); setError(null); if (item.type === 'workflow') { setSavedResults(null) } }}
+                                            className={`flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-300 cursor-pointer ${isActive ? 'studio-nav-pill text-white font-bold' : 'studio-nav-tab-inactive'}`}>
+                                            <span className={`material-symbols-outlined ${isActive ? 'text-lg' : 'text-base opacity-70'}`} style={isActive ? { color: item.color } : {}}>{item.icon}</span>
+                                            <span>{item.label}</span>
+                                            {isRunning && <span className="material-symbols-outlined text-xs animate-spin" style={{ color: item.color }}>sync</span>}
+                                            {isDone && !isRunning && <span className="material-symbols-outlined text-xs text-emerald-400">check_circle</span>}
+                                        </button>
+                                    )
+                                })
+                            )}
+                            {/* Quick access: Competitors + GA */}
+                            <div className="ml-auto flex-shrink-0 flex items-center gap-2">
+                                {gaConnected && (
+                                    <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/15 text-[11px] font-bold text-emerald-400">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />{gaEmail || 'GA'}
+                                    </span>
+                                )}
+                                {competitors.length > 0 && (
+                                    <button onClick={() => setActiveSection('competitors')}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl studio-nav-tab-inactive text-[11px] cursor-pointer">
+                                        <span className="material-symbols-outlined text-xs opacity-70">compare_arrows</span>
+                                        {competitors.length} Competitors
                                     </button>
                                 )}
-                                {showSetup && !sidebarCollapsed && (
-                                    <div className="px-3 py-2 space-y-3 animate-fade-in">
-                                        <div>
-                                            <p className="text-[9px] font-bold text-slate-500 uppercase mb-1">Competitors ({competitors.length})</p>
-                                            <div className="space-y-1 mb-2">
-                                                {competitors.slice(0, 4).map((c, i) => (
-                                                    <div key={i} className="flex items-center justify-between text-[10px] text-slate-400 px-2 py-1 rounded bg-white/[0.02] hover:bg-white/[0.05] transition-colors group">
-                                                        <span className="truncate cursor-pointer hover:text-white flex-1" onClick={() => { setActiveSection('competitors'); setShowSetup(false); }}>{c.name || c.url}</span>
-                                                        <button onClick={() => removeCompetitor(c.url)} className="text-slate-600 hover:text-rose-400 cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"><span className="material-symbols-outlined text-[10px]">close</span></button>
-                                                    </div>
-                                                ))}
-                                                {competitors.length > 4 && <p className="text-[9px] text-slate-600 px-2">+{competitors.length - 4} more</p>}
-                                            </div>
-                                            <div className="flex gap-1">
-                                                <input type="text" value={newCompUrl} onChange={e => setNewCompUrl(e.target.value)} onKeyDown={e => e.key === 'Enter' && addCompetitor()}
-                                                    placeholder="Add competitor URL..." className="flex-1 px-2 py-1 rounded text-[10px] text-white bg-white/[0.04] border border-white/[0.06] outline-none" />
-                                                <button onClick={addCompetitor} disabled={!newCompUrl.trim()} className="px-1.5 py-1 rounded text-[9px] font-bold bg-white/[0.04] text-slate-500 cursor-pointer disabled:opacity-30">+</button>
-                                            </div>
-                                            <button onClick={discoverCompetitors} disabled={compLoading}
-                                                className="mt-1 w-full flex items-center justify-center gap-1 px-2 py-1 rounded text-[9px] font-bold cursor-pointer transition-all disabled:opacity-30 text-[#FF4D00] bg-[#FF4D00]/10 hover:bg-[#FF4D00]/15">
-                                                {compLoading ? <span className="material-symbols-outlined text-[10px] animate-spin">sync</span> : <span className="material-symbols-outlined text-[10px]">auto_awesome</span>}
-                                                Auto-Discover
-                                            </button>
-                                            {showComparePrompt && (
-                                                <button onClick={() => { setActiveSection('competitors'); setShowSetup(false); setShowComparePrompt(false); }}
-                                                    className="mt-2 w-full flex items-center justify-center gap-1 px-2 py-1.5 rounded text-[9px] font-bold cursor-pointer transition-all text-white bg-gradient-to-r from-[#FF4D00] to-[#FF7A00] hover:shadow-lg hover:shadow-[#FF4D00]/20">
-                                                    <span className="material-symbols-outlined text-[10px]">compare_arrows</span>
-                                                    Compare Performance Now
-                                                </button>
-                                            )}
-                                        </div>
-                                        <div>
-                                            <p className="text-[9px] font-bold text-slate-500 uppercase mb-1">Analytics</p>
-                                            {gaConnected ? (
-                                                <div className="text-[10px] text-emerald-400 flex items-center gap-1 px-2 py-1 rounded bg-emerald-500/5 border border-emerald-500/10">
-                                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> {gaEmail || 'Connected'}
-                                                </div>
-                                            ) : (
-                                                <button onClick={() => navigate('/integrations')}
-                                                    className="w-full flex items-center justify-center gap-1 px-2 py-1.5 rounded text-[9px] font-bold cursor-pointer text-[#FF4D00] bg-[#FF4D00]/10 hover:bg-[#FF4D00]/15 transition-all">
-                                                    <span className="material-symbols-outlined text-[10px]">link</span> Connect GA
-                                                </button>
-                                            )}
-                                        </div>
-                                    </div>
-                                )}
+                                <button onClick={() => setShowGuide(!showGuide)}
+                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] cursor-pointer transition-all ${showGuide ? 'studio-nav-pill text-white' : 'studio-nav-tab-inactive'}`}>
+                                    <span className="material-symbols-outlined text-xs opacity-70">help</span>
+                                    Guide
+                                </button>
                             </div>
                         </div>
                     </div>
 
-                    {/* ═══════════ MAIN CONTENT PANEL ═══════════ */}
-                    <div className="flex-1 min-w-0 px-5 py-4 overflow-y-auto">
+                    {/* ═══════════ MAIN CONTENT ═══════════ */}
+                    <div className="px-2 py-2">
                         {/* Compact Brand Header + Ask Bar */}
                         <div className="flex items-center gap-3 mb-4">
                             <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"

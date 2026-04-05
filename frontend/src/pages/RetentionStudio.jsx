@@ -26,18 +26,18 @@ const STATUS_TO_STEP = {
 
 // ── Creative Templates ──
 const CREATIVE_TEMPLATES = [
-    { id: 'price-showdown', label: 'Price Showdown', icon: '⚔️', desc: 'Side-by-side Amazon vs Website pricing' },
-    { id: 'savings-spotlight', label: 'Savings Spotlight', icon: '💰', desc: 'Large product + savings callout badge' },
+    { id: 'price-showdown', label: 'Price Showdown', icon: 'balance', desc: 'Side-by-side Amazon vs Website pricing' },
+    { id: 'savings-spotlight', label: 'Savings Spotlight', icon: 'savings', desc: 'Large product + savings callout badge' },
     { id: 'loyalty-unlock', label: 'Loyalty Unlock', icon: 'redeem', desc: 'Price comparison + rewards messaging' },
-    { id: 'bundle-builder', label: 'Bundle Builder', icon: '📦', desc: 'Cross-sell — complete the set on our store' },
-    { id: 'vip-welcome', label: 'VIP Welcome', icon: '👑', desc: 'Premium exclusive offer design' },
+    { id: 'bundle-builder', label: 'Bundle Builder', icon: 'inventory_2', desc: 'Cross-sell — complete the set on our store' },
+    { id: 'vip-welcome', label: 'VIP Welcome', icon: 'workspace_premium', desc: 'Premium exclusive offer design' },
 ];
 
 const MAILER_TEMPLATES = [
     { id: 'clean-minimal', label: 'Clean Minimal', icon: 'auto_awesome', desc: 'White bg, brand header, single card CTA' },
-    { id: 'dark-premium', label: 'Dark Premium', icon: '🌙', desc: 'Dark gradient, premium feel, multi-product' },
+    { id: 'dark-premium', label: 'Dark Premium', icon: 'dark_mode', desc: 'Dark gradient, premium feel, multi-product' },
     { id: 'social-proof', label: 'Social Proof', icon: 'star', desc: 'Product card + reviews + testimonial' },
-    { id: 'urgency-drive', label: 'Urgency Drive', icon: '⏰', desc: 'Countdown timer + limited-time offer' },
+    { id: 'urgency-drive', label: 'Urgency Drive', icon: 'timer', desc: 'Countdown timer + limited-time offer' },
 ];
 
 const SAMPLE_CSV = `Name,Email,Product Name,ASIN,Price,Order Date
@@ -359,54 +359,38 @@ export default function RetentionStudio() {
     const currentStep = activeCampaign ? (STATUS_TO_STEP[activeCampaign.status] || 0) : 0;
 
     return (
-        <DashboardLayout>
-            <div style={{ minHeight: '100vh', background: '#050510', padding: '24px 32px' }}>
-                {/* ── Header ── */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                        {(mode === 'pipeline' && view === 'campaign') && (
-                            <button onClick={() => { setView('dashboard'); setActiveCampaign(null); }}
-                                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '8px 12px', color: '#94a3b8', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
-                                <span className="material-symbols-outlined" style={{ fontSize: 18 }}>arrow_back</span> Back
-                            </button>
-                        )}
-                        <div>
-                            <h1 style={{ color: '#fff', fontSize: 28, fontWeight: 800, margin: 0, display: 'flex', alignItems: 'center', gap: 12 }}>
-                                <span className="material-symbols-outlined" style={{ fontSize: 32, color: '#818cf8' }}>loyalty</span> Retention Studio
-                            </h1>
-                            <p style={{ color: '#64748b', fontSize: 13, marginTop: 4 }}>
-                                {mode === 'intel' ? 'Customer Intelligence • Segmentation • Multichannel Retention' : 'Amazon → D2C Re-Engagement Pipeline'}
-                            </p>
-                        </div>
-                    </div>
-                    {mode === 'pipeline' && view === 'dashboard' && (
-                        <button onClick={createCampaign} disabled={loading}
-                            style={{ background: 'linear-gradient(135deg, #6366f1, #FF4D00)', border: 'none', borderRadius: 12, padding: '12px 24px', color: '#fff', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, boxShadow: '0 4px 20px rgba(99,102,241,0.3)' }}>
-                            <span className="material-symbols-outlined" style={{ fontSize: 20 }}>add</span>
-                            New Campaign
+        <DashboardLayout title="Retention Studio" subtitle="Customer Intelligence • Segmentation • Amazon → D2C Pipeline">
+
+            {/* —— Standardized Studio Tab Bar —— */}
+            <div className="studio-tab-bar">
+                <div className="studio-tab-row">
+                    {MODES.map(m => (
+                        <button key={m.id} onClick={() => { setMode(m.id); setView('dashboard'); }}
+                            className={`flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-300 cursor-pointer ${mode === m.id ? 'studio-nav-pill text-white font-bold' : 'studio-nav-tab-inactive'}`}>
+                            <span className={`material-symbols-outlined ${mode === m.id ? 'text-lg' : 'text-base opacity-70'}`}>{m.icon}</span>
+                            <span>{m.label}</span>
                         </button>
+                    ))}
+                    {mode === 'pipeline' && view === 'dashboard' && (
+                        <div className="ml-auto flex-shrink-0">
+                            <button onClick={createCampaign} disabled={loading}
+                                className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-semibold studio-nav-pill text-white cursor-pointer">
+                                <span className="material-symbols-outlined text-base">add</span>
+                                New Campaign
+                            </button>
+                        </div>
+                    )}
+                    {mode === 'pipeline' && view === 'campaign' && (
+                        <div className="ml-auto flex-shrink-0">
+                            <button onClick={() => { setView('dashboard'); setActiveCampaign(null); }}
+                                className="flex items-center gap-2 px-3 py-2 rounded-xl studio-nav-tab-inactive text-[13px] cursor-pointer">
+                                <span className="material-symbols-outlined text-base opacity-70">arrow_back</span>
+                                <span>Back to Campaigns</span>
+                            </button>
+                        </div>
                     )}
                 </div>
-
-                {/* ── Mode Toggle ── */}
-                {!(mode === 'pipeline' && view === 'campaign') && (
-                    <div style={{ display: 'flex', gap: 12, marginBottom: 28 }}>
-                        {MODES.map(m => (
-                            <button key={m.id} onClick={() => { setMode(m.id); setView('dashboard'); }}
-                                style={{
-                                    flex: 1, padding: '16px 20px', borderRadius: 14, cursor: 'pointer', transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: 14,
-                                    background: mode === m.id ? 'rgba(99,102,241,0.12)' : 'rgba(255,255,255,0.02)',
-                                    border: mode === m.id ? '1px solid rgba(99,102,241,0.3)' : '1px solid rgba(255,255,255,0.06)',
-                                }}>
-                                <span className="material-symbols-outlined" style={{ fontSize: 28, color: mode === m.id ? '#818cf8' : '#475569' }}>{m.icon}</span>
-                                <div style={{ textAlign: 'left' }}>
-                                    <div style={{ color: mode === m.id ? '#fff' : '#94a3b8', fontSize: 14, fontWeight: 700 }}>{m.label}</div>
-                                    <div style={{ color: '#64748b', fontSize: 11, marginTop: 2 }}>{m.desc}</div>
-                                </div>
-                            </button>
-                        ))}
-                    </div>
-                )}
+            </div>
 
                 {/* Error */}
                 {error && (
@@ -864,7 +848,6 @@ export default function RetentionStudio() {
                         </div>
                     </div>
                 )}
-            </div>
 
             {/* Global spinner animation */}
             <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
