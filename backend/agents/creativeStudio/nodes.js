@@ -573,6 +573,13 @@ export async function promptEngineerNode(state) {
 
     const userPrompt = [
         `CONVERT THIS ART DIRECTION INTO AN IMAGE GENERATION PROMPT:`,
+        `--- BRAND GROUNDING (PRIORITY) ---`,
+        `Brand Identity: ${intel.overview || ''}`,
+        `Personality: ${intel.personality || ''}`,
+        `Aesthetic Direction: ${intel.designStyle || ''}, ${intel.imageMood || ''}`,
+        intel.colors?.length > 0 ? `Brand Color Palette (VISUAL ONLY): Use ${intel.colors.join(', ')} prominently. Describe these as light, atmospheric colors and surface materials. NEVER render color names as text.` : '',
+        '',
+        `--- ART DIRECTION TO EXECUTE ---`,
         `Creative Direction: ${state.artDirection?.creativeDirection || ''}`,
         `Visual Style: ${state.artDirection?.visualStyle || ''}`,
         `Mood: ${state.artDirection?.mood || ''}`,
@@ -589,8 +596,6 @@ export async function promptEngineerNode(state) {
         formatIntel2 ? `\n🎯 PLATFORM-SPECIFIC REQUIREMENTS (your prompt MUST address these):\n${formatIntel2.rules}` : '',
         `Image Model: ${state.imageModel || 'gemini'} — optimize prompt for this model`,
         `Original Brief: ${state.brief}`,
-        // Brand colors for visual context (no hex codes)
-        intel.colors?.length > 0 ? `BRAND COLORS (describe visually): ${intel.colors.join(', ')}` : '',
         productGrounding,
     ].filter(Boolean).join('\n');
 
@@ -1083,10 +1088,25 @@ export async function runCreativePipeline(params) {
         emit('style-critic', 'Brand alignment verified', 'done');
     }
 
-    // ── STEP 3: Finalize Prompt with MCoT Grounding + Copy Injection ──
+    // ── STEP 3: Finalize Prompt with Brand DNA + MCoT Grounding + Copy Injection ──
     state.finalPrompt = mode === 'fast' 
         ? (state.engineeredPrompt?.primaryPrompt || brief)
         : (state.styleCritique?.improvedPrompt || state.engineeredPrompt?.primaryPrompt || brief);
+
+    // ── Inject GLOBAL Brand Directives (Colors & Personality) ──
+    const brand = state.brandIntel;
+    if (brand) {
+        const brandAttributes = [
+            `\n═══ BRAND INTEGRITY DIRECTIVES ═══`,
+            brand.colors?.length > 0 ? `COLOR PALETTE: Use ${brand.colors.join(', ')} as the primary visual atmosphere. Ensure these colors dominate the lighting and surfaces. (Do NOT render color names as text).` : '',
+            brand.designStyle ? `BRAND STYLE: ${brand.designStyle}` : '',
+            brand.imageMood ? `BRAND MOOD: ${brand.imageMood}` : '',
+            brand.designRules?.length > 0 ? `GUIDELINES: ${brand.designRules.slice(0, 3).join('; ')}` : '',
+            brand.designAvoid?.length > 0 ? `AVOID: ${brand.designAvoid.slice(0, 3).join('; ')}` : '',
+            `═══════════════════════════════════`
+        ].filter(Boolean).join('\n');
+        state.finalPrompt = state.finalPrompt + '\n' + brandAttributes;
+    }
 
     // Inject Visual Grounding rationale (MCoT Stage 2)
     if (state.visualGrounding?.generationGuidance) {

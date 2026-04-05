@@ -74,7 +74,7 @@ export async function internalGenerateCreative({ body, user, creditsDeducted, jo
             agenticMeta.pipelineError = pipelineErr.message;
         }
 
-        const fullPrompt = agenticMeta.engineeredPrompt?.totalPrompt || prompt;
+        const fullPrompt = agenticMeta.finalPrompt || agenticMeta.engineeredPrompt?.totalPrompt || prompt;
         const selectedImageModel = (options?.imageModel || 'nanobanana-2').toLowerCase();
         const aspectRatio = options?.aspectRatio || '1:1';
         const imageSize = options?.imageSize || '1K';
