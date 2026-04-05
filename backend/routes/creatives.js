@@ -28,6 +28,103 @@ import { creativeQueue } from '../utils/creativeQueue.js';
 
 const router = Router();
 
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+/**
+ * Generate a unique job ID with environment-agnostic fallback.
+ */
+function generateJobId() {
+    try {
+        return randomUUID();
+    } catch {
+        return Date.now().toString(36) + Math.random().toString(36).substring(2);
+    }
+}
+
+/**
+ * Core handler for creative job creation.
+ * Moved above routes to ensure availability in all environments (hoisting).
+ */
+async function createCreativeJob(req, res) {
+    try {
+        const { brandId, type, prompt, options } = req.body;
+        const jobId = generateJobId();
+
+        // Sanitize brandId - ensure it's a valid ObjectId or null (Mongoose requirement for Schema)
+        const sanitizedBrandId = (brandId && mongoose.Types.ObjectId.isValid(brandId)) ? brandId : null;
+
+        console.log(`📦 [Job] Creating ${type} job ${jobId} for user ${req.user._id} (Brand: ${sanitizedBrandId || 'None'})`);
+
+        // Create the job record early
+        try {
+            await GenerationJob.create({
+                jobId,
+                user: req.user._id,
+                brand: sanitizedBrandId,
+                status: 'pending',
+                type: 'ai-create', // Strict job class from schema enum
+                format: type || 'instagram-post', // Platform format
+                prompt: prompt || '',
+                creditsDeducted: Number(req.creditsDeducted) || 0,
+                options: options || {}
+            });
+        } catch (dbErr) {
+            console.error(`❌ [Job] Database creation failed for ${jobId}:`, dbErr.message);
+            throw new Error(`Failed to initialize job record: ${dbErr.message}`);
+        }
+
+        // Return immediately to frontend
+        res.json({ success: true, jobId, message: 'Generation queued. Processing will begin shortly.' });
+
+        // Add to Bull queue with safety check
+        if (creativeQueue) {
+            creativeQueue.add({
+                jobId,
+                userId: req.user._id,
+                payload: { brandId: sanitizedBrandId, type, prompt, options, creditsDeducted: req.creditsDeducted || 0 }
+            }, {
+                jobId, 
+                attempts: 3,
+                backoff: { type: 'exponential', delay: 10000 },
+                removeOnComplete: true,
+                removeOnFail: false
+            }).catch(err => {
+                console.error(`🚨 [Job] Failed to add ${jobId} to creativeQueue:`, err.message);
+                // Update job status to failed if queueing fails
+                GenerationJob.updateOne({ jobId }, { status: 'failed', errorMessage: `Queueing failed: ${err.message}` }).catch(() => {});
+            });
+        } else {
+            console.error('🚨 [Job] creativeQueue is NOT initialized. Job will hang in pending.');
+            GenerationJob.updateOne({ jobId }, { status: 'failed', errorMessage: 'Internal Queue Service Unavailable' }).catch(() => {});
+        }
+
+    } catch (error) {
+        console.error('❌ [Job] createCreativeJob top-level error:', error);
+        
+        // Refund if job creation failed after credit deduction
+        if (req.creditsDeducted > 0) {
+            try {
+                await refundCredits(req.user._id, req.creditsDeducted, 'creative', `Refund: Job creation failed - ${error.message}`, 'creative');
+                console.log(`💰 [Job] Credits (${req.creditsDeducted}) refunded for user ${req.user._id}`);
+            } catch (refundErr) {
+                console.warn('⚠️ [Job] Refund failed during 500 handler:', refundErr.message);
+            }
+        }
+
+        // Enhanced error visibility for staging - pass through message if not Production
+        const isProd = process.env.NODE_ENV === 'production';
+        const errorMsg = isProd ? safeErrorMessage(error) : (error.message || 'Internal server error');
+        
+        if (!res.headersSent) {
+            res.status(500).json({ 
+                success: false, 
+                error: errorMsg,
+                details: isProd ? undefined : error.stack // Hide stack in Prod
+            });
+        }
+    }
+}
+
 // In-memory job tracker for carousel async pipeline
 // Allows polling to see real-time progress before DB write
 const carouselJobs = new Map(); // carouselId → { status, panels, panoramicUrl, error, updatedAt }
@@ -74,7 +171,7 @@ export async function internalGenerateCreative({ body, user, creditsDeducted, jo
             agenticMeta.pipelineError = pipelineErr.message;
         }
 
-        const fullPrompt = agenticMeta.engineeredPrompt?.totalPrompt || prompt;
+        const fullPrompt = agenticMeta.finalPrompt || agenticMeta.engineeredPrompt?.totalPrompt || prompt;
         const selectedImageModel = (options?.imageModel || 'nanobanana-2').toLowerCase();
         const aspectRatio = options?.aspectRatio || '1:1';
         const imageSize = options?.imageSize || '1K';
@@ -208,45 +305,12 @@ export async function internalGenerateCreative({ body, user, creditsDeducted, jo
 
 // POST /api/creatives/ — Create a new generation job (Queue-based)
 router.post('/', protect, requireCredits('creative'), async (req, res) => {
-    try {
-        const { brandId, type, prompt, options } = req.body;
-        const jobId = randomUUID();
+    return createCreativeJob(req, res);
+});
 
-        // Create the job record early so the user can see it in /jobs immediately
-        await GenerationJob.create({
-            jobId,
-            user: req.user._id,
-            status: 'pending',
-            type: type || 'instagram-post',
-            prompt,
-            creditsDeducted: req.creditsDeducted || 0,
-            options: options || {}
-        });
-
-        // Return immediately — job added to queue
-        res.json({ success: true, jobId, message: 'Generation queued. Processing will begin shortly.' });
-
-        // Add to Bull queue for reliable processing & automatic retries
-        creativeQueue.add({
-            jobId,
-            userId: req.user._id,
-            payload: { brandId, type, prompt, options, creditsDeducted: req.creditsDeducted || 0 }
-        }, {
-            jobId, // Use the same jobId as the custom jobId for Bull's own tracking
-            attempts: 3,
-            backoff: { type: 'exponential', delay: 10000 },
-            removeOnComplete: true,
-            removeOnFail: false
-        }).catch(err => console.error(`🚨 Failed to add job ${jobId} to creativeQueue:`, err.message));
-
-    } catch (error) {
-        console.error('Create job error:', error.message);
-        // Refund if job creation failed after credit deduction
-        if (req.creditsDeducted > 0) {
-            await refundCredits(req.user._id, req.creditsDeducted, 'creative', 'Refund: Job creation failed', 'creative');
-        }
-        res.status(500).json({ success: false, error: safeErrorMessage(error) });
-    }
+// POST /api/creatives/jobs — Explicit job creation endpoint
+router.post('/jobs', protect, requireCredits('creative'), async (req, res) => {
+    return createCreativeJob(req, res);
 });
 
 // ── GET /api/creatives/jobs — List recent jobs for the current user ────────────

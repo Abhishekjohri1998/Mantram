@@ -2195,7 +2195,9 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             studioMode === tab.id
                                 ? 'studio-nav-pill text-white font-bold'
                                 : 'studio-nav-tab-inactive'
-                        }`}>
+                        }`}
+                        aria-label={`Switch to ${tab.label} studio mode`}
+                    >
                         <span className={`material-symbols-outlined ${studioMode === tab.id ? 'text-lg' : 'text-base opacity-70'}`}>{tab.icon}</span>
                         <span>{tab.label}</span>
                         {tab.badge && <span className="bg-primary-fixed/15 text-primary-fixed text-[11px] font-bold px-1.5 py-0.5 rounded-full">{tab.badge}</span>}
@@ -2221,6 +2223,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                 ? 'bg-[#FF4D00]/15 text-[#FF7A00]'
                                                 : 'text-slate-500 hover:text-slate-300'
                                         }`}
+                                        aria-label={`Filter gallery by ${cat}`}
                                     >
                                         {cat}
                                     </button>
@@ -2233,11 +2236,17 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             )}
                             <div className="flex rounded-md border border-white/[0.08] overflow-hidden">
                                 <button onClick={() => setViewMode('list')}
-                                    className={`p-1 cursor-pointer transition-all ${viewMode === 'list' ? 'bg-white/[0.08] text-white' : 'text-slate-600 hover:text-slate-400'}`} title="List view">
+                                    className={`p-1 cursor-pointer transition-all ${viewMode === 'list' ? 'bg-white/[0.08] text-white' : 'text-slate-600 hover:text-slate-400'}`} 
+                                    title="List view"
+                                    aria-label="Switch to list view"
+                                >
                                     <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>view_list</span>
                                 </button>
                                 <button onClick={() => setViewMode('grid')}
-                                    className={`p-1 cursor-pointer transition-all ${viewMode === 'grid' ? 'bg-white/[0.08] text-white' : 'text-slate-600 hover:text-slate-400'}`} title="Grid view">
+                                    className={`p-1 cursor-pointer transition-all ${viewMode === 'grid' ? 'bg-white/[0.08] text-white' : 'text-slate-600 hover:text-slate-400'}`} 
+                                    title="Grid view"
+                                    aria-label="Switch to grid view"
+                                >
                                     <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>grid_view</span>
                                 </button>
                             </div>

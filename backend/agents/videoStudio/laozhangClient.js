@@ -1,4 +1,7 @@
-
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import { Upload } from "@aws-sdk/lib-storage";
+import config from "../../config/env.js";
+import { ensureS3Url } from '../../utils/s3.js';
 
 const LAOZHANG_BASE_URL = process.env.LAOZHANG_BASE_URL || 'https://api.laozhang.ai/v1';
 
@@ -200,8 +203,12 @@ export async function laozhangImageGenerate(prompt, { model = 'gemini-3.1-flash-
     const imageUrl = imgData?.url || '';
     const b64 = imgData?.b64_json || '';
     if (!imageUrl && !b64) throw new Error('LaoZhang returned empty image response');
-    const finalUrl = imageUrl || `data:image/png;base64,${b64}`;
-    console.log(`✅ [LaoZhang] Image generated via ${model} (${imageUrl ? 'URL' : 'base64'})`);
+    const rawUrl = imageUrl || `data:image/png;base64,${b64}`;
+    
+    // Auto-upload base64 to S3 to avoid massive strings in frontend/DB
+    const finalUrl = await ensureS3Url(rawUrl, 'studio/laozhang');
+    
+    console.log(`✅ [LaoZhang] Image generated via ${model} (${imageUrl ? 'URL' : 'base64'})${finalUrl !== rawUrl ? ' -> Uploaded to S3' : ''}`);
     return { imageUrl: finalUrl, model, provider: 'laozhang' };
 }
 
@@ -264,8 +271,12 @@ export async function laozhangMultimodalImageGenerate(prompt, imageUrls = [], { 
     }
 
     const isBase64 = imageUrl.startsWith('data:');
-    console.log(`✅ [LaoZhang-Multimodal] Image generated with ${imageUrls.length} refs (${isBase64 ? 'base64' : 'URL'}): ${imageUrl.substring(0, 80)}...`);
-    return { imageUrl, model, provider: 'laozhang' };
+    
+    // Auto-upload base64 to S3
+    const finalUrl = await ensureS3Url(imageUrl, 'studio/laozhang-multimodal');
+    
+    console.log(`✅ [LaoZhang-Multimodal] Image generated with ${imageUrls.length} refs (${isBase64 ? 'base64' : 'URL'})${finalUrl !== imageUrl ? ' -> Uploaded to S3' : ''}: ${finalUrl.substring(0, 80)}...`);
+    return { imageUrl: finalUrl, model, provider: 'laozhang' };
 }
 
 export default {

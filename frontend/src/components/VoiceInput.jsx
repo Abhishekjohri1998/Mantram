@@ -160,9 +160,21 @@ export default function VoiceInput({ onResult, language = 'english', className =
             const THRESHOLD = 15 // Adjust sensitivity (0-255)
             const SILENCE_DURATION = 1800 // 1.8 seconds of silence to stop
 
+            // Use a slightly slower interval for VAD logic to save main thread cycles
             vadIntervalRef.current = setInterval(() => {
+                const analyser = analyserRef.current
+                if (!analyser) return
+
                 analyser.getByteFrequencyData(dataArray)
-                const average = dataArray.reduce((a, b) => a + b) / bufferLength
+                
+                // Efficient calculation of average volume
+                let sum = 0
+                for (let i = 0; i < bufferLength; i++) {
+                    sum += dataArray[i]
+                }
+                const average = sum / bufferLength
+                
+                // Only update state if recording is still active
                 setAudioLevel(average)
 
                 if (average < THRESHOLD) {
@@ -173,7 +185,7 @@ export default function VoiceInput({ onResult, language = 'english', className =
                 } else {
                     silenceStartRef.current = null
                 }
-            }, 100)
+            }, 150) // Throttled from 100ms to 150ms
 
             mediaRecorder.start(250) // Collect data every 250ms
             setRecording(true)
@@ -229,6 +241,7 @@ export default function VoiceInput({ onResult, language = 'english', className =
                     disabled:cursor-wait
                 `}
                 title={processing ? 'Processing...' : recording ? 'Stop & transcribe' : `Speak in ${language} (Whisper AI)`}
+                aria-label={processing ? 'Processing transcription' : recording ? 'Stop recording voice' : `Start voice input in ${language}`}
             >
                 {/* Audio Level Meter Overlay */}
                 {recording && (

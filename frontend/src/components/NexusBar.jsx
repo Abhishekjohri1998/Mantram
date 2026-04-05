@@ -191,7 +191,13 @@ export default function NexusBar() {
                 silenceCheckRef.current = setInterval(() => {
                     const dataArray = new Uint8Array(analyser.frequencyBinCount)
                     analyser.getByteFrequencyData(dataArray)
-                    const avg = dataArray.reduce((a, b) => a + b, 0) / dataArray.length
+                    
+                    // Efficient loop instead of reduce for large arrays
+                    let sum = 0
+                    for (let i = 0; i < dataArray.length; i++) {
+                        sum += dataArray[i]
+                    }
+                    const avg = sum / dataArray.length
 
                     if (avg < SILENCE_THRESHOLD) {
                         silentFrames++
@@ -201,7 +207,7 @@ export default function NexusBar() {
                     } else {
                         silentFrames = 0
                     }
-                }, 60)
+                }, 120) // Throttled from 60ms to 120ms
             } catch (e) {
                 console.warn('Silence detection unavailable:', e.message)
             }
@@ -707,6 +713,7 @@ export default function NexusBar() {
                                 }}
                                 placeholder="Ask Fidato anything..."
                                 className="flex-1 bg-white/[0.04] rounded-xl px-3 py-2 text-sm text-white placeholder-slate-500 outline-none border border-white/[0.06] focus:border-[#FF4D00]/30 transition-all"
+                                aria-label="Message to Fidato AI agent"
                             />
                             {/* Mic */}
                             <button
@@ -719,6 +726,7 @@ export default function NexusBar() {
                                         : 'text-slate-400 hover:text-white hover:bg-white/[0.06]'
                                     }`}
                                 title={recording ? 'Stop recording' : 'Speak to Fidato'}
+                                aria-label={recording ? 'Stop voice recording' : 'Start voice input'}
                             >
                                 <span className="material-symbols-outlined text-sm">
                                     {recording ? 'stop_circle' : transcribing ? 'hourglass_top' : 'mic'}
@@ -733,6 +741,7 @@ export default function NexusBar() {
                                     : 'text-slate-600 cursor-not-allowed'
                                     }`}
                                 title="Send message"
+                                aria-label="Send message to Fidato"
                             >
                                 <span className="material-symbols-outlined text-sm">send</span>
                             </button>
@@ -744,6 +753,7 @@ export default function NexusBar() {
                 <button
                     onClick={() => { setOpen(!open); if (!open) setTimeout(() => inputRef.current?.focus(), 100) }}
                     className={`size-14 rounded-full flex items-center justify-center text-white shadow-2xl cursor-pointer transition-all duration-300 hover:scale-110 ${open ? 'rotate-0' : 'animate-bounce-slow'}`}
+                    aria-label={open ? 'Close Fidato chat' : 'Open Fidato AI assistant'}
                     style={{
                         background: 'linear-gradient(135deg, #FF4D00, #ec4899)',
                         boxShadow: '0 8px 32px rgba(255, 77, 0, 0.4), 0 0 20px rgba(255, 77, 0, 0.15)',

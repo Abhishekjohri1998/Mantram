@@ -231,41 +231,44 @@ export async function brandIntelligenceNode(state) {
         tagline: dna.tagline || '',
         overview: (dna.companyOverview || dna.brandDescription || '').substring(0, 300),
         
-        // Visual DNA
-        designStyle: dna.visualDNA?.designStyle || '',
-        layoutPreference: dna.visualDNA?.layoutPreference || '',
-        imageMood: dna.visualDNA?.imageMood || '',
-        textureStyle: dna.visualDNA?.textureStyle || '',
-        photographyStyle: dna.photographyStyle || '',
-        designRules: dna.visualDNA?.designRules || [],
-        designAvoid: dna.visualDNA?.designAvoid || [],
+        // Visual DNA (Explicitly structured for prompt injection)
+        visualDNA: {
+            designStyle: dna.visualDNA?.designStyle || '',
+            layoutPreference: dna.visualDNA?.layoutPreference || '',
+            imageMood: dna.visualDNA?.imageMood || '',
+            textureStyle: dna.visualDNA?.textureStyle || '',
+            photographyStyle: dna.photographyStyle || '',
+            designRules: dna.visualDNA?.designRules || [],
+            designAvoid: dna.visualDNA?.designAvoid || [],
+        },
 
-        // Colors — described by name only, NEVER hex codes
-        colors: (dna.colors || []).slice(0, 5).map(c => {
-            const name = c.name || '';
-            if (name && !/^#|rgb|color/i.test(name)) return name.toLowerCase();
-            return 'brand accent';
-        }).filter((v, i, a) => a.indexOf(v) === i),
+        // Colors — Passed as names for visual grounding, hex codes for precision
+        colors: (dna.colors || []).slice(0, 8).map(c => ({
+            name: c.name || 'brand accent',
+            hex: c.hex || '',
+            type: c.type || 'primary'
+        })).filter(c => c.hex || c.name),
+
+        // Brand anchor colors (for strict fidelity)
+        primaryColors: (dna.colors || []).filter(c => c.type === 'primary').map(c => c.name || c.hex),
 
         // Content style
-        contentDos: dna.contentStyle?.dos?.slice(0, 3) || [],
-        contentDonts: dna.contentStyle?.donts?.slice(0, 3) || [],
+        contentDos: dna.contentStyle?.dos?.slice(0, 5) || [],
+        contentDonts: dna.contentStyle?.donts?.slice(0, 5) || [],
         
         // Brand values
-        values: (dna.brandValues || []).slice(0, 4),
-        usps: (dna.uniqueSellingPoints || []).slice(0, 3),
+        values: (dna.brandValues || []).slice(0, 5),
+        usps: (dna.uniqueSellingPoints || []).slice(0, 5),
         services: (dna.servicesOffered || []).slice(0, 5),
         
-        // Logo info (for awareness, NOT for inclusion in prompts)
+        // Logo info
         hasLogo: !!(dna.logo?.url),
 
         // ── ANTI-HALLUCINATION: Real product data ──
         brandType,
         productCatalogSize: products.length,
         brandImages: (dna.brandImages || []).slice(0, 5).map(img => img.url).filter(Boolean),
-        // Product-relevant brand DNA images (discovered from alt text matching)
         matchedDnaImages,
-        // Product candidates for downstream image injection
         productCandidates,
     };
 
@@ -434,12 +437,12 @@ export async function artDirectorNode(state) {
         formatIntel ? `\n🎯 PLATFORM-SPECIFIC RULES FOR ${formatIntel.label.toUpperCase()}:\n${formatIntel.rules}` : '',
         state.style ? `PREFERRED STYLE: ${state.style}` : '',
         // Inject brand intelligence for smarter direction
-        intel.designStyle ? `BRAND DESIGN STYLE: ${intel.designStyle}` : '',
-        intel.imageMood ? `BRAND IMAGE MOOD: ${intel.imageMood}` : '',
-        intel.photographyStyle ? `PHOTOGRAPHY DIRECTION: ${intel.photographyStyle}` : '',
-        intel.colors?.length > 0 ? `BRAND COLOR PALETTE: ${intel.colors.join(', ')} — use these as accent colors that complement the occasion's mood` : '',
-        intel.designRules?.length > 0 ? `DESIGN RULES (must follow): ${intel.designRules.slice(0, 3).join('; ')}` : '',
-        intel.designAvoid?.length > 0 ? `AVOID: ${intel.designAvoid.slice(0, 3).join('; ')}` : '',
+        intel.visualDNA?.designStyle ? `BRAND DESIGN STYLE: ${intel.visualDNA.designStyle}` : '',
+        intel.visualDNA?.imageMood ? `BRAND IMAGE MOOD: ${intel.visualDNA.imageMood}` : '',
+        intel.visualDNA?.photographyStyle ? `PHOTOGRAPHY DIRECTION: ${intel.visualDNA.photographyStyle}` : '',
+        intel.primaryColors?.length > 0 ? `BRAND PRIMARY COLORS: ${intel.primaryColors.join(', ')} — these are the core anchors for the visual mood` : '',
+        intel.visualDNA?.designRules?.length > 0 ? `DESIGN RULES (must follow): ${intel.visualDNA.designRules.slice(0, 3).join('; ')}` : '',
+        intel.visualDNA?.designAvoid?.length > 0 ? `AVOID: ${intel.visualDNA.designAvoid.slice(0, 3).join('; ')}` : '',
         state.references ? `REFERENCE NOTES: ${state.references}` : '',
         state.productName ? `PRODUCT: ${state.productName}` : '',
         productContext,
@@ -513,8 +516,8 @@ export async function fastCreativeDirectorNode(state) {
         `ASPECT RATIO: ${state.aspectRatio || '1:1'}`,
         formatIntel ? `\nPLATFORM RULES for ${formatIntel.label.toUpperCase()}:\n${formatIntel.rules}` : '',
         state.style ? `STYLE: ${state.style}` : '',
-        intel.designStyle ? `BRAND STYLE: ${intel.designStyle}` : '',
-        intel.colors?.length > 0 ? `BRAND COLORS: ${intel.colors.join(', ')}` : '',
+        intel.visualDNA?.designStyle ? `BRAND STYLE: ${intel.visualDNA.designStyle}` : '',
+        intel.primaryColors?.length > 0 ? `BRAND PRIMARY COLORS: ${intel.primaryColors.join(', ')}` : '',
         `IMAGE MODEL: ${state.imageModel || 'gemini'} — optimize prompt accordingly`,
         productContext,
         // When no product is matched, give the agent catalog + decision authority
@@ -573,6 +576,13 @@ export async function promptEngineerNode(state) {
 
     const userPrompt = [
         `CONVERT THIS ART DIRECTION INTO AN IMAGE GENERATION PROMPT:`,
+        `--- BRAND GROUNDING (PRIORITY) ---`,
+        `Brand Identity: ${intel.overview || ''}`,
+        `Personality: ${intel.personality || ''}`,
+        `Aesthetic Direction: ${intel.visualDNA?.designStyle || ''}, ${intel.visualDNA?.imageMood || ''}`,
+        intel.primaryColors?.length > 0 ? `CRITICAL BRAND COLORS: Use ${intel.primaryColors.join(', ')} as the primary lighting and atmospheric hues. These colors MUST dominate the scene surfaces and environment. NEVER render names as text.` : '',
+        '',
+        `--- ART DIRECTION TO EXECUTE ---`,
         `Creative Direction: ${state.artDirection?.creativeDirection || ''}`,
         `Visual Style: ${state.artDirection?.visualStyle || ''}`,
         `Mood: ${state.artDirection?.mood || ''}`,
@@ -589,8 +599,6 @@ export async function promptEngineerNode(state) {
         formatIntel2 ? `\n🎯 PLATFORM-SPECIFIC REQUIREMENTS (your prompt MUST address these):\n${formatIntel2.rules}` : '',
         `Image Model: ${state.imageModel || 'gemini'} — optimize prompt for this model`,
         `Original Brief: ${state.brief}`,
-        // Brand colors for visual context (no hex codes)
-        intel.colors?.length > 0 ? `BRAND COLORS (describe visually): ${intel.colors.join(', ')}` : '',
         productGrounding,
     ].filter(Boolean).join('\n');
 
@@ -1083,10 +1091,25 @@ export async function runCreativePipeline(params) {
         emit('style-critic', 'Brand alignment verified', 'done');
     }
 
-    // ── STEP 3: Finalize Prompt with MCoT Grounding + Copy Injection ──
+    // ── STEP 3: Finalize Prompt with Brand DNA + MCoT Grounding + Copy Injection ──
     state.finalPrompt = mode === 'fast' 
         ? (state.engineeredPrompt?.primaryPrompt || brief)
         : (state.styleCritique?.improvedPrompt || state.engineeredPrompt?.primaryPrompt || brief);
+
+    // ── Inject GLOBAL Brand Directives (Colors & Personality) ──
+    const brand = state.brandIntel;
+    if (brand) {
+        const brandAttributes = [
+            `\n═══ BRAND INTEGRITY DIRECTIVES ═══`,
+            brand.colors?.length > 0 ? `COLOR PALETTE: Use ${brand.colors.join(', ')} as the primary visual atmosphere. Ensure these colors dominate the lighting and surfaces. (Do NOT render color names as text).` : '',
+            brand.designStyle ? `BRAND STYLE: ${brand.designStyle}` : '',
+            brand.imageMood ? `BRAND MOOD: ${brand.imageMood}` : '',
+            brand.designRules?.length > 0 ? `GUIDELINES: ${brand.designRules.slice(0, 3).join('; ')}` : '',
+            brand.designAvoid?.length > 0 ? `AVOID: ${brand.designAvoid.slice(0, 3).join('; ')}` : '',
+            `═══════════════════════════════════`
+        ].filter(Boolean).join('\n');
+        state.finalPrompt = state.finalPrompt + '\n' + brandAttributes;
+    }
 
     // Inject Visual Grounding rationale (MCoT Stage 2)
     if (state.visualGrounding?.generationGuidance) {
