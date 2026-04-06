@@ -673,24 +673,42 @@ export async function editorNode(state) {
  * Takes user's raw prompt → rewrites into a production-ready video prompt.
  */
 export async function enhancePromptNode(state) {
-    // Load brand context — CRITICAL: without this, enhanced prompts lose brand DNA
-    const { brandContext, styleMemory } = await loadContext(state.brandId, state.userId);
+    try {
+        // Load brand context — CRITICAL: without this, enhanced prompts lose brand DNA
+        const { brandContext, styleMemory } = await loadContext(state.brandId, state.userId);
 
-    const targetModel = state.model || 'seedance-2.0';
-    const userPrompt = `Enhance this video generation prompt for the ${targetModel} model:\n\n"${state.prompt}"\n\nDesired duration: ${state.duration || 5}s\nAspect ratio: ${state.aspectRatio || '16:9'}\nKey requirement: follow the exact prompt structure for ${targetModel} as described in your instructions.`;
+        const targetModel = state.model || 'seedance-2.0';
+        const userPrompt = `Enhance this video generation prompt for the ${targetModel} model:\n\n"${state.prompt}"\n\nDesired duration: ${state.duration || 5}s\nAspect ratio: ${state.aspectRatio || '16:9'}\nKey requirement: follow the exact prompt structure for ${targetModel} as described in your instructions.`;
 
-    const result = await callFastAgent(
-        PROMPT_ENHANCER_PROMPT(brandContext, styleMemory, targetModel),
-        userPrompt,
-        0.5,
-        4096
-    );
+        const result = await callFastAgent(
+            PROMPT_ENHANCER_PROMPT(brandContext, styleMemory, targetModel),
+            userPrompt,
+            0.5,
+            4096
+        );
 
-    return {
-        ...state,
-        enhancedPrompt: result.enhancedPrompt || state.prompt,
-        enhanceChanges: result.changes || [],
-    };
+        if (!result || result.error) {
+            console.warn('⚠️ Prompt enhancement AI failed (parse error or empty), using original prompt.');
+            return {
+                ...state,
+                enhancedPrompt: state.prompt,
+                enhanceChanges: [],
+            };
+        }
+
+        return {
+            ...state,
+            enhancedPrompt: result.enhancedPrompt || state.prompt,
+            enhanceChanges: result.changes || [],
+        };
+    } catch (err) {
+        console.error('❌ enhancePromptNode error (falling back to original prompt):', err.message);
+        return {
+            ...state,
+            enhancedPrompt: state.prompt,
+            enhanceChanges: [],
+        };
+    }
 }
 
 /**

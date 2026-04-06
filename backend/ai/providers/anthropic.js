@@ -32,7 +32,9 @@ export class AnthropicProvider extends BaseProvider {
         });
         if (!response.ok) {
             const data = await response.json().catch(() => ({}));
-            throw new Error(`Claude Error [${response.status}]: ${data.error?.message || response.statusText}`);
+            const errMsg = data.error?.message || response.statusText;
+            console.error(`❌ [Anthropic] API Error [${response.status}]: ${errMsg} | Model: ${modelId}`);
+            throw new Error(`Claude Error [${response.status}]: ${errMsg}`);
         }
 
         const data = await response.json();
