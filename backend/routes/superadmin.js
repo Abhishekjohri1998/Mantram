@@ -1973,7 +1973,7 @@ router.get('/provider-usage', async (req, res) => {
         // Map models to providers
         const providerModels = {
             openai: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo'],
-            anthropic: ['Claude Opus 4.6', 'claude-3-opus', 'claude-3-5-sonnet', 'claude-3-haiku'],
+            anthropic: ['claude-3-opus-20240229', 'claude-3-opus', 'claude-3-5-sonnet', 'claude-3-haiku'],
             gemini: ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-flash-image'],
             grok: ['grok-3', 'grok-3-mini', 'grok-beta'],
             piapi: ['seedance-2.0', 'kling-v2'],
@@ -2764,7 +2764,7 @@ router.get('/pricing-policy', async (req, res) => {
         const videoMatrix = Object.entries(COST_PER_SECOND || {}).map(([model, rates]) => {
             const caps = MODEL_CAPABILITIES?.[model] || {};
             return {
-                model: 'Claude Opus 4.6',
+                model: 'claude-3-opus-20240229',
                 fastPerSec: rates.fast, qualityPerSec: rates.quality,
                 // Cost examples at different durations
                 examples: [5, 10, 15].map(dur => ({
