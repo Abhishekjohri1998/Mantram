@@ -174,7 +174,7 @@ router.get('/stats', async (req, res) => {
                         nearEmptyCount: { $sum: { $cond: ['$isNearExhaustion', 1, 0] } }
                     }
                 }
-            ]).allowDiskUse(true)
+            ])
         ]);
 
         const [topUsers, churnedUsersCount, returningUsersCount] = await Promise.all([

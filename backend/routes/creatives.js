@@ -353,17 +353,24 @@ router.post('/jobs', protect, requireCredits('creative'), async (req, res) => {
 router.get('/jobs', protect, async (req, res) => {
     try {
         const since = new Date(Date.now() - 24 * 60 * 60 * 1000); // last 24h
+        
+        // Simplified query to ensure it hits the index { user: 1, createdAt: -1 } efficiently
+        // removed $slice: -5 temporarily to rule out environment-specific projection errors
         const jobs = await GenerationJob.find(
             { user: req.user._id, createdAt: { $gte: since } },
-            { jobId: 1, status: 1, type: 1, format: 1, imageUrl: 1, errorMessage: 1,
-              creativeId: 1, createdAt: 1, startedAt: 1, completedAt: 1, steps: { $slice: -5 } }
+            { 
+                jobId: 1, status: 1, type: 1, format: 1, imageUrl: 1, errorMessage: 1,
+                creativeId: 1, createdAt: 1, startedAt: 1, completedAt: 1, steps: 1 
+            }
         )
             .sort({ createdAt: -1 })
             .limit(20)
             .lean();
+
         res.json({ success: true, jobs });
     } catch (error) {
-        console.error('❌ [API] GET /jobs error:', error);
+        console.error('❌ [API] GET /api/creatives/jobs error:', error.message);
+        console.error('❌ Stack:', error.stack);
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });

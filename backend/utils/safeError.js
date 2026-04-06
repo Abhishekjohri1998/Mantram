@@ -21,6 +21,7 @@ const USER_FACING_PATTERNS = [
     'aspect ratio', 'invalid format', 'unsupported',
     'try a different', 'switch to', 'currently busy',
     'no image', 'returned no image',
+    'executor', 'memory limit', 'mongodb', 'mongoose', 'sort', 'index',
 ];
 
 export function safeErrorMessage(error, fallback = 'Internal server error') {
