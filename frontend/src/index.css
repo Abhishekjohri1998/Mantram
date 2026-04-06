@@ -296,10 +296,11 @@
     text-rendering: optimizeLegibility;
     font-feature-settings: 'liga';
     
-    /* ── Definitive FOUC Fix: Hide text, show icon via shadow ── */
-    font-display: block !important;
+    /* ── Definitive FOUC Fix: Hide text, show icon glyph ── */
     user-select: none;
+    speak: never;
     color: transparent !important;
+    -webkit-text-fill-color: transparent; /* Safari support */
     text-shadow: 0 0 0 white; /* This renders the icon glyph while 'color: transparent' hides the text word */
   }
 
