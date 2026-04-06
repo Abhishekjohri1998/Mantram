@@ -1290,7 +1290,7 @@ export default function BrandOnboarding() {
             // User needs to login/register first, then the pending brand will be saved
             navigate('/auth?redirect=dashboard&pending=brand')
         } else {
-            navigate('/nexus')
+            navigate('/dashboard')
         }
     }
 
