@@ -110,6 +110,7 @@ class Orchestrator {
         const result = await this.smartRouter.modelRouter.generateImage({
             prompt: visualPrompt,
             size: this._getCreativeSize(type),
+            aspectRatio: this._getAspectRatio(type) || options.aspectRatio,
         }, preferences);
 
         return {
@@ -238,8 +239,8 @@ class Orchestrator {
         let visual = prompt;
 
         if (dna.colors?.length) {
-            const colorStr = dna.colors.map(c => `${c.name} (${c.hex})`).join(', ');
-            visual += `\nBrand Colors: ${colorStr}`;
+            const colorStr = dna.colors.map(c => c.name).filter(Boolean).join(', ');
+            if (colorStr) visual += `\nBrand Colors: ${colorStr}`;
         }
         if (options.style) visual += `\nStyle: ${options.style}`;
         if (options.textOverlay) visual += `\nText overlay: "${options.textOverlay}"`;
@@ -281,15 +282,28 @@ class Orchestrator {
 
     _getCreativeSize(type) {
         return {
-            'instagram-post': '1024x1024',
-            'instagram-story': '1024x1792',
-            'facebook-ad': '1024x1024',
-            'linkedin-post': '1024x1024',
-            'youtube-thumb': '1792x1024',
-            'banner': '1792x1024',
-            'blog_hero': '1792x1024',
-            'blog_section': '1024x1024',
+            'instagram-post': '1080x1350',
+            'facebook-ad': '1080x1350',
+            'instagram-story': '1080x1920',
+            'linkedin-post': '1080x1080',
+            'youtube-thumb': '1920x1080',
+            'banner': '1920x1080',
+            'blog_hero': '1920x1080',
+            'blog_section': '1200x800',
         }[type] || '1024x1024';
+    }
+
+    _getAspectRatio(type) {
+        return {
+            'instagram-post': '4:5',
+            'facebook-ad': '4:5',
+            'instagram-story': '9:16',
+            'linkedin-post': '1:1',
+            'youtube-thumb': '16:9',
+            'banner': '16:9',
+            'blog_hero': '16:9',
+            'blog_section': '3:2',
+        }[type] || '1:1';
     }
 
     _getCreativeDimensions(type) {

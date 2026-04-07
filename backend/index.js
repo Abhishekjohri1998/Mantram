@@ -6,6 +6,7 @@ import mongoose from 'mongoose';
 
 // Route imports
 import authRoutes from './routes/auth.js';
+import integrationsRoutes from './routes/integrations.js';
 import brandRoutes from './routes/brands.js';
 import contentRoutes from './routes/content.js';
 import creativeRoutes, { internalGenerateCreative } from './routes/creatives.js';
@@ -55,6 +56,7 @@ import mediaUploadRoutes from './routes/mediaUpload.js';
 import studioReportRoutes from './routes/studio-reports.js';
 import funnelAgenticRoutes from './routes/funnel-agentic.js';
 import retentionStudioRoutes from './routes/retention-studio.js';
+import { createMantramMcpRouter } from './mcp/mantramToolsServer.js';
 
 const HARDCODED_ORIGINS = [
     'https://mantram.ai',
@@ -167,6 +169,16 @@ connectDB().then(() => {
     // Initialize Image Generation Worker (Bull + Redis)
     initCreativeWorker(internalGenerateCreative);
 
+    // Warm up MCP Registry — connects mcpBridge to internal tool server (non-blocking)
+    import('./mcp/registry.js').then(({ callMcpTool }) => {
+        // Trigger lazy connection by calling a no-op probe
+        setTimeout(() => {
+            callMcpTool('web_search', { query: 'mantram ai platform startup ping', mode: 'quick' })
+                .then(() => console.log('✅ MCP Registry: warm-up complete'))
+                .catch(() => console.log('⚠️ MCP Registry: warm-up skipped (will retry on first real call)'));
+        }, 8000); // Wait 8s for server to be fully ready
+    }).catch(() => {});
+
     // Start follow-up scheduler (every 4 hours — Meta Compliance)
     import('./services/autonomousAgent.js').then(({ runFollowUpCheck }) => {
         setInterval(() => {
@@ -269,6 +281,7 @@ if (config.nodeEnv === 'development') {
 
 // API Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/integrations', integrationsRoutes);
 app.use('/api/brands', brandRoutes);
 app.use('/api/content', contentRoutes);
 app.use('/api/creatives', creativeRoutes);
@@ -319,6 +332,11 @@ app.use('/api/funnel-agentic', funnelAgenticRoutes);
 app.use('/api/media', mediaUploadRoutes);
 app.use('/api/studio-reports', studioReportRoutes);
 app.use('/api/retention-studio', retentionStudioRoutes);
+
+// ── Internal MCP Tool Server (SSE) — must come AFTER body parsers ──
+// Exposes platform intelligence tools to all studio agents via mcpBridge
+app.use('/mcp/tools', createMantramMcpRouter());
+console.log('🔌 MCP Tool Server mounted at /mcp/tools/sse');
 
 // Error handler
 app.use((err, req, res, next) => {

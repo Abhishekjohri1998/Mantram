@@ -9,6 +9,7 @@ import SeoAudit from '../../models/SeoAudit.js';
 import AdCampaign from '../../models/AdCampaign.js';
 import Brand from '../../models/Brand.js';
 import { getRouter } from '../../ai/router.js';
+import { callAgent } from '../shared/agentUtils.js';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // SEO STUDIO → PM KEYWORDS
@@ -121,7 +122,19 @@ Return STRICT JSON:
         });
 
         const text = response.choices?.[0]?.message?.content || '{}';
-        return JSON.parse(text.replace(/```json?\n?/g, '').replace(/```/g, '').trim());
+        return (() => {
+            let _t = text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+            const lastThinkIdx = _t.lastIndexOf('<think>');
+            if (lastThinkIdx !== -1) {
+                const beforeThink = _t.substring(0, lastThinkIdx).trim();
+                const jsonAfter = _t.substring(lastThinkIdx).match(/\{[\s\S]*\}/);
+                if (!jsonAfter && (beforeThink.endsWith('}') || beforeThink.endsWith(']'))) {
+                    _t = beforeThink;
+                }
+            }
+            const jm = _t.match(/\{[\s\S]*\}/) || _t.match(/\[[\s\S]*\]/);
+            try { return JSON.parse(jm ? jm[0] : _t); } catch(e) { return {}; }
+        })();
     } catch (e) {
         console.error('Content calendar bridge error:', e.message);
         return { calendar: [], error: e.message };
@@ -178,7 +191,19 @@ Suggested paid keywords: ${seo.suggestedForPaid?.slice(0, 10).join(', ') || 'Non
         });
 
         const text = response.choices?.[0]?.message?.content || '{}';
-        const analysis = JSON.parse(text.replace(/```json?\n?/g, '').replace(/```/g, '').trim());
+        const analysis = (() => {
+            let _t = text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+            const lastThinkIdx = _t.lastIndexOf('<think>');
+            if (lastThinkIdx !== -1) {
+                const beforeThink = _t.substring(0, lastThinkIdx).trim();
+                const jsonAfter = _t.substring(lastThinkIdx).match(/\{[\s\S]*\}/);
+                if (!jsonAfter && (beforeThink.endsWith('}') || beforeThink.endsWith(']'))) {
+                    _t = beforeThink;
+                }
+            }
+            const jm = _t.match(/\{[\s\S]*\}/) || _t.match(/\[[\s\S]*\]/);
+            try { return JSON.parse(jm ? jm[0] : _t); } catch(e) { return {}; }
+        })();
 
         return {
             ...analysis,

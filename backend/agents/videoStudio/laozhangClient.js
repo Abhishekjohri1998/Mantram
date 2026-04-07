@@ -183,12 +183,18 @@ export async function getLaozhangVideoStatus(requestId) {
 export async function laozhangImageGenerate(prompt, { model = 'gemini-3.1-flash-image-preview', size = '1024x1024' } = {}) {
     const apiKey = getApiKey();
     console.log(`🖼️  [LaoZhang] Image generation: ${model}, size=${size}`);
+
+    // LaoZhang's OpenAI-compatible /generations endpoint silently drops non-square sizes that DALL-E wouldn't accept.
+    // To ensure NanoBanana 2 (Gemini-3.1) respects custom boundaries like 1080x1350 or 100x900, we must force it in prompt.
+    const arInstruction = size !== '1024x1024' ? `\n\n[CRITICAL REQUIREMENT: Generate this exact aspect ratio/size: ${size}]` : '';
+    const finalPrompt = prompt + arInstruction;
+
     console.log(`   📝 prompt (first 200): ${prompt?.substring(0, 200)}...`);
 
     const response = await fetch(`${LAOZHANG_BASE_URL}/images/generations`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-        body: JSON.stringify({ model, prompt, n: 1, size, response_format: 'url' }),
+        body: JSON.stringify({ model, prompt: finalPrompt, n: 1, size, response_format: 'url' }),
         signal: AbortSignal.timeout(90000),
     });
 
@@ -228,13 +234,13 @@ export async function laozhangMultimodalImageGenerate(prompt, imageUrls = [], { 
     for (const url of imageUrls) {
         if (url && url.startsWith('http')) contentParts.push({ type: 'image_url', image_url: { url } });
     }
-    const arInstruction = size !== '1024x1024' ? `Generate this image at ${size} resolution. ` : '';
-    contentParts.push({ type: 'text', text: arInstruction + prompt });
+    const arInstruction = size !== '1024x1024' ? `\n\n[CRITICAL REQUIREMENT: Generate this exact aspect ratio/size: ${size}]` : '';
+    contentParts.push({ type: 'text', text: prompt + arInstruction });
 
     const response = await fetch(`${LAOZHANG_BASE_URL}/chat/completions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-        body: JSON.stringify({ model, messages: [{ role: 'user', content: contentParts }] }),
+        body: JSON.stringify({ model, messages: [{ role: 'user', content: contentParts }], size }),
         signal: AbortSignal.timeout(90000),
     });
 

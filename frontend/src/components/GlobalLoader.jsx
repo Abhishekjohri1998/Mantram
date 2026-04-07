@@ -39,21 +39,28 @@ export default function GlobalLoader({
     elapsed = 0,
     estimatedDuration = 30,
     icon = 'troubleshoot',
+    startedAt = null, // Unix timestamp (ms) — if provided, elapsed is calculated from this
 }) {
     if (!isActive) return null;
 
-    const [localElapsed, setLocalElapsed] = useState(0);
+    const [localElapsed, setLocalElapsed] = useState(() => {
+        // If we have a startedAt anchor, compute elapsed immediately (survives re-renders)
+        if (startedAt) return Math.floor((Date.now() - startedAt) / 1000);
+        return 0;
+    });
 
-    // Reset timer when the loader becomes active or title changes (new task)
-    useEffect(() => {
-        setLocalElapsed(0);
-    }, [title]);
-
+    // Stable elapsed timer: anchor to startedAt if provided, so it never resets on re-render
     useEffect(() => {
         if (elapsed > 0) { setLocalElapsed(elapsed); return; }
-        const timer = setInterval(() => setLocalElapsed(prev => prev + 1), 1000);
+        const timer = setInterval(() => {
+            if (startedAt) {
+                setLocalElapsed(Math.floor((Date.now() - startedAt) / 1000));
+            } else {
+                setLocalElapsed(prev => prev + 1);
+            }
+        }, 1000);
         return () => clearInterval(timer);
-    }, [elapsed]);
+    }, [elapsed, startedAt]);
 
     // Determine if we have real pipeline steps
     const hasRealSteps = pipelineSteps.length > 0;

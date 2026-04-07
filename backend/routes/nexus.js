@@ -21,6 +21,7 @@ import { protect } from '../middleware/auth.js';
 import { getRouter } from '../ai/router.js';
 import { getSmartRouter } from '../ai/smartRouter.js';
 import { loadBrandContext, callMultimodalAgent } from '../agents/shared/agentUtils.js';
+import redis from '../utils/redisClient.js';
 import User from '../models/User.js';
 import { safeErrorMessage } from '../utils/safeError.js';
 import { inferBrandLanguage, buildLanguageDirective } from '../utils/brandLanguage.js';
@@ -210,8 +211,29 @@ Write like you're texting. Plain text. Line breaks between thoughts. Emojis for 
 → Content creation → as long as needed to deliver a complete, polished piece
 → Brainstorming → 5-10 ideas with brief descriptions`;
 
-// Conversation history per user (in-memory)
-const conversationHistory = new Map();
+// Conversation history — Redis-backed (survives restarts, 30-day TTL)
+// Key: nexus:memory:{userId}  |  Value: JSON array of {role, content} messages
+const NEXUS_MEMORY_KEY = (userId) => `nexus:memory:${userId}`;
+const NEXUS_MEMORY_TTL = 30 * 24 * 60 * 60; // 30 days
+const NEXUS_MAX_MESSAGES = 20;
+
+async function getNexusHistory(userId) {
+    try {
+        const raw = await redis.get(NEXUS_MEMORY_KEY(userId));
+        return raw ? JSON.parse(raw) : [];
+    } catch { return []; }
+}
+
+async function saveNexusHistory(userId, history) {
+    try {
+        const trimmed = history.slice(-NEXUS_MAX_MESSAGES);
+        await redis.setex(NEXUS_MEMORY_KEY(userId), NEXUS_MEMORY_TTL, JSON.stringify(trimmed));
+    } catch (e) { console.warn('[Nexus] History save failed (non-fatal):', e.message); }
+}
+
+async function clearNexusHistory(userId) {
+    try { await redis.del(NEXUS_MEMORY_KEY(userId)); } catch { /* silent */ }
+}
 
 // ============================================================================
 // HELPERS
@@ -458,13 +480,10 @@ router.post('/chat', protect, async (req, res) => {
         // Creation intents — fall through to LLM chat so Fidato handles them directly
 
         // 5. Chat intent — use language-aware LLM
-        // Get/create conversation history
-        if (!conversationHistory.has(userId)) {
-            conversationHistory.set(userId, []);
-        }
-        const history = conversationHistory.get(userId);
+        // Get/restore conversation history from Redis (survives server restarts)
+        const history = await getNexusHistory(userId);
         history.push({ role: 'user', content: message });
-        if (history.length > 20) history.splice(0, history.length - 20);
+        if (history.length > NEXUS_MAX_MESSAGES) history.splice(0, history.length - NEXUS_MAX_MESSAGES);
 
         let brandContext = '';
         let brandName = '';
@@ -664,8 +683,9 @@ ${brandContext ? `## Active Brand Context\n${brandContext}` : '(No brand selecte
             .replace(/\n{3,}/g, '\n\n')
             .trim();
 
-        // Save to history
+        // Persist to Redis
         history.push({ role: 'assistant', content: reply });
+        await saveNexusHistory(userId, history);
 
         // TTS if voice mode active — Sarvam handles ALL languages including English
         let ttsData = null;
@@ -727,11 +747,10 @@ router.post('/stream', protect, async (req, res) => {
 
         // Creation intents — fall through to LLM streaming so Fidato handles them directly
 
-        // Chat — stream the response
-        if (!conversationHistory.has(userId)) conversationHistory.set(userId, []);
-        const history = conversationHistory.get(userId);
+        // Chat — restore history from Redis + stream the response
+        const history = await getNexusHistory(userId);
         history.push({ role: 'user', content: message });
-        if (history.length > 20) history.splice(0, history.length - 20);
+        if (history.length > NEXUS_MAX_MESSAGES) history.splice(0, history.length - NEXUS_MAX_MESSAGES);
 
         let brandContext = '';
         let brandName = '';
@@ -952,8 +971,9 @@ ${brandContext ? `## Active Brand Context\n${brandContext}` : '(No brand selecte
             .replace(/\n{3,}/g, '\n\n')
             .trim();
 
-        // Save to conversation history
+        // Persist stream reply to Redis (same key as /chat — both handlers share history)
         history.push({ role: 'assistant', content: fullReply });
+        await saveNexusHistory(userId, history);
 
         // DO NOT send TTS through SSE (200KB+ base64 breaks stream parsing)
         // Frontend calls /api/nexus/tts separately
@@ -1240,8 +1260,8 @@ router.post('/preferences', protect, async (req, res) => {
 // ============================================================================
 // POST /api/nexus/clear — Clear conversation history
 // ============================================================================
-router.post('/clear', protect, (req, res) => {
-    conversationHistory.delete(String(req.user._id));
+router.post('/clear', protect, async (req, res) => {
+    await clearNexusHistory(String(req.user._id));
     res.json({ success: true });
 });
 

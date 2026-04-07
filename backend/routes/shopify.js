@@ -72,11 +72,12 @@ router.post('/connect', protect, async (req, res) => {
         const cleanDomain = shopDomain.replace(/^https?:\/\//, '').replace(/\/$/, '');
         const authUrl = getShopifyAuthUrl(cleanDomain, clientId, redirectUri) + `&state=${statePayload}`;
 
-        // Save pending integration — must match unique index (user, platform, brand) to prevent duplicate key errors
+        // Save pending integration — must match unique shop domain to prevent duplicate key errors
         await Integration.findOneAndUpdate(
             {
                 user: req.user._id,
                 platform: 'shopify',
+                'platformData.shopDomain': cleanDomain,
                 ...(brandId ? { brand: brandId } : { brand: { $exists: false } })
             },
             {
@@ -118,6 +119,7 @@ router.post('/connect-token', protect, async (req, res) => {
         const query = {
             user: req.user._id,
             platform: 'shopify',
+            'platformData.shopDomain': cleanDomain,
             ...(brandId ? { brand: brandId } : { brand: { $exists: false } })
         };
 
@@ -181,7 +183,7 @@ router.get('/callback', async (req, res) => {
         }
 
         // Find the integration — match by shop domain and brand (decoded from state)
-        const query = { platform: 'shopify' };
+        const query = { platform: 'shopify', 'platformData.shopDomain': shop };
         if (userId) query.user = userId;
         if (brandId) query.brand = brandId;
         else query.brand = { $exists: false };

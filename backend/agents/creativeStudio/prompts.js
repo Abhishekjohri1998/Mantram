@@ -186,7 +186,7 @@ RESPONSE FORMAT — valid JSON only:
   "designTrend": "Name of chosen aesthetic framework",
   "suggestedHeadline": "Catchy 3-5 word headline or null",
   "productIntegration": "hero | supporting | ambient | none",
-  "primaryPrompt": "The image prompt — one flowing paragraph, 100-180 words. Start with the emotional scene, layer in brand/product at the right proportion. Include: specific lighting setup, texture elements, depth layers, and cinematic quality. End with: professional photography, shot on [appropriate camera], ultra sharp, award-winning commercial photography.",
+  "primaryPrompt": "Follow this exact master structure: [Type of image], featuring [main subject], [action], in [setting], with [mood]. Use [composition], [lighting], and [brand color palette]. Include [important details/textures]. Final look should be [quality]. 100-180 words total.",
   "negativePrompt": "flat lighting, stock photo pose, centered floating product with no context, watermark, border, logo text, hex code, dimension labels, color swatches, poor anatomy, extra limbs, text artifacts",
   "engineeringNotes": "Design trend chosen and rationale for creative decisions"
 }`;
@@ -213,14 +213,20 @@ PROMPT ENGINEERING MASTERCLASS
 
 THE 80/20 RULE: First 10 words determine 80% of the image. Front-load the MOST IMPORTANT visual.
 
-SENTENCE STRUCTURE (follow this order):
-1. THE SCENE + EMOTIONAL ACTION: "A dramatic below-angle cinematic shot of..." / "A sun-drenched overhead flat-lay of..."
-2. THE HERO: Hyper-specific product/subject description with materials and textures
-3. THE ENVIRONMENT: Where in the world is this? What's the atmosphere?
-4. THE LIGHT: One specific light source, direction, quality, color temperature
-5. THE TEXTURE/SURFACE: What surfaces ground the composition?
-6. DEPTH/LAYERS: What's in foreground? Background? Bokeh?
-7. QUALITY ANCHORS: Camera, lens, style reference
+THE IDEAL PROMPT STRUCTURE (follow strictly in this order):
+1. Main subject: Who or what is the focus.
+2. What is happening: Action, expression, pose, interaction.
+3. Environment/Setting: Where it is happening.
+4. Mood and atmosphere: Emotional tone, time of day, weather, energy.
+5. Visual style: Realistic, cinematic, 3D cartoon, editorial, etc.
+6. Composition and camera: Close-up, wide shot, eye level, symmetrical, etc.
+7. Lighting and color: Soft light, neon glow, golden hour, specific color palette.
+8. Important details: Textures, materials, clothing, objects.
+9. Layout rules: Spacing, clean composition, text rules (if any).
+10. Quality/Render: Highly detailed, ultra-realistic, cinematic finish.
+
+FUSE INTO THIS MASTER FORMULA:
+[Type of image/visual style], featuring [main subject], [action/expression], in [setting/background], with [mood/atmosphere]. Use [composition/camera], [lighting], and [color palette]. Include [important details]. Keep [layout rules]. Final look should be [quality outcome].
 
 MATERIAL LANGUAGE LIBRARY (use these):
 - Metal: "brushed titanium", "satin-finish aluminum", "oxidized copper"

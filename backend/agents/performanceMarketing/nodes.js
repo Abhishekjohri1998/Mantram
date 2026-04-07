@@ -11,7 +11,7 @@ import AdLearning from '../../models/AdLearning.js';
 import Integration from '../../models/Integration.js';
 import Product from '../../models/Product.js';
 import { getRouter } from '../../ai/router.js';
-import { callMultimodalAgent, loadBrandContext } from '../shared/agentUtils.js';
+import { callAgent, callMultimodalAgent, loadBrandContext, buildBrandContext } from '../shared/agentUtils.js';
 import {
     COMPETITOR_RESEARCH_PROMPT,
     STRATEGY_PROMPT,
@@ -28,20 +28,8 @@ import { getKeywordTrends, getRelatedQueries } from './webIntelligence.js';
 import { runKeywordIntelligence } from '../../utils/keyword-intelligence.js';
 import { getSEOKeywordsForTargeting } from './crossStudioBridge.js';
 
-// ── Helper: Build brand context string ──
-function buildBrandCtx(brand) {
-    if (!brand) return '';
-    return [
-        `BRAND NAME: ${brand.name || 'Unknown'}`,
-        brand.industry ? `INDUSTRY: ${brand.industry}` : '',
-        brand.description ? `DESCRIPTION: ${brand.description}` : '',
-        brand.targetAudience ? `TARGET AUDIENCE: ${brand.targetAudience}` : '',
-        brand.brandVoice ? `BRAND VOICE: ${brand.brandVoice}` : '',
-        brand.values?.length ? `VALUES: ${brand.values.join(', ')}` : '',
-        brand.competitors?.length ? `KNOWN COMPETITORS: ${brand.competitors.join(', ')}` : '',
-        brand.website ? `WEBSITE: ${brand.website}` : '',
-    ].filter(Boolean).join('\n');
-}
+// buildBrandContext imported from '../shared/agentUtils.js' above
+// (canonical version — includes DNA, knowledge bank, product catalog, market rules)
 
 // ══════════════════════════════════════════════════════════════════════════════
 // NODE 1: COMPETITOR RESEARCH — Analyze competitor ads & strategies
@@ -735,7 +723,8 @@ export async function pmVisualGroundingNode(state) {
 
     console.log('🧠 PM MCoT: Visual grounding — fetching brand/product images...');
     try {
-        const brand = await Brand.findById(state.brandId).lean();
+        // Use cached loadBrandContext — avoids raw Brand.findById on every MCoT call
+        const { brand } = await loadBrandContext(state.brandId);
         if (!brand) return state;
 
         const imageUrls = [];

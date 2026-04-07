@@ -10,6 +10,7 @@ import AdLearning from '../../models/AdLearning.js';
 import AdReport from '../../models/AdReport.js';
 import AdCampaign from '../../models/AdCampaign.js';
 import { getRouter } from '../../ai/router.js';
+import { callAgent } from '../shared/agentUtils.js';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // EXTRACT LEARNINGS — Analyze completed work and extract insights
@@ -203,7 +204,9 @@ export async function generateMetaLearnings(brandId, userId) {
         const text = result.text || '';
         const jsonMatch = text.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
-            const parsed = JSON.parse(jsonMatch[0]);
+            const parsed = (() => {
+                try { return ( (() => { try { return JSON.parse(jsonMatch[0]); } catch(e) { return {}; } })() ); } catch(e) { return {}; }
+           })();
             return parsed.metaInsights || [];
         }
     } catch (e) {

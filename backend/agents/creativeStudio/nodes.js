@@ -11,6 +11,7 @@ import { callAgent, callMultimodalAgent, loadBrandContext } from '../shared/agen
 import Brand from '../../models/Brand.js';
 import Product from '../../models/Product.js';
 import { inferBrandLanguage, buildLanguageDirective } from '../../utils/brandLanguage.js';
+import { callMcpToolsParallel } from '../../mcp/registry.js';
 import {
     ART_DIRECTOR_PROMPT,
     FAST_CREATIVE_DIRECTOR_PROMPT,
@@ -21,6 +22,43 @@ import {
     VISUAL_GROUNDING_PROMPT,
     POST_GENERATION_CRITIC_PROMPT,
 } from './prompts.js';
+
+
+// ── MCP MARKET INTEL NODE — Runs BEFORE Art Director ──
+// Uses MCP to fetch live visual trends + web intel for the brand.
+// Non-blocking: if MCP is unavailable, pipeline continues without market intel.
+// NOTE: brandIntelligenceNode has already run — read industry directly from state
+// to avoid a redundant loadBrandContext() DB/Redis hit.
+export async function mcpMarketIntelNode(state) {
+    // Read industry directly from the brand intel state populated by brandIntelligenceNode
+    const industry = state.brandIntel?.industry || '';
+
+    console.log('🔎 Creative MCP: Fetching live market intelligence...');
+    const startMs = Date.now();
+
+    try {
+        const results = await callMcpToolsParallel([
+            { tool: 'fetch_trending',  args: { brandId: state.brandId } },
+            { tool: 'web_search',      args: { query: `visual design trends ${industry} ${new Date().getFullYear()} advertising creative`, mode: 'quick' } },
+        ]);
+
+        const trending  = results['fetch_trending'];
+        const webSearch = results['web_search'];
+
+        const trendingTopics = (trending?.data?.trending || []).slice(0, 4).map(t => `• ${t.topic}`).join('\n');
+        const viralFormats   = (trending?.data?.viralFormats || []).slice(0, 3).join(', ');
+        const calendarHooks  = (trending?.data?.calendarHooks || []).slice(0, 3).join(', ');
+        const webIntel       = webSearch?.data ? String(webSearch.data).substring(0, 800) : '';
+
+        state.marketIntel = { trendingTopics, viralFormats, calendarHooks, webIntel, source: 'mcp' };
+        console.log(`✅ Creative MCP: Market intel fetched in ${Date.now() - startMs}ms`);
+    } catch (err) {
+        console.warn('⚠️ Creative MCP: Market intel skipped (non-blocking):', err.message);
+        state.marketIntel = null;
+    }
+
+    return state;
+}
 
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -449,6 +487,10 @@ export async function artDirectorNode(state) {
         // When no product is matched, give the agent the full catalog + decision authority
         intel.brandType === 'product' && !mp ? `\n🧠 AGENTIC DECISION REQUIRED — NO PRODUCT WAS AUTO-MATCHED:\nThe user's brief didn't clearly reference any specific product. As the Art Director, YOU must decide:\n1. ANALYZE the brief — does it have ANY thematic connection to a product category? (e.g. "summer vibes" → portable speakers/earbuds)\n2. If YES → pick the most relevant product from the catalog below and integrate it naturally at a SUPPORTING level (30-40% of the image)\n3. If the brief is an OCCASION/GREETING → create a brand-atmosphere scene using the brand's visual identity, colors, and personality. Products appear as ambient props if at all (10-20%), NOT as the hero.\n4. If the brief is PURELY about brand identity → showcase the brand's world without forcing any product.\n\nDO NOT randomly pick a product just to fill space. Make a creative decision.` : '',
         !mp && intel.productCandidates?.length > 0 ? `\nAVAILABLE PRODUCTS IN CATALOG (pick ONLY if relevant to the brief):\n${intel.productCandidates.map(c => `• ${c.title}${c.category ? ` [${c.category}]` : ''}: ${c.description || 'No description'}${c.images?.length > 0 ? ' 📸' : ''}`).join('\n')}` : '',
+        // ── MCP Live Market Intelligence ──
+        state.marketIntel?.trendingTopics ? `\n📡 LIVE TRENDING TOPICS RIGHT NOW (from MCP):\n${state.marketIntel.trendingTopics}\nUse these as creative context if relevant to the brief.` : '',
+        state.marketIntel?.viralFormats ? `VIRAL AD FORMATS THIS WEEK: ${state.marketIntel.viralFormats}` : '',
+        state.marketIntel?.calendarHooks ? `UPCOMING CALENDAR HOOKS: ${state.marketIntel.calendarHooks}` : '',
     ].filter(Boolean).join('\n');
 
     const result = await callAgent(ART_DIRECTOR_PROMPT(brandContext), userPrompt, 0.7);
@@ -698,7 +740,12 @@ export async function copywriterNode(state) {
         resolvedBrandContext = ctx;
         brandObj = brand;
     }
+    // Use brandIntel (already loaded by brandIntelligenceNode) before doing a raw DB call
+    if (!brandObj && state.brandIntel) {
+        brandObj = { name: state.brandIntel.name, dna: { targetAudience: state.brandIntel.targetAudience, voice: { personality: state.brandIntel.personality }, defaultLanguage: state.brandIntel.defaultLanguage } };
+    }
     if (!brandObj && state.brandId) {
+        // Last resort — only reached if pipeline skipped brandIntelligenceNode entirely
         brandObj = await Brand.findById(state.brandId).select('name dna').lean();
     }
 
@@ -1010,9 +1057,17 @@ export async function runCreativePipeline(params) {
     const productName = state.matchedProduct?.title || '';
     emit('brand-intel', productName ? `Matched product: ${productName}` : 'Brand context loaded', 'done', productName ? `Using "${productName}" as hero product` : '');
 
+    // Node 0b: MCP Market Intelligence — live trends injected into art direction (non-blocking, runs fast from cache)
+    emit('brand-intel', 'Fetching live visual trends (MCP)...', 'working');
+    state = await mcpMarketIntelNode(state);
+    if (state.marketIntel) {
+        emit('brand-intel', '📡 Live trend data injected', 'done', state.marketIntel.viralFormats?.substring(0, 60) || '');
+    }
+
     // ── STEP 1: Parallel Node Execution (Visual Grounding + Art/Director + Copywriter) ──
     // We run independent agents in parallel to drastically reduce pipeline latency.
     const nodePromises = [];
+
 
     // Promise 1: Visual Grounding (Multimodal MCoT)
     const visualGroundingTask = (async () => {
@@ -1096,20 +1151,6 @@ export async function runCreativePipeline(params) {
         ? (state.engineeredPrompt?.primaryPrompt || brief)
         : (state.styleCritique?.improvedPrompt || state.engineeredPrompt?.primaryPrompt || brief);
 
-    // ── Inject GLOBAL Brand Directives (Colors & Personality) ──
-    const brand = state.brandIntel;
-    if (brand) {
-        const brandAttributes = [
-            `\n═══ BRAND INTEGRITY DIRECTIVES ═══`,
-            brand.colors?.length > 0 ? `COLOR PALETTE: Use ${brand.colors.join(', ')} as the primary visual atmosphere. Ensure these colors dominate the lighting and surfaces. (Do NOT render color names as text).` : '',
-            brand.designStyle ? `BRAND STYLE: ${brand.designStyle}` : '',
-            brand.imageMood ? `BRAND MOOD: ${brand.imageMood}` : '',
-            brand.designRules?.length > 0 ? `GUIDELINES: ${brand.designRules.slice(0, 3).join('; ')}` : '',
-            brand.designAvoid?.length > 0 ? `AVOID: ${brand.designAvoid.slice(0, 3).join('; ')}` : '',
-            `═══════════════════════════════════`
-        ].filter(Boolean).join('\n');
-        state.finalPrompt = state.finalPrompt + '\n' + brandAttributes;
-    }
 
     // Inject Visual Grounding rationale (MCoT Stage 2)
     if (state.visualGrounding?.generationGuidance) {

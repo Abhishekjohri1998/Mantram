@@ -15,6 +15,7 @@ import AdReport from '../../models/AdReport.js';
 import AdLearning from '../../models/AdLearning.js';
 import Brand from '../../models/Brand.js';
 import { getRouter } from '../../ai/router.js';
+import { callAgent } from '../shared/agentUtils.js';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // INDUSTRY BENCHMARK DATA (2024-2025 Averages)
@@ -205,7 +206,19 @@ STRATEGIC RULE: Every item MUST reference specific numbers from the data. If an 
         });
 
         const text = response.choices?.[0]?.message?.content || '{}';
-        const aiInsights = JSON.parse(text.replace(/```json?\n?/g, '').replace(/```/g, '').trim());
+        const aiInsights = (() => {
+            let _t = text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+            const lastThinkIdx = _t.lastIndexOf('<think>');
+            if (lastThinkIdx !== -1) {
+                const beforeThink = _t.substring(0, lastThinkIdx).trim();
+                const jsonAfter = _t.substring(lastThinkIdx).match(/\{[\s\S]*\}/);
+                if (!jsonAfter && (beforeThink.endsWith('}') || beforeThink.endsWith(']'))) {
+                    _t = beforeThink;
+                }
+            }
+            const jm = _t.match(/\{[\s\S]*\}/) || _t.match(/\[[\s\S]*\]/);
+            try { return JSON.parse(jm ? jm[0] : _t); } catch(e) { return {}; }
+        })();
 
         return { ...benchmarkData, aiInsights };
     } catch (e) {

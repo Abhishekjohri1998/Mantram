@@ -19,9 +19,15 @@ import redis from '../../utils/redisClient.js';
 const BRAND_CACHE_TTL = 300;
 
 /**
- * Call AI via router (auto-selects cheapest provider) and parse JSON response
+ * Call AI via router (auto-selects cheapest provider) and parse JSON response.
+ * @param {string}  systemPrompt
+ * @param {string}  userPrompt
+ * @param {number}  [temperature=0.7]
+ * @param {number}  [maxTokens=4096]
+ * @param {object}  [options={}]          - Optional overrides
+ * @param {string}  [options.provider]    - Force a specific provider ('google', 'anthropic', etc.)
  */
-export async function callAgent(systemPrompt, userPrompt, temperature = 0.7, maxTokens = 4096) {
+export async function callAgent(systemPrompt, userPrompt, temperature = 0.7, maxTokens = 4096, options = {}) {
     const router = getRouter();
     // Safety: Truncate extremely long prompts to prevent context overflow / max token errors
     const MAX_INPUT_CHARS = 100000; // ~25k tokens safety limit
@@ -33,7 +39,7 @@ export async function callAgent(systemPrompt, userPrompt, temperature = 0.7, max
         userPrompt: safeUser,
         temperature,
         maxTokens,
-    }); // Router auto-selects cheapest provider
+    }, options.provider ? { provider: options.provider } : undefined); // Router auto-selects unless overridden
 
     const text = result.text || '';
     try {
@@ -213,6 +219,7 @@ export function buildBrandContext(brand, products = []) {
 
     // ── Core Brand Identity ──
     if (brand.name) parts.push(`Brand: ${brand.name}`);
+    if (brand.website) parts.push(`Website: ${brand.website}`);
     if (dna.industry) parts.push(`Industry: ${dna.industry}`);
     if (dna.targetAudience) parts.push(`Target Audience: ${dna.targetAudience}`);
     if (dna.brandDescription) parts.push(`Description: ${dna.brandDescription}`);

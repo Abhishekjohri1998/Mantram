@@ -332,7 +332,7 @@ async function extractPricingFromWeb(url, modelsList, providerName) {
         const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
         
         const response = await ai.models.generateContent({
-            model: 'gemini-1.5-flash',
+            model: 'gemini-2.5-flash',
             contents: `You are an automated pricing extractor for Mantram AI. Extract the current pricing for these models:\n\n${modelsList.map(m => `- ${m.name}`).join('\n')}\n\nHere is the pricing page text from ${providerName}:\n\n${textContent}`,
             config: {
                 temperature: 0,

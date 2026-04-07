@@ -10,7 +10,6 @@
  * Brand Bible is injected into every agent prompt automatically.
  */
 
-import Brand from '../../models/Brand.js';
 import { getRouter } from '../../ai/router.js';
 import {
     buildBrandContext,
@@ -31,7 +30,8 @@ import { getPiApiGenerationStatus, resubmitPiApiTask, uploadImageToHostedUrl } f
 import { getMuApiGenerationStatus, resubmitMuApiTask } from './muapiClient.js';
 
 import { getPastProjects } from './selfLearning.js';
-import { callMultimodalAgent } from '../shared/agentUtils.js';
+import { callAgent, callMultimodalAgent, loadBrandContext } from '../shared/agentUtils.js';
+import { callMcpTool } from '../../mcp/registry.js';
 import Product from '../../models/Product.js';
 import { inferBrandLanguage, buildLanguageDirective } from '../../utils/brandLanguage.js';
 
@@ -66,17 +66,8 @@ function parseAgentJSON(text) {
     return { error: 'Failed to parse agent response', raw: text.substring(0, 500) };
 }
 
-// ── Call Claude Sonnet — for writing-heavy nodes (brainstorm, script) ──
-async function callAgent(systemPrompt, userPrompt, temperature = 0.7) {
-    const router = getRouter();
-    const result = await router.generateText({
-        systemPrompt,
-        userPrompt,
-        temperature,
-        maxTokens: 4096,
-    }); // Router auto-selects; video-studio.js handles claude fallback separately
-    return parseAgentJSON(result.text || '');
-}
+// ── Call AI model — delegates to shared callAgent (Strategy 1-4 JSON parsing, truncation safety) ──
+// Imported from '../shared/agentUtils.js' above
 
 // ── Call Gemini Flash — for utility nodes (router, curator, critic, editor) ──
 // ~10x faster than Claude, great for structured JSON tasks
@@ -92,9 +83,12 @@ async function callFastAgent(systemPrompt, userPrompt, temperature = 0.3, maxTok
 }
 
 // ── Helper: Load brand + past projects + language directive for context injection ──
+// Uses Redis-cached loadBrandContext (5-min TTL, invalidated on brand updates)
 async function loadContext(brandId, userId) {
-    const brand = await Brand.findById(brandId).lean();
+    // loadBrandContext is Redis-backed: avoids a DB hit on every node call
+    const { brand } = await loadBrandContext(brandId);
     const pastProjects = await getPastProjects(brandId, userId);
+    // buildBrandContext here is video-specific (from prompts.js) — intentionally kept separate
     const brandContext = buildBrandContext(brand);
     const styleMemory = buildStyleMemory(pastProjects);
     // Language inference — brand-aware regional language enforcement
@@ -119,8 +113,8 @@ export async function videoVisualGroundingNode(state) {
     }
 
     try {
-        // Load brand + product images
-        const brand = await Brand.findById(state.brandId).select('dna name logo').lean();
+        // Load brand via cached loadBrandContext (Brand import removed — use shared utility)
+        const { brand } = await loadBrandContext(state.brandId);
         const products = await Product.find({ brand: state.brandId, status: 'active' })
             .select('images title')
             .limit(5)
@@ -199,11 +193,23 @@ export async function brainstormNode(state) {
         ].filter(Boolean).join('\n');
     }
 
+    // ── MCP: Fetch live video trends for brainstorm enrichment ──
+    let videoTrendContext = '';
+    try {
+        const trending = await callMcpTool('fetch_trending', { brandId: state.brandId });
+        const topics = (trending?.data?.trending || []).slice(0, 3).map(t => `• ${t.topic}`).join('\n');
+        const viralFormats = (trending?.data?.viralFormats || []).slice(0, 3).join(', ');
+        if (topics || viralFormats) {
+            videoTrendContext = `\n📡 LIVE TRENDING TOPICS (via MCP):\n${topics}\nViral Video Formats: ${viralFormats}\nIncorporate relevant trends naturally into concepts.`;
+        }
+    } catch { /* non-blocking */ }
+
     const userPrompt = [
         `VIDEO BRIEF: ${state.brief || 'Create a professional video ad'}`,
         `VIDEO TYPE: ${state.videoType || 'ad-film'}`,
         imageContext,
         groundingContext,
+        videoTrendContext,
     ].filter(Boolean).join('\n');
 
     // Inject language directive into system prompt (prepend to BRAINSTORM_PROMPT)

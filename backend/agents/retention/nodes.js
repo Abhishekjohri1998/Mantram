@@ -10,6 +10,7 @@ import Integration from '../../models/Integration.js';
 import { getRouter } from '../../ai/router.js';
 import { sendRetentionEmail } from './mailer.js';
 import { buildRetentionBrandCtx, CREATIVE_DESIGN_PROMPT, MAILER_COMPOSE_PROMPT } from './prompts.js';
+import { callAgent } from '../shared/agentUtils.js';
 
 // ── Helper: Parse CSV text to contacts array ──
 function parseCSV(text) {
@@ -85,43 +86,11 @@ export function substituteTemplate(html, contact, brand) {
     return result;
 }
 
-// ── Helper: Call AI model ──
-async function callAgent(systemPrompt, userPrompt, temperature = 0.7) {
-    const router = getRouter();
-    const result = await router.generateText({
-        systemPrompt,
-        userPrompt,
-        temperature,
-        maxTokens: 8192,
-    }, { provider: 'google' }); // Use Gemini for creative tasks
-
-    const text = result.text || '';
-    try {
-        let cleaned = text;
-        // Strip <think>...</think> tags (Gemini 2.5 Flash reasoning)
-        cleaned = cleaned.replace(/<think>[\s\S]*?<\/think>/gi, '');
-        const lastThinkIdx = cleaned.lastIndexOf('<think>');
-        if (lastThinkIdx !== -1) {
-            const before = cleaned.substring(0, lastThinkIdx).trim();
-            cleaned = before.length > 0 ? before : '';
-        }
-        // Strip markdown code fences
-        cleaned = cleaned.replace(/```(?:json)?\s*\n?/gi, '');
-        cleaned = cleaned.trim();
-        
-        if (cleaned.startsWith('{')) {
-            try { return JSON.parse(cleaned); } catch (_) { /* try next */ }
-        }
-        const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-            try { return JSON.parse(jsonMatch[0]); } catch (_) { /* try next */ }
-            const fixed = jsonMatch[0].replace(/,\s*([\]}])/g, '$1').replace(/([{,]\s*)(\w+)\s*:/g, '$1"$2":');
-            try { return JSON.parse(fixed); } catch (_) { /* give up */ }
-        }
-    } catch (e) {
-        console.warn('[Retention] AI JSON parse failed:', text.substring(0, 300));
-    }
-    return { error: 'Failed to parse AI response', raw: text.substring(0, 500) };
+// ── Gemini-specific AI call — Retention locks to Google for HTML email generation ──
+// Uses canonical callAgent with provider override + 8192 token budget for full HTML
+// Note: router registers Gemini under key 'gemini', not 'google'
+function callGeminiAgent(systemPrompt, userPrompt, temperature = 0.7) {
+    return callAgent(systemPrompt, userPrompt, temperature, 8192, { provider: 'gemini' });
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -290,7 +259,7 @@ BRAND USPs: ${brand?.dna?.uniqueSellingPoints?.join(', ') || 'Direct from brand,
 
 Generate the email-safe HTML creative card following the ${templateType} style.`;
 
-    const result = await callAgent(
+    const result = await callGeminiAgent(
         CREATIVE_DESIGN_PROMPT(brandContext),
         userPrompt,
         0.8
@@ -342,7 +311,7 @@ SOCIAL LINKS:
 Generate a complete, production-ready HTML email in the ${templateType} style.
 The email should convince Amazon customers to buy direct from the brand's website.`;
 
-    const result = await callAgent(
+    const result = await callGeminiAgent(
         MAILER_COMPOSE_PROMPT(brandContext),
         userPrompt,
         0.7

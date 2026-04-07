@@ -38,6 +38,7 @@ import { scoreSiteContent, formatContentScoresForPrompt } from '../utils/content
 import CompetitorSnapshot from '../models/CompetitorSnapshot.js';
 import { getRouter } from '../ai/router.js';
 import { extractJSON } from '../utils/ai-parser.js';
+import { buildBrandContext } from '../agents/shared/agentUtils.js';
 
 const router = Router();
 
@@ -80,22 +81,9 @@ function parseJSON(text) {
   return extractJSON(text);
 }
 
-// Build brand context
-function buildBrandContext(brand) {
-  if (!brand) return '';
-  const dna = brand.dna || {};
-  return [
-    `Brand: ${brand.name}`,
-    brand.website ? `Website: ${brand.website}` : '',
-    dna.industry ? `Industry: ${dna.industry}` : '',
-    dna.brandDescription ? `Description: ${dna.brandDescription}` : '',
-    dna.targetAudience ? `Target Audience: ${dna.targetAudience}` : '',
-    dna.voice?.personality ? `Voice: ${dna.voice.personality}` : '',
-    dna.country ? `Country: ${dna.country}` : '',
-    dna.region ? `Region: ${dna.region}` : '',
-    dna.defaultLanguage ? `Language: ${dna.defaultLanguage}` : '',
-  ].filter(Boolean).join('\n');
-}
+// buildBrandContext imported from agents/shared/agentUtils.js above
+// The canonical version is a strict superset of the previous local version:
+// adds knowledge bank, product catalog, market context, and festival data.
 
 // Load brand with fallback
 async function loadBrand(brandId, userId) {

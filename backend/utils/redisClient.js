@@ -1,202 +1,144 @@
 /**
- * Redis Client — Singleton for Agent Caching
+ * Redis Client — Singleton using @upstash/redis REST SDK
  *
- * Supports:
- *   - Hosted Redis via REDIS_URL (Upstash/Railway/Redis Labs)
- *   - TLS auto-detected from rediss:// prefix
- *   - Graceful no-op fallback if Redis is unavailable
+ * Uses Upstash's official HTTPS REST API (port 443) instead of the
+ * raw Redis TCP protocol (port 6379). This works universally across
+ * all networks — dev machines, CI, production servers, restricted ISPs.
  *
- * Usage:
+ * Credentials are derived from:
+ *   UPSTASH_REDIS_REST_URL  → https://<endpoint>.upstash.io
+ *   UPSTASH_REDIS_REST_TOKEN → the password from your REDIS_URL
+ *
+ * Falls back to a no-op stub when credentials are absent — the platform
+ * continues to work without caching (Redis is never a hard dependency).
+ *
+ * Usage (identical API to previous ioredis wrapper):
  *   import redis from '../utils/redisClient.js';
- *   await redis.get('key')   → null if Redis down (never throws)
- *   await redis.setex('key', ttlSeconds, value)  → silently skips if down
- *   await redis.del('key')   → silently skips if down
+ *   await redis.get('key')               → null if missing or down
+ *   await redis.setex('key', ttl, value) → silently skips if down
+ *   await redis.del('key', ...)          → silently skips if down
+ *   await redis.ping()                   → boolean
+ *   redis.isConnected()                  → boolean
  */
 
-import IORedis from 'ioredis';
+import { Redis } from '@upstash/redis';
 
-const REDIS_URL = process.env.REDIS_URL;
-const REDIS_HOST = process.env.REDIS_HOST;
-const REDIS_PORT = parseInt(process.env.REDIS_PORT) || 6379;
-const REDIS_PASSWORD = process.env.REDIS_PASSWORD;
-const REDIS_TLS = process.env.REDIS_TLS === 'true';
+const REST_URL   = process.env.UPSTASH_REDIS_REST_URL;
+const REST_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
 
-// ── Build connection config ──────────────────────────────────────────────────
-function buildRedisConfig() {
-    // Option 1: Full URL (Upstash, Railway, Redis Labs)
-    if (REDIS_URL) {
-        const isTLS = REDIS_URL.startsWith('rediss://');
-        return {
-            mode: 'url',
-            url: REDIS_URL,
-            tls: isTLS ? {} : undefined,
-        };
-    }
-    // Option 2: Host + Port + Password (legacy splits)
-    if (REDIS_HOST) {
-        return {
-            mode: 'host',
-            host: REDIS_HOST,
-            port: REDIS_PORT,
-            password: REDIS_PASSWORD || undefined,
-            tls: REDIS_TLS ? {} : undefined,
-        };
-    }
-    // Option 3: Local (development only)
-    return { mode: 'local', host: '127.0.0.1', port: 6379 };
+const configured = !!(REST_URL && REST_TOKEN);
+
+// ── Build the Upstash REST client (only if configured) ────────────────────────
+let _client = null;
+if (configured) {
+    _client = new Redis({
+        url:   REST_URL,
+        token: REST_TOKEN,
+    });
+    console.log(`✅ Redis: Upstash REST client initialized (${REST_URL})`);
+} else {
+    console.warn('⚠️ Redis: UPSTASH_REDIS_REST_URL / TOKEN not set — running without cache');
 }
 
-// ── Create client ────────────────────────────────────────────────────────────
-let redisClient = null;
-let isAvailable = false;
-
-function createClient() {
-    const cfg = buildRedisConfig();
-    let client;
-
-    const sharedOptions = {
-        maxRetriesPerRequest: 1,
-        enableReadyCheck: false,
-        connectTimeout: 5000,
-        lazyConnect: true,
-        // Prevent connection flood on failures
-        retryStrategy: (times) => {
-            if (times > 3) {
-                console.warn('⚠️ Redis: max retries reached — running without cache');
-                return null; // Stop retrying
-            }
-            return Math.min(times * 500, 2000);
-        },
-    };
-
-    if (cfg.mode === 'url') {
-        client = new IORedis(cfg.url, {
-            ...sharedOptions,
-            tls: cfg.tls,
-        });
-    } else {
-        client = new IORedis({
-            host: cfg.host,
-            port: cfg.port,
-            password: cfg.password,
-            tls: cfg.tls,
-            ...sharedOptions,
-        });
-    }
-
-    client.on('connect', () => {
-        isAvailable = true;
-        console.log(`✅ Redis: Connected (${cfg.mode === 'url' ? 'URL' : cfg.host + ':' + cfg.port})`);
-    });
-
-    client.on('error', (err) => {
-        if (isAvailable) {
-            // Only log first error to avoid log spam
-            console.warn(`⚠️ Redis error: ${err.message} — cache disabled until reconnect`);
-        }
-        isAvailable = false;
-    });
-
-    client.on('reconnecting', () => {
-        console.log('🔄 Redis: Reconnecting...');
-    });
-
-    client.on('close', () => {
-        isAvailable = false;
-    });
-
-    return client;
-}
-
-// ── Safe wrapper — never throws ──────────────────────────────────────────────
+// ── Safe wrapper — every method is try/catch, never throws ───────────────────
 class SafeRedisClient {
-    constructor() {
-        this._client = null;
-        this._connecting = false;
-    }
 
-    async _getClient() {
-        if (this._client && isAvailable) return this._client;
-        if (!this._client && !this._connecting) {
-            this._connecting = true;
-            this._client = createClient();
-            try {
-                await this._client.connect();
-            } catch (err) {
-                console.warn(`⚠️ Redis: Could not connect — ${err.message}. Running without cache.`);
-                isAvailable = false;
-            }
-            this._connecting = false;
-        }
-        return isAvailable ? this._client : null;
+    isConnected() {
+        return configured && _client !== null;
     }
 
     /**
-     * Get a value by key. Returns null if key missing or Redis unavailable.
+     * GET — returns null if missing, down, or any error.
      */
     async get(key) {
+        if (!_client) return null;
         try {
-            const client = await this._getClient();
-            if (!client) return null;
-            return await client.get(key);
+            // @upstash/redis returns parsed value directly (not raw string)
+            // For compatibility with legacy JSON.parse callers we return the raw string.
+            const val = await _client.get(key);
+            if (val === null || val === undefined) return null;
+            // If already an object/array (Upstash auto-parses JSON), re-stringify
+            return typeof val === 'string' ? val : JSON.stringify(val);
         } catch (err) {
-            console.warn(`⚠️ Redis.get("${key}") failed: ${err.message}`);
+            console.warn(`⚠️ Redis.get("${key}"): ${err.message}`);
             return null;
         }
     }
 
     /**
-     * Set a value with TTL in seconds. Silently skips if Redis unavailable.
+     * SETEX — set with TTL in seconds.
      */
     async setex(key, ttlSeconds, value) {
+        if (!_client) return;
         try {
-            const client = await this._getClient();
-            if (!client) return;
-            await client.setex(key, ttlSeconds, value);
+            await _client.setex(key, ttlSeconds, value);
         } catch (err) {
-            console.warn(`⚠️ Redis.setex("${key}") failed: ${err.message}`);
+            console.warn(`⚠️ Redis.setex("${key}"): ${err.message}`);
         }
     }
 
     /**
-     * Delete one or more keys. Silently skips if Redis unavailable.
+     * DEL — delete one or more keys.
      */
     async del(...keys) {
+        if (!_client) return;
         try {
-            const client = await this._getClient();
-            if (!client) return;
-            await client.del(...keys);
+            await _client.del(...keys);
         } catch (err) {
-            console.warn(`⚠️ Redis.del(${keys.join(',')}) failed: ${err.message}`);
+            console.warn(`⚠️ Redis.del(${keys.join(', ')}): ${err.message}`);
         }
     }
 
     /**
-     * Check if Redis is currently reachable.
-     */
-    isConnected() {
-        return isAvailable;
-    }
-
-    /**
-     * Get connection status for health checks.
+     * PING — returns true if Upstash responds.
      */
     async ping() {
+        if (!_client) return false;
         try {
-            const client = await this._getClient();
-            if (!client) return false;
-            const result = await client.ping();
+            const result = await _client.ping();
             return result === 'PONG';
         } catch {
             return false;
         }
     }
+
+    /**
+     * INCR — increment counter. Returns new value or null on error.
+     */
+    async incr(key) {
+        if (!_client) return null;
+        try {
+            return await _client.incr(key);
+        } catch (err) {
+            console.warn(`⚠️ Redis.incr("${key}"): ${err.message}`);
+            return null;
+        }
+    }
+
+    /**
+     * EXPIRE — set TTL on an existing key (seconds).
+     */
+    async expire(key, ttlSeconds) {
+        if (!_client) return;
+        try {
+            await _client.expire(key, ttlSeconds);
+        } catch (err) {
+            console.warn(`⚠️ Redis.expire("${key}"): ${err.message}`);
+        }
+    }
+
+    /**
+     * TTL — seconds remaining. Returns -2 if key not found, -1 if no expiry.
+     */
+    async ttl(key) {
+        if (!_client) return -2;
+        try {
+            return await _client.ttl(key);
+        } catch {
+            return -2;
+        }
+    }
 }
 
-// Export singleton
 const redis = new SafeRedisClient();
-
-// Eagerly connect on import so first agent call is cached
-redis._getClient().catch(() => {});
-
 export default redis;

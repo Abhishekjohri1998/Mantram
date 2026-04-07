@@ -8,6 +8,7 @@
 import AdCampaign from '../../models/AdCampaign.js';
 import AdLearning from '../../models/AdLearning.js';
 import { getRouter } from '../../ai/router.js';
+import { callAgent } from '../shared/agentUtils.js';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // ROAS PREDICTION
@@ -117,7 +118,19 @@ Predict the expected ROAS range for this campaign.`;
         });
 
         const text = response.choices?.[0]?.message?.content || '{}';
-        const prediction = JSON.parse(text.replace(/```json?\n?/g, '').replace(/```/g, '').trim());
+        const prediction = (() => {
+            let _t = text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+            const lastThinkIdx = _t.lastIndexOf('<think>');
+            if (lastThinkIdx !== -1) {
+                const beforeThink = _t.substring(0, lastThinkIdx).trim();
+                const jsonAfter = _t.substring(lastThinkIdx).match(/\{[\s\S]*\}/);
+                if (!jsonAfter && (beforeThink.endsWith('}') || beforeThink.endsWith(']'))) {
+                    _t = beforeThink;
+                }
+            }
+            const jm = _t.match(/\{[\s\S]*\}/) || _t.match(/\[[\s\S]*\]/);
+            try { return JSON.parse(jm ? jm[0] : _t); } catch(e) { return {}; }
+        })();
 
         return {
             ...prediction,

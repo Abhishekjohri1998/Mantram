@@ -883,33 +883,8 @@ async function routedImageGenerate(promptText, imageParts = [], temperature = 0.
             'ideogram':       'flux-kontext-pro',                // → Flux Pro (ideogram not on this LZ account)
         };
         const lzModel = LZ_IMAGE_MAP[selectedModel];
-        const hasRefImages = imageParts && imageParts.length > 0;
-
-        // ── CUSTOM SIZE BYPASS: LaoZhang doesn't support arbitrary pixel sizes ──
-        // Route custom-size requests directly to fal.ai which accepts exact {width, height}
-        if (customSize && customSize.width && customSize.height) {
-            const isStandardSize = ['1024x1024', '1024x1792', '1792x1024', '1536x1024', '1024x1536'].includes(
-                `${customSize.width}x${customSize.height}`
-            );
-            if (!isStandardSize) {
-                try {
-                    console.log(`📐 Custom size ${customSize.width}x${customSize.height} → bypassing LaoZhang, routing to fal.ai (Flux) for exact pixel support`);
-                    const falEndpoint = modelConfig.endpoint || 'fal-ai/flux-pro/v1.1';
-                    const falResult = await falImageGenerate(promptText, falEndpoint, aspectRatio, customSize);
-                    return { ...falResult, provider: 'fal', model: selectedModel };
-                } catch (falErr) {
-                    console.warn(`⚠️ fal.ai custom-size failed (${falErr.message?.substring(0, 80)}), falling back to LaoZhang with nearest standard AR...`);
-                    // Fall through to LaoZhang — will use the nearest standard AR from aspectRatio
-                }
-            }
-        }
-
-        // LaoZhang supports TWO image generation modes:
-        //  1. Text-only: /v1/images/generations (all LZ models)
-        //  2. Multimodal: /v1/chat/completions (Gemini models only — supports S3 ref images)
-        // For non-multimodal models (Flux, Seedream, Ideogram): ALWAYS try LZ text-only first.
-        // Brand context is already baked into the text prompt, ref images are a bonus not a requirement.
-        const LZ_MULTIMODAL_MODELS = ['gemini-3.1-flash-image-preview'];
+        const hasRefImages = (imageParts && imageParts.length > 0) || (refImageUrls && refImageUrls.length > 0);
+        const LZ_MULTIMODAL_MODELS = ['gemini-3.1-flash-image-preview', 'gemini-3-pro-image-preview'];
         const isMultimodalCapable = LZ_MULTIMODAL_MODELS.includes(lzModel);
 
         if (lzModel && isLaozhangAvailable()) {
@@ -921,35 +896,102 @@ async function routedImageGenerate(promptText, imageParts = [], temperature = 0.
                     '3:2':  '1536x1024', '2:3':  '1024x1536',
                 };
                 const lzSize = AR_SIZE_MAP[aspectRatio] || (imageSize === '2K' ? '2048x2048' : '1024x1024');
-                // Use custom size for LaoZhang if provided
-                const finalLzSize = customSize ? `${Math.min(customSize.width, 2048)}x${Math.min(customSize.height, 2048)}` : lzSize;
+                
+                let finalLzSize = lzSize;
+
+                if (customSize && customSize.width && customSize.height) {
+                    let w = parseInt(customSize.width, 10);
+                    let h = parseInt(customSize.height, 10);
+                    
+                    if (isMultimodalCapable) {
+                        const ratio = w / h;
+                        const nativeRatios = [
+                            { str: "1:1", val: 1/1 }, { str: "1:4", val: 1/4 }, { str: "1:8", val: 1/8 },
+                            { str: "2:3", val: 2/3 }, { str: "3:2", val: 3/2 }, { str: "3:4", val: 3/4 },
+                            { str: "4:1", val: 4/1 }, { str: "4:3", val: 4/3 }, { str: "4:5", val: 4/5 },
+                            { str: "5:4", val: 5/4 }, { str: "8:1", val: 8/1 }, { str: "9:16", val: 9/16 },
+                            { str: "16:9", val: 16/9 }, { str: "21:9", val: 21/9 }
+                        ];
+                        let closestRatio = nativeRatios[0];
+                        let minDiff = Math.abs(ratio - closestRatio.val);
+                        for(let i=1; i<nativeRatios.length; i++) {
+                            const diff = Math.abs(ratio - nativeRatios[i].val);
+                            if (diff < minDiff) { minDiff = diff; closestRatio = nativeRatios[i]; }
+                        }
+                        finalLzSize = closestRatio.str;
+                        console.log(`📐 Native Gemini API: Target ${w}x${h} matches Native Ratio '${closestRatio.str}'. Passing literal string '${finalLzSize}' to LLM proxy.`);
+                    } else {
+                        finalLzSize = `${w}x${h}`;
+                        console.log(`📐 Native Ratio Enforced: passing exact ${finalLzSize} directly to backend.`);
+                    }
+                }
 
                 let lzResult;
                 const lzRefUrls = (refImageUrls || []).filter(u => u && u.startsWith('http'));
 
-                if (hasRefImages && isMultimodalCapable && lzRefUrls.length > 0) {
-                    // MULTIMODAL: Send S3 image URLs directly via chat/completions (Gemini only)
-                    console.log(`🏷️ [LaoZhang-Multimodal] ${selectedModel} → ${lzModel} with ${lzRefUrls.length} S3 URLs (size=${finalLzSize})...`);
-                    lzResult = await laozhangMultimodalImageGenerate(promptText, lzRefUrls, { model: lzModel, size: finalLzSize });
-                } else {
-                    // TEXT-ONLY: /v1/images/generations — works for ALL LZ models
-                    // Ref images aren't sent but brand context is in the text prompt
-                    if (hasRefImages && !isMultimodalCapable) {
-                        console.log(`ℹ️ [LaoZhang] ${selectedModel}: ref images present but not multimodal-capable — using text-only (brand context is in prompt)`);
+                // Route Natively if Model is Gemini to avoid DALL-E resolution constraints in LaoZhang proxy.
+                if (lzModel.includes('gemini') || selectedModel.includes('nanobanana')) {
+                    console.log(`🚀 [Native Router] Routing ${lzModel} natively to access Gemini Advanced Features.`);
+                    
+                    // FETCH IMAGE URL BUFFERS FOR NATIVE SDK
+                    // If imageParts is empty but user provided reference image URLs, dynamically download them.
+                    let finalImageParts = imageParts || [];
+                    if (finalImageParts.length === 0 && lzRefUrls && lzRefUrls.length > 0) {
+                        console.log(`📥 [Native Router] Extracting ${lzRefUrls.length} S3 Reference Images to buffers for Native payload...`);
+                        for (const url of lzRefUrls) {
+                            try {
+                                const resp = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Mantram AI Backend)' }, signal: AbortSignal.timeout(15000) });
+                                if (resp.ok) {
+                                    const buf = await resp.arrayBuffer();
+                                    const ct = resp.headers.get('content-type') || 'image/jpeg';
+                                    finalImageParts.push({ inlineData: { mimeType: ct, data: Buffer.from(buf).toString('base64') } });
+                                }
+                            } catch (e) {
+                                console.warn(`⚠️ [Native Router] Could not process ref image for payload: ${e.message}`);
+                            }
+                        }
                     }
-                    console.log(`🏷️ [LaoZhang-First] ${selectedModel} → ${lzModel} via LaoZhang (cheapest, size=${finalLzSize})...`);
-                    lzResult = await laozhangImageGenerate(promptText, { model: lzModel, size: finalLzSize });
-                }
-
-                if (lzResult?.imageUrl) {
-                    console.log(`✅ [LaoZhang] Image generated via ${lzModel}${hasRefImages && isMultimodalCapable ? ' (multimodal)' : ''}`);
+                    
+                    const routerResult = await router.generateImage({
+                        prompt: promptText,
+                        aspectRatio: finalLzSize,
+                        model: lzModel,
+                        imageParts: finalImageParts,
+                        size: imageSize
+                    }, {
+                        provider: 'gemini'
+                    });
+                    
                     return {
-                        imageUrl: lzResult.imageUrl,
+                        imageUrl: routerResult.imageUrl,
                         model: selectedModel,
-                        provider: 'laozhang',
+                        provider: 'gemini',
                         textResponse: '',
                         warnings: [],
                     };
+                } else {
+                    // NON-GEMINI LAOZHANG MODELS (Flux, Ideogram, Seedream)
+                    if (hasRefImages && isMultimodalCapable && lzRefUrls.length > 0) {
+                        console.log(`🏷️ [LaoZhang-Multimodal] ${selectedModel} → ${lzModel} with ${lzRefUrls.length} S3 URLs (size=${finalLzSize})...`);
+                        lzResult = await laozhangMultimodalImageGenerate(promptText, lzRefUrls, { model: lzModel, size: finalLzSize });
+                    } else {
+                        if (hasRefImages && !isMultimodalCapable) {
+                            console.log(`ℹ️ [LaoZhang] ${selectedModel}: ref images present but not multimodal-capable — using text-only (brand context is in prompt)`);
+                        }
+                        console.log(`🏷️ [LaoZhang-First] ${selectedModel} → ${lzModel} via LaoZhang (cheapest, size=${finalLzSize})...`);
+                        lzResult = await laozhangImageGenerate(promptText, { model: lzModel, size: finalLzSize });
+                    }
+
+                    if (lzResult?.imageUrl) {
+                        console.log(`✅ [LaoZhang] Image generated via ${lzModel}`);
+                        return {
+                            imageUrl: lzResult.imageUrl,
+                            model: selectedModel,
+                            provider: 'laozhang',
+                            textResponse: '',
+                            warnings: [],
+                        };
+                    }
                 }
             } catch (lzErr) {
                 console.warn(`⚠️ [LaoZhang] Image ${selectedModel} failed (${lzErr.message?.substring(0, 100)}), falling through to direct provider...`);
@@ -2404,11 +2446,12 @@ STRICT RULES: No text, no people, no faces, no products, no logos, no watermarks
 
         console.log(`\n🌅 Generating ONE panoramic background...`);
 
-        // Generate the panoramic — use widest ratio available (16:9)
-        // We'll scale and extend to total canvas size using sharp
+        // Generate the panoramic natively matching the width/height of the carousel panels
+        // We pass the exact customSize to NanoBanana 2, avoiding '16:9' fallback stretching
         let panoramicResult;
         try {
-            panoramicResult = await routedImageGenerate(panoramicPrompt, [], 0.3, '16:9', '1K', selectedModel, themeRefUrls, null);
+            const customSize = { width: totalW, height: totalH };
+            panoramicResult = await routedImageGenerate(panoramicPrompt, [], 0.3, '16:9', '1K', selectedModel, themeRefUrls, customSize);
         } catch(err) {
             if (req.creditsDeducted > 0) await refundCredits(req.user._id, req.creditsDeducted, 'carousel', 'Refund: Panoramic generation failed', 'creative');
             return res.status(500).json({ success: false, error: `Panoramic background failed: ${safeErrorMessage(err)}` });
@@ -2474,96 +2517,59 @@ STRICT RULES: No text, no people, no faces, no products, no logos, no watermarks
                 }
                 console.log(`✅ Split complete: ${panelBufs.length} panels at ${slideW}×${slideH}px each`);
 
-                // ── STEP 3: Per-panel AI generation with product as visual reference ──
-                // Architecture: Upload panel slice → S3 URL → routedImageGenerate(prompt, refUrls)
-                // Gemini sees the background panel + product image as vision inputs and generates
-                // a FRESH unified scene. This is the correct approach — no compositing, no SVG,
-                // no gradients. Pure AI generation like all other images in the system.
-
-                const GENRE_PRODUCT_PROMPT = {
-                    drama:        'cinematic chiaroscuro lighting, warm golden rim light, emotionally charged atmosphere, deep shadows',
-                    thriller:     'cool harsh key light, long sharp shadows, suspenseful and tense visual energy',
-                    romance:      'soft golden hour backlight, warm bokeh, dreamy hazy warmth, intimate atmosphere',
-                    comedy:       'bright cheerful high-key lighting, vibrant playful colors, energetic upbeat mood',
-                    horror:       'toxic green ambient light, harsh upward shadows, eerie fog at ground level',
-                    action:       'explosive rim lighting, lens flares, kinetic energy, high-impact bold visuals',
-                    inspirational:'golden sunrise God-rays, uplifting majestic atmosphere, hopeful and vast',
-                    luxury:       'silk-quality soft directional light, specular highlights, opulent premium atmosphere',
-                    nature:       'dappled natural sunlight, organic serene atmosphere, fresh and peaceful',
-                    tech:         'cool blue neon edge lighting, futuristic clean minimal aesthetic',
-                    modern:       'clean soft-box studio light, contemporary professional atmosphere',
-                };
-                const genrePromptAddition = GENRE_PRODUCT_PROMPT[genre] || 'professional premium marketing lighting';
-
                 const finalPanels = [];
                 for (let i = 0; i < panelBufs.length; i++) {
                     let panelBuf = panelBufs[i];
 
                     if (productImages[i]) {
                         try {
-                            console.log(`\n   🎨 Panel ${i+1}/${slideCount}: AI generation with product reference...`);
+                            console.log(`\n   🎨 Panel ${i+1}/${slideCount}: Compositing product using exact background pixels...`);
 
-                            // Upload this panel's background slice to S3 so LaoZhang can see it
-                            const panelSliceKey = `carousels/${brandId||'default'}/${carouselId}-slice-${i+1}.png`;
-                            const panelSliceUrl = await uploadToS3(panelBuf, panelSliceKey, 'image/png');
+                            // ── EXPERIMENTAL ZERO-HALLUCINATION COMPOSITING ──
+                            // Utility: Background Removal via fal.ai 
+                            const removeBackground = async (url) => {
+                                const falKey = process.env.FAL_API_KEY || process.env.FAL_KEY;
+                                if (!falKey) { console.warn('Missing FAL_API_KEY for auto-transparent cutouts'); return url; }
+                                const r = await fetch('https://queue.fal.run/fal-ai/bria/rmbg-1.4', {
+                                    method: 'POST', 
+                                    headers: { 'Authorization': `Key ${falKey}`, 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ image_url: url })
+                                });
+                                if (!r.ok) { console.warn(`Fal RMBG Failed: ${r.status}`); return url; }
+                                const d = await r.json();
+                                return d.image?.url || url;
+                            };
 
-                            // Resolve product image to S3 URL (may already be S3 or could be dataURL)
                             let productUrl = productImages[i];
-                            if (productImages[i].startsWith('data:')) {
+                            // Ensure url is an authenticated S3 link if it was base64 to allow fal.ai to download it
+                            if (productUrl.startsWith('data:')) {
                                 productUrl = await uploadToS3(
-                                    productImages[i],
-                                    `carousels/${brandId||'default'}/${carouselId}-product-${i+1}.png`
+                                    productUrl,
+                                    `carousels/${brandId||'default'}/${carouselId}-rawproduct-${i+1}.png`
                                 );
                             }
 
-                            // Build the generation prompt — tells Gemini how to fuse the two images
-                            const panelPrompt = `Create a single unified, immersive marketing carousel panel (panel ${i+1} of ${slideCount}).
+                            // Fetch transparent cutout
+                            const transparentProductUrl = await removeBackground(productUrl);
+                            const transparentProdBuf = await toBuffer(transparentProductUrl, 30000);
+                            if (!transparentProdBuf) throw new Error('Transparent cutout download failed');
 
-REFERENCE IMAGE 1 (background environment): Use this as the background setting of the full image.
-REFERENCE IMAGE 2 (subject/product): Naturally integrate this subject into the background environment from IMAGE 1.
+                            // Scale product cleanly to occupy roughly 60% of the slide frame while retaining its native proportion
+                            const targetW = Math.round(slideW * 0.60);
+                            const scaledProdBuf = await sharp(transparentProdBuf)
+                                .resize({ width: targetW, fit: 'inside' })
+                                .png()
+                                .toBuffer();
 
-REQUIREMENTS:
-- The main subject from IMAGE 2 must appear NATURALLY INSIDE the world of IMAGE 1
-- This must look like ONE unified photograph shot on location — not composited, not overlaid
-- The subject's lighting matches the environment: ${genrePromptAddition}
-- The subject has realistic ground shadow and surface interaction
-- The background from IMAGE 1 flows naturally around and behind the subject
-- Subject is prominent, centered, occupying 55-65% of frame height
-- Maintain the exact aspect ratio and dimensions — output must be ${slideW}×${slideH}
-- The scene tells a story — ${genre} genre treatment
-- NO borders, NO frames, NO text, NO logos, NO picture-in-picture, NO vignette effects
-- This is panel ${i+1} of a continuous ${slideCount}-panel carousel strip — the background environment extends beyond the edges left and right
+                            // Direct compositing: exact pixel preservation of the background slice!
+                            panelBuf = await sharp(panelBuf)
+                                .composite([{ input: scaledProdBuf, gravity: 'center' }])
+                                .png()
+                                .toBuffer();
 
-${themeStr}${moodStr}`;
-
-                            // Call the SAME pipeline as all other image generation
-                            // refImageUrls = [panelSliceUrl, productUrl] → LaoZhang multimodal sends both to Gemini
-                            console.log(`   📡 LaoZhang multimodal → Gemini with 2 visual refs (panel bg + product)`);
-                            const panelResult = await routedImageGenerate(
-                                panelPrompt,
-                                [],         // imageParts (inline) — empty, refs go via refImageUrls
-                                0.25,       // temperature — slightly creative but accurate
-                                slideRatio, // output aspect ratio
-                                '1K',
-                                selectedModel,
-                                [panelSliceUrl, productUrl],   // ← THE KEY: both images as multimodal refs
-                                null
-                            );
-
-                            if (panelResult?.imageUrl) {
-                                panelBuf = await toBuffer(panelResult.imageUrl, 30000);
-                                if (!panelBuf) throw new Error('Panel result buffer was null');
-                                // Ensure exact dimensions
-                                panelBuf = await sharp(panelBuf)
-                                    .resize(slideW, slideH, { fit: 'cover', position: 'centre' })
-                                    .png()
-                                    .toBuffer();
-                                console.log(`   ✅ Panel ${i+1}: AI generated (${panelResult.provider})`);
-                            } else {
-                                console.warn(`   ⚠️ Panel ${i+1}: generation returned no image — using clean background`);
-                            }
+                            console.log(`   ✅ Panel ${i+1}: Product perfectly composited with zero background shift.`);
                         } catch(pErr) {
-                            console.warn(`   ⚠️ Panel ${i+1}: AI generation failed (${pErr.message}) — using clean background`);
+                            console.warn(`   ⚠️ Panel ${i+1}: Exact compositing failed (${pErr.message}) — using clean background`);
                         }
                     }
 

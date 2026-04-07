@@ -334,8 +334,19 @@ export default function CreativeStudio() {
     const [selectedProduct, setSelectedProduct] = useState(null)
     const [showProductPicker, setShowProductPicker] = useState(false)
     const [productsList, setProductsList] = useState([])
-    const [activeGenerations, setActiveGenerations] = useState([]) // Array of in-progress jobs, max 3
-    const [pipelineSteps, setPipelineSteps] = useState([]) // Real-time agentic pipeline progress
+    // Each entry: { jobId, prompt, startedAt, steps: [] }
+    // steps is PER-JOB so multiple concurrent generations don't clobber each other
+    const [activeGenerations, setActiveGenerations] = useState(() => {
+        // Restore in-progress jobs on mount (survives tab navigation)
+        try {
+            const raw = localStorage.getItem('mantram_bg_jobs')
+            if (!raw) return []
+            const parsed = JSON.parse(raw)
+            return Object.values(parsed)
+                .filter(j => j.status === 'pending' || j.status === 'processing')
+                .map(j => ({ jobId: j.jobId, prompt: j.prompt || '', startedAt: j.createdAt || Date.now(), steps: [] }))
+        } catch { return [] }
+    }) // Array of in-progress jobs, max 3
     const [autoGenerate, setAutoGenerate] = useState(false)
     const [enhancing, setEnhancing] = useState(false)
     const [result, setResult] = useState(null)
@@ -1342,7 +1353,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
         if (activeGenerations.length >= 3) return // Max 3 concurrent
 
         const localJobId = `job_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
-        setActiveGenerations(prev => [...prev, { jobId: localJobId, prompt: prompt.substring(0, 60), startedAt: Date.now() }])
+        setActiveGenerations(prev => [...prev, { jobId: localJobId, prompt: prompt.substring(0, 60), startedAt: Date.now(), steps: [] }])
         setPipelineSteps([])
         setError('')
         setFeedbackState(null)
@@ -1425,7 +1436,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
 
                 // Show optimistic queued state
                 setFeedbackToast('✅ Generation queued! You can navigate to other pages — your image will be ready when done.')
-                setPipelineSteps([{ agent: 'queued', message: 'Image generation queued. Processing in background...', status: 'working' }])
+                setActiveGenerations(prev => prev.map(j => j.jobId === localJobId ? { ...j, steps: [{ agent: 'queued', message: 'Image generation queued. Processing in background...', status: 'working' }] } : j))
 
                 // Poll this specific job locally too (so the current page updates)
                 const pollLocalJob = async () => {
@@ -1435,6 +1446,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
                         attempts++
                         if (attempts > maxAttempts) {
                             clearInterval(localPollInterval)
+                            setActiveGenerations(prev => prev.filter(j => j.jobId !== localJobId))
                             return
                         }
                         try {
@@ -1450,21 +1462,20 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
                                 }
                                 if (job.warnings?.length > 0) setAiWarnings(job.warnings)
                                 setFeedbackToast('')
-                                setPipelineSteps([{ agent: 'complete', message: 'Image created successfully!', status: 'done' }])
+                                // Remove only this specific job from the active list
                                 setActiveGenerations(prev => prev.filter(j => j.jobId !== localJobId))
                             } else if (job.status === 'failed') {
                                 clearInterval(localPollInterval)
                                 setError({ message: job.errorMessage || 'Generation failed.', isRetryable: true })
                                 setActiveGenerations(prev => prev.filter(j => j.jobId !== localJobId))
                             } else if (job.status === 'processing') {
-                                // ✅ Read real agent steps from DB (brand-intel, art-director, prompt-engineer, etc.)
-                                // job.steps is populated by agentStep() in creatives.js — this drives the thinking display
-                                if (job.steps?.length > 0) {
-                                    setPipelineSteps(job.steps)
-                                } else {
-                                    // Fallback only if steps haven’t arrived yet (first poll)
-                                    setPipelineSteps([{ agent: 'brand-intel', message: 'Launching AI agent pipeline...', status: 'working' }])
-                                }
+                                // Update steps ONLY for THIS job — never overwrite siblings
+                                const newSteps = job.steps?.length > 0
+                                    ? job.steps
+                                    : [{ agent: 'brand-intel', message: 'Launching AI agent pipeline...', status: 'working' }]
+                                setActiveGenerations(prev => prev.map(j =>
+                                    j.jobId === localJobId ? { ...j, steps: newSteps } : j
+                                ))
                             }
                         } catch { /* ignore polling errors */ }
                     }, 5000)
@@ -2561,15 +2572,17 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
 
 
                         {/* ── Generating Indicators (one per active job) ── */}
+                        {/* Each job gets its own loader with its own steps — never reset by other jobs */}
                         {activeGenerations.map((job, idx) => (
                             <GlobalLoader
                                 key={job.jobId}
                                 isActive={true}
-                                title={activeGenerations.length > 1 ? `Creating visual ${idx + 1}/${activeGenerations.length}...` : 'Creating your visual...'}
-                                pipelineSteps={idx === 0 ? pipelineSteps : []}
+                                title={`Creating visual ${idx + 1}/${activeGenerations.length}...`}
+                                pipelineSteps={job.steps || []}
                                 currentStage={`${job.prompt}${job.prompt.length >= 60 ? '...' : ''}`}
                                 icon="photo_camera"
                                 estimatedDuration={60}
+                                startedAt={job.startedAt}
                             />
                         ))}
 

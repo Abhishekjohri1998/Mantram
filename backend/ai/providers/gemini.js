@@ -191,14 +191,16 @@ export class GeminiProvider extends BaseProvider {
                 
                 // Build content parts
                 const parts = [];
+                if (prompt) parts.push({ text: prompt });
+                
                 for (const ip of imageParts) {
                     if (ip.inlineData) parts.push({ inlineData: ip.inlineData });
                     if (ip.text) parts.push({ text: ip.text });
                 }
                 
-                // Append aspect ratio instruction to prompt if needed
-                const arInstruction = aspectRatio !== '1:1' ? `\n\n[ASPECT RATIO: ${aspectRatio}]` : '';
-                parts.push({ text: prompt + arInstruction });
+                // Clean aspectRatio parameter to guarantee valid native values (default to 1:1)
+                const safeARs = ["1:1","1:4","1:8","2:3","3:2","3:4","4:1","4:3","4:5","5:4","8:1","9:16","16:9","21:9"];
+                const nativeAspectRatio = safeARs.includes(aspectRatio) ? aspectRatio : '1:1';
 
                 const response = await fetch(url, {
                     method: 'POST',
@@ -208,6 +210,10 @@ export class GeminiProvider extends BaseProvider {
                         generationConfig: {
                             responseModalities: ['TEXT', 'IMAGE'],
                             temperature: 0.4,
+                            imageConfig: {
+                                aspectRatio: nativeAspectRatio,
+                                imageSize: "2K"
+                            }
                         },
                     }),
                 });
@@ -228,17 +234,20 @@ export class GeminiProvider extends BaseProvider {
                 }
 
                 const resParts = data.candidates?.[0]?.content?.parts || [];
-                let imageUrl = null;
+                let s3Url = null;
                 for (const part of resParts) {
                     if (part.inlineData?.mimeType?.startsWith('image/')) {
-                        imageUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+                        // Do NOT return base64 to frontend; extract to S3 immediately
+                        const { uploadToS3 } = await import('../../utils/s3.js');
+                        const buffer = Buffer.from(part.inlineData.data, 'base64');
+                        s3Url = await uploadToS3(buffer, `studio/gemini-native-${Date.now()}.png`, part.inlineData.mimeType);
                         break;
                     }
                 }
 
-                if (imageUrl) {
+                if (s3Url) {
                     return {
-                        imageUrl,
+                        imageUrl: s3Url,
                         model: modelId,
                         provider: 'gemini',
                         generationTime: Date.now() - startTime,

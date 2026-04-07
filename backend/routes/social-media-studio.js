@@ -9,6 +9,7 @@ import SocialAccount from '../models/SocialAccount.js';
 import { fetchRecentPosts } from '../services/socialService.js';
 import { getRouter } from '../ai/router.js';
 import { extractJSON } from '../utils/ai-parser.js';
+import { buildBrandContext } from '../agents/shared/agentUtils.js';
 
 const router = Router();
 
@@ -39,53 +40,48 @@ function parseJSON(text) {
     return extractJSON(text);
 }
 
-function buildBrandContext(brand) {
+/**
+ * Social Studio context — canonical brand context + social-specific fields
+ * Canonical buildBrandContext covers core DNA, knowledge bank, and product catalog.
+ * This wrapper adds Social Voice analysis, competitor list, and social content style
+ * fields that are unique to the Social Studio's strategy/calendar/audit prompts.
+ */
+function buildSocialContext(brand) {
     if (!brand) return '';
     const dna = brand.dna || {};
-    const lines = [
-        `Brand: ${brand.name}`,
-        dna.industry ? `Industry: ${dna.industry}` : '',
-        dna.brandDescription ? `Description: ${dna.brandDescription}` : '',
-        dna.targetAudience ? `Target Audience: ${dna.targetAudience}` : '',
-        dna.tagline ? `Tagline: ${dna.tagline}` : '',
-        dna.voice?.personality ? `Voice: ${dna.voice.personality}` : '',
-        dna.voice?.description ? `Voice Description: ${dna.voice.description}` : '',
-        dna.voice?.keywords?.length ? `Tone Keywords: ${dna.voice.keywords.join(', ')}` : '',
-        dna.contentStyle?.dos?.length ? `Content Dos: ${dna.contentStyle.dos.join(', ')}` : '',
-        dna.contentStyle?.donts?.length ? `Don'ts: ${dna.contentStyle.donts.join(', ')}` : '',
-        dna.contentStyle?.writingStyle ? `Writing Style: ${dna.contentStyle.writingStyle}` : '',
-        dna.contentStyle?.ctaStyle ? `CTA Style: ${dna.contentStyle.ctaStyle}` : '',
-        dna.contentStyle?.emojiUsage ? `Emoji Usage: ${dna.contentStyle.emojiUsage}` : '',
-        dna.contentStyle?.hashtagStyle ? `Hashtag Style: ${dna.contentStyle.hashtagStyle}` : '',
-        dna.country ? `Country: ${dna.country}` : '',
-        dna.region ? `Region: ${dna.region}` : '',
-        dna.targetMarkets?.length ? `Target Markets: ${dna.targetMarkets.join(', ')}` : '',
-        dna.defaultLanguage ? `Language: ${dna.defaultLanguage}` : '',
-        dna.colors?.length ? `Brand Colors: ${dna.colors.map(c => `${c.name || ''} ${c.hex}`).join(', ')}` : '',
-        dna.photographyStyle ? `Photography Style: ${dna.photographyStyle}` : '',
-    ];
-    // Social Voice analysis (if scraped)
+    // Start with rich canonical context (DNA + knowledge bank + product catalog)
+    let ctx = buildBrandContext(brand);
+    const extra = [];
+
+    // Social-specific content style fields (not in canonical)
+    if (dna.contentStyle?.ctaStyle) extra.push(`CTA Style: ${dna.contentStyle.ctaStyle}`);
+    if (dna.contentStyle?.emojiUsage) extra.push(`Emoji Usage: ${dna.contentStyle.emojiUsage}`);
+    if (dna.contentStyle?.hashtagStyle) extra.push(`Hashtag Style: ${dna.contentStyle.hashtagStyle}`);
+    if (dna.contentStyle?.writingStyle) extra.push(`Writing Style: ${dna.contentStyle.writingStyle}`);
+    if (dna.photographyStyle) extra.push(`Photography Style: ${dna.photographyStyle}`);
+
+    // Social Voice analysis (scraped from brand's own social accounts)
     const sv = dna.socialVoice || {};
     if (sv.captionStyle || sv.toneInsight) {
-        lines.push('--- Social Voice Analysis ---');
-        if (sv.captionStyle) lines.push(`Caption Style: ${sv.captionStyle}`);
-        if (sv.hashtagStrategy) lines.push(`Hashtag Strategy: ${sv.hashtagStrategy}`);
-        if (sv.emojiUsage) lines.push(`Social Emoji Usage: ${sv.emojiUsage}`);
-        if (sv.ctaStyle) lines.push(`Social CTA Style: ${sv.ctaStyle}`);
-        if (sv.postingPatterns) lines.push(`Posting Patterns: ${sv.postingPatterns}`);
-        if (sv.toneInsight) lines.push(`Tone Insight: ${sv.toneInsight}`);
-        if (sv.sampleCaptions?.length) lines.push(`Sample Captions: ${sv.sampleCaptions.slice(0, 3).join(' | ')}`);
+        extra.push('--- Social Voice Analysis ---');
+        if (sv.captionStyle) extra.push(`Caption Style: ${sv.captionStyle}`);
+        if (sv.hashtagStrategy) extra.push(`Hashtag Strategy: ${sv.hashtagStrategy}`);
+        if (sv.emojiUsage) extra.push(`Social Emoji Usage: ${sv.emojiUsage}`);
+        if (sv.ctaStyle) extra.push(`Social CTA Style: ${sv.ctaStyle}`);
+        if (sv.postingPatterns) extra.push(`Posting Patterns: ${sv.postingPatterns}`);
+        if (sv.toneInsight) extra.push(`Tone Insight: ${sv.toneInsight}`);
+        if (sv.sampleCaptions?.length) extra.push(`Sample Captions: ${sv.sampleCaptions.slice(0, 3).join(' | ')}`);
     }
+
     // Known competitors
     if (brand.competitors?.length) {
-        lines.push(`Known Competitors: ${brand.competitors.map(c => c.name + (c.url ? ` (${c.url})` : '')).join(', ')}`);
+        extra.push(`Known Competitors: ${brand.competitors.map(c => c.name + (c.url ? ` (${c.url})` : '')).join(', ')}`);
     }
-    // Knowledge bank summary
-    if (brand.knowledge?.entries?.length) {
-        lines.push(`Knowledge Bank: ${brand.knowledge.entries.length} entries (${brand.knowledge.entries.map(e => e.title || e.sourceType).join(', ')})`);
-    }
-    return lines.filter(Boolean).join('\n');
+
+    if (extra.length > 0) ctx += '\n' + extra.join('\n');
+    return ctx;
 }
+
 
 
 // ════════════════════════════════════════════════════════════════
@@ -402,7 +398,7 @@ router.post('/generate-strategy', protect, requireStudio('socialMediaStudio'), r
         const fullBrand = brand?._id ? await Brand.findById(brand._id).catch(() => null) : null;
         const brandToUse = fullBrand || brand;
 
-        const brandCtx = buildBrandContext(brandToUse);
+        const brandCtx = buildSocialContext(brandToUse);
         const timeframeLabel = timeframe === 'quarterly' ? '3-month quarterly' : '1-month';
         const dna = brandToUse?.dna || {};
         const isD2C = /d2c|ecommerce|e-commerce|retail|fashion|beauty|fmcg|consumer|shopify/i.test(industry || dna.industry || '');
@@ -565,7 +561,7 @@ router.post('/generate-calendar', protect, requireStudio('socialMediaStudio'), r
         const { platforms, month, year, brand, themes, postsPerWeek } = req.body;
         if (!platforms?.length) return res.status(400).json({ success: false, error: 'Select at least one platform' });
 
-        const brandCtx = buildBrandContext(brand);
+        const brandCtx = buildSocialContext(brand);
         const targetMonth = month || new Date().getMonth() + 1;
         const targetYear = year || new Date().getFullYear();
         const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -657,7 +653,7 @@ router.post('/account-audit', protect, requireStudio('socialMediaStudio'), requi
         const { platform, metrics, brand } = req.body;
         if (!platform) return res.status(400).json({ success: false, error: 'Platform is required' });
 
-        const brandCtx = buildBrandContext(brand);
+        const brandCtx = buildSocialContext(brand);
         const metricsText = metrics ? Object.entries(metrics).map(([k, v]) => `${k}: ${v}`).join('\n') : 'No metrics provided — analyze based on industry benchmarks';
 
         const systemPrompt = `You are a Social Media Audit specialist. Analyze the ${platform} account for this brand and provide a comprehensive health check.
@@ -769,7 +765,7 @@ router.post('/competitor-analysis', protect, requireStudio('socialMediaStudio'),
         const { competitors, platforms, brand } = req.body;
         if (!competitors?.length) return res.status(400).json({ success: false, error: 'Add at least one competitor' });
 
-        const brandCtx = buildBrandContext(brand);
+        const brandCtx = buildSocialContext(brand);
 
         const systemPrompt = `You are a Competitive Intelligence analyst specializing in social media. Analyze the following competitors against the brand.
 
@@ -926,7 +922,7 @@ router.post('/profile-score', protect, requireStudio('socialMediaStudio'), requi
         const rubric = PLATFORM_RUBRICS[platform];
         if (!rubric) return res.status(400).json({ success: false, error: `Unsupported platform: ${platform}` });
 
-        const brandCtx = buildBrandContext(brand);
+        const brandCtx = buildSocialContext(brand);
         const paramList = rubric.parameters.map((p, i) => `${i + 1}. ${p.name} — Benchmark: ${p.benchmark}`).join('\n');
 
         const systemPrompt = `You are an expert Social Media Profile Auditor with deep knowledge of ${rubric.label} best practices and algorithm optimization.

@@ -511,6 +511,8 @@ router.post('/:id/rescan', protect, async (req, res) => {
             updates: updateCount,
             message: `Re-scan complete! ${updateCount} fields refreshed.`,
         });
+        // Invalidate cache so next agent call fetches fresh DNA
+        invalidateBrandCache(brand._id.toString());
     } catch (error) {
         console.error('❌ Brand re-scan error:', error);
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
@@ -554,6 +556,8 @@ router.delete('/:id', protect, requireBrandOwner, async (req, res) => {
                 auditLogs: deletedLogs.deletedCount,
             },
         });
+        // Purge cache for the deleted brand
+        invalidateBrandCache(req.params.id);
     } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
@@ -759,7 +763,7 @@ router.post('/:id/knowledge/ingest', protect, knowledgeUpload.single('file'), as
             if (!content) return res.status(400).json({ success: false, error: 'Could not extract text from file' });
 
             // Upload original file to S3
-            const s3Key = `knowledge/${brandId}/${Date.now()}_${fileName}`;
+            const s3Key = `knowledge/${req.params.id}/${Date.now()}_${fileName}`;
             const s3Url = await uploadToS3(req.file.buffer, s3Key, req.file.mimetype);
             if (s3Url) sourceUrl = s3Url;
         }
@@ -864,6 +868,9 @@ router.post('/:id/knowledge/ingest', protect, knowledgeUpload.single('file'), as
             summary: `Added ${sourceType} knowledge: "${entryTitle}" (${content.length} chars)${replaceEntryId ? ' [replaced existing]' : ''}`,
         });
 
+        // Invalidate brand cache — new knowledge must be reflected immediately in agent prompts
+        invalidateBrandCache(brand._id.toString());
+
         res.json({ success: true, entry });
     } catch (error) {
         console.error('Knowledge ingest error:', error);
@@ -910,6 +917,9 @@ router.delete('/:id/knowledge/entries/:entryId', protect, async (req, res) => {
             section: 'knowledge',
             summary: `Removed ${entry.sourceType} knowledge: "${entry.title}"`,
         });
+
+        // Invalidate brand cache — deleted knowledge must stop appearing in agent prompts
+        invalidateBrandCache(brand._id.toString());
 
         res.json({ success: true, message: 'Entry deleted' });
     } catch (error) {

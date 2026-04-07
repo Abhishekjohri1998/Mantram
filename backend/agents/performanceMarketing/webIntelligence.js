@@ -276,7 +276,7 @@ function safeJSON(data) {
         if (clean.includes(")]}',")) {
             clean = clean.substring(clean.indexOf('\n') + 1);
         }
-        return JSON.parse(clean);
+        try { return JSON.parse(clean); } catch(e) { return {}; }
     } catch (e) {
         console.warn('[WebIntel] Google Trends JSON Parse failed:', e.message);
         return null;

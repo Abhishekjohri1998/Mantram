@@ -1,39 +1,97 @@
+/**
+ * Creative Generation Queue — Bull + Redis
+ *
+ * Supports:
+ *   - Upstash (rediss:// TLS) via REDIS_URL
+ *   - Standard Redis (redis://) via REDIS_URL
+ *   - Legacy REDIS_HOST/PORT/PASSWORD split config
+ *   - Local Redis (127.0.0.1:6379) for dev
+ *
+ * Bull requires explicit host/port/tls — it does NOT parse rediss:// URLs natively.
+ * We parse the URL ourselves and pass ioredis-style options.
+ */
+
 import Bull from 'bull';
 import mongoose from 'mongoose';
-import config from '../config/env.js';
 import GenerationJob from '../models/GenerationJob.js';
-import Creative from '../models/Creative.js';
 import { refundCredits } from '../middleware/credits.js';
-// We'll import internalGenerateCreative dynamically to avoid circular dependencies if any
-// or just import it if it's safe. In creatives.js it's a local function.
-// Better to move internalGenerateCreative to a service if it's shared.
-// For now, I will define the worker in index.js or a separate service file.
 
-const REDIS_URL = process.env.REDIS_URL || `redis://${process.env.REDIS_HOST || '127.0.0.1'}:${process.env.REDIS_PORT || 6379}`;
+// ── Build ioredis-compatible config for Bull ──────────────────────────────────
+function buildBullRedisConfig() {
+    const url = process.env.REDIS_URL;
 
-export const creativeQueue = new Bull('creative-generation', REDIS_URL, {
-    redis: {
-        maxRetriesPerRequest: null,
-        enableReadyCheck: false
-    },
-    settings: {
-        lockDuration: 300000, // 5 mins
-        stalledInterval: 300000,
-        maxStalledCount: 1
+    if (url) {
+        try {
+            const parsed = new URL(url);
+            const isTLS = url.startsWith('rediss://');
+            return {
+                host: parsed.hostname,
+                port: parseInt(parsed.port) || 6379,
+                password: parsed.password ? decodeURIComponent(parsed.password) : undefined,
+                username: parsed.username ? decodeURIComponent(parsed.username) : undefined,
+                // Upstash requires TLS; rejectUnauthorized: false for self-signed certs
+                tls: isTLS ? { rejectUnauthorized: false } : undefined,
+                maxRetriesPerRequest: null,
+                enableReadyCheck: false,
+                connectTimeout: 10000,
+            };
+        } catch (e) {
+            console.warn('⚠️ creativeQueue: Failed to parse REDIS_URL, falling back to host config:', e.message);
+        }
     }
+
+    // Legacy host/port/password split
+    if (process.env.REDIS_HOST) {
+        return {
+            host: process.env.REDIS_HOST,
+            port: parseInt(process.env.REDIS_PORT) || 6379,
+            password: process.env.REDIS_PASSWORD || undefined,
+            tls: process.env.REDIS_TLS === 'true' ? { rejectUnauthorized: false } : undefined,
+            maxRetriesPerRequest: null,
+            enableReadyCheck: false,
+        };
+    }
+
+    // Local development fallback
+    return {
+        host: '127.0.0.1',
+        port: 6379,
+        maxRetriesPerRequest: null,
+        enableReadyCheck: false,
+    };
+}
+
+const redisConfig = buildBullRedisConfig();
+
+export const creativeQueue = new Bull('creative-generation', {
+    redis: redisConfig,
+    settings: {
+        lockDuration:      300000, // 5 min — prevents stale lock issues
+        stalledInterval:   300000,
+        maxStalledCount:   1,
+    },
+    defaultJobOptions: {
+        attempts:      2,
+        removeOnComplete: true,  // Keep Redis clean — we store results in MongoDB
+        removeOnFail:  false,    // Keep failed jobs for debugging
+    },
 });
 
-// Worker will be initialized in index.js to ensure it has all models loaded
+creativeQueue.on('error', (err) => {
+    console.error('🚨 Bull Queue Error:', err.message);
+});
+
+// ── Worker — initialized in index.js after all models are loaded ───────────
 export const initCreativeWorker = (internalGenerateCreative) => {
     console.log('👷 Creative Worker Initialized (Concurrency: 10)');
-    
+
     creativeQueue.process(10, async (job) => {
         const { jobId, userId, payload } = job.data;
         const { brandId, type, prompt, options, creditsDeducted } = payload;
 
         try {
             console.log(`📦 [Queue] Processing JOB ${jobId} (User: ${userId})`);
-            
+
             await GenerationJob.findOneAndUpdate(
                 { jobId },
                 { status: 'processing', startedAt: new Date() }
@@ -43,12 +101,11 @@ export const initCreativeWorker = (internalGenerateCreative) => {
             const user = await User.findById(userId);
             if (!user) throw new Error('User not found for background job');
 
-            // Execute the actual generation logic
             const data = await internalGenerateCreative({
                 body: { brandId, type, prompt, options, jobId },
                 user,
                 creditsDeducted: creditsDeducted || 0,
-                jobId
+                jobId,
             });
 
             if (data?.success && data?.creative) {
@@ -59,10 +116,7 @@ export const initCreativeWorker = (internalGenerateCreative) => {
                         completedAt: new Date(),
                         creativeId: data.creative._id,
                         imageUrl: data.creative.imageUrl || data.creative.thumbnailUrl,
-                        result: {
-                            creative: data.creative,
-                            warnings: data.warnings || [],
-                        },
+                        result: { creative: data.creative, warnings: data.warnings || [] },
                     }
                 );
                 console.log(`✅ [Queue] JOB ${jobId} completed`);
@@ -72,24 +126,25 @@ export const initCreativeWorker = (internalGenerateCreative) => {
             }
         } catch (err) {
             console.error(`❌ [Queue] JOB ${jobId} failed:`, err.message);
-            
+
             await GenerationJob.findOneAndUpdate(
                 { jobId },
                 { status: 'failed', completedAt: new Date(), errorMessage: err.message }
             );
 
-            // Refund credits if applicable
             if (creditsDeducted > 0) {
                 try {
-                    await refundCredits(userId, creditsDeducted, 'creative',
-                        `Refund: Queue Job ${jobId} Failed — ${err.message}`, 'creative');
+                    await refundCredits(
+                        userId, creditsDeducted, 'creative',
+                        `Refund: Queue Job ${jobId} Failed — ${err.message}`, 'creative'
+                    );
                     console.log(`💰 [Queue] Credits refunded for JOB ${jobId}`);
                 } catch (refundErr) {
                     console.error(`❌ [Queue] Refund failed for JOB ${jobId}:`, refundErr.message);
                 }
             }
-            
-            throw err; // Allow Bull to handle retries if configured
+
+            throw err; // Let Bull handle retry logic
         }
     });
 
@@ -98,7 +153,7 @@ export const initCreativeWorker = (internalGenerateCreative) => {
     });
 
     creativeQueue.on('completed', (job) => {
-        // Clean up completed jobs to save Redis memory
-        job.remove();
+        // removeOnComplete handles this — kept for logging if needed
+        console.log(`✅ [Queue] Job ${job.id} cleaned up`);
     });
 };

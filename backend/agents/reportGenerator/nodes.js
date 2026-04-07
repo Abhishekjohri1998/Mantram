@@ -5,13 +5,13 @@
  * Pattern mirrors performanceMarketing/nodes.js: (state) → updatedState
  */
 
-import Brand from '../../models/Brand.js';
 import SeoAudit from '../../models/SeoAudit.js';
 import AdReport from '../../models/AdReport.js';
 import AdCampaign from '../../models/AdCampaign.js';
 import Funnel from '../../models/Funnel.js';
 import FunnelEntry from '../../models/FunnelEntry.js';
 import { getRouter } from '../../ai/router.js';
+import { buildBrandContext, loadBrandContext } from '../shared/agentUtils.js';
 import {
     REPORT_SECTIONS_PROMPT,
     SEO_REPORT_CONTEXT,
@@ -20,20 +20,8 @@ import {
     D2C_REPORT_CONTEXT,
 } from './prompts.js';
 
-// ── Helper: Build brand context string ──
-function buildBrandContext(brand) {
-    if (!brand) return '';
-    const dna = brand.dna || {};
-    return [
-        `BRAND: ${brand.name || 'Unknown'}`,
-        dna.industry ? `INDUSTRY: ${dna.industry}` : '',
-        dna.targetAudience ? `TARGET AUDIENCE: ${dna.targetAudience}` : '',
-        dna.voice?.personality ? `VOICE: ${dna.voice.personality}` : '',
-        dna.voice?.description ? `TONE: ${dna.voice.description}` : '',
-        dna.contentStyle?.writingStyle ? `WRITING STYLE: ${dna.contentStyle.writingStyle}` : '',
-        brand.website ? `WEBSITE: ${brand.website}` : '',
-    ].filter(Boolean).join('\n');
-}
+// buildBrandContext imported from agents/shared/agentUtils.js above
+
 
 // ── Helper: Extract branding snapshot from brand DNA ──
 function extractBranding(brand) {
@@ -214,8 +202,8 @@ export async function generateReportNode(state) {
     const { studio, reportType, userId, brandId } = state;
     console.log(`📊 Report Generator: Generating ${studio}/${reportType} report...`);
 
-    // 1. Load brand context
-    const brand = brandId ? await Brand.findById(brandId).lean() : null;
+    // 1. Load brand context (Redis-cached, 5-min TTL)
+    const { brand } = brandId ? await loadBrandContext(brandId) : { brand: null };
     const brandContext = buildBrandContext(brand);
     const branding = extractBranding(brand);
 
