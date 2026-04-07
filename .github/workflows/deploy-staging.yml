@@ -108,13 +108,13 @@ jobs:
       - name: 🚀 Deploy via SSH (staging)
         uses: appleboy/ssh-action@v1.2.3
         env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.MEDIA_AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.MEDIA_AWS_SECRET_ACCESS_KEY }}
-          AWS_S3_BUCKET: ${{ secrets.STAGING_MEDIA_S3_BUCKET }}
-          AWS_REGION: ${{ secrets.AWS_REGION }}
-          RAZORPAY_KEY_ID: ${{ secrets.RAZORPAY_KEY_ID }}
-          RAZORPAY_KEY_SECRET: ${{ secrets.RAZORPAY_KEY_SECRET }}
-          PIAPI_API_KEY: ${{ secrets.PIAPI_API_KEY }}
+          AWS_ACCESS_KEY_ID: "${{ secrets.MEDIA_AWS_ACCESS_KEY_ID }}"
+          AWS_SECRET_ACCESS_KEY: "${{ secrets.MEDIA_AWS_SECRET_ACCESS_KEY }}"
+          AWS_S3_BUCKET: "${{ secrets.STAGING_MEDIA_S3_BUCKET }}"
+          AWS_REGION: "${{ secrets.AWS_REGION }}"
+          RAZORPAY_KEY_ID: "${{ secrets.RAZORPAY_KEY_ID }}"
+          RAZORPAY_KEY_SECRET: "${{ secrets.RAZORPAY_KEY_SECRET }}"
+          PIAPI_API_KEY: "${{ secrets.PIAPI_API_KEY }}"
           STAGING_PORT: "3002"
         with:
           host: ${{ secrets.EC2_HOST }}
