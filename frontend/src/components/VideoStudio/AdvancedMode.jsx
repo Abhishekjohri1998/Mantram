@@ -209,6 +209,45 @@ export default function AdvancedMode({ activeBrand, initialData }) {
     const [error, setError] = useState('')
     const [generation, setGeneration] = useState(null)
     const [projectId, setProjectId] = useState(null)
+
+    // ── Persistence: Save/Load from localStorage ──
+    useEffect(() => {
+        const saved = localStorage.getItem('mantram_vm_state')
+        if (saved) {
+            try {
+                const state = JSON.parse(saved)
+                if (state.projectId) setProjectId(state.projectId)
+                if (state.phase) {
+                    setPhase(state.phase)
+                    if (state.phase === 'generating' && state.projectId) {
+                        startPolling(state.projectId)
+                    }
+                }
+                if (state.prompt) setPrompt(state.prompt)
+                if (state.model) setModel(state.model)
+                if (state.duration) setDuration(state.duration)
+                if (state.aspectRatio) setAspectRatio(state.aspectRatio)
+                if (state.quality) setQuality(state.quality)
+                if (state.videoMode) setVideoMode(state.videoMode)
+                if (state.firstFrame) setFirstFrame(state.firstFrame)
+                if (state.lastFrame) setLastFrame(state.lastFrame)
+                if (state.refImages) setRefImages(state.refImages)
+                if (state.i2vImage) setI2vImage(state.i2vImage)
+                if (state.generation) setGeneration(state.generation)
+            } catch (e) {
+                console.warn('VM state restore failed:', e)
+            }
+        }
+    }, [])
+
+    useEffect(() => {
+        const state = {
+            projectId, phase, prompt, model, duration, aspectRatio,
+            quality, videoMode, firstFrame, lastFrame, refImages,
+            i2vImage, generation
+        }
+        localStorage.setItem('mantram_vm_state', JSON.stringify(state))
+    }, [projectId, phase, prompt, model, duration, aspectRatio, quality, videoMode, firstFrame, lastFrame, refImages, i2vImage, generation])
     const [showLibrary, setShowLibrary] = useState(false)
     const [libraryFor, setLibraryFor] = useState(null)
     const [libraryImages, setLibraryImages] = useState([])
@@ -519,7 +558,7 @@ export default function AdvancedMode({ activeBrand, initialData }) {
                             </div>
                         </div>
                         <div className="vm-gen-info">
-                            <p style={{ fontSize: '13px', color: '#94a3b8', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}><span className="material-symbols-outlined vm-spin" style={{ fontSize: '16px', color: '#7c3aed' }}>progress_activity</span> Creating your video — usually 1-3 minutes</p>
+                            <p style={{ fontSize: '13px', color: '#94a3b8', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}><span className="material-symbols-outlined vm-spin" style={{ fontSize: '16px', color: '#7c3aed' }}>progress_activity</span> Creating your video — usually 5-10 minutes</p>
                             <div className="vm-progress-bar"><div className="vm-progress-fill" style={{ width: `${generation?.progress || 5}%` }} /></div>
                         </div>
                     </div>
@@ -585,191 +624,191 @@ export default function AdvancedMode({ activeBrand, initialData }) {
             {/* ══════════ COMPOSE — Floating Card at Bottom ══════════ */}
             {phase === 'compose' && (
                 <div className="vm-layout">
-                <div style={{ maxWidth: '780px', width: '100%', margin: '0 auto', padding: '0 4px 20px' }}>
-                    {error && (
-                        <div className="vm-err">
-                            <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>error</span>
-                            <span style={{ flex: 1 }}>{error}</span>
-                            <button onClick={() => setError('')}><span className="material-symbols-outlined" style={{ fontSize: '14px' }}>close</span></button>
-                        </div>
-                    )}
-
-                    <div className="vm-card">
-                        {/* §1 — Mode Toggle */}
-                        <div className="vm-modes">
-                            <button className={`vm-mode-btn ${videoMode === 't2v' ? 'active' : ''}`} onClick={() => setVideoMode('t2v')}>
-                                <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>text_fields</span> Text to Video
-                            </button>
-                            <button className={`vm-mode-btn ${videoMode === 'i2v' ? 'active' : ''}`} onClick={() => setVideoMode('i2v')}>
-                                <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>image</span> Image to Video <span className="badge">New</span>
-                            </button>
-                        </div>
-
-                        {/* §1b — I2V image upload */}
-                        {videoMode === 'i2v' && (
-                            <>
-                                <div className={`vm-i2v-zone ${i2vImage ? 'has' : ''}`} onClick={() => !i2vImage && i2vRef.current?.click()}>
-                                    {i2vImage ? (
-                                        <>
-                                            <img src={i2vImage.url} alt="Source" />
-                                            {i2vImage.uploading && <p style={{ fontSize: '11px', color: '#64748b', fontStyle: 'italic' }}>Uploading...</p>}
-                                            <button className="vm-i2v-remove" onClick={e => { e.stopPropagation(); setI2vImage(null) }}>×</button>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <span className="material-symbols-outlined" style={{ fontSize: '36px', color: '#7c3aed' }}>add_photo_alternate</span>
-                                            <span style={{ fontSize: '14px', color: '#94a3b8', fontWeight: 500 }}>Upload image to animate</span>
-                                            <span style={{ fontSize: '11px', color: '#475569' }}>Product photo, brand image, or any still</span>
-                                        </>
-                                    )}
-                                </div>
-                                <input ref={i2vRef} type="file" accept="image/*" onChange={onI2VFile} style={{ display: 'none' }} />
-                            </>
+                    <div style={{ maxWidth: '780px', width: '100%', margin: '0 auto', padding: '0 4px 20px' }}>
+                        {error && (
+                            <div className="vm-err">
+                                <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>error</span>
+                                <span style={{ flex: 1 }}>{error}</span>
+                                <button onClick={() => setError('')}><span className="material-symbols-outlined" style={{ fontSize: '14px' }}>close</span></button>
+                            </div>
                         )}
 
-                        {/* §2 — Prompt Area */}
-                        <div className="vm-prompt" style={{ position: 'relative' }}>
-                            <textarea
-                                ref={promptRef}
-                                className="vm-textarea"
-                                value={prompt}
-                                onChange={handlePromptChange}
-                                placeholder={videoMode === 'i2v'
-                                    ? 'Describe the motion... e.g. "Camera slowly zooms in, product rotates 360°"'
-                                    : activeBrand?.name
-                                        ? `What's your ${activeBrand.name} ad about? Type @ to tag assets...`
-                                        : 'What\'s your ad about? Type @ to tag images, video, audio...'}
-                            />
-                            {/* @ Autocomplete popup */}
-                            {showAutocomplete && acItems.length > 0 && (
-                                <div className="vm-autocomplete">
-                                    {acItems.map(item => (
-                                        <button key={item.tag} className="vm-ac-item" onClick={() => insertTag(item.tag)}>
-                                            {item.thumb ? <img src={item.thumb} alt="" /> : <span className="icon"><span className="material-symbols-outlined" style={{ fontSize: '14px' }}>{item.msIcon || 'attach_file'}</span></span>}
-                                            <span>{item.tag}</span>
-                                        </button>
+                        <div className="vm-card">
+                            {/* §1 — Mode Toggle */}
+                            <div className="vm-modes">
+                                <button className={`vm-mode-btn ${videoMode === 't2v' ? 'active' : ''}`} onClick={() => setVideoMode('t2v')}>
+                                    <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>text_fields</span> Text to Video
+                                </button>
+                                <button className={`vm-mode-btn ${videoMode === 'i2v' ? 'active' : ''}`} onClick={() => setVideoMode('i2v')}>
+                                    <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>image</span> Image to Video <span className="badge">New</span>
+                                </button>
+                            </div>
+
+                            {/* §1b — I2V image upload */}
+                            {videoMode === 'i2v' && (
+                                <>
+                                    <div className={`vm-i2v-zone ${i2vImage ? 'has' : ''}`} onClick={() => !i2vImage && i2vRef.current?.click()}>
+                                        {i2vImage ? (
+                                            <>
+                                                <img src={i2vImage.url} alt="Source" />
+                                                {i2vImage.uploading && <p style={{ fontSize: '11px', color: '#64748b', fontStyle: 'italic' }}>Uploading...</p>}
+                                                <button className="vm-i2v-remove" onClick={e => { e.stopPropagation(); setI2vImage(null) }}>×</button>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <span className="material-symbols-outlined" style={{ fontSize: '36px', color: '#7c3aed' }}>add_photo_alternate</span>
+                                                <span style={{ fontSize: '14px', color: '#94a3b8', fontWeight: 500 }}>Upload image to animate</span>
+                                                <span style={{ fontSize: '11px', color: '#475569' }}>Product photo, brand image, or any still</span>
+                                            </>
+                                        )}
+                                    </div>
+                                    <input ref={i2vRef} type="file" accept="image/*" onChange={onI2VFile} style={{ display: 'none' }} />
+                                </>
+                            )}
+
+                            {/* §2 — Prompt Area */}
+                            <div className="vm-prompt" style={{ position: 'relative' }}>
+                                <textarea
+                                    ref={promptRef}
+                                    className="vm-textarea"
+                                    value={prompt}
+                                    onChange={handlePromptChange}
+                                    placeholder={videoMode === 'i2v'
+                                        ? 'Describe the motion... e.g. "Camera slowly zooms in, product rotates 360°"'
+                                        : activeBrand?.name
+                                            ? `What's your ${activeBrand.name} ad about? Type @ to tag assets...`
+                                            : 'What\'s your ad about? Type @ to tag images, video, audio...'}
+                                />
+                                {/* @ Autocomplete popup */}
+                                {showAutocomplete && acItems.length > 0 && (
+                                    <div className="vm-autocomplete">
+                                        {acItems.map(item => (
+                                            <button key={item.tag} className="vm-ac-item" onClick={() => insertTag(item.tag)}>
+                                                {item.thumb ? <img src={item.thumb} alt="" /> : <span className="icon"><span className="material-symbols-outlined" style={{ fontSize: '14px' }}>{item.msIcon || 'attach_file'}</span></span>}
+                                                <span>{item.tag}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* §3 — Asset Tags (shows attached files) */}
+                            {allTags.length > 0 && (
+                                <div className="vm-tags">
+                                    {allTags.map(tag => (
+                                        <div key={tag.id} className={`vm-tag ${tag.linked ? 'linked' : ''}`}>
+                                            {tag.thumb ? <img src={tag.thumb} alt="" /> : <span className="icon"><span className="material-symbols-outlined" style={{ fontSize: '13px' }}>{tag.type === 'video' ? 'video_file' : tag.type === 'audio' ? 'audio_file' : 'attach_file'}</span></span>}
+                                            <span>{tag.label}</span>
+                                            {tag.linked && <span className="material-symbols-outlined" style={{ fontSize: 11, color: '#4ade80' }}>link</span>}
+                                            {tag.name && <span style={{ fontSize: 10, color: '#64748b' }}>{tag.name.length > 12 ? tag.name.slice(0, 12) + '…' : tag.name}</span>}
+                                            {tag.uploading && <span className="uploading">uploading…</span>}
+                                            <button onClick={() => removeTag(tag)}>×</button>
+                                        </div>
                                     ))}
                                 </div>
                             )}
-                        </div>
 
-                        {/* §3 — Asset Tags (shows attached files) */}
-                        {allTags.length > 0 && (
-                            <div className="vm-tags">
-                                {allTags.map(tag => (
-                                    <div key={tag.id} className={`vm-tag ${tag.linked ? 'linked' : ''}`}>
-                                        {tag.thumb ? <img src={tag.thumb} alt="" /> : <span className="icon"><span className="material-symbols-outlined" style={{ fontSize: '13px' }}>{tag.type === 'video' ? 'video_file' : tag.type === 'audio' ? 'audio_file' : 'attach_file'}</span></span>}
-                                        <span>{tag.label}</span>
-                                        {tag.linked && <span className="material-symbols-outlined" style={{ fontSize: 11, color: '#4ade80' }}>link</span>}
-                                        {tag.name && <span style={{ fontSize: 10, color: '#64748b' }}>{tag.name.length > 12 ? tag.name.slice(0, 12) + '…' : tag.name}</span>}
-                                        {tag.uploading && <span className="uploading">uploading…</span>}
-                                        <button onClick={() => removeTag(tag)}>×</button>
-                                    </div>
+                            {/* §4 — Asset Dock (compact icon buttons) */}
+                            <div className="vm-dock">
+                                {dockButtons.map(btn => (
+                                    <button key={btn.key} className={`vm-dock-btn ${btn.has ? 'has' : ''}`} onClick={btn.action} title={btn.label}>
+                                        <span className="material-symbols-outlined">{btn.msIcon}</span> {btn.label}
+                                    </button>
                                 ))}
+
+                                {/* AI First Frame button */}
+                                {m.has.firstFrame && videoMode === 't2v' && !firstFrame && (
+                                    <>
+                                        <div className="vm-dock-sep" />
+                                        <button className="vm-dock-btn ai" onClick={generateFirstFrame} disabled={generatingFrame || !prompt.trim()}>
+                                            {generatingFrame ? <span className="material-symbols-outlined vm-spin" style={{ fontSize: '14px' }}>progress_activity</span> : <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>auto_awesome</span>} AI Frame
+                                        </button>
+                                    </>
+                                )}
+
+                                {/* Library button */}
+                                {m.has.refImages && (
+                                    <>
+                                        <div className="vm-dock-sep" />
+                                        <button className="vm-dock-btn" onClick={() => loadLibrary('ref')}>
+                                            <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>photo_library</span> Library
+                                        </button>
+                                    </>
+                                )}
+
+                                <span style={{ marginLeft: 'auto', fontSize: '11px', color: '#475569' }}>{prompt.length} chars</span>
                             </div>
-                        )}
 
-                        {/* §4 — Asset Dock (compact icon buttons) */}
-                        <div className="vm-dock">
-                            {dockButtons.map(btn => (
-                                <button key={btn.key} className={`vm-dock-btn ${btn.has ? 'has' : ''}`} onClick={btn.action} title={btn.label}>
-                                    <span className="material-symbols-outlined">{btn.msIcon}</span> {btn.label}
-                                </button>
-                            ))}
+                            {/* Hidden file inputs */}
+                            <input ref={firstFrameRef} type="file" accept="image/*" onChange={e => onFile(e, setFirstFrame)} style={{ display: 'none' }} />
+                            <input ref={lastFrameRef} type="file" accept="image/*" onChange={e => onFile(e, setLastFrame)} style={{ display: 'none' }} />
+                            <input ref={refImgRef} type="file" accept="image/*" onChange={onRefFile} style={{ display: 'none' }} />
+                            <input ref={refVideoRef} type="file" accept="video/*" onChange={e => onMediaFile(e, setRefVideo)} style={{ display: 'none' }} />
+                            <input ref={refAudioRef} type="file" accept="audio/*" onChange={e => onMediaFile(e, setRefAudio)} style={{ display: 'none' }} />
 
-                            {/* AI First Frame button */}
-                            {m.has.firstFrame && videoMode === 't2v' && !firstFrame && (
-                                <>
-                                    <div className="vm-dock-sep" />
-                                    <button className="vm-dock-btn ai" onClick={generateFirstFrame} disabled={generatingFrame || !prompt.trim()}>
-                                        {generatingFrame ? <span className="material-symbols-outlined vm-spin" style={{ fontSize: '14px' }}>progress_activity</span> : <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>auto_awesome</span>} AI Frame
-                                    </button>
-                                </>
-                            )}
-
-                            {/* Library button */}
-                            {m.has.refImages && (
-                                <>
-                                    <div className="vm-dock-sep" />
-                                    <button className="vm-dock-btn" onClick={() => loadLibrary('ref')}>
-                                        <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>photo_library</span> Library
-                                    </button>
-                                </>
-                            )}
-
-                            <span style={{ marginLeft: 'auto', fontSize: '11px', color: '#475569' }}>{prompt.length} chars</span>
-                        </div>
-
-                        {/* Hidden file inputs */}
-                        <input ref={firstFrameRef} type="file" accept="image/*" onChange={e => onFile(e, setFirstFrame)} style={{ display: 'none' }} />
-                        <input ref={lastFrameRef} type="file" accept="image/*" onChange={e => onFile(e, setLastFrame)} style={{ display: 'none' }} />
-                        <input ref={refImgRef} type="file" accept="image/*" onChange={onRefFile} style={{ display: 'none' }} />
-                        <input ref={refVideoRef} type="file" accept="video/*" onChange={e => onMediaFile(e, setRefVideo)} style={{ display: 'none' }} />
-                        <input ref={refAudioRef} type="file" accept="audio/*" onChange={e => onMediaFile(e, setRefAudio)} style={{ display: 'none' }} />
-
-                        {/* Library Modal (inline) */}
-                        {showLibrary && (
-                            <div className="vm-library">
-                                <div className="vm-library-head">
-                                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span className="material-symbols-outlined" style={{ fontSize: '16px' }}>photo_library</span> Image Library</span>
-                                    <button onClick={() => setShowLibrary(false)}>
-                                        <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>close</span>
-                                    </button>
+                            {/* Library Modal (inline) */}
+                            {showLibrary && (
+                                <div className="vm-library">
+                                    <div className="vm-library-head">
+                                        <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span className="material-symbols-outlined" style={{ fontSize: '16px' }}>photo_library</span> Image Library</span>
+                                        <button onClick={() => setShowLibrary(false)}>
+                                            <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>close</span>
+                                        </button>
+                                    </div>
+                                    {libraryLoading ? <p style={{ fontSize: '12px', color: '#64748b', textAlign: 'center', padding: '12px 0' }}>Loading...</p>
+                                        : libraryImages.length === 0 ? <p style={{ fontSize: '12px', color: '#64748b', textAlign: 'center', padding: '12px 0' }}>No images yet</p>
+                                            : <div className="vm-library-grid">{libraryImages.map((img, i) => <img key={i} src={img.url || img.imageUrl} alt="" onClick={() => pickFromLibrary(img)} />)}</div>
+                                    }
                                 </div>
-                                {libraryLoading ? <p style={{ fontSize: '12px', color: '#64748b', textAlign: 'center', padding: '12px 0' }}>Loading...</p>
-                                    : libraryImages.length === 0 ? <p style={{ fontSize: '12px', color: '#64748b', textAlign: 'center', padding: '12px 0' }}>No images yet</p>
-                                        : <div className="vm-library-grid">{libraryImages.map((img, i) => <img key={i} src={img.url || img.imageUrl} alt="" onClick={() => pickFromLibrary(img)} />)}</div>
-                                }
-                            </div>
-                        )}
-
-                        {/* §5 — Config Bar (inline compact) */}
-                        <div className="vm-config">
-                            <ConfigDropdown
-                                value={model}
-                                onChange={setModel}
-                                options={Object.values(MODELS).map(mod => ({ value: mod.id, label: mod.name, msIcon: mod.msIcon }))}
-                                label="Model"
-                            />
-                            <ConfigDropdown
-                                value={aspectRatio}
-                                onChange={setAspectRatio}
-                                options={m.ratios.map(r => ({ value: r, label: r }))}
-                                label="Ratio"
-                            />
-                            <ConfigDropdown
-                                value={duration}
-                                onChange={setDuration}
-                                options={Array.from({ length: m.dur[1] - m.dur[0] + 1 }, (_, i) => m.dur[0] + i).map(d => ({ value: d, label: `${d}s` }))}
-                                label="Duration"
-                            />
-                            <button className={`vm-quality-pill ${quality === 'fast' ? 'active' : ''}`} onClick={() => setQuality('fast')}><span className="material-symbols-outlined" style={{ fontSize: '14px' }}>bolt</span> Fast</button>
-                            <button className={`vm-quality-pill ${quality === 'quality' ? 'active' : ''}`} onClick={() => setQuality('quality')}><span className="material-symbols-outlined" style={{ fontSize: '14px' }}>auto_awesome</span> Quality</button>
-                        </div>
-
-                        {/* §6 — Bottom bar (Enhance + Generate) */}
-                        <div className="vm-bottom">
-                            <CreditTooltipWrapper action="promptEnhance">
-                                <button className="vm-enhance" onClick={handleEnhance} disabled={enhancing || !prompt.trim()}>
-                                    {enhancing ? <><span className="material-symbols-outlined vm-spin" style={{ fontSize: '14px' }}>progress_activity</span> Enhancing...</>
-                                        : <><span className="material-symbols-outlined" style={{ fontSize: '16px' }}>auto_awesome</span> Enhance</>}
-                                </button>
-                            </CreditTooltipWrapper>
-
-                            {videoMode === 'i2v' ? (
-                                <button className="vm-generate" onClick={handleI2VGenerate} disabled={loading || !i2vImage?.url}>
-                                    {loading ? <><span className="material-symbols-outlined vm-spin" style={{ fontSize: '16px' }}>progress_activity</span> Animating...</>
-                                        : <><span className="material-symbols-outlined" style={{ fontSize: '18px' }}>animation</span> Animate · {credits} cr</>}
-                                </button>
-                            ) : (
-                                <button className="vm-generate" onClick={handleGenerate} disabled={loading || !prompt.trim()}>
-                                    {loading ? <><span className="material-symbols-outlined vm-spin" style={{ fontSize: '16px' }}>progress_activity</span> Submitting...</>
-                                        : <><span className="material-symbols-outlined" style={{ fontSize: '18px' }}>movie_creation</span> Generate · {credits} cr · ~2 min</>}
-                                </button>
                             )}
+
+                            {/* §5 — Config Bar (inline compact) */}
+                            <div className="vm-config">
+                                <ConfigDropdown
+                                    value={model}
+                                    onChange={setModel}
+                                    options={Object.values(MODELS).map(mod => ({ value: mod.id, label: mod.name, msIcon: mod.msIcon }))}
+                                    label="Model"
+                                />
+                                <ConfigDropdown
+                                    value={aspectRatio}
+                                    onChange={setAspectRatio}
+                                    options={m.ratios.map(r => ({ value: r, label: r }))}
+                                    label="Ratio"
+                                />
+                                <ConfigDropdown
+                                    value={duration}
+                                    onChange={setDuration}
+                                    options={Array.from({ length: m.dur[1] - m.dur[0] + 1 }, (_, i) => m.dur[0] + i).map(d => ({ value: d, label: `${d}s` }))}
+                                    label="Duration"
+                                />
+                                <button className={`vm-quality-pill ${quality === 'fast' ? 'active' : ''}`} onClick={() => setQuality('fast')}><span className="material-symbols-outlined" style={{ fontSize: '14px' }}>bolt</span> Fast</button>
+                                <button className={`vm-quality-pill ${quality === 'quality' ? 'active' : ''}`} onClick={() => setQuality('quality')}><span className="material-symbols-outlined" style={{ fontSize: '14px' }}>auto_awesome</span> Quality</button>
+                            </div>
+
+                            {/* §6 — Bottom bar (Enhance + Generate) */}
+                            <div className="vm-bottom">
+                                <CreditTooltipWrapper action="promptEnhance">
+                                    <button className="vm-enhance" onClick={handleEnhance} disabled={enhancing || !prompt.trim()}>
+                                        {enhancing ? <><span className="material-symbols-outlined vm-spin" style={{ fontSize: '14px' }}>progress_activity</span> Enhancing...</>
+                                            : <><span className="material-symbols-outlined" style={{ fontSize: '16px' }}>auto_awesome</span> Enhance</>}
+                                    </button>
+                                </CreditTooltipWrapper>
+
+                                {videoMode === 'i2v' ? (
+                                    <button className="vm-generate" onClick={handleI2VGenerate} disabled={loading || !i2vImage?.url}>
+                                        {loading ? <><span className="material-symbols-outlined vm-spin" style={{ fontSize: '16px' }}>progress_activity</span> Animating...</>
+                                            : <><span className="material-symbols-outlined" style={{ fontSize: '18px' }}>animation</span> Animate · {credits} cr</>}
+                                    </button>
+                                ) : (
+                                    <button className="vm-generate" onClick={handleGenerate} disabled={loading || !prompt.trim()}>
+                                        {loading ? <><span className="material-symbols-outlined vm-spin" style={{ fontSize: '16px' }}>progress_activity</span> Submitting...</>
+                                            : <><span className="material-symbols-outlined" style={{ fontSize: '18px' }}>movie_creation</span> Generate · {credits} cr · ~2 min</>}
+                                    </button>
+                                )}
+                            </div>
                         </div>
                     </div>
-                </div>
                 </div>
             )}
         </>

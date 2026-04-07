@@ -339,7 +339,7 @@ export default function Integrations() {
                                                 <div className="flex items-center gap-3">
                                                     <div className="w-12 h-12 rounded-xl flex items-center justify-center text-xl"
                                                         style={{ background: `${p.color}20` }}>
-                                                        {p.icon}
+                                                        <span className="material-symbols-outlined" style={{ color: p.color }}>{p.icon}</span>
                                                     </div>
                                                     <div>
                                                         <h3 className="font-bold text-white text-sm">{p.name}</h3>

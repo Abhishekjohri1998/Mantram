@@ -39,7 +39,7 @@ router.get('/status', protect, async (req, res) => {
                 success: true,
                 status: {
                     connected: integration.status === 'connected',
-                    status: integration.status, // Added for frontend StatusBadge
+                    status: integration.status,
                     shopDomain: integration.platformData?.shopDomain || '',
                     shopName: integration.platformData?.shopName || '',
                     displayName: integration.displayName || integration.platformData?.shopName || '',
@@ -63,7 +63,6 @@ router.post('/connect', protect, async (req, res) => {
         const clientId = config.shopify.apiKey;
         if (!clientId) return res.status(500).json({ success: false, error: 'Shopify app not configured. Add SHOPIFY_API_KEY to .env' });
 
-        // Use server URL for callback (must match Shopify app config exactly)
         const backendUrl = process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 3001}`;
         const redirectUri = `${backendUrl}/api/shopify/callback`;
 
@@ -108,7 +107,6 @@ router.post('/connect-token', protect, async (req, res) => {
 
         const cleanDomain = shopDomain.replace(/^https?:\/\//, '').replace(/\/$/, '');
 
-        // Validate the token by fetching shop info
         let shopInfo;
         try {
             shopInfo = await getShopInfo(accessToken, cleanDomain);
@@ -123,7 +121,6 @@ router.post('/connect-token', protect, async (req, res) => {
             ...(brandId ? { brand: brandId } : { brand: { $exists: false } })
         };
 
-        // Save or update integration
         await Integration.findOneAndUpdate(
             query,
             {
@@ -141,7 +138,6 @@ router.post('/connect-token', protect, async (req, res) => {
 
         console.log(`✅ Shopify connected via token: ${shopInfo.name} (${cleanDomain})`);
 
-        // Trigger initial sync and webhook registration in background
         const backendUrl = process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 3001}`;
         syncStoreData(accessToken, cleanDomain, req.user._id, brandId || undefined, { Product, ShopifyOrder, ShopifyCustomer })
             .then(res => console.log(`📦 Initial sync complete for ${cleanDomain}:`, res))
@@ -179,7 +175,7 @@ router.get('/callback', async (req, res) => {
                 const decoded = JSON.parse(Buffer.from(state, 'base64').toString('utf8'));
                 userId = decoded.userId;
                 brandId = decoded.brandId;
-            } catch { /* state decode failed, find by shop domain */ }
+            } catch { /* state decode failed */ }
         }
 
         // Find the integration — match by shop domain and brand (decoded from state)
@@ -208,7 +204,6 @@ router.get('/callback', async (req, res) => {
                 await integration.save();
                 console.log(`✅ Shopify connected: ${shopInfo.name} (${shop})`);
 
-                // Trigger initial sync and webhook registration in background
                 const backendUrl = process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 3001}`;
                 syncStoreData(tokenData.access_token, shop, userId, integration.brand, { Product, ShopifyOrder, ShopifyCustomer })
                     .then(res => console.log(`📦 Initial sync complete for ${shop}:`, res))
@@ -223,16 +218,18 @@ router.get('/callback', async (req, res) => {
             console.warn(`⚠️ No pending integration found for ${shop}`);
         }
 
-        // Determine final redirect URL
-        // If it's an embedded app, we should redirect to the Shopify Admin URL
-        const isEmbedded = req.query.embedded === '1' || !!state; // State presence often indicates embedded start
-        const apiKey = config.shopify.apiKey;
+        // FIX: Only treat as embedded if explicitly flagged via query param.
+        // Previously, !!state was always true (state is always set), causing
+        // all OAuth callbacks to redirect to Shopify Admin instead of mantram.ai.
+        const isEmbedded = req.query.embedded === '1';
 
-        if (isEmbedded && apiKey) {
+        if (isEmbedded) {
+            const apiKey = config.shopify.apiKey;
             console.log(`🚀 Redirecting to Shopify Admin (Embedded): ${shop}`);
             const host = req.query.host || Buffer.from(`${shop}/admin`).toString('base64');
             res.redirect(`https://${shop}/admin/apps/${apiKey}/integrations?shopify=connected&shop=${shop}&host=${host}`);
         } else {
+            // Standard redirect back to mantram.ai after successful OAuth
             res.redirect(`${frontendUrl}/integrations?shopify=connected`);
         }
     } catch (error) {
@@ -268,7 +265,6 @@ router.post('/sync', protect, async (req, res) => {
             { Product, ShopifyOrder, ShopifyCustomer }
         );
 
-        // Update sync metadata
         integration.lastSyncAt = new Date();
         integration.syncCount++;
         await integration.save();
@@ -335,118 +331,64 @@ router.delete('/disconnect', protect, async (req, res) => {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
+
 // ============================================================================
 // MANDATORY COMPLIANCE WEBHOOKS (Required for Shopify App Review)
-// These endpoints handle GDPR data privacy requirements.
-// All are verified with HMAC-SHA256 signatures.
 // ============================================================================
 
-
-/**
- * POST /api/shopify/webhooks/customers-data-request
- * Topic: customers/data_request
- * 
- * Triggered when a customer requests their data from a store.
- * We must respond with what data we have about them (if any).
- * Since we primarily store product/order aggregates and don't hold
- * raw customer PII beyond what Shopify provides, we acknowledge the request.
- */
-// Topic: customers/data_request
 router.post('/webhooks/customers-data-request', verifyShopifyWebhook, async (req, res) => {
-    res.status(200).json({ received: true }); // Respond immediately
+    res.status(200).json({ received: true });
     try {
-        const { shop_domain, customer, orders_requested } = req.body;
+        const { shop_domain, customer } = req.body;
         console.log(`📋 GDPR: Customer data request from ${shop_domain} for customer ${customer?.id}`);
-        // ... logging only
     } catch (error) {
         console.error('GDPR customers/data_request error:', error);
     }
 });
 
-/**
- * POST /api/shopify/webhooks/customers-redact
- * Topic: customers/redact
- * 
- * Triggered when a store owner requests deletion of a customer's data.
- * We must delete any customer data we've stored.
- */
-// Topic: customers/redact
 router.post('/webhooks/customers-redact', verifyShopifyWebhook, async (req, res) => {
     res.status(200).json({ received: true });
     try {
         const { shop_domain, customer } = req.body;
         if (!customer?.id) return;
-        
         console.log(`🗑️ GDPR: Redacting customer ${customer.id} for shop ${shop_domain}`);
-        
-        // Find integration to scope deletions
         const integration = await Integration.findOne({ 'platformData.shopDomain': shop_domain, platform: 'shopify' });
         if (!integration) return;
-
-        // Delete any PII related to this specific Shopify customer
         await Promise.all([
             ShopifyCustomer.deleteMany({ shopifyId: String(customer.id), user: integration.user }),
             ShopifyOrder.deleteMany({ customerEmail: customer.email, user: integration.user }),
-            // Any other collection containing customer PII...
         ]);
     } catch (error) {
         console.error('GDPR customers/redact error:', error);
     }
 });
 
-/**
- * POST /api/shopify/webhooks/shop-redact
- * Topic: shop/redact
- * 
- * Triggered 48 hours after a store owner uninstalls the app.
- * We must delete ALL data related to this shop from our systems.
- */
-// Topic: shop/redact
 router.post('/webhooks/shop-redact', verifyShopifyWebhook, async (req, res) => {
     res.status(200).json({ received: true });
     try {
         const { shop_domain } = req.body;
         console.log(`🏪 GDPR: Complete Shop redact request for ${shop_domain}`);
-        
-        // Find all integrations for this shop
         const integrations = await Integration.find({ 'platformData.shopDomain': shop_domain, platform: 'shopify' });
-        const userIds = integrations.map(i => i.user);
         const brandIds = integrations.map(i => i.brand).filter(Boolean);
-
-        // Perform cascading deletion of all shop-related data
         await Promise.all([
             Integration.deleteMany({ 'platformData.shopDomain': shop_domain, platform: 'shopify' }),
             Product.deleteMany({ brand: { $in: brandIds } }),
             ShopifyOrder.deleteMany({ brand: { $in: brandIds } }),
             ShopifyCustomer.deleteMany({ brand: { $in: brandIds } }),
         ]);
-
         console.log(`✅ GDPR: Data purged for ${shop_domain}`);
     } catch (error) {
         console.error('GDPR shop/redact error:', error);
     }
 });
 
-/**
- * Universal Compliance Webhook (Catch-all)
- * Use this single URL for all 3 compliance topics in shopify.app.toml or Dashboard:
- * https://api.mantram.ai/api/shopify/webhooks/compliance
- */
 router.post('/webhooks/compliance', verifyShopifyWebhook, async (req, res) => {
     const topic = req.get('X-Shopify-Topic');
     console.log(`🎯 Universal Compliance Webhook triggered: ${topic}`);
-
-    // Always respond 200 immediately
     res.status(200).json({ received: true });
-
     try {
-        if (topic === 'customers/data_request') {
-            console.log('📋 Handling universal customers/data_request');
-        } else if (topic === 'customers/redact') {
-            console.log('🗑️ Handling universal customers/redact');
-        } else if (topic === 'shop/redact') {
+        if (topic === 'shop/redact') {
             const { shop_domain } = req.body;
-            console.log(`🏪 Handling universal shop/redact for ${shop_domain}`);
             Integration.deleteMany({ 'platformData.shopDomain': shop_domain, platform: 'shopify' }).catch(e => { });
         }
     } catch (error) {
@@ -458,26 +400,19 @@ router.post('/webhooks/compliance', verifyShopifyWebhook, async (req, res) => {
 // REAL-TIME DATA WEBHOOKS
 // ============================================================================
 
-/**
- * Handle Order Created/Updated Webhooks
- */
 router.post('/webhooks/orders-create', verifyShopifyWebhook, async (req, res) => {
     try {
         const order = req.body;
         const shop = req.headers['x-shopify-shop-domain'];
-        console.log(`🔔 Webhook: Order created/updated in ${shop} — Order #${order.id}`);
-
-        // Find integration to get brand + userId
+        console.log(`🔔 Webhook: Order created in ${shop} — Order #${order.id}`);
         const integration = await Integration.findOne({ 'platformData.shopDomain': shop, platform: 'shopify' });
         if (!integration) return res.status(200).json({ received: true });
-
         const transformed = transformShopifyOrder(order, integration.user, integration.brand);
         await ShopifyOrder.findOneAndUpdate(
             { brand: integration.brand, shopifyOrderId: String(order.id) },
             transformed,
             { upsert: true }
         );
-
         res.status(200).json({ received: true });
     } catch (error) {
         console.error('Webhook order-create error:', error);
@@ -486,22 +421,18 @@ router.post('/webhooks/orders-create', verifyShopifyWebhook, async (req, res) =>
 });
 
 router.post('/webhooks/orders-updated', verifyShopifyWebhook, async (req, res) => {
-    // Shared logic with orders-create
     try {
         const order = req.body;
         const shop = req.headers['x-shopify-shop-domain'];
         console.log(`🔔 Webhook: Order updated in ${shop} — Order #${order.id}`);
-
         const integration = await Integration.findOne({ 'platformData.shopDomain': shop, platform: 'shopify' });
         if (!integration) return res.status(200).json({ received: true });
-
         const transformed = transformShopifyOrder(order, integration.user, integration.brand);
         await ShopifyOrder.findOneAndUpdate(
             { brand: integration.brand, shopifyOrderId: String(order.id) },
             transformed,
             { upsert: true }
         );
-
         res.status(200).json({ received: true });
     } catch (error) {
         console.error('Webhook order-update error:', error);
@@ -509,25 +440,19 @@ router.post('/webhooks/orders-updated', verifyShopifyWebhook, async (req, res) =
     }
 });
 
-/**
- * Handle Product Updated Webhook
- */
 router.post('/webhooks/products-update', verifyShopifyWebhook, async (req, res) => {
     try {
         const product = req.body;
         const shop = req.headers['x-shopify-shop-domain'];
         console.log(`🔔 Webhook: Product updated in ${shop} — ${product.title}`);
-
         const integration = await Integration.findOne({ 'platformData.shopDomain': shop, platform: 'shopify' });
         if (!integration) return res.status(200).json({ received: true });
-
         const transformed = transformShopifyProduct(product, integration.user, integration.brand);
         await Product.findOneAndUpdate(
             { brand: integration.brand, shopifyId: String(product.id) },
             transformed,
             { upsert: true }
         );
-
         res.status(200).json({ received: true });
     } catch (error) {
         console.error('Webhook product-update error:', error);
@@ -535,20 +460,14 @@ router.post('/webhooks/products-update', verifyShopifyWebhook, async (req, res) 
     }
 });
 
-/**
- * Handle App Uninstalled Webhook
- */
 router.post('/webhooks/app-uninstalled', verifyShopifyWebhook, async (req, res) => {
     try {
         const shop = req.headers['x-shopify-shop-domain'];
         console.log(`🗑️ Webhook: App uninstalled from ${shop}`);
-
-        // Mark integration as disconnected
         await Integration.updateMany(
             { 'platformData.shopDomain': shop, platform: 'shopify' },
             { status: 'disconnected', accessToken: null }
         );
-
         res.status(200).json({ received: true });
     } catch (error) {
         console.error('Webhook app-uninstalled error:', error);
@@ -556,10 +475,6 @@ router.post('/webhooks/app-uninstalled', verifyShopifyWebhook, async (req, res) 
     }
 });
 
-/**
- * Connectivity Check (No HMAC verification)
- * Used to verify TLS and reachability from Shopify/Internet
- */
 router.get('/webhooks/check', (req, res) => {
     res.status(200).json({
         status: 'ok',
@@ -568,9 +483,6 @@ router.get('/webhooks/check', (req, res) => {
     });
 });
 
-/**
- * Anonymized Config Check
- */
 router.get('/debug-config', (req, res) => {
     const rawSecret = config.shopify.apiSecret || '';
     const secret = rawSecret.trim();
@@ -585,27 +497,15 @@ router.get('/debug-config', (req, res) => {
     });
 });
 
-/**
- * HMAC Simulation/Verification Tool (for debugging)
- * Use this to verify that the server's HMAC logic is working with a known secret.
- */
 router.post('/debug/hmac-simulator', async (req, res) => {
     const providedHmac = req.get('X-Shopify-Hmac-Sha256');
     const secret = req.query.secret || '';
     const rawBody = req.rawBody;
-
-    if (!rawBody) {
-        return res.status(400).json({ error: 'No raw body captured' });
-    }
-
-    const computedHmac = crypto
-        .createHmac('sha256', secret)
-        .update(rawBody)
-        .digest('base64');
-
+    if (!rawBody) return res.status(400).json({ error: 'No raw body captured' });
+    const computedHmac = crypto.createHmac('sha256', secret).update(rawBody).digest('base64');
     res.status(200).json({
         receivedHmac: providedHmac,
-        computedHmac: computedHmac,
+        computedHmac,
         matches: providedHmac === computedHmac,
         bodySize: rawBody.length,
         usedSecretLength: secret.length

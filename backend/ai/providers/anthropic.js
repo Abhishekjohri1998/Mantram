@@ -12,7 +12,7 @@ export class AnthropicProvider extends BaseProvider {
     }
 
     async generateText({ systemPrompt, userPrompt, temperature = 0.7, maxTokens = 2048, model }) {
-        const modelId = model || this.config.defaultModel || 'Claude Opus 4.6';
+        const modelId = model || this.config.defaultModel || 'claude-3-5-sonnet-20241022';
 
         const startTime = Date.now();
         const response = await fetch(`${this.baseUrl}/messages`, {
@@ -32,7 +32,9 @@ export class AnthropicProvider extends BaseProvider {
         });
         if (!response.ok) {
             const data = await response.json().catch(() => ({}));
-            throw new Error(`Claude Error [${response.status}]: ${data.error?.message || response.statusText}`);
+            const errMsg = data.error?.message || response.statusText;
+            console.error(`❌ [Anthropic] API Error [${response.status}]: ${errMsg} | Model: ${modelId}`);
+            throw new Error(`Claude Error [${response.status}]: ${errMsg}`);
         }
 
         const data = await response.json();
@@ -68,7 +70,7 @@ export class AnthropicProvider extends BaseProvider {
      * Returns both the text response and the array of tool calls made.
      */
     async generateWithTools({ systemPrompt, userPrompt, tools, toolHandlers = {}, temperature = 0.5, maxTokens = 4096, model }) {
-        const modelId = model || this.config.defaultModel || 'Claude Opus 4.6';
+        const modelId = model || this.config.defaultModel || 'claude-3-5-sonnet-20241022';
         const startTime = Date.now();
 
         let messages = [{ role: 'user', content: userPrompt }];

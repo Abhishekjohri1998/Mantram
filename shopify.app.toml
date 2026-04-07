@@ -3,14 +3,14 @@
 client_id = "3316fa753006b2de85d8cc512cb462c5"
 name = "Mantram AI"
 application_url = "https://mantram.ai"
-embedded = true
+embedded = false
 
 [webhooks]
 api_version = "2026-01"
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
-scopes = ""
+scopes = "read_products,write_products,read_orders,read_customers,read_inventory,read_analytics"
 optional_scopes = [ ]
 use_legacy_install_flow = false
 

@@ -338,7 +338,6 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
             }
             throw new Error(`Provider ${provider} unconfigured or failed.`);
         } catch (err) {
-            console.warn(`⚠️ [Seedance 2.0] Primary Provider (${provider}) failed: ${err.message}. Cascading...`);
             const cascade = await trySeedanceCascade({
                 prompt: safePrompt, imageUrl: s3ImageUrl, duration,
                 aspectRatio: aspectRatio || '16:9', generateAudio, mode,
@@ -353,6 +352,24 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
             };
         }
     }
+
+    if (model === 'grok-imagine') {
+        const result = await submitGrokVideoGeneration({
+            prompt: safePrompt,
+            imageUrl: s3ImageUrl,
+            duration,
+            resolution,
+            aspectRatio: aspectRatio || '16:9'
+        });
+        return {
+            requestId: result.requestId,
+            endpoint: 'grok-beta',
+            statusUrl: null,
+            resultUrl: null,
+            provider: 'grok'
+        };
+    }
+
     const apiKey = getApiKey();
     const endpoints = MODEL_ENDPOINTS[model];
     if (!endpoints) throw new Error(`Unknown video model: ${model}`);

@@ -41,8 +41,8 @@ export const PROVIDER_PRICING = {
     'anthropic': {
         provider: 'Anthropic', icon: '🟠',
         models: {
-            'Claude Opus 4.6': {
-                name: 'Claude Opus 4.6', type: 'text',
+            'claude-3-opus-20240229': {
+                name: 'claude-3-opus-20240229', type: 'text',
                 inputPer1M: 15.00, outputPer1M: 75.00, unit: 'USD/1M tokens',
                 pricingUrl: 'https://docs.anthropic.com/en/docs/about-claude/pricing',
             },

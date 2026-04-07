@@ -296,11 +296,20 @@
     text-rendering: optimizeLegibility;
     font-feature-settings: 'liga';
     
-    /* ── Definitive FOUC Fix: Hide text, show icon via shadow ── */
-    font-display: block !important;
+    /* ── Definitive FOUT Fix: Hide icons until font is loaded ── */
+    visibility: hidden;
     user-select: none;
-    color: transparent !important;
-    text-shadow: 0 0 0 white; /* This renders the icon glyph while 'color: transparent' hides the text word */
+    speak: never;
+  }
+
+  .material-icons {
+    visibility: hidden;
+  }
+
+  /* Reveal icons once font is confirmed loaded */
+  body.fonts-loaded .material-symbols-outlined,
+  body.fonts-loaded .material-icons {
+    visibility: visible;
   }
 
   .glass-panel-hover:hover {
