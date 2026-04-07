@@ -1,18 +1,15 @@
 import Redis from 'ioredis';
 
-const redisClient = process.env.REDIS_HOST ? new Redis({
-  host: process.env.REDIS_HOST,
-  port: parseInt(process.env.REDIS_PORT) || 6379,
-  // ElastiCache with encryption requires TLS
-  tls: process.env.REDIS_TLS === 'true' ? {} : undefined,
+const redisClient = process.env.REDIS_URL ? new Redis(process.env.REDIS_URL, {
+  tls: { rejectUnauthorized: false },
   retryStrategy: (times) => Math.min(times * 200, 3000),
-  maxRetriesPerRequest: 1, // Fail fast if it's down
+  maxRetriesPerRequest: 1,
 }) : null;
 
 if (redisClient) {
   redisClient.on('error', (err) => {
     if (err.code === 'ECONNREFUSED') {
-       console.warn('⚠️  Redis connection refused. Check your REDIS_HOST or start redis-server.');
+       console.warn('⚠️  Redis connection refused. Check your REDIS_URL or start redis-server.');
     } else {
        console.error('Redis Client Error:', err);
     }
@@ -55,10 +52,10 @@ export async function getCachedOrFetch(key, fetchFn, ttl = CACHE_TTL) {
  */
 export function getRedisStatus() {
   return {
-    configured: !!process.env.REDIS_HOST,
+    configured: !!process.env.REDIS_URL,
     connected: redisClient ? redisClient.status === 'ready' : false,
-    mode: process.env.REDIS_TLS === 'true' ? 'TLS/SSL' : 'standard',
-    host: process.env.REDIS_HOST || 'none'
+    mode: 'TLS/SSL (Upstash)',
+    host: process.env.REDIS_URL ? 'charming-narwhal-74523.upstash.io' : 'none'
   };
 }
 

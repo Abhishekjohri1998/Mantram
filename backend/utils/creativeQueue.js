@@ -9,15 +9,12 @@ import { refundCredits } from '../middleware/credits.js';
 // Better to move internalGenerateCreative to a service if it's shared.
 // For now, I will define the worker in index.js or a separate service file.
 
-const REDIS_URL = process.env.REDIS_URL || `redis://${process.env.REDIS_HOST || '127.0.0.1'}:${process.env.REDIS_PORT || 6379}`;
+const REDIS_URL = process.env.REDIS_URL || 'redis://127.0.0.1:6379';
 
-export const creativeQueue = new Bull('creative-generation', REDIS_URL, {
-    redis: {
-        maxRetriesPerRequest: null,
-        enableReadyCheck: false
-    },
+export const creativeQueue = new Bull('creative-generation', {
+    redis: REDIS_URL,
     settings: {
-        lockDuration: 300000, // 5 mins
+        lockDuration: 300000,
         stalledInterval: 300000,
         maxStalledCount: 1
     }
