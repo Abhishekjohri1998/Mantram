@@ -302,6 +302,10 @@
     speak: never;
   }
 
+  .material-icons {
+    visibility: hidden;
+  }
+
   /* Reveal icons once font is confirmed loaded */
   body.fonts-loaded .material-symbols-outlined,
   body.fonts-loaded .material-icons {

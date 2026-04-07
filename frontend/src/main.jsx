@@ -10,13 +10,21 @@ createRoot(document.getElementById('root')).render(
 )
 
 // Antigravity Pro — FOUT/FOUC Fix for Material Icons
-if (document.fonts && document.fonts.ready) {
-  document.fonts.ready.then(() => {
+const revealFonts = () => {
+  if (!document.body.classList.contains('fonts-loaded')) {
     document.body.classList.add('fonts-loaded');
-  });
+  }
+};
+
+// 1. Try to load specific icon fonts first
+if (document.fonts && document.fonts.load) {
+  Promise.all([
+    document.fonts.load('24px "Material Symbols Outlined"'),
+    document.fonts.load('24px "Material Icons"')
+  ]).then(revealFonts).catch(revealFonts);
 } else {
-  // Fallback for older browsers
-  window.addEventListener('load', () => {
-    document.body.classList.add('fonts-loaded');
-  });
+  window.addEventListener('load', revealFonts);
 }
+
+// 2. Safety Timeout (2 seconds) — Ensure icons show up anyway
+setTimeout(revealFonts, 2000);
