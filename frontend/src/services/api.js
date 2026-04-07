@@ -7,7 +7,24 @@
 export const API_BASE = (import.meta.env.VITE_API_URL || `${window.location.origin}/api`).replace(/\/$/, '');
 
 // Token management
-// ... (omitted lines 9-29)
+let authToken = localStorage.getItem('mantram_token') || '';
+let dynamicTokenProvider = null;
+
+export const setToken = (token) => {
+    authToken = token;
+    localStorage.setItem('mantram_token', token);
+};
+
+export const setDynamicTokenProvider = (provider) => {
+    dynamicTokenProvider = provider;
+};
+
+export const clearToken = () => {
+    authToken = '';
+    localStorage.removeItem('mantram_token');
+};
+
+export const getToken = () => authToken;
 
 // Base fetch wrapper
 export async function apiFetch(endpoint, options = {}) {
