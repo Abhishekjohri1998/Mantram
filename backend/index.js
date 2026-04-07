@@ -69,14 +69,20 @@ const app = express();
 // ── CORS CONFIGURATION ────────────────────────────────────────
 const isOriginAllowed = (origin) => {
     if (!origin) return true;
-    const cleanOrigin = origin.toLowerCase().replace(/\/$/, '');
-    const envOrigins = (config.frontendUrl || []).map(u => u.toLowerCase().replace(/\/$/, ''));
-    const allowedOrigins = [...new Set([...HARDCODED_ORIGINS.map(u => u.toLowerCase()), ...envOrigins])];
+    const cleanOrigin = origin.toLowerCase().trim().replace(/\/$/, '');
     
-    return allowedOrigins.includes(cleanOrigin) || 
-           cleanOrigin.endsWith('mantram.ai') || 
-           cleanOrigin.includes('localhost') ||
-           /\.mantram\.ai$/.test(cleanOrigin); 
+    // Check hardcoded origins
+    if (HARDCODED_ORIGINS.some(ao => cleanOrigin === ao.toLowerCase().replace(/\/$/, ''))) return true;
+    
+    // Check environment origins
+    const envOrigins = (config.frontendUrl || []).map(u => u.toLowerCase().replace(/\/$/, ''));
+    if (envOrigins.includes(cleanOrigin)) return true;
+    
+    // Domain-based allowance (mantram.ai subdomains)
+    if (cleanOrigin.endsWith('mantram.ai') || cleanOrigin.includes('localhost')) return true;
+    if (/\.mantram\.ai$/.test(cleanOrigin)) return true;
+    
+    return false;
 };
 
 const corsOptions = {
@@ -84,7 +90,7 @@ const corsOptions = {
         if (isOriginAllowed(origin)) {
             return callback(null, true);
         }
-        console.error(`❌ CORS Rejected: "${origin}" not in allowed list.`);
+        console.warn(`⚠️ CORS Rejected: "${origin}"`);
         return callback(null, false);
     },
     credentials: true,
@@ -94,6 +100,7 @@ const corsOptions = {
     maxAge: 86400, // Cache preflight for 24h
 };
 
+// Apply CORS at the absolute top of the middleware stack
 app.use(cors(corsOptions));
 
 // Trust proxy for rate limiting behind Nginx
@@ -110,25 +117,6 @@ app.use((req, res, next) => {
 
     if (!req.isBotScan && !['/api/health', '/health', '/favicon.ico', '/robots.txt'].includes(path)) {
         console.log(`[INCOMING] ${req.method} ${req.path} | Origin: ${req.headers.origin || 'none'}`);
-    }
-    
-    // Immediate CORS Force for all allowed origins
-    const origin = req.headers.origin;
-    const isAllowedOrigin = origin && (
-        HARDCODED_ORIGINS.some(ao => origin.toLowerCase() === ao.toLowerCase()) ||
-        origin.toLowerCase().endsWith('mantram.ai') || 
-        origin.toLowerCase().includes('mantram.ai')
-    );
-    if (isAllowedOrigin) {
-        res.setHeader('Access-Control-Allow-Origin', origin);
-        res.setHeader('Access-Control-Allow-Credentials', 'true');
-        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin, Cache-Control, Pragma');
-    }
-    
-    // Immediate OPTIONS Intercept
-    if (req.method === 'OPTIONS') {
-        return res.status(200).end();
     }
     
     // Start time for AI budgeting
@@ -329,8 +317,6 @@ app.use((err, req, res, next) => {
     if (origin && isOriginAllowed(origin)) {
         res.setHeader('Access-Control-Allow-Origin', origin);
         res.setHeader('Access-Control-Allow-Credentials', 'true');
-        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin, Cache-Control, Pragma');
     }
 
     

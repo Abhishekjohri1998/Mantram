@@ -4,27 +4,10 @@
  * Handles auth tokens, error handling, and response parsing.
  */
 
-export const API_BASE = import.meta.env.VITE_API_URL || `${window.location.origin}/api`;
+export const API_BASE = (import.meta.env.VITE_API_URL || `${window.location.origin}/api`).replace(/\/$/, '');
 
 // Token management
-let authToken = localStorage.getItem('mantram_token') || '';
-let dynamicTokenProvider = null;
-
-export const setToken = (token) => {
-    authToken = token;
-    localStorage.setItem('mantram_token', token);
-};
-
-export const setDynamicTokenProvider = (provider) => {
-    dynamicTokenProvider = provider;
-};
-
-export const clearToken = () => {
-    authToken = '';
-    localStorage.removeItem('mantram_token');
-};
-
-export const getToken = () => authToken;
+// ... (omitted lines 9-29)
 
 // Base fetch wrapper
 export async function apiFetch(endpoint, options = {}) {
@@ -53,7 +36,9 @@ export async function apiFetch(endpoint, options = {}) {
 
     let response;
     try {
-        response = await fetch(`${API_BASE}${endpoint}`, {
+        // Ensure endpoint starts with /
+        const url = endpoint.startsWith('/') ? endpoint : `/${endpoint}`; 
+        response = await fetch(`${API_BASE}${url}`, {
             ...fetchOptions,
             headers,
             signal: controller.signal,
@@ -61,7 +46,13 @@ export async function apiFetch(endpoint, options = {}) {
     } catch (e) {
         clearTimeout(timer);
         if (e.name === 'AbortError') throw new Error('Request timed out — the server is still processing. Please try again.');
-        throw new Error(e.message === 'Load failed' ? 'Network error — check your connection and ensure the backend is running.' : e.message);
+        
+        // Detailed error for common fetch failures
+        const msg = e.message || '';
+        if (msg.includes('Load failed') || msg.includes('Failed to fetch')) {
+            throw new Error('Network error — This usually means the server is down or blocked by CORS. Ensure https://api.mantram.ai is accessible.');
+        }
+        throw new Error(msg || 'Unknown network error');
     }
     clearTimeout(timer);
 
