@@ -296,12 +296,16 @@
     text-rendering: optimizeLegibility;
     font-feature-settings: 'liga';
     
-    /* ── Definitive FOUC Fix: Hide text, show icon glyph ── */
+    /* ── Definitive FOUT Fix: Hide icons until font is loaded ── */
+    visibility: hidden;
     user-select: none;
     speak: never;
-    color: transparent !important;
-    -webkit-text-fill-color: transparent; /* Safari support */
-    text-shadow: 0 0 0 white; /* This renders the icon glyph while 'color: transparent' hides the text word */
+  }
+
+  /* Reveal icons once font is confirmed loaded */
+  body.fonts-loaded .material-symbols-outlined,
+  body.fonts-loaded .material-icons {
+    visibility: visible;
   }
 
   .glass-panel-hover:hover {
