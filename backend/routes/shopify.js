@@ -1,6 +1,13 @@
 /**
  * Shopify Routes
  * Handles Shopify OAuth, product sync, and catalog management.
+ *
+ * FLOW (Custom Distribution):
+ *   1. POST /connect  → builds Custom Distribution install URL
+ *   2. User visits URL on Shopify Admin → clicks Install
+ *   3. Shopify calls GET /callback with code + shop + state
+ *   4. Callback exchanges code for access_token, saves integration
+ *   5. User redirected to mantram.ai/integrations?shopify=connected
  */
 
 import { Router } from 'express';
@@ -12,6 +19,7 @@ import ShopifyOrder from '../models/ShopifyOrder.js';
 import ShopifyCustomer from '../models/ShopifyCustomer.js';
 import {
     getShopifyAuthUrl,
+    getCustomDistributionUrl,
     exchangeShopifyToken,
     fetchShopifyProducts,
     transformShopifyProduct,
@@ -54,23 +62,33 @@ router.get('/status', protect, async (req, res) => {
     }
 });
 
-// POST /api/shopify/connect — Start Shopify OAuth
+// POST /api/shopify/connect — Start Shopify OAuth via Custom Distribution
+// Returns an authUrl that the frontend must redirect to (full-page, not popup).
 router.post('/connect', protect, async (req, res) => {
     try {
         const { shopDomain, brandId } = req.body;
-        if (!shopDomain) return res.status(400).json({ success: false, error: 'Shop domain is required (e.g. my-store.myshopify.com)' });
+        if (!shopDomain) {
+            return res.status(400).json({ success: false, error: 'Shop domain is required (e.g. my-store.myshopify.com)' });
+        }
 
         const clientId = config.shopify.apiKey;
-        if (!clientId) return res.status(500).json({ success: false, error: 'Shopify app not configured. Add SHOPIFY_API_KEY to .env' });
+        if (!clientId) {
+            return res.status(500).json({ success: false, error: 'Shopify app not configured. Add SHOPIFY_API_KEY to .env' });
+        }
 
-        const backendUrl = process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 3001}`;
-        const redirectUri = `${backendUrl}/api/shopify/callback`;
-
-        // Pass userId + brandId in state so callback can find the right integration
-        const statePayload = Buffer.from(JSON.stringify({ userId: String(req.user._id), brandId: brandId || '' })).toString('base64');
         const cleanDomain = shopDomain.replace(/^https?:\/\//, '').replace(/\/$/, '');
-        const authUrl = getShopifyAuthUrl(cleanDomain, clientId, redirectUri) + `&state=${statePayload}`;
 
+        // Encode userId + brandId in state so /callback can identify the user
+        const statePayload = Buffer.from(
+            JSON.stringify({ userId: String(req.user._id), brandId: brandId || '' })
+        ).toString('base64');
+
+        // Use Custom Distribution install URL — works for any merchant without App Store review.
+        // This URL is unique per store (uses the store handle, not the full domain).
+        const baseUrl = getCustomDistributionUrl(cleanDomain, clientId);
+        const authUrl = `${baseUrl}&state=${statePayload}`;
+
+        // Save a pending integration record so /callback can find and update it
         await Integration.findOneAndUpdate(
             {
                 user: req.user._id,
@@ -87,7 +105,7 @@ router.post('/connect', protect, async (req, res) => {
             { upsert: true, returnDocument: 'after' }
         );
 
-        console.log(`🔗 Shopify OAuth started for ${cleanDomain} → redirect: ${redirectUri}`);
+        console.log(`🔗 Shopify OAuth started (Custom Distribution) for ${cleanDomain}`);
         res.json({ success: true, authUrl, shopDomain: cleanDomain });
     } catch (error) {
         console.error('Shopify connect error:', error);
@@ -95,7 +113,8 @@ router.post('/connect', protect, async (req, res) => {
     }
 });
 
-// POST /api/shopify/connect-token — Direct access token connection (for Custom Distribution apps)
+// POST /api/shopify/connect-token — Direct access token connection
+// Used when a merchant generates a Custom App token from their own Shopify Admin.
 router.post('/connect-token', protect, async (req, res) => {
     try {
         const { shopDomain, accessToken, brandId } = req.body;
@@ -137,11 +156,11 @@ router.post('/connect-token', protect, async (req, res) => {
 
         const backendUrl = process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 3001}`;
         syncStoreData(accessToken, cleanDomain, req.user._id, brandId || undefined, { Product, ShopifyOrder, ShopifyCustomer })
-            .then(res => console.log(`📦 Initial sync complete for ${cleanDomain}:`, res))
+            .then(r => console.log(`📦 Initial sync complete for ${cleanDomain}:`, r))
             .catch(err => console.error(`❌ Initial sync failed for ${cleanDomain}:`, err));
 
         registerShopifyWebhooks(accessToken, cleanDomain, backendUrl)
-            .then(res => console.log(`🔗 Webhooks registered for ${cleanDomain}:`, res.filter(r => r.success).map(r => r.topic)))
+            .then(r => console.log(`🔗 Webhooks registered for ${cleanDomain}:`, r.filter(x => x.success).map(x => x.topic)))
             .catch(err => console.error(`❌ Webhook registration failed for ${cleanDomain}:`, err));
 
         res.json({ success: true, shopName: shopInfo.name, shopDomain: cleanDomain });
@@ -152,6 +171,7 @@ router.post('/connect-token', protect, async (req, res) => {
 });
 
 // GET /api/shopify/callback — Shopify OAuth Callback
+// Shopify redirects here after the merchant clicks "Install" on the Custom Distribution page.
 router.get('/callback', async (req, res) => {
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
     try {
@@ -161,18 +181,18 @@ router.get('/callback', async (req, res) => {
         const clientId = config.shopify.apiKey;
         const clientSecret = config.shopify.apiSecret;
 
-        console.log(`🔄 Shopify callback: shop=${shop}, code=${code ? 'present' : 'missing'}`);
+        console.log(`🔄 Shopify callback: shop=${shop}`);
 
         const tokenData = await exchangeShopifyToken(shop, clientId, clientSecret, code);
 
-        // Decode state to get userId + brandId
+        // Decode state to retrieve userId + brandId that were set during /connect
         let userId = null, brandId = null;
         if (state) {
             try {
                 const decoded = JSON.parse(Buffer.from(state, 'base64').toString('utf8'));
                 userId = decoded.userId;
-                brandId = decoded.brandId;
-            } catch { /* state decode failed */ }
+                brandId = decoded.brandId || null;
+            } catch { /* state decode failed — continue without it */ }
         }
 
         const query = { platform: 'shopify' };
@@ -202,30 +222,31 @@ router.get('/callback', async (req, res) => {
 
                 const backendUrl = process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 3001}`;
                 syncStoreData(tokenData.access_token, shop, userId, integration.brand, { Product, ShopifyOrder, ShopifyCustomer })
-                    .then(res => console.log(`📦 Initial sync complete for ${shop}:`, res))
+                    .then(r => console.log(`📦 Initial sync complete for ${shop}:`, r))
                     .catch(err => console.error(`❌ Initial sync failed for ${shop}:`, err));
 
                 registerShopifyWebhooks(tokenData.access_token, shop, backendUrl)
-                    .then(res => console.log(`🔗 Webhooks registered for ${shop}:`, res.filter(r => r.success).map(r => r.topic)))
+                    .then(r => console.log(`🔗 Webhooks registered for ${shop}:`, r.filter(x => x.success).map(x => x.topic)))
                     .catch(err => console.error(`❌ Webhook registration failed for ${shop}:`, err));
 
             } catch (e) { console.warn('Shop info fetch failed:', e.message); }
         } else {
-            console.warn(`⚠️ No pending integration found for ${shop}`);
+            console.warn(`⚠️ No pending integration found for user ${userId}, shop ${shop}`);
         }
 
-        // FIX: Only treat as embedded if explicitly flagged via query param.
-        // Previously, !!state was always true (state is always set), causing
-        // all OAuth callbacks to redirect to Shopify Admin instead of mantram.ai.
+        // FIX: isEmbedded was previously `!!state` which is ALWAYS true (state is always set).
+        // This caused every OAuth callback to redirect to Shopify Admin instead of mantram.ai.
+        // Now only redirect to Shopify Admin when explicitly requested via ?embedded=1.
         const isEmbedded = req.query.embedded === '1';
 
         if (isEmbedded) {
             const apiKey = config.shopify.apiKey;
-            console.log(`🚀 Redirecting to Shopify Admin (Embedded): ${shop}`);
             const host = req.query.host || Buffer.from(`${shop}/admin`).toString('base64');
+            console.log(`🚀 Redirecting to Shopify Admin (embedded): ${shop}`);
             res.redirect(`https://${shop}/admin/apps/${apiKey}/integrations?shopify=connected&shop=${shop}&host=${host}`);
         } else {
-            // Standard redirect back to mantram.ai after successful OAuth
+            // Standard: redirect merchant back to mantram.ai dashboard
+            console.log(`✅ OAuth complete — redirecting to ${frontendUrl}/integrations`);
             res.redirect(`${frontendUrl}/integrations?shopify=connected`);
         }
     } catch (error) {
@@ -234,7 +255,7 @@ router.get('/callback', async (req, res) => {
     }
 });
 
-// POST /api/shopify/sync — Sync products from Shopify
+// POST /api/shopify/sync — Sync products, orders, customers from Shopify
 router.post('/sync', protect, async (req, res) => {
     try {
         const { brandId } = req.body;
