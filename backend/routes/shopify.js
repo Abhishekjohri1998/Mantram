@@ -2,12 +2,13 @@
  * Shopify Routes
  * Handles Shopify OAuth, product sync, and catalog management.
  *
- * FLOW (Custom Distribution):
- *   1. POST /connect  → builds Custom Distribution install URL
- *   2. User visits URL on Shopify Admin → clicks Install
- *   3. Shopify calls GET /callback with code + shop + state
- *   4. Callback exchanges code for access_token, saves integration
- *   5. User redirected to mantram.ai/integrations?shopify=connected
+ * FLOW (Standard OAuth — works for ANY merchant store):
+ *   1. POST /connect  → builds standard Shopify OAuth URL with state
+ *   2. Frontend redirects user to that URL (full-page, NOT a popup)
+ *   3. Merchant sees "Install Mantram AI Connect" on their Shopify Admin
+ *   4. Merchant clicks Install → Shopify calls GET /callback with code + shop + state
+ *   5. Callback exchanges code for access_token, saves integration to DB
+ *   6. User redirected to mantram.ai/integrations?shopify=connected
  */
 
 import { Router } from 'express';
@@ -19,7 +20,6 @@ import ShopifyOrder from '../models/ShopifyOrder.js';
 import ShopifyCustomer from '../models/ShopifyCustomer.js';
 import {
     getShopifyAuthUrl,
-    getCustomDistributionUrl,
     exchangeShopifyToken,
     fetchShopifyProducts,
     transformShopifyProduct,
@@ -62,8 +62,8 @@ router.get('/status', protect, async (req, res) => {
     }
 });
 
-// POST /api/shopify/connect — Start Shopify OAuth via Custom Distribution
-// Returns an authUrl that the frontend must redirect to (full-page, not popup).
+// POST /api/shopify/connect — Initiate Shopify OAuth
+// Works for ANY merchant store. Returns an authUrl the frontend must redirect to.
 router.post('/connect', protect, async (req, res) => {
     try {
         const { shopDomain, brandId } = req.body;
@@ -77,16 +77,17 @@ router.post('/connect', protect, async (req, res) => {
         }
 
         const cleanDomain = shopDomain.replace(/^https?:\/\//, '').replace(/\/$/, '');
+        const backendUrl = process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 3001}`;
+        const redirectUri = `${backendUrl}/api/shopify/callback`;
+        const scopes = process.env.SHOPIFY_SCOPES || 'read_products,read_orders,read_customers';
 
-        // Encode userId + brandId in state so /callback can identify the user
+        // Encode userId + brandId in state so /callback can identify which user is connecting
         const statePayload = Buffer.from(
             JSON.stringify({ userId: String(req.user._id), brandId: brandId || '' })
         ).toString('base64');
 
-        // Use Custom Distribution install URL — works for any merchant without App Store review.
-        // This URL is unique per store (uses the store handle, not the full domain).
-        const baseUrl = getCustomDistributionUrl(cleanDomain, clientId);
-        const authUrl = `${baseUrl}&state=${statePayload}`;
+        // Standard OAuth URL: https://{shop}/admin/oauth/authorize?client_id=...&scope=...&redirect_uri=...&state=...
+        const authUrl = getShopifyAuthUrl(cleanDomain, clientId, redirectUri, scopes) + `&state=${statePayload}`;
 
         // Save a pending integration record so /callback can find and update it
         await Integration.findOneAndUpdate(
@@ -105,7 +106,7 @@ router.post('/connect', protect, async (req, res) => {
             { upsert: true, returnDocument: 'after' }
         );
 
-        console.log(`🔗 Shopify OAuth started (Custom Distribution) for ${cleanDomain}`);
+        console.log(`🔗 Shopify OAuth started for ${cleanDomain} → redirect: ${redirectUri}`);
         res.json({ success: true, authUrl, shopDomain: cleanDomain });
     } catch (error) {
         console.error('Shopify connect error:', error);
@@ -171,7 +172,7 @@ router.post('/connect-token', protect, async (req, res) => {
 });
 
 // GET /api/shopify/callback — Shopify OAuth Callback
-// Shopify redirects here after the merchant clicks "Install" on the Custom Distribution page.
+// Shopify redirects here after the merchant clicks "Install".
 router.get('/callback', async (req, res) => {
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
     try {
@@ -231,12 +232,26 @@ router.get('/callback', async (req, res) => {
 
             } catch (e) { console.warn('Shop info fetch failed:', e.message); }
         } else {
-            console.warn(`⚠️ No pending integration found for user ${userId}, shop ${shop}`);
+            // No pending record found — upsert a new one so the connection isn't lost
+            console.warn(`⚠️ No pending integration found for user ${userId}, shop ${shop} — creating new record`);
+            if (userId) {
+                await Integration.findOneAndUpdate(
+                    { user: userId, platform: 'shopify', ...(brandId ? { brand: brandId } : {}) },
+                    {
+                        user: userId,
+                        platform: 'shopify',
+                        status: 'connected',
+                        accessToken: tokenData.access_token,
+                        brand: brandId || undefined,
+                        platformData: { shopDomain: shop },
+                    },
+                    { upsert: true }
+                );
+            }
         }
 
-        // FIX: isEmbedded was previously `!!state` which is ALWAYS true (state is always set).
-        // This caused every OAuth callback to redirect to Shopify Admin instead of mantram.ai.
-        // Now only redirect to Shopify Admin when explicitly requested via ?embedded=1.
+        // Only treat as embedded if explicitly flagged via ?embedded=1
+        // (Previously this was `!!state` which is ALWAYS true, breaking the redirect back to mantram.ai)
         const isEmbedded = req.query.embedded === '1';
 
         if (isEmbedded) {
@@ -245,7 +260,7 @@ router.get('/callback', async (req, res) => {
             console.log(`🚀 Redirecting to Shopify Admin (embedded): ${shop}`);
             res.redirect(`https://${shop}/admin/apps/${apiKey}/integrations?shopify=connected&shop=${shop}&host=${host}`);
         } else {
-            // Standard: redirect merchant back to mantram.ai dashboard
+            // ✅ Normal flow: send merchant back to mantram.ai
             console.log(`✅ OAuth complete — redirecting to ${frontendUrl}/integrations`);
             res.redirect(`${frontendUrl}/integrations?shopify=connected`);
         }
