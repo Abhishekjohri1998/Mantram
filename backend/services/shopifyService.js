@@ -7,11 +7,31 @@
 const SHOPIFY_API_VERSION = '2024-01';
 
 /**
- * Build Shopify OAuth authorization URL
+ * Build Shopify OAuth authorization URL (legacy / App Store flow)
  */
-export function getShopifyAuthUrl(shopDomain, clientId, redirectUri, scopes = 'read_products,read_orders,read_customers,read_inventory') {
+export function getShopifyAuthUrl(shopDomain, clientId, redirectUri, scopes) {
     const cleanDomain = shopDomain.replace(/^https?:\/\//, '').replace(/\/$/, '');
-    return `https://${cleanDomain}/admin/oauth/authorize?client_id=${clientId}&scope=${scopes}&redirect_uri=${encodeURIComponent(redirectUri)}`;
+    const scopeStr = scopes || process.env.SHOPIFY_SCOPES || 'read_products,read_orders,read_customers';
+    return `https://${cleanDomain}/admin/oauth/authorize?client_id=${clientId}&scope=${encodeURIComponent(scopeStr)}&redirect_uri=${encodeURIComponent(redirectUri)}`;
+}
+
+/**
+ * Build Shopify Custom Distribution install URL.
+ * Works immediately for any merchant — no App Store review needed.
+ * Requires the app to be set to "Custom distribution" in Partner Dashboard.
+ *
+ * Flow:
+ *   1. User enters their store domain on mantram.ai
+ *   2. Backend builds this URL and returns it
+ *   3. Frontend redirects user to this URL (full page redirect, not popup)
+ *   4. Shopify shows "Install Mantram AI Connect" screen
+ *   5. User clicks Install → Shopify calls our /callback with OAuth code
+ *   6. Callback exchanges code for access token → integration saved → user redirected back
+ */
+export function getCustomDistributionUrl(shopDomain, clientId) {
+    const cleanDomain = shopDomain.replace(/^https?:\/\//, '').replace(/\/$/, '');
+    const storeHandle = cleanDomain.replace('.myshopify.com', '');
+    return `https://admin.shopify.com/store/${storeHandle}/oauth/install_custom_app?client_id=${clientId}`;
 }
 
 /**
