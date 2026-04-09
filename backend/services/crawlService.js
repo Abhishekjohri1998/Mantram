@@ -14,8 +14,15 @@ const RETRY_STRATEGIES = [
   {
     label: 'Googlebot-mimicry',
     userAgent: 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
-    delayMs: 4000,      // polite delay before retry
+    delayMs: 3000,      // polite delay before retry
     renderJs: true
+  },
+  {
+    label: 'Stealth-Safari',
+    userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15',
+    delayMs: 5000,      // extra delay for sensitivity
+    renderJs: true,
+    stealth: true
   }
 ];
 

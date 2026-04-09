@@ -22,13 +22,15 @@ export async function buildSeoHealthReport(website, options = {}) {
     timeout: options.timeout || 60000
   });
 
-  // STEP 2: NO PAGES discovered — Trigger Pipeline Diagnostic
-  if (!pages || pages.length === 0) {
-    const diagnosis = await diagnoseCrawlPipeline({ jobId });
+  // STEP 2: NO SUCCESSFUL PAGES discovered — Trigger Pipeline Diagnostic
+  const successfulPages = (pages || []).filter(p => p.success);
+  
+  if (successfulPages.length === 0) {
+    const diagnosis = await diagnoseCrawlPipeline({ jobId, lastError: pages?.[0]?.error });
     return {
       status: 'CRAWL_PIPELINE_FAILURE',
       success: false,
-      reason: 'No pages were discovered during the crawl.',
+      reason: 'No successful pages were discovered during the crawl.',
       diagnosis, // Full diagnostic report
       userMessage: getDiagnosticUserMessage(diagnosis.stage),
       attemptsMade,

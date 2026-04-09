@@ -9,6 +9,7 @@ import Bull from 'bull';
  */
 export async function diagnoseCrawlPipeline({
   jobId, // This is the ID of the SeoAudit record
+  lastError = null, // Optional error from the service layer
 }) {
   const SeoAudit = mongoose.model('SeoAudit');
   
@@ -109,10 +110,15 @@ export async function diagnoseCrawlPipeline({
     report.pagesInDb = pageCount;
 
     if (pageCount === 0) {
+      if (lastError && (lastError.includes('403') || lastError.includes('429') || lastError.includes('Bot challenge'))) {
+        report.stage = 'HOMEPAGE_FETCH_FAILED';
+        report.errors.push(`Homepage fetch was blocked: ${lastError}`);
+        return report;
+      }
       report.stage = 'AUDIT_COMPLETED_NO_PAGES';
       report.errors.push(
         `Audit status is "completed" but 0 pages were recorded. ` +
-        `This suggests the crawl returned an empty result set (blocked by robots.txt, 403 Forbidden, or DNS failure).`
+        `This suggests the crawl returned an empty result set (blocked by robots.txt or DNS failure).`
       );
       return report;
     }
@@ -140,8 +146,9 @@ export function getDiagnosticUserMessage(stage) {
     AUDIT_NOT_CREATED: 'The health check request failed to initialize. Please refresh and try again.',
     AUDIT_STUCK_RUNNING: 'The crawl started but seems to have stalled. This often happens with very slow websites or bot protection.',
     AUDIT_IN_PROGRESS: 'Analysis is still in progress. Large sites can take up to 2 minutes.',
-    AUDIT_FAILED: 'The crawler encountered a critical error. This can happen if the site is down or using aggressive bot blocking.',
-    AUDIT_COMPLETED_NO_PAGES: 'Zero pages were discovered. Please verify if the URL is accessible and not blocking "MantramBot".',
+    AUDIT_FAILED: 'The crawler encountered a critical error. This can happen if the site is down or unreachable.',
+    HOMEPAGE_FETCH_FAILED: 'Access Denied: The website is blocking our automated audit tool. (WAF/Cloudflare Block)',
+    AUDIT_COMPLETED_NO_PAGES: 'Zero pages were discovered. Please verify if the URL is accessible and not blocking "MantramBot" in robots.txt.',
     EMPTY_RESULTS_OBJECT: 'The crawl finished but the data could not be saved correctly. Our engineers have been notified.',
     UNKNOWN: 'An unknown pipeline failure occurred. No data was returned from the crawl.'
   };

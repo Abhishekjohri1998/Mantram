@@ -1151,12 +1151,19 @@ export async function researchDomain(baseUrl, options = {}) {
     const MAX_PAGES = options.maxPages || 800;
     const CRAWL_TIMEOUT_MS = options.timeout || 3600000; // 1 hour budget
     const skipCfSolve = options.skipCfSolve || false;
+    const customUA = options.userAgent;
 
     console.log(`🕷️  Deep crawl starting: ${cleanBase} (max ${MAX_PAGES} pages, timeout ${CRAWL_TIMEOUT_MS / 1000}s)`);
 
     // PHASE 0: Conditional Cloudflare challenge detection
     // Try a quick fetch first — only launch the expensive Playwright solver if CF is detected
     resetCfSession(); // Fresh session for each domain
+    
+    // If a custom UA is provided (e.g. for stealth), prime the session with it
+    if (customUA) {
+        _cfSession = { userAgent: customUA, cookies: '', solved: false };
+    }
+
     let _cfNeeded = false;
     if (!skipCfSolve) {
       try {
