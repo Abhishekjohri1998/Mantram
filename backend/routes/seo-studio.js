@@ -163,7 +163,7 @@ router.post('/health-check', protect, requireStudio('seoStudio'), requireCredits
         error: reportData.userMessage || reportData.reason
       });
 
-      return res.status(422).json({
+      return res.status(200).json({
         success: false,
         status: 'CRAWL_PIPELINE_FAILURE',
         error: reportData.userMessage,

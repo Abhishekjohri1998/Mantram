@@ -55,6 +55,7 @@ export async function crawlWithRetry(url, options = {}) {
       const siteResearch = await researchDomain(url, { 
         ...options,
         userAgent: strategy.userAgent,
+        stealth: strategy.stealth,
         // If we want to force JS rendering to be more aggressive on 2nd attempt
         timeout: attempt === 1 ? 90000 : (options.timeout || 60000)
       });
