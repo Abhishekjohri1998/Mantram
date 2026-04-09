@@ -1001,6 +1001,7 @@ async function routedImageGenerate(promptText, imageParts = [], temperature = 0.
                 const lzRefUrls = (refImageUrls || []).filter(u => u && u.startsWith('http'));
 
                 // Route Natively if Model is Gemini to avoid DALL-E resolution constraints in LaoZhang proxy.
+                let nativeSuccess = false;
                 if (lzModel.includes('gemini') || selectedModel.includes('nanobanana')) {
                     console.log(`🚀 [Native Router] Routing ${lzModel} natively to access Gemini Advanced Features.`);
                     
@@ -1023,25 +1024,31 @@ async function routedImageGenerate(promptText, imageParts = [], temperature = 0.
                         }
                     }
                     
-                    const routerResult = await router.generateImage({
-                        prompt: promptText,
-                        aspectRatio: finalLzSize,
-                        model: lzModel,
-                        imageParts: finalImageParts,
-                        size: imageSize
-                    }, {
-                        provider: 'gemini'
-                    });
-                    
-                    return {
-                        imageUrl: routerResult.imageUrl,
-                        model: selectedModel,
-                        provider: 'gemini',
-                        textResponse: '',
-                        warnings: [],
-                    };
-                } else {
-                    // NON-GEMINI LAOZHANG MODELS (Flux, Ideogram, Seedream)
+                    try {
+                        const routerResult = await router.generateImage({
+                            prompt: promptText,
+                            aspectRatio: finalLzSize,
+                            model: lzModel,
+                            imageParts: finalImageParts,
+                            size: imageSize
+                        }, {
+                            provider: 'gemini'
+                        });
+                        
+                        return {
+                            imageUrl: routerResult.imageUrl,
+                            model: selectedModel,
+                            provider: 'gemini',
+                            textResponse: '',
+                            warnings: [],
+                        };
+                    } catch (nativeErr) {
+                        console.warn(`⚠️ [Native Router] Native Gemini failed (${nativeErr.message.substring(0, 80)}). Falling back to LaoZhang proxy...`);
+                    }
+                }
+                
+                // If native wasn't attempted, or if it failed, we use LaoZhang Proxy
+                if (!nativeSuccess) {
                     if (hasRefImages && isMultimodalCapable && lzRefUrls.length > 0) {
                         console.log(`🏷️ [LaoZhang-Multimodal] ${selectedModel} → ${lzModel} with ${lzRefUrls.length} S3 URLs (size=${finalLzSize})...`);
                         lzResult = await laozhangMultimodalImageGenerate(promptText, lzRefUrls, { model: lzModel, size: finalLzSize });

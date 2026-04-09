@@ -14,6 +14,7 @@ import Content from '../models/Content.js';
 import Brand from '../models/Brand.js';
 import { protect } from '../middleware/auth.js';
 import { requireCredits, refundCredits } from '../middleware/credits.js';
+import { fetchOptions } from '../utils/network.js';
 import { safeErrorMessage } from '../utils/safeError.js';
 import { laozhangImageGenerate, isLaozhangAvailable } from '../agents/videoStudio/laozhangClient.js';
 import {
@@ -936,14 +937,24 @@ router.post('/blog/:id/generate-image', protect, async (req, res) => {
         contentParts.push({ text: arInstruction + imagePrompt });
 
         const url = `${baseUrl}/models/${modelId}:generateContent?key=${imageKey}`;
-        const resp = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contents: [{ role: 'user', parts: contentParts }],
-                generationConfig: { responseModalities: ['TEXT', 'IMAGE'], temperature: 0.4 },
-            }),
-        });
+        
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 90_000);
+        
+        let resp;
+        try {
+            resp = await fetch(url, fetchOptions({
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ role: 'user', parts: contentParts }],
+                    generationConfig: { responseModalities: ['TEXT', 'IMAGE'], temperature: 0.4 },
+                }),
+                signal: controller.signal
+            }));
+        } finally {
+            clearTimeout(timeoutId);
+        }
 
         const data = await resp.json();
         if (data.error) {

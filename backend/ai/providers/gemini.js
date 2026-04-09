@@ -1,4 +1,5 @@
 import { BaseProvider } from './base.js';
+import { fetchOptions } from '../../utils/network.js';
 
 /**
  * Google Gemini Provider
@@ -210,7 +211,7 @@ export class GeminiProvider extends BaseProvider {
 
                 let response;
                 try {
-                    response = await fetch(url, {
+                    response = await fetch(url, fetchOptions({
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
@@ -225,7 +226,7 @@ export class GeminiProvider extends BaseProvider {
                             },
                         }),
                         signal: controller.signal,
-                    });
+                    }));
                 } finally {
                     clearTimeout(timeoutId);
                 }
