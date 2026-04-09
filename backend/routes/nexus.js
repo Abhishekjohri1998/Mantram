@@ -133,11 +133,13 @@ You DO have access to real-time web search and research capabilities. NEVER say 
 → Write product descriptions, brand stories, press releases
 → Craft SEO-optimized content, meta descriptions, and keywords
 
-### Creative Direction — YOU DO IT
-→ Describe image concepts in vivid detail with art direction (mood, colors, composition, style)
-→ Create creative briefs for campaigns
-→ Design banner/poster concepts with detailed visual descriptions
 → Suggest photoshoot directions and visual themes
+→ ALWAYS signal visual generation (see signaling rules below)
+
+## Visual Signaling (CRITICAL)
+Whenever you decide to create a visual asset (image, poster, banner, etc.) based on the conversation, you MUST include this exact signal tag at the beginning or end of your response:
+'[SIGNAL: CREATE_IMAGE | prompt: PROMPT_HERE]'
+Substitute PROMPT_HERE with a vivid, detailed instruction for an image model (DALL-E style). The user will not see this tag; it is used to trigger our engine.
 
 ### Brand Strategy — YOU DO IT
 → Analyze brand positioning and suggest improvements
@@ -198,7 +200,7 @@ You know every studio intimately. Only mention them when the user asks WHERE or 
 → Sound human — vary your sentence structure, don't use template phrases repeatedly
 
 ## Formatting Rules
-NEVER use markdown. No **bold**, no *italic*, no ## headers, no bullet points with -, no numbered lists, no backticks, no code blocks.
+NEVER use markdown. No **bold**, no *italic*, no ## headers, no bullet points with -, no numbered lists, no backticks, no code blocks (EXCEPT for the '[SIGNAL: ...]' tag which is mandatory for visuals).
 Write like you're texting. Plain text. Line breaks between thoughts. Emojis for emphasis. Use → for list items if needed.
 
 ## Language Rules
@@ -300,8 +302,11 @@ function classifyIntent(message) {
         return { intent: 'content_create', studioTarget: 'content' };
     }
 
-    // Image creation intents (Phase 2)
-    if (/\b(create|generate|design|make)\s+(a\s+)?(image|banner|poster|creative|graphic|photoshoot)\b/i.test(lower)) {
+    // Image creation intents — Proximity based matching (Verb ... Noun) to handle adjectives & articles
+    const visualVerbs = '(create|generate|show|imagine|make|draw|paint|sketch|give|design|visualize|illustrate)';
+    const visualNouns = '(image|picture|photo|visual|graphic|poster|concept|illustration|scene|banner|creative|artwork|drawing|painting)';
+    
+    if (new RegExp(`\\b${visualVerbs}\\b.*\\b${visualNouns}\\b`, 'i').test(lower)) {
         return { intent: 'image_create', studioTarget: 'creative' };
     }
 
@@ -745,6 +750,19 @@ router.post('/stream', protect, async (req, res) => {
             return res.end();
         }
 
+        if (intentResult.intent === 'image_create') {
+            sendSSE('intent', { intent: 'image_create', prompt: message });
+            // continue to chat so Fidato can say "I'm on it!"
+        }
+
+        if (intentResult.intent === 'content_create') {
+            sendSSE('intent', { intent: 'content_create', prompt: message });
+        }
+
+        if (intentResult.intent === 'brainstorm') {
+            sendSSE('intent', { intent: 'brainstorm', prompt: message });
+        }
+
         // Creation intents — fall through to LLM streaming so Fidato handles them directly
 
         // Chat — restore history from Redis + stream the response
@@ -901,7 +919,7 @@ ${brandContext ? `## Active Brand Context\n${brandContext}` : '(No brand selecte
                                 const token = chunk.choices?.[0]?.delta?.content;
                                 if (token) {
                                     fullReply += token;
-                                    sendSSE('token', { t: token });
+                                    sendSSE('token', { token });
                                 }
                             } catch { /* skip malformed */ }
                         }
