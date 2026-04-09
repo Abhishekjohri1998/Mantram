@@ -1111,7 +1111,7 @@ small{color:#94a3b8;font-size:10px}
                             </div>
                         )}
 
-                        {/* ─── TIERED DIAGNOSTIC UI (SEO Audit Guard) ─── */}
+                        {/* ─── TIERED DIAGNOSTIC UI (SEO Audit Guard & Pipeline Diagnostic) ─── */}
                         {error && error.diagnosis && (
                             <div className="glass-panel rounded-2xl p-6 mb-6 border-rose-500/20 animate-fade-in relative overflow-hidden">
                                 <div className="absolute top-0 right-0 p-4 opacity-5">
@@ -1123,7 +1123,9 @@ small{color:#94a3b8;font-size:10px}
                                     </div>
                                     <div>
                                         <h3 className="text-lg font-bold text-white leading-tight">{error.message}</h3>
-                                        <p className="text-xs text-rose-400/80 font-bold uppercase tracking-wider">Error Code: {error.diagnosis.errorCode}</p>
+                                        <p className="text-xs text-rose-400/80 font-bold uppercase tracking-wider">
+                                            {error.diagnosis.errorCode ? `Error Code: ${error.diagnosis.errorCode}` : `Pipeline Stage: ${error.diagnosis.stage}`}
+                                        </p>
                                     </div>
                                     <button onClick={() => setError(null)} className="ml-auto text-slate-500 hover:text-white transition-colors cursor-pointer">
                                         <span className="material-symbols-outlined">close</span>
@@ -1131,30 +1133,61 @@ small{color:#94a3b8;font-size:10px}
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                                    {/* Column 1: Analysis Logic / Trace */}
                                     <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.08]">
                                         <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-2">
                                             <span className="material-symbols-outlined text-xs text-primary">visibility</span> Analysis Logic
                                         </h4>
-                                        <p className="text-sm text-slate-300 leading-relaxed mb-4">{error.diagnosis.explanation}</p>
+                                        <p className="text-sm text-slate-300 leading-relaxed mb-4">
+                                            {error.diagnosis.explanation || (error.diagnosis.errors && error.diagnosis.errors[0]) || 'The crawl failed to return valid data.'}
+                                        </p>
                                         <div className="flex flex-wrap gap-2">
                                             <span className="text-[10px] px-2 py-1 rounded bg-white/5 text-slate-400 border border-white/5">Strategy: {error.strategyUsed}</span>
                                             <span className="text-[10px] px-2 py-1 rounded bg-white/5 text-slate-400 border border-white/5">Attempts: {error.attemptsMade}</span>
+                                            {error.diagnosis.pagesInDb !== undefined && (
+                                                <span className="text-[10px] px-2 py-1 rounded bg-white/5 text-slate-400 border border-white/5">Pages Disc: {error.diagnosis.pagesInDb}</span>
+                                            )}
                                         </div>
                                     </div>
                                     
+                                    {/* Column 2: Remediation / Action */}
                                     <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.08]">
                                         <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-2">
                                             <span className="material-symbols-outlined text-xs text-rose-400">assignment_late</span> Action Required
                                         </h4>
                                         <div className="space-y-3">
-                                            <div className="flex gap-2.5">
-                                                <span className="text-xs text-slate-500 font-bold w-12 shrink-0">User:</span>
-                                                <p className="text-xs text-slate-300 italic">"{error.diagnosis.userAction}"</p>
-                                            </div>
-                                            <div className="flex gap-2.5">
-                                                <span className="text-xs text-slate-500 font-bold w-12 shrink-0">Admin:</span>
-                                                <p className="text-xs text-slate-400/80">{error.diagnosis.adminAction}</p>
-                                            </div>
+                                            {error.diagnosis.remediation ? (
+                                                <>
+                                                    <div className="flex gap-2.5">
+                                                        <div className="size-5 rounded-lg bg-rose-500/10 flex items-center justify-center shrink-0">
+                                                            <span className="material-symbols-outlined text-[10px] text-rose-400">person</span>
+                                                        </div>
+                                                        <div className="text-xs text-slate-400 leading-snug">
+                                                            <span className="text-rose-400 font-bold block mb-0.5 uppercase tracking-tighter">Your Action:</span>
+                                                            {error.diagnosis.remediation.user}
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex gap-2.5">
+                                                        <div className="size-5 rounded-lg bg-emerald-500/10 flex items-center justify-center shrink-0">
+                                                            <span className="material-symbols-outlined text-[10px] text-emerald-400">admin_panel_settings</span>
+                                                        </div>
+                                                        <div className="text-xs text-slate-400 leading-snug">
+                                                            <span className="text-emerald-400 font-bold block mb-0.5 uppercase tracking-tighter">AI Self-Correction:</span>
+                                                            {error.diagnosis.remediation.admin}
+                                                        </div>
+                                                    </div>
+                                                </>
+                                            ) : (
+                                                <div className="flex gap-2.5">
+                                                    <div className="size-5 rounded-lg bg-rose-500/10 flex items-center justify-center shrink-0">
+                                                        <span className="material-symbols-outlined text-[10px] text-rose-400">info</span>
+                                                    </div>
+                                                    <div className="text-xs text-slate-400 leading-snug">
+                                                        <span className="text-rose-400 font-bold block mb-0.5 uppercase tracking-tighter">Recommended:</span>
+                                                        {error.diagnosis.errors?.length > 1 ? error.diagnosis.errors.slice(1).join(' ') : 'Verify your URL and try with Googlebot-mimicry if selected.'}
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 </div>

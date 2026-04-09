@@ -114,6 +114,16 @@ router.post('/health-check', protect, requireStudio('seoStudio'), requireCredits
 
     const brandContext = buildBrandContext(brand || brandPayload);
 
+    // ── INITIALIZE JOB TRACKING ──
+    const auditRecord = await SeoAudit.create({
+      user: req.user._id,
+      brand: brand?._id || brandPayload?._id,
+      type: 'health-check',
+      url: website,
+      status: 'running'
+    });
+    const jobId = auditRecord._id;
+
     // STEP 1: FAST parallel data gathering — replaces 800-page crawl with APIs
     // researchDomainLight: homepage-only crawl (3-5s) for basic site structure
     // getInstantSiteIntelligence: DataForSEO APIs in parallel (5-10s) for ranked keywords, SERP competitors, instant page analysis
@@ -129,6 +139,7 @@ router.post('/health-check', protect, requireStudio('seoStudio'), requireCredits
     // This replaces researchDomain + manual fallback with a deterministic validation layer.
     let [reportData, siteIntel, pageSpeedData, backlinkData, mozData] = await Promise.all([
       buildSeoHealthReport(website, { 
+        jobId, // PASS JOB ID for diagnostics
         maxPages: 200, 
         timeout: 60000,
         brandContext 
@@ -142,9 +153,36 @@ router.post('/health-check', protect, requireStudio('seoStudio'), requireCredits
       isMozConfigured() ? getMozDomainAuthority(brandDomain).catch(e => ({ available: false, error: e.message })) : Promise.resolve({ available: false }),
     ]);
 
+    // ── HALT ON CRAWL_PIPELINE_FAILURE: Complete Pipeline Diagnosis ──
+    if (reportData.status === 'CRAWL_PIPELINE_FAILURE') {
+      console.error(`🚨 SEO Pipeline Failure: ${website} | Stage: ${reportData.diagnosis?.stage}`);
+      
+      // Update job to failed
+      await SeoAudit.findByIdAndUpdate(jobId, {
+        status: 'failed',
+        error: reportData.userMessage || reportData.reason
+      });
+
+      return res.status(422).json({
+        success: false,
+        status: 'CRAWL_PIPELINE_FAILURE',
+        error: reportData.userMessage,
+        diagnosis: reportData.diagnosis, // Full pipeline trace
+        strategyUsed: reportData.strategyUsed,
+        attemptsMade: reportData.attemptsMade
+      });
+    }
+
     // ── HALT ON CRAWL_INVALID: Block Hallucination Risk ──
     if (reportData.status === 'CRAWL_INVALID') {
       console.error(`🛑 SEO Audit Guard: Blocking hallucination risk for ${website}. Reason: ${reportData.reason}`);
+      
+      // Update job to failed
+      await SeoAudit.findByIdAndUpdate(jobId, {
+        status: 'failed',
+        error: reportData.reason
+      });
+
       return res.status(422).json({
         success: false,
         error: reportData.message, // "Recrawl Required: High Hallucination Risk"
@@ -745,11 +783,7 @@ Generate 8-15 critical, high-impact issues. Be STRATEGIC — every issue must ha
     // Save audit
     if (req.user) {
       try {
-        await SeoAudit.create({
-          user: req.user._id,
-          brand: brand?._id || brandPayload?._id,
-          type: 'health-check',
-          url: website,
+        await SeoAudit.findByIdAndUpdate(jobId, {
           scores: {
             seoHealth: parsed.seoHealthScore || 0,
             aiVisibility: parsed.aiVisibilityScore || 0,

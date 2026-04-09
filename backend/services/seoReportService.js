@@ -2,6 +2,7 @@ import { crawlWithRetry } from './crawlService.js';
 import { diagnoseCrawlFailure } from '../utils/crawlDiagnosis.js';
 import { generateGroundedNarrative } from './groundingService.js';
 import { extractJSON } from '../utils/ai-parser.js';
+import { diagnoseCrawlPipeline, getDiagnosticUserMessage } from '../utils/crawlPipelineDiagnostic.js';
 
 /**
  * SEO Report Service
@@ -13,7 +14,7 @@ import { extractJSON } from '../utils/ai-parser.js';
  * 4. Grounded AI Narrative (if partial or full)
  */
 export async function buildSeoHealthReport(website, options = {}) {
-  const { brandContext, provider } = options;
+  const { brandContext, provider, jobId } = options;
 
   // STEP 1: Crawl with auto-retry
   const { pages, audit, attemptsMade, strategyUsed, siteResearch } = await crawlWithRetry(website, {
@@ -21,7 +22,25 @@ export async function buildSeoHealthReport(website, options = {}) {
     timeout: options.timeout || 60000
   });
 
-  // STEP 2: Handle INVALID state (Hard Block)
+  // STEP 2: NO PAGES discovered — Trigger Pipeline Diagnostic
+  if (!pages || pages.length === 0) {
+    const diagnosis = await diagnoseCrawlPipeline({ jobId });
+    return {
+      status: 'CRAWL_PIPELINE_FAILURE',
+      success: false,
+      reason: 'No pages were discovered during the crawl.',
+      diagnosis, // Full diagnostic report
+      userMessage: getDiagnosticUserMessage(diagnosis.stage),
+      attemptsMade,
+      strategyUsed,
+      metrics: {
+        totalPages: 0,
+        meaningfulRatio: 0
+      }
+    };
+  }
+
+  // STEP 3: Handle INVALID state (Hard Block - Data found but poor quality)
   if (audit.reportMode === 'INVALID') {
     const diagnosis = diagnoseCrawlFailure(audit);
     return {
