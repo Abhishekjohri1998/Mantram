@@ -22,7 +22,7 @@ class ModelRouter {
         this.providers.gemini = new GeminiProvider({
             apiKey: providerConfigs.gemini?.apiKey,
             imageApiKey: providerConfigs.gemini?.imageApiKey,
-            defaultModel: config.ai.defaultGeminiModel || 'gemini-2.0-flash',
+            defaultModel: config.ai.defaultGeminiModel || 'gemini-2.5-flash',
             defaultImageModel: config.ai.defaultImageModel || 'gemini-3.1-flash-image-preview',
             // GCP Vertex AI (Billed)
             gcpProjectId: providerConfigs.gemini?.gcpProjectId,

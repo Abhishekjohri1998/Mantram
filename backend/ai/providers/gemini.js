@@ -204,21 +204,31 @@ export class GeminiProvider extends BaseProvider {
                 const safeARs = ["1:1","1:4","1:8","2:3","3:2","3:4","4:1","4:3","4:5","5:4","8:1","9:16","16:9","21:9"];
                 const nativeAspectRatio = safeARs.includes(aspectRatio) ? aspectRatio : '1:1';
 
-                const response = await fetch(url, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        contents: [{ role: 'user', parts }],
-                        generationConfig: {
-                            responseModalities: ['TEXT', 'IMAGE'],
-                            temperature: 0.4,
-                            imageConfig: {
-                                aspectRatio: nativeAspectRatio,
-                                imageSize: "2K"
-                            }
-                        },
-                    }),
-                });
+                // ── 90s hard timeout — Gemini can hang indefinitely without it ──
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 90_000);
+
+                let response;
+                try {
+                    response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            contents: [{ role: 'user', parts }],
+                            generationConfig: {
+                                responseModalities: ['TEXT', 'IMAGE'],
+                                temperature: 0.4,
+                                imageConfig: {
+                                    aspectRatio: nativeAspectRatio,
+                                    imageSize: "2K"
+                                }
+                            },
+                        }),
+                        signal: controller.signal,
+                    });
+                } finally {
+                    clearTimeout(timeoutId);
+                }
 
                 const data = await response.json();
                 
@@ -236,24 +246,20 @@ export class GeminiProvider extends BaseProvider {
                 }
 
                 const resParts = data.candidates?.[0]?.content?.parts || [];
-                let s3Url = null;
+                // ── Return base64 immediately — caller's background IIFE handles S3 upload ──
+                // Previously we blocked here on S3 upload (could take 10-30s extra).
+                // Now we return the data URL and let the background upload flow handle it.
                 for (const part of resParts) {
                     if (part.inlineData?.mimeType?.startsWith('image/')) {
-                        // Do NOT return base64 to frontend; extract to S3 immediately
-                        const { uploadToS3 } = await import('../../utils/s3.js');
-                        const buffer = Buffer.from(part.inlineData.data, 'base64');
-                        s3Url = await uploadToS3(buffer, `studio/gemini-native-${Date.now()}.png`, part.inlineData.mimeType);
-                        break;
+                        const imageUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+                        console.log(`✅ Gemini image generated (${modelId}) — returning base64, S3 upload pending`);
+                        return {
+                            imageUrl,
+                            model: modelId,
+                            provider: 'gemini',
+                            generationTime: Date.now() - startTime,
+                        };
                     }
-                }
-
-                if (s3Url) {
-                    return {
-                        imageUrl: s3Url,
-                        model: modelId,
-                        provider: 'gemini',
-                        generationTime: Date.now() - startTime,
-                    };
                 }
                 throw new Error('Gemini returned no image in response');
             } 

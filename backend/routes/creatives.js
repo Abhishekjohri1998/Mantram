@@ -76,27 +76,56 @@ async function createCreativeJob(req, res) {
         // Return immediately to frontend
         res.json({ success: true, jobId, message: 'Generation queued. Processing will begin shortly.' });
 
-        // Add to Bull queue with safety check
-        if (creativeQueue) {
-            creativeQueue.add({
-                jobId,
-                userId: req.user._id,
-                payload: { brandId: sanitizedBrandId, type, prompt, options, creditsDeducted: req.creditsDeducted || 0 }
-            }, {
-                jobId, 
-                attempts: 3,
-                backoff: { type: 'exponential', delay: 10000 },
-                removeOnComplete: true,
-                removeOnFail: false
-            }).catch(err => {
-                console.error(`🚨 [Job] Failed to add ${jobId} to creativeQueue:`, err.message);
-                // Update job status to failed if queueing fails
-                GenerationJob.updateOne({ jobId }, { status: 'failed', errorMessage: `Queueing failed: ${err.message}` }).catch(() => {});
-            });
-        } else {
-            console.error('🚨 [Job] creativeQueue is NOT initialized. Job will hang in pending.');
-            GenerationJob.updateOne({ jobId }, { status: 'failed', errorMessage: 'Internal Queue Service Unavailable' }).catch(() => {});
-        }
+        // ── DIRECT BACKGROUND EXECUTION ──────────────────────────────────────
+        // We previously used Bull+Redis (Upstash) here, but Upstash is a serverless
+        // REST-based Redis that does NOT support persistent TCP connections required
+        // by Bull's BRPOP/SUBSCRIBE model. Jobs were enqueued but NEVER processed.
+        //
+        // Fix: run the generation directly in Node.js background via setImmediate.
+        // This is non-blocking (response is already sent above), reliable, and doesn't
+        // require Redis. It handles up to ~10 concurrent generations comfortably.
+        // ─────────────────────────────────────────────────────────────────────
+        setImmediate(async () => {
+            try {
+                console.log(`🚀 [Job] Starting direct background generation: ${jobId}`);
+
+                // Mark as processing
+                await GenerationJob.findOneAndUpdate(
+                    { jobId },
+                    { status: 'processing', startedAt: new Date() }
+                );
+
+                // Get user model
+                const User = mongoose.model('User');
+                const user = req.user; // Already authenticated — use req.user directly
+
+                const data = await internalGenerateCreative({
+                    body: { brandId: sanitizedBrandId, type, prompt, options, jobId },
+                    user,
+                    creditsDeducted: req.creditsDeducted || 0,
+                    jobId,
+                });
+
+                if (data?.success) {
+                    console.log(`✅ [Job] ${jobId} completed — Creative: ${data.creative?._id}`);
+                } else {
+                    throw new Error(data?.error || 'Pipeline returned no creative');
+                }
+            } catch (err) {
+                console.error(`❌ [Job] Background generation failed (${jobId}):`, err.message);
+                await GenerationJob.findOneAndUpdate(
+                    { jobId },
+                    { status: 'failed', completedAt: new Date(), errorMessage: err.message }
+                ).catch(() => {});
+
+                // Refund credits on failure
+                if (req.creditsDeducted > 0) {
+                    refundCredits(req.user._id, req.creditsDeducted, 'creative',
+                        `Refund: Background Job ${jobId} Failed — ${err.message}`, 'creative'
+                    ).catch(e => console.error(`❌ [Job] Refund failed for ${jobId}:`, e.message));
+                }
+            }
+        });
 
     } catch (error) {
         console.error('❌ [Job] createCreativeJob top-level error:', error);
@@ -150,17 +179,24 @@ export async function internalGenerateCreative({ body, user, creditsDeducted, jo
 
         let pipelineResult;
         try {
-            pipelineResult = await runCreativePipeline({
-                brandId,
-                brief: prompt,
-                type: type || 'instagram-post',
-                options: options || {},
-                emit: async (agent, message, status, detail) => {
-                    if (progressId) {
-                        await addStep(progressId, { agent, message, status, detail });
+            // ── 45s timeout on agentic pipeline — falls back to raw prompt if slow ──
+            const pipelineTimeout = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('Pipeline timeout (45s) — using raw prompt')), 45_000)
+            );
+            pipelineResult = await Promise.race([
+                runCreativePipeline({
+                    brandId,
+                    brief: prompt,
+                    type: type || 'instagram-post',
+                    options: options || {},
+                    emit: async (agent, message, status, detail) => {
+                        if (progressId) {
+                            await addStep(progressId, { agent, message, status, detail });
+                        }
                     }
-                }
-            });
+                }),
+                pipelineTimeout,
+            ]);
             agenticMeta = {
                 ...agenticMeta,
                 ...pipelineResult,
@@ -216,16 +252,38 @@ export async function internalGenerateCreative({ body, user, creditsDeducted, jo
         });
 
         if (jobId) {
+            // ── IMPORTANT: Never store raw base64 imageUrl in GenerationJob.result ──
+            // Base64 images can be 1-3MB, which bloats MongoDB documents and may
+            // silently fail the findOneAndUpdate (hitting the 16MB doc limit).
+            // Instead, store a slim creative object with only safe HTTP URLs.
+            // The background S3 upload will update Creative.imageUrl shortly after.
+            const safeImageUrl = (creative.imageUrl || '').startsWith('data:')
+                ? creative.thumbnailUrl  // prefer thumbnail URL if available
+                : creative.imageUrl;
+            const slimCreative = {
+                _id: creative._id,
+                type: creative.type,
+                title: creative.title,
+                prompt: creative.prompt,
+                // Only store safe HTTP URLs — base64 data goes via background S3 upload
+                imageUrl: safeImageUrl && !safeImageUrl.startsWith('data:') ? safeImageUrl : null,
+                thumbnailUrl: creative.thumbnailUrl && !creative.thumbnailUrl.startsWith('data:') ? creative.thumbnailUrl : null,
+                dimensions: creative.dimensions,
+                aiMeta: creative.aiMeta ? { processingStatus: creative.aiMeta.processingStatus } : {},
+                copy: creative.copy,
+                createdAt: creative.createdAt,
+            };
             await GenerationJob.findOneAndUpdate(
                 { jobId },
                 { 
                     status: 'completed', 
                     completedAt: new Date(), 
                     creativeId: creative._id,
-                    imageUrl: creative.imageUrl,
-                    result: { creative, warnings: result.warnings || [] }
+                    // Store safe external URL for quick display (may be null until S3 upload finishes)
+                    imageUrl: slimCreative.imageUrl || slimCreative.thumbnailUrl || null,
+                    result: { creative: slimCreative, warnings: result.warnings || [] }
                 }
-            ).catch(() => {});
+            ).catch(err => console.error('[GenerationJob] Failed to mark completed:', err.message));
         }
 
         user.updateOne({ $inc: { 'usage.creativesGenerated': 1 } }).catch(() => {});
@@ -283,6 +341,13 @@ export async function internalGenerateCreative({ body, user, creditsDeducted, jo
                         { _id: creative._id },
                         { $set: { imageUrl: finalUrl, thumbnailUrl: finalUrl, 'aiMeta.processingStatus': 'ready' } }
                     );
+                    // ── Also update the GenerationJob so the polling frontend gets the real URL ──
+                    if (jobId) {
+                        await GenerationJob.updateOne(
+                            { jobId },
+                            { $set: { imageUrl: finalUrl, 'result.creative.imageUrl': finalUrl, 'result.creative.thumbnailUrl': finalUrl } }
+                        ).catch(() => {});
+                    }
                 } else {
                     await Creative.updateOne(
                         { _id: creative._id },
@@ -1291,7 +1356,7 @@ No markdown, no explanation.`;
         if (geminiKey) {
             try {
                 const resp = await fetch(
-                    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,
+                    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`,
                     {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },

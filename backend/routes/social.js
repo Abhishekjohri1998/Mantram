@@ -386,7 +386,7 @@ Do not include any text outside the JSON. Do not wrap in markdown code blocks.`;
         parts.push({ text: systemPrompt });
 
         // Call Gemini for caption generation (text-only response)
-        const models = ['gemini-2.0-flash', 'gemini-1.5-pro'];
+        const models = ['gemini-2.5-flash', 'gemini-2.5-pro'];
         let captionsResult = null;
 
         for (const modelId of models) {

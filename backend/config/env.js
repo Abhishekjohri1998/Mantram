@@ -30,7 +30,7 @@ export default {
         defaultTextProvider: process.env.DEFAULT_TEXT_PROVIDER || 'anthropic',
         defaultImageProvider: process.env.DEFAULT_IMAGE_PROVIDER || 'gemini',
         defaultTextModel: process.env.DEFAULT_TEXT_MODEL || 'claude-3-5-sonnet-20241022',
-        defaultGeminiModel: process.env.DEFAULT_GEMINI_MODEL || 'gemini-2.0-flash',
+        defaultGeminiModel: process.env.DEFAULT_GEMINI_MODEL || 'gemini-2.5-flash',
         defaultOpenAIModel: process.env.DEFAULT_OPENAI_MODEL || 'gpt-4o-mini',
         defaultAnthropicModel: process.env.DEFAULT_ANTHROPIC_MODEL || 'claude-3-5-sonnet-20241022',
         defaultImageModel: process.env.DEFAULT_IMAGE_MODEL || 'gemini-3.1-flash-image-preview',

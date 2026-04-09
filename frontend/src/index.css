@@ -674,12 +674,11 @@
     display: flex;
     flex-direction: column;
     position: sticky;
-    /* top = studio tab-nav offset: pt-16 (4rem) inside main + tab-row (~3.25rem) + buffer (1.25rem) */
-    top: 8.5rem;
-    /* height = viewport minus fixed header (4rem) minus sticky top offset (8.5rem) = 12.5rem total */
-    /* This ensures the panel fits exactly in the visible viewport below the header + tab nav */
-    height: calc(100vh - 12.5rem);
-    max-height: calc(100vh - 12.5rem);
+    /* top = header (4rem) + tab-nav (~3rem) + small buffer (0.75rem) */
+    top: 7.75rem;
+    /* height = viewport minus header+tab offset */
+    height: calc(100vh - 11.75rem);
+    max-height: calc(100vh - 11.75rem);
     background: rgba(10, 10, 14, 0.97);
     border: 1px solid rgba(72, 71, 76, 0.18);
     border-radius: 1rem;
@@ -739,37 +738,43 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 36px;
-    height: 36px;
-    border-radius: 10px;
-    border: 1px solid rgba(72, 71, 76, 0.15);
-    background: rgba(255, 255, 255, 0.03);
-    color: rgba(243, 239, 246, 0.5);
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    border: 1px solid rgba(72, 71, 76, 0.25);
+    background: rgba(255, 255, 255, 0.04);
+    color: rgba(243, 239, 246, 0.6);
     transition: all 0.2s ease;
     cursor: pointer;
     flex-shrink: 0;
   }
   .floating-setting-btn:hover {
-    background: rgba(255, 255, 255, 0.06);
-    color: rgba(243, 239, 246, 0.8);
-    border-color: rgba(72, 71, 76, 0.3);
+    background: rgba(255, 255, 255, 0.08);
+    color: rgba(243, 239, 246, 0.9);
+    border-color: rgba(72, 71, 76, 0.4);
+    transform: translateY(-1px);
   }
   .floating-setting-btn.active {
-    background: rgba(255, 77, 0, 0.12);
+    background: rgba(255, 77, 0, 0.15);
     color: #FF4D00;
-    border-color: rgba(255, 77, 0, 0.35);
-    box-shadow: 0 0 12px -2px rgba(255, 77, 0, 0.2);
+    border-color: rgba(255, 77, 0, 0.45);
+    box-shadow: 0 0 16px -2px rgba(255, 77, 0, 0.25);
   }
   /* Active dot indicator */
   .floating-setting-btn .setting-dot {
     position: absolute;
-    top: 4px;
-    right: 4px;
-    width: 6px;
-    height: 6px;
+    top: 5px;
+    right: 5px;
+    width: 7px;
+    height: 7px;
     border-radius: 50%;
     background: #FF4D00;
-    box-shadow: 0 0 6px rgba(255, 77, 0, 0.6);
+    box-shadow: 0 0 8px rgba(255, 77, 0, 0.7);
+  }
+  /* Force visible icon size inside setting buttons */
+  .floating-setting-btn .material-symbols-outlined {
+    font-size: 22px !important;
+    line-height: 1;
   }
 
   /* ── Settings Accordion ── */
@@ -783,12 +788,17 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0.75rem 1rem;
+    padding: 0.85rem 1rem;
     cursor: pointer;
     transition: all 0.2s ease;
   }
   .sidebar-accordion-header:hover {
     background: rgba(255, 255, 255, 0.03);
+  }
+  /* Enlarge accordion header icons for better visibility */
+  .sidebar-accordion-header .material-symbols-outlined {
+    font-size: 22px !important;
+    line-height: 1;
   }
   .sidebar-accordion-body {
     padding: 0 1rem 1rem 1rem;
@@ -822,13 +832,12 @@
     border-bottom: none;
   }
 
-  /* Force Material Symbols inside pill chip buttons to never overflow */
+  /* Force Material Symbols inside floating-tray chip buttons to stay compact without
+     becoming illegibly tiny. 13px is the sweet spot for pill-chip labels. */
   .floating-tray button .material-symbols-outlined,
   .floating-tray button span.material-symbols-outlined {
-    font-size: 10px !important;
+    font-size: 13px !important;
     line-height: 1 !important;
-    max-width: 12px;
-    overflow: hidden;
     display: inline-block;
     vertical-align: middle;
     flex-shrink: 0;

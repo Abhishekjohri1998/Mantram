@@ -344,6 +344,7 @@ export default function CreativeStudio() {
             const parsed = JSON.parse(raw)
             return Object.values(parsed)
                 .filter(j => j.status === 'pending' || j.status === 'processing')
+                .filter(j => (Date.now() - (j.createdAt || 0)) < 10 * 60 * 1000) // EXPIRE ANY JOB OLDER THAN 10 MINS to unblock users
                 .map(j => ({ jobId: j.jobId, prompt: j.prompt || '', startedAt: j.createdAt || Date.now(), steps: [] }))
         } catch { return [] }
     }) // Array of in-progress jobs, max 3
@@ -1354,7 +1355,6 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
 
         const localJobId = `job_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
         setActiveGenerations(prev => [...prev, { jobId: localJobId, prompt: prompt.substring(0, 60), startedAt: Date.now(), steps: [] }])
-        setPipelineSteps([])
         setError('')
         setFeedbackState(null)
         setFeedbackToast('')
@@ -1453,17 +1453,48 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
                             const pollData = await creativesAPI.pollJob(jobData.jobId)
                             if (!pollData?.success) return
                             const job = pollData.job
-                            if (job.status === 'completed' && job.result?.creative) {
+                            if (job.status === 'completed') {
                                 clearInterval(localPollInterval)
-                                const creative = job.result.creative
-                                setResult(creative)
-                                if (creative?.imageUrl) {
-                                    setGenerationHistory(prev => [{ ...creative, _prompt: prompt, _timestamp: Date.now() }, ...prev])
+                                const creative = job.result?.creative || {}
+                                // imageUrl may be null if S3 upload is still in-progress
+                                const imageUrl = creative.imageUrl || job.imageUrl
+
+                                if (!imageUrl && creative._id) {
+                                    // S3 not done yet — wait up to 60s
+                                    let retries = 0
+                                    const waitForS3 = setInterval(async () => {
+                                        retries++
+                                        if (retries > 12) {
+                                            clearInterval(waitForS3)
+                                            setResult({ ...creative, _prompt: prompt })
+                                            setFeedbackToast('⚠️ Image upload is taking longer than expected. Refresh in a moment.')
+                                            setActiveGenerations(prev => prev.filter(j => j.jobId !== localJobId))
+                                            return
+                                        }
+                                        try {
+                                            const repoll = await creativesAPI.pollJob(jobData.jobId)
+                                            const freshJob = repoll?.job
+                                            const freshUrl = freshJob?.result?.creative?.imageUrl || freshJob?.imageUrl
+                                            if (freshUrl) {
+                                                clearInterval(waitForS3)
+                                                const freshCreative = { ...creative, imageUrl: freshUrl, thumbnailUrl: freshUrl }
+                                                setResult(freshCreative)
+                                                setGenerationHistory(prev => [{ ...freshCreative, _prompt: prompt, _timestamp: Date.now() }, ...prev])
+                                                setFeedbackToast('')
+                                                setActiveGenerations(prev => prev.filter(j => j.jobId !== localJobId))
+                                            }
+                                        } catch { /* ignore */ }
+                                    }, 5000)
+                                } else {
+                                    const finalCreative = { ...creative, imageUrl: imageUrl || creative.imageUrl }
+                                    setResult(finalCreative)
+                                    if (imageUrl) {
+                                        setGenerationHistory(prev => [{ ...finalCreative, _prompt: prompt, _timestamp: Date.now() }, ...prev])
+                                    }
+                                    if (job.warnings?.length > 0) setAiWarnings(job.warnings)
+                                    setFeedbackToast('')
+                                    setActiveGenerations(prev => prev.filter(j => j.jobId !== localJobId))
                                 }
-                                if (job.warnings?.length > 0) setAiWarnings(job.warnings)
-                                setFeedbackToast('')
-                                // Remove only this specific job from the active list
-                                setActiveGenerations(prev => prev.filter(j => j.jobId !== localJobId))
                             } else if (job.status === 'failed') {
                                 clearInterval(localPollInterval)
                                 setError({ message: job.errorMessage || 'Generation failed.', isRetryable: true })
@@ -1486,6 +1517,8 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
             }
         } catch (e) {
             console.error('❌ Generation error:', e)
+            // Clean up from active generations since no polling was started
+            setActiveGenerations(prev => prev.filter(j => j.jobId !== localJobId))
             
             const errMsg = (e.message || '').toLowerCase()
             
@@ -1512,16 +1545,9 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
                 })
             }
         } finally {
-            // Only remove from activeGenerations if we're not in job-polling mode
-            // (job-polling mode removes it when done)
-            setActiveGenerations(prev => {
-                const still = prev.find(j => j.jobId === localJobId)
-                // If it's been there more than 2s and we haven't started polling, remove it
-                if (still && (Date.now() - still.startedAt) > 2000) {
-                    return prev.filter(j => j.jobId !== localJobId)
-                }
-                return prev
-            })
+            // The poll interval handles cleanup for successful jobs.
+            // Only clean up here if we hit the catch block (error state set).
+            // This prevents the 2s timeout from killing actively-polling jobs.
         }
     }
 
@@ -2197,7 +2223,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
             />
 
             {/* ══ Unified Studio Navigation (sticky — tabs + optional gallery sub-bar) ══ */}
-            <div className="flex flex-col gap-0 rounded-2xl mb-4 mx-2 sticky z-40" style={{ top: '4rem', background: '#12121a', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 6px 32px rgba(0,0,0,0.6), 0 1px 0 rgba(255,255,255,0.05) inset' }}>
+            <div className="flex flex-col gap-0 rounded-2xl mb-2 mx-1 sticky z-40" style={{ top: '3.75rem', background: '#12121a', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 6px 32px rgba(0,0,0,0.6), 0 1px 0 rgba(255,255,255,0.05) inset' }}>
                 {/* ── Row 1: Tab Buttons ── */}
                 <div className="flex items-center gap-1.5 p-2 overflow-x-auto scrollbar-hide whitespace-nowrap">
                 {[
@@ -2581,7 +2607,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 pipelineSteps={job.steps || []}
                                 currentStage={`${job.prompt}${job.prompt.length >= 60 ? '...' : ''}`}
                                 icon="photo_camera"
-                                estimatedDuration={60}
+                                estimatedDuration={150}
                                 startedAt={job.startedAt}
                             />
                         ))}
@@ -3299,8 +3325,8 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             {/* Accordion: Aspect Ratio */}
                             <div className="sidebar-accordion">
                                 <div className="sidebar-accordion-header" onClick={() => setFloatingTray(prev => prev === 'format' ? null : 'format')}>
-                                    <span className="text-[11px] text-slate-200 font-bold flex items-center gap-2">
-                                        <span className="material-symbols-outlined text-[15px] text-primary">crop</span>
+                                    <span className="text-slate-200 font-bold flex items-center gap-2" style={{ fontSize: 13 }}>
+                                        <span className="material-symbols-outlined text-primary" style={{ fontSize: 20 }}>crop</span>
                                         Format
                                         {selectedType && (
                                             <span className="text-[9px] px-1.5 py-0.5 rounded bg-primary/15 text-primary font-bold">
@@ -3341,8 +3367,8 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             {/* Accordion: Camera Shot */}
                             <div className="sidebar-accordion">
                                 <div className="sidebar-accordion-header" onClick={() => setFloatingTray(prev => prev === 'camera' ? null : 'camera')}>
-                                    <span className="text-[11px] text-slate-200 font-bold flex items-center gap-2">
-                                        <span className="material-symbols-outlined text-[15px] text-cyan-400">photo_camera</span>
+                                    <span className="text-slate-200 font-bold flex items-center gap-2" style={{ fontSize: 13 }}>
+                                        <span className="material-symbols-outlined text-cyan-400" style={{ fontSize: 20 }}>photo_camera</span>
                                         Camera
                                         {selectedShot && (
                                             <span className="text-[9px] px-1.5 py-0.5 rounded bg-cyan-500/15 text-cyan-400 font-bold">
@@ -3407,8 +3433,8 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             {/* Accordion: Character & References */}
                             <div className="sidebar-accordion">
                                 <div className="sidebar-accordion-header" onClick={() => setFloatingTray(prev => prev === 'references' ? null : 'references')}>
-                                    <span className="text-[11px] text-slate-200 font-bold flex items-center gap-2">
-                                        <span className="material-symbols-outlined text-[15px] text-[#FF4D00]">collections</span>
+                                    <span className="text-slate-200 font-bold flex items-center gap-2" style={{ fontSize: 13 }}>
+                                        <span className="material-symbols-outlined text-[#FF4D00]" style={{ fontSize: 20 }}>collections</span>
                                         References
                                         {(referenceImages.style || characters.length > 0) && (
                                             <span className="text-[9px] px-1.5 py-0.5 rounded bg-[#FF4D00]/15 text-[#FF7A00] font-bold">
@@ -3467,8 +3493,8 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             {/* Accordion: Visual Style & Setup */}
                             <div className="sidebar-accordion">
                                 <div className="sidebar-accordion-header" onClick={() => setFloatingTray(prev => prev === 'advanced' ? null : 'advanced')}>
-                                    <span className="text-[11px] text-slate-200 font-bold flex items-center gap-2">
-                                        <span className="material-symbols-outlined text-[15px] text-amber-500">palette</span>
+                                    <span className="text-slate-200 font-bold flex items-center gap-2" style={{ fontSize: 13 }}>
+                                        <span className="material-symbols-outlined text-amber-500" style={{ fontSize: 20 }}>palette</span>
                                         Style
                                         {style && (
                                             <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 font-bold capitalize">{style}</span>
@@ -3512,8 +3538,8 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             {/* Accordion: Typography & Layout */}
                             <div className="sidebar-accordion">
                                 <div className="sidebar-accordion-header" onClick={() => setFloatingTray(prev => prev === 'text' ? null : 'text')}>
-                                    <span className="text-[11px] text-slate-200 font-bold flex items-center gap-2">
-                                        <span className="material-symbols-outlined text-[15px] text-pink-400">title</span>
+                                    <span className="text-slate-200 font-bold flex items-center gap-2" style={{ fontSize: 13 }}>
+                                        <span className="material-symbols-outlined text-pink-400" style={{ fontSize: 20 }}>title</span>
                                         Text Overlay
                                         {(customHeadline || customCtaText) && (
                                             <span className="text-[9px] px-1.5 py-0.5 rounded bg-pink-500/15 text-pink-400 font-bold">set</span>
@@ -4171,38 +4197,38 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             <div className="floating-tray" key="ps-camera-tray">
                                 <div className="flex items-center justify-between mb-2">
                                     <span className="text-[11px] text-slate-400 uppercase tracking-widest font-bold flex items-center gap-1.5">
-                                        <span className="material-symbols-outlined text-xs text-amber-400">photo_camera</span>
+                                        <span className="material-symbols-outlined text-amber-400" style={{ fontSize: 22 }}>photo_camera</span>
                                         Camera & Lighting
                                     </span>
                                     <button onClick={() => setPsTray(null)} className="text-slate-500 hover:text-white cursor-pointer"><span className="material-symbols-outlined text-sm">close</span></button>
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
-                                        <p className="text-[9px] text-slate-500 uppercase tracking-widest font-bold mb-1.5">Camera Angle</p>
+                                        <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold mb-1.5">Camera Angle</p>
                                         <div className="flex flex-wrap gap-1">
                                             {[{id:'eye-level',label:'Eye Level'},{id:'hero',label:'Low Angle'},{id:'45deg',label:'3/4 View'},{id:'overhead',label:'Overhead'},{id:'macro',label:'Macro'},{id:'dutch',label:'Dutch Tilt'}].map(a => (
-                                                <button key={a.id} onClick={() => setCameraAngle(a.id)} className={`px-2 py-0.5 rounded-full text-[9px] font-medium transition-all cursor-pointer border ${cameraAngle === a.id ? 'bg-amber-500/20 border-amber-500/50 text-amber-300' : 'bg-white/[0.03] border-white/[0.06] text-slate-400 hover:bg-white/[0.06]'}`}>{a.label}</button>
+                                                <button key={a.id} onClick={() => setCameraAngle(a.id)} className={`px-2.5 py-1 rounded-full text-[10px] font-medium transition-all cursor-pointer border ${cameraAngle === a.id ? 'bg-amber-500/20 border-amber-500/50 text-amber-300' : 'bg-white/[0.03] border-white/[0.06] text-slate-400 hover:bg-white/[0.06]'}`}>{a.label}</button>
                                             ))}
                                         </div>
-                                        <p className="text-[9px] text-slate-500 uppercase tracking-widest font-bold mb-1.5 mt-3">Lens</p>
+                                        <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold mb-1.5 mt-3">Lens</p>
                                         <div className="flex flex-wrap gap-1">
                                             {[{id:'24mm',label:'24mm'},{id:'35mm',label:'35mm'},{id:'50mm',label:'50mm'},{id:'85mm',label:'85mm'},{id:'105mm',label:'105mm'},{id:'200mm',label:'200mm'}].map(l => (
-                                                <button key={l.id} onClick={() => setLens(l.id)} className={`px-2 py-0.5 rounded-full text-[9px] font-medium transition-all cursor-pointer border ${lens === l.id ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300' : 'bg-white/[0.03] border-white/[0.06] text-slate-400 hover:bg-white/[0.06]'}`}>{l.label}</button>
+                                                <button key={l.id} onClick={() => setLens(l.id)} className={`px-2.5 py-1 rounded-full text-[10px] font-medium transition-all cursor-pointer border ${lens === l.id ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300' : 'bg-white/[0.03] border-white/[0.06] text-slate-400 hover:bg-white/[0.06]'}`}>{l.label}</button>
                                             ))}
                                         </div>
                                     </div>
                                     <div>
-                                        <p className="text-[9px] text-slate-500 uppercase tracking-widest font-bold mb-1.5">Lighting Style</p>
+                                        <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold mb-1.5">Lighting Style</p>
                                         <div className="flex flex-wrap gap-1">
                                             {[{id:'softbox',label:'Softbox',ms:'cloud'},{id:'natural',label:'Window',ms:'window'},{id:'golden',label:'Golden Hr',ms:'wb_twilight'},{id:'dramatic',label:'Dramatic',ms:'theater_comedy'},{id:'neon',label:'Neon',ms:'fluorescent'},{id:'rim',label:'Rim',ms:'flare'},{id:'highkey',label:'High Key',ms:'light_mode'}].map(l => (
-                                                <button key={l.id} onClick={() => setLightingStyle(l.id)} className={`px-2 py-0.5 rounded-full text-[9px] font-medium transition-all cursor-pointer border ${lightingStyle === l.id ? 'bg-yellow-500/20 border-yellow-500/50 text-yellow-300' : 'bg-white/[0.03] border-white/[0.06] text-slate-400 hover:bg-white/[0.06]'}`}>{l.label}</button>
+                                                <button key={l.id} onClick={() => setLightingStyle(l.id)} className={`px-2.5 py-1 rounded-full text-[10px] font-medium transition-all cursor-pointer border ${lightingStyle === l.id ? 'bg-yellow-500/20 border-yellow-500/50 text-yellow-300' : 'bg-white/[0.03] border-white/[0.06] text-slate-400 hover:bg-white/[0.06]'}`}>{l.label}</button>
                                             ))}
                                         </div>
-                                        <p className="text-[9px] text-slate-500 uppercase tracking-widest font-bold mb-1.5 mt-3">Camera Shot Preset</p>
+                                        <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold mb-1.5 mt-3">Camera Shot Preset</p>
                                         <div className="flex flex-wrap gap-1">
                                             {CAMERA_SHOT_PRESETS.slice(0, 8).map(shot => (
                                                 <button key={shot.id} onClick={() => setPsSelectedShot(prev => prev === shot.id ? null : shot.id)}
-                                                    className={`px-2 py-0.5 rounded-full text-[9px] font-medium transition-all cursor-pointer border ${psSelectedShot === shot.id ? 'border text-white' : 'bg-white/[0.03] border-white/[0.06] text-slate-400 hover:bg-white/[0.06]'}`}
+                                                    className={`px-2.5 py-1 rounded-full text-[10px] font-medium transition-all cursor-pointer border ${psSelectedShot === shot.id ? 'border text-white' : 'bg-white/[0.03] border-white/[0.06] text-slate-400 hover:bg-white/[0.06]'}`}
                                                     style={psSelectedShot === shot.id ? { backgroundColor: `${shot.color}18`, borderColor: `${shot.color}50`, color: shot.color } : {}}>
                                                     <span className="leading-none mr-0.5">{shot.emoji}</span> {shot.label}
                                                 </button>
@@ -4218,32 +4244,32 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             <div className="floating-tray" key="ps-scene-tray">
                                 <div className="flex items-center justify-between mb-2">
                                     <span className="text-[11px] text-slate-400 uppercase tracking-widest font-bold flex items-center gap-1.5">
-                                        <span className="material-symbols-outlined text-xs text-emerald-400">landscape</span>
+                                        <span className="material-symbols-outlined text-emerald-400" style={{ fontSize: 22 }}>landscape</span>
                                         Scene & Style
                                     </span>
                                     <button onClick={() => setPsTray(null)} className="text-slate-500 hover:text-white cursor-pointer"><span className="material-symbols-outlined text-sm">close</span></button>
                                 </div>
                                 <div className="grid grid-cols-3 gap-4">
                                     <div>
-                                        <p className="text-[9px] text-slate-500 uppercase tracking-widest font-bold mb-1.5">Surface</p>
+                                        <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold mb-1.5">Surface</p>
                                         <div className="flex flex-wrap gap-1">
                                             {[{id:'white',label:'White',ms:'crop_square'},{id:'marble',label:'Marble',ms:'grid_on'},{id:'stone',label:'Stone',ms:'texture'},{id:'wood',label:'Wood',ms:'park'},{id:'concrete',label:'Concrete',ms:'domain'},{id:'fabric',label:'Silk',ms:'checkroom'},{id:'podium',label:'Podium',ms:'account_balance'},{id:'glass',label:'Glass',ms:'blur_on'},{id:'sand',label:'Sand',ms:'beach_access'},{id:'foliage',label:'Foliage',ms:'eco'}].map(s => (
-                                                <button key={s.id} onClick={() => setSurface(s.id)} className={`px-2 py-0.5 rounded-full text-[9px] font-medium transition-all cursor-pointer border flex items-center gap-0.5 ${surface === s.id ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300' : 'bg-white/[0.03] border-white/[0.06] text-slate-400 hover:bg-white/[0.06]'}`}><span className="material-symbols-outlined text-[9px]">{s.ms}</span>{s.label}</button>
+                                                <button key={s.id} onClick={() => setSurface(s.id)} className={`px-2.5 py-1 rounded-full text-[10px] font-medium transition-all cursor-pointer border flex items-center gap-1 ${surface === s.id ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300' : 'bg-white/[0.03] border-white/[0.06] text-slate-400 hover:bg-white/[0.06]'}`}><span className="material-symbols-outlined" style={{fontSize:13}}>{s.ms}</span>{s.label}</button>
                                             ))}
                                         </div>
                                     </div>
                                     <div>
-                                        <p className="text-[9px] text-slate-500 uppercase tracking-widest font-bold mb-1.5">Model</p>
+                                        <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold mb-1.5">Model</p>
                                         <div className="flex flex-wrap gap-1">
                                             {[{id:'none',label:'None',ms:'block'},{id:'hands',label:'Hands',ms:'pan_tool'},{id:'model-woman',label:'Woman',ms:'face_3'},{id:'model-man',label:'Man',ms:'face_6'}].map(m => (
-                                                <button key={m.id} onClick={() => setModelPresence(m.id)} className={`px-2 py-0.5 rounded-full text-[9px] font-medium transition-all cursor-pointer border flex items-center gap-0.5 ${modelPresence === m.id ? 'bg-[#FF4D00]/20 border-[#FF4D00]/50 text-[#FF7A00]' : 'bg-white/[0.03] border-white/[0.06] text-slate-400 hover:bg-white/[0.06]'}`}><span className="material-symbols-outlined text-[9px]">{m.ms}</span>{m.label}</button>
+                                                <button key={m.id} onClick={() => setModelPresence(m.id)} className={`px-2.5 py-1 rounded-full text-[10px] font-medium transition-all cursor-pointer border flex items-center gap-1 ${modelPresence === m.id ? 'bg-[#FF4D00]/20 border-[#FF4D00]/50 text-[#FF7A00]' : 'bg-white/[0.03] border-white/[0.06] text-slate-400 hover:bg-white/[0.06]'}`}><span className="material-symbols-outlined" style={{fontSize:13}}>{m.ms}</span>{m.label}</button>
                                             ))}
                                         </div>
-                                        <p className="text-[9px] text-slate-500 uppercase tracking-widest font-bold mb-1.5 mt-3">Mood <span className="text-slate-600 normal-case">(multi)</span></p>
+                                        <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold mb-1.5 mt-3">Mood <span className="text-slate-600 normal-case">(multi)</span></p>
                                         <div className="flex flex-wrap gap-1">
                                             {[{id:'editorial',label:'Editorial',ms:'article'},{id:'commercial',label:'Commercial',ms:'shopping_bag'},{id:'lifestyle',label:'Lifestyle',ms:'coffee'},{id:'luxury',label:'Luxury',ms:'diamond'},{id:'minimal',label:'Minimal',ms:'check_box_outline_blank'},{id:'moody',label:'Moody',ms:'dark_mode'},{id:'vibrant',label:'Vibrant',ms:'palette'}].map(m => {
                                                 const active = mood.includes(m.id)
-                                                return <button key={m.id} onClick={() => setMood(prev => active ? prev.filter(x => x !== m.id) : [...prev, m.id])} className={`px-2 py-0.5 rounded-full text-[9px] font-medium transition-all cursor-pointer border flex items-center gap-0.5 ${active ? 'bg-[#FF4D00]/20 border-[#FF4D00]/50 text-[#FF7A00]' : 'bg-white/[0.03] border-white/[0.06] text-slate-400 hover:bg-white/[0.06]'}`}><span className="material-symbols-outlined text-[9px]">{m.ms}</span>{m.label}</button>
+                                                return <button key={m.id} onClick={() => setMood(prev => active ? prev.filter(x => x !== m.id) : [...prev, m.id])} className={`px-2.5 py-1 rounded-full text-[10px] font-medium transition-all cursor-pointer border flex items-center gap-1 ${active ? 'bg-[#FF4D00]/20 border-[#FF4D00]/50 text-[#FF7A00]' : 'bg-white/[0.03] border-white/[0.06] text-slate-400 hover:bg-white/[0.06]'}`}><span className="material-symbols-outlined" style={{fontSize:13}}>{m.ms}</span>{m.label}</button>
                                             })}
                                         </div>
                                     </div>
@@ -4265,7 +4291,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             <div className="floating-tray" key="ps-ratio-tray">
                                 <div className="flex items-center justify-between mb-2">
                                     <span className="text-[11px] text-slate-400 uppercase tracking-widest font-bold flex items-center gap-1.5">
-                                        <span className="material-symbols-outlined text-xs text-cyan-400">aspect_ratio</span>
+                                        <span className="material-symbols-outlined text-cyan-400" style={{ fontSize: 22 }}>aspect_ratio</span>
                                         Aspect Ratio
                                     </span>
                                     <button onClick={() => setPsTray(null)} className="text-slate-500 hover:text-white cursor-pointer"><span className="material-symbols-outlined text-sm">close</span></button>
@@ -4287,7 +4313,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             <div className="floating-tray" key="ps-refs-tray">
                                 <div className="flex items-center justify-between mb-2">
                                     <span className="text-[11px] text-slate-400 uppercase tracking-widest font-bold flex items-center gap-1.5">
-                                        <span className="material-symbols-outlined text-xs text-violet-400">image_search</span>
+                                        <span className="material-symbols-outlined text-violet-400" style={{ fontSize: 22 }}>image_search</span>
                                         Style & Character References
                                     </span>
                                     <button onClick={() => setPsTray(null)} className="text-slate-500 hover:text-white cursor-pointer"><span className="material-symbols-outlined text-sm">close</span></button>
@@ -4318,27 +4344,32 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                         <div className="creative-tools-panel-footer">
                         <div className="floating-prompt-row">
                             {/* Setting Icons */}
-                            <div className="flex items-center gap-1 mr-1">
+                            <div className="flex items-center gap-2 mr-1">
                                 <button onClick={() => setPsTray(psTray === 'product' ? null : 'product')}
-                                    className={`floating-setting-btn ${psTray === 'product' ? 'active' : ''}`} title="Product Image">
-                                    <span className="material-symbols-outlined text-sm">add_a_photo</span>
+                                    className={`floating-setting-btn ${psTray === 'product' ? 'active' : ''}`} title="Product Image"
+                                    style={{ width: 48, height: 48, minWidth: 48, minHeight: 48 }}>
+                                    <span className="material-symbols-outlined" style={{ fontSize: 22 }}>add_a_photo</span>
                                     {productImage && <span className="setting-dot" />}
                                 </button>
                                 <button onClick={() => setPsTray(psTray === 'camera' ? null : 'camera')}
-                                    className={`floating-setting-btn ${psTray === 'camera' ? 'active' : ''}`} title="Camera & Lighting">
-                                    <span className="material-symbols-outlined text-sm">photo_camera</span>
+                                    className={`floating-setting-btn ${psTray === 'camera' ? 'active' : ''}`} title="Camera & Lighting"
+                                    style={{ width: 48, height: 48, minWidth: 48, minHeight: 48 }}>
+                                    <span className="material-symbols-outlined" style={{ fontSize: 22 }}>photo_camera</span>
                                 </button>
                                 <button onClick={() => setPsTray(psTray === 'scene' ? null : 'scene')}
-                                    className={`floating-setting-btn ${psTray === 'scene' ? 'active' : ''}`} title="Scene & Style">
-                                    <span className="material-symbols-outlined text-sm">landscape</span>
+                                    className={`floating-setting-btn ${psTray === 'scene' ? 'active' : ''}`} title="Scene & Style"
+                                    style={{ width: 48, height: 48, minWidth: 48, minHeight: 48 }}>
+                                    <span className="material-symbols-outlined" style={{ fontSize: 22 }}>landscape</span>
                                 </button>
                                 <button onClick={() => setPsTray(psTray === 'ratio' ? null : 'ratio')}
-                                    className={`floating-setting-btn ${psTray === 'ratio' ? 'active' : ''}`} title="Aspect Ratio">
-                                    <span className="material-symbols-outlined text-sm">aspect_ratio</span>
+                                    className={`floating-setting-btn ${psTray === 'ratio' ? 'active' : ''}`} title="Aspect Ratio"
+                                    style={{ width: 48, height: 48, minWidth: 48, minHeight: 48 }}>
+                                    <span className="material-symbols-outlined" style={{ fontSize: 22 }}>aspect_ratio</span>
                                 </button>
                                 <button onClick={() => setPsTray(psTray === 'refs' ? null : 'refs')}
-                                    className={`floating-setting-btn ${psTray === 'refs' ? 'active' : ''}`} title="References">
-                                    <span className="material-symbols-outlined text-sm">image_search</span>
+                                    className={`floating-setting-btn ${psTray === 'refs' ? 'active' : ''}`} title="References"
+                                    style={{ width: 48, height: 48, minWidth: 48, minHeight: 48 }}>
+                                    <span className="material-symbols-outlined" style={{ fontSize: 22 }}>image_search</span>
                                     {(referenceImages.style || referenceImages.character) && <span className="setting-dot" />}
                                 </button>
                             </div>
@@ -4749,7 +4780,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             <div className="floating-tray" key="car-scene-tray">
                                 <div className="flex items-center justify-between mb-2">
                                     <span className="text-[11px] text-slate-400 uppercase tracking-widest font-bold flex items-center gap-1.5">
-                                        <span className="material-symbols-outlined text-xs text-orange-400">landscape</span>
+                                        <span className="material-symbols-outlined text-orange-400" style={{ fontSize: 22 }}>landscape</span>
                                         Background Scene
                                     </span>
                                     <div className="flex items-center gap-2">
@@ -4836,7 +4867,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             <div className="floating-tray" key="car-format-tray">
                                 <div className="flex items-center justify-between mb-2">
                                     <span className="text-[11px] text-slate-400 uppercase tracking-widest font-bold flex items-center gap-1.5">
-                                        <span className="material-symbols-outlined text-xs text-orange-400">aspect_ratio</span>
+                                        <span className="material-symbols-outlined text-orange-400" style={{ fontSize: 22 }}>aspect_ratio</span>
                                         Slide Format & Count
                                     </span>
                                     <button onClick={() => setCarouselTray(null)} className="text-slate-500 hover:text-white cursor-pointer"><span className="material-symbols-outlined text-sm">close</span></button>
@@ -4854,10 +4885,10 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                 { id: '2:3', label: 'Tall', icon: 'view_agenda' },
                                             ].map(f => (
                                                 <button key={f.id} onClick={() => setCarouselSlideFormat(f.id)}
-                                                    className={`px-1.5 py-1.5 rounded-lg text-[9px] font-semibold transition-all cursor-pointer flex flex-col items-center gap-0.5 ${
+                                                    className={`px-2 py-2 rounded-lg text-[10px] font-semibold transition-all cursor-pointer flex flex-col items-center gap-0.5 ${
                                                         carouselSlideFormat === f.id ? 'bg-orange-500/15 text-orange-400 border border-orange-500/30' : 'bg-white/[0.03] text-slate-500 border border-white/[0.06] hover:text-white'
                                                     }`}>
-                                                    <span className="material-symbols-outlined text-xs">{f.icon}</span>
+                                                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>{f.icon}</span>
                                                     {f.label}
                                                 </button>
                                             ))}
@@ -4883,7 +4914,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             <div className="floating-tray" key="car-genre-tray">
                                 <div className="flex items-center justify-between mb-2">
                                     <span className="text-[11px] text-slate-400 uppercase tracking-widest font-bold flex items-center gap-1.5">
-                                        <span className="material-symbols-outlined text-xs text-orange-400">movie</span>
+                                        <span className="material-symbols-outlined text-orange-400" style={{ fontSize: 22 }}>movie</span>
                                         Genre / Mood
                                         {carouselThemeAnalysis?.genre && <span className="text-[8px] text-[#FF4D00] font-semibold px-1.5 py-0.5 rounded-full bg-[#FF4D00]/10 border border-[#FF4D00]/20">AI detected</span>}
                                     </span>
@@ -4905,11 +4936,11 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                         { id: 'none',          label: 'None',     msIcon: 'block',            color: '#64748b' },
                                     ].map(g => (
                                         <button key={g.id} onClick={() => setCarouselGenre(g.id)} title={g.label}
-                                            className={`py-2 px-1 rounded-lg text-[9px] font-bold transition-all cursor-pointer flex flex-col items-center gap-1 ${
+                                            className={`py-2.5 px-1.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer flex flex-col items-center gap-1 ${
                                                 carouselGenre === g.id ? 'border shadow-md' : 'bg-white/[0.03] text-slate-500 border border-white/[0.05] hover:bg-white/[0.06]'
                                             }`}
                                             style={carouselGenre === g.id ? { backgroundColor: `${g.color}20`, borderColor: `${g.color}50`, color: g.color } : {}}>
-                                            <span className="material-symbols-outlined" style={{ fontSize: '16px', lineHeight: 1 }}>{g.msIcon}</span>
+                                            <span className="material-symbols-outlined" style={{ fontSize: '22px', lineHeight: 1 }}>{g.msIcon}</span>
                                             <span className="leading-none">{g.label}</span>
                                         </button>
                                     ))}
@@ -4922,7 +4953,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             <div className="floating-tray" key="car-style-tray">
                                 <div className="flex items-center justify-between mb-2">
                                     <span className="text-[11px] text-slate-400 uppercase tracking-widest font-bold flex items-center gap-1.5">
-                                        <span className="material-symbols-outlined text-xs text-orange-400">palette</span>
+                                        <span className="material-symbols-outlined text-orange-400" style={{ fontSize: 22 }}>palette</span>
                                         Visual Style
                                     </span>
                                     <button onClick={() => setCarouselTray(null)} className="text-slate-500 hover:text-white cursor-pointer"><span className="material-symbols-outlined text-sm">close</span></button>
@@ -4937,11 +4968,11 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                         { id: 'tech',    label: 'Tech',    icon: 'devices',       color: '#06b6d4' },
                                     ].map(s => (
                                         <button key={s.id} onClick={() => setCarouselStyle(s.id)}
-                                            className={`px-2 py-2 rounded-lg text-[10px] font-semibold transition-all cursor-pointer flex flex-col items-center gap-1 ${
+                                            className={`px-2.5 py-2.5 rounded-lg text-[11px] font-semibold transition-all cursor-pointer flex flex-col items-center gap-1 ${
                                                 carouselStyle === s.id ? 'text-white border shadow-md' : 'bg-white/[0.03] text-slate-500 border border-white/[0.06] hover:bg-white/[0.06]'
                                             }`}
                                             style={carouselStyle === s.id ? { backgroundColor: `${s.color}18`, borderColor: `${s.color}50`, color: s.color } : {}}>
-                                            <span className="material-symbols-outlined" style={{fontSize:'14px'}}>{s.icon}</span>
+                                            <span className="material-symbols-outlined" style={{fontSize:'18px'}}>{s.icon}</span>
                                             {s.label}
                                         </button>
                                     ))}
@@ -4954,7 +4985,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             <div className="floating-tray" key="car-products-tray">
                                 <div className="flex items-center justify-between mb-2">
                                     <span className="text-[11px] text-slate-400 uppercase tracking-widest font-bold flex items-center gap-1.5">
-                                        <span className="material-symbols-outlined text-xs text-orange-400">shopping_bag</span>
+                                        <span className="material-symbols-outlined text-orange-400" style={{ fontSize: 22 }}>shopping_bag</span>
                                         Product Images (Optional)
                                     </span>
                                     <button onClick={() => setCarouselTray(null)} className="text-slate-500 hover:text-white cursor-pointer"><span className="material-symbols-outlined text-sm">close</span></button>
@@ -4994,7 +5025,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                         <div className="creative-tools-panel-footer">
                         <div className="floating-prompt-row">
                             {/* Tray toggle icons */}
-                            <div className="flex items-center gap-1 mr-1">
+                            <div className="flex items-center gap-2 mr-1">
                                 {[
                                     { key: 'scene',    icon: 'landscape',     tip: 'Background Scene' },
                                     { key: 'format',   icon: 'aspect_ratio',  tip: 'Format & Slides' },
@@ -5004,8 +5035,9 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 ].map(t => (
                                     <button key={t.key} title={t.tip}
                                         onClick={() => setCarouselTray(carouselTray === t.key ? null : t.key)}
-                                        className={`floating-setting-btn ${carouselTray === t.key ? 'active' : ''}`}>
-                                        <span className="material-symbols-outlined text-sm">{t.icon}</span>
+                                        className={`floating-setting-btn ${carouselTray === t.key ? 'active' : ''}`}
+                                        style={{ width: 48, height: 48, minWidth: 48, minHeight: 48 }}>
+                                        <span className="material-symbols-outlined" style={{ fontSize: 22 }}>{t.icon}</span>
                                     </button>
                                 ))}
                             </div>

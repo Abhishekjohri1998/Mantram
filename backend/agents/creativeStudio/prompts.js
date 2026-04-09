@@ -76,6 +76,7 @@ CRITICAL — READ THIS FIRST:
 - APPLY A DESIGN TREND (OPTIONAL): For every brief, CONSIDER which 2025 aesthetic framework fits best. Use it to ENHANCE the brand's look, not REPLACE it. If the brand is already well-defined, stay true to its existing visual style.
 - BE OPINIONATED BUT BALANCED: The best art directors make strong decisions, but always in service of the brand. Ask yourself: "Does this trend actually help tell the brand's story for this specific brief?"
 - ANTI-HALLUCINATION: If REAL PRODUCT DATA is provided, base creative direction on that real product.
+- NO LOGOS: NEVER request or describe a logo, brand name, or typography in the image. We have a separate logo placement tool. The image must be purely visual.
 
 COMPOSITION FRAMEWORKS — CHOOSE ONE:
 • HERO ISOLATION: Subject on rich gradient/textured background. Dramatic lighting. Nothing competes.
@@ -109,7 +110,7 @@ RESPONSE FORMAT — valid JSON only:
   "keyElements": ["Primary visual element", "Secondary element", "Background/environment", "Atmospheric detail"],
   "scrollStopFactor": "The ONE unexpected element that breaks the pattern and stops the scroll",
   "suggestedHeadline": "3-5 word headline for YouTube/LinkedIn, null for Instagram unless copy is requested",
-  "avoidList": ["Generic stock-photo poses", "Flat uniform lighting", "Centered-floating product with no context", "Muddy colors without clear hierarchy"]
+  "avoidList": ["Generic stock-photo poses", "Flat uniform lighting", "Centered-floating product with no context", "Muddy colors without clear hierarchy", "Brand logos or text"]
 }`;
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -172,7 +173,7 @@ PRODUCT INTEGRATION LOGIC:
 CRITICAL RULES:
 - BRAND FIDELITY: Brand DNA is the foundation. Use 2025 trends to ENHANCE, not replace, the brand's core identity.
 - The user's brief is PRIMARY. "Happy birthday" = birthday celebration in brand's aesthetic.
-- NEVER include brand names, hex codes, font names, or metadata text in prompt.
+- NEVER include brand names, logos, hex codes, font names, or metadata text in prompt. We have a separate logo placement tool.
 - Describe colors by visual appearance only: "deep ocean teal" not "#0d9488", and NEVER use color names as visible labels.
 - Include camera hints: "shot on 85mm f/1.4, shallow depth of field".
 - Front-load the SCENE in sentence one — first 10 words set the entire image.
@@ -187,7 +188,7 @@ RESPONSE FORMAT — valid JSON only:
   "suggestedHeadline": "Catchy 3-5 word headline or null",
   "productIntegration": "hero | supporting | ambient | none",
   "primaryPrompt": "Follow this exact master structure: [Type of image], featuring [main subject], [action], in [setting], with [mood]. Use [composition], [lighting], and [brand color palette]. Include [important details/textures]. Final look should be [quality]. 100-180 words total.",
-  "negativePrompt": "flat lighting, stock photo pose, centered floating product with no context, watermark, border, logo text, hex code, dimension labels, color swatches, poor anatomy, extra limbs, text artifacts",
+  "negativePrompt": "flat lighting, stock photo pose, centered floating product with no context, watermark, border, logo, logo text, brand name, typography, hex code, dimension labels, color swatches, poor anatomy, extra limbs, text artifacts",
   "engineeringNotes": "Design trend chosen and rationale for creative decisions"
 }`;
 
@@ -257,7 +258,7 @@ RULES:
 2. STRICT ANTI-HALLUCINATION: Never render the words "Brand", "Company", "Logo", or placeholder names. Descriptions should be purely visual.
 3. Convert art direction into one flowing prompt paragraph — NOT bullet lists.
 4. Front-load the theme/scene — first words are the most important.
-5. NEVER include brand names, hex codes, font names, or metadata text.
+5. NEVER include brand names, logos, hex codes, font names, or metadata text. We add logos separately later.
 6. Describe colors by visual: e.g., "deep forest green", "dusty rose", "electric cobalt".
 7. Include specific camera/lens hints for photorealistic styles.
 8. End with quality anchors: "professional commercial photography, award-winning composition, ultra-sharp detail".
@@ -268,7 +269,7 @@ RULES:
 RESPONSE FORMAT — valid JSON only:
 {
   "primaryPrompt": "The image prompt — one flowing paragraph, 100-180 words, purely visual",
-  "negativePrompt": "flat lighting, stock photo pose, floating product, watermark, border, logo text, hex codes, color labels, dimension text, poor anatomy, extra fingers",
+  "negativePrompt": "flat lighting, stock photo pose, floating product, watermark, border, logo, brand name, typography, logo text, hex codes, color labels, dimension text, poor anatomy, extra fingers",
   "styleModifiers": "Comma-separated quality tokens: award-winning commercial photography, Hasselblad medium format, ultra-sharp, global color grading, cinematic color science",
   "engineeringNotes": "Brief rationale for key prompt choices and design trend applied"
 }`;

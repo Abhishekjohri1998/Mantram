@@ -37,7 +37,7 @@ export default function GlobalLoader({
     pipelineSteps = [],
     currentStage = '',
     elapsed = 0,
-    estimatedDuration = 30,
+    estimatedDuration = 120, // ← Bumped default: real generation takes 60-180s
     icon = 'troubleshoot',
     startedAt = null, // Unix timestamp (ms) — if provided, elapsed is calculated from this
 }) {
@@ -79,22 +79,43 @@ export default function GlobalLoader({
         return [...uniqueSteps].reverse().find(s => s.status === 'working');
     }, [uniqueSteps]);
 
-    // Progress calculation — based on completed steps if real steps exist
+    // Progress calculation — smooth asymptotic curve that never looks frozen
+    // Backend queue does NOT send granular step updates, so we rely on elapsed time.
+    // The curve: races to ~80% by estimatedDuration/2, ~92% by estimatedDuration, 
+    // then SLOWLY climbs 92→97% over the next T seconds to avoid a hard stall.
+    // Cap at 97% to leave headroom before the real completion fires.
     const doneCount = uniqueSteps.filter(s => s.status === 'done').length;
-    const totalExpected = 6; // brand-intel, art-director, prompt-engineer, image-inject, generating, complete
-    const rawPct = hasRealSteps
-        ? (doneCount / totalExpected) * 100
-        : estimatedDuration > 0 ? (localElapsed / estimatedDuration) * 100 : 0;
-    const pct = Math.min(95, rawPct < 60 ? rawPct : 60 + (rawPct - 60) * 0.35);
+    const workingCount = uniqueSteps.filter(s => s.status === 'working').length;
+    const allDone = hasRealSteps && doneCount > 0 && workingCount === 0;
+    
+    let pct;
+    if (allDone) {
+        pct = 100;
+    } else if (hasRealSteps && doneCount > 0) {
+        // If we have some done steps, use step-based progress (rare path)
+        const totalExpected = Math.max(6, uniqueSteps.length);
+        pct = Math.min(95, (doneCount / totalExpected) * 100);
+    } else {
+        // Time-based asymptotic curve (the common path)
+        // k=2.0/T → slower climb → at t=T we're ~86%, at t=1.5T ~95%
+        // This prevents the dreaded 98%-forever stall with a realistic time budget
+        const t = localElapsed;
+        const T = Math.max(60, estimatedDuration); // min 60s baseline
+        const k = 2.0 / T;
+        pct = Math.min(97, (1 - Math.exp(-k * t)) * 100);
+    }
     const displayPct = Math.round(pct);
+    const isNearlyDone = displayPct >= 90; // show shimmer when almost done
 
-    // ETA remaining
+    // ETA remaining — patient, honest messaging
     const etaRemaining = Math.max(0, estimatedDuration - localElapsed);
-    const etaLabel = etaRemaining > 60
-        ? `~${Math.ceil(etaRemaining / 60)} min remaining`
-        : etaRemaining > 0
+    const etaLabel = localElapsed < estimatedDuration * 0.25
+        ? `~${Math.ceil(etaRemaining / 60) || 1} min remaining`
+        : localElapsed < estimatedDuration
             ? `~${etaRemaining}s remaining`
-            : 'Almost done...';
+            : displayPct >= 95
+                ? 'Hang tight, finalizing…'
+                : 'Finishing up…';
 
     const elapsedLabel = `${Math.floor(localElapsed / 60)}:${String(localElapsed % 60).padStart(2, '0')}`;
 
@@ -179,18 +200,32 @@ export default function GlobalLoader({
                     <span className="text-2xl font-black text-white">{displayPct}%</span>
                     <span className="text-xs text-slate-500 font-mono">{elapsedLabel} elapsed</span>
                 </div>
-                <div className="w-full h-2 bg-white/[0.06] rounded-full overflow-hidden">
+                <div className="w-full h-2 bg-white/[0.06] rounded-full overflow-hidden relative">
                     <div
-                        className="h-full rounded-full transition-all duration-700 ease-out"
+                        className="h-full rounded-full transition-all duration-1000 ease-out"
                         style={{
                             width: `${displayPct}%`,
                             background: 'linear-gradient(90deg, #FF4D00, #6366f1, #06b6d4)',
                             boxShadow: '0 0 12px rgba(255, 77, 0,0.4)',
                         }}
                     />
+                    {/* Shimmer animation when nearly done — signals it's still working */}
+                    {isNearlyDone && (
+                        <div
+                            className="absolute inset-0 rounded-full"
+                            style={{
+                                background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.15) 50%, transparent 100%)',
+                                backgroundSize: '200% 100%',
+                                animation: 'progressShimmer 1.8s linear infinite',
+                            }}
+                        />
+                    )}
                 </div>
                 <div className="flex items-center justify-between mt-2">
-                    <span className="text-[11px] text-slate-500">{etaLabel}</span>
+                    <span className="text-[11px] text-slate-500 flex items-center gap-1">
+                        {isNearlyDone && <span className="w-1.5 h-1.5 rounded-full bg-[#FF4D00] animate-pulse flex-shrink-0" />}
+                        {etaLabel}
+                    </span>
                     {hasRealSteps && (
                         <span className="text-[10px] text-slate-600 flex items-center gap-1">
                             <span className="material-symbols-outlined text-[12px] text-[#FF4D00]">smart_toy</span>
@@ -225,7 +260,7 @@ export default function GlobalLoader({
                 </div>
             )}
 
-            {/* Inline CSS for mesh rings */}
+            {/* Inline CSS for mesh rings + shimmer */}
             <style dangerouslySetInnerHTML={{__html: `
                 .loader-mesh { position: relative; width: 80px; height: 80px; display: flex; align-items: center; justify-content: center; }
                 .mesh-ring { position: absolute; border-radius: 50%; border: 2px solid transparent; border-top-color: #FF4D00; }
@@ -233,6 +268,10 @@ export default function GlobalLoader({
                 .mesh-ring-2 { width: 80%; height: 80%; animation: spin 1.5s linear infinite reverse; border-top-color: #6366f1; opacity: 0.8; }
                 .mesh-ring-3 { width: 60%; height: 60%; animation: spin 1s linear infinite; border-top-color: #e2e8f0; opacity: 0.3; }
                 @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+                @keyframes progressShimmer {
+                    0% { background-position: -200% 0; }
+                    100% { background-position: 200% 0; }
+                }
             `}} />
         </div>
     );

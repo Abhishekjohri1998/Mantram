@@ -37,9 +37,19 @@ export async function mcpMarketIntelNode(state) {
     const startMs = Date.now();
 
     try {
-        const results = await callMcpToolsParallel([
-            { tool: 'fetch_trending',  args: { brandId: state.brandId } },
-            { tool: 'web_search',      args: { query: `visual design trends ${industry} ${new Date().getFullYear()} advertising creative`, mode: 'quick' } },
+        // Hard 6s timeout on the full MCP block — since this now runs in parallel, we cap it
+        // so a slow Grok response never delays the art director or visual grounding results.
+        const MCP_TIMEOUT_MS = 6000;
+        const mcpTimeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('MCP market intel timeout (6s)')), MCP_TIMEOUT_MS)
+        );
+
+        const results = await Promise.race([
+            callMcpToolsParallel([
+                { tool: 'fetch_trending',  args: { brandId: state.brandId } },
+                { tool: 'web_search',      args: { query: `visual design trends ${industry} ${new Date().getFullYear()} advertising creative`, mode: 'quick' } },
+            ]),
+            mcpTimeoutPromise,
         ]);
 
         const trending  = results['fetch_trending'];
@@ -930,7 +940,7 @@ export async function visualGroundingNode(state) {
         VISUAL_GROUNDING_PROMPT,
         userPrompt,
         imagesToAnalyze,
-        { temperature: 0.2, maxTokens: 4096 }
+        { temperature: 0.2, maxTokens: 1024 } // Reduced from 4096 — grounding only needs color/material/shape (saves 3–10s)
     );
 
     // Handle MCoT failure gracefully — never block the pipeline
@@ -1057,17 +1067,21 @@ export async function runCreativePipeline(params) {
     const productName = state.matchedProduct?.title || '';
     emit('brand-intel', productName ? `Matched product: ${productName}` : 'Brand context loaded', 'done', productName ? `Using "${productName}" as hero product` : '');
 
-    // Node 0b: MCP Market Intelligence — live trends injected into art direction (non-blocking, runs fast from cache)
-    emit('brand-intel', 'Fetching live visual trends (MCP)...', 'working');
-    state = await mcpMarketIntelNode(state);
-    if (state.marketIntel) {
-        emit('brand-intel', '📡 Live trend data injected', 'done', state.marketIntel.viralFormats?.substring(0, 60) || '');
-    }
-
-    // ── STEP 1: Parallel Node Execution (Visual Grounding + Art/Director + Copywriter) ──
-    // We run independent agents in parallel to drastically reduce pipeline latency.
+    // ── STEP 1: Parallel Node Execution (MCP Intel + Visual Grounding + Art Director + Copywriter) ──
+    // ALL agents that don't depend on each other run in parallel to minimize wall-clock latency.
+    // mcpMarketIntelNode moved INTO this block (was sequential before — added 3–12s unnecessarily).
     const nodePromises = [];
 
+    // Promise 0: MCP Market Intelligence — live trends for art director (non-blocking, from cache most of the time)
+    const mcpMarketTask = (async () => {
+        emit('brand-intel', 'Fetching live visual trends (MCP)...', 'working');
+        const updatedState = await mcpMarketIntelNode(state);
+        state.marketIntel = updatedState.marketIntel;
+        if (state.marketIntel) {
+            emit('brand-intel', '📡 Live trend data injected', 'done', state.marketIntel.viralFormats?.substring(0, 60) || '');
+        }
+    })();
+    nodePromises.push(mcpMarketTask);
 
     // Promise 1: Visual Grounding (Multimodal MCoT)
     const visualGroundingTask = (async () => {

@@ -109,17 +109,11 @@ export const initCreativeWorker = (internalGenerateCreative) => {
             });
 
             if (data?.success && data?.creative) {
-                await GenerationJob.findOneAndUpdate(
-                    { jobId },
-                    {
-                        status: 'completed',
-                        completedAt: new Date(),
-                        creativeId: data.creative._id,
-                        imageUrl: data.creative.imageUrl || data.creative.thumbnailUrl,
-                        result: { creative: data.creative, warnings: data.warnings || [] },
-                    }
-                );
-                console.log(`✅ [Queue] JOB ${jobId} completed`);
+                // ── NOTE: internalGenerateCreative already marked the job 'completed'
+                // with a slim result object (no raw base64). We do NOT overwrite it here
+                // to avoid re-introducing large base64 imageUrl back into MongoDB.
+                // Only log for debugging.
+                console.log(`✅ [Queue] JOB ${jobId} completed — Creative: ${data.creative._id}`);
                 return { success: true, creativeId: data.creative._id };
             } else {
                 throw new Error(data?.error || 'Pipeline returned no creative');
