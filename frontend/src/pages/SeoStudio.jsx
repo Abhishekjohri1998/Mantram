@@ -1096,18 +1096,90 @@ small{color:#94a3b8;font-size:10px}
                             </div>
                         )}
 
-                        {error && (
-                            <div className={`p-4 rounded-xl border ${error.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'} mb-4 flex items-center gap-2`}>
+                        {error && !error.diagnosis && (
+                            <div className={`p-4 rounded-xl border ${error.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'} mb-4 flex items-center gap-2 animate-fade-in`}>
                                 <span className="material-symbols-outlined text-sm">
                                     {error.isProviderError ? 'warning' : 'error'}
                                 </span>
-                                <div className="flex-1">
+                                <div className="flex-1 text-sm">
                                     {error.isProviderError && <span className="font-bold mr-1">[{error.provider || 'AI Provider'}]</span>}
                                     {error.message}
                                 </div>
                                 <button onClick={() => setError(null)} className="ml-auto opacity-50 hover:opacity-100 transition-opacity cursor-pointer">
                                     <span className="material-symbols-outlined text-xs">close</span>
                                 </button>
+                            </div>
+                        )}
+
+                        {/* ─── TIERED DIAGNOSTIC UI (SEO Audit Guard) ─── */}
+                        {error && error.diagnosis && (
+                            <div className="glass-panel rounded-2xl p-6 mb-6 border-rose-500/20 animate-fade-in relative overflow-hidden">
+                                <div className="absolute top-0 right-0 p-4 opacity-5">
+                                    <span className="material-symbols-outlined text-7xl text-rose-500">troubleshoot</span>
+                                </div>
+                                <div className="flex items-center gap-3 mb-6">
+                                    <div className="size-10 rounded-xl bg-rose-500/20 flex items-center justify-center">
+                                        <span className="material-symbols-outlined text-rose-400">gpp_maybe</span>
+                                    </div>
+                                    <div>
+                                        <h3 className="text-lg font-bold text-white leading-tight">{error.message}</h3>
+                                        <p className="text-xs text-rose-400/80 font-bold uppercase tracking-wider">Error Code: {error.diagnosis.errorCode}</p>
+                                    </div>
+                                    <button onClick={() => setError(null)} className="ml-auto text-slate-500 hover:text-white transition-colors cursor-pointer">
+                                        <span className="material-symbols-outlined">close</span>
+                                    </button>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                                    <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.08]">
+                                        <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                            <span className="material-symbols-outlined text-xs text-primary">visibility</span> Analysis Logic
+                                        </h4>
+                                        <p className="text-sm text-slate-300 leading-relaxed mb-4">{error.diagnosis.explanation}</p>
+                                        <div className="flex flex-wrap gap-2">
+                                            <span className="text-[10px] px-2 py-1 rounded bg-white/5 text-slate-400 border border-white/5">Strategy: {error.strategyUsed}</span>
+                                            <span className="text-[10px] px-2 py-1 rounded bg-white/5 text-slate-400 border border-white/5">Attempts: {error.attemptsMade}</span>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.08]">
+                                        <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                            <span className="material-symbols-outlined text-xs text-rose-400">assignment_late</span> Action Required
+                                        </h4>
+                                        <div className="space-y-3">
+                                            <div className="flex gap-2.5">
+                                                <span className="text-xs text-slate-500 font-bold w-12 shrink-0">User:</span>
+                                                <p className="text-xs text-slate-300 italic">"{error.diagnosis.userAction}"</p>
+                                            </div>
+                                            <div className="flex gap-2.5">
+                                                <span className="text-xs text-slate-500 font-bold w-12 shrink-0">Admin:</span>
+                                                <p className="text-xs text-slate-400/80">{error.diagnosis.adminAction}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Micro-Metrics from failed crawl */}
+                                {error.metrics && (
+                                    <div className="flex flex-wrap gap-4 pt-4 border-t border-white/[0.05]">
+                                        <div className="flex flex-col">
+                                            <span className="text-[10px] text-slate-500 font-bold uppercase">Pages Seen</span>
+                                            <span className="text-lg font-black text-white">{error.metrics.pagesCrawled}</span>
+                                        </div>
+                                        <div className="flex flex-col">
+                                            <span className="text-[10px] text-slate-500 font-bold uppercase">Success Rate</span>
+                                            <span className={`text-lg font-black ${error.metrics.successRate > 80 ? 'text-emerald-400' : 'text-rose-400'}`}>{error.metrics.successRate}%</span>
+                                        </div>
+                                        <div className="flex flex-col">
+                                            <span className="text-[10px] text-slate-500 font-bold uppercase">Status Group</span>
+                                            <span className="text-lg font-black text-white">{error.metrics.primaryStatus || 'N/A'}</span>
+                                        </div>
+                                        <div className="flex flex-col flex-1 text-right">
+                                            <span className="text-[10px] text-slate-500 font-bold uppercase">Hallucination Risk</span>
+                                            <span className="text-lg font-black text-rose-500 uppercase">HIGH</span>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         )}
 
@@ -1178,6 +1250,16 @@ small{color:#94a3b8;font-size:10px}
                                             <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/8 border border-emerald-500/12">
                                                 <span className="material-symbols-outlined text-emerald-400 text-xs">verified</span>
                                                 <span className="text-[10px] text-emerald-400 font-bold">{results.researchSources.length} pages crawled</span>
+                                                <span className="mx-1 h-3 w-[1px] bg-emerald-500/20"></span>
+                                                {results.findingsMode === 'MEASURED' ? (
+                                                    <span className="text-[9px] text-emerald-400/80 font-black uppercase flex items-center gap-1">
+                                                        <span className="material-symbols-outlined text-[10px]">check_circle</span> Measured Data
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-[9px] text-amber-400 font-black uppercase flex items-center gap-1">
+                                                        <span className="material-symbols-outlined text-[10px]">history_edu</span> Estimated data
+                                                    </span>
+                                                )}
                                             </div>
                                         )}
                                         {results.crawlIntelligence && (
@@ -1336,7 +1418,21 @@ function HealthCheckResults({ results }) {
 
     return (<>
         {/* Summary */}
-        <div className="glass-panel rounded-2xl p-6 mb-6">
+        <div className="glass-panel rounded-2xl p-6 mb-6 relative overflow-hidden">
+            {results.findingsMode === 'ESTIMATED' && (
+                <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 animate-pulse"></div>
+            )}
+            
+            {results.findingsMode === 'ESTIMATED' && (
+                <div className="mb-4 flex items-start gap-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
+                    <span className="material-symbols-outlined text-amber-400 text-sm mt-0.5">warning</span>
+                    <div>
+                        <p className="text-[11px] font-bold text-amber-400 uppercase tracking-wider mb-1">Partial Crawl Detection</p>
+                        <p className="text-[11px] text-slate-300 leading-tight">The crawler encountered resistance (JS Rendering or Bot Mitigation). High-level strategy is <strong>estimated</strong> based on partial data. Use with caution.</p>
+                    </div>
+                </div>
+            )}
+
             <p className="text-sm text-slate-300 leading-relaxed">{results.summary}</p>
             {results.topOpportunity && <p className="text-sm text-primary font-bold mt-2">{results.topOpportunity}</p>}
             {results.strategicBrief && <p className="text-xs text-slate-400 mt-3 leading-relaxed">{results.strategicBrief}</p>}
