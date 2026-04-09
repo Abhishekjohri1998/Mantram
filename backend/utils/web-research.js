@@ -1988,6 +1988,8 @@ export async function researchDomain(baseUrl, options = {}) {
         url: normalizedUrl,
         pages: allPages.map(p => ({
             url: p.url,
+            success: p.success,
+            isSoft404: p.isSoft404,
             title: p.title,
             metaDescription: p.metaDescription,
             h1: p.h1,
