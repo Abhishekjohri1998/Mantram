@@ -207,11 +207,24 @@ export async function internalGenerateCreative({ body, user, creditsDeducted, jo
             agenticMeta.pipelineError = pipelineErr.message;
         }
 
-        const fullPrompt = agenticMeta.finalPrompt || agenticMeta.engineeredPrompt?.totalPrompt || prompt;
+        let fullPrompt = agenticMeta.finalPrompt || agenticMeta.engineeredPrompt?.totalPrompt || prompt;
         const selectedImageModel = (options?.imageModel || 'nanobanana-2').toLowerCase();
         const aspectRatio = options?.aspectRatio || '1:1';
         const imageSize = options?.imageSize || '1K';
         const customSize = options?.customSize || null;
+
+        let ratioNum = 1;
+        if (customSize && customSize.width && customSize.height) {
+            ratioNum = customSize.width / customSize.height;
+        } else if (aspectRatio && aspectRatio.includes(':')) {
+            const [w, h] = aspectRatio.split(':').map(Number);
+            if (w && h) ratioNum = w / h;
+        }
+
+        if (ratioNum >= 2.5 || ratioNum <= 1/2.5) {
+            console.log(`📐 Extreme aspect ratio detected (ratio ${ratioNum.toFixed(2)}). Injecting anti-tiling prompt.`);
+            fullPrompt += "\n\nCRITICAL COMPOSITION INSTRUCTION: Render this as a single, continuous, and seamless scene spanning the entire canvas. DO NOT tile the image. DO NOT repeat elements, borders, or patterns.";
+        }
 
         if (progressId) {
             await addStep(progressId, { agent: 'generating', message: `Generating using ${selectedImageModel}...`, status: 'working' });
@@ -232,9 +245,30 @@ export async function internalGenerateCreative({ body, user, creditsDeducted, jo
             throw new Error('AI model servers are busy. Please try again soon.');
         }
 
-        const rawImageUrl = result.imageUrl || '';
+        let rawImageUrl = result.imageUrl || '';
         if (!rawImageUrl) {
             throw new Error('Image generation produced no image');
+        }
+
+        // --- ENFORCE EXACT CUSTOM SIZE WITH SHARP ---
+        if (customSize && customSize.width && customSize.height) {
+            try {
+                const targetW = parseInt(customSize.width, 10);
+                const targetH = parseInt(customSize.height, 10);
+                console.log(`✂️ Enforcing exact custom size crop: ${targetW}x${targetH} from AI generated ratio.`);
+                const sharp = (await import('sharp')).default;
+                const imgBuffer = await fetchImageBuffer(rawImageUrl);
+                if (imgBuffer) {
+                    const resizedBuffer = await sharp(imgBuffer)
+                        .resize({ width: targetW, height: targetH, fit: 'cover', position: 'centre' })
+                        .png()
+                        .toBuffer();
+                    rawImageUrl = `data:image/png;base64,${resizedBuffer.toString('base64')}`;
+                    console.log(`✅ Cropped to exact requested size: ${targetW}x${targetH}`);
+                }
+            } catch (resizeErr) {
+                console.warn('⚠️ Failed to enforce exact custom size crop:', resizeErr.message);
+            }
         }
 
         const creative = await Creative.create({
@@ -1025,9 +1059,12 @@ async function routedImageGenerate(promptText, imageParts = [], temperature = 0.
                     }
                     
                     try {
+                        // Native Gemini expects the string ratio (e.g. '4:5'), not exact resolutions like '1024x1280'
+                        const nativeAspectRatio = (customSize && isMultimodalCapable) ? finalLzSize : aspectRatio;
+                        
                         const routerResult = await router.generateImage({
                             prompt: promptText,
-                            aspectRatio: finalLzSize,
+                            aspectRatio: nativeAspectRatio,
                             model: lzModel,
                             imageParts: finalImageParts,
                             size: imageSize
@@ -1241,7 +1278,7 @@ router.post('/enhance-prompt', protect, requireCredits('promptEnhance'), async (
         const enhancedPrompt = pipelineResult.finalPrompt || pipelineResult.engineeredPrompt?.primaryPrompt || prompt;
 
         // Sanity check — if pipeline returned something too short or failed, fall back gracefully
-        if (!enhancedPrompt || enhancedPrompt.length < 80) {
+        if (!enhancedPrompt || enhancedPrompt.length < 20) {
             console.warn(`✨ [EnhancePrompt] Pipeline returned short result (${enhancedPrompt?.length || 0} chars) — using raw brief`);
             return res.json({ success: true, enhancedPrompt: prompt, agenticEnhanced: false });
         }
@@ -1899,6 +1936,193 @@ router.get('/vto-status/:requestId', protect, async (req, res) => {
         console.error('VTO status error:', error);
         if (req.creditsDeducted > 0) {
             await refundCredits(req.user._id, req.creditsDeducted, 'vtoGenerate', `Refund: Virtual Try-On Sync Failure (${safeErrorMessage(error)})`, 'creative');
+        }
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// POST /api/creatives/edit-image — AI Image Editing powered by Gemini Nano Banana 2
+// Supports: style transfer, bg change, object add/remove, color grading, text edits
+// Multi-turn: pass editHistory[] for iterative refinement with conversation context
+// ══════════════════════════════════════════════════════════════════════════════
+router.post('/edit-image', protect, requireCredits('creative'), async (req, res) => {
+    try {
+        const { imageUrl, editPrompt, editHistory = [], brandId } = req.body;
+        if (!imageUrl) return res.status(400).json({ success: false, error: 'imageUrl is required' });
+        if (!editPrompt) return res.status(400).json({ success: false, error: 'editPrompt is required' });
+
+        const imageKey = process.env.GEMINI_IMAGE_API_KEY || process.env.GEMINI_API_KEY;
+        if (!imageKey) return res.status(500).json({ success: false, error: 'GEMINI_API_KEY not configured' });
+
+        console.log(`\n🎨 ════ IMAGE EDIT REQUEST ════`);
+        console.log(`📝 Prompt: ${editPrompt}`);
+        console.log(`🖼️ Source: ${imageUrl.substring(0, 80)}...`);
+        console.log(`📜 History turns: ${editHistory.length}`);
+
+        // ── Fetch the source image → base64 ──
+        let sourceBase64, sourceMime;
+        if (imageUrl.startsWith('data:')) {
+            const match = imageUrl.match(/^data:([\w/+]+);base64,(.+)$/);
+            if (match) { sourceMime = match[1]; sourceBase64 = match[2]; }
+        } else {
+            try {
+                const imgResp = await fetch(imageUrl);
+                if (!imgResp.ok) throw new Error(`HTTP ${imgResp.status}`);
+                const buf = await imgResp.arrayBuffer();
+                sourceBase64 = Buffer.from(buf).toString('base64');
+                sourceMime = imgResp.headers.get('content-type') || 'image/jpeg';
+            } catch (fetchErr) {
+                console.error('❌ Failed to fetch source image:', fetchErr.message);
+                return res.status(400).json({ success: false, error: 'Could not fetch the source image. It may have expired.' });
+            }
+        }
+
+        if (!sourceBase64) return res.status(400).json({ success: false, error: 'Could not process image data' });
+
+        // ── Build Gemini multi-turn conversation ──
+        const baseUrl = 'https://generativelanguage.googleapis.com/v1beta';
+        const modelId = 'gemini-3.1-flash-image-preview';
+        const url = `${baseUrl}/models/${modelId}:generateContent?key=${imageKey}`;
+
+        // Build contents array for multi-turn editing
+        const contents = [];
+
+        // If we have edit history, reconstruct the conversation
+        if (editHistory.length > 0) {
+            for (const turn of editHistory) {
+                // User turn: image + prompt
+                const userParts = [];
+                if (turn.imageUrl) {
+                    try {
+                        let turnBase64, turnMime;
+                        if (turn.imageUrl.startsWith('data:')) {
+                            const m = turn.imageUrl.match(/^data:([\w/+]+);base64,(.+)$/);
+                            if (m) { turnMime = m[1]; turnBase64 = m[2]; }
+                        } else {
+                            const r = await fetch(turn.imageUrl);
+                            if (r.ok) {
+                                const b = await r.arrayBuffer();
+                                turnBase64 = Buffer.from(b).toString('base64');
+                                turnMime = r.headers.get('content-type') || 'image/jpeg';
+                            }
+                        }
+                        if (turnBase64) {
+                            userParts.push({ inlineData: { mimeType: turnMime, data: turnBase64 } });
+                        }
+                    } catch (e) {
+                        console.warn('⚠️ Skipping history image fetch:', e.message);
+                    }
+                }
+                if (turn.prompt) userParts.push({ text: turn.prompt });
+                if (userParts.length > 0) {
+                    contents.push({ role: 'user', parts: userParts });
+                }
+
+                // Model turn: the result image (if available)
+                if (turn.resultImageUrl) {
+                    try {
+                        let resMime, resBase64;
+                        if (turn.resultImageUrl.startsWith('data:')) {
+                            const m = turn.resultImageUrl.match(/^data:([\w/+]+);base64,(.+)$/);
+                            if (m) { resMime = m[1]; resBase64 = m[2]; }
+                        } else {
+                            const r = await fetch(turn.resultImageUrl);
+                            if (r.ok) {
+                                const b = await r.arrayBuffer();
+                                resBase64 = Buffer.from(b).toString('base64');
+                                resMime = r.headers.get('content-type') || 'image/jpeg';
+                            }
+                        }
+                        if (resBase64) {
+                            contents.push({ role: 'model', parts: [{ inlineData: { mimeType: resMime, data: resBase64 } }] });
+                        }
+                    } catch (e) {
+                        console.warn('⚠️ Skipping history result image fetch:', e.message);
+                    }
+                }
+            }
+        }
+
+        // Current turn: source image + edit prompt
+        const currentParts = [
+            { inlineData: { mimeType: sourceMime, data: sourceBase64 } },
+            { text: `You are an elite AI image editor. Edit this image precisely as instructed. CRITICAL RULES:\n1. Apply ONLY the requested change — do not alter any other aspect of the image\n2. Maintain the exact same resolution, lighting quality, and color temperature for unaffected areas\n3. Ensure the edit blends seamlessly with the rest of the image\n4. The result must look professionally retouched, not AI-generated\n\nEDIT INSTRUCTION: ${editPrompt}\n\nOutput the complete modified image.` },
+        ];
+        contents.push({ role: 'user', parts: currentParts });
+
+        // ── Call Gemini with 90s timeout ──
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 90_000);
+
+        let response;
+        try {
+            response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents,
+                    generationConfig: {
+                        responseModalities: ['TEXT', 'IMAGE'],
+                        temperature: 0.4,
+                    },
+                }),
+                signal: controller.signal,
+            });
+        } finally {
+            clearTimeout(timeoutId);
+        }
+
+        const data = await response.json();
+        if (data.error) {
+            console.error('❌ Gemini Edit Error:', data.error.message);
+            throw new Error(`Image editing failed: ${data.error.message}`);
+        }
+
+        // Extract the edited image
+        const resParts = data.candidates?.[0]?.content?.parts || [];
+        let editedImageUrl = null;
+        let editDescription = '';
+
+        for (const part of resParts) {
+            if (part.inlineData?.mimeType?.startsWith('image/') && !part.thought) {
+                editedImageUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+            }
+            if (part.text && !part.thought) {
+                editDescription += part.text;
+            }
+        }
+
+        if (!editedImageUrl) {
+            console.error('❌ Gemini returned no image. Parts:', resParts.map(p => ({ hasImage: !!p.inlineData, hasText: !!p.text, thought: !!p.thought })));
+            return res.status(500).json({ success: false, error: 'Image editing failed — the AI did not return an edited image. Try a different edit instruction.' });
+        }
+
+        // ── Upload to S3 ──
+        let s3Url = null;
+        try {
+            const s3Key = `edits/${req.user._id}/${Date.now()}_edit.png`;
+            s3Url = await uploadToS3(editedImageUrl, s3Key, 'image/png');
+        } catch (e) {
+            console.warn('⚠️ S3 upload failed for edit, returning base64:', e.message);
+        }
+
+        const finalUrl = s3Url || editedImageUrl;
+        console.log(`✅ Image edit complete → ${s3Url ? 'S3' : 'base64'} (${editPrompt.substring(0, 50)}...)`);
+
+        res.json({
+            success: true,
+            imageUrl: finalUrl,
+            editDescription: editDescription || editPrompt,
+            model: 'Nano Banana 2',
+            provider: 'gemini',
+            source: s3Url ? 's3' : 'base64',
+        });
+
+    } catch (error) {
+        console.error('❌ Image edit error:', error.message);
+        if (req.creditsDeducted) {
+            await refundCredits(req.user._id, req.creditsDeducted, 'creative', `Refund: Image edit failed (${safeErrorMessage(error)})`, 'creative');
         }
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }

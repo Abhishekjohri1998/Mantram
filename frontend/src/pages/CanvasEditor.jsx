@@ -185,6 +185,7 @@ function CanvasEditorInner() {
     const [aiPrompt, setAiPrompt] = useState('')
     const [aiLoading, setAiLoading] = useState(false)
     const [aiResult, setAiResult] = useState(null) // { imageUrl, type:'image' } or { copy, type:'copy' }
+    const [editHistory, setEditHistory] = useState([]) // Gemini conversational turns array
     const [aiError, setAiError] = useState('')
     const [panelOpen, setPanelOpen] = useState(false) // content panel visibility
     // Mask painting state
@@ -450,8 +451,7 @@ function CanvasEditorInner() {
                             id: 'bg-image',
                         })
                         fc.add(img)
-                        // Keep artboard at back, image on top of it
-                        fc.sendObjectToBack(artboard)
+                        fc.sendToBack(img) // ensure background image is at the absolute bottom
                         fc.renderAll()
                         updateLayers()
                         saveHistory()
@@ -1884,11 +1884,26 @@ function CanvasEditorInner() {
             let imageUrl
             // If canvas has objects, send canvas image for editing
             if (fc && fc.getObjects().length > 0) {
-                showToast('🎨 Editing image with AI...')
-                const canvasDataUrl = fc.toDataURL({ format: 'png', quality: 0.9 })
-                const data = await canvasAssets.aiEdit({ prompt: aiPrompt, imageBase64: canvasDataUrl })
-                if (data.error) throw new Error(data.error)
-                imageUrl = data.imageUrl
+                // Flatten canvas natively and securely
+                const canvasDataUrl = fc.toDataURL({ format: 'png', quality: 1.0 })
+                showToast('🎨 Editing image with Gemini AI...')
+                
+                const resp = await creativesAPI.editImage({
+                    imageUrl: canvasDataUrl, // base64 payload is fully supported by editImage backend
+                    editPrompt: aiPrompt.trim(),
+                    editHistory,
+                    brandId: activeBrand?._id,
+                })
+                if (!resp.success) throw new Error(resp.error || 'Edit failed')
+                imageUrl = resp.imageUrl
+
+                // Append to conversation turn history
+                setEditHistory(prev => [...prev, {
+                    prompt: aiPrompt.trim(),
+                    imageUrl: canvasDataUrl,
+                    resultImageUrl: imageUrl,
+                }])
+
             } else {
                 // Empty canvas → generate a new image
                 showToast('✨ Generating image with AI...')
@@ -1896,23 +1911,25 @@ function CanvasEditorInner() {
                 if (data.error) throw new Error(data.error)
                 imageUrl = data.imageUrl
             }
-            // AUTO-APPLY: Add/replace directly on canvas
+
+            // AUTO-APPLY: Replace entire canvas content directly
             const img = await fabric.FabricImage.fromURL(imageUrl, { crossOrigin: 'anonymous' })
             const allObjects = fc.getObjects().filter(o => o.id !== 'artboard').slice()
             allObjects.forEach(o => fc.remove(o))
             const scaleX = fc.width / img.width
             const scaleY = fc.height / img.height
-            const scale = Math.max(scaleX, scaleY)
-            img.set({ left: 0, top: 0, scaleX: scale, scaleY: scale })
-            img._customName = 'AI Generated'
+            const scale = Math.min(scaleX, scaleY) // Preserve aspect
+            img.set({ left: fc.width / 2, top: fc.height / 2, originX: 'center', originY: 'center', scaleX: scale, scaleY: scale })
+            img._customName = 'AI Edited'
             fc.add(img)
             fc.renderAll()
             saveHistory()
             setGeneratedImages(prev => [{ url: imageUrl, label: 'AI Edit', timestamp: Date.now() }, ...prev])
-            showToast('✨ Canvas updated with AI result')
-        } catch (err) { setAiError(err.message) }
+            setAiPrompt('') // clear prompt on success
+            showToast('✨ Canvas updated with edited result')
+        } catch (err) { setAiError(err.message || 'Image editing failed.') }
         setAiLoading(false)
-    }, [aiPrompt, canvasWidth, canvasHeight])
+    }, [aiPrompt, canvasWidth, canvasHeight, editHistory, activeBrand])
 
     // ── VISUAL TOOL: Inpaint masked area with prompt ──
     const aiVisualEdit = useCallback(async () => {
@@ -4530,10 +4547,32 @@ function CanvasEditorInner() {
 
                                         {/* === PROMPT TOOL === */}
                                         {aiTool === 'prompt' && (
-                                            <div className="ce-ai-tool-section">
+                                            <div className="ce-ai-tool-section flex flex-col gap-3">
                                                 <p className="ce-ai-tool-hint">
-                                                    ✨ Describe what you want. If the canvas has content, AI edits it. If empty, AI generates a new image.
+                                                    ✨ Describe what you want. If the canvas has content, Gemini edits it preserving layout. If empty, AI generates a new image.
                                                 </p>
+
+                                                {/* Edit History Timeline */}
+                                                {editHistory.length > 0 && (
+                                                    <div className="bg-black/20 rounded-xl p-3 max-h-[200px] overflow-y-auto custom-scrollbar flex flex-col gap-2 border border-white/5">
+                                                        <div className="flex items-center justify-between">
+                                                            <span className="text-[10px] font-bold text-slate-500 uppercase">Edit Timeline</span>
+                                                            <button onClick={() => { handleUndo(); setEditHistory(prev => prev.slice(0, -1)); }} 
+                                                                className="text-[10px] text-amber-400 hover:text-amber-300 flex items-center gap-1 cursor-pointer">
+                                                                <span className="material-symbols-outlined" style={{fontSize: 12}}>undo</span> Revert Last
+                                                            </button>
+                                                        </div>
+                                                        {editHistory.map((h, i) => (
+                                                            <div key={i} className="flex gap-2 items-start bg-white/5 rounded-lg p-2 border border-white/[0.02]">
+                                                                <div className="w-4 h-4 rounded-full bg-violet-500/20 text-violet-400 flex items-center justify-center text-[9px] font-bold mt-0.5 flex-shrink-0">
+                                                                    {i + 1}
+                                                                </div>
+                                                                <p className="text-[11px] text-slate-300 flex-1 leading-tight">{h.prompt}</p>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+
                                                 <div className="ce-ai-prompt-bar">
                                                     <textarea
                                                         className="ce-ai-prompt-input"

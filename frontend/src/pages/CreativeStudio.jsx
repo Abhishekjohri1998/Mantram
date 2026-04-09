@@ -51,12 +51,12 @@ const ASPECT_RATIOS = [
 
 // ── Creative Formats ──
 const creativeTypes = [
-    { id: 'instagram-post', icon: 'photo_camera', label: 'Instagram Post', size: '1080×1350', aspectRatio: '4:5' },
-    { id: 'instagram-story', icon: 'smartphone', label: 'Story / Reel', size: '1080×1920', aspectRatio: '9:16' },
-    { id: 'facebook-ad', icon: 'ads_click', label: 'Facebook Ad', size: '1080×1350', aspectRatio: '4:5' },
-    { id: 'linkedin-post', icon: 'work', label: 'LinkedIn Post', size: '1200×1200', aspectRatio: '1:1' },
-    { id: 'youtube-thumb', icon: 'smart_display', label: 'YouTube Thumb', size: '1280×720', aspectRatio: '16:9' },
-    { id: 'banner', icon: 'web', label: 'Banner', size: '1920×600', aspectRatio: '16:9' },
+    { id: 'instagram-post', icon: 'photo_camera', label: 'Instagram Post', size: '1080×1350', aspectRatio: '4:5', w: 1080, h: 1350 },
+    { id: 'instagram-story', icon: 'smartphone', label: 'Story / Reel', size: '1080×1920', aspectRatio: '9:16', w: 1080, h: 1920 },
+    { id: 'facebook-ad', icon: 'ads_click', label: 'Facebook Ad', size: '1080×1350', aspectRatio: '4:5', w: 1080, h: 1350 },
+    { id: 'linkedin-post', icon: 'work', label: 'LinkedIn Post', size: '1200×1200', aspectRatio: '1:1', w: 1200, h: 1200 },
+    { id: 'youtube-thumb', icon: 'smart_display', label: 'YouTube Thumb', size: '1280×720', aspectRatio: '16:9', w: 1280, h: 720 },
+    { id: 'banner', icon: 'web', label: 'Banner', size: '1920×600', aspectRatio: '16:9', w: 1920, h: 600 },
     { id: 'film-poster', icon: 'movie', label: 'Film Poster', size: '2000×3000', aspectRatio: '2:3', w: 2000, h: 3000 },
     { id: 'hd-wide', icon: 'monitor', label: 'HD 16:9', size: '1920×1080', aspectRatio: '16:9', w: 1920, h: 1080 },
     { id: 'a4-portrait', icon: 'description', label: 'A4 Portrait', size: '2480×3508', aspectRatio: '2:3', w: 2480, h: 3508 },
@@ -513,11 +513,11 @@ export default function CreativeStudio() {
 
     // Synced with backend MODEL_CAPABILITIES (falClient.js) + xAI/fal.ai/PiAPI API docs
     const ANIMATE_MODELS = {
-        'grok-imagine': { name: 'Grok Imagine', icon: 'smart_toy', dur: [1, 15], ratios: ['1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3'], firstFrame: true, refImages: false, nativeAudio: true, desc: 'Fast, affordable, image-to-video' },
-        'seedance-2.0': { name: 'Seedance 2.0', icon: 'movie', dur: [4, 15], ratios: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'], firstFrame: true, refImages: true, nativeAudio: true, desc: 'Cinematic, camera control' },
-        'kling-3.0': { name: 'Kling 3.0', icon: 'videocam', dur: [3, 15], ratios: ['16:9', '9:16', '1:1'], firstFrame: true, refImages: false, nativeAudio: true, desc: 'Best motion & physics' },
-        'veo-3.1': { name: 'Veo 3.1', icon: 'theaters', dur: [4, 8], ratios: ['16:9', '9:16'], firstFrame: true, refImages: true, nativeAudio: true, desc: 'Premium cinematic quality' },
-        'seedance-1.0': { name: 'Seedance 1.0', icon: 'eco', dur: [5, 10], ratios: ['16:9', '9:16', '1:1', '4:3', '3:4'], firstFrame: true, refImages: false, nativeAudio: false, desc: 'Fast & affordable' },
+        'grok-imagine': { name: 'Grok Imagine', icon: 'memory', dur: [5, 5], ratios: ['16:9', '1:1', '9:16'], firstFrame: true, refImages: false, nativeAudio: false, desc: 'Fast, affordable, image-to-video' },
+        'seedance-2.0': { name: 'Seedance 2.0', icon: 'switch_video', dur: [5, 15], ratios: ['16:9', '9:16'], firstFrame: true, refImages: true, nativeAudio: false, desc: 'Cinematic, camera control' },
+        'kling-3.0': { name: 'Kling 3.0', icon: 'slow_motion_video', dur: [5, 10], ratios: ['16:9', '9:16', '1:1'], firstFrame: true, refImages: false, nativeAudio: false, desc: 'Best motion & physics' },
+        'veo-3.1': { name: 'Veo 3.1', icon: 'movie_filter', dur: [5, 10], ratios: ['16:9'], firstFrame: true, refImages: false, nativeAudio: true, desc: 'Premium cinematic quality' },
+        'seedance-1.0': { name: 'Seedance 1.0', icon: 'animation', dur: [5, 10], ratios: ['16:9', '9:16', '1:1', '4:3', '3:4'], firstFrame: true, refImages: false, nativeAudio: false, desc: 'Fast & affordable' },
     }
 
     // ── Animate: AI Prompt Suggestion ──
@@ -574,6 +574,7 @@ export default function CreativeStudio() {
 - Atmosphere (lighting shifts, particle effects)
 ${originalContext}
 
+CRITICAL INSTRUCTION: You MUST write the prompt entirely in ENGLISH. Do not use Hindi, mixing scripts, or any other language except pure English.
 Be specific and cinematic. Do NOT describe the image — describe the MOTION only. Output ONLY the prompt, nothing else.`,
                 activeBrand?._id,
                 { images: [imageUrl] }
@@ -664,6 +665,13 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
 
     // Cleanup animate polling on unmount
     useEffect(() => () => { if (animatePollRef.current) clearInterval(animatePollRef.current) }, [])
+
+    // ── AI Image Editing ──
+    const handleOpenEditPanel = (imageUrl, title = 'Creative') => {
+        if (!imageUrl) return;
+        sessionStorage.setItem('canvasEditorImage', imageUrl);
+        navigate('/ai-canvas');
+    }
     
     // ── Studio Mode — driven by URL ?mode= param ──
     const studioMode = searchParams.get('mode') || 'create'
@@ -2213,7 +2221,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
 
     return (
         <DashboardLayout 
-            title={<h1 className="text-2xl font-black m-0">Creative Studio</h1>} 
+            title="Creative Studio"
             subtitle="AI-powered image generation & design"
         >
             <SEOHead 
@@ -2433,66 +2441,24 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     <span className="text-[10px] text-slate-600">Just now</span>
                                 </div>
 
-                                {/* Action Bar */}
-                                <div className="flex items-center gap-1.5 pt-2 border-t border-white/[0.05]">
-                                    <button onClick={() => handleFeedback('accept')}
-                                        className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${feedbackState === 'accepted' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'text-slate-400 hover:text-emerald-400 hover:bg-emerald-400/10'}`}>
-                                        <span className="material-symbols-outlined text-sm">{feedbackState === 'accepted' ? 'check_circle' : 'check'}</span>
-                                        {feedbackState === 'accepted' ? 'Accepted' : 'Accept'}
+                                {/* Action Bar (Streamlined) */}
+                                <div className="flex items-center gap-1.5 pt-3 border-t border-white/[0.05]">
+                                    <button onClick={() => { setPrompt(prompt); if (result.style) setStyle(result.style); }}
+                                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold text-slate-400 hover:text-white hover:bg-white/[0.06] cursor-pointer transition-all">
+                                        <span className="material-symbols-outlined text-sm">history</span>
+                                        Reuse Prompt
                                     </button>
-                                    <button onClick={() => handleDownloadImage(result?.imageUrl, `${result?.title || 'creative'}.png`)}
-                                        className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-white/[0.06] cursor-pointer transition-all" title="Download Original (1K)">
-                                        <span className="material-symbols-outlined text-sm">download</span>
+                                    <button onClick={() => { navigator.clipboard.writeText(prompt); setFeedbackToast('Prompt copied!'); setTimeout(() => setFeedbackToast(''), 2000); }}
+                                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold text-slate-400 hover:text-white hover:bg-white/[0.06] cursor-pointer transition-all">
+                                        <span className="material-symbols-outlined text-sm">content_copy</span>
+                                        Copy Prompt
                                     </button>
-                                    <div className="relative">
-                                        <button onClick={(e) => { e.stopPropagation(); setUpscaleMenu(upscaleMenu ? null : { url: result?.imageUrl, filename: `${result?.title || 'creative'}.png` }) }}
-                                            className="p-1.5 rounded-lg text-slate-500 hover:text-amber-400 hover:bg-amber-400/10 cursor-pointer transition-all" title="Download HD / 4K">
-                                            {upscalingState ? <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span> : <span className="material-symbols-outlined text-sm">high_quality</span>}
-                                        </button>
-                                        {upscaleMenu && upscaleMenu.url === result?.imageUrl && (
-                                            <div ref={upscaleMenuRef} className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-[#121217]/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl p-1.5 min-w-[180px] z-50 animate-in fade-in slide-in-from-bottom-2 duration-200">
-                                                <div className="text-[10px] text-slate-500 px-2 pt-1 pb-1.5 font-semibold uppercase tracking-wider">Download Quality</div>
-                                                <button onClick={() => handleDownloadWithUpscale(upscaleMenu.url, upscaleMenu.filename, '1k')}
-                                                    className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs text-slate-300 hover:bg-white/[0.08] hover:text-white transition-all cursor-pointer">
-                                                    <span className="material-symbols-outlined text-sm text-slate-500">image</span>
-                                                    <div><div className="font-semibold">1K Original</div><div className="text-[10px] text-slate-500">1024px • Instant</div></div>
-                                                </button>
-                                                <button onClick={() => handleDownloadWithUpscale(upscaleMenu.url, upscaleMenu.filename, '2k')}
-                                                    disabled={upscalingState === '2k'}
-                                                    className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs text-slate-300 hover:bg-emerald-500/10 hover:text-emerald-400 transition-all cursor-pointer disabled:opacity-50">
-                                                    <span className="material-symbols-outlined text-sm text-emerald-500">hd</span>
-                                                    <div><div className="font-semibold">2K HD{upscalingState === '2k' ? ' — Upscaling...' : ''}</div><div className="text-[10px] text-slate-500">2048px • ~1s • Free</div></div>
-                                                    {upscalingState === '2k' && <span className="material-symbols-outlined text-sm animate-spin ml-auto text-emerald-400">progress_activity</span>}
-                                                </button>
-                                                <button onClick={() => handleDownloadWithUpscale(upscaleMenu.url, upscaleMenu.filename, '4k')}
-                                                    disabled={upscalingState === '4k'}
-                                                    className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs text-slate-300 hover:bg-amber-500/10 hover:text-amber-400 transition-all cursor-pointer disabled:opacity-50">
-                                                    <span className="material-symbols-outlined text-sm text-amber-500">4k</span>
-                                                    <div><div className="font-semibold">4K Ultra HD{upscalingState === '4k' ? ' — AI Upscaling...' : ''}</div><div className="text-[10px] text-slate-500">4096px • ~5s • AI Enhanced</div></div>
-                                                    {upscalingState === '4k' && <span className="material-symbols-outlined text-sm animate-spin ml-auto text-amber-400">progress_activity</span>}
-                                                </button>
-                                            </div>
-                                        )}
-                                    </div>
-                                    <button onClick={() => setPublishData({ image: result?.imageUrl, text: result?.copy?.caption || result?.title || '' })}
-                                        className="p-1.5 rounded-lg text-slate-500 hover:text-[#1877F2] hover:bg-[#1877F2]/10 cursor-pointer transition-all" title="Publish">
-                                        <span className="material-symbols-outlined text-sm">share</span>
-                                    </button>
-                                    <button onClick={handleAnimateClick}
-                                        className="p-1.5 rounded-lg text-slate-500 hover:text-[#FF4D00] hover:bg-[#FF4D00]/10 cursor-pointer transition-all" title="Animate">
-                                        <span className="material-symbols-outlined text-sm">animation</span>
-                                    </button>
-                                    <button onClick={() => {
-                                        if (!result?.imageUrl) return
-                                        const params = new URLSearchParams({ fromCreative: 'true', imageUrl: result.imageUrl })
-                                        navigate(`/content-studio?${params.toString()}`)
-                                    }}
-                                        className="p-1.5 rounded-lg text-slate-500 hover:text-cyan-400 hover:bg-cyan-400/10 cursor-pointer transition-all" title="Get Caption in Content Studio">
-                                        <span className="material-symbols-outlined text-sm">edit_note</span>
-                                    </button>
-                                    <button onClick={handleGenerate}
-                                        className="ml-auto p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-white/[0.06] cursor-pointer transition-all" title="Regenerate">
-                                        <span className="material-symbols-outlined text-sm">refresh</span>
+
+                                    {/* Link to advanced actions */}
+                                    <button onClick={() => result.imageUrl && setZoomImage(result.imageUrl)}
+                                        className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-violet-300 hover:text-white hover:bg-violet-500/20 cursor-pointer transition-all border border-violet-500/20 bg-violet-500/10">
+                                        <span className="material-symbols-outlined text-sm">open_in_full</span>
+                                        View Actions
                                     </button>
                                 </div>
                             </div>
@@ -2626,23 +2592,8 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                 {idx === 0 && <span className="absolute top-1.5 left-1.5 text-[8px] font-bold text-[#FF7A00] bg-[#FF4D00]/30 px-1.5 py-0.5 rounded-md backdrop-blur-sm">Latest</span>}
                                                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-all flex flex-col justify-end p-2">
                                                     <p className="text-[9px] text-white/80 line-clamp-2 mb-1.5 leading-tight">{item._prompt || 'AI Generated'}</p>
-                                                    <div className="flex gap-1">
-                                                        <button onClick={(e) => { e.stopPropagation(); handleDownloadImage(item.imageUrl, `creative-${idx}.png`) }}
-                                                            className="p-1 rounded-md bg-white/10 text-white hover:bg-white/20 transition-all" title="Download">
-                                                            <span className="material-symbols-outlined text-xs">download</span>
-                                                        </button>
-                                                        <button onClick={(e) => { e.stopPropagation(); setDesignBaseImage(item.imageUrl); setPrompt(item._prompt || ''); }}
-                                                            className="p-1 rounded-md bg-white/10 text-white hover:bg-primary/40 transition-all" title="Edit">
-                                                            <span className="material-symbols-outlined text-xs">edit</span>
-                                                        </button>
-                                                        <button onClick={(e) => { e.stopPropagation(); handleAnimateClick(item); }}
-                                                            className="p-1 rounded-md bg-white/10 text-white hover:bg-[#FF4D00]/40 transition-all" title="Animate">
-                                                            <span className="material-symbols-outlined text-xs">movie</span>
-                                                        </button>
-                                                        <button onClick={(e) => { e.stopPropagation(); setResult(item); }}
-                                                            className="p-1 rounded-md bg-white/10 text-white hover:bg-emerald-500/40 transition-all" title="View full">
-                                                            <span className="material-symbols-outlined text-xs">open_in_full</span>
-                                                        </button>
+                                                    <div className="mt-1">
+                                                        <span className="text-[9px] text-[#FF4D00] font-bold tracking-widest uppercase bg-black/40 px-2 py-0.5 rounded-sm backdrop-blur-sm shadow-sm border border-white/5">Click to view actions</span>
                                                     </div>
                                                 </div>
                                             </div>
@@ -2719,38 +2670,23 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                                 </div>
                                                             </div>
 
-                                                            {/* Actions row */}
-                                                            <div className="flex items-center gap-1 flex-wrap">
+                                                            {/* Actions row (Streamlined) */}
+                                                            <div className="flex items-center gap-1.5 flex-wrap">
                                                                 <button onClick={() => { setPrompt(group.prompt); }}
-                                                                    className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold text-[#FF4D00] bg-[#FF4D00]/10 hover:bg-[#FF4D00]/20 cursor-pointer transition-all" title="Reuse this prompt">
-                                                                    <span className="material-symbols-outlined text-xs">replay</span>
+                                                                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-400 bg-white/[0.04] hover:bg-white/[0.08] hover:text-white cursor-pointer transition-all" title="Reuse this prompt">
+                                                                    <span className="material-symbols-outlined text-sm">history</span>
                                                                     Reuse
                                                                 </button>
                                                                 <button onClick={() => { navigator.clipboard.writeText(group.prompt); setFeedbackToast('Prompt copied!'); setTimeout(() => setFeedbackToast(''), 2000); }}
-                                                                    className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold text-slate-400 bg-white/[0.04] hover:bg-white/[0.08] cursor-pointer transition-all" title="Copy prompt">
-                                                                    <span className="material-symbols-outlined text-xs">content_copy</span>
+                                                                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-400 bg-white/[0.04] hover:bg-white/[0.08] hover:text-white cursor-pointer transition-all" title="Copy prompt">
+                                                                    <span className="material-symbols-outlined text-sm">content_copy</span>
                                                                     Copy
                                                                 </button>
-                                                                <button onClick={() => handleAnimateClick(group.items[0])}
-                                                                    className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold text-[#FF7A00] bg-[#FF4D00]/10 hover:bg-[#FF4D00]/20 cursor-pointer transition-all" title="Animate this image">
-                                                                    <span className="material-symbols-outlined text-xs">movie</span>
-                                                                    Animate
-                                                                </button>
-                                                                <button onClick={() => handleDownloadImage(group.items[0].imageUrl, `creative-${gIdx}.png`)}
-                                                                    className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-white/[0.06] cursor-pointer transition-all" title="Download">
-                                                                    <span className="material-symbols-outlined text-sm">download</span>
-                                                                </button>
-                                                                <button onClick={() => { setDesignBaseImage(group.items[0].imageUrl); setPrompt(group.prompt); }}
-                                                                    className="p-1.5 rounded-lg text-slate-500 hover:text-primary hover:bg-primary/10 cursor-pointer transition-all" title="Edit / Remix">
-                                                                    <span className="material-symbols-outlined text-sm">edit</span>
-                                                                </button>
-                                                                <button onClick={() => setPublishData({ image: group.items[0].imageUrl, text: group.prompt })}
-                                                                    className="p-1.5 rounded-lg text-slate-500 hover:text-[#1877F2] hover:bg-[#1877F2]/10 cursor-pointer transition-all" title="Publish">
-                                                                    <span className="material-symbols-outlined text-sm">share</span>
-                                                                </button>
-                                                                <button onClick={() => { setResult(group.items[0]); }}
-                                                                    className="p-1.5 rounded-lg text-slate-500 hover:text-emerald-400 hover:bg-emerald-500/10 cursor-pointer transition-all" title="View full">
+
+                                                                <button onClick={() => setZoomImage(group.items[0].imageUrl)}
+                                                                    className="ml-auto flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-violet-300 bg-violet-500/10 hover:bg-violet-500/20 cursor-pointer transition-all border border-violet-500/20" title="View image and actions">
                                                                     <span className="material-symbols-outlined text-sm">open_in_full</span>
+                                                                    View Actions
                                                                 </button>
                                                             </div>
 
@@ -4126,6 +4062,10 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                         <button onClick={(e) => { e.stopPropagation(); setPhotoshootResult(item); }}
                                                             className="p-1 rounded-md bg-white/10 text-white hover:bg-emerald-500/40 transition-all" title="View full">
                                                             <span className="material-symbols-outlined text-xs">open_in_full</span>
+                                                        </button>
+                                                        <button onClick={(e) => { e.stopPropagation(); handleOpenEditPanel(item.imageUrl, item._brief || item.description || 'Photoshoot'); }}
+                                                            className="p-1 rounded-md bg-white/10 text-white hover:bg-violet-500/40 transition-all" title="AI Edit">
+                                                            <span className="material-symbols-outlined text-xs">auto_fix_high</span>
                                                         </button>
                                                         <button onClick={(e) => { e.stopPropagation(); setPublishData({ image: item.imageUrl, text: item._brief || '' }) }}
                                                             className="p-1 rounded-md bg-white/10 text-white hover:bg-[#1877F2]/40 transition-all" title="Publish">
@@ -7632,14 +7572,37 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                 </div>
             )}
 
+
             {/* ═══ ZOOM LIGHTBOX (for generated result — global, all tabs) ═══ */}
             {zoomImage && (
                 <div className="fixed inset-0 z-[110] flex items-center justify-center animate-fade-in"
                     onClick={() => setZoomImage(null)}>
                     <div className="absolute inset-0 bg-black/90 backdrop-blur-xl" />
                     <div className="relative max-w-[90vw] max-h-[90vh]" onClick={e => e.stopPropagation()}>
-                        <img src={zoomImage} alt="Zoomed" className="max-w-full max-h-[85vh] rounded-2xl shadow-2xl object-contain" />
-                        <div className="absolute top-3 right-3 flex gap-2">
+                        <img src={zoomImage} alt="Zoomed" className="max-w-full max-h-[85vh] rounded-2xl shadow-2xl object-contain relative z-10" />
+                        
+                        {/* Bottom Actions Dock */}
+                        <div className="absolute -bottom-16 left-1/2 -translate-x-1/2 flex items-center gap-2 p-1.5 rounded-2xl bg-black/60 backdrop-blur-xl border border-white/10 shadow-2xl z-20 animate-in slide-in-from-bottom-4 duration-300">
+                            <button onClick={(e) => { e.stopPropagation(); handleOpenEditPanel(zoomImage, 'Creative'); setZoomImage(null); }}
+                                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold text-violet-300 hover:text-white hover:bg-violet-500/20 cursor-pointer transition-all whitespace-nowrap">
+                                <span className="material-symbols-outlined text-base">auto_fix_high</span>
+                                Edit in AI Canvas
+                            </button>
+                            <div className="w-px h-6 bg-white/10" />
+                            <button onClick={(e) => { e.stopPropagation(); handleAnimateClick({ imageUrl: zoomImage }); setZoomImage(null); }}
+                                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold text-[#FF7A00] hover:text-white hover:bg-[#FF4D00]/20 cursor-pointer transition-all whitespace-nowrap">
+                                <span className="material-symbols-outlined text-base">movie</span>
+                                Animate
+                            </button>
+                            <div className="w-px h-6 bg-white/10" />
+                            <button onClick={(e) => { e.stopPropagation(); setPublishData({ image: zoomImage, text: '' }); setZoomImage(null); }}
+                                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold text-[#1877F2] hover:text-white hover:bg-[#1877F2]/20 cursor-pointer transition-all whitespace-nowrap">
+                                <span className="material-symbols-outlined text-base">send</span>
+                                Publish to Content Studio
+                            </button>
+                        </div>
+
+                        <div className="absolute top-3 right-3 flex gap-2 z-20">
                             <button onClick={(e) => { e.stopPropagation(); handleDownloadImage(zoomImage, 'mantram-creative.png') }}
                                 className="p-2 rounded-full bg-black/60 text-white hover:bg-white/20 backdrop-blur-sm cursor-pointer transition-colors" title="Download 1K">
                                 <span className="material-symbols-outlined text-lg">download</span>
@@ -7761,7 +7724,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                     ? 'bg-[#FF4D00]/15 border-[#FF4D00]/30 text-white'
                                                     : 'bg-white/[0.03] border-white/[0.06] text-slate-400 hover:border-white/[0.12]'
                                             }`}>
-                                            <span className="text-sm mr-1">{m.icon}</span>
+                                            <span className="material-symbols-outlined text-sm mr-1 align-middle">{m.icon}</span>
                                             <span className="font-bold">{m.name}</span>
                                             <p className="text-[10px] text-slate-500 mt-0.5">{m.desc}</p>
                                         </button>
@@ -8905,6 +8868,10 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                             <button onClick={() => handleDownloadImage(mockupResult, "lifestyle-mockup.png")}
                                                 className="flex-1 py-2.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] text-white text-sm font-medium flex items-center justify-center gap-2 transition-all cursor-pointer">
                                                 <span className="material-symbols-outlined text-lg">download</span>Download
+                                            </button>
+                                            <button onClick={() => handleOpenEditPanel(mockupResult, 'Lifestyle Mockup')}
+                                                className="flex-1 py-2.5 rounded-xl bg-violet-500/10 hover:bg-violet-500/20 text-violet-300 hover:text-violet-200 text-sm font-medium flex items-center justify-center gap-2 transition-all cursor-pointer" title="AI Edit">
+                                                <span className="material-symbols-outlined text-lg">auto_fix_high</span>AI Canvas
                                             </button>
                                             <button onClick={() => { setMockupResult(null); setMockupScenePrompt('') }}
                                                 className="flex-1 py-2.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] text-white text-sm font-medium flex items-center justify-center gap-2 transition-all cursor-pointer">
