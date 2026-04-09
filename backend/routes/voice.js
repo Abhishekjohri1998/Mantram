@@ -94,6 +94,21 @@ router.post('/transcribe', protect, requireCredits('voiceTranscribe'), upload.si
  * Best accuracy for Indian languages (22+ languages)
  * Supports auto-detection, code-mixing, transliteration
  */
+// Detect file extension from multer upload
+function getAudioFileInfo(multerFile) {
+    const mime = multerFile.mimetype || 'audio/m4a';
+    const extMap = {
+        'audio/m4a': 'm4a', 'audio/mp4': 'm4a', 'audio/x-m4a': 'm4a',
+        'audio/mpeg': 'mp3', 'audio/mp3': 'mp3',
+        'audio/wav': 'wav', 'audio/x-wav': 'wav', 'audio/wave': 'wav',
+        'audio/webm': 'webm', 'audio/ogg': 'ogg', 'audio/flac': 'flac',
+    };
+    // Try from original filename first, then from mimetype
+    let ext = (multerFile.originalname || '').split('.').pop()?.toLowerCase();
+    if (!ext || ext.length > 5) ext = extMap[mime] || 'm4a';
+    return { ext, mime, filename: `audio.${ext}` };
+}
+
 async function transcribeWithSarvam(req, res, language) {
     const apiKey = process.env.SARVAM_API_KEY;
     if (!apiKey) {
@@ -103,11 +118,12 @@ async function transcribeWithSarvam(req, res, language) {
 
     try {
         const langCode = INDIAN_LANGUAGES[language] || 'unknown';
+        const fileInfo = getAudioFileInfo(req.file);
 
         // Build FormData for Sarvam API
         const form = new FormData();
-        const audioBlob = new Blob([req.file.buffer], { type: req.file.mimetype || 'audio/webm' });
-        form.append('file', audioBlob, 'audio.webm');
+        const audioBlob = new Blob([req.file.buffer], { type: fileInfo.mime });
+        form.append('file', audioBlob, fileInfo.filename);
         form.append('model', 'saaras:v3');
         form.append('language_code', langCode);
         form.append('mode', 'transcribe');
@@ -155,9 +171,11 @@ async function transcribeWithWhisper(req, res, language) {
         return res.status(500).json({ success: false, error: 'OpenAI API key not configured' });
     }
 
+    const fileInfo = getAudioFileInfo(req.file);
+
     const form = new FormData();
-    const audioBlob = new Blob([req.file.buffer], { type: req.file.mimetype || 'audio/webm' });
-    form.append('file', audioBlob, 'audio.webm');
+    const audioBlob = new Blob([req.file.buffer], { type: fileInfo.mime });
+    form.append('file', audioBlob, fileInfo.filename);
     form.append('model', 'whisper-1');
     form.append('response_format', 'json');
 
