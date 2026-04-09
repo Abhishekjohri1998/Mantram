@@ -183,7 +183,7 @@ router.post('/health-check', protect, requireStudio('seoStudio'), requireCredits
         error: reportData.reason
       });
 
-      return res.status(422).json({
+      return res.status(200).json({
         success: false,
         error: reportData.message, // "Recrawl Required: High Hallucination Risk"
         diagnosis: reportData.diagnosis, // Tiered failure feedback
