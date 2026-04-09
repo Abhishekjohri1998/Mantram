@@ -136,10 +136,12 @@ async function solveCloudflare(url) {
       return Array.from(h1s).map(h => h.textContent?.trim()).filter(Boolean);
     });
 
+    const solvedHtml = await page.content();
+
     console.log(`🛡️  Extracted ${cookies.length} cookies, UA: ${ua.substring(0, 50)}...`);
     console.log(`🛡️  Homepage H1 (JS rendered): ${h1Data.length > 0 ? h1Data.join(', ').substring(0, 80) : 'NONE'}`);
 
-    _cfSession = { cookies: cookieStr, userAgent: ua, solved: true, homepageH1: h1Data };
+    _cfSession = { cookies: cookieStr, userAgent: ua, solved: true, homepageH1: h1Data, initialHtml: solvedHtml };
     await browser.close();
     return _cfSession;
   } catch (e) {
@@ -1203,11 +1205,22 @@ export async function researchDomain(baseUrl, options = {}) {
     let homepageResult, robotsTxt, sitemap, llmsTxt;
 
     const _homepageFetchFn = async () => {
-            const { html, redirectChain, finalUrl } = await safeFetchWithRedirects(cleanBase);
-            if (!html) return { success: false, error: 'Empty response', redirectChain };
+            let html, redirectChain, finalUrl, metaFetch;
 
-            // Also fetch metadata (status, timing, headers) via enhanced fetch
-            const metaFetch = await safeFetchWithMeta(finalUrl);
+            if (_cfSession?.initialHtml) {
+                console.log("🛡️  Using HTML extracted directly from Playwright CF solver to bypass TLS fingerprinting.");
+                html = _cfSession.initialHtml;
+                redirectChain = [];
+                finalUrl = cleanBase;
+                metaFetch = { status: 200, responseTimeMs: 1500, pageSizeBytes: html.length, headers: {} };
+            } else {
+                const fetchRes = await safeFetchWithRedirects(cleanBase);
+                html = fetchRes.html;
+                redirectChain = fetchRes.redirectChain;
+                finalUrl = fetchRes.finalUrl;
+                if (!html) return { success: false, error: 'Empty response', redirectChain };
+                metaFetch = await safeFetchWithMeta(finalUrl);
+            }
 
             const meta = extractMeta(html);
             const headings = extractHeadings(html);

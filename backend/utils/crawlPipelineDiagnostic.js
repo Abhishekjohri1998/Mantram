@@ -88,6 +88,19 @@ export async function diagnoseCrawlPipeline({
 
   const audit = report.jobRecord;
 
+  // ── Stage 3.5: Inline Failure Override ──────────────────────────
+  // If called directly from the running pipeline with an error, process it immediately.
+  if (lastError) {
+    if (lastError.includes('403') || lastError.includes('429') || lastError.includes('Bot challenge') || lastError.includes('Access Denied')) {
+      report.stage = 'HOMEPAGE_FETCH_FAILED';
+      report.errors.push(`Homepage fetch was blocked: ${lastError}`);
+      return report;
+    }
+    report.stage = 'AUDIT_COMPLETED_NO_PAGES';
+    report.errors.push(`Crawl failed with pipeline error: ${lastError}`);
+    return report;
+  }
+
   // ── Stage 4: Is the audit stuck/running too long? ──────────────
   if (audit.status === 'running') {
     const ageMs = Date.now() - new Date(audit.createdAt).getTime();
@@ -119,11 +132,6 @@ export async function diagnoseCrawlPipeline({
     report.pagesInDb = pageCount;
 
     if (pageCount === 0) {
-      if (lastError && (lastError.includes('403') || lastError.includes('429') || lastError.includes('Bot challenge'))) {
-        report.stage = 'HOMEPAGE_FETCH_FAILED';
-        report.errors.push(`Homepage fetch was blocked: ${lastError}`);
-        return report;
-      }
       report.stage = 'AUDIT_COMPLETED_NO_PAGES';
       report.errors.push(
         `Audit status is "completed" but 0 pages were recorded. ` +
