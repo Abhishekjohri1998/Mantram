@@ -66,7 +66,7 @@ let _cfSession = null; // { cookies: string, userAgent: string, solved: boolean 
  * Launches Chromium ONCE, navigates to the site, waits for challenge to pass,
  * then extracts cookies + UA for all subsequent HTTP requests.
  */
-async function solveCloudflare(url) {
+async function solveCloudflare(url, customUA = null) {
   if (_cfSession?.solved) return _cfSession;
 
   let pw;
@@ -86,7 +86,7 @@ async function solveCloudflare(url) {
       args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu', '--disable-dev-shm-usage']
     });
     const context = await browser.newContext({
-      userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+      userAgent: customUA || 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
       viewport: { width: 1280, height: 800 },
       ignoreHTTPSErrors: true,
     });
@@ -1179,7 +1179,7 @@ export async function researchDomain(baseUrl, options = {}) {
         const probeTimer = setTimeout(() => probeCtrl.abort(), 8000);
         const probeResp = await fetch(cleanBase, {
             signal: probeCtrl.signal,
-            headers: { 'User-Agent': USER_AGENT, 'Accept': 'text/html,*/*;q=0.8' },
+            headers: { 'User-Agent': customUA || USER_AGENT, 'Accept': 'text/html,*/*;q=0.8' },
             redirect: 'follow',
         });
         clearTimeout(probeTimer);
@@ -1187,13 +1187,13 @@ export async function researchDomain(baseUrl, options = {}) {
         _cfNeeded = isBotChallengePage(probeHtml);
         if (_cfNeeded) {
             console.log(`🛡️  Cloudflare challenge DETECTED — launching solver...`);
-            await solveCloudflare(cleanBase);
+            await solveCloudflare(cleanBase, customUA);
         } else {
             console.log(`🛡️  No Cloudflare challenge — skipping solver (saved 15-30s)`);
         }
       } catch (probeErr) {
         console.log(`🛡️  Homepage probe failed (${probeErr.message}) — trying solver as fallback`);
-        await solveCloudflare(cleanBase);
+        await solveCloudflare(cleanBase, customUA);
       }
     } else {
       console.log(`🛡️  CF solve skipped (fast mode)`);

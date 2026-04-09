@@ -54,6 +54,9 @@ export function inspectCrawlDataset(pages = []) {
   if (totalPages === 0) {
     blockers.push('Crawler returned zero pages.');
   }
+  if (totalPages > 0 && okPages === 0) {
+    blockers.push('Crawler returned pages, but none of them loaded successfully (no HTTP 200).');
+  }
   if (okPages > 0 && quality.empty200Ratio >= THRESHOLDS.EMPTY_200_RATIO_BLOCK) {
     blockers.push(
       `${empty200.length}/${okPages} pages (${Math.round(quality.empty200Ratio * 100)}%) ` +
