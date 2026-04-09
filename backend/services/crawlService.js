@@ -15,7 +15,8 @@ const RETRY_STRATEGIES = [
     label: 'Googlebot-mimicry',
     userAgent: 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
     delayMs: 3000,      // polite delay before retry
-    renderJs: true
+    renderJs: true,
+    stealth: true       // Force Playwright to bypass TLS fingerprint blocks definitively 
   },
   {
     label: 'Stealth-Safari',
