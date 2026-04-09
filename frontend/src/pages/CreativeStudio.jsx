@@ -2618,7 +2618,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
 
                                 {viewMode === 'grid' ? (
                                     /* ── Grid / Tiled View ── */
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-[700px] overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.1) transparent' }}>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                                         {generationHistory.map((item, idx) => (
                                             <div key={item._id || idx} className={`group relative rounded-xl overflow-hidden border ${idx === 0 ? 'border-[#FF4D00]/30 ring-1 ring-[#FF4D00]/20' : 'border-white/[0.06]'} bg-black/20 cursor-pointer transition-all hover:border-white/[0.12] hover:scale-[1.02]`}
                                                 onClick={() => setZoomImage(item.imageUrl)}>
@@ -2650,7 +2650,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     </div>
                                 ) : (
                                     /* ── List View — grouped by prompt, full image on left ── */
-                                    <div className="space-y-4 max-h-[700px] overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.1) transparent' }}>
+                                    <div className="space-y-4">
                                         {(() => {
                                             // Group items by prompt (normalized) so regenerations appear side by side
                                             const groups = [];
