@@ -2413,7 +2413,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                             </div>
                                         </>
                                     ) : (
-                                        <div className="flex flex-col items-center justify-center p-8 text-center"
+                                        <div className="flex flex-col items-center justify-center p-4 sm:p-8 text-center"
                                             style={{ aspectRatio: aspectRatio?.replace(':', '/') || '1/1', background: `linear-gradient(135deg, ${activeBrand?.dna?.colors?.[0]?.hex || '#2B4BEE'}40, ${activeBrand?.dna?.colors?.[1]?.hex || '#FF4D00'}40)` }}>
                                             <span className="material-symbols-outlined text-6xl text-white/20 mb-4 block">image</span>
                                             <p className="text-white font-bold text-lg mb-2">{textOverlay || result.title || prompt.substring(0, 40)}</p>
@@ -2618,7 +2618,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
 
                                 {viewMode === 'grid' ? (
                                     /* ── Grid / Tiled View ── */
-                                    <div className="grid grid-cols-3 gap-2 max-h-[700px] overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.1) transparent' }}>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-[700px] overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.1) transparent' }}>
                                         {generationHistory.map((item, idx) => (
                                             <div key={item._id || idx} className={`group relative rounded-xl overflow-hidden border ${idx === 0 ? 'border-[#FF4D00]/30 ring-1 ring-[#FF4D00]/20' : 'border-white/[0.06]'} bg-black/20 cursor-pointer transition-all hover:border-white/[0.12] hover:scale-[1.02]`}
                                                 onClick={() => setZoomImage(item.imageUrl)}>
@@ -2870,7 +2870,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             {/* ── Grid View ── */}
                             if (viewMode === 'grid') {
                                 return (
-                                    <div className="grid grid-cols-3 gap-2">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                                         {filtered.map(img => (
                                             <div key={img._id} className="group relative rounded-xl overflow-hidden border border-white/[0.06] bg-black/20 cursor-pointer transition-all hover:border-white/[0.12]"
                                                 onClick={() => setZoomImage(img.imageUrl || img.thumbnailUrl)}>
@@ -3383,7 +3383,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 </div>
                                 {floatingTray === 'camera' && (
                                     <div className="sidebar-accordion-body">
-                                        <div className="grid grid-cols-2 gap-1.5">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                                             {CAMERA_SHOT_PRESETS.map(shot => (
                                                 <button key={shot.id}
                                                     onClick={() => setSelectedShot(prev => prev === shot.id ? null : shot.id)}
@@ -3703,7 +3703,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                         const recentPhotoshoots = bankImages.filter(i => i.type === 'ai-photoshoot' || i.type === 'photoshoot').slice(0, 8);
                         if (recentPhotoshoots.length === 0) return null;
                         return (
-                            <div className="studio-card p-5 mb-4 fade-up-1">
+                            <div className="studio-card p-4 sm:p-5 mb-4 fade-up-1">
                                 <div className="flex items-center justify-between mb-3">
                                     <h4 className="text-sm font-bold text-white flex items-center gap-2">
                                         <span className="material-symbols-outlined text-amber-400 text-lg">history</span>
@@ -3743,7 +3743,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                         {/* ══ Product Image Picker Modal ══ */}
                         {productPickerOpen && (
                             <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setProductPickerOpen(false)}>
-                                <div className="bg-[#0f1729] border border-white/10 rounded-2xl w-full max-w-lg mx-4 shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+                                <div className="bg-[#0f1729] border border-white/10 rounded-2xl w-full max-w-[calc(100%-2rem)] sm:max-w-lg mx-auto mx-4 shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
                                     {/* Header */}
                                     <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-white/[0.06]">
                                         <h3 className="text-white font-bold text-sm">Select Product Image</h3>
@@ -3766,7 +3766,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                         ))}
                                     </div>
                                     {/* Tab Content */}
-                                    <div className="p-5 max-h-[400px] overflow-y-auto custom-scrollbar">
+                                    <div className="p-4 sm:p-5 max-h-[400px] overflow-y-auto custom-scrollbar">
                                         {/* Brand Photos */}
                                         {productPickerTab === 'brand' && (() => {
                                             const imgSet = new Set()
@@ -3788,7 +3788,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                 }
                                             })
                                             return allBrandPhotos.length > 0 ? (
-                                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
                                                     {allBrandPhotos.map((img, i) => (
                                                         <button key={`bpm-${i}`}
                                                             onClick={() => {
@@ -3895,7 +3895,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             </div>
                         )}
 
-                        <div className="studio-card p-6 flex-1 flex items-center justify-center">
+                        <div className="studio-card p-4 sm:p-6 flex-1 flex items-center justify-center">
                             {!photoshootResult && !photoshootGenerating && (
                                 <div className="text-center">
                                     <span className="material-symbols-outlined text-6xl text-slate-700 mb-4 block">photo_camera</span>
@@ -3968,14 +3968,14 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
 
                                     {/* ═══ AI IMAGE EDITOR PANEL ═══ */}
                                     {psEditMode && (
-                                        <div className="mt-5 studio-card p-5 border border-[#FF4D00]/20 fade-up">
+                                        <div className="mt-5 studio-card p-4 sm:p-5 border border-[#FF4D00]/20 fade-up">
                                             <h4 className="font-bold text-white text-sm flex items-center gap-2 mb-4">
                                                 <span className="material-symbols-outlined text-[#FF4D00]">auto_fix_high</span>
                                                 AI Image Editor
                                             </h4>
 
                                             {/* Tool Cards */}
-                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2 mb-4">
                                                 {[
                                                     { id: 'prompt', icon: 'edit_note', label: 'Prompt', desc: 'Edit by text' },
                                                     { id: 'visual', icon: 'gesture', label: 'Visual', desc: 'Paint & edit' },
@@ -4110,7 +4110,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                         </h4>
                                         <button onClick={() => setPsHistory([])} className="text-[10px] text-slate-600 hover:text-slate-400 cursor-pointer transition-all">Clear</button>
                                     </div>
-                                    <div className="grid grid-cols-2 gap-2.5 max-h-[500px] overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.1) transparent' }}>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-[500px] overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.1) transparent' }}>
                                         {psHistory.map((item, idx) => (
                                             <div key={item._id || idx} className={`group relative rounded-xl overflow-hidden border ${idx === 0 ? 'border-emerald-500/30 ring-1 ring-emerald-500/20' : 'border-white/[0.06]'} bg-black/20 cursor-pointer transition-all hover:border-white/[0.12]`}
                                                 onClick={() => setZoomImage(item.imageUrl)}>
@@ -4202,7 +4202,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     </span>
                                     <button onClick={() => setPsTray(null)} className="text-slate-500 hover:text-white cursor-pointer"><span className="material-symbols-outlined text-sm">close</span></button>
                                 </div>
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div>
                                         <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold mb-1.5">Camera Angle</p>
                                         <div className="flex flex-wrap gap-1">
@@ -4249,7 +4249,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     </span>
                                     <button onClick={() => setPsTray(null)} className="text-slate-500 hover:text-white cursor-pointer"><span className="material-symbols-outlined text-sm">close</span></button>
                                 </div>
-                                <div className="grid grid-cols-3 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                     <div>
                                         <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold mb-1.5">Surface</p>
                                         <div className="flex flex-wrap gap-1">
@@ -4318,7 +4318,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     </span>
                                     <button onClick={() => setPsTray(null)} className="text-slate-500 hover:text-white cursor-pointer"><span className="material-symbols-outlined text-sm">close</span></button>
                                 </div>
-                                <div className="grid grid-cols-2 gap-3">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                     {[{key:'style',icon:'brush',label:'Style Reference',hint:'Match this visual style'},{key:'character',icon:'face',label:'Character',hint:'Include this person/mascot'}].map(ref => (
                                         <div key={ref.key}>
                                             {referenceImages[ref.key] ? (
@@ -4434,7 +4434,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
             {/* =================== CAMPAIGN LOGO GENERATOR =================== */}
             {studioMode === 'campaignlogo' && (
                 <div className="max-w-6xl mx-auto fade-up pt-6">
-                    <div className="glow-border rounded-2xl p-6 mb-6 relative overflow-hidden" style={{ background: 'linear-gradient(135deg, rgba(245,158,11,0.06), rgba(239,68,68,0.04), rgba(255, 77, 0,0.03))' }}>
+                    <div className="glow-border rounded-2xl p-4 sm:p-6 mb-6 relative overflow-hidden" style={{ background: 'linear-gradient(135deg, rgba(245,158,11,0.06), rgba(239,68,68,0.04), rgba(255, 77, 0,0.03))' }}>
                         <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(circle at 80% 20%, rgba(245,158,11,0.08) 0%, transparent 50%)' }} />
                         <div className="relative">
                             <h2 className="text-xl font-bold text-white flex items-center gap-3 mb-1">
@@ -4446,10 +4446,10 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
                         <div className="col-span-12 lg:col-span-5 space-y-4">
                             {/* Text */}
-                            <div className="studio-card p-5">
+                            <div className="studio-card p-4 sm:p-5">
                                 <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3">
                                     <span className="material-symbols-outlined text-amber-400 text-lg">title</span>Logo Text
                                 </h3>
@@ -4457,11 +4457,11 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             </div>
 
                             {/* Style */}
-                            <div className="studio-card p-5">
+                            <div className="studio-card p-4 sm:p-5">
                                 <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3">
                                     <span className="material-symbols-outlined text-[#FF4D00] text-lg">palette</span>Style
                                 </h3>
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2">
                                     {[{id:'2d-flat',l:'2D Flat'},{id:'3d-render',l:'3D Rendered'},{id:'isometric',l:'Isometric'},{id:'hand-drawn',l:'Hand-drawn'},{id:'neon',l:'Neon Glow'},{id:'metallic',l:'Metallic'},{id:'gradient',l:'Gradient'},{id:'pixel',l:'Pixel Art'}].map(s=>(
                                         <button key={s.id} onClick={()=>setClgStyle(s.id)} className={`px-2 py-1.5 rounded-lg text-[11px] font-medium border transition-all cursor-pointer ${clgStyle===s.id?'border-[#FF4D00]/40 bg-[#FF4D00]/10 text-white':'border-white/[0.06] bg-white/[0.02] text-slate-400 hover:text-slate-200'}`}>{s.l}</button>
                                     ))}
@@ -4469,7 +4469,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             </div>
 
                             {/* Occasion */}
-                            <div className="studio-card p-5">
+                            <div className="studio-card p-4 sm:p-5">
                                 <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3">
                                     <span className="material-symbols-outlined text-rose-400 text-lg">celebration</span>Occasion
                                 </h3>
@@ -4481,7 +4481,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             </div>
 
                             {/* Icon Theme */}
-                            <div className="studio-card p-5">
+                            <div className="studio-card p-4 sm:p-5">
                                 <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3">
                                     <span className="material-symbols-outlined text-cyan-400 text-lg">interests</span>Icon Theme <span className="text-xs text-slate-600 font-normal">(optional)</span>
                                 </h3>
@@ -4493,7 +4493,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             </div>
 
                             {/* Colors, Background, Shape */}
-                            <div className="studio-card p-5 space-y-4">
+                            <div className="studio-card p-4 sm:p-5 space-y-4">
                                 <div>
                                     <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-2"><span className="material-symbols-outlined text-emerald-400 text-lg">format_color_fill</span>Colors</h3>
                                     <div className="flex gap-2 mb-2">
@@ -4522,7 +4522,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             </div>
 
                             {/* AI Enhancement */}
-                            <div className="studio-card p-5">
+                            <div className="studio-card p-4 sm:p-5">
                                 <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3"><span className="material-symbols-outlined text-amber-400 text-lg">auto_awesome</span>AI Enhancement</h3>
                                 <input type="text" value={clgEnhance} onChange={e=>setClgEnhance(e.target.value)} placeholder="e.g. bold, elegant, playful, luxury" className="w-full px-3 py-2 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm placeholder:text-slate-600 focus:outline-none focus:border-amber-400/30" />
                                 <div className="flex flex-wrap gap-1 mt-2">
@@ -4595,11 +4595,11 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
 
                         {/* Right — Results */}
                         <div className="col-span-12 lg:col-span-7">
-                            <div className="studio-card p-5 min-h-[500px] flex flex-col">
+                            <div className="studio-card p-4 sm:p-5 min-h-[500px] flex flex-col">
                                 <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-4"><span className="material-symbols-outlined text-amber-400 text-lg">image</span>Logo Variants</h3>
                                 {clgResults.length>0?(
                                     <div className="flex-1">
-                                        <div className="grid grid-cols-2 gap-3 mb-4">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
                                             {clgResults.map((url,i)=>(
                                                 <div key={i} className="rounded-xl overflow-hidden bg-[repeating-conic-gradient(#1a1a2e_0%_25%,#16162a_0%_50%)] bg-[length:16px_16px] group relative">
                                                     <img src={url} alt={`Variant ${i+1}`} className="w-full h-auto object-contain" />
@@ -4629,7 +4629,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
             {studioMode === 'carousel' && (
                 <div className="creative-split fade-up">
                     <div className="creative-gallery">
-                        <div className="studio-card p-6 flex-1 flex items-center justify-center">
+                        <div className="studio-card p-4 sm:p-6 flex-1 flex items-center justify-center">
                             {/* ── Loading State ── */}
                             <GlobalLoader 
                                 isActive={carouselGenerating} 
@@ -4681,7 +4681,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
 
                                     {/* Polling state */}
                                     {carouselPolling && !carouselResult.panels?.length && (
-                                        <div className="glass-panel rounded-xl p-6 flex flex-col items-center gap-3 animate-pulse">
+                                        <div className="glass-panel rounded-xl p-4 sm:p-6 flex flex-col items-center gap-3 animate-pulse">
                                             <span className="material-symbols-outlined text-3xl text-orange-400 animate-spin">progress_activity</span>
                                             <p className="text-sm text-slate-400">Splitting into panels & compositing products...</p>
                                             <p className="text-[10px] text-slate-600">This takes 10-15 seconds</p>
@@ -4872,10 +4872,10 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     </span>
                                     <button onClick={() => setCarouselTray(null)} className="text-slate-500 hover:text-white cursor-pointer"><span className="material-symbols-outlined text-sm">close</span></button>
                                 </div>
-                                <div className="grid grid-cols-2 gap-3">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                     <div>
                                         <span className="text-[9px] text-slate-500 uppercase tracking-wider font-bold mb-1.5 block">Format</span>
-                                        <div className="grid grid-cols-3 gap-1">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1">
                                             {[
                                                 { id: '1:1', label: 'Square', icon: 'crop_square' },
                                                 { id: '4:5', label: 'Portrait', icon: 'crop_portrait' },
@@ -4920,7 +4920,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     </span>
                                     <button onClick={() => setCarouselTray(null)} className="text-slate-500 hover:text-white cursor-pointer"><span className="material-symbols-outlined text-sm">close</span></button>
                                 </div>
-                                <div className="grid grid-cols-4 gap-1">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-1">
                                     {[
                                         { id: 'drama',         label: 'Drama',    msIcon: 'theater_comedy',   color: '#dc2626' },
                                         { id: 'thriller',      label: 'Thriller', msIcon: 'experiment',       color: '#7c3aed' },
@@ -4958,7 +4958,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     </span>
                                     <button onClick={() => setCarouselTray(null)} className="text-slate-500 hover:text-white cursor-pointer"><span className="material-symbols-outlined text-sm">close</span></button>
                                 </div>
-                                <div className="grid grid-cols-6 gap-1.5">
+                                <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-6 gap-1.5">
                                     {[
                                         { id: 'modern',  label: 'Modern',  icon: 'auto_awesome', color: '#f97316' },
                                         { id: 'minimal', label: 'Minimal', icon: 'crop_square',  color: '#64748b' },
@@ -4991,7 +4991,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     <button onClick={() => setCarouselTray(null)} className="text-slate-500 hover:text-white cursor-pointer"><span className="material-symbols-outlined text-sm">close</span></button>
                                 </div>
                                 <p className="text-[9px] text-slate-600 mb-2">Add product images to overlay on each carousel panel</p>
-                                <div className="grid grid-cols-5 gap-2">
+                                <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-2">
                                     {Array.from({ length: carouselSlides }).map((_, i) => (
                                         <div key={i} className="relative">
                                             <span className="absolute -top-1 -left-1 z-10 w-4 h-4 rounded-full bg-orange-500 text-white text-[8px] font-bold flex items-center justify-center">{i + 1}</span>
@@ -5085,7 +5085,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
             {studioMode === 'campaigns' && (
                 <div className="max-w-6xl mx-auto fade-up pt-6">
                     {/* Header */}
-                    <div className="glow-border rounded-2xl p-6 mb-6 relative overflow-hidden" style={{ background: 'linear-gradient(135deg, rgba(255, 77, 0,0.06), rgba(255, 77, 0,0.04), rgba(6,182,212,0.03))' }}>
+                    <div className="glow-border rounded-2xl p-4 sm:p-6 mb-6 relative overflow-hidden" style={{ background: 'linear-gradient(135deg, rgba(255, 77, 0,0.06), rgba(255, 77, 0,0.04), rgba(6,182,212,0.03))' }}>
                         <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(circle at 80% 20%, rgba(255, 77, 0,0.08) 0%, transparent 50%)' }} />
                         <div className="relative">
                             <h2 className="text-xl font-bold text-white flex items-center gap-3 mb-1">
@@ -5111,10 +5111,10 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
 
                     {/* ══ STEP 1: Intelligence Brief (merged Brief + Products) ══ */}
                     {campStep === 1 && (
-                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
                             <div className="col-span-12 lg:col-span-7 space-y-4">
                                 {/* Campaign Name + Goal */}
-                                <div className="studio-card p-5">
+                                <div className="studio-card p-4 sm:p-5">
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div>
                                             <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-2"><span className="material-symbols-outlined text-[#FF4D00] text-lg">badge</span>Campaign Name</h3>
@@ -5132,7 +5132,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 </div>
 
                                 {/* ── Keyword Intelligence Section ── */}
-                                <div className="studio-card p-5">
+                                <div className="studio-card p-4 sm:p-5">
                                     <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3"><span className="material-symbols-outlined text-amber-400 text-lg">psychology</span>Keyword Intelligence <span className="text-[10px] text-amber-400/60 font-normal bg-amber-500/10 px-2 py-0.5 rounded-full">AI Agent</span></h3>
                                     <div className="flex gap-2 mb-4">
                                         {[{id:'product-trends',l:'Product Trends',icon:'trending_up'},{id:'trending',l:'Social Trends',icon:'whatshot'},{id:'seo',l:'SEO Keywords',icon:'search'},{id:'custom',l:'Custom',icon:'edit'}].map(t=>(
@@ -5245,7 +5245,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                             {(campProductIntel?.viralAngles||[]).length>0&&(
                                                 <div>
                                                     <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-2">Viral Content Angles</p>
-                                                    <div className="grid grid-cols-2 gap-2">
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                                         {(campProductIntel.viralAngles||[]).slice(0,4).map((v,i)=>(
                                                             <button key={i} onClick={()=>{setCampKeyword(v.angle);if(!campName)setCampName(`${v.angle} Campaign`)}} className={`p-2.5 rounded-xl text-left border transition-all cursor-pointer ${campKeyword===v.angle?'border-rose-400/40 bg-rose-500/10':'border-white/[0.06] hover:border-rose-400/20'}`}>
                                                                 <p className="text-xs text-white font-medium">{v.angle}</p>
@@ -5273,7 +5273,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
 
                                 {/* ── Suggested Products (inline — appears after keyword selection) ── */}
                                 {campKeyword && (
-                                    <div className="studio-card p-5">
+                                    <div className="studio-card p-4 sm:p-5">
                                         <div className="flex items-center justify-between mb-3">
                                             <h3 className="font-bold text-white text-sm flex items-center gap-2"><span className="material-symbols-outlined text-[#FF4D00] text-lg">inventory_2</span>Matching Products {campProducts.length>0&&<span className="text-[10px] bg-[#FF4D00]/15 text-[#FF7A00] px-2 py-0.5 rounded-full font-bold">{campProducts.length} selected</span>}</h3>
                                             {campProducts.length>0&&<button onClick={()=>setCampProducts([])} className="text-[10px] text-red-400 hover:text-red-300 cursor-pointer">Clear all</button>}
@@ -5302,7 +5302,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                 {campBrandProducts.length>0?(
                                                     <div>
                                                         <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-1.5">Add more from catalog ({campBrandProducts.length} available)</p>
-                                                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-[180px] overflow-y-auto">
+                                                        <div className="grid grid-cols-1 sm:grid-cols-2 sm:grid-cols-3 gap-2 max-h-[180px] overflow-y-auto">
                                                             {campBrandProducts.map(prod=>{
                                                                 const isSelected=campProducts.some(p=>p.productId===prod._id);
                                                                 return(
@@ -5355,7 +5355,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
 
                             <div className="col-span-12 lg:col-span-5 space-y-4">
                                 {/* Number of Creatives */}
-                                <div className="studio-card p-5">
+                                <div className="studio-card p-4 sm:p-5">
                                     <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3"><span className="material-symbols-outlined text-[#FF4D00] text-lg">grid_view</span>Number of Creatives</h3>
                                     <div className="flex items-center gap-3">
                                         <input type="range" min={1} max={10} value={campCount} onChange={e=>setCampCount(Number(e.target.value))} className="flex-1 accent-violet-500" />
@@ -5364,7 +5364,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     <div className="flex gap-1 mt-2">{[1,3,5,8,10].map(n=><button key={n} onClick={()=>setCampCount(n)} className={`px-2 py-0.5 rounded text-[10px] font-medium border transition-all cursor-pointer ${campCount===n?'border-[#FF4D00]/30 bg-[#FF4D00]/10 text-white':'border-white/[0.06] text-slate-500'}`}>{n}</button>)}</div>
                                 </div>
                                 {/* Sizes */}
-                                <div className="studio-card p-5">
+                                <div className="studio-card p-4 sm:p-5">
                                     <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3"><span className="material-symbols-outlined text-cyan-400 text-lg">aspect_ratio</span>Creative Sizes</h3>
                                     <div className="flex flex-wrap gap-2">
                                         {[{id:'4:5',l:'IG Post 4:5'},{id:'1:1',l:'Square 1:1'},{id:'9:16',l:'Story 9:16'},{id:'16:9',l:'YouTube 16:9'},{id:'2:3',l:'Pinterest 2:3'},{id:'1.91:1',l:'LinkedIn'}].map(sz=>(
@@ -5405,10 +5405,10 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
 
                     {/* ══ STEP 2: Copy & Style ══ */}
                     {campStep === 2 && (
-                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
                             <div className="col-span-12 lg:col-span-7 space-y-4">
                                 {/* AI Copy */}
-                                <div className="studio-card p-5">
+                                <div className="studio-card p-4 sm:p-5">
                                     <div className="flex items-center justify-between mb-3">
                                         <h3 className="font-bold text-white text-sm flex items-center gap-2"><span className="material-symbols-outlined text-emerald-400 text-lg">smart_toy</span>AI-Generated Copies</h3>
                                         <button disabled={campCopyLoading} onClick={async()=>{
@@ -5491,7 +5491,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     ):(<p className="text-slate-600 text-xs text-center py-4">Click "Generate Copies" to create AI copy for each creative{campFeatures.length>0?` — each highlighting a different feature`:''}</p>)}
                                 </div>
                                 {/* Product Features */}
-                                <div className="studio-card p-5">
+                                <div className="studio-card p-4 sm:p-5">
                                     <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-2"><span className="material-symbols-outlined text-orange-400 text-lg">stars</span>Product Features<span className="text-[10px] text-slate-500 font-normal ml-1">distributed across creatives</span></h3>
                                     <p className="text-slate-500 text-[10px] mb-3">Add key features/USPs — each creative will highlight a different feature in its copy and visual.</p>
                                     <div className="flex flex-wrap gap-1.5 mb-2">
@@ -5510,7 +5510,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     {campFeatures.length>=campCount&&campFeatures.length>0&&<p className="text-emerald-400/60 text-[10px] mt-1.5"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">check_circle</span> {campFeatures.length} features for {campCount} creatives — each creative gets a unique feature!</p>}
                                 </div>
                                 {/* Price Point */}
-                                <div className="studio-card p-5">
+                                <div className="studio-card p-4 sm:p-5">
                                     <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-2"><span className="material-symbols-outlined text-green-400 text-lg">payments</span>Price Point<span className="text-[10px] text-slate-500 font-normal ml-1">optional — for pricing messaging</span></h3>
                                     <div className="flex gap-2 mb-2">
                                         <input value={campPrice} onChange={e=>setCampPrice(e.target.value)} className="flex-1 px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.06] text-white text-xs font-semibold focus:outline-none focus:border-green-400/30 placeholder:text-slate-600" placeholder="e.g. ₹2,999 or Starting at ₹999" />
@@ -5523,7 +5523,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     </div>
                                 </div>
                                 {/* CTA */}
-                                <div className="studio-card p-5">
+                                <div className="studio-card p-4 sm:p-5">
                                     <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3"><span className="material-symbols-outlined text-rose-400 text-lg">touch_app</span>Call to Action</h3>
                                     <div className="flex flex-wrap gap-1.5">
                                         {['Shop Now','Learn More','Order Today','Grab Deal','Download','Sign Up','Book Now','Explore','Get Offer','Buy Now'].map(ct=>(
@@ -5534,27 +5534,27 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             </div>
                             <div className="col-span-12 lg:col-span-5 space-y-4">
                                 {/* Style */}
-                                <div className="studio-card p-5">
+                                <div className="studio-card p-4 sm:p-5">
                                     <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3"><span className="material-symbols-outlined text-[#FF4D00] text-lg">palette</span>Style</h3>
-                                    <div className="grid grid-cols-2 gap-2">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                         {['Minimal','Bold','Elegant','Vibrant','Dark Luxury','Retro','Gradient Pop','Corporate'].map(st=>(
                                             <button key={st} onClick={()=>setCampStyle(st.toLowerCase())} className={`px-3 py-2 rounded-xl text-xs font-medium border transition-all cursor-pointer ${campStyle===st.toLowerCase()?'border-[#FF4D00]/40 bg-[#FF4D00]/10 text-white':'border-white/[0.06] bg-white/[0.02] text-slate-400 hover:text-slate-200'}`}>{st}</button>
                                         ))}
                                     </div>
                                 </div>
                                 {/* Logo Placement */}
-                                <div className="studio-card p-5">
+                                <div className="studio-card p-4 sm:p-5">
                                     <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3"><span className="material-symbols-outlined text-amber-400 text-lg">crop_free</span>Logo Placement</h3>
-                                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-1.5">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-1.5">
                                         {[{id:'top-left',l:'TL',ms:'north_west'},{id:'top-center',l:'TC',ms:'north'},{id:'top-right',l:'TR',ms:'north_east'},{id:'bottom-left',l:'BL',ms:'south_west'},{id:'bottom-center',l:'BC',ms:'south'},{id:'bottom-right',l:'BR',ms:'south_east'},{id:'none',l:'None',ms:'block'}].map(p=>(
                                             <button key={p.id} onClick={()=>setCampLogoPlacement(p.id)} className={`px-2 py-1.5 rounded-lg text-[11px] font-medium border transition-all cursor-pointer flex items-center gap-0.5 ${campLogoPlacement===p.id?'border-amber-400/40 bg-amber-500/10 text-white':'border-white/[0.06] text-slate-400'}`}><span className="material-symbols-outlined text-[11px]">{p.ms}</span>{p.l}</button>
                                         ))}
                                     </div>
                                 </div>
                                 {/* Creative Scene / Setting */}
-                                <div className="studio-card p-5">
+                                <div className="studio-card p-4 sm:p-5">
                                     <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3"><span className="material-symbols-outlined text-teal-400 text-lg">photo_camera</span>Creative Scene</h3>
-                                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-1.5">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-1.5">
                                         {[
                                             {id:'auto',l:'Auto',ms:'auto_awesome',d:'AI picks best scene'},
                                             {id:'studio',l:'Studio',ms:'photo_camera',d:'Clean studio backdrop'},
@@ -5574,7 +5574,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     </div>
                                 </div>
                                 {/* Style from Best Performing */}
-                                <div className="studio-card p-5">
+                                <div className="studio-card p-4 sm:p-5">
                                     <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3"><span className="material-symbols-outlined text-yellow-400 text-lg">emoji_events</span>Style from Best Performing</h3>
                                     {campStyleRef?(
                                         <div className="relative rounded-xl overflow-hidden group">
@@ -5592,7 +5592,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     )}
                                 </div>
                                 {/* Campaign Logo */}
-                                <div className="studio-card p-5">
+                                <div className="studio-card p-4 sm:p-5">
                                     <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3"><span className="material-symbols-outlined text-amber-400 text-lg">verified</span>Campaign Logo <span className="text-xs text-slate-600 font-normal">(optional)</span></h3>
                                     {campCampaignLogo?(
                                         <div className="relative rounded-xl overflow-hidden group">
@@ -5600,7 +5600,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                             <button onClick={()=>setCampCampaignLogo(null)} className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"><span className="material-symbols-outlined text-xs">close</span></button>
                                         </div>
                                     ):(
-                                        <div className="grid grid-cols-2 gap-2">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                             {activeBrand?.dna?.logo?.url&&(
                                                 <button onClick={()=>setCampCampaignLogo(activeBrand.dna.logo.url)} className="flex flex-col items-center justify-center h-20 rounded-xl border-2 border-dashed border-amber-400/20 hover:border-amber-400/40 bg-amber-500/5 cursor-pointer transition-all group">
                                                     <img src={activeBrand.dna.logo.url} alt="Brand logo" className="h-8 object-contain opacity-70 group-hover:opacity-100 transition-opacity" />
@@ -5642,9 +5642,9 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                     {campStep === 3 && (
                         <div className="space-y-4">
                             {/* Summary */}
-                            <div className="studio-card p-5">
+                            <div className="studio-card p-4 sm:p-5">
                                 <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3"><span className="material-symbols-outlined text-[#FF4D00] text-lg">summarize</span>Campaign Summary</h3>
-                                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
                                     <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06] text-center"><p className="text-slate-500 text-[10px] mb-0.5">Keyword</p><p className="text-white text-xs font-semibold truncate">{campKeyword}</p></div>
                                     <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06] text-center"><p className="text-slate-500 text-[10px] mb-0.5">Goal</p><p className="text-white text-xs font-semibold">{campGoal}</p></div>
                                     <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06] text-center"><p className="text-slate-500 text-[10px] mb-0.5">Creatives</p><p className="text-white text-xs font-semibold">{campCount} × {campSizes.length} sizes</p></div>
@@ -5807,7 +5807,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                             <button onClick={()=>{setCampResults([]);setCampStep(2)}} className="px-3 py-1.5 rounded-lg bg-white/[0.06] text-white text-xs font-medium hover:bg-white/[0.1] transition-all cursor-pointer">Regenerate All</button>
                                         </div>
                                     </div>
-                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                                         {campResults.map((r,i)=>(
                                             <div key={i} className="rounded-xl overflow-hidden bg-white/[0.03] border border-white/[0.06] group">
                                                 <div className="relative"><img src={r.url} alt={`Creative ${i+1}`} className="w-full h-auto object-contain" />
@@ -5831,14 +5831,14 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                     {bplOpen&&(
                         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={()=>setBplOpen(false)}>
                             <div className="bg-[#0f0f23] rounded-2xl border border-white/[0.08] w-full max-w-3xl max-h-[70vh] overflow-hidden" onClick={e=>e.stopPropagation()}>
-                                <div className="flex items-center justify-between p-5 border-b border-white/[0.06]">
+                                <div className="flex items-center justify-between p-4 sm:p-5 border-b border-white/[0.06]">
                                     <h3 className="font-bold text-white text-base flex items-center gap-2"><span className="material-symbols-outlined text-yellow-400">emoji_events</span>Best Performing Creatives</h3>
                                     <button onClick={()=>setBplOpen(false)} className="w-8 h-8 rounded-full bg-white/[0.06] flex items-center justify-center text-white hover:bg-white/[0.1] transition-all cursor-pointer"><span className="material-symbols-outlined text-lg">close</span></button>
                                 </div>
-                                <div className="p-5 overflow-y-auto max-h-[55vh]">
+                                <div className="p-4 sm:p-5 overflow-y-auto max-h-[55vh]">
                                     {bplLoading?<div className="text-center py-8 text-slate-500"><span className="material-symbols-outlined animate-spin text-2xl align-middle mr-2">progress_activity</span>Loading creatives...</div>:
                                     bplCreatives.length>0?(
-                                        <div className="grid grid-cols-3 gap-3">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                                             {bplCreatives.map((c,i)=>(
                                                 <button key={i} onClick={()=>{if(bplMode==='logo')setCampCampaignLogo(c.imageUrl);else setCampStyleRef(c.imageUrl);setBplOpen(false)}} className="rounded-xl overflow-hidden border border-white/[0.06] hover:border-yellow-400/30 transition-all cursor-pointer group">
                                                     <img src={c.imageUrl} alt={c.title||`Creative ${i+1}`} className="w-full h-32 object-cover" />
@@ -5887,12 +5887,12 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                             {!activeCategory ? (
                                 /* ═══ LEVEL 1: Category Grid ═══ */
                                 <>
-                                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                                         {/* ── Built-in Categories ── */}
                                         {templateCategories.map((cat, idx) => (
                                             <button key={cat.id}
                                                 onClick={() => setActiveCategory(cat)}
-                                                className={`studio-card p-5 text-left cursor-pointer group min-h-[180px] relative overflow-hidden fade-up-${Math.min(idx + 1, 5)}`}>
+                                                className={`studio-card p-4 sm:p-5 text-left cursor-pointer group min-h-[180px] relative overflow-hidden fade-up-${Math.min(idx + 1, 5)}`}>
                                                 {/* Gradient top band */}
                                                 <div className="absolute top-0 left-0 right-0 h-1 opacity-60" style={{ background: `linear-gradient(90deg, ${cat.color}, transparent)` }} />
                                                 <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform duration-300 shadow-lg"
@@ -5920,7 +5920,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                     referenceImageUrl: cc.referenceImageUrl,
                                                     subTemplates: [] // custom categories only have custom sub-templates
                                                 })}
-                                                className="studio-card p-5 text-left border border-amber-500/10 hover:border-amber-500/30 cursor-pointer group min-h-[170px] relative">
+                                                className="studio-card p-4 sm:p-5 text-left border border-amber-500/10 hover:border-amber-500/30 cursor-pointer group min-h-[170px] relative">
                                                 <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
                                                     <button onClick={async (e) => {
                                                         e.stopPropagation()
@@ -5950,7 +5950,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
 
                                         {/* ── Create New Category Card ── */}
                                         <button onClick={() => setShowCreateCategory(true)}
-                                            className="rounded-2xl p-5 text-left border-2 border-dashed border-primary/30 hover:border-primary/60 hover:bg-primary/[0.03] transition-all cursor-pointer group flex flex-col items-center justify-center min-h-[170px]">
+                                            className="rounded-2xl p-4 sm:p-5 text-left border-2 border-dashed border-primary/30 hover:border-primary/60 hover:bg-primary/[0.03] transition-all cursor-pointer group flex flex-col items-center justify-center min-h-[170px]">
                                             <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center mb-3 group-hover:bg-primary/20 group-hover:scale-110 transition-all">
                                                 <span className="material-symbols-outlined text-3xl text-primary">add</span>
                                             </div>
@@ -6010,7 +6010,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                     </div>
 
                                     {/* Sub-template grid */}
-                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                                         {/* ── Built-in sub-templates ── */}
                                         {activeCategory.subTemplates.map(sub => (
                                             <button key={sub.id}
@@ -6107,7 +6107,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                             {showCreateTemplate && (
                                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in"
                                     onClick={() => setShowCreateTemplate(false)}>
-                                    <div className="w-full max-w-2xl max-h-[85vh] overflow-y-auto glass-panel rounded-3xl p-6 mx-4 animate-scale-in"
+                                    <div className="w-full max-w-[calc(100%-2rem)] sm:max-w-2xl mx-auto max-h-[85vh] overflow-y-auto glass-panel rounded-3xl p-4 sm:p-6 mx-4 animate-scale-in"
                                         onClick={e => e.stopPropagation()}>
                                         <div className="flex items-center justify-between mb-6">
                                             <div>
@@ -6322,7 +6322,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                                 </button>
                                                             </div>
                                                         ) : (
-                                                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                                            <div className="grid grid-cols-1 sm:grid-cols-2 sm:grid-cols-3 gap-2">
                                                                 {/* Upload from system */}
                                                                 <label className="flex flex-col items-center gap-1.5 p-4 rounded-xl border-2 border-dashed border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04] hover:border-primary/30 cursor-pointer transition-all text-center">
                                                                     <span className="material-symbols-outlined text-lg text-slate-500">upload_file</span>
@@ -6368,7 +6368,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                                     <button onClick={() => setNewTmpl(p => ({ ...p, _showBrandImages: false }))}
                                                                         className="text-xs text-slate-500 hover:text-white cursor-pointer">✕</button>
                                                                 </div>
-                                                                <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5 max-h-32 overflow-y-auto">
+                                                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 sm:grid-cols-4 gap-1.5 max-h-32 overflow-y-auto">
                                                                     {newTmpl._brandImageList.map((img, i) => (
                                                                         <img key={i} src={img.url} alt=""
                                                                             className="w-full h-16 object-cover rounded-lg cursor-pointer border-2 border-transparent hover:border-primary transition-all"
@@ -6509,7 +6509,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                                         {/* Brand image picker */}
                                                                         {f._showPicker && (f._pickerImages || []).length > 0 && (
                                                                             <div className="mt-1.5 p-2 rounded-lg bg-black/20 border border-amber-500/10">
-                                                                                <div className="grid grid-cols-4 gap-1 max-h-24 overflow-y-auto">
+                                                                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-1 max-h-24 overflow-y-auto">
                                                                                     {f._pickerImages.map((img, pi) => (
                                                                                         <img key={pi} src={img.url} alt=""
                                                                                             className="w-full h-12 object-cover rounded cursor-pointer border-2 border-transparent hover:border-primary"
@@ -6558,7 +6558,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                             {showCreateCategory && (
                                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in"
                                     onClick={() => setShowCreateCategory(false)}>
-                                    <div className="w-full max-w-md studio-card p-6 mx-4 animate-scale-in"
+                                    <div className="w-full max-w-[calc(100%-2rem)] sm:max-w-md mx-auto studio-card p-4 sm:p-6 mx-4 animate-scale-in"
                                         onClick={e => e.stopPropagation()}>
 
                                         {/* Header */}
@@ -6596,7 +6596,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                         </div>
 
                                         {/* Icon & Color — side by side */}
-                                        <div className="grid grid-cols-2 gap-4 mb-5">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5">
                                             <div>
                                                 <label className="text-xs font-bold text-slate-400 mb-1.5 block">Icon</label>
                                                 <select value={newCat.icon}
@@ -6636,11 +6636,11 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
 
                     ) : (
                         /* ──────────── Active Template Detail Panel ──────────── */
-                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
                             {/* Left — Form Fields */}
                             <div className="col-span-12 lg:col-span-5 space-y-4">
                                 {/* Template Header */}
-                                <div className="studio-card p-5">
+                                <div className="studio-card p-4 sm:p-5">
                                     <div className="flex items-center gap-3 mb-4">
                                         <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
                                             <span className="material-symbols-outlined text-2xl text-primary">{activeTemplate.icon}</span>
@@ -6801,7 +6801,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                                 {templateFields[`${field.key}_picker`] === 'bank' && (
                                                                     <div className="rounded-xl border border-white/10 bg-black/20 p-3 max-h-[220px] overflow-y-auto custom-scrollbar">
                                                                         {bankImages.length > 0 ? (
-                                                                            <div className="grid grid-cols-4 gap-2">
+                                                                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
                                                                                 {bankImages.slice(0, 24).map(img => (
                                                                                     <button key={img._id} onClick={() => {
                                                                                         setTemplateFields(prev => {
@@ -6830,7 +6830,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                                 {/* Brand assets grid picker */}
                                                                 {templateFields[`${field.key}_picker`] === 'brand' && activeBrand?.dna?.brandImages?.length > 0 && (
                                                                     <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3 max-h-[220px] overflow-y-auto custom-scrollbar">
-                                                                        <div className="grid grid-cols-4 gap-2">
+                                                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
                                                                             {activeBrand.dna.brandImages.map((img, i) => (
                                                                                 <button key={i} onClick={() => {
                                                                                     setTemplateFields(prev => {
@@ -6859,7 +6859,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                 </div>
 
                                 {/* Learn from Image (Reverse Prompting) */}
-                                <div className="studio-card p-5">
+                                <div className="studio-card p-4 sm:p-5">
                                     <h4 className="text-sm font-bold text-white flex items-center gap-2 mb-3">
                                         <span className="material-symbols-outlined text-amber-400 text-sm">lightbulb</span>
                                         Learn from an Image
@@ -6904,7 +6904,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                         <span className="material-symbols-outlined text-sm text-emerald-500">language</span>
                                                         Or pick from your brand website:
                                                     </p>
-                                                    <div className="grid grid-cols-5 gap-1.5 max-h-24 overflow-y-auto">
+                                                    <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-1.5 max-h-24 overflow-y-auto">
                                                         {(activeBrand.dna.brandImages || activeBrand.dna.bannerImages || []).slice(0, 10).map((img, i) => (
                                                             <button key={i}
                                                                 onClick={() => handleReversePrompt(img.url, activeTemplate.id)}
@@ -6921,7 +6921,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                 </div>
 
                                 {/* Size & Resolution Controls */}
-                                <div className="studio-card p-5">
+                                <div className="studio-card p-4 sm:p-5">
                                     <h4 className="text-sm font-bold text-white flex items-center gap-2 mb-3">
                                         <span className="material-symbols-outlined text-cyan-400 text-sm">aspect_ratio</span>
                                         Size & Resolution
@@ -6974,7 +6974,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                 </div>
 
                                 {/* Additional Instructions (AI Vision adjustments) */}
-                                <div className="studio-card p-5">
+                                <div className="studio-card p-4 sm:p-5">
                                     <div className="flex items-center justify-between cursor-pointer"
                                         onClick={() => setTemplateFields(prev => ({ ...prev, _showExtraInstructions: !prev._showExtraInstructions }))}>
                                         <h4 className="text-sm font-bold text-white flex items-center gap-2">
@@ -7092,7 +7092,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                             <div className="col-span-12 lg:col-span-7 space-y-4">
                                 {/* Prompt Preview */}
                                 {(templatePromptPreview || Object.keys(templateFields).length > 0) && (
-                                    <div className="studio-card p-5">
+                                    <div className="studio-card p-4 sm:p-5">
                                         <div className="flex items-center justify-between mb-3">
                                             <h4 className="text-sm font-bold text-white flex items-center gap-2">
                                                 <span className="material-symbols-outlined text-primary text-sm">visibility</span>
@@ -7136,7 +7136,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                 )}
 
                                 {templateResult && (
-                                    <div className="studio-card p-5 fade-up">
+                                    <div className="studio-card p-4 sm:p-5 fade-up">
                                         <div className="rounded-2xl overflow-hidden mb-4">
                                             <img src={templateResult.imageUrl} alt={activeTemplate.label} className="w-full rounded-2xl" loading="lazy" decoding="async" />
                                         </div>
@@ -7248,7 +7248,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                         return allBrandImgs.length > 0 ? (
                             <div>
                                 <p className="text-xs text-slate-500 mb-4">Images scraped from your brand website during onboarding. Use them as references for AI generation.</p>
-                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
                                     {allBrandImgs.map((img, idx) => (
                                         <div key={`brand-${idx}`}
                                             className="studio-card overflow-hidden group relative cursor-pointer">
@@ -7280,7 +7280,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                             <div className="studio-card p-12 text-center">
                                 <span className="material-symbols-outlined text-6xl text-slate-700 mb-4 block">language</span>
                                 <h3 className="text-lg font-bold text-slate-500 mb-2">No Brand Images</h3>
-                                <p className="text-xs text-slate-600 mb-4 max-w-md mx-auto">Run brand onboarding to scan your website and auto-import brand images.</p>
+                                <p className="text-xs text-slate-600 mb-4 max-w-[calc(100%-2rem)] sm:max-w-md mx-auto mx-auto">Run brand onboarding to scan your website and auto-import brand images.</p>
                                 <button onClick={() => navigate('/onboarding')}
                                     className="btn-primary py-2.5 px-5 rounded-xl text-xs font-bold cursor-pointer">
                                     <span className="material-symbols-outlined text-sm">language</span> Scan Website
@@ -7294,7 +7294,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                         <div className="studio-card p-12 text-center">
                             <span className="material-symbols-outlined text-6xl text-slate-700 mb-4 block">{bankTab === 'uploaded' ? 'upload_file' : 'auto_awesome'}</span>
                             <h3 className="text-lg font-bold text-slate-500 mb-2">{bankTab === 'uploaded' ? 'No Uploaded Images' : 'No Generated Images Yet'}</h3>
-                            <p className="text-xs text-slate-600 mb-4 max-w-md mx-auto">
+                            <p className="text-xs text-slate-600 mb-4 max-w-[calc(100%-2rem)] sm:max-w-md mx-auto mx-auto">
                                 {bankTab === 'uploaded'
                                     ? 'Upload images to use as references or base images for your designs.'
                                     : 'Generate images in Design Studio or AI Photoshoot — they\'ll automatically appear here.'}
@@ -7449,7 +7449,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                             </div>
                         ) : (
                             /* ── GRID VIEW ── */
-                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 max-h-[70vh] overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 max-h-[70vh] overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}>
                                 {bankImages.map((img, idx) => {
                                     const isPhotoshoot = img.type === 'ai-photoshoot' || img.type === 'photoshoot';
                                     const isUploaded = img.type === 'uploaded';
@@ -7565,7 +7565,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                         className="max-w-full max-h-[65vh] object-contain rounded-2xl shadow-2xl" />
 
                                     {/* Info bar */}
-                                    <div className="mt-4 w-full max-w-2xl px-4">
+                                    <div className="mt-4 w-full max-w-[calc(100%-2rem)] sm:max-w-2xl mx-auto px-4">
                                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
                                             <div>
                                                 <p className="text-white font-bold text-sm">{img.title || 'AI Generated Image'}</p>
@@ -7705,11 +7705,11 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                 <div className="fixed inset-0 z-[100] flex items-center justify-center animate-fade-in"
                     onClick={() => { if (!animateGenerating) setAnimateModalOpen(false) }}>
                     <div className="absolute inset-0 bg-black/80 backdrop-blur-xl" />
-                    <div className="relative w-full max-w-lg mx-4 bg-[#12121f] rounded-2xl border border-white/[0.08] shadow-2xl overflow-hidden animate-scale-in"
+                    <div className="relative w-full max-w-[calc(100%-2rem)] sm:max-w-lg mx-auto mx-4 bg-[#12121f] rounded-2xl border border-white/[0.08] shadow-2xl overflow-hidden animate-scale-in"
                         onClick={e => e.stopPropagation()}>
 
                         {/* Header */}
-                        <div className="flex items-center justify-between p-5 border-b border-white/[0.06]">
+                        <div className="flex items-center justify-between p-4 sm:p-5 border-b border-white/[0.06]">
                             <div className="flex items-center gap-3">
                                 <div className="w-10 h-10 rounded-xl bg-[#FF4D00]/15 flex items-center justify-center">
                                     <span className="material-symbols-outlined text-[#FF4D00]">animation</span>
@@ -7726,7 +7726,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                         </div>
 
                         {/* Content */}
-                        <div className="p-5 space-y-4 max-h-[65vh] overflow-y-auto">
+                        <div className="p-4 sm:p-5 space-y-4 max-h-[65vh] overflow-y-auto">
 
                             {/* Preview */}
                             {result?.imageUrl && (
@@ -7753,7 +7753,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                             {/* Model Selector */}
                             <div>
                                 <label className="text-xs font-bold text-slate-400 mb-1.5 block">Model</label>
-                                <div className="grid grid-cols-2 gap-2">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                     {Object.entries(ANIMATE_MODELS).map(([id, m]) => (
                                         <button key={id} onClick={() => setAnimateModel(id)}
                                             className={`p-2.5 rounded-xl text-left text-xs transition-all cursor-pointer border ${
@@ -7770,7 +7770,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                             </div>
 
                             {/* Duration + Aspect Ratio */}
-                            <div className="grid grid-cols-2 gap-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <div>
                                     <label className="text-xs font-bold text-slate-400 mb-1.5 block">Duration (sec)</label>
                                     <input type="number" value={animateDuration}
@@ -7832,7 +7832,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
 
                         {/* Footer */}
                         {!animateVideoUrl && (
-                            <div className="p-5 border-t border-white/[0.06]">
+                            <div className="p-4 sm:p-5 border-t border-white/[0.06]">
                                 <button onClick={handleAnimateGenerate}
                                     disabled={animateGenerating || animateAnalyzing || !animatePrompt.trim()}
                                     className={`w-full py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 cursor-pointer transition-all ${
@@ -7937,7 +7937,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                             </div>
 
                             {/* Content area */}
-                            <div className="flex-1 overflow-y-auto p-5">
+                            <div className="flex-1 overflow-y-auto p-4 sm:p-5">
 
                                 {/* Upload tab content */}
                                 {refPickerTab === 'upload' && (
@@ -7968,7 +7968,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                 {refPickerTab === 'bank' && (
                                     <div>
                                         {bankImages.length > 0 ? (
-                                            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2.5">
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 sm:grid-cols-4 gap-2.5">
                                                 {bankImages.map((img, i) => (
                                                     <button key={img._id || i}
                                                         onClick={() => {
@@ -8004,7 +8004,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                 {refPickerTab === 'brand' && (
                                     <div>
                                         {brandImages.length > 0 ? (
-                                            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2.5">
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 sm:grid-cols-4 gap-2.5">
                                                 {brandImages.map((img, i) => (
                                                     <button key={`brand-${i}`}
                                                         onClick={() => {
@@ -8060,7 +8060,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
             {showProductPicker && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in"
                     onClick={() => setShowProductPicker(false)}>
-                    <div className="glass-panel rounded-2xl p-6 w-full max-w-xl max-h-[80vh] overflow-y-auto animate-scale-in"
+                    <div className="glass-panel rounded-2xl p-4 sm:p-6 w-full max-w-[calc(100%-2rem)] sm:max-w-xl mx-auto max-h-[80vh] overflow-y-auto animate-scale-in"
                         onClick={e => e.stopPropagation()}>
                         <div className="flex items-center justify-between mb-5">
                             <h3 className="text-lg font-extrabold text-white">
@@ -8108,7 +8108,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                     <span className="material-symbols-outlined text-sm text-emerald-500">language</span>
                                     From Your Website
                                 </p>
-                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 sm:grid-cols-3 gap-2.5">
                                     {(activeBrand.dna.brandImages || activeBrand.dna.bannerImages || []).map((img, i) => (
                                         <button key={`brand-${i}`}
                                             onClick={() => {
@@ -8150,7 +8150,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
             {studioMode === 'tryon' && (
                 <div className="max-w-5xl mx-auto fade-up pt-6">
                     {/* Hero Header */}
-                    <div className="glow-border rounded-2xl p-6 mb-6 relative overflow-hidden" style={{ background: 'linear-gradient(135deg, rgba(236,72,153,0.06), rgba(255, 77, 0,0.04), rgba(6,182,212,0.03))' }}>
+                    <div className="glow-border rounded-2xl p-4 sm:p-6 mb-6 relative overflow-hidden" style={{ background: 'linear-gradient(135deg, rgba(236,72,153,0.06), rgba(255, 77, 0,0.04), rgba(6,182,212,0.03))' }}>
                         <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(circle at 80% 20%, rgba(236,72,153,0.08) 0%, transparent 50%), radial-gradient(circle at 20% 80%, rgba(255, 77, 0,0.06) 0%, transparent 50%)' }} />
                         <div className="relative">
                             <h2 className="text-xl font-bold text-white flex items-center gap-3 mb-1">
@@ -8162,11 +8162,11 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
                         {/* Left — Upload Zone */}
                         <div className="col-span-12 lg:col-span-5 space-y-4">
                             {/* Person Photo Upload */}
-                            <div className="studio-card p-5">
+                            <div className="studio-card p-4 sm:p-5">
                                 <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3">
                                     <span className="material-symbols-outlined text-[#FF7A00] text-lg">person</span>
                                     Person Photo
@@ -8197,7 +8197,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                             </div>
 
                             {/* Garment Upload */}
-                            <div className="studio-card p-5">
+                            <div className="studio-card p-4 sm:p-5">
                                 <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3">
                                     <span className="material-symbols-outlined text-[#FF4D00] text-lg">checkroom</span>
                                     Clothing / Garment
@@ -8228,13 +8228,13 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                             </div>
 
                             {/* Sample Models — Quick Start */}
-                            <div className="studio-card p-5">
+                            <div className="studio-card p-4 sm:p-5">
                                 <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-2">
                                     <span className="material-symbols-outlined text-amber-400 text-lg">face</span>
                                     Quick Start — Sample Models
                                 </h3>
                                 <p className="text-xs text-slate-500 mb-3">Click to auto-generate a model photo (no upload needed)</p>
-                                <div className="grid grid-cols-2 gap-2">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                     {[
                                         { label: 'Woman — Indian', desc: 'Young Indian woman, medium skin tone, full body front pose, plain white background, professional model photo, natural lighting, 5\'6" average build', icon: 'person', gender: 'female' },
                                         { label: 'Man — Indian', desc: 'Young Indian man, medium skin tone, full body front pose, plain white background, professional model photo, natural lighting, 5\'10" athletic build', icon: 'person', gender: 'male' },
@@ -8391,7 +8391,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
 
                         {/* Right — Result Preview */}
                         <div className="col-span-12 lg:col-span-7">
-                            <div className="studio-card p-5 min-h-[400px] flex flex-col">
+                            <div className="studio-card p-4 sm:p-5 min-h-[400px] flex flex-col">
                                 <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-4">
                                     <span className="material-symbols-outlined text-cyan-400 text-lg">image</span>
                                     Try-On Result
@@ -8433,7 +8433,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
             {studioMode === 'mockups' && (
                 <div className="max-w-5xl mx-auto fade-up pt-6">
                     {/* Hero Header */}
-                    <div className="glow-border rounded-2xl p-6 mb-6 relative overflow-hidden" style={{ background: 'linear-gradient(135deg, rgba(6,182,212,0.06), rgba(255, 77, 0,0.04), rgba(255, 77, 0,0.03))' }}>
+                    <div className="glow-border rounded-2xl p-4 sm:p-6 mb-6 relative overflow-hidden" style={{ background: 'linear-gradient(135deg, rgba(6,182,212,0.06), rgba(255, 77, 0,0.04), rgba(255, 77, 0,0.03))' }}>
                         <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(circle at 80% 20%, rgba(6,182,212,0.08) 0%, transparent 50%), radial-gradient(circle at 20% 80%, rgba(255, 77, 0,0.06) 0%, transparent 50%)' }} />
                         <div className="relative">
                             <h2 className="text-xl font-bold text-white flex items-center gap-3 mb-2">
@@ -8468,11 +8468,11 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
 
                     {/* ── Product Lifestyle Sub-mode ── */}
                     {mockupSubMode === 'lifestyle' && (
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
                         {/* Left — Controls */}
                         <div className="col-span-12 lg:col-span-5 space-y-4">
                             {/* Product Upload */}
-                            <div className="studio-card p-5">
+                            <div className="studio-card p-4 sm:p-5">
                                 <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3">
                                     <span className="material-symbols-outlined text-cyan-400 text-lg">add_a_photo</span>
                                     Product Image
@@ -8503,7 +8503,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                             </div>
 
                             {/* Reference Scene Template */}
-                            <div className="studio-card p-5">
+                            <div className="studio-card p-4 sm:p-5">
                                 <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3">
                                     <span className="material-symbols-outlined text-[#FF4D00] text-lg">photo_library</span>
                                     Reference Scene
@@ -8538,7 +8538,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                             </div>
 
                             {/* Scene Library */}
-                            <div className="studio-card p-5">
+                            <div className="studio-card p-4 sm:p-5">
                                 <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3">
                                     <span className="material-symbols-outlined text-amber-400 text-lg">auto_fix_high</span>
                                     Scene Library
@@ -8669,7 +8669,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                 </div>
 
                                 {/* Scene Grid */}
-                                <div className="grid grid-cols-2 gap-2 mb-3 max-h-[320px] overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.1) transparent' }}>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3 max-h-[320px] overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.1) transparent' }}>
                                     {(() => {
                                         const allScenes = {
                                             cosmetics: [
@@ -8789,7 +8789,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                             </div>
 
                             {/* Brand DNA Harmonize Toggle */}
-                            <div className="studio-card p-5">
+                            <div className="studio-card p-4 sm:p-5">
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-2">
                                         <span className="material-symbols-outlined text-lg" style={{ color: activeBrand?.dna?.colors?.[0]?.hex || '#6366f1' }}>palette</span>
@@ -8821,7 +8821,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                             </div>
 
                             {/* Aspect Ratio */}
-                            <div className="studio-card p-5">
+                            <div className="studio-card p-4 sm:p-5">
                                 <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3">
                                     <span className="material-symbols-outlined text-[#FF4D00] text-lg">aspect_ratio</span>
                                     Aspect Ratio
@@ -8891,7 +8891,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
 
                         {/* Right — Result */}
                         <div className="col-span-12 lg:col-span-7">
-                            <div className="studio-card p-5 min-h-[400px] flex flex-col">
+                            <div className="studio-card p-4 sm:p-5 min-h-[400px] flex flex-col">
                                 <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-4">
                                     <span className="material-symbols-outlined text-cyan-400 text-lg">image</span>
                                     Mockup Result
@@ -8928,11 +8928,11 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
 
                     {/* ── Logo / Brand Mockup Sub-mode ── */}
                     {mockupSubMode === 'logo' && (
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
                         {/* Left — Controls */}
                         <div className="col-span-12 lg:col-span-5 space-y-4">
                             {/* Logo Upload */}
-                            <div className="studio-card p-5">
+                            <div className="studio-card p-4 sm:p-5">
                                 <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3">
                                     <span className="material-symbols-outlined text-amber-400 text-lg">branding_watermark</span>
                                     Logo / Design
@@ -8981,7 +8981,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                             </div>
 
                             {/* Surface Presets */}
-                            <div className="studio-card p-5">
+                            <div className="studio-card p-4 sm:p-5">
                                 <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3">
                                     <span className="material-symbols-outlined text-cyan-400 text-lg">category</span>
                                     Mockup Surface
@@ -9009,7 +9009,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                         </button>
                                     ))}
                                 </div>
-                                <div className="grid grid-cols-2 gap-2 max-h-[240px] overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.1) transparent' }}>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[240px] overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.1) transparent' }}>
                                     {(() => {
                                         const surfaces = {
                                             apparel: [
@@ -9087,7 +9087,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                             </div>
 
                             {/* Style Reference (optional) */}
-                            <div className="studio-card p-5">
+                            <div className="studio-card p-4 sm:p-5">
                                 <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3">
                                     <span className="material-symbols-outlined text-[#FF4D00] text-lg">style</span>
                                     Style Reference <span className="text-xs text-slate-600 font-normal">(optional)</span>
@@ -9117,7 +9117,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                             </div>
 
                             {/* AI Enhancement Keywords */}
-                            <div className="studio-card p-5">
+                            <div className="studio-card p-4 sm:p-5">
                                 <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3">
                                     <span className="material-symbols-outlined text-emerald-400 text-lg">auto_awesome</span>
                                     AI Enhancement Keywords <span className="text-xs text-slate-600 font-normal">(optional)</span>
@@ -9137,7 +9137,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                             </div>
 
                             {/* Aspect Ratio */}
-                            <div className="studio-card p-5">
+                            <div className="studio-card p-4 sm:p-5">
                                 <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3">
                                     <span className="material-symbols-outlined text-[#FF4D00] text-lg">aspect_ratio</span>
                                     Aspect Ratio
@@ -9215,7 +9215,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
 
                         {/* Right — Result */}
                         <div className="col-span-12 lg:col-span-7">
-                            <div className="studio-card p-5 min-h-[400px] flex flex-col">
+                            <div className="studio-card p-4 sm:p-5 min-h-[400px] flex flex-col">
                                 <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-4">
                                     <span className="material-symbols-outlined text-amber-400 text-lg">image</span>
                                     Logo Mockup Result
@@ -9268,7 +9268,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
                     <div className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" onClick={() => setShowBusyModal(false)} />
                     
-                    <div className="relative w-full max-w-md transform overflow-hidden rounded-3xl border border-white/10 bg-[#161b22] p-8 text-center shadow-2xl transition-all animate-in fade-in zoom-in duration-300">
+                    <div className="relative w-full max-w-[calc(100%-2rem)] sm:max-w-md mx-auto transform overflow-hidden rounded-3xl border border-white/10 bg-[#161b22] p-4 sm:p-8 text-center shadow-2xl transition-all animate-in fade-in zoom-in duration-300">
                         {/* Premium Glow effect */}
                         <div className="absolute -top-24 -left-24 h-48 w-48 rounded-full bg-amber-500/10 blur-[80px]" />
                         <div className="absolute -bottom-24 -right-24 h-48 w-48 rounded-full bg-rose-500/10 blur-[80px]" />
