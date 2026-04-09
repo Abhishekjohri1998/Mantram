@@ -113,6 +113,27 @@ export async function callAgent(systemPrompt, userPrompt, temperature = 0.7, max
                 for (const [, key, val] of stringPairs) {
                     if (!obj[key]) obj[key] = val.replace(/\\n/g, '\n').replace(/\\"/g, '"');
                 }
+
+                // --- NEW: Truncation Recovery ---
+                // If certain expected keys are missing, they might be truncated at the end of the string
+                const expectedKeys = ['primaryPrompt', 'engineeringNotes', 'creativeDirection', 'suggestedHeadline', 'analysis', 'headline'];
+                const missingKeys = expectedKeys.filter(k => !obj[k]);
+                
+                if (missingKeys.length > 0) {
+                    for (const key of missingKeys) {
+                        // Look for "key": " (open quote but no closing quote at end of string)
+                        const truncatedRegex = new RegExp(`"${key}"\\s*:\\s*"([\\s\\S]*)$`, 'i');
+                        const truncatedMatch = fieldExtract.match(truncatedRegex);
+                        if (truncatedMatch) {
+                            console.log(`🔍 Recovery: Found truncated field "${key}"`);
+                            let val = truncatedMatch[1].trim();
+                            // Strip any trailing garbage that isn't part of the string (like a trailing comma or partial brace if they somehow got there)
+                            val = val.replace(/["\s,}]*$/, ''); 
+                            obj[key] = val.replace(/\\n/g, '\n').replace(/\\"/g, '"');
+                        }
+                    }
+                }
+
                 // Extract array fields: "key": [...]
                 const arrayPairs = fieldExtract.matchAll(/"(\w+)"\s*:\s*\[([\s\S]*?)\]/g);
                 for (const [, key, val] of arrayPairs) {
