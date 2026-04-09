@@ -72,15 +72,15 @@ export default function Insights() {
             <SEOHead title="Insights — Mantram AI" noIndex={true} />
             <div className="flex items-center gap-1 mb-6 p-1 glass-panel rounded-xl w-fit">
                 <button onClick={() => navigate('/conversations')}
-                    className="px-5 py-2 rounded-lg text-sm font-bold text-slate-400 hover:text-white hover:bg-white/[0.04] transition-all flex items-center gap-2 cursor-pointer">
+                    className="px-5 py-2 rounded-lg text-sm font-bold text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)] transition-all flex items-center gap-2 cursor-pointer">
                     <span className="material-symbols-outlined text-sm">inbox</span> Inbox
                 </button>
                 <button onClick={() => navigate('/conversations/automations')}
-                    className="px-5 py-2 rounded-lg text-sm font-bold text-slate-400 hover:text-white hover:bg-white/[0.04] transition-all flex items-center gap-2 cursor-pointer">
+                    className="px-5 py-2 rounded-lg text-sm font-bold text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)] transition-all flex items-center gap-2 cursor-pointer">
                     <span className="material-symbols-outlined text-sm">bolt</span> Automations
                 </button>
                 <button onClick={() => navigate('/conversations/ai-settings')}
-                    className="px-5 py-2 rounded-lg text-sm font-bold text-slate-400 hover:text-white hover:bg-white/[0.04] transition-all flex items-center gap-2 cursor-pointer">
+                    className="px-5 py-2 rounded-lg text-sm font-bold text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)] transition-all flex items-center gap-2 cursor-pointer">
                     <span className="material-symbols-outlined text-sm">psychology</span> AI Settings
                 </button>
                 <button className="px-5 py-2 rounded-lg text-sm font-bold bg-primary/10 text-primary flex items-center gap-2 cursor-pointer">
@@ -176,11 +176,11 @@ function VolumeChart({ data }) {
                         <span style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 600 }}>{d.total}</span>
                         <div style={{ width: '100%', display: 'flex', gap: '2px', alignItems: 'flex-end', height: '100px' }}>
                             <div style={{
-                                flex: 1, borderRadius: '4px 4px 0 0', background: 'linear-gradient(to top, #6366f120, #6366f1)',
+                                flex: 1, borderRadius: '4px 4px 0 0', background: 'var(--sys-primary)',
                                 height: `${Math.max(4, (d.total / maxVal) * 100)}%`, transition: 'height 0.5s ease',
                             }} />
                             <div style={{
-                                flex: 1, borderRadius: '4px 4px 0 0', background: 'linear-gradient(to top, #10b98120, #10b981)',
+                                flex: 1, borderRadius: '4px 4px 0 0', background: 'var(--sys-primary)',
                                 height: `${Math.max(4, (d.aiHandled / maxVal) * 100)}%`, transition: 'height 0.5s ease',
                             }} />
                         </div>

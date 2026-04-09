@@ -4554,20 +4554,20 @@ function CanvasEditorInner() {
 
                                                 {/* Edit History Timeline */}
                                                 {editHistory.length > 0 && (
-                                                    <div className="bg-black/20 rounded-xl p-3 max-h-[200px] overflow-y-auto custom-scrollbar flex flex-col gap-2 border border-white/5">
+                                                    <div className="bg-[var(--sys-surface)] rounded-xl p-3 max-h-[200px] overflow-y-auto custom-scrollbar flex flex-col gap-2 border border-[var(--sys-border)]">
                                                         <div className="flex items-center justify-between">
-                                                            <span className="text-[10px] font-bold text-slate-500 uppercase">Edit Timeline</span>
+                                                            <span className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase">Edit Timeline</span>
                                                             <button onClick={() => { handleUndo(); setEditHistory(prev => prev.slice(0, -1)); }} 
-                                                                className="text-[10px] text-amber-400 hover:text-amber-300 flex items-center gap-1 cursor-pointer">
+                                                                className="text-[10px] text-primary hover:text-[var(--sys-primary)] flex items-center gap-1 cursor-pointer">
                                                                 <span className="material-symbols-outlined" style={{fontSize: 12}}>undo</span> Revert Last
                                                             </button>
                                                         </div>
                                                         {editHistory.map((h, i) => (
-                                                            <div key={i} className="flex gap-2 items-start bg-white/5 rounded-lg p-2 border border-white/[0.02]">
+                                                            <div key={i} className="flex gap-2 items-start bg-[var(--sys-surface)] rounded-lg p-2 border border-[var(--sys-border)]">
                                                                 <div className="w-4 h-4 rounded-full bg-violet-500/20 text-violet-400 flex items-center justify-center text-[9px] font-bold mt-0.5 flex-shrink-0">
                                                                     {i + 1}
                                                                 </div>
-                                                                <p className="text-[11px] text-slate-300 flex-1 leading-tight">{h.prompt}</p>
+                                                                <p className="text-[11px] text-[var(--sys-text-muted)] flex-1 leading-tight">{h.prompt}</p>
                                                             </div>
                                                         ))}
                                                     </div>
@@ -5467,7 +5467,7 @@ function CanvasEditorInner() {
                                     <div className="ce-gradient-grid">
                                         {GRADIENT_PRESETS.map((g, i) => (
                                             <button key={i} className="ce-gradient-card" onClick={() => addGradientToCanvas(g)} onContextMenu={e => { e.preventDefault(); applyGradientToSelected(g) }} title={`${g.name} — Right-click to apply to selection`}>
-                                                <div className="ce-gradient-preview" style={{ background: `linear-gradient(${g.angle}deg, ${g.colors[0]}, ${g.colors[1]})` }} />
+                                                <div className="ce-gradient-preview" style={{ background: `var(--sys-primary)` }} />
                                                 <span className="ce-gradient-label">{g.name}</span>
                                             </button>
                                         ))}
@@ -6156,7 +6156,7 @@ function CanvasEditorInner() {
                                         </span>
                                     </button>
                                     {fidatoLoading ? (
-                                        <button className="ce-fidato-send-btn" style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)', borderColor: '#ef4444' }} onClick={() => {
+                                        <button className="ce-fidato-send-btn" style={{ background: 'var(--sys-primary)', borderColor: '#ef4444' }} onClick={() => {
                                             if (fidatoAbortRef.current) {
                                                 fidatoAbortRef.current.abort()
                                                 fidatoAbortRef.current = null
@@ -6622,7 +6622,7 @@ function CanvasEditorInner() {
                                 <button onClick={() => { addText(textInput || 'Your Heading', true); setShowTextModal(false); setTextInput('') }}
                                     style={{
                                         flex: 1, padding: '10px', borderRadius: 10, border: 'none',
-                                        background: 'linear-gradient(135deg, #6366f1, #FF4D00)', color: '#fff', fontWeight: 700,
+                                        background: 'var(--sys-primary)', color: '#fff', fontWeight: 700,
                                         cursor: 'pointer', fontSize: 13,
                                     }}>
                                     Heading

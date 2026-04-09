@@ -169,7 +169,7 @@ export default function IntelReportViewer({ mission, findings, onClose }) {
 
                     {/* ── Header: Dossier ── */}
                     <div style={{
-                        background: 'linear-gradient(180deg, rgba(10,12,22,0.98) 0%, rgba(10,12,22,0.95) 100%)',
+                        background: 'var(--sys-primary) 0%, rgba(10,12,22,0.95) 100%)',
                         backdropFilter: 'blur(20px)',
                         borderBottom: '1px solid rgba(255, 77, 0,0.15)',
                         padding: '20px 28px', position: 'relative', zIndex: 2,
@@ -179,7 +179,7 @@ export default function IntelReportViewer({ mission, findings, onClose }) {
                             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                 <div style={{
                                     width: '36px', height: '36px', borderRadius: '10px',
-                                    background: 'linear-gradient(135deg, rgba(255, 77, 0,0.25), rgba(16,185,129,0.15))',
+                                    background: 'var(--sys-primary), rgba(16,185,129,0.15))',
                                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                                 }}>
                                     <span className="material-symbols-outlined" style={{ color: '#a78bfa', fontSize: '20px' }}>
@@ -262,10 +262,10 @@ export default function IntelReportViewer({ mission, findings, onClose }) {
                                             <div style={{
                                                 height: '100%', borderRadius: '3px',
                                                 background: criticalCount > 0
-                                                    ? 'linear-gradient(90deg, #f59e0b, #ef4444)'
+                                                    ? 'var(--sys-primary)'
                                                     : totalFindings > 3
-                                                        ? 'linear-gradient(90deg, #06b6d4, #f59e0b)'
-                                                        : 'linear-gradient(90deg, #06b6d4, #34d399)',
+                                                        ? 'var(--sys-primary)'
+                                                        : 'var(--sys-primary)',
                                                 width: `${Math.min(100, criticalCount > 0 ? 85 : totalFindings > 3 ? 55 : 25)}%`,
                                                 transition: 'width 1s ease', animation: 'intel-threat-fill 1.5s ease-out',
                                                 boxShadow: criticalCount > 0 ? '0 0 12px rgba(239,68,68,0.4)' : 'none',
@@ -286,13 +286,13 @@ export default function IntelReportViewer({ mission, findings, onClose }) {
                     {/* ── Findings Body ── */}
                     <div ref={scrollRef} style={{
                         flex: 1, overflow: 'auto', padding: '20px 28px',
-                        background: 'linear-gradient(180deg, rgba(6,8,16,0.98) 0%, rgba(10,12,22,0.98) 100%)',
+                        background: 'var(--sys-primary) 0%, rgba(10,12,22,0.98) 100%)',
                         position: 'relative', zIndex: 2,
                     }}>
                         {/* Scan line overlay on content */}
                         <div style={{
                             position: 'absolute', inset: 0, pointerEvents: 'none',
-                            background: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255, 77, 0,0.015) 2px, rgba(255, 77, 0,0.015) 4px)',
+                            background: 'repeating-var(--sys-primary) 2px, rgba(255, 77, 0,0.015) 4px)',
                         }} />
 
                         {totalFindings === 0 && phase >= 3 && (
@@ -318,7 +318,7 @@ export default function IntelReportViewer({ mission, findings, onClose }) {
                                         marginBottom: '16px',
                                         borderRadius: '12px',
                                         border: `1px solid ${threat.primary}25`,
-                                        background: `linear-gradient(135deg, ${threat.primary}08, transparent)`,
+                                        background: `var(--sys-primary)`,
                                         overflow: 'hidden',
                                         animation: 'intel-finding-slide 0.5s ease-out both',
                                         animationDelay: `${i * 0.15}s`,
@@ -327,7 +327,7 @@ export default function IntelReportViewer({ mission, findings, onClose }) {
                                     {/* Severity bar */}
                                     <div style={{
                                         height: '3px', width: '100%',
-                                        background: `linear-gradient(90deg, ${threat.primary}, transparent)`,
+                                        background: `var(--sys-primary)`,
                                         boxShadow: `0 0 8px ${threat.glow}`,
                                     }} />
 

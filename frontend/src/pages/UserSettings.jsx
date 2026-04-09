@@ -144,7 +144,7 @@ export default function UserSettings() {
         /^[a-z0-9][a-z0-9-]*[a-z0-9]$/.test(claimInput.toLowerCase()) && !/--/.test(claimInput)
 
     const MsgBox = ({ msg }) => msg ? (
-        <div className={`mt-4 px-4 py-2.5 rounded-xl text-sm font-medium ${msg.type === 'success' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}`}>
+        <div className={`mt-4 px-4 py-2.5 rounded-xl text-sm font-medium ${msg.type === 'success' ? 'bg-[var(--sys-primary-dim)] text-primary border border-[var(--sys-border)]' : 'bg-[var(--sys-primary-dim)] text-primary border border-[var(--sys-border)]'}`}>
             {msg.text}
         </div>
     ) : null
@@ -156,15 +156,15 @@ export default function UserSettings() {
             <div className="grid grid-cols-12 gap-6 max-w-6xl mx-auto">
                 {/* ══════ SIDEBAR NAV ══════ */}
                 <div className="col-span-12 lg:col-span-3">
-                    <div className="glass-panel rounded-2xl border border-white/[0.08] p-3 lg:sticky lg:top-24">
+                    <div className="glass-panel rounded-2xl border border-[var(--sys-border)] p-3 lg:sticky lg:top-24">
                         {/* User mini card */}
                         <div className="flex items-center gap-3 p-3 mb-2">
-                            <div className="size-11 rounded-xl bg-gradient-to-br from-primary to-[#FF7A00] flex items-center justify-center text-white font-bold text-base border-2 border-primary/30">
+                            <div className="size-11 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] flex items-center justify-center text-[var(--sys-text)] font-bold text-base border border-primary/30">
                                 {initials}
                             </div>
                             <div className="min-w-0">
-                                <p className="text-sm font-bold text-white truncate">{profile?.name || 'Loading...'}</p>
-                                <p className="text-xs text-slate-500 truncate">{profile?.email}</p>
+                                <p className="text-sm font-bold text-[var(--sys-text)] truncate">{profile?.name || 'Loading...'}</p>
+                                <p className="text-xs text-[var(--sys-text-muted)] truncate">{profile?.email}</p>
                             </div>
                         </div>
 
@@ -175,7 +175,7 @@ export default function UserSettings() {
                                     onClick={() => setSection(s.key)}
                                     className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer text-left ${section === s.key
                                         ? 'bg-primary/10 text-primary border border-primary/20'
-                                        : 'text-slate-400 hover:text-white hover:bg-white/[0.04]'
+                                        : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)]'
                                     }`}
                                 >
                                     <span className="material-symbols-outlined text-lg">{s.icon}</span>
@@ -190,7 +190,7 @@ export default function UserSettings() {
                 <div className="col-span-12 lg:col-span-9">
                     {profileLoading ? (
                         <div className="flex items-center justify-center h-64">
-                            <div className="size-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                            <div className="size-8 border border-primary border-t-transparent rounded-full animate-spin" />
                         </div>
                     ) : (
                         <>
@@ -198,60 +198,60 @@ export default function UserSettings() {
 {/* ═══════════════ PROFILE ═══════════════ */}
 {section === 'profile' && (
     <div className="space-y-6">
-        <div className="glass-panel rounded-2xl border border-white/[0.08] p-8">
+        <div className="glass-panel rounded-2xl border border-[var(--sys-border)] p-8">
             <div className="flex items-center gap-6 mb-8">
-                <div className="size-20 rounded-2xl bg-gradient-to-br from-primary to-[#FF7A00] flex items-center justify-center text-white font-bold text-2xl border-2 border-primary/30">
+                <div className="size-20 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] flex items-center justify-center text-[var(--sys-text)] font-bold text-2xl border border-primary/30">
                     {initials}
                 </div>
                 <div>
-                    <h2 className="text-2xl font-bold text-white">{profile?.name}</h2>
-                    <p className="text-sm text-slate-500">{profile?.email}</p>
+                    <h2 className="text-2xl font-bold text-[var(--sys-text)]">{profile?.name}</h2>
+                    <p className="text-sm text-[var(--sys-text-muted)]">{profile?.email}</p>
                     <div className="flex items-center gap-3 mt-2">
                         <span className="px-2.5 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-bold uppercase">
                             {profile?.plan || 'Starter'}
                         </span>
-                        <span className="px-2.5 py-0.5 rounded-full bg-white/[0.06] text-slate-400 text-xs font-bold">
+                        <span className="px-2.5 py-0.5 rounded-full bg-[var(--sys-surface)] text-[var(--sys-text-muted)] text-xs font-bold">
                             {profile?.role === 'superadmin' ? 'Super Admin' : profile?.role || 'User'}
                         </span>
                     </div>
                 </div>
             </div>
 
-            <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2">
+            <h3 className="text-base font-bold text-[var(--sys-text)] mb-4 flex items-center gap-2">
                 <span className="material-symbols-outlined text-lg text-primary">edit</span>
                 Edit Profile
             </h3>
             <div className="space-y-4 max-w-lg">
                 <div>
-                    <label className="text-xs text-slate-500 uppercase font-bold tracking-wider block mb-1.5">Full Name</label>
+                    <label className="text-xs text-[var(--sys-text-muted)] uppercase font-bold tracking-wider block mb-1.5">Full Name</label>
                     <input type="text" value={editName} onChange={e => setEditName(e.target.value)}
-                        className="w-full px-4 py-3 rounded-xl bg-white/[0.04] border border-white/[0.1] text-white text-sm focus:border-primary/50 outline-none transition-all"
+                        className="w-full px-4 py-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm focus:border-primary/50 outline-none transition-all"
                         placeholder="Your name" />
                 </div>
                 <div>
-                    <label className="text-xs text-slate-500 uppercase font-bold tracking-wider block mb-1.5">Company</label>
+                    <label className="text-xs text-[var(--sys-text-muted)] uppercase font-bold tracking-wider block mb-1.5">Company</label>
                     <input type="text" value={editCompany} onChange={e => setEditCompany(e.target.value)}
-                        className="w-full px-4 py-3 rounded-xl bg-white/[0.04] border border-white/[0.1] text-white text-sm focus:border-primary/50 outline-none transition-all"
+                        className="w-full px-4 py-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm focus:border-primary/50 outline-none transition-all"
                         placeholder="Company name (optional)" />
                 </div>
                 <div>
-                    <label className="text-xs text-slate-500 uppercase font-bold tracking-wider block mb-1.5">Email</label>
+                    <label className="text-xs text-[var(--sys-text-muted)] uppercase font-bold tracking-wider block mb-1.5">Email</label>
                     <input type="text" value={profile?.email || ''} readOnly
-                        className="w-full px-4 py-3 rounded-xl bg-white/[0.02] border border-white/[0.06] text-slate-500 text-sm cursor-not-allowed" />
-                    <p className="text-xs text-slate-600 mt-1">Email cannot be changed</p>
+                        className="w-full px-4 py-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text-muted)] text-sm cursor-not-allowed" />
+                    <p className="text-xs text-[var(--sys-text-muted)] mt-1">Email cannot be changed</p>
                 </div>
             </div>
             <MsgBox msg={profileMsg} />
             <button onClick={handleProfileSave} disabled={profileSaving || !editName.trim()}
-                className="mt-6 px-8 py-3 rounded-xl bg-primary text-white font-bold text-sm shadow-lg shadow-primary/20 hover:bg-primary-light disabled:opacity-40 transition-all cursor-pointer">
+                className="mt-6 px-8 py-3 rounded-xl bg-primary text-white font-bold text-sm shadow-none hover:bg-primary-light disabled:opacity-40 transition-all cursor-pointer">
                 {profileSaving ? 'Saving...' : 'Save Changes'}
             </button>
         </div>
 
         {/* Account details grid */}
-        <div className="glass-panel rounded-2xl border border-white/[0.08] p-6">
-            <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2">
-                <span className="material-symbols-outlined text-lg text-slate-400">info</span>Account Details
+        <div className="glass-panel rounded-2xl border border-[var(--sys-border)] p-6">
+            <h3 className="text-base font-bold text-[var(--sys-text)] mb-4 flex items-center gap-2">
+                <span className="material-symbols-outlined text-lg text-[var(--sys-text-muted)]">info</span>Account Details
             </h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {[
@@ -260,10 +260,10 @@ export default function UserSettings() {
                     { label: 'Plan', value: (profile?.plan || 'starter').charAt(0).toUpperCase() + (profile?.plan || 'starter').slice(1), icon: 'workspace_premium' },
                     { label: 'Status', value: profile?.approvalStatus === 'approved' ? 'Active' : profile?.approvalStatus || 'Pending', icon: 'verified' },
                 ].map(item => (
-                    <div key={item.label} className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-4 text-center">
+                    <div key={item.label} className="bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl p-4 text-center">
                         <span className="material-symbols-outlined text-xl text-primary mb-2 block">{item.icon}</span>
-                        <p className="text-lg font-bold text-white">{item.value}</p>
-                        <p className="text-xs text-slate-500 uppercase font-bold mt-1">{item.label}</p>
+                        <p className="text-lg font-bold text-[var(--sys-text)]">{item.value}</p>
+                        <p className="text-xs text-[var(--sys-text-muted)] uppercase font-bold mt-1">{item.label}</p>
                     </div>
                 ))}
             </div>
@@ -273,24 +273,24 @@ export default function UserSettings() {
 
 {/* ═══════════════ USER ID ═══════════════ */}
 {section === 'userid' && (
-    <div className="glass-panel rounded-2xl border border-white/[0.08] p-8">
-        <h3 className="text-xl font-bold text-white flex items-center gap-2 mb-2">
+    <div className="glass-panel rounded-2xl border border-[var(--sys-border)] p-8">
+        <h3 className="text-xl font-bold text-[var(--sys-text)] flex items-center gap-2 mb-2">
             <span className="material-symbols-outlined text-2xl text-primary">badge</span>
             Your User ID
         </h3>
-        <p className="text-sm text-slate-500 mb-8">Your unique identity on Mantram AI. Visible as your handle across the platform.</p>
+        <p className="text-sm text-[var(--sys-text-muted)] mb-8">Your unique identity on Mantram AI. Visible as your handle across the platform.</p>
 
         {/* Current ID display */}
-        <div className="bg-gradient-to-r from-[#FF4D00]/5 to-cyan-500/5 border border-[#FF4D00]/20 rounded-xl p-6 mb-8">
+        <div className="bg-[var(--sys-surface)] border border-[var(--sys-border)] border border-[#FF4D00]/20 rounded-xl p-6 mb-8">
             <div className="flex items-center justify-between">
                 <div>
-                    <p className="text-xs text-slate-500 uppercase font-bold tracking-wider mb-1">Current User ID</p>
+                    <p className="text-xs text-[var(--sys-text-muted)] uppercase font-bold tracking-wider mb-1">Current User ID</p>
                     <div className="flex items-center gap-3">
-                        <p className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-[#FF4D00] to-cyan-400">
+                        <p className="text-3xl font-black text-transparent bg-clip-text bg-[var(--sys-surface)] border border-[var(--sys-border)]">
                             {profile?.userId || '—'}
                         </p>
                         {profile?.userIdClaimed && (
-                            <span className="px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold flex items-center gap-1">
+                            <span className="px-2.5 py-1 rounded-full bg-[var(--sys-primary-dim)] border border-[var(--sys-border)] text-primary text-xs font-bold flex items-center gap-1">
                                 <span className="material-symbols-outlined text-xs">verified</span>
                                 Claimed
                             </span>
@@ -299,7 +299,7 @@ export default function UserSettings() {
                 </div>
                 {profile?.userId && (
                     <button onClick={copyUserId}
-                        className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white/[0.06] border border-white/[0.1] text-slate-300 hover:text-white hover:bg-white/[0.1] transition-all text-sm font-bold cursor-pointer">
+                        className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)] transition-all text-sm font-bold cursor-pointer">
                         <span className="material-symbols-outlined text-base">content_copy</span>Copy
                     </button>
                 )}
@@ -308,23 +308,23 @@ export default function UserSettings() {
 
         {/* Claim section */}
         {profile?.userIdClaimed ? (
-            <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-5">
+            <div className="bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl p-5">
                 <div className="flex items-center gap-3">
-                    <span className="material-symbols-outlined text-2xl text-emerald-400">check_circle</span>
+                    <span className="material-symbols-outlined text-2xl text-primary">check_circle</span>
                     <div>
-                        <p className="text-sm font-bold text-white">User ID Claimed Permanently</p>
-                        <p className="text-xs text-slate-500">Your custom User ID has been locked in. This cannot be changed.</p>
+                        <p className="text-sm font-bold text-[var(--sys-text)]">User ID Claimed Permanently</p>
+                        <p className="text-xs text-[var(--sys-text-muted)]">Your custom User ID has been locked in. This cannot be changed.</p>
                     </div>
                 </div>
             </div>
         ) : (
             <div>
-                <h4 className="text-base font-bold text-white mb-3 flex items-center gap-2">
-                    <span className="material-symbols-outlined text-lg text-amber-400">edit_square</span>
+                <h4 className="text-base font-bold text-[var(--sys-text)] mb-3 flex items-center gap-2">
+                    <span className="material-symbols-outlined text-lg text-primary">edit_square</span>
                     Claim Your Custom ID
                 </h4>
-                <p className="text-sm text-slate-500 mb-4">
-                    Choose a unique handle for yourself. <span className="text-amber-400 font-bold flex items-center gap-1 inline-flex"><span className="material-symbols-outlined text-xs">warning</span> This is a one-time action and cannot be undone.</span>
+                <p className="text-sm text-[var(--sys-text-muted)] mb-4">
+                    Choose a unique handle for yourself. <span className="text-primary font-bold flex items-center gap-1 inline-flex"><span className="material-symbols-outlined text-xs">warning</span> This is a one-time action and cannot be undone.</span>
                 </p>
 
                 <div className="flex gap-3 max-w-lg mb-3">
@@ -333,27 +333,27 @@ export default function UserSettings() {
                         value={claimInput}
                         onChange={e => setClaimInput(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
                         maxLength={30}
-                        className="flex-1 px-4 py-3 rounded-xl bg-white/[0.04] border border-white/[0.1] text-white text-sm focus:border-primary/50 outline-none transition-all font-mono tracking-wider"
+                        className="flex-1 px-4 py-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm focus:border-primary/50 outline-none transition-all font-mono tracking-wider"
                         placeholder="e.g. creative-sultan"
                     />
                     <button
                         onClick={handleClaimUserId}
                         disabled={claimLoading || !validClaimInput}
-                        className="px-6 py-3 rounded-xl bg-primary text-white font-bold text-sm shadow-lg shadow-primary/20 hover:bg-primary-light disabled:opacity-40 transition-all cursor-pointer whitespace-nowrap"
+                        className="px-6 py-3 rounded-xl bg-primary text-white font-bold text-sm shadow-none hover:bg-primary-light disabled:opacity-40 transition-all cursor-pointer whitespace-nowrap"
                     >
                         {claimLoading ? 'Claiming...' : <span className="flex items-center gap-1.5"><span className="material-symbols-outlined text-sm">sell</span>Claim Forever</span>}
                     </button>
                 </div>
 
                 {/* Validation hints */}
-                <div className="space-y-1 text-xs text-slate-600">
-                    <p className={claimInput.length >= 3 && claimInput.length <= 30 ? 'text-emerald-400 flex items-center gap-1' : 'flex items-center gap-1'}>
+                <div className="space-y-1 text-xs text-[var(--sys-text-muted)]">
+                    <p className={claimInput.length >= 3 && claimInput.length <= 30 ? 'text-primary flex items-center gap-1' : 'flex items-center gap-1'}>
                         <span className="material-symbols-outlined text-[11px]">{claimInput.length >= 3 && claimInput.length <= 30 ? 'check' : 'radio_button_unchecked'}</span> 3-30 characters ({claimInput.length}/30)
                     </p>
-                    <p className={claimInput && /^[a-z0-9]/.test(claimInput) && /[a-z0-9]$/.test(claimInput) ? 'text-emerald-400 flex items-center gap-1' : 'flex items-center gap-1'}>
+                    <p className={claimInput && /^[a-z0-9]/.test(claimInput) && /[a-z0-9]$/.test(claimInput) ? 'text-primary flex items-center gap-1' : 'flex items-center gap-1'}>
                         <span className="material-symbols-outlined text-[11px]">{claimInput && /^[a-z0-9]/.test(claimInput) && /[a-z0-9]$/.test(claimInput) ? 'check' : 'radio_button_unchecked'}</span> Starts and ends with a letter or number
                     </p>
-                    <p className={claimInput && !/--/.test(claimInput) && /^[a-z0-9-]*$/.test(claimInput) ? 'text-emerald-400 flex items-center gap-1' : 'flex items-center gap-1'}>
+                    <p className={claimInput && !/--/.test(claimInput) && /^[a-z0-9-]*$/.test(claimInput) ? 'text-primary flex items-center gap-1' : 'flex items-center gap-1'}>
                         <span className="material-symbols-outlined text-[11px]">{claimInput && !/--/.test(claimInput) && /^[a-z0-9-]*$/.test(claimInput) ? 'check' : 'radio_button_unchecked'}</span> Only lowercase letters, numbers, and hyphens
                     </p>
                 </div>
@@ -365,72 +365,72 @@ export default function UserSettings() {
 
 {/* ═══════════════ SECURITY ═══════════════ */}
 {section === 'security' && (
-    <div className="glass-panel rounded-2xl border border-white/[0.08] p-8">
+    <div className="glass-panel rounded-2xl border border-[var(--sys-border)] p-8">
         <div className="mb-8">
-            <h3 className="text-xl font-bold text-white flex items-center gap-2 mb-2">
+            <h3 className="text-xl font-bold text-[var(--sys-text)] flex items-center gap-2 mb-2">
                 <span className="material-symbols-outlined text-2xl text-primary">lock</span>
                 Change Password
             </h3>
-            <p className="text-sm text-slate-500">Update your password to keep your account secure</p>
+            <p className="text-sm text-[var(--sys-text-muted)]">Update your password to keep your account secure</p>
         </div>
 
         <div className="space-y-5 max-w-md">
             <div>
-                <label className="text-xs text-slate-500 uppercase font-bold tracking-wider block mb-1.5">Current Password</label>
+                <label className="text-xs text-[var(--sys-text-muted)] uppercase font-bold tracking-wider block mb-1.5">Current Password</label>
                 <div className="relative">
                     <input type={showCurrentPw ? 'text' : 'password'} value={currentPw} onChange={e => setCurrentPw(e.target.value)}
-                        className="w-full px-4 py-3 rounded-xl bg-white/[0.04] border border-white/[0.1] text-white text-sm focus:border-primary/50 outline-none transition-all pr-12"
+                        className="w-full px-4 py-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm focus:border-primary/50 outline-none transition-all pr-12"
                         placeholder="Enter current password" />
                     <button type="button" onClick={() => setShowCurrentPw(!showCurrentPw)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-all cursor-pointer">
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] transition-all cursor-pointer">
                         <span className="material-symbols-outlined text-lg">{showCurrentPw ? 'visibility_off' : 'visibility'}</span>
                     </button>
                 </div>
             </div>
             <div>
-                <label className="text-xs text-slate-500 uppercase font-bold tracking-wider block mb-1.5">New Password</label>
+                <label className="text-xs text-[var(--sys-text-muted)] uppercase font-bold tracking-wider block mb-1.5">New Password</label>
                 <div className="relative">
                     <input type={showNewPw ? 'text' : 'password'} value={newPw} onChange={e => setNewPw(e.target.value)}
-                        className="w-full px-4 py-3 rounded-xl bg-white/[0.04] border border-white/[0.1] text-white text-sm focus:border-primary/50 outline-none transition-all pr-12"
+                        className="w-full px-4 py-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm focus:border-primary/50 outline-none transition-all pr-12"
                         placeholder="Min 6 characters" />
                     <button type="button" onClick={() => setShowNewPw(!showNewPw)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-all cursor-pointer">
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] transition-all cursor-pointer">
                         <span className="material-symbols-outlined text-lg">{showNewPw ? 'visibility_off' : 'visibility'}</span>
                     </button>
                 </div>
-                {newPw && newPw.length < 6 && <p className="text-xs text-rose-400 mt-1">Min 6 characters</p>}
+                {newPw && newPw.length < 6 && <p className="text-xs text-primary mt-1">Min 6 characters</p>}
             </div>
             <div>
-                <label className="text-xs text-slate-500 uppercase font-bold tracking-wider block mb-1.5">Confirm New Password</label>
+                <label className="text-xs text-[var(--sys-text-muted)] uppercase font-bold tracking-wider block mb-1.5">Confirm New Password</label>
                 <input type="password" value={confirmPw} onChange={e => setConfirmPw(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl bg-white/[0.04] border border-white/[0.1] text-white text-sm focus:border-primary/50 outline-none transition-all"
+                    className="w-full px-4 py-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm focus:border-primary/50 outline-none transition-all"
                     placeholder="Confirm new password" />
-                {confirmPw && confirmPw !== newPw && <p className="text-xs text-rose-400 mt-1">Passwords do not match</p>}
+                {confirmPw && confirmPw !== newPw && <p className="text-xs text-primary mt-1">Passwords do not match</p>}
             </div>
         </div>
 
         <MsgBox msg={pwMsg} />
         <button onClick={handlePasswordChange} disabled={pwLoading || !currentPw || !newPw || !confirmPw || newPw !== confirmPw || newPw.length < 6}
-            className="mt-6 px-8 py-3 rounded-xl bg-primary text-white font-bold text-sm shadow-lg shadow-primary/20 hover:bg-primary-light disabled:opacity-40 transition-all cursor-pointer">
+            className="mt-6 px-8 py-3 rounded-xl bg-primary text-white font-bold text-sm shadow-none hover:bg-primary-light disabled:opacity-40 transition-all cursor-pointer">
             {pwLoading ? 'Changing...' : 'Change Password'}
         </button>
 
         {/* Login info */}
-        <div className="mt-10 pt-8 border-t border-white/[0.06]">
-            <h4 className="text-base font-bold text-white mb-4 flex items-center gap-2">
-                <span className="material-symbols-outlined text-lg text-slate-400">devices</span>
+        <div className="mt-10 pt-8 border-t border-[var(--sys-border)]">
+            <h4 className="text-base font-bold text-[var(--sys-text)] mb-4 flex items-center gap-2">
+                <span className="material-symbols-outlined text-lg text-[var(--sys-text-muted)]">devices</span>
                 Login Information
             </h4>
             <div className="grid grid-cols-2 gap-4 max-w-md">
-                <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-4">
-                    <p className="text-xs text-slate-500 uppercase font-bold mb-1">Last Active</p>
-                    <p className="text-sm text-white font-medium">
+                <div className="bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl p-4">
+                    <p className="text-xs text-[var(--sys-text-muted)] uppercase font-bold mb-1">Last Active</p>
+                    <p className="text-sm text-[var(--sys-text)] font-medium">
                         {profile?.lastActive ? new Date(profile.lastActive).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Now'}
                     </p>
                 </div>
-                <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-4">
-                    <p className="text-xs text-slate-500 uppercase font-bold mb-1">Account Created</p>
-                    <p className="text-sm text-white font-medium">
+                <div className="bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl p-4">
+                    <p className="text-xs text-[var(--sys-text-muted)] uppercase font-bold mb-1">Account Created</p>
+                    <p className="text-sm text-[var(--sys-text)] font-medium">
                         {profile?.createdAt ? new Date(profile.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
                     </p>
                 </div>
@@ -443,14 +443,14 @@ export default function UserSettings() {
 {section === 'subscription' && (
     <div className="space-y-6">
         {subStatus?.isCancelled && subStatus?.isInGracePeriod && (
-            <div className="bg-gradient-to-r from-amber-500/10 to-orange-500/5 border border-amber-500/30 p-5 rounded-2xl flex items-center gap-4">
-                <span className="material-symbols-outlined text-3xl text-amber-400">warning</span>
+            <div className="bg-[var(--sys-surface)] border border-[var(--sys-border)] border border-[var(--sys-border)] p-5 rounded-2xl flex items-center gap-4">
+                <span className="material-symbols-outlined text-3xl text-primary">warning</span>
                 <div className="flex-1">
-                    <h3 className="text-base font-bold text-amber-400">Subscription Cancelled</h3>
-                    <p className="text-sm text-slate-400">
-                        Access to <strong className="text-white">{subStatus.plan}</strong> until{' '}
-                        <strong className="text-white">{new Date(subStatus.gracePeriodEnd).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}</strong>
-                        {' '}— <strong className="text-amber-400">{subStatus.daysRemaining} days left</strong>
+                    <h3 className="text-base font-bold text-primary">Subscription Cancelled</h3>
+                    <p className="text-sm text-[var(--sys-text-muted)]">
+                        Access to <strong className="text-[var(--sys-text)]">{subStatus.plan}</strong> until{' '}
+                        <strong className="text-[var(--sys-text)]">{new Date(subStatus.gracePeriodEnd).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}</strong>
+                        {' '}— <strong className="text-primary">{subStatus.daysRemaining} days left</strong>
                     </p>
                 </div>
                 <button onClick={() => navigate('/credits')}
@@ -460,8 +460,8 @@ export default function UserSettings() {
             </div>
         )}
 
-        <div className="glass-panel rounded-2xl border border-white/[0.08] p-8">
-            <h3 className="text-xl font-bold text-white flex items-center gap-2 mb-6">
+        <div className="glass-panel rounded-2xl border border-[var(--sys-border)] p-8">
+            <h3 className="text-xl font-bold text-[var(--sys-text)] flex items-center gap-2 mb-6">
                 <span className="material-symbols-outlined text-2xl text-primary">credit_card</span>
                 Subscription Overview
             </h3>
@@ -470,33 +470,33 @@ export default function UserSettings() {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
                     {[
                         { label: 'Plan', value: (subStatus.plan || 'Starter').charAt(0).toUpperCase() + (subStatus.plan || 'starter').slice(1), icon: 'workspace_premium', color: 'text-primary' },
-                        { label: 'Billing', value: (subStatus.billingCycle || 'monthly').charAt(0).toUpperCase() + (subStatus.billingCycle || 'monthly').slice(1), icon: 'autorenew', color: 'text-cyan-400' },
-                        { label: 'Days Left', value: subStatus.daysRemaining || 0, icon: 'schedule', color: (subStatus.daysRemaining || 0) > 15 ? 'text-emerald-400' : 'text-amber-400' },
-                        { label: 'Renews On', value: subStatus.endDate ? new Date(subStatus.endDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : '—', icon: 'event', color: 'text-slate-400' },
+                        { label: 'Billing', value: (subStatus.billingCycle || 'monthly').charAt(0).toUpperCase() + (subStatus.billingCycle || 'monthly').slice(1), icon: 'autorenew', color: 'text-primary' },
+                        { label: 'Days Left', value: subStatus.daysRemaining || 0, icon: 'schedule', color: (subStatus.daysRemaining || 0) > 15 ? 'text-primary' : 'text-primary' },
+                        { label: 'Renews On', value: subStatus.endDate ? new Date(subStatus.endDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : '—', icon: 'event', color: 'text-[var(--sys-text-muted)]' },
                     ].map(item => (
-                        <div key={item.label} className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-5">
+                        <div key={item.label} className="bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl p-5">
                             <span className={`material-symbols-outlined text-xl ${item.color} mb-2 block`}>{item.icon}</span>
-                            <p className="text-lg font-bold text-white">{item.value}</p>
-                            <p className="text-xs text-slate-500 uppercase font-bold mt-1">{item.label}</p>
+                            <p className="text-lg font-bold text-[var(--sys-text)]">{item.value}</p>
+                            <p className="text-xs text-[var(--sys-text-muted)] uppercase font-bold mt-1">{item.label}</p>
                         </div>
                     ))}
                 </div>
             ) : (
-                <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-8 text-center mb-8">
-                    <span className="material-symbols-outlined text-4xl text-slate-500 mb-3 block">credit_card_off</span>
-                    <p className="text-lg font-bold text-white">No Active Subscription</p>
-                    <p className="text-sm text-slate-500 mt-1">You're on the free starter plan</p>
+                <div className="bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl p-8 text-center mb-8">
+                    <span className="material-symbols-outlined text-4xl text-[var(--sys-text-muted)] mb-3 block">credit_card_off</span>
+                    <p className="text-lg font-bold text-[var(--sys-text)]">No Active Subscription</p>
+                    <p className="text-sm text-[var(--sys-text-muted)] mt-1">You're on the free starter plan</p>
                 </div>
             )}
 
             <div className="flex flex-wrap gap-3">
                 <button onClick={() => navigate('/credits')}
-                    className="flex items-center gap-2 px-5 py-3 rounded-xl bg-primary text-white font-bold text-sm shadow-lg shadow-primary/20 hover:bg-primary-light transition-all cursor-pointer">
+                    className="flex items-center gap-2 px-5 py-3 rounded-xl bg-primary text-white font-bold text-sm shadow-none hover:bg-primary-light transition-all cursor-pointer">
                     <span className="material-symbols-outlined text-lg">upgrade</span>
                     {subStatus?.hasSubscription ? 'Manage Subscription' : 'Upgrade Plan'}
                 </button>
                 <button onClick={() => navigate('/credits')}
-                    className="flex items-center gap-2 px-5 py-3 rounded-xl bg-white/[0.06] border border-white/[0.1] text-white font-bold text-sm hover:bg-white/[0.1] transition-all cursor-pointer">
+                    className="flex items-center gap-2 px-5 py-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] font-bold text-sm hover:bg-[var(--sys-surface)] transition-all cursor-pointer">
                     <span className="material-symbols-outlined text-lg">receipt_long</span>
                     Transaction History
                 </button>
@@ -509,32 +509,32 @@ export default function UserSettings() {
 {section === 'credits' && (
     <div className="space-y-6">
         {/* Credit balance card */}
-        <div className="glass-panel rounded-2xl border border-white/[0.08] p-8">
-            <h3 className="text-xl font-bold text-white flex items-center gap-2 mb-6">
+        <div className="glass-panel rounded-2xl border border-[var(--sys-border)] p-8">
+            <h3 className="text-xl font-bold text-[var(--sys-text)] flex items-center gap-2 mb-6">
                 <span className="material-symbols-outlined text-2xl text-primary">toll</span>
                 Credit Balance
             </h3>
 
             {creditBalance?.unlimited ? (
-                <div className="bg-gradient-to-r from-amber-500/5 to-yellow-500/5 border border-amber-500/20 rounded-xl p-6 flex items-center gap-4">
-                    <span className="material-symbols-outlined text-4xl text-amber-400">all_inclusive</span>
+                <div className="bg-[var(--sys-surface)] border border-[var(--sys-border)] border border-[var(--sys-border)] rounded-xl p-6 flex items-center gap-4">
+                    <span className="material-symbols-outlined text-4xl text-primary">all_inclusive</span>
                     <div>
-                        <p className="text-2xl font-black text-amber-400">Unlimited Credits</p>
-                        <p className="text-sm text-slate-500">Enterprise plan — no credit limits</p>
+                        <p className="text-2xl font-black text-primary">Unlimited Credits</p>
+                        <p className="text-sm text-[var(--sys-text-muted)]">Enterprise plan — no credit limits</p>
                     </div>
                 </div>
             ) : creditBalance ? (
                 <div>
                     <div className="flex items-end justify-between mb-4">
                         <div>
-                            <p className="text-4xl font-black text-white">{creditBalance.remaining}</p>
-                            <p className="text-sm text-slate-500">of {creditBalance.total} credits remaining</p>
+                            <p className="text-4xl font-black text-[var(--sys-text)]">{creditBalance.remaining}</p>
+                            <p className="text-sm text-[var(--sys-text-muted)]">of {creditBalance.total} credits remaining</p>
                         </div>
                         <span className="text-sm font-bold px-3 py-1 rounded-full" style={{ background: creditBgHex, color: creditColorHex }}>
                             {Math.round(creditPercent)}%
                         </span>
                     </div>
-                    <div className="w-full h-3 rounded-full bg-white/[0.06] overflow-hidden mb-6">
+                    <div className="w-full h-3 rounded-full bg-[var(--sys-surface)] overflow-hidden mb-6">
                         <div className="h-full rounded-full transition-all"
                             style={{ width: `${creditPercent}%`, background: creditColorHex }} />
                     </div>
@@ -546,38 +546,38 @@ export default function UserSettings() {
                             { label: 'Creatives', value: profile?.usage?.creativesGenerated || 0, icon: 'palette', color: '#ec4899' },
                             { label: 'Brands', value: profile?.usage?.brandsCreated || 0, icon: 'business', color: '#8b5cf6' },
                         ].map(item => (
-                            <div key={item.label} className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-4 text-center">
+                            <div key={item.label} className="bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl p-4 text-center">
                                 <span className="material-symbols-outlined text-xl mb-2 block" style={{ color: item.color }}>{item.icon}</span>
-                                <p className="text-xl font-bold text-white">{item.value}</p>
-                                <p className="text-xs text-slate-500 uppercase font-bold mt-1">{item.label}</p>
+                                <p className="text-xl font-bold text-[var(--sys-text)]">{item.value}</p>
+                                <p className="text-xs text-[var(--sys-text-muted)] uppercase font-bold mt-1">{item.label}</p>
                             </div>
                         ))}
                     </div>
                 </div>
             ) : (
-                <p className="text-slate-500">Loading credit info...</p>
+                <p className="text-[var(--sys-text-muted)]">Loading credit info...</p>
             )}
 
             <button onClick={() => navigate('/credits')}
-                className="mt-6 flex items-center gap-2 px-5 py-3 rounded-xl bg-primary text-white font-bold text-sm shadow-lg shadow-primary/20 hover:bg-primary-light transition-all cursor-pointer">
+                className="mt-6 flex items-center gap-2 px-5 py-3 rounded-xl bg-primary text-white font-bold text-sm shadow-none hover:bg-primary-light transition-all cursor-pointer">
                 <span className="material-symbols-outlined text-lg">toll</span>
                 Buy More Credits
             </button>
         </div>
 
         {/* Streak & Rewards */}
-        <div className="glass-panel rounded-2xl border border-white/[0.08] p-6">
-            <h4 className="text-base font-bold text-white flex items-center gap-2 mb-4">
-                <span className="material-symbols-outlined text-lg text-amber-400">local_fire_department</span>
+        <div className="glass-panel rounded-2xl border border-[var(--sys-border)] p-6">
+            <h4 className="text-base font-bold text-[var(--sys-text)] flex items-center gap-2 mb-4">
+                <span className="material-symbols-outlined text-lg text-primary">local_fire_department</span>
                 Activity Streak
             </h4>
             <div className="flex items-center gap-6">
                 <div className="text-center">
-                    <p className="text-3xl font-black text-amber-400">{profile?.streak || 0}</p>
-                    <p className="text-xs text-slate-500 uppercase font-bold">Day Streak</p>
+                    <p className="text-3xl font-black text-primary">{profile?.streak || 0}</p>
+                    <p className="text-xs text-[var(--sys-text-muted)] uppercase font-bold">Day Streak</p>
                 </div>
-                <div className="flex-1 bg-white/[0.02] border border-white/[0.06] rounded-xl p-4">
-                    <p className="text-sm text-slate-400">
+                <div className="flex-1 bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl p-4">
+                    <p className="text-sm text-[var(--sys-text-muted)]">
                         {(profile?.streak || 0) >= 7
                             ? 'On fire! Keep the momentum going.'
                             : (profile?.streak || 0) >= 3
@@ -592,25 +592,25 @@ export default function UserSettings() {
 
 {/* ═══════════════ PREFERENCES ═══════════════ */}
 {section === 'preferences' && (
-    <div className="glass-panel rounded-2xl border border-white/[0.08] p-8">
-        <h3 className="text-xl font-bold text-white flex items-center gap-2 mb-2">
+    <div className="glass-panel rounded-2xl border border-[var(--sys-border)] p-8">
+        <h3 className="text-xl font-bold text-[var(--sys-text)] flex items-center gap-2 mb-2">
             <span className="material-symbols-outlined text-2xl text-primary">tune</span>
             Preferences
         </h3>
-        <p className="text-sm text-slate-500 mb-8">Customize your AI experience and platform behavior</p>
+        <p className="text-sm text-[var(--sys-text-muted)] mb-8">Customize your AI experience and platform behavior</p>
 
         <div className="space-y-8 max-w-lg">
             {/* AI Model Preferences */}
             <div>
-                <h4 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
+                <h4 className="text-sm font-bold text-[var(--sys-text)] mb-4 flex items-center gap-2">
                     <span className="material-symbols-outlined text-base text-[#FF4D00]">auto_awesome</span>
                     AI Model Defaults
                 </h4>
                 <div className="space-y-4">
                     <div>
-                        <label className="text-xs text-slate-500 uppercase font-bold tracking-wider block mb-1.5">Default Text Provider</label>
+                        <label className="text-xs text-[var(--sys-text-muted)] uppercase font-bold tracking-wider block mb-1.5">Default Text Provider</label>
                         <select value={prefs.defaultTextProvider || ''} onChange={e => setPrefs(p => ({ ...p, defaultTextProvider: e.target.value }))}
-                            className="w-full px-4 py-3 rounded-xl bg-white/[0.04] border border-white/[0.1] text-white text-sm focus:border-primary/50 outline-none">
+                            className="w-full px-4 py-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm focus:border-primary/50 outline-none">
                             <option value="">Auto (Smart Router)</option>
                             <option value="anthropic">Anthropic (Claude)</option>
                             <option value="gemini">Google (Gemini)</option>
@@ -619,9 +619,9 @@ export default function UserSettings() {
                         </select>
                     </div>
                     <div>
-                        <label className="text-xs text-slate-500 uppercase font-bold tracking-wider block mb-1.5">Default Image Provider</label>
+                        <label className="text-xs text-[var(--sys-text-muted)] uppercase font-bold tracking-wider block mb-1.5">Default Image Provider</label>
                         <select value={prefs.defaultImageProvider || ''} onChange={e => setPrefs(p => ({ ...p, defaultImageProvider: e.target.value }))}
-                            className="w-full px-4 py-3 rounded-xl bg-white/[0.04] border border-white/[0.1] text-white text-sm focus:border-primary/50 outline-none">
+                            className="w-full px-4 py-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm focus:border-primary/50 outline-none">
                             <option value="">Auto</option>
                             <option value="flux">Flux</option>
                             <option value="gemini">Gemini Imagen</option>
@@ -632,23 +632,23 @@ export default function UserSettings() {
 
             {/* Fidato / AI Assistant */}
             <div>
-                <h4 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
-                    <span className="material-symbols-outlined text-base text-emerald-400">smart_toy</span>
+                <h4 className="text-sm font-bold text-[var(--sys-text)] mb-4 flex items-center gap-2">
+                    <span className="material-symbols-outlined text-base text-primary">smart_toy</span>
                     Fidato AI Assistant
                 </h4>
                 <div className="space-y-3">
-                    <label className="flex items-center justify-between p-4 rounded-xl bg-white/[0.02] border border-white/[0.06] cursor-pointer hover:bg-white/[0.04] transition-all">
+                    <label className="flex items-center justify-between p-4 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] cursor-pointer hover:bg-[var(--sys-surface)] transition-all">
                         <div>
-                            <p className="text-sm text-white font-medium">Enable Fidato</p>
-                            <p className="text-xs text-slate-500">AI assistant available across all studios</p>
+                            <p className="text-sm text-[var(--sys-text)] font-medium">Enable Fidato</p>
+                            <p className="text-xs text-[var(--sys-text-muted)]">AI assistant available across all studios</p>
                         </div>
                         <input type="checkbox" checked={prefs.fidatoEnabled !== false} onChange={e => setPrefs(p => ({ ...p, fidatoEnabled: e.target.checked }))}
                             className="accent-primary w-5 h-5 cursor-pointer" />
                     </label>
-                    <label className="flex items-center justify-between p-4 rounded-xl bg-white/[0.02] border border-white/[0.06] cursor-pointer hover:bg-white/[0.04] transition-all">
+                    <label className="flex items-center justify-between p-4 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] cursor-pointer hover:bg-[var(--sys-surface)] transition-all">
                         <div>
-                            <p className="text-sm text-white font-medium">Welcome Popup</p>
-                            <p className="text-xs text-slate-500">Show Fidato greeting when entering a studio</p>
+                            <p className="text-sm text-[var(--sys-text)] font-medium">Welcome Popup</p>
+                            <p className="text-xs text-[var(--sys-text-muted)]">Show Fidato greeting when entering a studio</p>
                         </div>
                         <input type="checkbox" checked={prefs.fidatoPopup !== false} onChange={e => setPrefs(p => ({ ...p, fidatoPopup: e.target.checked }))}
                             className="accent-primary w-5 h-5 cursor-pointer" />
@@ -659,7 +659,7 @@ export default function UserSettings() {
 
         <MsgBox msg={prefsMsg} />
         <button onClick={handlePrefsSave} disabled={prefsSaving}
-            className="mt-6 px-8 py-3 rounded-xl bg-primary text-white font-bold text-sm shadow-lg shadow-primary/20 hover:bg-primary-light disabled:opacity-40 transition-all cursor-pointer">
+            className="mt-6 px-8 py-3 rounded-xl bg-primary text-white font-bold text-sm shadow-none hover:bg-primary-light disabled:opacity-40 transition-all cursor-pointer">
             {prefsSaving ? 'Saving...' : 'Save Preferences'}
         </button>
     </div>
@@ -668,12 +668,12 @@ export default function UserSettings() {
 {/* ═══════════════ TEAM ═══════════════ */}
 {section === 'team' && (
     <div className="space-y-6">
-        <div className="glass-panel rounded-2xl border border-white/[0.08] p-8">
-            <h3 className="text-xl font-bold text-white flex items-center gap-2 mb-2">
+        <div className="glass-panel rounded-2xl border border-[var(--sys-border)] p-8">
+            <h3 className="text-xl font-bold text-[var(--sys-text)] flex items-center gap-2 mb-2">
                 <span className="material-symbols-outlined text-2xl text-primary">group</span>
                 Team Management
             </h3>
-            <p className="text-sm text-slate-500 mb-6">Manage your team members, roles, and collaboration settings</p>
+            <p className="text-sm text-[var(--sys-text-muted)] mb-6">Manage your team members, roles, and collaboration settings</p>
 
             {/* Team stats */}
             <div className="grid grid-cols-3 gap-4 mb-6">
@@ -682,10 +682,10 @@ export default function UserSettings() {
                     { label: 'Pending Invites', value: teamInfo?.invites?.length || 0, icon: 'mail', color: '#f59e0b' },
                     { label: 'Your Role', value: teamInfo?.isAdmin ? 'Admin' : 'Member', icon: 'shield_person', color: '#34d399' },
                 ].map(item => (
-                    <div key={item.label} className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-5 text-center">
+                    <div key={item.label} className="bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl p-5 text-center">
                         <span className="material-symbols-outlined text-xl mb-2 block" style={{ color: item.color }}>{item.icon}</span>
-                        <p className="text-lg font-bold text-white">{item.value}</p>
-                        <p className="text-xs text-slate-500 uppercase font-bold mt-1">{item.label}</p>
+                        <p className="text-lg font-bold text-[var(--sys-text)]">{item.value}</p>
+                        <p className="text-xs text-[var(--sys-text-muted)] uppercase font-bold mt-1">{item.label}</p>
                     </div>
                 ))}
             </div>
@@ -693,17 +693,17 @@ export default function UserSettings() {
             {/* Quick member list */}
             {teamInfo?.members?.length > 0 && (
                 <div className="mb-6">
-                    <p className="text-xs text-slate-500 uppercase font-bold tracking-wider mb-3">Team Members</p>
+                    <p className="text-xs text-[var(--sys-text-muted)] uppercase font-bold tracking-wider mb-3">Team Members</p>
                     <div className="flex -space-x-2">
                         {teamInfo.members.slice(0, 8).map((m, i) => (
                             <div key={m._id || i}
-                                className="size-10 rounded-full bg-gradient-to-br from-primary to-[#FF7A00] flex items-center justify-center text-white text-xs font-bold border-2 border-[#0a0a1a]"
+                                className="size-10 rounded-full bg-[var(--sys-surface)] border border-[var(--sys-border)] flex items-center justify-center text-[var(--sys-text)] text-xs font-bold border border-[#0a0a1a]"
                                 title={m.name || m.email}>
                                 {(m.name || '?').charAt(0).toUpperCase()}
                             </div>
                         ))}
                         {teamInfo.members.length > 8 && (
-                            <div className="size-10 rounded-full bg-white/[0.06] flex items-center justify-center text-slate-400 text-xs font-bold border-2 border-[#0a0a1a]">
+                            <div className="size-10 rounded-full bg-[var(--sys-surface)] flex items-center justify-center text-[var(--sys-text-muted)] text-xs font-bold border border-[#0a0a1a]">
                                 +{teamInfo.members.length - 8}
                             </div>
                         )}
@@ -712,23 +712,23 @@ export default function UserSettings() {
             )}
 
             <button onClick={() => navigate('/team')}
-                className="flex items-center gap-2 px-6 py-3 rounded-xl bg-primary text-white font-bold text-sm shadow-lg shadow-primary/20 hover:bg-primary-light transition-all cursor-pointer">
+                className="flex items-center gap-2 px-6 py-3 rounded-xl bg-primary text-white font-bold text-sm shadow-none hover:bg-primary-light transition-all cursor-pointer">
                 <span className="material-symbols-outlined text-lg">open_in_new</span>
                 Open Team Dashboard
             </button>
         </div>
 
         {/* Integrations link */}
-        <div className="glass-panel rounded-2xl border border-white/[0.08] p-6">
+        <div className="glass-panel rounded-2xl border border-[var(--sys-border)] p-6">
             <button onClick={() => navigate('/integrations')} className="w-full flex items-center justify-between group cursor-pointer">
                 <div className="flex items-center gap-3">
-                    <span className="material-symbols-outlined text-xl text-cyan-400">electrical_services</span>
+                    <span className="material-symbols-outlined text-xl text-primary">electrical_services</span>
                     <div className="text-left">
-                        <p className="text-sm font-bold text-white">Integrations</p>
-                        <p className="text-xs text-slate-500">Connect Shopify, Meta, Google Ads & more</p>
+                        <p className="text-sm font-bold text-[var(--sys-text)]">Integrations</p>
+                        <p className="text-xs text-[var(--sys-text-muted)]">Connect Shopify, Meta, Google Ads & more</p>
                     </div>
                 </div>
-                <span className="material-symbols-outlined text-slate-500 group-hover:text-white transition-all">chevron_right</span>
+                <span className="material-symbols-outlined text-[var(--sys-text-muted)] group-hover:text-[var(--sys-text)] transition-all">chevron_right</span>
             </button>
         </div>
     </div>

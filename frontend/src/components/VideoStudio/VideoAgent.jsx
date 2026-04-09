@@ -444,27 +444,27 @@ export default function VideoAgent({ activeBrand }) {
             <div className="lg:col-span-8 flex flex-col" style={{ maxHeight: '80vh' }}>
 
                 {/* Header */}
-                <div className="glass-panel rounded-2xl p-4 border border-white/[0.08] mb-3">
+                <div className="glass-panel rounded-2xl p-4 border border-[var(--sys-border)]/[0.08] mb-3">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #14b8a6, #06b6d4, #8b5cf6)' }}>
-                            <span className="material-symbols-outlined text-white text-xl">smart_display</span>
+                            <span className="material-symbols-outlined text-[var(--sys-text)] text-xl">smart_display</span>
                         </div>
                         <div className="flex-1 min-w-0">
-                            <h2 className="text-lg font-bold text-white">Video Agent</h2>
-                            <p className="text-[10px] text-slate-500 truncate">Prompt-driven • Brand-aware • Multi-scene • AI Compiled</p>
+                            <h2 className="text-lg font-bold text-[var(--sys-text)]">Video Agent</h2>
+                            <p className="text-[10px] text-[var(--sys-text-muted)] truncate">Prompt-driven • Brand-aware • Multi-scene • AI Compiled</p>
                         </div>
                         <button onClick={() => setShowSettingsPanel(!showSettingsPanel)}
-                            className={`p-2 rounded-xl transition-all cursor-pointer ${showSettingsPanel ? 'bg-teal-500/20 text-teal-300' : 'text-slate-500 hover:text-white hover:bg-white/[0.05]'}`}>
+                            className={`p-2 rounded-xl transition-all cursor-pointer ${showSettingsPanel ? 'bg-[var(--sys-surface)] text-[var(--sys-primary)]' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-white/[0.05]'}`}>
                             <span className="material-symbols-outlined text-lg">tune</span>
                         </button>
                     </div>
 
                     {showSettingsPanel && (
-                        <div className="mt-3 pt-3 border-t border-white/[0.05] grid grid-cols-2 md:grid-cols-3 gap-2">
+                        <div className="mt-3 pt-3 border-t border-[var(--sys-border)]/[0.05] grid grid-cols-2 md:grid-cols-3 gap-2">
                             <div>
-                                <label className="text-[10px] text-slate-500 mb-1 block">Quality</label>
+                                <label className="text-[10px] text-[var(--sys-text-muted)] mb-1 block">Quality</label>
                                 <select value={overrideQuality} onChange={e => setOverrideQuality(e.target.value)}
-                                    className="w-full bg-white/[0.04] border border-white/[0.08] rounded-lg px-2 py-1.5 text-xs text-white appearance-none cursor-pointer">
+                                    className="w-full bg-white/[0.04] border border-[var(--sys-border)]/[0.08] rounded-lg px-2 py-1.5 text-xs text-[var(--sys-text)] appearance-none cursor-pointer">
                                     <option value="">AI Picks</option>
                                     <option value="draft">🎨 Draft (cheapest)</option>
                                     <option value="fast">⚡ Fast</option>
@@ -472,9 +472,9 @@ export default function VideoAgent({ activeBrand }) {
                                 </select>
                             </div>
                             <div>
-                                <label className="text-[10px] text-slate-500 mb-1 block">Aspect</label>
+                                <label className="text-[10px] text-[var(--sys-text-muted)] mb-1 block">Aspect</label>
                                 <select value={overrideAspect} onChange={e => setOverrideAspect(e.target.value)}
-                                    className="w-full bg-white/[0.04] border border-white/[0.08] rounded-lg px-2 py-1.5 text-xs text-white appearance-none cursor-pointer">
+                                    className="w-full bg-white/[0.04] border border-[var(--sys-border)]/[0.08] rounded-lg px-2 py-1.5 text-xs text-[var(--sys-text)] appearance-none cursor-pointer">
                                     <option value="">Auto</option>
                                     <option value="16:9">16:9 Landscape</option>
                                     <option value="9:16">9:16 Portrait</option>
@@ -482,32 +482,32 @@ export default function VideoAgent({ activeBrand }) {
                                 </select>
                             </div>
                             <div>
-                                <label className="text-[10px] text-slate-500 mb-1 block">Voiceover</label>
+                                <label className="text-[10px] text-[var(--sys-text-muted)] mb-1 block">Voiceover</label>
                                 <select value={voEnabled ? voProvider : 'off'} onChange={e => {
                                     if (e.target.value === 'off') { setVoEnabled(false) }
                                     else { setVoEnabled(true); setVoProvider(e.target.value) }
                                 }}
-                                    className="w-full bg-white/[0.04] border border-white/[0.08] rounded-lg px-2 py-1.5 text-xs text-white appearance-none cursor-pointer">
+                                    className="w-full bg-white/[0.04] border border-[var(--sys-border)]/[0.08] rounded-lg px-2 py-1.5 text-xs text-[var(--sys-text)] appearance-none cursor-pointer">
                                     <option value="minimax">🎙️ MiniMax</option>
                                     <option value="sarvam">🇮🇳 Sarvam</option>
                                     <option value="off">No VO</option>
                                 </select>
                             </div>
                             <div>
-                                <label className="text-[10px] text-slate-500 mb-1 block">🎵 AI Music</label>
+                                <label className="text-[10px] text-[var(--sys-text-muted)] mb-1 block">🎵 AI Music</label>
                                 <select value={musicEnabled ? 'on' : 'off'} onChange={e => setMusicEnabled(e.target.value === 'on')}
-                                    className="w-full bg-white/[0.04] border border-white/[0.08] rounded-lg px-2 py-1.5 text-xs text-white appearance-none cursor-pointer">
+                                    className="w-full bg-white/[0.04] border border-[var(--sys-border)]/[0.08] rounded-lg px-2 py-1.5 text-xs text-[var(--sys-text)] appearance-none cursor-pointer">
                                     <option value="on">Generate Music</option>
                                     <option value="off">No Music</option>
                                 </select>
                             </div>
                             <div>
-                                <label className="text-[10px] text-slate-500 mb-1 block">📝 Text Overlays</label>
+                                <label className="text-[10px] text-[var(--sys-text-muted)] mb-1 block">📝 Text Overlays</label>
                                 <select value={textOverlaysEnabled ? overlayLanguage : 'off'} onChange={e => {
                                     if (e.target.value === 'off') { setTextOverlaysEnabled(false) }
                                     else { setTextOverlaysEnabled(true); setOverlayLanguage(e.target.value) }
                                 }}
-                                    className="w-full bg-white/[0.04] border border-white/[0.08] rounded-lg px-2 py-1.5 text-xs text-white appearance-none cursor-pointer">
+                                    className="w-full bg-white/[0.04] border border-[var(--sys-border)]/[0.08] rounded-lg px-2 py-1.5 text-xs text-[var(--sys-text)] appearance-none cursor-pointer">
                                     <option value="english">English</option>
                                     <option value="hindi">हिन्दी Hindi</option>
                                     <option value="tamil">தமிழ் Tamil</option>
@@ -518,7 +518,7 @@ export default function VideoAgent({ activeBrand }) {
                             </div>
                             <div className="flex items-end">
                                 <button onClick={() => { setOverrideQuality(''); setOverrideAspect(''); setVoEnabled(true); setVoProvider('minimax'); setMusicEnabled(false); setTextOverlaysEnabled(true); setOverlayLanguage('english') }}
-                                    className="w-full px-2 py-1.5 text-xs text-slate-400 hover:text-white border border-white/[0.08] rounded-lg hover:bg-white/[0.04] transition-all cursor-pointer">
+                                    className="w-full px-2 py-1.5 text-xs text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] border border-[var(--sys-border)]/[0.08] rounded-lg hover:bg-white/[0.04] transition-all cursor-pointer">
                                     Reset
                                 </button>
                             </div>
@@ -534,10 +534,10 @@ export default function VideoAgent({ activeBrand }) {
                         <div className="grid grid-cols-3 gap-2 mb-2">
                             {QUICK_PROMPTS.map((qp, i) => (
                                 <button key={i} onClick={() => handleSend(qp.prompt)}
-                                    className="p-3 rounded-xl border border-white/[0.06] bg-white/[0.02] hover:border-teal-400/30 hover:bg-teal-500/5 transition-all cursor-pointer text-left group">
+                                    className="p-3 rounded-xl border border-[var(--sys-border)]/[0.06] bg-white/[0.02] hover:border-[var(--sys-border)] hover:bg-[var(--sys-surface)] transition-all cursor-pointer text-left group">
                                     <div className="text-lg mb-1">{qp.icon}</div>
-                                    <div className="text-xs font-bold text-white group-hover:text-teal-300 transition-colors">{qp.label}</div>
-                                    <div className="text-[10px] text-slate-600 mt-0.5 line-clamp-2">{qp.prompt.substring(0, 55)}...</div>
+                                    <div className="text-xs font-bold text-[var(--sys-text)] group-hover:text-[var(--sys-primary)] transition-colors">{qp.label}</div>
+                                    <div className="text-[10px] text-[var(--sys-text-muted)] mt-0.5 line-clamp-2">{qp.prompt.substring(0, 55)}...</div>
                                 </button>
                             ))}
                         </div>
@@ -546,28 +546,28 @@ export default function VideoAgent({ activeBrand }) {
                     {messages.map((msg, i) => (
                         <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                             <div className={`max-w-[85%] rounded-2xl p-3.5 ${
-                                msg.role === 'user' ? 'bg-gradient-to-r from-teal-500/20 to-cyan-500/20 border border-teal-500/20 text-white'
-                                    : msg.isError ? 'bg-rose-500/10 border border-rose-500/20 text-rose-300'
-                                    : 'bg-white/[0.04] border border-white/[0.06] text-slate-300'}`}>
+                                msg.role === 'user' ? 'bg-[var(--sys-surface)] border border-[var(--sys-border)] border border-[var(--sys-border)] text-[var(--sys-text)]'
+                                    : msg.isError ? 'bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-primary)]'
+                                    : 'bg-white/[0.04] border border-[var(--sys-border)]/[0.06] text-[var(--sys-text-muted)]'}`}>
 
                                 {msg.role === 'agent' && (
                                     <div className="flex items-center gap-1.5 mb-2">
                                         <div className="w-5 h-5 rounded-md flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #14b8a6, #8b5cf6)' }}>
-                                            <span className="material-symbols-outlined text-white" style={{ fontSize: '12px' }}>smart_display</span>
+                                            <span className="material-symbols-outlined text-[var(--sys-text)]" style={{ fontSize: '12px' }}>smart_display</span>
                                         </div>
-                                        <span className="text-[10px] font-bold text-teal-400">Video Agent</span>
+                                        <span className="text-[10px] font-bold text-[var(--sys-primary)]">Video Agent</span>
                                     </div>
                                 )}
 
                                 {/* Product tag */}
                                 {msg.product && (
-                                    <div className="flex items-center gap-2 mb-2 p-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                                    <div className="flex items-center gap-2 mb-2 p-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)]">
                                         {msg.product.images?.[0] && (
                                             <img src={msg.product.images[0].url} alt="" className="w-8 h-8 rounded-lg object-cover" />
                                         )}
                                         <div>
-                                            <p className="text-[10px] font-bold text-amber-300">🛍️ {msg.product.title}</p>
-                                            {msg.product.price?.amount && <p className="text-[9px] text-slate-500">{msg.product.price.currency} {msg.product.price.amount}</p>}
+                                            <p className="text-[10px] font-bold text-[var(--sys-primary)]">🛍️ {msg.product.title}</p>
+                                            {msg.product.price?.amount && <p className="text-[9px] text-[var(--sys-text-muted)]">{msg.product.price.currency} {msg.product.price.amount}</p>}
                                         </div>
                                     </div>
                                 )}
@@ -576,7 +576,7 @@ export default function VideoAgent({ activeBrand }) {
                                 {msg.images && msg.images.length > 0 && (
                                     <div className="flex gap-1.5 mb-2">
                                         {msg.images.map((img, j) => (
-                                            <div key={j} className="w-12 h-12 rounded-lg overflow-hidden border border-white/[0.1]">
+                                            <div key={j} className="w-12 h-12 rounded-lg overflow-hidden border border-[var(--sys-border)]/[0.1]">
                                                 <img src={img.url} alt="" className="w-full h-full object-cover" />
                                             </div>
                                         ))}
@@ -589,7 +589,7 @@ export default function VideoAgent({ activeBrand }) {
                                 {msg.type === 'storyboard-review' && !generating && !generatingFrames && (
                                     <div className="mt-3 flex flex-wrap gap-2">
                                         <button onClick={() => handleApproveFirstFrames(msg.sessionId)}
-                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-500/20 text-teal-300 text-[11px] font-bold hover:bg-teal-500/30 cursor-pointer transition-colors border border-teal-500/30">
+                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--sys-surface)] text-[var(--sys-primary)] text-[11px] font-bold hover:bg-[var(--sys-surface)] cursor-pointer transition-colors border border-[var(--sys-border)]">
                                             <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>image</span>
                                             ✅ Approve & Generate Previews
                                         </button>
@@ -606,10 +606,10 @@ export default function VideoAgent({ activeBrand }) {
                                     <>
                                         <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2">
                                             {msg.frames.filter(f => f.imageUrl).map((f, j) => (
-                                                <div key={j} className="rounded-xl overflow-hidden border border-white/[0.08] bg-black relative group">
+                                                <div key={j} className="rounded-xl overflow-hidden border border-[var(--sys-border)]/[0.08] bg-black relative group">
                                                     <img src={f.imageUrl} alt={`Scene ${f.sceneNumber} preview`} className="w-full aspect-video object-cover" />
                                                     <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/80 p-1.5">
-                                                        <span className="text-[10px] text-white/80 font-bold">Scene {f.sceneNumber}</span>
+                                                        <span className="text-[10px] text-[var(--sys-text)]/80 font-bold">Scene {f.sceneNumber}</span>
                                                     </div>
                                                 </div>
                                             ))}
@@ -617,12 +617,12 @@ export default function VideoAgent({ activeBrand }) {
                                         {!generating && (
                                             <div className="mt-3 flex gap-2">
                                                 <button onClick={() => handleApproveGenerate(msg.sessionId)}
-                                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-500/20 text-teal-300 text-[11px] font-bold hover:bg-teal-500/30 cursor-pointer transition-colors border border-teal-500/30">
+                                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--sys-surface)] text-[var(--sys-primary)] text-[11px] font-bold hover:bg-[var(--sys-surface)] cursor-pointer transition-colors border border-[var(--sys-border)]">
                                                     <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>movie</span>
                                                     ✅ Approve & Generate Videos
                                                 </button>
                                                 <button onClick={() => handleApproveFirstFrames(msg.sessionId)}
-                                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/20 text-amber-300 text-[11px] font-bold hover:bg-amber-500/30 cursor-pointer transition-colors border border-amber-500/30">
+                                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--sys-surface)] text-[var(--sys-primary)] text-[11px] font-bold hover:bg-[var(--sys-surface)] cursor-pointer transition-colors border border-[var(--sys-border)]">
                                                     <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>refresh</span>
                                                     🔁 Regenerate Frames
                                                 </button>
@@ -635,14 +635,14 @@ export default function VideoAgent({ activeBrand }) {
                                 {msg.completedScenes && msg.completedScenes.length > 0 && (
                                     <div className="mt-3 space-y-2">
                                         {msg.completedScenes.map((sc, j) => (
-                                            <div key={j} className="rounded-xl overflow-hidden border border-white/[0.08] bg-black">
+                                            <div key={j} className="rounded-xl overflow-hidden border border-[var(--sys-border)]/[0.08] bg-black">
                                                 <div style={{ aspectRatio: '16/9' }}>
                                                     <video src={sc.videoUrl} controls className="w-full h-full" />
                                                 </div>
                                                 <div className="flex items-center justify-between p-2">
-                                                    <span className="text-[10px] text-slate-500">{sc.id === 'compiled' ? '🎬 Final Video' : `Scene ${j + 1}`}</span>
+                                                    <span className="text-[10px] text-[var(--sys-text-muted)]">{sc.id === 'compiled' ? '🎬 Final Video' : `Scene ${j + 1}`}</span>
                                                     <button onClick={() => handleDownload(sc.videoUrl, sc.id === 'compiled' ? 'final-video' : `scene-${j + 1}`)}
-                                                        className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-teal-500/20 text-teal-300 text-[10px] font-bold hover:bg-teal-500/30 cursor-pointer">
+                                                        className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-[var(--sys-surface)] text-[var(--sys-primary)] text-[10px] font-bold hover:bg-[var(--sys-surface)] cursor-pointer">
                                                         <span className="material-symbols-outlined" style={{ fontSize: '11px' }}>download</span> Download
                                                     </button>
                                                 </div>
@@ -652,7 +652,7 @@ export default function VideoAgent({ activeBrand }) {
                                         {/* Compile button */}
                                         {msg.showCompile && !generating && (
                                             <button onClick={() => handleCompile(msg.completedScenes)}
-                                                className="w-full mt-2 py-2.5 rounded-xl font-bold text-sm text-white cursor-pointer transition-all hover:scale-[1.02]"
+                                                className="w-full mt-2 py-2.5 rounded-xl font-bold text-sm text-[var(--sys-text)] cursor-pointer transition-all hover:scale-[1.02]"
                                                 style={{ background: 'linear-gradient(135deg, #14b8a6, #06b6d4, #8b5cf6)' }}>
                                                 🎬 Compile Final Video
                                             </button>
@@ -660,7 +660,7 @@ export default function VideoAgent({ activeBrand }) {
                                     </div>
                                 )}
 
-                                <div className="text-[9px] text-slate-600 mt-1.5">
+                                <div className="text-[9px] text-[var(--sys-text-muted)] mt-1.5">
                                     {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                 </div>
                             </div>
@@ -670,13 +670,13 @@ export default function VideoAgent({ activeBrand }) {
                     {/* Thinking */}
                     {isThinking && (
                         <div className="flex justify-start">
-                            <div className="bg-white/[0.04] border border-white/[0.06] rounded-2xl p-3.5 flex items-center gap-2">
+                            <div className="bg-white/[0.04] border border-[var(--sys-border)]/[0.06] rounded-2xl p-3.5 flex items-center gap-2">
                                 <div className="flex gap-1">
-                                    <div className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-bounce" style={{ animationDelay: '0ms' }} />
-                                    <div className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-bounce" style={{ animationDelay: '150ms' }} />
+                                    <div className="w-1.5 h-1.5 rounded-full bg-[var(--sys-surface)] animate-bounce" style={{ animationDelay: '0ms' }} />
+                                    <div className="w-1.5 h-1.5 rounded-full bg-[var(--sys-surface)] animate-bounce" style={{ animationDelay: '150ms' }} />
                                     <div className="w-1.5 h-1.5 rounded-full bg-[#FF4D00] animate-bounce" style={{ animationDelay: '300ms' }} />
                                 </div>
-                                <span className="text-xs text-slate-500">AI writing storyboard, selecting models...</span>
+                                <span className="text-xs text-[var(--sys-text-muted)]">AI writing storyboard, selecting models...</span>
                             </div>
                         </div>
                     )}
@@ -684,15 +684,15 @@ export default function VideoAgent({ activeBrand }) {
                     {/* Scene generation progress */}
                     {generating && Object.keys(sceneStatuses).length > 0 && (
                         <div className="flex justify-start">
-                            <div className="w-full max-w-[85%] bg-white/[0.04] border border-teal-500/20 rounded-2xl p-4">
+                            <div className="w-full max-w-[85%] bg-white/[0.04] border border-[var(--sys-border)] rounded-2xl p-4">
                                 <div className="flex items-center gap-2 mb-3">
-                                    <span className="material-symbols-outlined text-teal-400 text-lg animate-spin">progress_activity</span>
-                                    <span className="text-xs font-bold text-white">Generating scenes...</span>
+                                    <span className="material-symbols-outlined text-[var(--sys-primary)] text-lg animate-spin">progress_activity</span>
+                                    <span className="text-xs font-bold text-[var(--sys-text)]">Generating scenes...</span>
                                 </div>
                                 <div className="space-y-2">
                                     {Object.entries(sceneStatuses).map(([id, st], idx) => (
                                         <div key={id} className="flex items-center gap-2">
-                                            <span className="text-[10px] text-slate-500 w-14 flex-shrink-0">Scene {idx + 1}</span>
+                                            <span className="text-[10px] text-[var(--sys-text-muted)] w-14 flex-shrink-0">Scene {idx + 1}</span>
                                             <div className="flex-1 h-2 rounded-full bg-white/[0.06] overflow-hidden">
                                                 <div className="h-full rounded-full transition-all duration-700"
                                                     style={{
@@ -717,33 +717,33 @@ export default function VideoAgent({ activeBrand }) {
                 {(selectedProduct || refImages.length > 0 || characterPhoto || audioFile) && (
                     <div className="flex items-center gap-2 mb-2 flex-wrap px-1">
                         {selectedProduct && (
-                            <div className="flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/20 rounded-lg px-2 py-1 group">
+                            <div className="flex items-center gap-1.5 bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-lg px-2 py-1 group">
                                 {selectedProduct.images?.[0] && <img src={selectedProduct.images[0].url} alt="" className="w-6 h-6 rounded object-cover" />}
-                                <span className="text-[10px] text-amber-300 font-medium">{selectedProduct.title}</span>
-                                <button onClick={() => setSelectedProduct(null)} className="text-amber-400 hover:text-rose-400 cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity" style={{ fontSize: '10px' }}>✕</button>
+                                <span className="text-[10px] text-[var(--sys-primary)] font-medium">{selectedProduct.title}</span>
+                                <button onClick={() => setSelectedProduct(null)} className="text-[var(--sys-primary)] hover:text-[var(--sys-primary)] cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity" style={{ fontSize: '10px' }}>✕</button>
                             </div>
                         )}
                         {characterPhoto && (
                             <div className="flex items-center gap-1.5 bg-[#FF4D00]/10 border border-[#FF4D00]/20 rounded-lg px-2 py-1 group">
                                 <img src={characterPhoto.url} alt="" className="w-6 h-6 rounded-full object-cover" />
                                 <span className="text-[10px] text-[#FF7A00] font-medium">👤 Character</span>
-                                <button onClick={() => setCharacterPhoto(null)} className="text-[#FF4D00] hover:text-rose-400 cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity" style={{ fontSize: '10px' }}>✕</button>
+                                <button onClick={() => setCharacterPhoto(null)} className="text-[#FF4D00] hover:text-[var(--sys-primary)] cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity" style={{ fontSize: '10px' }}>✕</button>
                             </div>
                         )}
                         {audioFile && (
-                            <div className="flex items-center gap-1.5 bg-orange-500/10 border border-orange-500/20 rounded-lg px-2 py-1 group">
+                            <div className="flex items-center gap-1.5 bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-lg px-2 py-1 group">
                                 <span className="text-sm">🎧</span>
-                                <span className="text-[10px] text-orange-300 font-medium truncate max-w-[100px]">{audioFile.name}</span>
-                                <button onClick={() => { setAudioFile(null); setVoEnabled(true) }} className="text-orange-400 hover:text-rose-400 cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity" style={{ fontSize: '10px' }}>✕</button>
+                                <span className="text-[10px] text-[var(--sys-primary)] font-medium truncate max-w-[100px]">{audioFile.name}</span>
+                                <button onClick={() => { setAudioFile(null); setVoEnabled(true) }} className="text-[var(--sys-primary)] hover:text-[var(--sys-primary)] cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity" style={{ fontSize: '10px' }}>✕</button>
                             </div>
                         )}
                         {refImages.map((img, i) => (
                             <div key={i} className="relative group">
-                                <div className="w-8 h-8 rounded-lg overflow-hidden border border-white/[0.1]">
+                                <div className="w-8 h-8 rounded-lg overflow-hidden border border-[var(--sys-border)]/[0.1]">
                                     <img src={img.url} alt="" className="w-full h-full object-cover" />
                                 </div>
                                 <button onClick={() => setRefImages(prev => prev.filter((_, j) => j !== i))}
-                                    className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-rose-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer" style={{ fontSize: '7px' }}>×</button>
+                                    className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-[var(--sys-surface)] text-[var(--sys-text)] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer" style={{ fontSize: '7px' }}>×</button>
                             </div>
                         ))}
                     </div>
@@ -752,7 +752,7 @@ export default function VideoAgent({ activeBrand }) {
                 {/* Character Description (collapsible) */}
                 <div className="mb-2 px-1">
                     <button onClick={() => setShowCharDesc(!showCharDesc)}
-                        className={`text-[10px] flex items-center gap-1 mb-1 cursor-pointer transition-colors ${characterDesc.trim() ? 'text-[#FF4D00]' : 'text-slate-500 hover:text-[#FF4D00]'}`}>
+                        className={`text-[10px] flex items-center gap-1 mb-1 cursor-pointer transition-colors ${characterDesc.trim() ? 'text-[#FF4D00]' : 'text-[var(--sys-text-muted)] hover:text-[#FF4D00]'}`}>
                         <span className="material-symbols-outlined" style={{ fontSize: '12px' }}>{showCharDesc ? 'expand_less' : 'group'}</span>
                         {characterDesc.trim() ? `👤 Characters defined (${characterDesc.trim().split('\n').filter(Boolean).length})` : 'Define characters (optional)'}
                     </button>
@@ -760,30 +760,30 @@ export default function VideoAgent({ activeBrand }) {
                         <textarea value={characterDesc}
                             onChange={e => setCharacterDesc(e.target.value)}
                             placeholder="Describe your characters, e.g.:\n• Hero: 25-year-old woman, long black hair, red dress, confident\n• Villain: Tall man in dark suit, scar on left cheek\n• Narrator: Warm, friendly grandmother figure"
-                            className="w-full bg-white/[0.03] border border-[#FF4D00]/20 rounded-xl px-3 py-2 text-[11px] text-slate-300 placeholder:text-slate-600 resize-none focus:outline-none focus:border-[#FF4D00]/40"
+                            className="w-full bg-white/[0.03] border border-[#FF4D00]/20 rounded-xl px-3 py-2 text-[11px] text-[var(--sys-text-muted)] placeholder:text-[var(--sys-text-muted)] resize-none focus:outline-none focus:border-[#FF4D00]/40"
                             rows={3} />
                     )}
                 </div>
 
                 {/* Input */}
-                <div className="glass-panel rounded-2xl border border-white/[0.08] p-3 flex items-end gap-2">
+                <div className="glass-panel rounded-2xl border border-[var(--sys-border)]/[0.08] p-3 flex items-end gap-2">
                     <button onClick={() => setShowProductPicker(!showProductPicker)}
-                        className={`p-2 rounded-xl transition-all cursor-pointer flex-shrink-0 ${showProductPicker ? 'bg-amber-500/20 text-amber-300' : 'text-slate-500 hover:text-amber-400 hover:bg-amber-500/10'}`}
+                        className={`p-2 rounded-xl transition-all cursor-pointer flex-shrink-0 ${showProductPicker ? 'bg-[var(--sys-surface)] text-[var(--sys-primary)]' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-primary)] hover:bg-[var(--sys-surface)]'}`}
                         title="Select product from brand catalog">
                         <span className="material-symbols-outlined text-lg">shopping_bag</span>
                     </button>
                     <button onClick={() => charFileRef.current?.click()}
-                        className={`p-2 rounded-xl transition-all cursor-pointer flex-shrink-0 ${characterPhoto ? 'bg-[#FF4D00]/20 text-[#FF7A00]' : 'text-slate-500 hover:text-[#FF4D00] hover:bg-[#FF4D00]/10'}`}
+                        className={`p-2 rounded-xl transition-all cursor-pointer flex-shrink-0 ${characterPhoto ? 'bg-[#FF4D00]/20 text-[#FF7A00]' : 'text-[var(--sys-text-muted)] hover:text-[#FF4D00] hover:bg-[#FF4D00]/10'}`}
                         title="Upload model/character photo for consistency">
                         <span className="material-symbols-outlined text-lg">face</span>
                     </button>
                     <button onClick={() => audioFileRef.current?.click()}
-                        className={`p-2 rounded-xl transition-all cursor-pointer flex-shrink-0 ${audioFile ? 'bg-orange-500/20 text-orange-300' : 'text-slate-500 hover:text-orange-400 hover:bg-orange-500/10'}`}
+                        className={`p-2 rounded-xl transition-all cursor-pointer flex-shrink-0 ${audioFile ? 'bg-[var(--sys-surface)] text-[var(--sys-primary)]' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-primary)] hover:bg-[var(--sys-surface)]'}`}
                         title="Upload audio (VO/music) — video syncs to this">
                         <span className="material-symbols-outlined text-lg">headphones</span>
                     </button>
                     <button onClick={() => fileRef.current?.click()}
-                        className="p-2 rounded-xl text-slate-500 hover:text-teal-400 hover:bg-teal-500/10 transition-all cursor-pointer flex-shrink-0"
+                        className="p-2 rounded-xl text-[var(--sys-text-muted)] hover:text-[var(--sys-primary)] hover:bg-[var(--sys-surface)] transition-all cursor-pointer flex-shrink-0"
                         title="Upload reference images for style blending">
                         <span className="material-symbols-outlined text-lg">add_photo_alternate</span>
                     </button>
@@ -791,7 +791,7 @@ export default function VideoAgent({ activeBrand }) {
                     {/* Model selector */}
                     <div className="relative flex-shrink-0">
                         <select value={videoModel} onChange={e => setVideoModel(e.target.value)}
-                            className="appearance-none bg-white/[0.05] border border-white/[0.08] rounded-lg text-[10px] text-slate-300 pl-2 pr-6 py-1.5 cursor-pointer hover:bg-white/[0.08] focus:outline-none focus:border-teal-500/40 transition-colors"
+                            className="appearance-none bg-white/[0.05] border border-[var(--sys-border)]/[0.08] rounded-lg text-[10px] text-[var(--sys-text-muted)] pl-2 pr-6 py-1.5 cursor-pointer hover:bg-white/[0.08] focus:outline-none focus:border-[var(--sys-border)] transition-colors"
                             title="Select video model">
                             <option value="auto" className="bg-[#08080C]">🤖 Auto (Best)</option>
                             <option value="kling-3.0" className="bg-[#08080C]">👑 Kling 3.0</option>
@@ -800,7 +800,7 @@ export default function VideoAgent({ activeBrand }) {
                             <option value="hunyuan" className="bg-[#08080C]">🎨 Hunyuan (Draft)</option>
                             <option value="grok-imagine" className="bg-[#08080C]">🤖 Grok (Fast)</option>
                         </select>
-                        <span className="material-symbols-outlined absolute right-1 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" style={{ fontSize: '12px' }}>expand_more</span>
+                        <span className="material-symbols-outlined absolute right-1 top-1/2 -translate-y-1/2 text-[var(--sys-text-muted)] pointer-events-none" style={{ fontSize: '12px' }}>expand_more</span>
                     </div>
                     <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={handleImageUpload} />
                     <input ref={charFileRef} type="file" accept="image/*" className="hidden" onChange={handleCharacterUpload} />
@@ -809,47 +809,47 @@ export default function VideoAgent({ activeBrand }) {
                     <textarea value={input} onChange={e => setInput(e.target.value)}
                         onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() } }}
                         placeholder="Describe your video... (e.g., 'Create a 30s ad for our protein powder with VO')"
-                        className="flex-1 bg-transparent text-white text-sm placeholder:text-slate-600 resize-none focus:outline-none min-h-[40px] max-h-[100px]"
+                        className="flex-1 bg-transparent text-[var(--sys-text)] text-sm placeholder:text-[var(--sys-text-muted)] resize-none focus:outline-none min-h-[40px] max-h-[100px]"
                         rows={1} disabled={generating} style={{ lineHeight: '1.5' }} />
 
                     <button onClick={() => handleSend()} disabled={!input.trim() || isThinking || generating}
                         className="p-2.5 rounded-xl transition-all cursor-pointer flex-shrink-0 disabled:opacity-30 disabled:cursor-not-allowed"
                         style={{ background: input.trim() ? 'linear-gradient(135deg, #14b8a6, #06b6d4)' : 'rgba(255,255,255,0.04)' }}>
-                        <span className="material-symbols-outlined text-white text-lg">send</span>
+                        <span className="material-symbols-outlined text-[var(--sys-text)] text-lg">send</span>
                     </button>
                 </div>
 
                 {/* Product Picker Dropdown */}
                 {showProductPicker && (
-                    <div className="glass-panel rounded-2xl border border-white/[0.08] p-4 mt-2 max-h-[40vh] overflow-y-auto" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.06) transparent' }}>
+                    <div className="glass-panel rounded-2xl border border-[var(--sys-border)]/[0.08] p-4 mt-2 max-h-[40vh] overflow-y-auto" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.06) transparent' }}>
                         <div className="flex items-center justify-between mb-3">
-                            <h4 className="text-xs font-bold text-white">Select Product from Brand Catalog</h4>
-                            <button onClick={() => setShowProductPicker(false)} className="text-slate-500 hover:text-white cursor-pointer">
+                            <h4 className="text-xs font-bold text-[var(--sys-text)]">Select Product from Brand Catalog</h4>
+                            <button onClick={() => setShowProductPicker(false)} className="text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer">
                                 <span className="material-symbols-outlined text-sm">close</span>
                             </button>
                         </div>
 
                         {products.length === 0 ? (
-                            <p className="text-xs text-slate-500 text-center py-4">No products found. Add products in Brand DNA → Products.</p>
+                            <p className="text-xs text-[var(--sys-text-muted)] text-center py-4">No products found. Add products in Brand DNA → Products.</p>
                         ) : (
                             <div className="grid grid-cols-2 gap-2">
                                 {products.map(p => (
                                     <button key={p._id} onClick={() => { setSelectedProduct(p); setShowProductPicker(false) }}
                                         className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
-                                            selectedProduct?._id === p._id ? 'border-amber-400/40 bg-amber-500/10' : 'border-white/[0.06] bg-white/[0.02] hover:border-amber-400/20 hover:bg-amber-500/5'
+                                            selectedProduct?._id === p._id ? 'border-[var(--sys-border)] bg-[var(--sys-surface)]' : 'border-[var(--sys-border)]/[0.06] bg-white/[0.02] hover:border-[var(--sys-border)] hover:bg-[var(--sys-surface)]'
                                         }`}>
                                         <div className="flex items-start gap-2">
                                             {p.images?.[0] ? (
                                                 <img src={p.images[0].url} alt="" className="w-10 h-10 rounded-lg object-cover flex-shrink-0" />
                                             ) : (
                                                 <div className="w-10 h-10 rounded-lg bg-white/[0.06] flex items-center justify-center flex-shrink-0">
-                                                    <span className="material-symbols-outlined text-slate-600 text-lg">image</span>
+                                                    <span className="material-symbols-outlined text-[var(--sys-text-muted)] text-lg">image</span>
                                                 </div>
                                             )}
                                             <div className="min-w-0">
-                                                <p className="text-xs font-bold text-white truncate">{p.title}</p>
-                                                {p.category && <p className="text-[10px] text-slate-500">{p.category}</p>}
-                                                {p.price?.amount > 0 && <p className="text-[10px] text-emerald-400">{p.price.currency} {p.price.amount}</p>}
+                                                <p className="text-xs font-bold text-[var(--sys-text)] truncate">{p.title}</p>
+                                                {p.category && <p className="text-[10px] text-[var(--sys-text-muted)]">{p.category}</p>}
+                                                {p.price?.amount > 0 && <p className="text-[10px] text-[var(--sys-primary)]">{p.price.currency} {p.price.amount}</p>}
                                             </div>
                                         </div>
                                     </button>
@@ -860,14 +860,14 @@ export default function VideoAgent({ activeBrand }) {
                         {/* Brand Images section */}
                         {brandImages.length > 0 && (
                             <>
-                                <h4 className="text-xs font-bold text-white mt-4 mb-2">Brand Images</h4>
+                                <h4 className="text-xs font-bold text-[var(--sys-text)] mt-4 mb-2">Brand Images</h4>
                                 <div className="flex gap-2 flex-wrap">
                                     {brandImages.slice(0, 12).map((img, i) => (
                                         <button key={i} onClick={() => { setRefImages(prev => [...prev.slice(-4), { url: img.url, name: img.alt }]); setShowProductPicker(false) }}
-                                            className="w-14 h-14 rounded-lg overflow-hidden border border-white/[0.06] hover:border-teal-400/30 transition-all cursor-pointer group relative">
+                                            className="w-14 h-14 rounded-lg overflow-hidden border border-[var(--sys-border)]/[0.06] hover:border-[var(--sys-border)] transition-all cursor-pointer group relative">
                                             <img src={img.url} alt={img.alt} className="w-full h-full object-cover" />
-                                            <div className="absolute inset-0 bg-teal-500/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <span className="material-symbols-outlined text-white text-sm">add</span>
+                                            <div className="absolute inset-0 bg-[var(--sys-surface)] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <span className="material-symbols-outlined text-[var(--sys-text)] text-sm">add</span>
                                             </div>
                                         </button>
                                     ))}
@@ -882,9 +882,9 @@ export default function VideoAgent({ activeBrand }) {
             <div className="lg:col-span-4 space-y-4">
 
                 {/* Agentic Pipeline */}
-                <div className="glass-panel rounded-2xl p-5 border border-white/[0.08]">
-                    <h3 className="text-sm font-bold text-white flex items-center gap-2 mb-3">
-                        <span className="material-symbols-outlined text-teal-400 text-lg">auto_awesome</span>
+                <div className="glass-panel rounded-2xl p-5 border border-[var(--sys-border)]/[0.08]">
+                    <h3 className="text-sm font-bold text-[var(--sys-text)] flex items-center gap-2 mb-3">
+                        <span className="material-symbols-outlined text-[var(--sys-primary)] text-lg">auto_awesome</span>
                         Agentic Pipeline
                     </h3>
                     <div className="space-y-2.5">
@@ -905,8 +905,8 @@ export default function VideoAgent({ activeBrand }) {
                                     <span className="material-symbols-outlined" style={{ fontSize: '12px', color: step.color }}>{step.icon}</span>
                                 </div>
                                 <div>
-                                    <p className="text-[11px] font-bold text-white">{step.label}</p>
-                                    <p className="text-[10px] text-slate-500 leading-tight">{step.desc}</p>
+                                    <p className="text-[11px] font-bold text-[var(--sys-text)]">{step.label}</p>
+                                    <p className="text-[10px] text-[var(--sys-text-muted)] leading-tight">{step.desc}</p>
                                 </div>
                             </div>
                         ))}
@@ -915,30 +915,30 @@ export default function VideoAgent({ activeBrand }) {
 
                 {/* Current Pipeline Status */}
                 {pipeline && (
-                    <div className="glass-panel rounded-2xl p-5 border border-white/[0.08]">
-                        <h3 className="text-sm font-bold text-white flex items-center gap-2 mb-3">
+                    <div className="glass-panel rounded-2xl p-5 border border-[var(--sys-border)]/[0.08]">
+                        <h3 className="text-sm font-bold text-[var(--sys-text)] flex items-center gap-2 mb-3">
                             <span className="material-symbols-outlined text-[#FF4D00] text-lg">analytics</span>
                             Pipeline Status
                         </h3>
                         <div className="space-y-2 text-xs">
-                            <div className="flex justify-between"><span className="text-slate-500">Title</span><span className="text-white font-medium truncate ml-2">{pipeline.pipeline?.title}</span></div>
-                            <div className="flex justify-between"><span className="text-slate-500">Scenes</span><span className="text-white">{pipeline.pipeline?.totalScenes}</span></div>
-                            <div className="flex justify-between"><span className="text-slate-500">Duration</span><span className="text-white">~{pipeline.pipeline?.totalDuration}s</span></div>
-                            <div className="flex justify-between"><span className="text-slate-500">Model</span><span className="text-white">{MODEL_INFO[pipeline.pipeline?.model]?.icon} {MODEL_INFO[pipeline.pipeline?.model]?.name || pipeline.pipeline?.model}</span></div>
-                            <div className="flex justify-between"><span className="text-slate-500">Voiceover</span><span className="text-white">{pipeline.voiceover?.provider || 'None'}{pipeline.voiceover?.url?.startsWith('fal-pending:') ? ' (generating...)' : ''}</span></div>
-                            {pipeline.pipeline?.characterRefUsed && <div className="flex justify-between"><span className="text-slate-500">Character</span><span className="text-[#FF7A00]">👤 Ref sheet active</span></div>}
-                            {pipeline.audioFile && <div className="flex justify-between"><span className="text-slate-500">Audio</span><span className="text-orange-300">🎧 User audio {pipeline.audioFile.transcript ? '(transcribed ✓)' : '(base track)'}</span></div>}
-                            {pipeline.music?.url && <div className="flex justify-between"><span className="text-slate-500">Music</span><span className="text-orange-300">🎵 {pipeline.music.mood || 'AI Generated'}{pipeline.music.url?.startsWith('fal-pending:') ? ' (generating...)' : ''}</span></div>}
-                            {pipeline.textOverlays?.length > 0 && <div className="flex justify-between"><span className="text-slate-500">Overlays</span><span className="text-cyan-300">📝 {pipeline.textOverlays.length} text layers</span></div>}
-                            {pipeline.productUsed && <div className="flex justify-between"><span className="text-slate-500">Product</span><span className="text-amber-300">📦 {pipeline.productUsed.imagesCount} images</span></div>}
+                            <div className="flex justify-between"><span className="text-[var(--sys-text-muted)]">Title</span><span className="text-[var(--sys-text)] font-medium truncate ml-2">{pipeline.pipeline?.title}</span></div>
+                            <div className="flex justify-between"><span className="text-[var(--sys-text-muted)]">Scenes</span><span className="text-[var(--sys-text)]">{pipeline.pipeline?.totalScenes}</span></div>
+                            <div className="flex justify-between"><span className="text-[var(--sys-text-muted)]">Duration</span><span className="text-[var(--sys-text)]">~{pipeline.pipeline?.totalDuration}s</span></div>
+                            <div className="flex justify-between"><span className="text-[var(--sys-text-muted)]">Model</span><span className="text-[var(--sys-text)]">{MODEL_INFO[pipeline.pipeline?.model]?.icon} {MODEL_INFO[pipeline.pipeline?.model]?.name || pipeline.pipeline?.model}</span></div>
+                            <div className="flex justify-between"><span className="text-[var(--sys-text-muted)]">Voiceover</span><span className="text-[var(--sys-text)]">{pipeline.voiceover?.provider || 'None'}{pipeline.voiceover?.url?.startsWith('fal-pending:') ? ' (generating...)' : ''}</span></div>
+                            {pipeline.pipeline?.characterRefUsed && <div className="flex justify-between"><span className="text-[var(--sys-text-muted)]">Character</span><span className="text-[#FF7A00]">👤 Ref sheet active</span></div>}
+                            {pipeline.audioFile && <div className="flex justify-between"><span className="text-[var(--sys-text-muted)]">Audio</span><span className="text-[var(--sys-primary)]">🎧 User audio {pipeline.audioFile.transcript ? '(transcribed ✓)' : '(base track)'}</span></div>}
+                            {pipeline.music?.url && <div className="flex justify-between"><span className="text-[var(--sys-text-muted)]">Music</span><span className="text-[var(--sys-primary)]">🎵 {pipeline.music.mood || 'AI Generated'}{pipeline.music.url?.startsWith('fal-pending:') ? ' (generating...)' : ''}</span></div>}
+                            {pipeline.textOverlays?.length > 0 && <div className="flex justify-between"><span className="text-[var(--sys-text-muted)]">Overlays</span><span className="text-[var(--sys-primary)]">📝 {pipeline.textOverlays.length} text layers</span></div>}
+                            {pipeline.productUsed && <div className="flex justify-between"><span className="text-[var(--sys-text-muted)]">Product</span><span className="text-[var(--sys-primary)]">📦 {pipeline.productUsed.imagesCount} images</span></div>}
                         </div>
                     </div>
                 )}
 
                 {/* Capabilities */}
-                <div className="glass-panel rounded-2xl p-5 border border-white/[0.08]">
-                    <h3 className="text-sm font-bold text-white flex items-center gap-2 mb-3">
-                        <span className="material-symbols-outlined text-amber-400 text-lg">bolt</span>
+                <div className="glass-panel rounded-2xl p-5 border border-[var(--sys-border)]/[0.08]">
+                    <h3 className="text-sm font-bold text-[var(--sys-text)] flex items-center gap-2 mb-3">
+                        <span className="material-symbols-outlined text-[var(--sys-primary)] text-lg">bolt</span>
                         What Makes This Different
                     </h3>
                     <div className="space-y-2">
@@ -951,9 +951,9 @@ export default function VideoAgent({ activeBrand }) {
                             { q: '🎬 Multi-scene', a: 'Long videos break into 5-15s scenes with character consistency' },
                             { q: '🤖 7 AI Models', a: 'Kling 3.0, Veo 3.1, Seedance 2.0, Hunyuan, Grok' },
                         ].map((item, i) => (
-                            <div key={i} className="p-2 rounded-lg bg-white/[0.02] border border-white/[0.04]">
-                                <p className="text-[10px] font-bold text-teal-400">{item.q}</p>
-                                <p className="text-[10px] text-slate-500">{item.a}</p>
+                            <div key={i} className="p-2 rounded-lg bg-white/[0.02] border border-[var(--sys-border)]/[0.04]">
+                                <p className="text-[10px] font-bold text-[var(--sys-primary)]">{item.q}</p>
+                                <p className="text-[10px] text-[var(--sys-text-muted)]">{item.a}</p>
                             </div>
                         ))}
                     </div>

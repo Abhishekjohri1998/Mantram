@@ -128,7 +128,7 @@ export default function GlobalLoader({
         <div className="glass-panel rounded-2xl p-8 text-center flex flex-col items-center justify-center min-h-[400px] animate-fade-in w-full">
             {/* Animated mesh spinner */}
             <div className="loader-mesh mb-5">
-                <div className="mesh-ring mesh-ring-1"></div>
+                <div className="mesh-ring mesh-"></div>
                 <div className="mesh-ring mesh-ring-2"></div>
                 <div className="mesh-ring mesh-ring-3"></div>
                 <span className="material-symbols-outlined text-3xl text-primary relative z-10 animate-pulse">
@@ -137,12 +137,12 @@ export default function GlobalLoader({
             </div>
 
             {/* Title */}
-            <h3 className="text-lg font-black text-white mb-1">{dynamicTitle}</h3>
+            <h3 className="text-lg font-black text-[var(--sys-text)] mb-1">{dynamicTitle}</h3>
             {activeStep && (
-                <p className="text-sm text-primary/80 animate-pulse mb-4 max-w-md">{activeStep.message}</p>
+                <p className="text-sm text-[var(--sys-text-muted)] animate-pulse mb-4 max-w-md">{activeStep.message}</p>
             )}
             {!activeStep && currentStage && (
-                <p className="text-sm text-primary animate-pulse mb-4">{currentStage}</p>
+                <p className="text-sm text-[var(--sys-text)] animate-pulse mb-4">{currentStage}</p>
             )}
 
             {/* ── Real-time Pipeline Steps ── */}
@@ -157,7 +157,7 @@ export default function GlobalLoader({
                         return (
                             <div key={step.agent + i} 
                                 className={`flex items-center gap-3 py-2 px-3 rounded-lg mb-1 transition-all duration-500 ${
-                                    isWorking ? 'bg-white/[0.06] border border-white/[0.08]' : isDone ? 'opacity-70' : 'opacity-40'
+                                    isWorking ? 'bg-[var(--sys-surface)] border border-[var(--sys-border)]' : isDone ? 'opacity-70' : 'opacity-40'
                                 }`}
                             >
                                 {/* Status icon */}
@@ -167,7 +167,7 @@ export default function GlobalLoader({
                                     ) : isWorking ? (
                                         <span className="material-symbols-outlined text-base animate-spin" style={{ color: meta.color }}>progress_activity</span>
                                     ) : (
-                                        <span className="material-symbols-outlined text-base text-slate-600">circle</span>
+                                        <span className="material-symbols-outlined text-base text-[var(--sys-text-muted)]">circle</span>
                                     )}
                                 </div>
 
@@ -176,17 +176,17 @@ export default function GlobalLoader({
 
                                 {/* Message */}
                                 <div className="flex-1 min-w-0">
-                                    <span className={`text-xs font-semibold ${isWorking ? 'text-white' : isDone ? 'text-slate-400' : 'text-slate-600'}`}>
+                                    <span className={`text-xs font-semibold ${isWorking ? 'text-[var(--sys-text)]' : isDone ? 'text-[var(--sys-text-muted)]' : 'text-[var(--sys-text-muted)]'}`}>
                                         {step.message}
                                     </span>
                                     {step.detail && isDone && (
-                                        <span className="text-[10px] text-slate-500 ml-2">— {step.detail}</span>
+                                        <span className="text-[10px] text-[var(--sys-text-muted)] ml-2">— {step.detail}</span>
                                     )}
                                 </div>
 
                                 {/* Duration */}
                                 {isDone && duration && (
-                                    <span className="text-[10px] font-mono text-slate-600 flex-shrink-0">{duration}</span>
+                                    <span className="text-[10px] font-mono text-[var(--sys-text-muted)] flex-shrink-0">{duration}</span>
                                 )}
                             </div>
                         );
@@ -197,15 +197,15 @@ export default function GlobalLoader({
             {/* ── Progress Bar ── */}
             <div className="w-full max-w-sm mt-2">
                 <div className="flex items-center justify-between mb-2">
-                    <span className="text-2xl font-black text-white">{displayPct}%</span>
-                    <span className="text-xs text-slate-500 font-mono">{elapsedLabel} elapsed</span>
+                    <span className="text-2xl font-black text-[var(--sys-text)]">{displayPct}%</span>
+                    <span className="text-xs text-[var(--sys-text-muted)] font-mono">{elapsedLabel} elapsed</span>
                 </div>
-                <div className="w-full h-2 bg-white/[0.06] rounded-full overflow-hidden relative">
+                <div className="w-full h-2 bg-[var(--sys-surface)] rounded-full overflow-hidden relative">
                     <div
                         className="h-full rounded-full transition-all duration-1000 ease-out"
                         style={{
                             width: `${displayPct}%`,
-                            background: 'linear-gradient(90deg, #FF4D00, #6366f1, #06b6d4)',
+                            background: 'var(--sys-primary)',
                             boxShadow: '0 0 12px rgba(255, 77, 0,0.4)',
                         }}
                     />
@@ -214,7 +214,7 @@ export default function GlobalLoader({
                         <div
                             className="absolute inset-0 rounded-full"
                             style={{
-                                background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.15) 50%, transparent 100%)',
+                                background: 'var(--sys-primary) 50%, transparent 100%)',
                                 backgroundSize: '200% 100%',
                                 animation: 'progressShimmer 1.8s linear infinite',
                             }}
@@ -222,12 +222,12 @@ export default function GlobalLoader({
                     )}
                 </div>
                 <div className="flex items-center justify-between mt-2">
-                    <span className="text-[11px] text-slate-500 flex items-center gap-1">
+                    <span className="text-[11px] text-[var(--sys-text-muted)] flex items-center gap-1">
                         {isNearlyDone && <span className="w-1.5 h-1.5 rounded-full bg-[#FF4D00] animate-pulse flex-shrink-0" />}
                         {etaLabel}
                     </span>
                     {hasRealSteps && (
-                        <span className="text-[10px] text-slate-600 flex items-center gap-1">
+                        <span className="text-[10px] text-[var(--sys-text-muted)] flex items-center gap-1">
                             <span className="material-symbols-outlined text-[12px] text-[#FF4D00]">smart_toy</span>
                             Agentic Pipeline
                         </span>
@@ -244,7 +244,7 @@ export default function GlobalLoader({
                             className={`flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold transition-all ${
                                 stages.indexOf(currentStage) >= i
                                     ? 'bg-primary/15 text-primary'
-                                    : 'bg-white/[0.04] text-slate-600'
+                                    : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)]'
                             }`}
                         >
                             {stages.indexOf(currentStage) > i ? (
@@ -264,7 +264,7 @@ export default function GlobalLoader({
             <style dangerouslySetInnerHTML={{__html: `
                 .loader-mesh { position: relative; width: 80px; height: 80px; display: flex; align-items: center; justify-content: center; }
                 .mesh-ring { position: absolute; border-radius: 50%; border: 2px solid transparent; border-top-color: #FF4D00; }
-                .mesh-ring-1 { width: 100%; height: 100%; animation: spin 2s linear infinite; opacity: 0.6; }
+                .mesh- { width: 100%; height: 100%; animation: spin 2s linear infinite; opacity: 0.6; }
                 .mesh-ring-2 { width: 80%; height: 80%; animation: spin 1.5s linear infinite reverse; border-top-color: #6366f1; opacity: 0.8; }
                 .mesh-ring-3 { width: 60%; height: 60%; animation: spin 1s linear infinite; border-top-color: #e2e8f0; opacity: 0.3; }
                 @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }

@@ -11,10 +11,10 @@ import PublishModal from '../components/PublishModal'
 // ═══════════════════════════════════════════════════════════════
 
 const PLATFORM_META = {
-    instagram: { label: 'Instagram', icon: '📸', color: '#E1306C', gradient: 'from-[#FF4D00] to-[#FF7A00]', ring: 'ring-pink-500/30' },
+    instagram: { label: 'Instagram', icon: '📸', color: '#E1306C', gradient: 'from-[#FF4D00] to-[#FF7A00]', ring: '' },
     facebook: { label: 'Facebook', icon: '👥', color: '#1877F2', gradient: 'from-[#FF4D00] to-[#FF7A00]', ring: 'ring-[#FF4D00]/30' },
-    twitter: { label: 'Twitter / X', icon: '𝕏', color: '#1DA1F2', gradient: 'from-slate-400 to-slate-600', ring: 'ring-slate-400/30' },
-    linkedin: { label: 'LinkedIn', icon: '💼', color: '#0A66C2', gradient: 'from-sky-500 to-[#FF7A00]', ring: 'ring-sky-500/30' },
+    twitter: { label: 'Twitter / X', icon: '𝕏', color: '#1DA1F2', gradient: 'from-slate-400 to-slate-600', ring: 'border-[var(--sys-border)]' },
+    linkedin: { label: 'LinkedIn', icon: '💼', color: '#0A66C2', gradient: 'from-sky-500 to-[#FF7A00]', ring: '' },
 }
 
 const typeIcons = {
@@ -116,66 +116,66 @@ export default function PublishSchedule() {
                 {/* ═══ Hero Stats ═══ */}
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
                     {/* Published Stat */}
-                    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-500/[0.08] to-emerald-600/[0.03] border border-emerald-500/10 p-5 group hover:border-emerald-500/20 transition-all">
-                        <div className="absolute top-0 right-0 w-20 h-20 bg-emerald-500/5 rounded-full -translate-y-1/2 translate-x-1/2 group-hover:scale-150 transition-transform duration-500" />
+                    <div className="relative overflow-hidden rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] border border-[var(--sys-border)] p-5 group hover:border-[var(--sys-border)] transition-all">
+                        <div className="absolute top-0 right-0 w-20 h-20 bg-[var(--sys-primary-dim)] rounded-full -translate-y-1/2 translate-x-1/2 group-hover:scale-150 transition-transform duration-500" />
                         <div className="flex items-center gap-3 mb-3">
-                            <div className="w-10 h-10 rounded-xl bg-emerald-500/15 flex items-center justify-center">
-                                <span className="material-symbols-outlined text-emerald-400">task_alt</span>
+                            <div className="w-10 h-10 rounded-xl bg-[var(--sys-primary-dim)] flex items-center justify-center">
+                                <span className="material-symbols-outlined text-primary">task_alt</span>
                             </div>
-                            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Published</span>
+                            <span className="text-xs font-bold text-[var(--sys-text-muted)] uppercase tracking-wider">Published</span>
                         </div>
-                        <p className="text-3xl font-black text-white">{publishedPosts.length}</p>
+                        <p className="text-3xl font-black text-[var(--sys-text)]">{publishedPosts.length}</p>
                     </div>
 
                     {/* Scheduled Stat */}
-                    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#FF4D00]/[0.08] to-[#FF7A00]/[0.03] border border-[#FF4D00]/10 p-5 group hover:border-[#FF4D00]/20 transition-all">
+                    <div className="relative overflow-hidden rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] border border-[#FF4D00]/10 p-5 group hover:border-[#FF4D00]/20 transition-all">
                         <div className="absolute top-0 right-0 w-20 h-20 bg-[#FF4D00]/5 rounded-full -translate-y-1/2 translate-x-1/2 group-hover:scale-150 transition-transform duration-500" />
                         <div className="flex items-center gap-3 mb-3">
                             <div className="w-10 h-10 rounded-xl bg-[#FF4D00]/15 flex items-center justify-center">
                                 <span className="material-symbols-outlined text-[#FF4D00]">schedule_send</span>
                             </div>
-                            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Scheduled</span>
+                            <span className="text-xs font-bold text-[var(--sys-text-muted)] uppercase tracking-wider">Scheduled</span>
                         </div>
-                        <p className="text-3xl font-black text-white">{scheduledPosts.length}</p>
+                        <p className="text-3xl font-black text-[var(--sys-text)]">{scheduledPosts.length}</p>
                     </div>
 
                     {/* Ready Stat */}
-                    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-sky-500/[0.08] to-sky-600/[0.03] border border-sky-500/10 p-5 group hover:border-sky-500/20 transition-all">
+                    <div className="relative overflow-hidden rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] border border-sky-500/10 p-5 group hover:border-sky-500/20 transition-all">
                         <div className="absolute top-0 right-0 w-20 h-20 bg-sky-500/5 rounded-full -translate-y-1/2 translate-x-1/2 group-hover:scale-150 transition-transform duration-500" />
                         <div className="flex items-center gap-3 mb-3">
                             <div className="w-10 h-10 rounded-xl bg-sky-500/15 flex items-center justify-center">
                                 <span className="material-symbols-outlined text-sky-400">check_circle</span>
                             </div>
-                            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Ready</span>
+                            <span className="text-xs font-bold text-[var(--sys-text-muted)] uppercase tracking-wider">Ready</span>
                         </div>
-                        <p className="text-3xl font-black text-white">{readyContent.length}</p>
+                        <p className="text-3xl font-black text-[var(--sys-text)]">{readyContent.length}</p>
                     </div>
 
                     {/* Failed Stat */}
-                    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-rose-500/[0.08] to-rose-600/[0.03] border border-rose-500/10 p-5 group hover:border-rose-500/20 transition-all">
-                        <div className="absolute top-0 right-0 w-20 h-20 bg-rose-500/5 rounded-full -translate-y-1/2 translate-x-1/2 group-hover:scale-150 transition-transform duration-500" />
+                    <div className="relative overflow-hidden rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] border border-[var(--sys-border)] p-5 group hover:border-[var(--sys-border)] transition-all">
+                        <div className="absolute top-0 right-0 w-20 h-20 bg-[var(--sys-primary-dim)] rounded-full -translate-y-1/2 translate-x-1/2 group-hover:scale-150 transition-transform duration-500" />
                         <div className="flex items-center gap-3 mb-3">
-                            <div className="w-10 h-10 rounded-xl bg-rose-500/15 flex items-center justify-center">
-                                <span className="material-symbols-outlined text-rose-400">error_outline</span>
+                            <div className="w-10 h-10 rounded-xl bg-[var(--sys-primary-dim)] flex items-center justify-center">
+                                <span className="material-symbols-outlined text-primary">error_outline</span>
                             </div>
-                            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Failed</span>
+                            <span className="text-xs font-bold text-[var(--sys-text-muted)] uppercase tracking-wider">Failed</span>
                         </div>
-                        <p className="text-3xl font-black text-white">{failedPosts.length}</p>
+                        <p className="text-3xl font-black text-[var(--sys-text)]">{failedPosts.length}</p>
                     </div>
                 </div>
 
                 {/* ═══ Tabs ═══ */}
-                <div className="flex gap-1.5 mb-6 bg-white/[0.02] p-1.5 rounded-2xl border border-white/[0.06]">
+                <div className="flex gap-1.5 mb-6 bg-[var(--sys-surface)] p-1.5 rounded-2xl border border-[var(--sys-border)]">
                     {tabs.map(tab => (
                         <button key={tab.id} onClick={() => setActiveTab(tab.id)}
                             className={`flex-1 py-3 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer
                                 ${activeTab === tab.id
-                                    ? 'bg-gradient-to-r from-primary to-primary-light text-white shadow-lg shadow-primary/20'
-                                    : 'text-slate-500 hover:text-slate-300 hover:bg-white/[0.04]'}`}>
+                                    ? 'bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] shadow-none'
+                                    : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text-muted)] hover:bg-[var(--sys-surface)]'}`}>
                             <span className="material-symbols-outlined text-lg">{tab.icon}</span>
                             <span className="hidden sm:inline">{tab.label}</span>
                             {tab.count > 0 && (
-                                <span className={`text-[10px] font-bold min-w-[20px] h-5 flex items-center justify-center rounded-full ${activeTab === tab.id ? 'bg-white/20' : 'bg-white/[0.06]'}`}>{tab.count}</span>
+                                <span className={`text-[10px] font-bold min-w-[20px] h-5 flex items-center justify-center rounded-full ${activeTab === tab.id ? 'bg-[var(--sys-surface)]' : 'bg-[var(--sys-surface)]'}`}>{tab.count}</span>
                             )}
                         </button>
                     ))}
@@ -183,7 +183,7 @@ export default function PublishSchedule() {
 
                 {/* ═══ Content Area ═══ */}
                 {isLoading ? (
-                    <div className="flex flex-col items-center justify-center py-24 text-slate-500">
+                    <div className="flex flex-col items-center justify-center py-24 text-[var(--sys-text-muted)]">
                         <span className="material-symbols-outlined text-4xl animate-spin mb-3 text-primary/60">progress_activity</span>
                         <p className="text-sm font-medium">Loading posts...</p>
                     </div>
@@ -196,7 +196,7 @@ export default function PublishSchedule() {
                                 const meta = PLATFORM_META[post.platform] || {}
                                 return (
                                     <div key={post._id}
-                                        className="group relative rounded-2xl bg-white/[0.02] border border-white/[0.06] hover:border-white/[0.12] hover:bg-white/[0.03] p-5 transition-all duration-200"
+                                        className="group relative rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:border-[var(--sys-border)] hover:bg-[var(--sys-surface)] p-5 transition-all duration-200"
                                         style={{ animation: `fadeInUp 0.4s ease-out ${idx * 60}ms both` }}>
 
                                         {/* Platform accent line */}
@@ -205,31 +205,31 @@ export default function PublishSchedule() {
                                         <div className="flex items-start gap-4 pl-3">
                                             {/* Image thumb */}
                                             {post.imageUrl && (
-                                                <img src={post.imageUrl} alt="" className={`w-16 h-16 rounded-xl object-cover flex-shrink-0 border border-white/10 ring-2 ${meta.ring || 'ring-white/10'}`} onError={e => e.target.style.display = 'none'} />
+                                                <img src={post.imageUrl} alt="" className={`w-16 h-16 rounded-xl object-cover flex-shrink-0 border border-[var(--sys-border)] ring-2 ${meta.ring || 'border-[var(--sys-border)]'}`} onError={e => e.target.style.display = 'none'} />
                                             )}
 
                                             <div className="min-w-0 flex-1">
                                                 {/* Meta row */}
                                                 <div className="flex items-center gap-2 mb-2 flex-wrap">
-                                                    <span className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-lg bg-gradient-to-r ${meta.gradient || 'from-primary to-primary-light'} text-white shadow-sm`}>
+                                                    <span className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-lg bg-gradient-to-r ${meta.gradient || 'from-primary to-primary-light'} text-[var(--sys-text)] shadow-sm`}>
                                                         {meta.icon || 'smartphone'} {meta.label || post.platform}
                                                     </span>
-                                                    <span className="text-xs text-slate-500 font-medium">{post.accountName}</span>
-                                                    <span className="inline-flex items-center gap-0.5 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400">
+                                                    <span className="text-xs text-[var(--sys-text-muted)] font-medium">{post.accountName}</span>
+                                                    <span className="inline-flex items-center gap-0.5 text-[10px] font-bold px-2 py-0.5 rounded-full bg-[var(--sys-primary-dim)] text-primary">
                                                         <span className="material-symbols-outlined text-[10px]">check_circle</span> Live
                                                     </span>
                                                 </div>
 
                                                 {/* Caption */}
-                                                <p className="text-[13px] text-slate-300 line-clamp-2 whitespace-pre-wrap leading-relaxed">{post.caption?.substring(0, 250)}</p>
+                                                <p className="text-[13px] text-[var(--sys-text-muted)] line-clamp-2 whitespace-pre-wrap leading-relaxed">{post.caption?.substring(0, 250)}</p>
 
                                                 {/* Timestamp */}
                                                 <div className="flex items-center gap-3 mt-2.5">
-                                                    <span className="text-[11px] text-slate-600 flex items-center gap-1">
+                                                    <span className="text-[11px] text-[var(--sys-text-muted)] flex items-center gap-1">
                                                         <span className="material-symbols-outlined text-[11px]">schedule</span>
                                                         {formatTimeAgo(post.publishedAt || post.createdAt)}
                                                     </span>
-                                                    <span className="text-[11px] text-slate-600">
+                                                    <span className="text-[11px] text-[var(--sys-text-muted)]">
                                                         {new Date(post.publishedAt || post.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
                                                     </span>
                                                 </div>
@@ -237,7 +237,7 @@ export default function PublishSchedule() {
 
                                             {/* Actions */}
                                             <button onClick={() => handleCopy(post.caption, post._id)}
-                                                className="p-2.5 rounded-xl hover:bg-white/[0.06] text-slate-600 hover:text-white transition-all cursor-pointer opacity-0 group-hover:opacity-100 flex-shrink-0">
+                                                className="p-2.5 rounded-xl hover:bg-[var(--sys-surface)] text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] transition-all cursor-pointer opacity-0 group-hover:opacity-100 flex-shrink-0">
                                                 <span className="material-symbols-outlined text-lg">{copiedId === post._id ? 'check' : 'content_copy'}</span>
                                             </button>
                                         </div>
@@ -266,7 +266,7 @@ export default function PublishSchedule() {
                                         className="group relative rounded-2xl bg-[#FF4D00]/[0.03] border border-[#FF4D00]/10 hover:border-[#FF4D00]/20 p-5 transition-all duration-200"
                                         style={{ animation: `fadeInUp 0.4s ease-out ${idx * 60}ms both` }}>
 
-                                        <div className="absolute left-0 top-4 bottom-4 w-[3px] rounded-full bg-gradient-to-b from-[#FF4D00] to-[#FF7A00] opacity-60" />
+                                        <div className="absolute left-0 top-4 bottom-4 w-[3px] rounded-full bg-[var(--sys-surface)] border border-[var(--sys-border)] opacity-60" />
 
                                         <div className="flex items-start gap-4 pl-3">
                                             {post.imageUrl && (
@@ -275,17 +275,17 @@ export default function PublishSchedule() {
 
                                             <div className="min-w-0 flex-1">
                                                 <div className="flex items-center gap-2 mb-2 flex-wrap">
-                                                    <span className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-lg bg-gradient-to-r ${meta.gradient || 'from-primary to-primary-light'} text-white shadow-sm`}>
+                                                    <span className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-lg bg-gradient-to-r ${meta.gradient || 'from-primary to-primary-light'} text-[var(--sys-text)] shadow-sm`}>
                                                         {meta.icon || 'smartphone'} {meta.label || post.platform}
                                                     </span>
-                                                    <span className="text-xs text-slate-500 font-medium">{post.accountName}</span>
+                                                    <span className="text-xs text-[var(--sys-text-muted)] font-medium">{post.accountName}</span>
                                                     {/* Countdown badge */}
                                                     <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full bg-[#FF4D00]/15 text-[#FF7A00] border border-[#FF4D00]/20">
                                                         <span className="material-symbols-outlined text-[12px]">timer</span>
                                                         {formatCountdown(post.scheduledFor)}
                                                     </span>
                                                 </div>
-                                                <p className="text-[13px] text-slate-300 line-clamp-2 whitespace-pre-wrap leading-relaxed">{post.caption?.substring(0, 250)}</p>
+                                                <p className="text-[13px] text-[var(--sys-text-muted)] line-clamp-2 whitespace-pre-wrap leading-relaxed">{post.caption?.substring(0, 250)}</p>
                                                 <div className="flex items-center gap-2 mt-2.5">
                                                     <span className="material-symbols-outlined text-xs text-[#FF4D00]">event</span>
                                                     <span className="text-[11px] text-[#FF4D00] font-medium">
@@ -297,7 +297,7 @@ export default function PublishSchedule() {
                                             <button
                                                 onClick={() => handleCancel(post._id)}
                                                 disabled={cancellingId === post._id}
-                                                className="px-4 py-2.5 rounded-xl bg-rose-500/10 text-rose-400 text-xs font-bold hover:bg-rose-500/20 transition-all cursor-pointer flex items-center gap-1.5 border border-rose-500/15 hover:border-rose-500/30 flex-shrink-0 disabled:opacity-30">
+                                                className="px-4 py-2.5 rounded-xl bg-[var(--sys-primary-dim)] text-primary text-xs font-bold hover:bg-[var(--sys-primary-dim)] transition-all cursor-pointer flex items-center gap-1.5 border border-[var(--sys-border)] hover:border-[var(--sys-border)] flex-shrink-0 disabled:opacity-30">
                                                 {cancellingId === post._id ? (
                                                     <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>
                                                 ) : (
@@ -325,20 +325,20 @@ export default function PublishSchedule() {
                         <div className="space-y-3">
                             {readyContent.map((item, idx) => (
                                 <div key={item._id}
-                                    className="group relative rounded-2xl bg-white/[0.02] border border-white/[0.06] hover:border-primary/20 hover:bg-white/[0.03] p-5 transition-all duration-200"
+                                    className="group relative rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:border-primary/20 hover:bg-[var(--sys-surface)] p-5 transition-all duration-200"
                                     style={{ animation: `fadeInUp 0.4s ease-out ${idx * 60}ms both` }}>
 
-                                    <div className="absolute left-0 top-4 bottom-4 w-[3px] rounded-full bg-gradient-to-b from-primary to-primary-light opacity-40" />
+                                    <div className="absolute left-0 top-4 bottom-4 w-[3px] rounded-full bg-[var(--sys-surface)] border border-[var(--sys-border)] opacity-40" />
 
                                     <div className="flex items-start justify-between gap-4 pl-3">
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-2 mb-2 flex-wrap">
                                                 <span className="material-symbols-outlined text-primary text-lg">{typeIcons[item.type] || 'description'}</span>
-                                                <h3 className="font-bold text-white truncate text-[15px]">{item.title || `${item.type} content`}</h3>
+                                                <h3 className="font-bold text-[var(--sys-text)] truncate text-[15px]">{item.title || `${item.type} content`}</h3>
                                                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-primary/10 text-primary uppercase">{item.type}</span>
                                             </div>
-                                            <p className="text-[13px] text-slate-400 line-clamp-2 whitespace-pre-wrap leading-relaxed">{item.content?.substring(0, 280)}</p>
-                                            <span className="text-[11px] text-slate-600 mt-2 inline-block">
+                                            <p className="text-[13px] text-[var(--sys-text-muted)] line-clamp-2 whitespace-pre-wrap leading-relaxed">{item.content?.substring(0, 280)}</p>
+                                            <span className="text-[11px] text-[var(--sys-text-muted)] mt-2 inline-block">
                                                 {new Date(item.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                                                 {item.brand?.name && ` • ${item.brand.name}`}
                                             </span>
@@ -346,11 +346,11 @@ export default function PublishSchedule() {
 
                                         <div className="flex items-center gap-2 shrink-0">
                                             <button onClick={() => handleCopy(item.content, item._id)}
-                                                className="p-2.5 rounded-xl hover:bg-white/[0.06] text-slate-600 hover:text-white transition-all cursor-pointer opacity-0 group-hover:opacity-100">
+                                                className="p-2.5 rounded-xl hover:bg-[var(--sys-surface)] text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] transition-all cursor-pointer opacity-0 group-hover:opacity-100">
                                                 <span className="material-symbols-outlined text-lg">{copiedId === item._id ? 'check' : 'content_copy'}</span>
                                             </button>
                                             <button onClick={() => { setPublishItem(item); setIsPublishModalOpen(true) }}
-                                                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-primary to-primary-light text-white text-xs font-bold hover:shadow-lg hover:shadow-primary/20 transition-all cursor-pointer flex items-center gap-2">
+                                                className="px-5 py-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-xs font-bold hover:shadow-lg hover:shadow-none transition-all cursor-pointer flex items-center gap-2">
                                                 <span className="material-symbols-outlined text-sm">send</span>
                                                 Publish
                                             </button>
@@ -377,30 +377,30 @@ export default function PublishSchedule() {
                                 const meta = PLATFORM_META[post.platform] || {}
                                 return (
                                     <div key={post._id}
-                                        className="group relative rounded-2xl bg-rose-500/[0.03] border border-rose-500/10 hover:border-rose-500/20 p-5 transition-all duration-200"
+                                        className="group relative rounded-2xl bg-[var(--sys-surface)]/[0.03] border border-[var(--sys-border)] hover:border-[var(--sys-border)] p-5 transition-all duration-200"
                                         style={{ animation: `fadeInUp 0.4s ease-out ${idx * 60}ms both` }}>
 
-                                        <div className="absolute left-0 top-4 bottom-4 w-[3px] rounded-full bg-gradient-to-b from-rose-400 to-red-600 opacity-60" />
+                                        <div className="absolute left-0 top-4 bottom-4 w-[3px] rounded-full bg-[var(--sys-surface)] border border-[var(--sys-border)] opacity-60" />
 
                                         <div className="flex items-start gap-4 pl-3">
                                             <div className="min-w-0 flex-1">
                                                 <div className="flex items-center gap-2 mb-2 flex-wrap">
-                                                    <span className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-lg bg-gradient-to-r ${meta.gradient || 'from-slate-500 to-slate-600'} text-white/80`}>
+                                                    <span className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-lg bg-gradient-to-r ${meta.gradient || 'from-slate-500 to-slate-600'} text-[var(--sys-text)]/80`}>
                                                         {meta.icon || 'smartphone'} {meta.label || post.platform}
                                                     </span>
-                                                    <span className="text-xs text-slate-500">{post.accountName}</span>
-                                                    <span className="inline-flex items-center gap-0.5 text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400">
+                                                    <span className="text-xs text-[var(--sys-text-muted)]">{post.accountName}</span>
+                                                    <span className="inline-flex items-center gap-0.5 text-[10px] font-bold px-2 py-0.5 rounded-full bg-[var(--sys-primary-dim)] text-primary">
                                                         <span className="material-symbols-outlined text-[10px]">error</span> Failed
                                                     </span>
                                                 </div>
-                                                <p className="text-[13px] text-slate-400 line-clamp-2 whitespace-pre-wrap">{post.caption?.substring(0, 200)}</p>
+                                                <p className="text-[13px] text-[var(--sys-text-muted)] line-clamp-2 whitespace-pre-wrap">{post.caption?.substring(0, 200)}</p>
                                                 {post.error && (
-                                                    <div className="mt-2 px-3 py-2 rounded-lg bg-rose-500/[0.06] border border-rose-500/10 flex items-start gap-2">
-                                                        <span className="material-symbols-outlined text-rose-400 text-sm mt-0.5">warning</span>
-                                                        <p className="text-xs text-rose-300/80 leading-relaxed">{post.error}</p>
+                                                    <div className="mt-2 px-3 py-2 rounded-lg bg-[var(--sys-surface)]/[0.06] border border-[var(--sys-border)] flex items-start gap-2">
+                                                        <span className="material-symbols-outlined text-primary text-sm mt-0.5">warning</span>
+                                                        <p className="text-xs text-[var(--sys-primary)] leading-relaxed">{post.error}</p>
                                                     </div>
                                                 )}
-                                                <span className="text-[11px] text-slate-600 mt-2 inline-block">{formatTimeAgo(post.createdAt)}</span>
+                                                <span className="text-[11px] text-[var(--sys-text-muted)] mt-2 inline-block">{formatTimeAgo(post.createdAt)}</span>
                                             </div>
                                         </div>
                                     </div>
@@ -441,15 +441,15 @@ export default function PublishSchedule() {
 // ── Premium Empty State ──
 function EmptyState({ icon, title, desc, actionLabel, onAction }) {
     return (
-        <div className="flex flex-col items-center justify-center py-24 glass-panel rounded-2xl border border-white/[0.04]">
-            <div className="w-20 h-20 rounded-2xl bg-white/[0.03] border border-white/[0.06] flex items-center justify-center mb-5">
-                <span className="material-symbols-outlined text-4xl text-slate-600">{icon}</span>
+        <div className="flex flex-col items-center justify-center py-24 glass-panel rounded-2xl border border-[var(--sys-border)]">
+            <div className="w-20 h-20 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] flex items-center justify-center mb-5">
+                <span className="material-symbols-outlined text-4xl text-[var(--sys-text-muted)]">{icon}</span>
             </div>
-            <h3 className="text-lg font-bold text-white mb-1.5">{title}</h3>
-            <p className="text-sm text-slate-500 text-center max-w-sm mb-5 leading-relaxed">{desc}</p>
+            <h3 className="text-lg font-bold text-[var(--sys-text)] mb-1.5">{title}</h3>
+            <p className="text-sm text-[var(--sys-text-muted)] text-center max-w-sm mb-5 leading-relaxed">{desc}</p>
             {actionLabel && onAction && (
                 <button onClick={onAction}
-                    className="px-6 py-3 rounded-xl text-sm font-bold bg-gradient-to-r from-primary to-primary-light text-white shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all cursor-pointer flex items-center gap-2">
+                    className="px-6 py-3 rounded-xl text-sm font-bold bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] shadow-none hover:shadow-none transition-all cursor-pointer flex items-center gap-2">
                     <span className="material-symbols-outlined text-sm">arrow_forward</span>
                     {actionLabel}
                 </button>

@@ -10,7 +10,7 @@ export default function ProtectedRoute({ children, allowedRoles }) {
             <div className="min-h-screen flex items-center justify-center" style={{ background: '#0a0c16' }}>
                 <div className="text-center space-y-4">
                     <span className="material-symbols-outlined text-primary text-5xl animate-spin">progress_activity</span>
-                    <p className="text-slate-400 text-sm">Loading...</p>
+                    <p className="text-[var(--sys-text-muted)] text-sm">Loading...</p>
                 </div>
             </div>
         )

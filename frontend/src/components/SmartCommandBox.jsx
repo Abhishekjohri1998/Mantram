@@ -353,23 +353,23 @@ export default function SmartCommandBox({ variant = 'dashboard', className = '' 
     return (
         <div className={`relative ${className}`}>
             <div className={`rounded-2xl border transition-all duration-300 overflow-hidden ${expanded
-                ? 'border-primary/30 bg-gradient-to-b from-[#1a1f2e] to-[#141820] shadow-xl shadow-primary/5'
-                : 'border-white/10 bg-gradient-to-r from-primary/[0.06] to-[#FF7A00]/[0.04] hover:border-primary/20'
+                ? 'border-primary/30 bg-[var(--sys-surface)] border border-[var(--sys-border)] shadow-none'
+                : 'border-[var(--sys-border)] bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:border-primary/20'
                 }`}>
 
                 {/* Header — only when expanded */}
                 {expanded && (
-                    <div className="flex items-center justify-between px-5 py-3 border-b border-white/[0.06] bg-white/[0.02]">
+                    <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--sys-border)] bg-[var(--sys-surface)]">
                         <div className="flex items-center gap-2">
                             <div className="relative">
                                 <span className="material-symbols-outlined text-primary text-lg">neurology</span>
-                                <span className="absolute -bottom-0.5 -right-0.5 size-2 rounded-full bg-emerald-400 animate-pulse" />
+                                <span className="absolute -bottom-0.5 -right-0.5 size-2 rounded-full bg-[var(--sys-surface)] animate-pulse" />
                             </div>
-                            <span className="text-sm font-bold text-white">Mantram AI</span>
-                            {activeBrand && <span className="text-sm text-slate-500">• {activeBrand.name}</span>}
+                            <span className="text-sm font-bold text-[var(--sys-text)]">Mantram AI</span>
+                            {activeBrand && <span className="text-sm text-[var(--sys-text-muted)]">• {activeBrand.name}</span>}
                         </div>
                         <button onClick={clearChat}
-                            className="text-slate-500 hover:text-slate-300 transition-colors cursor-pointer p-1 rounded-lg hover:bg-white/5">
+                            className="text-[var(--sys-text-muted)] hover:text-[var(--sys-text-muted)] transition-colors cursor-pointer p-1 rounded-lg hover:bg-[var(--sys-surface)]">
                             <span className="material-symbols-outlined text-sm">close</span>
                         </button>
                     </div>
@@ -397,23 +397,23 @@ export default function SmartCommandBox({ variant = 'dashboard', className = '' 
                                     <div className={`rounded-2xl px-4 py-3 text-sm leading-relaxed ${msg.role === 'user'
                                         ? 'bg-primary/15 border border-primary/20 text-white rounded-tr-md ml-auto'
                                         : msg.type === 'error'
-                                            ? 'bg-rose-500/10 border border-rose-500/15 text-rose-300 rounded-tl-md'
-                                            : 'bg-white/[0.04] border border-white/[0.06] text-slate-200 rounded-tl-md'
+                                            ? 'bg-[var(--sys-primary-dim)] border border-[var(--sys-border)] text-[var(--sys-primary)] rounded-tl-md'
+                                            : 'bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] rounded-tl-md'
                                         }`}>
                                         {/* ── CONTENT RESULT ── */}
                                         {msg.intent === 'content' && msg.data?.content && (
-                                            <div className="mb-3 p-3.5 rounded-xl bg-emerald-500/[0.06] border border-emerald-500/15">
+                                            <div className="mb-3 p-3.5 rounded-xl bg-[var(--sys-surface)]/[0.06] border border-[var(--sys-border)]">
                                                 <div className="flex items-center gap-1.5 mb-2">
-                                                    <span className="material-symbols-outlined text-emerald-400 text-xs">edit_note</span>
-                                                    <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider">Generated Content</span>
-                                                    {msg.data.platform && <span className="text-sm text-emerald-400/60 ml-1">• {msg.data.platform}</span>}
+                                                    <span className="material-symbols-outlined text-primary text-xs">edit_note</span>
+                                                    <span className="text-xs font-bold text-primary uppercase tracking-wider">Generated Content</span>
+                                                    {msg.data.platform && <span className="text-sm text-primary/60 ml-1">• {msg.data.platform}</span>}
                                                 </div>
-                                                <p className="text-sm text-white whitespace-pre-wrap leading-relaxed">{stripMarkdown(msg.data.content)}</p>
+                                                <p className="text-sm text-[var(--sys-text)] whitespace-pre-wrap leading-relaxed">{stripMarkdown(msg.data.content)}</p>
 
                                                 {/* ACTION BUTTONS for content */}
-                                                <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-emerald-500/10">
+                                                <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-[var(--sys-border)]">
                                                     <button onClick={() => navigator.clipboard.writeText(stripMarkdown(msg.data.content))}
-                                                        className="flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 cursor-pointer transition-all font-medium">
+                                                        className="flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-lg bg-[var(--sys-primary-dim)] text-primary hover:bg-[var(--sys-primary-dim)] cursor-pointer transition-all font-medium">
                                                         <span className="material-symbols-outlined text-xs">content_copy</span> Copy Text
                                                     </button>
                                                     <button onClick={() => openInContentStudio(msg.data.content)}
@@ -435,7 +435,7 @@ export default function SmartCommandBox({ variant = 'dashboard', className = '' 
                                                 {(msg.generatedImage || msg.data?.imageUrl) && (
                                                     <div>
                                                         <img src={msg.generatedImage || msg.data.imageUrl} alt="Generated creative"
-                                                            className="rounded-xl w-full max-h-80 object-cover border border-white/10 shadow-lg" />
+                                                            className="rounded-xl w-full max-h-80 object-cover border border-[var(--sys-border)] shadow-lg" />
                                                     </div>
                                                 )}
 
@@ -446,7 +446,7 @@ export default function SmartCommandBox({ variant = 'dashboard', className = '' 
                                                             <span className="material-symbols-outlined text-[#FF4D00] text-xs mt-0.5">edit_note</span>
                                                             <div>
                                                                 <span className="text-[10px] font-bold text-[#FF4D00]/70 uppercase tracking-wider">Text on Image</span>
-                                                                <p className="text-sm text-white font-medium">{msg.data.textOverlay}</p>
+                                                                <p className="text-sm text-[var(--sys-text)] font-medium">{msg.data.textOverlay}</p>
                                                             </div>
                                                         </div>
                                                     )}
@@ -455,7 +455,7 @@ export default function SmartCommandBox({ variant = 'dashboard', className = '' 
                                                             <span className="material-symbols-outlined text-[#FF4D00] text-xs mt-0.5">palette</span>
                                                             <div>
                                                                 <span className="text-[10px] font-bold text-[#FF4D00]/70 uppercase tracking-wider">Style</span>
-                                                                <p className="text-xs text-slate-300">{msg.data.style}</p>
+                                                                <p className="text-xs text-[var(--sys-text-muted)]">{msg.data.style}</p>
                                                             </div>
                                                         </div>
                                                     )}
@@ -464,7 +464,7 @@ export default function SmartCommandBox({ variant = 'dashboard', className = '' 
                                                             <span className="material-symbols-outlined text-[#FF4D00] text-xs mt-0.5">format_quote</span>
                                                             <div>
                                                                 <span className="text-[10px] font-bold text-[#FF4D00]/70 uppercase tracking-wider">Brand Tagline</span>
-                                                                <p className="text-xs text-slate-400 italic">"{msg.data.tagline}"</p>
+                                                                <p className="text-xs text-[var(--sys-text-muted)] italic">"{msg.data.tagline}"</p>
                                                             </div>
                                                         </div>
                                                     )}
@@ -473,7 +473,7 @@ export default function SmartCommandBox({ variant = 'dashboard', className = '' 
                                                             <span className="material-symbols-outlined text-[#FF4D00] text-xs mt-0.5">inventory_2</span>
                                                             <div>
                                                                 <span className="text-[10px] font-bold text-[#FF4D00]/70 uppercase tracking-wider">Product</span>
-                                                                <p className="text-xs text-slate-300">{msg.data.productMention}</p>
+                                                                <p className="text-xs text-[var(--sys-text-muted)]">{msg.data.productMention}</p>
                                                             </div>
                                                         </div>
                                                     )}
@@ -484,12 +484,12 @@ export default function SmartCommandBox({ variant = 'dashboard', className = '' 
                                                     {(msg.generatedImage || msg.data?.imageUrl) ? (
                                                         <>
                                                             <button onClick={() => downloadImage(msg.generatedImage || msg.data.imageUrl)}
-                                                                className="flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 cursor-pointer transition-all font-medium">
+                                                                className="flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-lg bg-[var(--sys-primary-dim)] text-primary hover:bg-[var(--sys-primary-dim)] cursor-pointer transition-all font-medium">
                                                                 <span className="material-symbols-outlined text-xs">download</span> Download
                                                             </button>
                                                             <button onClick={() => handleGenerateImage(i, msg.data.imagePrompt)}
                                                                 disabled={generatingImage !== null}
-                                                                className="flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-lg bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 cursor-pointer transition-all font-medium disabled:opacity-50">
+                                                                className="flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-lg bg-[var(--sys-primary-dim)] text-primary hover:bg-[var(--sys-primary-dim)] cursor-pointer transition-all font-medium disabled:opacity-50">
                                                                 <span className="material-symbols-outlined text-xs">refresh</span> Regenerate
                                                             </button>
                                                             <button onClick={() => openInCreativeStudio(msg.data.imagePrompt)}
@@ -501,7 +501,7 @@ export default function SmartCommandBox({ variant = 'dashboard', className = '' 
                                                         <>
                                                             <button onClick={() => handleGenerateImage(i, msg.data.imagePrompt)}
                                                                 disabled={generatingImage !== null}
-                                                                className="flex items-center gap-1.5 text-[11px] px-4 py-2 rounded-lg bg-primary text-white font-bold hover:bg-primary-light cursor-pointer transition-all shadow-lg shadow-primary/20 disabled:opacity-50">
+                                                                className="flex items-center gap-1.5 text-[11px] px-4 py-2 rounded-lg bg-primary text-white font-bold hover:bg-primary-light cursor-pointer transition-all shadow-none disabled:opacity-50">
                                                                 {generatingImage === i ? (
                                                                     <><span className="material-symbols-outlined text-xs animate-spin">progress_activity</span> Generating...</>
                                                                 ) : (
@@ -509,7 +509,7 @@ export default function SmartCommandBox({ variant = 'dashboard', className = '' 
                                                                 )}
                                                             </button>
                                                             <button onClick={() => openInCreativeStudio(msg.data.imagePrompt)}
-                                                                className="flex items-center gap-1.5 text-[11px] px-3 py-2 rounded-lg bg-white/[0.06] text-slate-300 hover:bg-white/[0.1] cursor-pointer transition-all border border-white/[0.08]">
+                                                                className="flex items-center gap-1.5 text-[11px] px-3 py-2 rounded-lg bg-[var(--sys-surface)] text-[var(--sys-text-muted)] hover:bg-[var(--sys-surface)] cursor-pointer transition-all border border-[var(--sys-border)]">
                                                                 <span className="material-symbols-outlined text-xs">palette</span> Open in Studio
                                                             </button>
                                                         </>
@@ -524,7 +524,7 @@ export default function SmartCommandBox({ variant = 'dashboard', className = '' 
                                                 {msg.data.ideas.map((idea, j) => (
                                                     <div key={j} className="p-3 rounded-xl bg-[#FF4D00]/[0.06] border border-[#FF4D00]/15">
                                                         <p className="text-xs font-bold text-[#FF7A00] mb-1">💡 {idea.title}</p>
-                                                        <p className="text-[11px] text-slate-300 leading-relaxed">{idea.description}</p>
+                                                        <p className="text-[11px] text-[var(--sys-text-muted)] leading-relaxed">{idea.description}</p>
                                                     </div>
                                                 ))}
                                                 <div className="flex gap-2 mt-2">
@@ -541,7 +541,7 @@ export default function SmartCommandBox({ variant = 'dashboard', className = '' 
                                             <div className="mb-3 space-y-3">
                                                 {/* Video player if generated */}
                                                 {(msg.generatedVideo || msg.data?.videoUrl) && (
-                                                    <div className="rounded-xl overflow-hidden border border-white/10 shadow-lg bg-black/20 aspect-video">
+                                                    <div className="rounded-xl overflow-hidden border border-[var(--sys-border)] shadow-lg bg-[var(--sys-surface)] aspect-video">
                                                         <video 
                                                             src={msg.generatedVideo || msg.data.videoUrl} 
                                                             controls 
@@ -551,18 +551,18 @@ export default function SmartCommandBox({ variant = 'dashboard', className = '' 
                                                 )}
 
                                                 {/* Prompt details */}
-                                                <div className="p-3.5 rounded-xl bg-blue-500/[0.06] border border-blue-500/15 space-y-2">
+                                                <div className="p-3.5 rounded-xl bg-[var(--sys-surface)]/[0.06] border border-[var(--sys-border)] space-y-2">
                                                     <div className="flex items-start gap-2">
-                                                        <span className="material-symbols-outlined text-blue-400 text-xs mt-0.5">movie</span>
+                                                        <span className="material-symbols-outlined text-primary text-xs mt-0.5">movie</span>
                                                         <div>
-                                                            <span className="text-[10px] font-bold text-blue-400/70 uppercase tracking-wider">Video Prompt</span>
-                                                            <p className="text-sm text-white font-medium">{msg.data.prompt}</p>
+                                                            <span className="text-[10px] font-bold text-primary/70 uppercase tracking-wider">Video Prompt</span>
+                                                            <p className="text-sm text-[var(--sys-text)] font-medium">{msg.data.prompt}</p>
                                                         </div>
                                                     </div>
                                                     {msg.data.duration && (
                                                         <div className="flex items-center gap-2">
-                                                            <span className="material-symbols-outlined text-blue-400 text-xs">timer</span>
-                                                            <span className="text-xs text-slate-300">Duration: {msg.data.duration}s</span>
+                                                            <span className="material-symbols-outlined text-primary text-xs">timer</span>
+                                                            <span className="text-xs text-[var(--sys-text-muted)]">Duration: {msg.data.duration}s</span>
                                                         </div>
                                                     )}
                                                 </div>
@@ -570,7 +570,7 @@ export default function SmartCommandBox({ variant = 'dashboard', className = '' 
                                                 {/* Action buttons */}
                                                 <div className="flex flex-wrap gap-2">
                                                     <button onClick={() => navigate(`/creative-studio?prompt=${encodeURIComponent(msg.data.prompt)}&video=true`)}
-                                                        className="flex items-center gap-1.5 text-[11px] px-4 py-2 rounded-lg bg-blue-500 text-white font-bold hover:bg-blue-600 cursor-pointer transition-all shadow-lg shadow-blue-500/20">
+                                                        className="flex items-center gap-1.5 text-[11px] px-4 py-2 rounded-lg bg-[var(--sys-surface)] text-[var(--sys-text)] font-bold hover:bg-[var(--sys-surface)] cursor-pointer transition-all shadow-none">
                                                         <span className="material-symbols-outlined text-xs">palette</span> Open in Creative Studio
                                                     </button>
                                                 </div>
@@ -595,7 +595,7 @@ export default function SmartCommandBox({ variant = 'dashboard', className = '' 
                                         <div className="flex flex-wrap gap-1.5 mt-2">
                                             {msg.suggestions.map((s, j) => (
                                                 <button key={j} onClick={() => { setInput(s); handleSend(s) }}
-                                                    className="text-xs px-2.5 py-1.5 rounded-full bg-white/[0.04] text-slate-400 border border-white/[0.08] hover:bg-primary/10 hover:text-primary hover:border-primary/20 cursor-pointer transition-all">
+                                                    className="text-xs px-2.5 py-1.5 rounded-full bg-[var(--sys-surface)] text-[var(--sys-text-muted)] border border-[var(--sys-border)] hover:bg-primary/10 hover:text-primary hover:border-primary/20 cursor-pointer transition-all">
                                                     {s}
                                                 </button>
                                             ))}
@@ -605,8 +605,8 @@ export default function SmartCommandBox({ variant = 'dashboard', className = '' 
 
                                 {/* User avatar */}
                                 {msg.role === 'user' && (
-                                    <div className="size-7 rounded-full bg-white/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-                                        <span className="material-symbols-outlined text-slate-400 text-xs">person</span>
+                                    <div className="size-7 rounded-full bg-[var(--sys-surface)] flex items-center justify-center flex-shrink-0 mt-0.5">
+                                        <span className="material-symbols-outlined text-[var(--sys-text-muted)] text-xs">person</span>
                                     </div>
                                 )}
                             </div>
@@ -618,14 +618,14 @@ export default function SmartCommandBox({ variant = 'dashboard', className = '' 
                                 <div className="size-7 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
                                     <span className="material-symbols-outlined text-primary text-xs animate-spin">progress_activity</span>
                                 </div>
-                                <div className="bg-white/[0.04] border border-white/[0.06] rounded-2xl rounded-tl-md px-4 py-3">
+                                <div className="bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-2xl rounded-tl-md px-4 py-3">
                                     <div className="flex items-center gap-2">
                                         <div className="flex gap-1">
                                             <span className="size-1.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: '0ms' }} />
                                             <span className="size-1.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: '150ms' }} />
                                             <span className="size-1.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: '300ms' }} />
                                         </div>
-                                        <span className="text-sm text-slate-500">Thinking...</span>
+                                        <span className="text-sm text-[var(--sys-text-muted)]">Thinking...</span>
                                     </div>
                                 </div>
                             </div>
@@ -636,16 +636,16 @@ export default function SmartCommandBox({ variant = 'dashboard', className = '' 
                 )}
 
                 {/* ===== INPUT BAR ===== */}
-                <div className={`relative ${expanded ? 'border-t border-white/[0.06]' : ''}`}>
+                <div className={`relative ${expanded ? 'border-t border-[var(--sys-border)]' : ''}`}>
                     {!expanded && (
-                        <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-primary/10 via-purple-500/5 to-primary/10 opacity-50 blur-xl pointer-events-none" />
+                        <div className="absolute inset-0 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] opacity-50 blur-xl pointer-events-none" />
                     )}
 
                     <div className={`relative flex items-center gap-2 ${expanded ? 'p-3' : 'p-4'}`}>
                         {!expanded && (
                             <div className="relative flex-shrink-0">
                                 <span className="material-symbols-outlined text-primary text-xl">neurology</span>
-                                <span className="absolute -bottom-0.5 -right-0.5 size-2 rounded-full bg-emerald-400 animate-pulse" />
+                                <span className="absolute -bottom-0.5 -right-0.5 size-2 rounded-full bg-[var(--sys-surface)] animate-pulse" />
                             </div>
                         )}
 
@@ -653,11 +653,11 @@ export default function SmartCommandBox({ variant = 'dashboard', className = '' 
                         {attachedImages.length > 0 && (
                             <div className="flex flex-wrap gap-2 px-3 pb-2 animate-fade-in">
                                 {attachedImages.map((img, idx) => (
-                                    <div key={idx} className="relative group size-14 rounded-lg overflow-hidden border border-white/20 shadow-lg">
+                                    <div key={idx} className="relative group size-14 rounded-lg overflow-hidden border border-[var(--sys-border)] shadow-lg">
                                         <img src={img.preview} alt="Attachment" className="size-full object-cover" />
                                         <button 
                                             onClick={() => removeAttachment(idx)}
-                                            className="absolute top-0.5 right-0.5 size-5 rounded-full bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                                            className="absolute top-0.5 right-0.5 size-5 rounded-full bg-[var(--sys-surface)] text-[var(--sys-text)] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
                                             <span className="material-symbols-outlined text-[12px]">close</span>
                                         </button>
                                     </div>
@@ -674,7 +674,7 @@ export default function SmartCommandBox({ variant = 'dashboard', className = '' 
                             onFocus={() => { if (history.length > 0) setExpanded(true) }}
                             placeholder={placeholders[placeholderIdx]}
                             disabled={loading || recording}
-                            className={`flex-1 bg-transparent text-white text-sm placeholder-slate-500 outline-none ${expanded ? 'px-3 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.08] focus:border-primary/30' : ''
+                            className={`flex-1 bg-transparent text-[var(--sys-text)] text-sm placeholder-slate-500 outline-none ${expanded ? 'px-3 py-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] focus:border-primary/30' : ''
                                 }`}
                         />
 
@@ -692,7 +692,7 @@ export default function SmartCommandBox({ variant = 'dashboard', className = '' 
                         <button 
                             onClick={() => fileInputRef.current?.click()}
                             disabled={loading || recording || attachedImages.length >= 5}
-                            className="flex-shrink-0 p-2.5 rounded-xl bg-white/[0.04] text-slate-400 border border-white/[0.08] hover:bg-primary/10 hover:text-primary hover:border-primary/20 transition-all cursor-pointer disabled:opacity-50"
+                            className="flex-shrink-0 p-2.5 rounded-xl bg-[var(--sys-surface)] text-[var(--sys-text-muted)] border border-[var(--sys-border)] hover:bg-primary/10 hover:text-primary hover:border-primary/20 transition-all cursor-pointer disabled:opacity-50"
                             title="Attach images (@image1, @image2...)">
                             <span className="material-symbols-outlined text-lg">image</span>
                         </button>
@@ -700,17 +700,17 @@ export default function SmartCommandBox({ variant = 'dashboard', className = '' 
                         {/* Mic */}
                         <button onClick={recording ? stopRecording : startRecording} disabled={loading || transcribing}
                             className={`flex-shrink-0 p-2.5 rounded-xl transition-all cursor-pointer relative overflow-hidden ${recording
-                                ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                                ? 'bg-[var(--sys-primary-dim)] text-primary border border-[var(--sys-border)]'
                                 : transcribing
-                                    ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                                    : 'bg-white/[0.04] text-slate-400 border border-white/[0.08] hover:bg-primary/10 hover:text-primary hover:border-primary/20'
+                                    ? 'bg-[var(--sys-primary-dim)] text-primary border border-[var(--sys-border)]'
+                                    : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] border border-[var(--sys-border)] hover:bg-primary/10 hover:text-primary hover:border-primary/20'
                                 }`}
                             title={recording ? `Recording... ${formatTime(recordingTime)}` : transcribing ? 'Transcribing...' : 'Speak your request'}>
                             {/* Pulse animation when recording */}
                             {recording && (
                                 <>
-                                    <span className="absolute inset-0 rounded-xl bg-rose-500/20 animate-ping" style={{ animationDuration: '1.5s' }} />
-                                    <span className="absolute inset-0 rounded-xl bg-rose-500/10 animate-pulse" />
+                                    <span className="absolute inset-0 rounded-xl bg-[var(--sys-primary-dim)] animate-ping" style={{ animationDuration: '1.5s' }} />
+                                    <span className="absolute inset-0 rounded-xl bg-[var(--sys-primary-dim)] animate-pulse" />
                                 </>
                             )}
                             
@@ -727,8 +727,8 @@ export default function SmartCommandBox({ variant = 'dashboard', className = '' 
                         {/* Send */}
                         <button onClick={() => handleSend()} disabled={loading || !input.trim()}
                             className={`flex-shrink-0 p-2.5 rounded-xl transition-all cursor-pointer ${input.trim()
-                                ? 'bg-primary text-white shadow-lg shadow-primary/20 hover:bg-primary-light'
-                                : 'bg-white/[0.04] text-slate-600 border border-white/[0.06]'
+                                ? 'bg-primary text-white shadow-none hover:bg-primary-light'
+                                : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] border border-[var(--sys-border)]'
                                 }`}>
                             <span className="material-symbols-outlined text-sm">send</span>
                         </button>
@@ -737,13 +737,13 @@ export default function SmartCommandBox({ variant = 'dashboard', className = '' 
                     {/* Quick Hints */}
                     {!expanded && history.length === 0 && (
                         <div className="px-4 pb-4 flex items-center gap-2 flex-wrap">
-                            <span className="text-xs text-slate-600">Try:</span>
+                            <span className="text-xs text-[var(--sys-text-muted)]">Try:</span>
                             {(variant === 'brainstorm'
                                 ? ['Campaign ideas', 'Name a product', 'Ad film concept']
                                 : ['Write a post', 'Design a poster', 'Brainstorm ideas', 'Open Calendar']
                             ).map((hint, i) => (
                                 <button key={i} onClick={() => { setInput(hint); inputRef.current?.focus() }}
-                                    className="text-xs px-2.5 py-1 rounded-full bg-white/[0.04] text-slate-400 border border-white/[0.06] hover:bg-primary/10 hover:text-primary hover:border-primary/20 cursor-pointer transition-all">
+                                    className="text-xs px-2.5 py-1 rounded-full bg-[var(--sys-surface)] text-[var(--sys-text-muted)] border border-[var(--sys-border)] hover:bg-primary/10 hover:text-primary hover:border-primary/20 cursor-pointer transition-all">
                                     {hint}
                                 </button>
                             ))}

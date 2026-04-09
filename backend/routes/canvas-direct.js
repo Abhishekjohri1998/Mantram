@@ -176,6 +176,23 @@ const CANVAS_TOOLS = [
             required: ['prompt'],
         },
     },
+    {
+        name: 'merge_images',
+        description: 'Merge two or more images on the canvas into a new AI-generated image. Use this when the user asks to blend, merge, or combine images.',
+        input_schema: {
+            type: 'object',
+            properties: {
+                prompt: { type: 'string', description: 'Detailed prompt describing how the images should be combined or what the final output should look like' },
+                imageNames: {
+                    type: 'array',
+                    items: { type: 'string' },
+                    description: 'Optional names of the images to merge if they are not specifically selected.'
+                },
+                position: { type: 'string', enum: ['center', 'top-center', 'bottom-center', 'top-left', 'top-right', 'bottom-left', 'bottom-right'], description: 'Where to place the merged image' },
+            },
+            required: ['prompt'],
+        },
+    },
 
     // ═══════════════════════════════════════════════════════════════
     // ── AGENTIC CANVAS TOOLS — Scripting, Storyboarding, Layout ──

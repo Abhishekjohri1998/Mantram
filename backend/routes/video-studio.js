@@ -44,6 +44,7 @@ import { listAvatars, listVoices, generateUGCVideo, generatePhotoAvatarVideo, ge
 import { generateUGCScript, UGC_STYLES } from '../agents/videoStudio/ugcScriptGenerator.js';
 import { saveLearnings, getStylePreferences } from '../agents/videoStudio/selfLearning.js';
 import { getRouter as getAIRouter } from '../ai/router.js';
+import { getProviderBadge } from '../ai/providerRouting.js';
 import { uploadToS3, mirrorUrlToS3 } from '../utils/s3.js';
 import { safeErrorMessage } from '../utils/safeError.js';
 
@@ -3425,8 +3426,21 @@ router.get('/models/info', protect, (req, res) => {
 // ══════════════════════════════════════════════════════════════════════════════
 // GET /api/video-studio/models/capabilities — Full model capability matrix
 // ══════════════════════════════════════════════════════════════════════════════
-router.get('/models/capabilities', protect, (req, res) => {
-    res.json({ success: true, capabilities: MODEL_CAPABILITIES });
+router.get('/models/capabilities', protect, async (req, res) => {
+    try {
+        const capabilities = JSON.parse(JSON.stringify(MODEL_CAPABILITIES));
+        for (const modelId of Object.keys(capabilities)) {
+            try {
+                const badge = await getProviderBadge('video', modelId);
+                capabilities[modelId].activeProvider = badge ? badge.label : null;
+            } catch (e) {
+                capabilities[modelId].activeProvider = null;
+            }
+        }
+        res.json({ success: true, capabilities });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
 });
 
 // ══════════════════════════════════════════════════════════════════════════════

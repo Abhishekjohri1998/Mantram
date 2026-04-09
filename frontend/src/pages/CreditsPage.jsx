@@ -342,7 +342,7 @@ export default function CreditsPage() {
 
             {/* Daily Reward Toast */}
             {dailyToast && (
-                <div className="fixed top-4 right-4 z-50 animate-slide-in bg-gradient-to-r from-amber-500/90 to-orange-500/90 text-white rounded-2xl px-6 py-4 shadow-2xl shadow-amber-500/30 flex items-center gap-3 max-w-sm">
+                <div className="fixed top-4 right-4 z-50 animate-slide-in bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] rounded-2xl px-6 py-4 shadow-none flex items-center gap-3 max-w-sm">
                     <span className="material-symbols-outlined text-2xl animate-pulse">local_fire_department</span>
                     <div>
                         <p className="font-bold text-sm">{dailyToast.message}</p>
@@ -354,28 +354,28 @@ export default function CreditsPage() {
 
             {loading ? (
                 <div className="flex items-center justify-center h-64">
-                    <div className="size-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                    <div className="size-8 border border-primary border-t-transparent rounded-full animate-spin" />
                 </div>
             ) : (
                 <div className="max-w-6xl mx-auto space-y-6">
                     {/* Top Balance Card */}
-                    <div className="glass-panel rounded-2xl border border-white/[0.08] p-6">
+                    <div className="glass-panel rounded-2xl border border-[var(--sys-border)] p-6">
                         <div className="flex flex-wrap items-center gap-8">
                             {/* Main balance */}
                             <div className="flex-1 min-w-[200px]">
-                                <p className="text-sm text-slate-500 uppercase tracking-wider font-bold mb-1">Credit Balance</p>
+                                <p className="text-sm text-[var(--sys-text-muted)] uppercase tracking-wider font-bold mb-1">Credit Balance</p>
                                 {balance?.unlimited ? (
                                     <div className="flex items-center gap-2">
-                                        <span className="material-symbols-outlined text-3xl text-amber-400">all_inclusive</span>
-                                        <span className="text-3xl font-black text-amber-400">Unlimited</span>
+                                        <span className="material-symbols-outlined text-3xl text-primary">all_inclusive</span>
+                                        <span className="text-3xl font-black text-primary">Unlimited</span>
                                     </div>
                                 ) : (
                                     <>
                                          <div className="flex flex-wrap items-baseline gap-x-4 gap-y-2">
                                             <div className="flex items-baseline gap-2">
                                                 <span className={`text-4xl font-black text-${creditColor}-400`}>{balance?.remaining || 0}</span>
-                                                <span className="text-lg text-slate-600 font-medium">/ {balance?.total || 0}</span>
-                                                <span className="text-sm text-slate-600">Monthly Credits</span>
+                                                <span className="text-lg text-[var(--sys-text-muted)] font-medium">/ {balance?.total || 0}</span>
+                                                <span className="text-sm text-[var(--sys-text-muted)]">Monthly Credits</span>
                                             </div>
                                             {subStatus?.plan && (
                                                 <div className="px-3 py-1 rounded-lg bg-primary/10 border border-primary/20 flex items-center gap-2">
@@ -384,18 +384,18 @@ export default function CreditsPage() {
                                                 </div>
                                             )}
                                             {balance?.bonus > 0 && (
-                                                <div className="px-2 py-1 rounded-lg bg-amber-400/10 border border-amber-400/20">
-                                                    <span className="text-xs font-bold text-amber-400">+{balance.bonus} Bonus</span>
+                                                <div className="px-2 py-1 rounded-lg bg-[var(--sys-primary-dim)] border border-[var(--sys-border)]">
+                                                    <span className="text-xs font-bold text-primary">+{balance.bonus} Bonus</span>
                                                 </div>
                                             )}
                                         </div>
-                                        <div className="mt-3 w-full max-w-md h-2.5 rounded-full bg-white/[0.06] overflow-hidden">
+                                        <div className="mt-3 w-full max-w-md h-2.5 rounded-full bg-[var(--sys-surface)] overflow-hidden">
                                             <div
                                                 className={`h-full rounded-full transition-all duration-700 bg-${creditColor}-500`}
                                                 style={{ width: `${creditPercent}%` }}
                                             />
                                         </div>
-                                        <p className="mt-2 text-xs text-slate-500 font-medium">
+                                        <p className="mt-2 text-xs text-[var(--sys-text-muted)] font-medium">
                                             {subStatus?.daysRemaining !== undefined && (
                                                 <span className="mr-3">
                                                     <span className="material-symbols-outlined text-[10px] align-middle mr-1">history</span>
@@ -415,11 +415,11 @@ export default function CreditsPage() {
                                     { label: 'This Week', value: summary?.week?.credits || 0, sub: `${summary?.week?.operations || 0} ops`, icon: 'date_range', color: 'cyan' },
                                     { label: 'This Month', value: summary?.month?.credits || 0, sub: `${summary?.month?.operations || 0} ops`, icon: 'calendar_month', color: 'purple' },
                                 ].map(s => (
-                                    <div key={s.label} className="text-center p-4 rounded-xl bg-white/[0.02] border border-white/[0.06] min-w-[120px]">
+                                    <div key={s.label} className="text-center p-4 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] min-w-[120px]">
                                         <span className={`material-symbols-outlined text-xl text-${s.color}-400 mb-1`}>{s.icon}</span>
-                                        <p className="text-xl font-black text-white">{s.value}</p>
-                                        <p className="text-sm text-slate-500 uppercase font-bold">{s.label}</p>
-                                        <p className="text-xs text-slate-600">{s.sub}</p>
+                                        <p className="text-xl font-black text-[var(--sys-text)]">{s.value}</p>
+                                        <p className="text-sm text-[var(--sys-text-muted)] uppercase font-bold">{s.label}</p>
+                                        <p className="text-xs text-[var(--sys-text-muted)]">{s.sub}</p>
                                     </div>
                                 ))}
                             </div>
@@ -438,7 +438,7 @@ export default function CreditsPage() {
                                 onClick={() => setTab(t)}
                                 className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${tab === t
                                     ? 'bg-primary/10 text-primary border border-primary/20'
-                                    : 'text-slate-400 hover:bg-white/[0.04] border border-transparent'
+                                    : 'text-[var(--sys-text-muted)] hover:bg-[var(--sys-surface)] border border-transparent'
                                     }`}
                             >
                                 {t === 'overview' ? '📊 Usage Breakdown' : t === 'plans' ? '💎 Upgrade Plans' : t === 'topup' ? '⚡ Quick Top-up' : t === 'rewards' ? '🎯 Rewards' : '📋 History'}
@@ -449,16 +449,16 @@ export default function CreditsPage() {
                     {tab === 'overview' ? (
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                             {/* Usage by Action */}
-                            <div className="glass-panel rounded-2xl border border-white/[0.08] p-6">
-                                <h3 className="text-base font-bold text-white flex items-center gap-2 mb-4">
+                            <div className="glass-panel rounded-2xl border border-[var(--sys-border)] p-6">
+                                <h3 className="text-base font-bold text-[var(--sys-text)] flex items-center gap-2 mb-4">
                                     <span className="material-symbols-outlined text-lg text-primary">pie_chart</span>
                                     Credits by Operation
                                 </h3>
                                 {(summary?.byAction || []).length === 0 ? (
                                     <div className="text-center py-8">
                                         <span className="material-symbols-outlined text-4xl text-slate-700 mb-2">analytics</span>
-                                        <p className="text-sm text-slate-500">No usage data yet</p>
-                                        <p className="text-xs text-slate-600 mt-1">Credits used for AI operations will appear here</p>
+                                        <p className="text-sm text-[var(--sys-text-muted)]">No usage data yet</p>
+                                        <p className="text-xs text-[var(--sys-text-muted)] mt-1">Credits used for AI operations will appear here</p>
                                     </div>
                                 ) : (
                                     <div className="space-y-3">
@@ -473,14 +473,14 @@ export default function CreditsPage() {
                                                             <span className={`material-symbols-outlined text-sm text-${color}-400`}>
                                                                 {ACTION_ICONS[a._id] || 'token'}
                                                             </span>
-                                                            <span className="text-sm text-slate-300 font-medium">{a.description || a._id}</span>
+                                                            <span className="text-sm text-[var(--sys-text-muted)] font-medium">{a.description || a._id}</span>
                                                         </div>
                                                         <div className="flex items-center gap-2">
-                                                            <span className="text-sm text-slate-500">{a.count} ops</span>
+                                                            <span className="text-sm text-[var(--sys-text-muted)]">{a.count} ops</span>
                                                             <span className={`text-xs font-bold text-${color}-400`}>{a.total}</span>
                                                         </div>
                                                     </div>
-                                                    <div className="w-full h-1.5 rounded-full bg-white/[0.04] overflow-hidden">
+                                                    <div className="w-full h-1.5 rounded-full bg-[var(--sys-surface)] overflow-hidden">
                                                         <div
                                                             className={`h-full rounded-full bg-${color}-500/60 transition-all duration-500`}
                                                             style={{ width: `${pct}%` }}
@@ -494,16 +494,16 @@ export default function CreditsPage() {
                             </div>
 
                             {/* Daily Trend */}
-                            <div className="glass-panel rounded-2xl border border-white/[0.08] p-6">
-                                <h3 className="text-base font-bold text-white flex items-center gap-2 mb-4">
-                                    <span className="material-symbols-outlined text-lg text-cyan-400">show_chart</span>
+                            <div className="glass-panel rounded-2xl border border-[var(--sys-border)] p-6">
+                                <h3 className="text-base font-bold text-[var(--sys-text)] flex items-center gap-2 mb-4">
+                                    <span className="material-symbols-outlined text-lg text-primary">show_chart</span>
                                     Daily Usage (Last 7 Days)
                                 </h3>
                                 {(summary?.dailyTrend || []).length === 0 ? (
                                     <div className="text-center py-8">
                                         <span className="material-symbols-outlined text-4xl text-slate-700 mb-2">timeline</span>
-                                        <p className="text-sm text-slate-500">No trend data yet</p>
-                                        <p className="text-xs text-slate-600 mt-1">Daily credit usage will show here after your first operations</p>
+                                        <p className="text-sm text-[var(--sys-text-muted)]">No trend data yet</p>
+                                        <p className="text-xs text-[var(--sys-text-muted)] mt-1">Daily credit usage will show here after your first operations</p>
                                     </div>
                                 ) : (
                                     <div className="flex items-end gap-2 h-40">
@@ -514,10 +514,10 @@ export default function CreditsPage() {
                                                 const day = new Date(d._id).toLocaleDateString('en-IN', { weekday: 'short' })
                                                 return (
                                                     <div key={d._id} className="flex-1 flex flex-col items-center gap-1">
-                                                        <span className="text-sm text-slate-500 font-bold">{d.total}</span>
+                                                        <span className="text-sm text-[var(--sys-text-muted)] font-bold">{d.total}</span>
                                                         <div className="w-full rounded-t-md bg-primary/30 hover:bg-primary/50 transition-all"
                                                             style={{ height: `${h}%` }} />
-                                                        <span className="text-xs text-slate-600 font-medium">{day}</span>
+                                                        <span className="text-xs text-[var(--sys-text-muted)] font-medium">{day}</span>
                                                     </div>
                                                 )
                                             })
@@ -532,11 +532,11 @@ export default function CreditsPage() {
                         <div className="space-y-6">
                             {/* First Purchase Banner */}
                             {isFirstPurchase && (
-                                <div className="bg-gradient-to-r from-amber-500/15 to-orange-500/10 border border-amber-500/30 p-6 rounded-2xl flex items-center gap-4">
-                                    <span className="material-symbols-outlined text-4xl text-amber-400 animate-pulse">celebration</span>
+                                <div className="bg-[var(--sys-surface)] border border-[var(--sys-border)] border border-[var(--sys-border)] p-6 rounded-2xl flex items-center gap-4">
+                                    <span className="material-symbols-outlined text-4xl text-primary animate-pulse">celebration</span>
                                     <div>
-                                        <h3 className="text-lg font-black text-amber-400">🎉 First Purchase — 2× Credits!</h3>
-                                        <p className="text-sm text-slate-400">Your first top-up gets double credits. This offer applies once, on any pack.</p>
+                                        <h3 className="text-lg font-black text-primary">🎉 First Purchase — 2× Credits!</h3>
+                                        <p className="text-sm text-[var(--sys-text-muted)]">Your first top-up gets double credits. This offer applies once, on any pack.</p>
                                     </div>
                                 </div>
                             )}
@@ -545,39 +545,39 @@ export default function CreditsPage() {
 
                             {/* ── Promo Section (Kling-style green border) ── */}
                             {promoPacks.length > 0 && (
-                                <div className="bg-gradient-to-r from-emerald-500/10 to-green-500/5 border border-emerald-500/30 rounded-2xl p-6">
+                                <div className="bg-[var(--sys-surface)] border border-[var(--sys-border)] border border-[var(--sys-border)] rounded-2xl p-6">
                                     <div className="flex items-center gap-3 mb-4">
-                                        <span className="material-symbols-outlined text-2xl text-emerald-400">diamond</span>
+                                        <span className="material-symbols-outlined text-2xl text-primary">diamond</span>
                                         <div>
-                                            <h3 className="text-lg font-black text-emerald-400">◆ Exclusive Promo For You ◆</h3>
-                                            <p className="text-xs text-slate-400">Limited time offers. Credits purchased via promo are valid for 31 days.</p>
+                                            <h3 className="text-lg font-black text-primary">◆ Exclusive Promo For You ◆</h3>
+                                            <p className="text-xs text-[var(--sys-text-muted)]">Limited time offers. Credits purchased via promo are valid for 31 days.</p>
                                         </div>
                                     </div>
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                         {promoPacks.map(pack => (
-                                            <div key={pack.id} className="bg-emerald-500/5 border-2 border-emerald-500/30 rounded-xl p-5 flex flex-col hover:border-emerald-400/50 transition-all">
+                                            <div key={pack.id} className="bg-[var(--sys-primary-dim)] border border-[var(--sys-border)] rounded-xl p-5 flex flex-col hover:border-[var(--sys-border)] transition-all">
                                                 <div className="flex items-center justify-between mb-3">
                                                     <div className="flex items-center gap-2">
-                                                        <span className="material-symbols-outlined text-2xl text-emerald-400">{pack.icon}</span>
-                                                        <span className="text-2xl font-black text-emerald-400">{pack.total?.toLocaleString()}</span>
+                                                        <span className="material-symbols-outlined text-2xl text-primary">{pack.icon}</span>
+                                                        <span className="text-2xl font-black text-primary">{pack.total?.toLocaleString()}</span>
                                                     </div>
                                                     {pack.promoLabel && (
-                                                        <span className="px-2 py-0.5 rounded-full bg-emerald-500 text-[10px] font-black text-white uppercase tracking-wider">
+                                                        <span className="px-2 py-0.5 rounded-full bg-[var(--sys-surface)] text-[10px] font-black text-[var(--sys-text)] uppercase tracking-wider">
                                                             {pack.promoLabel}
                                                         </span>
                                                     )}
                                                 </div>
-                                                <p className="text-xs text-slate-400 mb-2">
+                                                <p className="text-xs text-[var(--sys-text-muted)] mb-2">
                                                     ₹{pack.perCredit} / credit, valid for {pack.validityDays} days
                                                 </p>
                                                 {pack.promoOriginalPrice > 0 && (
-                                                    <p className="text-xs text-slate-600 line-through mb-1">₹{pack.promoOriginalPrice?.toLocaleString()}</p>
+                                                    <p className="text-xs text-[var(--sys-text-muted)] line-through mb-1">₹{pack.promoOriginalPrice?.toLocaleString()}</p>
                                                 )}
                                                 <div className="flex items-center justify-between mt-auto pt-3">
-                                                    <span className="text-xl font-black text-white">₹ {pack.price?.toLocaleString()}</span>
+                                                    <span className="text-xl font-black text-[var(--sys-text)]">₹ {pack.price?.toLocaleString()}</span>
                                                     <button
                                                         onClick={() => handleTopup(pack)}
-                                                        className="px-5 py-2 rounded-lg text-sm font-bold bg-white/10 border border-white/20 text-white hover:bg-white/20 transition-all"
+                                                        className="px-5 py-2 rounded-lg text-sm font-bold bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] hover:bg-[var(--sys-surface)] transition-all"
                                                     >
                                                         Purchase
                                                     </button>
@@ -589,7 +589,7 @@ export default function CreditsPage() {
                             )}
 
                             {/* Note */}
-                            <p className="text-xs text-slate-500 text-center">
+                            <p className="text-xs text-[var(--sys-text-muted)] text-center">
                                 Credits cannot be exchanged for memberships, nor refunded, transferred, or withdrawn.
                                 {' '}<span className="text-primary cursor-pointer hover:underline">Credits Policy</span>
                             </p>
@@ -597,37 +597,37 @@ export default function CreditsPage() {
                             {/* ── Standard Packs (8-tier grid) ── */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                                 {standardPacks.map(pack => (
-                                    <div key={pack.id} className={`glass-panel p-5 rounded-2xl border transition-all hover:scale-[1.02] flex flex-col ${pack.badge === 'Best Value' ? 'border-amber-400 ring-1 ring-amber-400/20 bg-amber-400/[0.03]' : 'border-white/[0.08]'}`}>
+                                    <div key={pack.id} className={`glass-panel p-5 rounded-2xl border transition-all hover:scale-[1.02] flex flex-col ${pack.badge === 'Best Value' ? 'border-[var(--sys-border)]  bg-[var(--sys-surface)]/[0.03]' : 'border-[var(--sys-border)]'}`}>
                                         <div className="flex-1">
                                             <div className="flex items-center justify-between mb-3">
                                                 <div className="flex items-center gap-2">
-                                                    <span className="material-symbols-outlined text-2xl text-amber-400">{pack.icon}</span>
-                                                    <span className="text-xl font-black text-white">{pack.total?.toLocaleString()}</span>
+                                                    <span className="material-symbols-outlined text-2xl text-primary">{pack.icon}</span>
+                                                    <span className="text-xl font-black text-[var(--sys-text)]">{pack.total?.toLocaleString()}</span>
                                                 </div>
                                                 {pack.badge && (
-                                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase text-white tracking-wider" style={{ backgroundColor: pack.badgeColor || '#ef4444' }}>
+                                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase text-[var(--sys-text)] tracking-wider" style={{ backgroundColor: pack.badgeColor || '#ef4444' }}>
                                                         {pack.badge}
                                                     </span>
                                                 )}
                                             </div>
                                             {pack.bonus > 0 && (
-                                                <p className="text-xs text-emerald-400 font-bold mb-2">
-                                                    Total: {pack.credits?.toLocaleString()} + <span className="text-amber-400">{pack.bonus?.toLocaleString()} Bonus</span>
+                                                <p className="text-xs text-primary font-bold mb-2">
+                                                    Total: {pack.credits?.toLocaleString()} + <span className="text-primary">{pack.bonus?.toLocaleString()} Bonus</span>
                                                 </p>
                                             )}
                                             {isFirstPurchase && pack.firstPurchaseTotal && (
-                                                <p className="text-xs text-amber-400 font-bold mb-2">→ 2× = {pack.firstPurchaseTotal?.toLocaleString()} credits!</p>
+                                                <p className="text-xs text-primary font-bold mb-2">→ 2× = {pack.firstPurchaseTotal?.toLocaleString()} credits!</p>
                                             )}
                                         </div>
-                                        <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/[0.06]">
+                                        <div className="flex items-center justify-between mt-3 pt-3 border-t border-[var(--sys-border)]">
                                             <div>
-                                                <span className="text-lg font-black text-white">₹ {pack.price?.toLocaleString()}</span>
+                                                <span className="text-lg font-black text-[var(--sys-text)]">₹ {pack.price?.toLocaleString()}</span>
 
-                                                <p className="text-[10px] text-slate-500">₹{pack.perCredit}/cr • {pack.validityDays}d</p>
+                                                <p className="text-[10px] text-[var(--sys-text-muted)]">₹{pack.perCredit}/cr • {pack.validityDays}d</p>
                                             </div>
                                             <button
                                                 onClick={() => handleTopup(pack)}
-                                                className="px-5 py-2 rounded-lg text-sm font-bold bg-white/10 border border-white/20 text-white hover:bg-white/20 transition-all"
+                                                className="px-5 py-2 rounded-lg text-sm font-bold bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] hover:bg-[var(--sys-surface)] transition-all"
                                             >
                                                 Purchase
                                             </button>
@@ -642,31 +642,31 @@ export default function CreditsPage() {
                         <div className="space-y-6">
                             {!rewardStatus ? (
                                 <div className="flex items-center justify-center h-40">
-                                    <div className="size-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                                    <div className="size-8 border border-primary border-t-transparent rounded-full animate-spin" />
                                 </div>
                             ) : (
                                 <>
                                     {/* Streak Card */}
-                                    <div className="glass-panel rounded-2xl border border-white/[0.08] p-6">
-                                        <h3 className="text-base font-bold text-white flex items-center gap-2 mb-4">
-                                            <span className="material-symbols-outlined text-lg text-orange-400">local_fire_department</span>
+                                    <div className="glass-panel rounded-2xl border border-[var(--sys-border)] p-6">
+                                        <h3 className="text-base font-bold text-[var(--sys-text)] flex items-center gap-2 mb-4">
+                                            <span className="material-symbols-outlined text-lg text-[var(--sys-primary)]">local_fire_department</span>
                                             Daily Login Streak
                                         </h3>
                                         <div className="flex items-center gap-8">
                                             <div className="text-center">
-                                                <p className="text-5xl font-black text-orange-400">{rewardStatus.streak?.current || 0}</p>
-                                                <p className="text-sm text-slate-500 font-bold mt-1">day streak</p>
+                                                <p className="text-5xl font-black text-[var(--sys-primary)]">{rewardStatus.streak?.current || 0}</p>
+                                                <p className="text-sm text-[var(--sys-text-muted)] font-bold mt-1">day streak</p>
                                             </div>
                                             <div className="flex-1">
                                                 <div className="flex items-center gap-3 mb-2">
-                                                    <span className={`size-3 rounded-full ${rewardStatus.streak?.loggedInToday ? 'bg-emerald-400' : 'bg-slate-600'}`} />
-                                                    <span className="text-sm text-slate-300">{rewardStatus.streak?.loggedInToday ? 'Logged in today ✓' : 'Log in daily to keep streak!'}</span>
+                                                    <span className={`size-3 rounded-full ${rewardStatus.streak?.loggedInToday ? 'bg-[var(--sys-surface)]' : 'bg-[var(--sys-border)]'}`} />
+                                                    <span className="text-sm text-[var(--sys-text-muted)]">{rewardStatus.streak?.loggedInToday ? 'Logged in today ✓' : 'Log in daily to keep streak!'}</span>
                                                 </div>
-                                                <p className="text-xs text-slate-500">
+                                                <p className="text-xs text-[var(--sys-text-muted)]">
                                                     2 credits/day • +5 at 7-day streak • +25 at 30-day streak
                                                 </p>
                                                 {rewardStatus.streak?.nextReward && (
-                                                    <p className="text-xs text-amber-400 mt-1">
+                                                    <p className="text-xs text-primary mt-1">
                                                         Next bonus: +{rewardStatus.streak.nextReward.bonus} credits at day {rewardStatus.streak.nextReward.at}
                                                     </p>
                                                 )}
@@ -675,11 +675,11 @@ export default function CreditsPage() {
                                     </div>
 
                                     {/* Milestones */}
-                                    <div className="glass-panel rounded-2xl border border-white/[0.08] p-6">
-                                        <h3 className="text-base font-bold text-white flex items-center gap-2 mb-4">
-                                            <span className="material-symbols-outlined text-lg text-emerald-400">emoji_events</span>
+                                    <div className="glass-panel rounded-2xl border border-[var(--sys-border)] p-6">
+                                        <h3 className="text-base font-bold text-[var(--sys-text)] flex items-center gap-2 mb-4">
+                                            <span className="material-symbols-outlined text-lg text-primary">emoji_events</span>
                                             First-Time Milestones
-                                            <span className="text-xs text-slate-500 font-normal ml-2">
+                                            <span className="text-xs text-[var(--sys-text-muted)] font-normal ml-2">
                                                 {rewardStatus.totalMilestoneCredits} / {rewardStatus.totalMilestoneCredits + rewardStatus.availableMilestoneCredits} credits earned
                                             </span>
                                         </h3>
@@ -687,19 +687,19 @@ export default function CreditsPage() {
                                             {(rewardStatus.milestones || []).map(m => (
                                                 <div key={m.id}
                                                     className={`p-4 rounded-xl border transition-all ${m.claimed
-                                                        ? 'bg-emerald-500/5 border-emerald-500/20'
-                                                        : 'bg-white/[0.02] border-white/[0.06] hover:border-white/[0.12]'
+                                                        ? 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)]'
+                                                        : 'bg-[var(--sys-surface)] border-[var(--sys-border)] hover:border-[var(--sys-border)]'
                                                         }`}
                                                 >
                                                     <div className="flex items-center justify-between mb-2">
-                                                        <span className={`material-symbols-outlined text-xl ${m.claimed ? 'text-emerald-400' : 'text-slate-500'}`}>
+                                                        <span className={`material-symbols-outlined text-xl ${m.claimed ? 'text-primary' : 'text-[var(--sys-text-muted)]'}`}>
                                                             {m.claimed ? 'check_circle' : m.icon}
                                                         </span>
-                                                        <span className={`text-xs font-bold ${m.claimed ? 'text-emerald-400' : 'text-amber-400'}`}>
+                                                        <span className={`text-xs font-bold ${m.claimed ? 'text-primary' : 'text-primary'}`}>
                                                             +{m.credits} cr
                                                         </span>
                                                     </div>
-                                                    <p className={`text-sm font-medium ${m.claimed ? 'text-emerald-300' : 'text-slate-300'}`}>{m.label}</p>
+                                                    <p className={`text-sm font-medium ${m.claimed ? 'text-[var(--sys-primary)]' : 'text-[var(--sys-text-muted)]'}`}>{m.label}</p>
                                                     {!m.claimed && (
                                                         <button
                                                             onClick={() => handleClaimMilestone(m.id)}
@@ -714,17 +714,17 @@ export default function CreditsPage() {
                                     </div>
 
                                     {/* Referral */}
-                                    <div className="glass-panel rounded-2xl border border-white/[0.08] p-6">
-                                        <h3 className="text-base font-bold text-white flex items-center gap-2 mb-4">
+                                    <div className="glass-panel rounded-2xl border border-[var(--sys-border)] p-6">
+                                        <h3 className="text-base font-bold text-[var(--sys-text)] flex items-center gap-2 mb-4">
                                             <span className="material-symbols-outlined text-lg text-[#FF4D00]">group_add</span>
                                             Referral Program
                                         </h3>
                                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                                             {/* Your code */}
                                             <div>
-                                                <p className="text-sm text-slate-400 mb-2">Share your code — earn <span className="font-bold text-amber-400">50 credits</span> per friend who subscribes!</p>
+                                                <p className="text-sm text-[var(--sys-text-muted)] mb-2">Share your code — earn <span className="font-bold text-primary">50 credits</span> per friend who subscribes!</p>
                                                 <div className="flex items-center gap-2">
-                                                    <div className="flex-1 px-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] font-mono text-amber-400 font-bold text-sm tracking-wider">
+                                                    <div className="flex-1 px-4 py-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] font-mono text-primary font-bold text-sm tracking-wider">
                                                         {rewardStatus.referral?.code || '—'}
                                                     </div>
                                                     <button
@@ -734,41 +734,41 @@ export default function CreditsPage() {
                                                         <span className="material-symbols-outlined text-lg">content_copy</span>
                                                     </button>
                                                 </div>
-                                                <p className="text-xs text-slate-500 mt-2">
+                                                <p className="text-xs text-[var(--sys-text-muted)] mt-2">
                                                     {rewardStatus.referral?.count || 0} referrals • {rewardStatus.referral?.creditsEarned || 0} credits earned
                                                 </p>
                                             </div>
 
                                             {/* Apply a code */}
                                             <div>
-                                                <p className="text-sm text-slate-400 mb-2">Have a referral code? Get <span className="font-bold text-emerald-400">30 bonus credits</span>!</p>
+                                                <p className="text-sm text-[var(--sys-text-muted)] mb-2">Have a referral code? Get <span className="font-bold text-primary">30 bonus credits</span>!</p>
                                                 <div className="flex items-center gap-2">
                                                     <input
                                                         type="text"
                                                         value={referralInput}
                                                         onChange={e => setReferralInput(e.target.value)}
                                                         placeholder="Enter code..."
-                                                        className="flex-1 px-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm placeholder:text-slate-600 focus:outline-none focus:border-primary/40"
+                                                        className="flex-1 px-4 py-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm placeholder:text-[var(--sys-text-muted)] focus:outline-none focus:border-primary/40"
                                                     />
                                                     <button
                                                         onClick={handleApplyReferral}
-                                                        className="px-4 py-2.5 rounded-xl bg-emerald-500/10 text-emerald-400 font-bold text-sm border border-emerald-500/20 hover:bg-emerald-500/20 transition-all"
+                                                        className="px-4 py-2.5 rounded-xl bg-[var(--sys-primary-dim)] text-primary font-bold text-sm border border-[var(--sys-border)] hover:bg-[var(--sys-primary-dim)] transition-all"
                                                     >
                                                         Apply
                                                     </button>
                                                 </div>
-                                                {referralMsg && <p className="text-xs text-amber-400 mt-2">{referralMsg}</p>}
+                                                {referralMsg && <p className="text-xs text-primary mt-2">{referralMsg}</p>}
                                             </div>
                                         </div>
                                     </div>
 
                                     {/* Top-up Balance Info */}
                                     {rewardStatus.topUp?.balance > 0 && (
-                                        <div className="glass-panel rounded-2xl border border-white/[0.08] p-4 flex items-center gap-4">
-                                            <span className="material-symbols-outlined text-2xl text-amber-400">account_balance_wallet</span>
+                                        <div className="glass-panel rounded-2xl border border-[var(--sys-border)] p-4 flex items-center gap-4">
+                                            <span className="material-symbols-outlined text-2xl text-primary">account_balance_wallet</span>
                                             <div>
-                                                <p className="text-sm text-white font-bold">{rewardStatus.topUp.balance} purchased credits</p>
-                                                <p className="text-xs text-slate-500">
+                                                <p className="text-sm text-[var(--sys-text)] font-bold">{rewardStatus.topUp.balance} purchased credits</p>
+                                                <p className="text-xs text-[var(--sys-text-muted)]">
                                                     {rewardStatus.topUp.expired
                                                         ? '⚠️ Expired — purchase new credits'
                                                         : `Expires: ${new Date(rewardStatus.topUp.expiresAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}`
@@ -785,56 +785,56 @@ export default function CreditsPage() {
                         <div className="space-y-6">
                             {/* ── Cancelled Subscription Banner ── */}
                             {subStatus?.isCancelled && subStatus?.isInGracePeriod && (
-                                <div className="bg-gradient-to-r from-amber-500/10 to-orange-500/5 border border-amber-500/30 p-5 rounded-2xl flex items-center gap-4">
-                                    <span className="material-symbols-outlined text-3xl text-amber-400">warning</span>
+                                <div className="bg-[var(--sys-surface)] border border-[var(--sys-border)] border border-[var(--sys-border)] p-5 rounded-2xl flex items-center gap-4">
+                                    <span className="material-symbols-outlined text-3xl text-primary">warning</span>
                                     <div className="flex-1">
-                                        <h3 className="text-base font-bold text-amber-400">Subscription Cancelled</h3>
-                                        <p className="text-sm text-slate-400">
-                                            You have access to <span className="font-bold text-white">{subStatus.plan}</span> features until{' '}
-                                            <span className="font-bold text-white">
+                                        <h3 className="text-base font-bold text-primary">Subscription Cancelled</h3>
+                                        <p className="text-sm text-[var(--sys-text-muted)]">
+                                            You have access to <span className="font-bold text-[var(--sys-text)]">{subStatus.plan}</span> features until{' '}
+                                            <span className="font-bold text-[var(--sys-text)]">
                                                 {new Date(subStatus.gracePeriodEnd).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
                                             </span>
-                                            {' '}— <span className="font-bold text-amber-400">{subStatus.daysRemaining} days remaining</span>
+                                            {' '}— <span className="font-bold text-primary">{subStatus.daysRemaining} days remaining</span>
                                         </p>
                                     </div>
                                 </div>
                             )}
 
                             {/* ── Billing Cycle Toggle ── */}
-                            <div className="flex items-center justify-center gap-1 bg-white/[0.04] rounded-xl p-1 w-fit mx-auto">
+                            <div className="flex items-center justify-center gap-1 bg-[var(--sys-surface)] rounded-xl p-1 w-fit mx-auto">
                                 {[{k: 'monthly', l: 'Monthly'}, {k: 'quarterly', l: 'Quarterly', save: '10%'}, {k: 'yearly', l: 'Annual', save: '20%'}].map(c => (
                                     <button
                                         key={c.k}
                                         onClick={() => setBillingCycle(c.k)}
                                         className={`px-5 py-2.5 rounded-lg text-sm font-bold transition-all relative ${billingCycle === c.k
-                                            ? 'bg-primary text-white shadow-lg shadow-primary/20'
-                                            : 'text-slate-400 hover:text-white hover:bg-white/[0.06]'
+                                            ? 'bg-primary text-white shadow-none'
+                                            : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)]'
                                         }`}
                                     >
                                         {c.l}
                                         {c.save && billingCycle === c.k && (
-                                            <span className="absolute -top-2 -right-2 px-1.5 py-0.5 rounded-full bg-emerald-500 text-[9px] font-black text-white">Save {c.save}</span>
+                                            <span className="absolute -top-2 -right-2 px-1.5 py-0.5 rounded-full bg-[var(--sys-surface)] text-[9px] font-black text-[var(--sys-text)]">Save {c.save}</span>
                                         )}
                                     </button>
                                 ))}
                             </div>
 
                             {/* Coupon Section (Plans) */}
-                            <div className="glass-panel p-6 rounded-2xl border border-white/[0.08] flex flex-wrap items-center justify-between gap-4">
+                            <div className="glass-panel p-6 rounded-2xl border border-[var(--sys-border)] flex flex-wrap items-center justify-between gap-4">
                                 <div className="flex items-center gap-3">
                                     <span className="material-symbols-outlined text-2xl text-primary">local_offer</span>
                                     <div>
-                                        <h4 className="text-sm font-bold text-white">Have a Coupon?</h4>
-                                        <p className="text-xs text-slate-500">Get additional discounts on your subscription.</p>
+                                        <h4 className="text-sm font-bold text-[var(--sys-text)]">Have a Coupon?</h4>
+                                        <p className="text-xs text-[var(--sys-text-muted)]">Get additional discounts on your subscription.</p>
                                     </div>
                                 </div>
                                 {appliedCoupon ? (
-                                    <div className="flex items-center gap-3 bg-emerald-500/10 border border-emerald-500/20 px-4 py-2 rounded-xl">
+                                    <div className="flex items-center gap-3 bg-[var(--sys-primary-dim)] border border-[var(--sys-border)] px-4 py-2 rounded-xl">
                                         <div className="flex items-center gap-2">
-                                            <span className="text-sm font-bold text-emerald-400">{appliedCoupon.coupon.code}</span>
-                                            <span className="text-xs text-emerald-500">Applied</span>
+                                            <span className="text-sm font-bold text-primary">{appliedCoupon.coupon.code}</span>
+                                            <span className="text-xs text-primary">Applied</span>
                                         </div>
-                                        <button onClick={removeCoupon} className="material-symbols-outlined text-sm text-emerald-500 hover:text-white transition-all">cancel</button>
+                                        <button onClick={removeCoupon} className="material-symbols-outlined text-sm text-primary hover:text-[var(--sys-text)] transition-all">cancel</button>
                                     </div>
                                 ) : (
                                     <div className="flex items-center gap-2">
@@ -843,7 +843,7 @@ export default function CreditsPage() {
                                             placeholder="Enter code..." 
                                             value={couponInput}
                                             onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
-                                            className="bg-white/[0.04] border border-white/[0.08] rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-primary/50"
+                                            className="bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl px-4 py-2 text-sm text-[var(--sys-text)] focus:outline-none focus:border-primary/50"
                                         />
                                         <button 
                                             onClick={handleApplyCoupon}
@@ -854,12 +854,12 @@ export default function CreditsPage() {
                                         </button>
                                     </div>
                                 )}
-                                {couponError && <p className="w-full text-xs text-rose-500">{couponError}</p>}
+                                {couponError && <p className="w-full text-xs text-primary">{couponError}</p>}
                             </div>
 
                             {packagesLoading ? (
                                 <div className="flex items-center justify-center h-64">
-                                    <div className="size-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                                    <div className="size-8 border border-primary border-t-transparent rounded-full animate-spin" />
                                 </div>
                             ) : (
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -873,35 +873,35 @@ export default function CreditsPage() {
                                         const savings = billingCycle !== 'monthly' && monthlyPrice > 0 && price > 0 ? Math.round((1 - monthlyEquiv / monthlyPrice) * 100) : 0;
 
                                         return (
-                                            <div key={pkg._id} className={`glass-panel p-6 rounded-2xl border transition-all hover:scale-[1.02] flex flex-col ${isCurrent ? 'border-primary ring-1 ring-primary/20 bg-primary/5' : 'border-white/[0.08]'}`}>
+                                            <div key={pkg._id} className={`glass-panel p-6 rounded-2xl border transition-all hover:scale-[1.02] flex flex-col ${isCurrent ? 'border-primary  ring-primary/20 bg-primary/5' : 'border-[var(--sys-border)]'}`}>
                                                 <div className="flex-1">
                                                     <div className="flex items-center justify-between mb-4">
-                                                        <h3 className="text-xl font-bold text-white">{pkg.name}</h3>
+                                                        <h3 className="text-xl font-bold text-[var(--sys-text)]">{pkg.name}</h3>
                                                         {isCurrent && <span className="px-2 py-0.5 rounded-full bg-primary text-[10px] font-black uppercase text-white tracking-wider">Current Plan</span>}
                                                     </div>
-                                                    <p className="text-sm text-slate-500 mb-6">{pkg.description}</p>
+                                                    <p className="text-sm text-[var(--sys-text-muted)] mb-6">{pkg.description}</p>
                                                     <div className="mb-6">
                                                         <>
-                                                            <span className="text-3xl font-black text-white">{pkg.pricing.currency === 'INR' ? '₹' : '$'}{price?.toLocaleString()}</span>
-                                                            <span className="text-slate-500 text-sm">/{billingCycle === 'yearly' ? 'yr' : billingCycle === 'quarterly' ? 'qtr' : 'mo'}</span>
+                                                            <span className="text-3xl font-black text-[var(--sys-text)]">{pkg.pricing.currency === 'INR' ? '₹' : '$'}{price?.toLocaleString()}</span>
+                                                            <span className="text-[var(--sys-text-muted)] text-sm">/{billingCycle === 'yearly' ? 'yr' : billingCycle === 'quarterly' ? 'qtr' : 'mo'}</span>
                                                         </>
 
                                                         {savings > 0 && (
-                                                            <span className="ml-2 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 text-xs font-bold">
+                                                            <span className="ml-2 px-2 py-0.5 rounded-full bg-[var(--sys-primary-dim)] text-primary text-xs font-bold">
                                                                 Save {savings}%
                                                             </span>
                                                         )}
                                                         {billingCycle !== 'monthly' && monthlyEquiv > 0 && (
-                                                            <p className="text-xs text-slate-600 mt-1">≈ ₹{monthlyEquiv?.toLocaleString()}/mo</p>
+                                                            <p className="text-xs text-[var(--sys-text-muted)] mt-1">≈ ₹{monthlyEquiv?.toLocaleString()}/mo</p>
                                                         )}
                                                     </div>
                                                     <ul className="space-y-3 mb-8">
-                                                        <li className="flex items-center gap-2 text-sm text-slate-300">
+                                                        <li className="flex items-center gap-2 text-sm text-[var(--sys-text-muted)]">
                                                             <span className="material-symbols-outlined text-primary text-lg">{pkg.credits?.monthly >= 999999 ? 'all_inclusive' : 'check_circle'}</span>
                                                             {pkg.credits?.monthly >= 999999 ? 'Unlimited' : pkg.credits?.monthly?.toLocaleString()} Credits / mo
                                                         </li>
                                                         {pkg.features?.map((f, j) => (
-                                                            <li key={j} className="flex items-center gap-2 text-sm text-slate-300">
+                                                            <li key={j} className="flex items-center gap-2 text-sm text-[var(--sys-text-muted)]">
                                                                 <span className="material-symbols-outlined text-primary text-lg">check_circle</span>
                                                                 {typeof f === 'object' ? (f.name || 'Feature') : f}
                                                             </li>
@@ -912,10 +912,10 @@ export default function CreditsPage() {
                                                     onClick={() => !isCurrent && handleUpgrade(pkg)}
                                                     disabled={isCurrent}
                                                     className={`w-full py-3 rounded-xl font-bold text-sm text-center block transition-all cursor-pointer ${isCurrent
-                                                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 cursor-default'
+                                                        ? 'bg-[var(--sys-primary-dim)] text-primary border border-[var(--sys-border)] cursor-default'
                                                         : isUpgrade
-                                                            ? 'bg-primary text-white shadow-lg shadow-primary/20 hover:bg-primary-light'
-                                                            : 'bg-white/5 text-white border border-white/10 hover:bg-white/10'
+                                                            ? 'bg-primary text-white shadow-none hover:bg-primary-light'
+                                                            : 'bg-[var(--sys-surface)] text-[var(--sys-text)] border border-[var(--sys-border)] hover:bg-[var(--sys-surface)]'
                                                     }`}
                                                 >
                                                     {isCurrent ? 'Current Plan' : isUpgrade ? `Upgrade to ${pkg.name}` : `Switch to ${pkg.name}`}
@@ -924,7 +924,7 @@ export default function CreditsPage() {
                                                 {isCurrent && subStatus?.hasSubscription && subStatus?.status === 'active' && (
                                                     <button
                                                         onClick={() => setCancelModal({ step: 'reason' })}
-                                                        className="mt-3 w-full py-2 text-xs text-slate-500 hover:text-rose-400 transition-all"
+                                                        className="mt-3 w-full py-2 text-xs text-[var(--sys-text-muted)] hover:text-primary transition-all"
                                                     >
                                                         Cancel Subscription
                                                     </button>
@@ -937,20 +937,20 @@ export default function CreditsPage() {
                         </div>
                     ) : (
                         /* Transaction History */
-                        <div className="glass-panel rounded-2xl border border-white/[0.08] overflow-hidden">
-                            <div className="p-4 border-b border-white/[0.06] flex items-center justify-between">
-                                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                        <div className="glass-panel rounded-2xl border border-[var(--sys-border)] overflow-hidden">
+                            <div className="p-4 border-b border-[var(--sys-border)] flex items-center justify-between">
+                                <h3 className="text-base font-bold text-[var(--sys-text)] flex items-center gap-2">
                                     <span className="material-symbols-outlined text-lg text-primary">receipt_long</span>
                                     Recent Transactions
-                                    <span className="text-sm text-slate-500 font-normal ml-1">({usageTotal} total)</span>
+                                    <span className="text-sm text-[var(--sys-text-muted)] font-normal ml-1">({usageTotal} total)</span>
                                 </h3>
                             </div>
 
                             {usage.length === 0 ? (
                                 <div className="p-12 text-center">
                                     <span className="material-symbols-outlined text-5xl text-slate-700">receipt_long</span>
-                                    <p className="text-sm text-slate-500 mt-2">No transactions yet</p>
-                                    <p className="text-xs text-slate-600">Start using AI features to see your credit history</p>
+                                    <p className="text-sm text-[var(--sys-text-muted)] mt-2">No transactions yet</p>
+                                    <p className="text-xs text-[var(--sys-text-muted)]">Start using AI features to see your credit history</p>
                                 </div>
                             ) : (
                                 <>
@@ -958,25 +958,25 @@ export default function CreditsPage() {
                                         {usage.map((u, i) => {
                                             const color = ACTION_COLORS[u.action] || 'slate'
                                             return (
-                                                <div key={u._id || i} className="px-4 py-3 flex items-center gap-4 hover:bg-white/[0.02] transition-colors">
+                                                <div key={u._id || i} className="px-4 py-3 flex items-center gap-4 hover:bg-[var(--sys-surface)] transition-colors">
                                                     <div className={`size-9 rounded-lg bg-${color}-500/10 flex items-center justify-center flex-shrink-0`}>
                                                         <span className={`material-symbols-outlined text-lg text-${color}-400`}>
                                                             {ACTION_ICONS[u.action] || 'token'}
                                                         </span>
                                                     </div>
                                                     <div className="flex-1 min-w-0">
-                                                        <p className="text-sm text-white font-medium truncate">{u.description || u.action}</p>
-                                                        <p className="text-xs text-slate-600 truncate">
+                                                        <p className="text-sm text-[var(--sys-text)] font-medium truncate">{u.description || u.action}</p>
+                                                        <p className="text-xs text-[var(--sys-text-muted)] truncate">
                                                             {u.metadata?.route || ''} {u.metadata?.brandName ? `• ${u.metadata.brandName}` : ''}
                                                         </p>
                                                     </div>
                                                     <div className="text-right flex-shrink-0">
-                                                        <p className="text-sm font-bold text-rose-400">-{u.cost}</p>
-                                                        <p className="text-xs text-slate-600">{formatTime(u.createdAt)}</p>
+                                                        <p className="text-sm font-bold text-primary">-{u.cost}</p>
+                                                        <p className="text-xs text-[var(--sys-text-muted)]">{formatTime(u.createdAt)}</p>
                                                     </div>
                                                     <div className="text-right flex-shrink-0 w-16">
-                                                        <p className="text-sm text-slate-500">Balance</p>
-                                                        <p className="text-xs font-bold text-slate-400">{u.balanceAfter}</p>
+                                                        <p className="text-sm text-[var(--sys-text-muted)]">Balance</p>
+                                                        <p className="text-xs font-bold text-[var(--sys-text-muted)]">{u.balanceAfter}</p>
                                                     </div>
                                                 </div>
                                             )
@@ -985,20 +985,20 @@ export default function CreditsPage() {
 
                                     {/* Pagination */}
                                     {pages > 1 && (
-                                        <div className="p-4 border-t border-white/[0.06] flex items-center justify-between">
-                                            <p className="text-sm text-slate-500">
+                                        <div className="p-4 border-t border-[var(--sys-border)] flex items-center justify-between">
+                                            <p className="text-sm text-[var(--sys-text-muted)]">
                                                 Page {page} of {pages} ({usageTotal} records)
                                             </p>
                                             <div className="flex gap-2">
                                                 <button
                                                     onClick={() => setPage(p => Math.max(1, p - 1))}
                                                     disabled={page <= 1}
-                                                    className="px-3 py-1 rounded-lg text-xs font-medium bg-white/[0.04] text-slate-400 hover:bg-white/[0.08] disabled:opacity-30 transition-all"
+                                                    className="px-3 py-1 rounded-lg text-xs font-medium bg-[var(--sys-surface)] text-[var(--sys-text-muted)] hover:bg-[var(--sys-surface)] disabled:opacity-30 transition-all"
                                                 >← Previous</button>
                                                 <button
                                                     onClick={() => setPage(p => Math.min(pages, p + 1))}
                                                     disabled={page >= pages}
-                                                    className="px-3 py-1 rounded-lg text-xs font-medium bg-white/[0.04] text-slate-400 hover:bg-white/[0.08] disabled:opacity-30 transition-all"
+                                                    className="px-3 py-1 rounded-lg text-xs font-medium bg-[var(--sys-surface)] text-[var(--sys-text-muted)] hover:bg-[var(--sys-surface)] disabled:opacity-30 transition-all"
                                                 >Next →</button>
                                             </div>
                                         </div>
@@ -1013,16 +1013,16 @@ export default function CreditsPage() {
 
         {/* ═══ Cancel Subscription Modal ═══ */}
         {cancelModal && (
-            <div className="fixed inset-0 z-[999] bg-black/60 flex items-center justify-center p-4" onClick={() => !cancelLoading && setCancelModal(null)}>
-                <div className="bg-[#0e1117] border border-white/[0.1] rounded-3xl max-w-md w-full p-8 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="fixed inset-0 z-[999] bg-[var(--sys-surface)] flex items-center justify-center p-4" onClick={() => !cancelLoading && setCancelModal(null)}>
+                <div className="bg-[#0e1117] border border-[var(--sys-border)] rounded-3xl max-w-md w-full p-8 shadow-2xl" onClick={e => e.stopPropagation()}>
 
                     {/* Step 1: Reason */}
                     {cancelModal.step === 'reason' && (
                         <>
                             <div className="text-center mb-6">
-                                <span className="material-symbols-outlined text-4xl text-rose-400 mb-3 block">sentiment_dissatisfied</span>
-                                <h2 className="text-xl font-bold text-white">Cancel Subscription?</h2>
-                                <p className="text-sm text-slate-400 mt-2">We're sorry to see you go. Please tell us why:</p>
+                                <span className="material-symbols-outlined text-4xl text-primary mb-3 block">sentiment_dissatisfied</span>
+                                <h2 className="text-xl font-bold text-[var(--sys-text)]">Cancel Subscription?</h2>
+                                <p className="text-sm text-[var(--sys-text-muted)] mt-2">We're sorry to see you go. Please tell us why:</p>
                             </div>
                             <div className="space-y-2 mb-6">
                                 {CANCEL_REASONS.map(r => (
@@ -1030,8 +1030,8 @@ export default function CreditsPage() {
                                         key={r}
                                         onClick={() => setCancelReason(r)}
                                         className={`w-full text-left px-4 py-3 rounded-xl text-sm transition-all border ${cancelReason === r
-                                            ? 'border-rose-500/40 bg-rose-500/10 text-white'
-                                            : 'border-white/[0.06] bg-white/[0.02] text-slate-400 hover:bg-white/[0.05]'
+                                            ? 'border-[var(--sys-border)] bg-[var(--sys-primary-dim)] text-[var(--sys-text)]'
+                                            : 'border-[var(--sys-border)] bg-[var(--sys-surface)] text-[var(--sys-text-muted)] hover:bg-[var(--sys-surface)]'
                                         }`}
                                     >
                                         {r}
@@ -1041,14 +1041,14 @@ export default function CreditsPage() {
                             <div className="flex gap-3">
                                 <button
                                     onClick={() => setCancelModal(null)}
-                                    className="flex-1 py-3 rounded-xl text-sm font-bold text-slate-400 bg-white/[0.04] hover:bg-white/[0.08] transition-all"
+                                    className="flex-1 py-3 rounded-xl text-sm font-bold text-[var(--sys-text-muted)] bg-[var(--sys-surface)] hover:bg-[var(--sys-surface)] transition-all"
                                 >
                                     Keep Subscription
                                 </button>
                                 <button
                                     onClick={handleCancelSubscription}
                                     disabled={!cancelReason || cancelLoading}
-                                    className="flex-1 py-3 rounded-xl text-sm font-bold text-white bg-rose-600 hover:bg-rose-700 disabled:opacity-40 transition-all"
+                                    className="flex-1 py-3 rounded-xl text-sm font-bold text-[var(--sys-text)] bg-[var(--sys-surface)] hover:bg-[var(--sys-surface)] disabled:opacity-40 transition-all"
                                 >
                                     {cancelLoading ? 'Processing...' : 'Continue'}
                                 </button>
@@ -1060,37 +1060,37 @@ export default function CreditsPage() {
                     {cancelModal.step === 'offer' && cancelModal.retentionOffer && (
                         <>
                             <div className="text-center mb-6">
-                                <span className="material-symbols-outlined text-4xl text-amber-400 mb-3 block">{cancelModal.retentionOffer.icon || 'local_offer'}</span>
-                                <h2 className="text-xl font-bold text-white">{cancelModal.retentionOffer.headline || 'Wait! We have a special offer'}</h2>
-                                <p className="text-sm text-slate-400 mt-2">{cancelModal.retentionOffer.description}</p>
+                                <span className="material-symbols-outlined text-4xl text-primary mb-3 block">{cancelModal.retentionOffer.icon || 'local_offer'}</span>
+                                <h2 className="text-xl font-bold text-[var(--sys-text)]">{cancelModal.retentionOffer.headline || 'Wait! We have a special offer'}</h2>
+                                <p className="text-sm text-[var(--sys-text-muted)] mt-2">{cancelModal.retentionOffer.description}</p>
                             </div>
-                            <div className="bg-gradient-to-br from-amber-500/10 to-orange-500/5 border border-amber-500/30 rounded-2xl p-6 mb-6 text-center">
-                                <p className="text-2xl font-black text-white mb-1">
+                            <div className="bg-[var(--sys-surface)] border border-[var(--sys-border)] border border-[var(--sys-border)] rounded-2xl p-6 mb-6 text-center">
+                                <p className="text-2xl font-black text-[var(--sys-text)] mb-1">
                                     {cancelModal.retentionOffer.offerType === 'discount' && `${cancelModal.retentionOffer.value}% OFF`}
                                     {cancelModal.retentionOffer.offerType === 'bonus_credits' && `+${cancelModal.retentionOffer.value} Credits`}
                                     {cancelModal.retentionOffer.offerType === 'free_month' && `${cancelModal.retentionOffer.value} Free Month(s)`}
                                     {cancelModal.retentionOffer.offerType === 'downgrade' && `Switch to ${cancelModal.retentionOffer.value}`}
                                 </p>
-                                <p className="text-xs text-amber-400/80">{cancelModal.retentionOffer.name}</p>
+                                <p className="text-xs text-primary/80">{cancelModal.retentionOffer.name}</p>
                             </div>
-                            <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4 mb-6">
-                                <p className="text-sm text-slate-400">
-                                    <span className="material-symbols-outlined text-sm text-amber-400 align-middle mr-1">schedule</span>
-                                    Your <span className="text-white font-bold">{cancelModal.plan}</span> access continues until end of billing period
-                                    {cancelModal.daysRemaining > 0 && <> — <span className="text-amber-400 font-bold">{cancelModal.daysRemaining} days remaining</span></>}
+                            <div className="bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl p-4 mb-6">
+                                <p className="text-sm text-[var(--sys-text-muted)]">
+                                    <span className="material-symbols-outlined text-sm text-primary align-middle mr-1">schedule</span>
+                                    Your <span className="text-[var(--sys-text)] font-bold">{cancelModal.plan}</span> access continues until end of billing period
+                                    {cancelModal.daysRemaining > 0 && <> — <span className="text-primary font-bold">{cancelModal.daysRemaining} days remaining</span></>}
                                 </p>
                             </div>
                             <div className="flex gap-3">
                                 <button
                                     onClick={() => setCancelModal({ ...cancelModal, step: 'done' })}
-                                    className="flex-1 py-3 rounded-xl text-sm font-bold text-slate-400 bg-white/[0.04] hover:bg-white/[0.08] transition-all"
+                                    className="flex-1 py-3 rounded-xl text-sm font-bold text-[var(--sys-text-muted)] bg-[var(--sys-surface)] hover:bg-[var(--sys-surface)] transition-all"
                                 >
                                     No thanks, cancel
                                 </button>
                                 <button
                                     onClick={() => handleAcceptRetention(cancelModal.retentionOffer.id)}
                                     disabled={cancelLoading}
-                                    className="flex-1 py-3 rounded-xl text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 transition-all"
+                                    className="flex-1 py-3 rounded-xl text-sm font-bold text-[var(--sys-text)] bg-[var(--sys-surface)] hover:bg-[var(--sys-surface)] disabled:opacity-40 transition-all"
                                 >
                                     {cancelLoading ? 'Applying...' : 'Accept Offer!'}
                                 </button>
@@ -1102,16 +1102,16 @@ export default function CreditsPage() {
                     {cancelModal.step === 'done' && (
                         <>
                             <div className="text-center mb-6">
-                                <span className="material-symbols-outlined text-4xl text-slate-400 mb-3 block">check_circle</span>
-                                <h2 className="text-xl font-bold text-white">Subscription Cancelled</h2>
-                                <p className="text-sm text-slate-400 mt-2">
+                                <span className="material-symbols-outlined text-4xl text-[var(--sys-text-muted)] mb-3 block">check_circle</span>
+                                <h2 className="text-xl font-bold text-[var(--sys-text)]">Subscription Cancelled</h2>
+                                <p className="text-sm text-[var(--sys-text-muted)] mt-2">
                                     {cancelModal.message || `Your subscription has been cancelled. You'll continue to have access until the end of your billing period.`}
                                 </p>
                             </div>
                             {cancelModal.daysRemaining > 0 && (
-                                <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-4 mb-6 text-center">
-                                    <p className="text-3xl font-black text-amber-400">{cancelModal.daysRemaining}</p>
-                                    <p className="text-xs text-slate-500 uppercase tracking-wider font-bold mt-1">Days Remaining</p>
+                                <div className="bg-[var(--sys-primary-dim)] border border-[var(--sys-border)] rounded-xl p-4 mb-6 text-center">
+                                    <p className="text-3xl font-black text-primary">{cancelModal.daysRemaining}</p>
+                                    <p className="text-xs text-[var(--sys-text-muted)] uppercase tracking-wider font-bold mt-1">Days Remaining</p>
                                 </div>
                             )}
                             <button
@@ -1129,48 +1129,48 @@ export default function CreditsPage() {
         {showCheckout && checkoutItem && (
             <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
                 <div 
-                    className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-fade-in" 
+                    className="absolute inset-0 bg-[var(--sys-surface)] animate-fade-in" 
                     onClick={() => setShowCheckout(false)} 
                 />
-                <div className="relative w-full max-w-md bg-[#0f172a] border border-white/[0.08] rounded-3xl overflow-hidden shadow-2xl animate-scale-in">
+                <div className="relative w-full max-w-md bg-[#0f172a] border border-[var(--sys-border)] rounded-3xl overflow-hidden shadow-2xl animate-scale-in">
                     {/* Header */}
-                    <div className="p-6 pb-4 border-b border-white/[0.04] flex items-center justify-between">
-                        <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                    <div className="p-6 pb-4 border-b border-[var(--sys-border)] flex items-center justify-between">
+                        <h3 className="text-lg font-bold text-[var(--sys-text)] flex items-center gap-2">
                             <span className="material-symbols-outlined text-primary">shopping_cart</span>
                             Review Order
                         </h3>
-                        <button onClick={() => setShowCheckout(false)} className="material-symbols-outlined text-slate-500 hover:text-white transition-all">close</button>
+                        <button onClick={() => setShowCheckout(false)} className="material-symbols-outlined text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] transition-all">close</button>
                     </div>
 
                     <div className="p-6 space-y-6">
                         {/* Item Summary */}
-                        <div className="bg-white/[0.02] border border-white/10 rounded-2xl p-4 flex items-center gap-4">
+                        <div className="bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-2xl p-4 flex items-center gap-4">
                             <div className="size-12 rounded-xl bg-primary/10 flex items-center justify-center">
                                 <span className="material-symbols-outlined text-2xl text-primary">
                                     {checkoutItem.type === 'subscription' ? 'diamond' : (checkoutItem.icon || 'token')}
                                 </span>
                             </div>
                             <div className="flex-1">
-                                <h4 className="text-white font-bold">{checkoutItem.name || (checkoutItem.type === 'subscription' ? 'Subscription Upgrade' : `${checkoutItem.total} Credits`)}</h4>
-                                <p className="text-xs text-slate-500">
+                                <h4 className="text-[var(--sys-text)] font-bold">{checkoutItem.name || (checkoutItem.type === 'subscription' ? 'Subscription Upgrade' : `${checkoutItem.total} Credits`)}</h4>
+                                <p className="text-xs text-[var(--sys-text-muted)]">
                                     {checkoutItem.type === 'subscription' ? `Billed ${billingCycle}` : `${checkoutItem.validityDays} Days Validity`}
                                 </p>
                             </div>
                             <div className="text-right">
-                                <p className="text-lg font-black text-white">₹{(checkoutItem.type === 'subscription' ? (checkoutItem.pricing?.[billingCycle] || checkoutItem.pricing?.monthly) : checkoutItem.price)?.toLocaleString()}</p>
+                                <p className="text-lg font-black text-[var(--sys-text)]">₹{(checkoutItem.type === 'subscription' ? (checkoutItem.pricing?.[billingCycle] || checkoutItem.pricing?.monthly) : checkoutItem.price)?.toLocaleString()}</p>
                             </div>
                         </div>
 
                         {/* Coupon Section */}
                         <div className="space-y-3">
-                            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider px-1">Promo Code</h4>
+                            <h4 className="text-xs font-bold text-[var(--sys-text-muted)] uppercase tracking-wider px-1">Promo Code</h4>
                             {appliedCoupon ? (
-                                <div className="flex items-center justify-between bg-emerald-500/10 border border-emerald-500/20 px-4 py-3 rounded-2xl">
+                                <div className="flex items-center justify-between bg-[var(--sys-primary-dim)] border border-[var(--sys-border)] px-4 py-3 rounded-2xl">
                                     <div className="flex items-center gap-3">
-                                        <span className="material-symbols-outlined text-emerald-400">local_offer</span>
+                                        <span className="material-symbols-outlined text-primary">local_offer</span>
                                         <div>
-                                            <p className="text-sm font-bold text-emerald-400">{appliedCoupon.coupon.code}</p>
-                                            <p className="text-[10px] text-emerald-500/80">
+                                            <p className="text-sm font-bold text-primary">{appliedCoupon.coupon.code}</p>
+                                            <p className="text-[10px] text-primary/80">
                                                 {appliedCoupon.coupon.discountType === 'percentage' 
                                                     ? `${appliedCoupon.coupon.discountValue}% OFF Applied` 
                                                     : `₹${appliedCoupon.coupon.discountValue} OFF Applied`}
@@ -1179,7 +1179,7 @@ export default function CreditsPage() {
                                     </div>
                                     <button 
                                         onClick={removeCoupon}
-                                        className="text-xs font-bold text-emerald-500 hover:text-rose-400 transition-all"
+                                        className="text-xs font-bold text-primary hover:text-primary transition-all"
                                     >
                                         Remove
                                     </button>
@@ -1191,7 +1191,7 @@ export default function CreditsPage() {
                                         placeholder="Enter coupon code..." 
                                         value={couponInput}
                                         onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
-                                        className="w-full bg-white/[0.04] border border-white/[0.1] rounded-2xl px-5 py-3.5 pr-24 text-sm text-white focus:outline-none focus:border-primary/50 transition-all"
+                                        className="w-full bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-2xl px-5 py-3.5 pr-24 text-sm text-[var(--sys-text)] focus:outline-none focus:border-primary/50 transition-all"
                                     />
                                     <button 
                                         onClick={handleApplyCoupon}
@@ -1202,24 +1202,24 @@ export default function CreditsPage() {
                                     </button>
                                 </div>
                             )}
-                            {couponError && <p className="text-[10px] text-rose-500 px-1">{couponError}</p>}
+                            {couponError && <p className="text-[10px] text-primary px-1">{couponError}</p>}
                         </div>
 
                         {/* Totals */}
                         <div className="space-y-3 pt-2">
-                            <div className="flex justify-between text-sm text-slate-400">
+                            <div className="flex justify-between text-sm text-[var(--sys-text-muted)]">
                                 <span>Subtotal</span>
                                 <span>₹{(checkoutItem.type === 'subscription' ? (checkoutItem.pricing?.[billingCycle] || checkoutItem.pricing?.monthly) : checkoutItem.price)?.toLocaleString()}</span>
                             </div>
                             {appliedCoupon && (
-                                <div className="flex justify-between text-sm text-emerald-400">
+                                <div className="flex justify-between text-sm text-primary">
                                     <span>Discount ({appliedCoupon.coupon.code})</span>
                                     <span>-₹{appliedCoupon.discount?.toLocaleString()}</span>
                                 </div>
                             )}
-                            <div className="flex justify-between items-center pt-3 border-t border-white/[0.08]">
-                                <span className="text-white font-bold">Total Amount</span>
-                                <span className="text-2xl font-black text-white">
+                            <div className="flex justify-between items-center pt-3 border-t border-[var(--sys-border)]">
+                                <span className="text-[var(--sys-text)] font-bold">Total Amount</span>
+                                <span className="text-2xl font-black text-[var(--sys-text)]">
                                     ₹{(appliedCoupon?.finalPrice || (checkoutItem.type === 'subscription' ? (checkoutItem.pricing?.[billingCycle] || checkoutItem.pricing?.monthly) : checkoutItem.price))?.toLocaleString()}
                                 </span>
                             </div>
@@ -1232,12 +1232,12 @@ export default function CreditsPage() {
                                 else confirmUpgrade(checkoutItem)
                                 setShowCheckout(false)
                             }}
-                            className="w-full py-4 bg-primary text-black font-black rounded-2xl shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                            className="w-full py-4 bg-primary text-black font-black rounded-2xl shadow-none hover:scale-[1.02] active:scale-[0.98] transition-all"
                         >
                             Proceed to Payment
                         </button>
                         
-                        <p className="text-[10px] text-slate-600 text-center">
+                        <p className="text-[10px] text-[var(--sys-text-muted)] text-center">
                             By proceeding, you agree to our Terms of Service. Payments are processed securely via Razorpay.
                         </p>
                     </div>

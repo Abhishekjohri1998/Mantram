@@ -551,7 +551,7 @@ export default function VideoStudio() {
                             { id: 'storyboard', icon: 'view_timeline', label: 'Storyboard' },
                         ].map(tab => (
                             <button key={tab.id} onClick={() => setStudioMode(tab.id)}
-                                className={`flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-300 cursor-pointer ${studioMode === tab.id ? 'studio-nav-pill text-white font-bold' : 'studio-nav-tab-inactive'}`}>
+                                className={`flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-300 cursor-pointer ${studioMode === tab.id ? 'studio-nav-pill text-[var(--sys-text)] font-bold' : 'studio-nav-tab-inactive'}`}>
                                 <span className={`material-symbols-outlined ${studioMode === tab.id ? 'text-lg' : 'text-base opacity-70'}`}>{tab.icon}</span>
                                 <span>{tab.label}</span>
                             </button>
@@ -571,33 +571,33 @@ export default function VideoStudio() {
 
                 {/* ── History Panel (shown in both modes) ── */}
                 {showHistory && (
-                    <div className="glass-panel rounded-2xl p-5 mb-6 border border-white/[0.08]">
+                    <div className="glass-panel rounded-2xl p-5 mb-6 border border-[var(--sys-border)]">
                         <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-base font-bold text-white flex items-center gap-2">
+                            <h3 className="text-base font-bold text-[var(--sys-text)] flex items-center gap-2">
                                 <span className="material-symbols-outlined text-[#FF4D00]">folder_open</span>
                                 Video History
-                                <span className="text-xs font-normal text-slate-500 ml-1">({projects.length})</span>
+                                <span className="text-xs font-normal text-[var(--sys-text-muted)] ml-1">({projects.length})</span>
                             </h3>
                             <div className="flex items-center gap-2">
                                 {/* Grid/List toggle */}
-                                <div className="flex rounded-lg border border-white/[0.08] overflow-hidden">
+                                <div className="flex rounded-lg border border-[var(--sys-border)] overflow-hidden">
                                     <button onClick={() => setHistoryView('list')}
-                                        className={`p-1.5 transition-all cursor-pointer ${historyView === 'list' ? 'bg-white/[0.08] text-white' : 'text-slate-600 hover:text-slate-400'}`}
+                                        className={`p-1.5 transition-all cursor-pointer ${historyView === 'list' ? 'bg-[var(--sys-surface)] text-[var(--sys-text)]' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text-muted)]'}`}
                                         title="List view">
                                         <span className="material-symbols-outlined text-sm">view_list</span>
                                     </button>
                                     <button onClick={() => setHistoryView('grid')}
-                                        className={`p-1.5 transition-all cursor-pointer ${historyView === 'grid' ? 'bg-white/[0.08] text-white' : 'text-slate-600 hover:text-slate-400'}`}
+                                        className={`p-1.5 transition-all cursor-pointer ${historyView === 'grid' ? 'bg-[var(--sys-surface)] text-[var(--sys-text)]' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text-muted)]'}`}
                                         title="Grid view">
                                         <span className="material-symbols-outlined text-sm">grid_view</span>
                                     </button>
                                 </div>
                                 <button onClick={() => {
                                     api('/video-studio?limit=50').then(d => setProjects(d.projects || [])).catch(() => { })
-                                }} className="text-xs text-slate-500 hover:text-white flex items-center gap-1 cursor-pointer px-2 py-1 rounded-lg hover:bg-white/[0.04] transition-all">
+                                }} className="text-xs text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] flex items-center gap-1 cursor-pointer px-2 py-1 rounded-lg hover:bg-[var(--sys-surface)] transition-all">
                                     <span className="material-symbols-outlined text-sm">refresh</span> Refresh
                                 </button>
-                                <button onClick={() => setShowHistory(false)} className="text-slate-500 hover:text-white cursor-pointer p-1 rounded-lg hover:bg-white/[0.04] transition-all">
+                                <button onClick={() => setShowHistory(false)} className="text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer p-1 rounded-lg hover:bg-[var(--sys-surface)] transition-all">
                                     <span className="material-symbols-outlined text-sm">close</span>
                                 </button>
                             </div>
@@ -606,7 +606,7 @@ export default function VideoStudio() {
                         {projects.length === 0 ? (
                             <div className="text-center py-12">
                                 <span className="material-symbols-outlined text-4xl text-slate-700 mb-3 block">videocam_off</span>
-                                <p className="text-sm text-slate-500">No videos yet. Create your first one!</p>
+                                <p className="text-sm text-[var(--sys-text-muted)]">No videos yet. Create your first one!</p>
                             </div>
                         ) : historyView === 'list' ? (
                             <div className="space-y-2 max-h-[70vh] overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}>
@@ -623,42 +623,42 @@ export default function VideoStudio() {
                                     const promptPreview = promptText ? (promptText.length > 80 ? promptText.slice(0, 80) + '…' : promptText) : '';
 
                                     return (
-                                        <div key={p._id} className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/[0.05] hover:border-white/[0.12] transition-all group">
+                                        <div key={p._id} className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:border-[var(--sys-border)] transition-all group">
                                             {/* Thumbnail / Play area */}
-                                            <div className="relative w-full sm:w-28 h-40 sm:h-16 flex-shrink-0 rounded-lg overflow-hidden bg-black/40 cursor-pointer"
+                                            <div className="relative w-full sm:w-28 h-40 sm:h-16 flex-shrink-0 rounded-lg overflow-hidden bg-[var(--sys-surface)] cursor-pointer"
                                                 onClick={() => { if (videoUrl) setPlayingVideo(videoUrl); else loadProject(p._id) }}>
                                                 {videoUrl ? (
                                                     <video src={`${videoUrl}#t=1`} className="w-full h-full object-cover" muted playsInline preload="auto"
                                                         onLoadedData={e => { e.target.currentTime = 1 }} />
                                                 ) : (
-                                                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800">
-                                                        <span className="material-symbols-outlined text-slate-600 text-xl">
+                                                    <div className="w-full h-full flex items-center justify-center bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                                                        <span className="material-symbols-outlined text-[var(--sys-text-muted)] text-xl">
                                                             {isFailed ? 'error' : isGenerating ? 'pending' : 'movie'}
                                                         </span>
                                                     </div>
                                                 )}
                                                 {videoUrl && (
-                                                    <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                                        <span className="material-symbols-outlined text-white text-2xl drop-shadow-lg">play_circle</span>
+                                                    <div className="absolute inset-0 bg-[var(--sys-surface)] opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                        <span className="material-symbols-outlined text-[var(--sys-text)] text-2xl drop-shadow-lg">play_circle</span>
                                                     </div>
                                                 )}
                                             </div>
 
                                             {/* Info */}
                                             <div className="flex-1 min-w-0">
-                                                <p className="text-sm font-medium text-white truncate mb-0.5">{p.title || 'Untitled Video'}</p>
+                                                <p className="text-sm font-medium text-[var(--sys-text)] truncate mb-0.5">{p.title || 'Untitled Video'}</p>
                                                 {promptPreview && (
-                                                    <p className="text-xs text-slate-500 truncate mb-1" title={promptText}>{promptPreview}</p>
+                                                    <p className="text-xs text-[var(--sys-text-muted)] truncate mb-1" title={promptText}>{promptPreview}</p>
                                                 )}
                                                 <div className="flex items-center gap-2 flex-wrap">
-                                                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${isDone ? 'bg-emerald-500/15 text-emerald-400' :
-                                                        isFailed ? 'bg-rose-500/15 text-rose-400' :
-                                                            isGenerating ? 'bg-amber-500/15 text-amber-400' :
-                                                                'bg-slate-500/15 text-slate-400'}`}>
+                                                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${isDone ? 'bg-[var(--sys-primary-dim)] text-primary' :
+                                                        isFailed ? 'bg-[var(--sys-primary-dim)] text-primary' :
+                                                            isGenerating ? 'bg-[var(--sys-primary-dim)] text-primary' :
+                                                                'bg-[var(--sys-border)]/15 text-[var(--sys-text-muted)]'}`}>
                                                         {isDone ? 'Done' : isFailed ? 'Failed' : isGenerating ? 'Generating' : p.status}
                                                     </span>
                                                     {modelName && (
-                                                        <span className="text-[10px] text-slate-600">{modelName}</span>
+                                                        <span className="text-[10px] text-[var(--sys-text-muted)]">{modelName}</span>
                                                     )}
                                                     <span className="text-[10px] text-slate-700">{timeAgo}</span>
                                                 </div>
@@ -669,12 +669,12 @@ export default function VideoStudio() {
                                                 {videoUrl && (
                                                     <>
                                                         <button onClick={(e) => { e.stopPropagation(); setPlayingVideo(videoUrl) }}
-                                                            className="p-1.5 rounded-lg text-slate-500 hover:text-[#FF4D00] hover:bg-[#FF4D00]/10 transition-all cursor-pointer"
+                                                            className="p-1.5 rounded-lg text-[var(--sys-text-muted)] hover:text-[#FF4D00] hover:bg-[#FF4D00]/10 transition-all cursor-pointer"
                                                             title="Play">
                                                             <span className="material-symbols-outlined text-base">play_arrow</span>
                                                         </button>
                                                         <button onClick={(e) => { e.stopPropagation(); handleDownloadVideo(videoUrl, p.title || 'video') }}
-                                                            className="p-1.5 rounded-lg text-slate-500 hover:text-cyan-400 hover:bg-cyan-500/10 transition-all cursor-pointer"
+                                                            className="p-1.5 rounded-lg text-[var(--sys-text-muted)] hover:text-primary hover:bg-[var(--sys-primary-dim)] transition-all cursor-pointer"
                                                             title="Download">
                                                             <span className="material-symbols-outlined text-base">download</span>
                                                         </button>
@@ -682,18 +682,18 @@ export default function VideoStudio() {
                                                 )}
                                                 {promptText && (
                                                     <button onClick={(e) => { e.stopPropagation(); handleCopyPrompt(promptText, p._id) }}
-                                                        className={`p-1.5 rounded-lg transition-all cursor-pointer ${copiedId === p._id ? 'text-emerald-400 bg-emerald-500/10' : 'text-slate-500 hover:text-[#FF4D00] hover:bg-[#FF4D00]/10'}`}
+                                                        className={`p-1.5 rounded-lg transition-all cursor-pointer ${copiedId === p._id ? 'text-primary bg-[var(--sys-primary-dim)]' : 'text-[var(--sys-text-muted)] hover:text-[#FF4D00] hover:bg-[#FF4D00]/10'}`}
                                                         title={copiedId === p._id ? 'Copied!' : 'Copy prompt'}>
                                                         <span className="material-symbols-outlined text-base">{copiedId === p._id ? 'check' : 'content_copy'}</span>
                                                     </button>
                                                 )}
                                                 <button onClick={(e) => { e.stopPropagation(); handleRefillProject(p) }}
-                                                    className="p-1.5 rounded-lg text-slate-500 hover:text-amber-400 hover:bg-amber-500/10 transition-all cursor-pointer"
+                                                    className="p-1.5 rounded-lg text-[var(--sys-text-muted)] hover:text-primary hover:bg-[var(--sys-primary-dim)] transition-all cursor-pointer"
                                                     title="Refill inputs & regenerate">
                                                     <span className="material-symbols-outlined text-base">replay</span>
                                                 </button>
                                                 <button onClick={(e) => { e.stopPropagation(); loadProject(p._id); setShowHistory(false) }}
-                                                    className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-white/[0.06] transition-all cursor-pointer"
+                                                    className="p-1.5 rounded-lg text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)] transition-all cursor-pointer"
                                                     title="Open project">
                                                     <span className="material-symbols-outlined text-base">open_in_new</span>
                                                 </button>
@@ -716,66 +716,66 @@ export default function VideoStudio() {
                                     const promptText = getProjectPrompt(p);
 
                                     return (
-                                        <div key={p._id} className="rounded-xl bg-white/[0.02] border border-white/[0.05] hover:border-white/[0.12] transition-all group overflow-hidden">
+                                        <div key={p._id} className="rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:border-[var(--sys-border)] transition-all group overflow-hidden">
                                             {/* Video thumbnail */}
-                                            <div className="relative aspect-video bg-black/40 cursor-pointer"
+                                            <div className="relative aspect-video bg-[var(--sys-surface)] cursor-pointer"
                                                 onClick={() => { if (videoUrl) setPlayingVideo(videoUrl); else loadProject(p._id) }}>
                                                 {videoUrl ? (
                                                     <video src={`${videoUrl}#t=1`} className="w-full h-full object-cover" muted playsInline crossOrigin="anonymous" preload="auto"
                                                         onLoadedData={e => { e.target.currentTime = 1 }} />
                                                 ) : (
-                                                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800">
-                                                        <span className="material-symbols-outlined text-slate-600 text-2xl">
+                                                    <div className="w-full h-full flex items-center justify-center bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                                                        <span className="material-symbols-outlined text-[var(--sys-text-muted)] text-2xl">
                                                             {isFailed ? 'error' : isGenerating ? 'pending' : 'movie'}
                                                         </span>
                                                     </div>
                                                 )}
                                                 {videoUrl && (
-                                                    <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                                        <span className="material-symbols-outlined text-white text-3xl drop-shadow-lg">play_circle</span>
+                                                    <div className="absolute inset-0 bg-[var(--sys-surface)] opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                        <span className="material-symbols-outlined text-[var(--sys-text)] text-3xl drop-shadow-lg">play_circle</span>
                                                     </div>
                                                 )}
                                                 {/* Status badge */}
-                                                <span className={`absolute top-1.5 left-1.5 text-[9px] px-1.5 py-0.5 rounded font-bold backdrop-blur-sm ${isDone ? 'bg-emerald-500/30 text-emerald-300' :
-                                                    isFailed ? 'bg-rose-500/30 text-rose-300' :
-                                                        isGenerating ? 'bg-amber-500/30 text-amber-300' :
-                                                            'bg-slate-500/30 text-slate-300'}`}>
+                                                <span className={`absolute top-1.5 left-1.5 text-[9px] px-1.5 py-0.5 rounded font-bold ${isDone ? 'bg-[var(--sys-primary-dim)] text-[var(--sys-primary)]' :
+                                                    isFailed ? 'bg-[var(--sys-primary-dim)] text-[var(--sys-primary)]' :
+                                                        isGenerating ? 'bg-[var(--sys-primary-dim)] text-[var(--sys-primary)]' :
+                                                            'bg-[var(--sys-border)]/30 text-[var(--sys-text-muted)]'}`}>
                                                     {isDone ? '✓' : isFailed ? '✕' : isGenerating ? '⏳' : p.status}
                                                 </span>
                                             </div>
                                             {/* Info + actions */}
                                             <div className="p-2.5">
-                                                <p className="text-xs font-medium text-white truncate mb-1">{p.title || 'Untitled Video'}</p>
+                                                <p className="text-xs font-medium text-[var(--sys-text)] truncate mb-1">{p.title || 'Untitled Video'}</p>
                                                 <div className="flex items-center gap-1.5 mb-2">
-                                                    {modelName && <span className="text-[9px] text-slate-600">{modelName}</span>}
+                                                    {modelName && <span className="text-[9px] text-[var(--sys-text-muted)]">{modelName}</span>}
                                                     <span className="text-[9px] text-slate-700">{timeAgo}</span>
                                                 </div>
                                                 <div className="flex items-center gap-1">
                                                     {videoUrl && (
                                                         <>
                                                             <button onClick={() => setPlayingVideo(videoUrl)}
-                                                                className="p-1 rounded text-slate-500 hover:text-[#FF4D00] hover:bg-[#FF4D00]/10 transition-all cursor-pointer" title="Play">
+                                                                className="p-1 rounded text-[var(--sys-text-muted)] hover:text-[#FF4D00] hover:bg-[#FF4D00]/10 transition-all cursor-pointer" title="Play">
                                                                 <span className="material-symbols-outlined text-sm">play_arrow</span>
                                                             </button>
                                                             <button onClick={() => handleDownloadVideo(videoUrl, p.title || 'video')}
-                                                                className="p-1 rounded text-slate-500 hover:text-cyan-400 hover:bg-cyan-500/10 transition-all cursor-pointer" title="Download">
+                                                                className="p-1 rounded text-[var(--sys-text-muted)] hover:text-primary hover:bg-[var(--sys-primary-dim)] transition-all cursor-pointer" title="Download">
                                                                 <span className="material-symbols-outlined text-sm">download</span>
                                                             </button>
                                                         </>
                                                     )}
                                                     {promptText && (
                                                         <button onClick={() => handleCopyPrompt(promptText, p._id)}
-                                                            className={`p-1 rounded transition-all cursor-pointer ${copiedId === p._id ? 'text-emerald-400 bg-emerald-500/10' : 'text-slate-500 hover:text-[#FF4D00] hover:bg-[#FF4D00]/10'}`}
+                                                            className={`p-1 rounded transition-all cursor-pointer ${copiedId === p._id ? 'text-primary bg-[var(--sys-primary-dim)]' : 'text-[var(--sys-text-muted)] hover:text-[#FF4D00] hover:bg-[#FF4D00]/10'}`}
                                                             title={copiedId === p._id ? 'Copied!' : 'Copy prompt'}>
                                                             <span className="material-symbols-outlined text-sm">{copiedId === p._id ? 'check' : 'content_copy'}</span>
                                                         </button>
                                                     )}
                                                     <button onClick={() => handleRefillProject(p)}
-                                                        className="p-1 rounded text-slate-500 hover:text-amber-400 hover:bg-amber-500/10 transition-all cursor-pointer" title="Refill">
+                                                        className="p-1 rounded text-[var(--sys-text-muted)] hover:text-primary hover:bg-[var(--sys-primary-dim)] transition-all cursor-pointer" title="Refill">
                                                         <span className="material-symbols-outlined text-sm">replay</span>
                                                     </button>
                                                     <button onClick={() => { loadProject(p._id); setShowHistory(false) }}
-                                                        className="p-1 rounded text-slate-500 hover:text-white hover:bg-white/[0.06] transition-all cursor-pointer" title="Open">
+                                                        className="p-1 rounded text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)] transition-all cursor-pointer" title="Open">
                                                         <span className="material-symbols-outlined text-sm">open_in_new</span>
                                                     </button>
                                                 </div>
@@ -790,16 +790,16 @@ export default function VideoStudio() {
 
                 {/* ── Video Player Modal ── */}
                 {playingVideo && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={() => setPlayingVideo(null)}>
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--sys-surface)] " onClick={() => setPlayingVideo(null)}>
                         <div className="relative max-w-4xl w-full mx-4" onClick={e => e.stopPropagation()}>
-                            <video src={playingVideo} controls autoPlay className="w-full rounded-2xl shadow-2xl shadow-black/50" />
+                            <video src={playingVideo} controls autoPlay className="w-full rounded-2xl shadow-none" />
                             <div className="absolute -top-12 right-0 flex items-center gap-2">
                                 <button onClick={() => handleDownloadVideo(playingVideo, 'video')}
-                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 text-white text-sm hover:bg-white/20 transition-all cursor-pointer backdrop-blur">
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--sys-surface)] text-[var(--sys-text)] text-sm hover:bg-[var(--sys-surface)] transition-all cursor-pointer backdrop-blur">
                                     <span className="material-symbols-outlined text-base">download</span> Download
                                 </button>
                                 <button onClick={() => setPlayingVideo(null)}
-                                    className="p-1.5 rounded-lg bg-white/10 text-white hover:bg-white/20 transition-all cursor-pointer backdrop-blur">
+                                    className="p-1.5 rounded-lg bg-[var(--sys-surface)] text-[var(--sys-text)] hover:bg-[var(--sys-surface)] transition-all cursor-pointer backdrop-blur">
                                     <span className="material-symbols-outlined text-lg">close</span>
                                 </button>
                             </div>
@@ -830,19 +830,19 @@ export default function VideoStudio() {
                         {STEPS.map((s, i) => (
                             <div key={s.id} className="flex items-center flex-shrink-0">
                                 <div className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium transition-all ${i === step ? 'bg-[#FF4D00]/20 text-[#FF7A00] border border-[#FF4D00]/30' :
-                                    i < step ? 'bg-emerald-500/10 text-emerald-400' : 'text-slate-600'
+                                    i < step ? 'bg-[var(--sys-primary-dim)] text-primary' : 'text-[var(--sys-text-muted)]'
                                     }`}>
                                     <span className="material-symbols-outlined text-sm">{i < step ? 'check_circle' : s.icon}</span>
                                     <span className="hidden sm:inline">{s.label}</span>
                                 </div>
-                                {i < STEPS.length - 1 && <div className={`w-4 sm:w-8 h-px mx-1 ${i < step ? 'bg-emerald-500/30' : 'bg-white/[0.06]'}`} />}
+                                {i < STEPS.length - 1 && <div className={`w-4 sm:w-8 h-px mx-1 ${i < step ? 'bg-[var(--sys-primary-dim)]' : 'bg-[var(--sys-surface)]'}`} />}
                             </div>
                         ))}
                     </div>
 
                     {/* ── Error ── */}
                     {error && (
-                        <div className={`mb-4 p-4 rounded-xl border ${error.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'} text-sm flex items-center gap-2`}>
+                        <div className={`mb-4 p-4 rounded-xl border ${error.isProviderError ? 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary' : 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary'} text-sm flex items-center gap-2`}>
                             <span className="material-symbols-outlined text-sm">
                                 {error.isProviderError ? 'warning' : 'error'}
                             </span>
@@ -850,7 +850,7 @@ export default function VideoStudio() {
                                 {error.isProviderError && <span className="font-bold mr-1">[{error.provider || 'AI Provider'}]</span>}
                                 {error.message}
                             </div>
-                            <button onClick={() => setError(null)} className={`ml-auto ${error.isProviderError ? 'text-amber-300' : 'text-rose-300'} hover:text-white cursor-pointer`}>
+                            <button onClick={() => setError(null)} className={`ml-auto ${error.isProviderError ? 'text-[var(--sys-primary)]' : 'text-[var(--sys-primary)]'} hover:text-[var(--sys-text)] cursor-pointer`}>
                                 <span className="material-symbols-outlined text-sm">close</span>
                             </button>
                         </div>
@@ -862,8 +862,8 @@ export default function VideoStudio() {
                     {step === 0 && (
                         <div className="space-y-6">
                             {/* Video Type Selector */}
-                            <div className="glass-panel rounded-2xl p-5 border border-white/[0.08]">
-                                <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                            <div className="glass-panel rounded-2xl p-5 border border-[var(--sys-border)]">
+                                <h3 className="text-[11px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest mb-4 flex items-center gap-2">
                                     <span className="material-symbols-outlined text-[#FF4D00] text-[15px]">category</span>
                                     What kind of video?
                                 </h3>
@@ -871,17 +871,17 @@ export default function VideoStudio() {
                                     {VIDEO_TYPES.map(vt => (
                                         <button key={vt.id} onClick={() => setVideoType(vt.id)}
                                             className={`flex-1 min-w-[180px] max-w-[240px] flex items-center gap-3 p-3 rounded-xl transition-all duration-300 cursor-pointer border text-left ${videoType === vt.id
-                                                ? 'bg-[#FF4D00]/15 border-[#FF4D00]/40 shadow-md shadow-[#FF4D00]/10'
-                                                : 'bg-white/[0.02] border-white/[0.06] hover:border-white/[0.15] hover:bg-white/[0.04]'
+                                                ? 'bg-[#FF4D00]/15 border-[#FF4D00]/40 shadow-md shadow-none'
+                                                : 'bg-[var(--sys-surface)] border-[var(--sys-border)] hover:border-[var(--sys-border)] hover:bg-[var(--sys-surface)]'
                                                 }`}>
-                                            <div className={`shrink-0 flex items-center justify-center size-9 rounded-lg ${videoType === vt.id ? 'bg-[#FF4D00]/20' : 'bg-white/[0.05]'}`}>
-                                                <span className={`material-symbols-outlined text-[19px] ${videoType === vt.id ? 'text-[#FF4D00]' : 'text-slate-400'}`}>
+                                            <div className={`shrink-0 flex items-center justify-center size-9 rounded-lg ${videoType === vt.id ? 'bg-[#FF4D00]/20' : 'bg-[var(--sys-surface)]'}`}>
+                                                <span className={`material-symbols-outlined text-[19px] ${videoType === vt.id ? 'text-[#FF4D00]' : 'text-[var(--sys-text-muted)]'}`}>
                                                     {vt.icon}
                                                 </span>
                                             </div>
                                             <div>
-                                                <p className={`text-[13px] font-bold ${videoType === vt.id ? 'text-white' : 'text-slate-300'}`}>{vt.label}</p>
-                                                <p className="text-[10px] text-slate-500 mt-0.5 leading-tight">{vt.desc}</p>
+                                                <p className={`text-[13px] font-bold ${videoType === vt.id ? 'text-[var(--sys-text)]' : 'text-[var(--sys-text-muted)]'}`}>{vt.label}</p>
+                                                <p className="text-[10px] text-[var(--sys-text-muted)] mt-0.5 leading-tight">{vt.desc}</p>
                                             </div>
                                         </button>
                                     ))}
@@ -889,41 +889,41 @@ export default function VideoStudio() {
                             </div>
 
                             {/* Brief Input */}
-                            <div className="glass-panel rounded-2xl p-5 border border-white/[0.08]">
-                                <h3 className="text-base font-bold text-white mb-3 flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-cyan-400">edit_note</span>
+                            <div className="glass-panel rounded-2xl p-5 border border-[var(--sys-border)]">
+                                <h3 className="text-base font-bold text-[var(--sys-text)] mb-3 flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-primary">edit_note</span>
                                     Your Brief
                                 </h3>
                                 <textarea
                                     value={brief}
                                     onChange={e => setBrief(e.target.value)}
                                     placeholder="Describe what you want... e.g. 'A 15-second Instagram reel showcasing our new summer collection with upbeat music and golden hour lighting'"
-                                    className="w-full h-32 px-4 py-3 rounded-xl bg-white/[0.03] border border-white/[0.08] text-white text-sm placeholder-slate-600 outline-none focus:border-[#FF4D00]/30 resize-none"
+                                    className="w-full h-32 px-4 py-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm placeholder-slate-600 outline-none focus:border-[#FF4D00]/30 resize-none"
                                 />
                             </div>
 
                             {/* Image Input — 3 Options */}
-                            <div className="glass-panel rounded-2xl p-5 border border-white/[0.08]">
-                                <h3 className="text-base font-bold text-white mb-3 flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-amber-400">image</span>
-                                    Reference Images <span className="text-slate-600 font-normal">(optional)</span>
+                            <div className="glass-panel rounded-2xl p-5 border border-[var(--sys-border)]">
+                                <h3 className="text-base font-bold text-[var(--sys-text)] mb-3 flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-primary">image</span>
+                                    Reference Images <span className="text-[var(--sys-text-muted)] font-normal">(optional)</span>
                                 </h3>
                                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
                                     {/* Option 1: Upload */}
                                     <button onClick={() => fileInputRef.current?.click()}
-                                        className="p-4 rounded-xl border-2 border-dashed border-white/[0.08] hover:border-[#FF4D00]/30 flex flex-col items-center gap-2 cursor-pointer transition-all bg-white/[0.01]">
+                                        className="p-4 rounded-xl border border-dashed border-[var(--sys-border)] hover:border-[#FF4D00]/30 flex flex-col items-center gap-2 cursor-pointer transition-all bg-[var(--sys-surface)]">
                                         <span className="material-symbols-outlined text-2xl text-[#FF4D00]">cloud_upload</span>
-                                        <span className="text-sm font-medium text-slate-300">Upload Image</span>
-                                        <span className="text-xs text-slate-600">From your device</span>
+                                        <span className="text-sm font-medium text-[var(--sys-text-muted)]">Upload Image</span>
+                                        <span className="text-xs text-[var(--sys-text-muted)]">From your device</span>
                                     </button>
                                     <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
 
                                     {/* Option 2: AI Generate */}
                                     <button onClick={() => setShowAiPrompt(!showAiPrompt)}
-                                        className={`p-4 rounded-xl border-2 border-dashed flex flex-col items-center gap-2 cursor-pointer transition-all bg-white/[0.01] ${showAiPrompt ? 'border-cyan-500/40 bg-cyan-500/5' : 'border-white/[0.08] hover:border-cyan-500/30'}`}>
-                                        <span className="material-symbols-outlined text-2xl text-cyan-400">auto_awesome</span>
-                                        <span className="text-sm font-medium text-slate-300">AI Generate</span>
-                                        <span className="text-xs text-slate-600">Create with AI</span>
+                                        className={`p-4 rounded-xl border border-dashed flex flex-col items-center gap-2 cursor-pointer transition-all bg-[var(--sys-surface)] ${showAiPrompt ? 'border-[var(--sys-border)] bg-[var(--sys-primary-dim)]' : 'border-[var(--sys-border)] hover:border-[var(--sys-border)]'}`}>
+                                        <span className="material-symbols-outlined text-2xl text-primary">auto_awesome</span>
+                                        <span className="text-sm font-medium text-[var(--sys-text-muted)]">AI Generate</span>
+                                        <span className="text-xs text-[var(--sys-text-muted)]">Create with AI</span>
                                     </button>
 
                                     {/* Option 3: From Library */}
@@ -938,23 +938,23 @@ export default function VideoStudio() {
                                             setLibraryLoading(false)
                                         }
                                     }}
-                                        className={`p-4 rounded-xl border-2 border-dashed flex flex-col items-center gap-2 cursor-pointer transition-all bg-white/[0.01] ${showLibrary ? 'border-amber-500/40 bg-amber-500/5' : 'border-white/[0.08] hover:border-amber-500/30'}`}>
-                                        <span className="material-symbols-outlined text-2xl text-amber-400">photo_library</span>
-                                        <span className="text-sm font-medium text-slate-300">From Library</span>
-                                        <span className="text-xs text-slate-600">Existing creatives</span>
+                                        className={`p-4 rounded-xl border border-dashed flex flex-col items-center gap-2 cursor-pointer transition-all bg-[var(--sys-surface)] ${showLibrary ? 'border-[var(--sys-border)] bg-[var(--sys-primary-dim)]' : 'border-[var(--sys-border)] hover:border-[var(--sys-border)]'}`}>
+                                        <span className="material-symbols-outlined text-2xl text-primary">photo_library</span>
+                                        <span className="text-sm font-medium text-[var(--sys-text-muted)]">From Library</span>
+                                        <span className="text-xs text-[var(--sys-text-muted)]">Existing creatives</span>
                                     </button>
                                 </div>
 
                                 {/* ── Inline URL Input ── */}
                                 {showUrlInput && (
-                                    <div className="mb-4 p-4 rounded-xl bg-white/[0.02] border border-white/[0.06]">
-                                        <p className="text-sm font-medium text-slate-300 mb-2">Paste Image URL</p>
+                                    <div className="mb-4 p-4 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                                        <p className="text-sm font-medium text-[var(--sys-text-muted)] mb-2">Paste Image URL</p>
                                         <div className="flex gap-2">
                                             <input
                                                 value={urlInputValue}
                                                 onChange={e => setUrlInputValue(e.target.value)}
                                                 placeholder="https://example.com/image.jpg"
-                                                className="flex-1 px-3 py-2.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white placeholder-slate-600 outline-none focus:border-[#FF4D00]/30"
+                                                className="flex-1 px-3 py-2.5 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] placeholder-slate-600 outline-none focus:border-[#FF4D00]/30"
                                             />
                                             <button onClick={() => {
                                                 if (urlInputValue.trim()) {
@@ -965,7 +965,7 @@ export default function VideoStudio() {
                                                 Add
                                             </button>
                                             <button onClick={() => { setShowUrlInput(false); setUrlInputValue('') }}
-                                                className="px-3 py-2.5 rounded-lg text-slate-500 hover:text-white hover:bg-white/[0.05] transition-all cursor-pointer">
+                                                className="px-3 py-2.5 rounded-lg text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)] transition-all cursor-pointer">
                                                 <span className="material-symbols-outlined text-sm">close</span>
                                             </button>
                                         </div>
@@ -974,13 +974,13 @@ export default function VideoStudio() {
 
                                 {/* ── Inline AI Generate Prompt ── */}
                                 {showAiPrompt && (
-                                    <div className="mb-4 p-4 rounded-xl bg-cyan-500/5 border border-cyan-500/15">
-                                        <p className="text-sm font-medium text-cyan-300 mb-2">Describe the reference image to generate</p>
+                                    <div className="mb-4 p-4 rounded-xl bg-[var(--sys-primary-dim)] border border-[var(--sys-border)]">
+                                        <p className="text-sm font-medium text-[var(--sys-primary)] mb-2">Describe the reference image to generate</p>
                                         <textarea
                                             value={aiPromptValue}
                                             onChange={e => setAiPromptValue(e.target.value)}
                                             placeholder="e.g. A luxury perfume bottle on a marble surface with golden hour lighting..."
-                                            className="w-full h-20 px-3 py-2.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white placeholder-slate-600 outline-none focus:border-cyan-500/30 resize-none text-sm"
+                                            className="w-full h-20 px-3 py-2.5 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] placeholder-slate-600 outline-none focus:border-[var(--sys-border)] resize-none text-sm"
                                         />
                                         <div className="flex gap-2 mt-2">
                                             <button onClick={async () => {
@@ -1020,12 +1020,12 @@ export default function VideoStudio() {
                                                     }); 
                                                 }
                                                 setLoading(false)
-                                            }} disabled={loading} className="px-4 py-2 rounded-lg bg-cyan-500/20 text-cyan-300 font-medium text-sm hover:bg-cyan-500/30 transition-all cursor-pointer flex items-center gap-2 disabled:opacity-50">
+                                            }} disabled={loading} className="px-4 py-2 rounded-lg bg-[var(--sys-primary-dim)] text-[var(--sys-primary)] font-medium text-sm hover:bg-[var(--sys-primary-dim)] transition-all cursor-pointer flex items-center gap-2 disabled:opacity-50">
                                                 <span className="material-symbols-outlined text-sm">{loading ? 'progress_activity' : 'auto_awesome'}</span>
                                                 {loading ? 'Generating...' : 'Generate Image'}
                                             </button>
                                             <button onClick={() => { setShowAiPrompt(false); setAiPromptValue('') }}
-                                                className="px-3 py-2 rounded-lg text-slate-500 hover:text-white hover:bg-white/[0.05] transition-all cursor-pointer text-sm">
+                                                className="px-3 py-2 rounded-lg text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)] transition-all cursor-pointer text-sm">
                                                 Cancel
                                             </button>
                                         </div>
@@ -1034,23 +1034,23 @@ export default function VideoStudio() {
 
                                 {/* ── Image Library Modal ── */}
                                 {showLibrary && (
-                                    <div className="mb-4 p-4 rounded-xl bg-amber-500/5 border border-amber-500/15">
+                                    <div className="mb-4 p-4 rounded-xl bg-[var(--sys-primary-dim)] border border-[var(--sys-border)]">
                                         <div className="flex items-center justify-between mb-3">
-                                            <p className="text-sm font-medium text-amber-300">Select from Creative Studio Library</p>
-                                            <button onClick={() => setShowLibrary(false)} className="text-slate-500 hover:text-white cursor-pointer">
+                                            <p className="text-sm font-medium text-[var(--sys-primary)]">Select from Creative Studio Library</p>
+                                            <button onClick={() => setShowLibrary(false)} className="text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer">
                                                 <span className="material-symbols-outlined text-sm">close</span>
                                             </button>
                                         </div>
                                         {libraryLoading ? (
-                                            <div className="flex items-center justify-center py-8 text-slate-500">
+                                            <div className="flex items-center justify-center py-8 text-[var(--sys-text-muted)]">
                                                 <span className="material-symbols-outlined animate-spin mr-2">progress_activity</span>
                                                 Loading your images...
                                             </div>
                                         ) : libraryImages.length === 0 ? (
                                             <div className="text-center py-8">
-                                                <span className="material-symbols-outlined text-3xl text-slate-600 mb-2 block">image_not_supported</span>
-                                                <p className="text-sm text-slate-500">No images in your library yet.</p>
-                                                <p className="text-sm text-slate-600 mt-1">Generate images in Creative Studio first, or upload/paste a URL above.</p>
+                                                <span className="material-symbols-outlined text-3xl text-[var(--sys-text-muted)] mb-2 block">image_not_supported</span>
+                                                <p className="text-sm text-[var(--sys-text-muted)]">No images in your library yet.</p>
+                                                <p className="text-sm text-[var(--sys-text-muted)] mt-1">Generate images in Creative Studio first, or upload/paste a URL above.</p>
                                             </div>
                                         ) : (
                                             <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2 max-h-60 overflow-y-auto">
@@ -1061,35 +1061,35 @@ export default function VideoStudio() {
                                                             setImages(prev => [...prev, { url: imgUrl, source: 'library', label: img.prompt?.substring(0, 30) || 'From Library' }])
                                                         }
                                                     }}
-                                                        className="relative aspect-square rounded-lg overflow-hidden border border-white/[0.08] hover:border-amber-400/50 transition-all cursor-pointer group">
+                                                        className="relative aspect-square rounded-lg overflow-hidden border border-[var(--sys-border)] hover:border-[var(--sys-border)] transition-all cursor-pointer group">
                                                         <img
                                                             src={img.imageUrl || img.url || img.outputUrl}
                                                             alt={img.prompt || 'Library image'}
                                                             className="w-full h-full object-cover"
                                                         />
-                                                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                                            <span className="material-symbols-outlined text-white text-lg">add_circle</span>
+                                                        <div className="absolute inset-0 bg-[var(--sys-surface)] opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                            <span className="material-symbols-outlined text-[var(--sys-text)] text-lg">add_circle</span>
                                                         </div>
                                                     </button>
                                                 ))}
                                             </div>
                                         )}
                                         {/* Also offer URL paste inline */}
-                                        <div className="mt-3 pt-3 border-t border-white/[0.06]">
-                                            <p className="text-sm text-slate-500 mb-2">Or paste an image URL:</p>
+                                        <div className="mt-3 pt-3 border-t border-[var(--sys-border)]">
+                                            <p className="text-sm text-[var(--sys-text-muted)] mb-2">Or paste an image URL:</p>
                                             <div className="flex gap-2">
                                                 <input
                                                     value={urlInputValue}
                                                     onChange={e => setUrlInputValue(e.target.value)}
                                                     placeholder="https://example.com/image.jpg"
-                                                    className="flex-1 px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white placeholder-slate-600 outline-none focus:border-amber-500/30 text-sm"
+                                                    className="flex-1 px-3 py-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] placeholder-slate-600 outline-none focus:border-[var(--sys-border)] text-sm"
                                                 />
                                                 <button onClick={() => {
                                                     if (urlInputValue.trim()) {
                                                         setImages(prev => [...prev, { url: urlInputValue.trim(), source: 'url', label: 'From URL' }])
                                                         setUrlInputValue('')
                                                     }
-                                                }} className="px-4 py-2 rounded-lg bg-amber-500/20 text-amber-300 font-medium text-sm hover:bg-amber-500/30 transition-all cursor-pointer">
+                                                }} className="px-4 py-2 rounded-lg bg-[var(--sys-primary-dim)] text-[var(--sys-primary)] font-medium text-sm hover:bg-[var(--sys-primary-dim)] transition-all cursor-pointer">
                                                     Add
                                                 </button>
                                             </div>
@@ -1103,18 +1103,18 @@ export default function VideoStudio() {
                                         {images.map((img, i) => (
                                             <div key={i} className="relative group">
                                                 {img.url ? (
-                                                    <img src={img.url} alt={img.label} className="w-20 h-20 rounded-lg object-cover border border-white/[0.08]" />
+                                                    <img src={img.url} alt={img.label} className="w-20 h-20 rounded-lg object-cover border border-[var(--sys-border)]" />
                                                 ) : (
-                                                    <div className="w-20 h-20 rounded-lg bg-cyan-500/10 border border-cyan-500/20 flex flex-col items-center justify-center p-1">
-                                                        <span className="material-symbols-outlined text-cyan-400 text-sm">auto_awesome</span>
-                                                        <span className="text-xs text-cyan-400 mt-0.5 text-center leading-tight truncate w-full">{img.source}</span>
+                                                    <div className="w-20 h-20 rounded-lg bg-[var(--sys-primary-dim)] border border-[var(--sys-border)] flex flex-col items-center justify-center p-1">
+                                                        <span className="material-symbols-outlined text-primary text-sm">auto_awesome</span>
+                                                        <span className="text-xs text-primary mt-0.5 text-center leading-tight truncate w-full">{img.source}</span>
                                                     </div>
                                                 )}
                                                 <button onClick={() => setImages(prev => prev.filter((_, j) => j !== i))}
-                                                    className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-rose-500 text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                                                    className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-[var(--sys-surface)] text-[var(--sys-text)] text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
                                                     ×
                                                 </button>
-                                                <p className="text-xs text-slate-600 mt-1 truncate w-20">{img.source}</p>
+                                                <p className="text-xs text-[var(--sys-text-muted)] mt-1 truncate w-20">{img.source}</p>
                                             </div>
                                         ))}
                                     </div>
@@ -1133,7 +1133,7 @@ export default function VideoStudio() {
                                 />
                             ) : (
                                 <button onClick={handleStart}
-                                    className="w-full py-4 rounded-2xl bg-gradient-to-r from-[#FF4D00] to-cyan-600 text-white font-bold text-base hover:shadow-xl hover:shadow-[#FF4D00]/20 transition-all cursor-pointer flex items-center justify-center gap-3">
+                                    className="w-full py-4 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] font-bold text-base hover:shadow-xl hover:shadow-none transition-all cursor-pointer flex items-center justify-center gap-3">
                                     <span className="material-symbols-outlined">auto_awesome</span>Generate Video Concepts
                                 </button>
                             )}
@@ -1145,11 +1145,11 @@ export default function VideoStudio() {
                     {/* ════════════════════════════════════════════════════════════ */}
                     {step === 1 && (
                         <div>
-                            <h2 className="text-lg font-bold text-white mb-1 flex items-center gap-2">
-                                <span className="material-symbols-outlined text-amber-400">lightbulb</span>
+                            <h2 className="text-lg font-bold text-[var(--sys-text)] mb-1 flex items-center gap-2">
+                                <span className="material-symbols-outlined text-primary">lightbulb</span>
                                 AI Generated Concepts
                             </h2>
-                            <p className="text-sm text-slate-500 mb-6">Pick the concept that excites you most. AI will build a full script from it.</p>
+                            <p className="text-sm text-[var(--sys-text-muted)] mb-6">Pick the concept that excites you most. AI will build a full script from it.</p>
 
                             {loading ? (
                                 <GlobalLoader
@@ -1164,18 +1164,18 @@ export default function VideoStudio() {
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     {concepts.map((c, i) => (
                                         <button key={i} onClick={() => handleSelectConcept(i)}
-                                            className="text-left p-5 rounded-2xl bg-white/[0.02] border border-white/[0.08] hover:border-[#FF4D00]/30 hover:bg-[#FF4D00]/5 transition-all cursor-pointer group">
+                                            className="text-left p-5 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:border-[#FF4D00]/30 hover:bg-[#FF4D00]/5 transition-all cursor-pointer group">
                                             <div className="flex items-start justify-between mb-3">
-                                                <h3 className="text-base font-bold text-white group-hover:text-[#FF7A00] transition-colors">{c.title}</h3>
+                                                <h3 className="text-base font-bold text-[var(--sys-text)] group-hover:text-[#FF7A00] transition-colors">{c.title}</h3>
                                                 <span className="text-xs px-2 py-1 rounded-full bg-[#FF4D00]/10 text-[#FF4D00] flex-shrink-0 ml-2">{c.duration}s</span>
                                             </div>
-                                            <p className="text-sm text-slate-300 mb-3 leading-relaxed">{c.description}</p>
+                                            <p className="text-sm text-[var(--sys-text-muted)] mb-3 leading-relaxed">{c.description}</p>
                                             <div className="flex flex-wrap gap-2">
-                                                <span className="text-xs px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400">{c.style}</span>
-                                                <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400">{c.mood}</span>
-                                                <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400">{c.targetPlatform}</span>
+                                                <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--sys-primary-dim)] text-primary">{c.style}</span>
+                                                <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--sys-primary-dim)] text-primary">{c.mood}</span>
+                                                <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--sys-primary-dim)] text-primary">{c.targetPlatform}</span>
                                             </div>
-                                            <p className="text-sm text-slate-500 mt-3 italic">🪝 Hook: {c.hook}</p>
+                                            <p className="text-sm text-[var(--sys-text-muted)] mt-3 italic">🪝 Hook: {c.hook}</p>
                                         </button>
                                     ))}
                                 </div>
@@ -1190,40 +1190,40 @@ export default function VideoStudio() {
                         <div className="space-y-6">
                             {/* Shot-by-shot Storyboard */}
                             <div>
-                                <h2 className="text-lg font-bold text-white mb-1 flex items-center gap-2">
+                                <h2 className="text-lg font-bold text-[var(--sys-text)] mb-1 flex items-center gap-2">
                                     <span className="material-symbols-outlined text-[#FF4D00]">movie</span>
                                     Shot-by-Shot Storyboard
                                 </h2>
-                                <p className="text-sm text-slate-500 mb-4">{script.narrative}</p>
+                                <p className="text-sm text-[var(--sys-text-muted)] mb-4">{script.narrative}</p>
 
                                 <div className="space-y-3">
                                     {(script.shots || []).map((shot, i) => (
-                                        <div key={i} className="glass-panel rounded-xl p-4 border border-white/[0.06]">
+                                        <div key={i} className="glass-panel rounded-xl p-4 border border-[var(--sys-border)]">
                                             <div className="flex items-center gap-3 mb-2">
                                                 <span className="text-xs font-bold text-[#FF4D00] bg-[#FF4D00]/10 px-2 py-0.5 rounded">Shot {shot.shotNum}</span>
-                                                <span className="text-sm text-slate-500">{shot.duration}s</span>
-                                                <span className="text-xs text-slate-600 ml-auto">{shot.transition}</span>
+                                                <span className="text-sm text-[var(--sys-text-muted)]">{shot.duration}s</span>
+                                                <span className="text-xs text-[var(--sys-text-muted)] ml-auto">{shot.transition}</span>
                                             </div>
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                                 <div>
-                                                    <p className="text-sm text-cyan-400 font-bold mb-1">📹 Visual</p>
-                                                    <p className="text-sm text-slate-300 leading-relaxed">{shot.visual}</p>
+                                                    <p className="text-sm text-primary font-bold mb-1">📹 Visual</p>
+                                                    <p className="text-sm text-[var(--sys-text-muted)] leading-relaxed">{shot.visual}</p>
                                                 </div>
                                                 <div className="space-y-2">
                                                     {shot.dialogue && (
                                                         <div>
-                                                            <p className="text-sm text-amber-400 font-bold mb-0.5">🗣️ Dialogue</p>
-                                                            <p className="text-sm text-slate-400 italic">"{shot.dialogue}"</p>
+                                                            <p className="text-sm text-primary font-bold mb-0.5">🗣️ Dialogue</p>
+                                                            <p className="text-sm text-[var(--sys-text-muted)] italic">"{shot.dialogue}"</p>
                                                         </div>
                                                     )}
                                                     <div>
-                                                        <p className="text-sm text-emerald-400 font-bold mb-0.5"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">videocam</span> Camera</p>
-                                                        <p className="text-sm text-slate-400">{shot.camera}</p>
+                                                        <p className="text-sm text-primary font-bold mb-0.5"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">videocam</span> Camera</p>
+                                                        <p className="text-sm text-[var(--sys-text-muted)]">{shot.camera}</p>
                                                     </div>
                                                     {shot.audio && (
                                                         <div>
-                                                            <p className="text-sm text-rose-400 font-bold mb-0.5">🎵 Audio</p>
-                                                            <p className="text-sm text-slate-400">{shot.audio}</p>
+                                                            <p className="text-sm text-primary font-bold mb-0.5">🎵 Audio</p>
+                                                            <p className="text-sm text-[var(--sys-text-muted)]">{shot.audio}</p>
                                                         </div>
                                                     )}
                                                 </div>
@@ -1236,17 +1236,17 @@ export default function VideoStudio() {
                             {/* Backend Prompt — fully editable */}
                             <div className="glass-panel rounded-2xl p-5 border border-[#FF4D00]/20">
                                 <div className="flex items-center justify-between mb-3">
-                                    <h3 className="text-base font-bold text-white flex items-center gap-2">
+                                    <h3 className="text-base font-bold text-[var(--sys-text)] flex items-center gap-2">
                                         <span className="material-symbols-outlined text-[#FF4D00]">code</span>
                                         Exact Backend Prompt
                                     </h3>
                                     <span className="text-sm text-[#FF4D00] bg-[#FF4D00]/10 px-2 py-0.5 rounded-full"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">edit</span> Editable</span>
                                 </div>
-                                <p className="text-sm text-slate-500 mb-2">This is the exact prompt sent to the AI video model. Edit it to fine-tune the output.</p>
+                                <p className="text-sm text-[var(--sys-text-muted)] mb-2">This is the exact prompt sent to the AI video model. Edit it to fine-tune the output.</p>
                                 <textarea
                                     value={backendPrompt}
                                     onChange={e => setBackendPrompt(e.target.value)}
-                                    className="w-full h-40 px-4 py-3 rounded-xl bg-black/30 border border-[#FF4D00]/20 text-orange-50 text-xs font-mono outline-none focus:border-[#FF4D00]/40 resize-y leading-relaxed"
+                                    className="w-full h-40 px-4 py-3 rounded-xl bg-[var(--sys-surface)] border border-[#FF4D00]/20 text-orange-50 text-xs font-mono outline-none focus:border-[#FF4D00]/40 resize-y leading-relaxed"
                                 />
                             </div>
 
@@ -1262,7 +1262,7 @@ export default function VideoStudio() {
                                 />
                             ) : (
                                 <button onClick={handleApproveScript}
-                                    className="w-full py-4 rounded-2xl bg-gradient-to-r from-[#FF4D00] to-cyan-600 text-white font-bold hover:shadow-xl hover:shadow-[#FF4D00]/20 transition-all cursor-pointer flex items-center justify-center gap-3">
+                                    className="w-full py-4 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] font-bold hover:shadow-xl hover:shadow-none transition-all cursor-pointer flex items-center justify-center gap-3">
                                     <span className="material-symbols-outlined">check_circle</span>Approve Script & Find Best Model
                                 </button>
                             )}
@@ -1274,28 +1274,28 @@ export default function VideoStudio() {
                     {/* ════════════════════════════════════════════════════════════ */}
                     {step === 3 && (
                         <div className="space-y-6">
-                            <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                                <span className="material-symbols-outlined text-cyan-400">record_voice_over</span>
+                            <h2 className="text-lg font-bold text-[var(--sys-text)] flex items-center gap-2">
+                                <span className="material-symbols-outlined text-primary">record_voice_over</span>
                                 Voice Over Preview
                             </h2>
-                            <p className="text-sm text-slate-400 -mt-3">
+                            <p className="text-sm text-[var(--sys-text-muted)] -mt-3">
                                 Generate a voice over from your script dialogue to QC before creating the final video.
                             </p>
 
                             {/* Script dialogue preview */}
                             {script?.shots?.some(s => s.dialogue) && (
-                                <div className="glass-panel rounded-2xl p-5 border border-white/[0.08]">
-                                    <h3 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
-                                        <span className="material-symbols-outlined text-amber-400 text-base">description</span>
+                                <div className="glass-panel rounded-2xl p-5 border border-[var(--sys-border)]">
+                                    <h3 className="text-sm font-bold text-[var(--sys-text)] mb-3 flex items-center gap-2">
+                                        <span className="material-symbols-outlined text-primary text-base">description</span>
                                         Script Dialogue
                                     </h3>
                                     <div className="space-y-2">
                                         {script.shots.filter(s => s.dialogue).map((shot, i) => (
-                                            <div key={i} className="flex items-start gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
+                                            <div key={i} className="flex items-start gap-3 p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
                                                 <span className="text-xs font-bold text-[#FF4D00] bg-[#FF4D00]/10 px-2 py-0.5 rounded flex-shrink-0 mt-0.5">
                                                     Shot {shot.shotNum}
                                                 </span>
-                                                <p className="text-sm text-slate-300 italic">"{shot.dialogue}"</p>
+                                                <p className="text-sm text-[var(--sys-text-muted)] italic">"{shot.dialogue}"</p>
                                             </div>
                                         ))}
                                     </div>
@@ -1303,22 +1303,22 @@ export default function VideoStudio() {
                             )}
 
                             {/* Voice Provider Tabs */}
-                            <div className="glass-panel rounded-2xl p-5 border border-cyan-500/20">
-                                <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-cyan-400 text-base">mic</span>
+                            <div className="glass-panel rounded-2xl p-5 border border-[var(--sys-border)]">
+                                <h3 className="text-sm font-bold text-[var(--sys-text)] mb-4 flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-primary text-base">mic</span>
                                     Select Voice
                                 </h3>
                                 <div className="flex flex-wrap gap-2 mb-4">
                                     <button onClick={() => setSelectedVoProvider('minimax')}
                                         className={`flex-1 sm:flex-none px-4 py-2 rounded-xl text-sm font-medium transition-all cursor-pointer ${selectedVoProvider === 'minimax'
                                             ? 'bg-[#FF4D00]/20 text-[#FF7A00] border border-[#FF4D00]/30'
-                                            : 'bg-white/[0.03] text-slate-500 border border-white/[0.06] hover:text-white'}`}>
+                                            : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] border border-[var(--sys-border)] hover:text-[var(--sys-text)]'}`}>
                                         🌍 Global (Minimax)
                                     </button>
                                     <button onClick={() => setSelectedVoProvider('sarvam')}
                                         className={`flex-1 sm:flex-none px-4 py-2 rounded-xl text-sm font-medium transition-all cursor-pointer ${selectedVoProvider === 'sarvam'
-                                            ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                                            : 'bg-white/[0.03] text-slate-500 border border-white/[0.06] hover:text-white'}`}>
+                                            ? 'bg-[var(--sys-primary-dim)] text-[var(--sys-primary)] border border-[var(--sys-border)]'
+                                            : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] border border-[var(--sys-border)] hover:text-[var(--sys-text)]'}`}>
                                         🇮🇳 Indian (Sarvam)
                                     </button>
                                 </div>
@@ -1336,10 +1336,10 @@ export default function VideoStudio() {
                                         ].map(v => (
                                             <button key={v.voice_id} onClick={() => setSelectedVoVoice(v)}
                                                 className={`text-left p-3 rounded-xl transition-all cursor-pointer ${selectedVoVoice?.voice_id === v.voice_id
-                                                    ? 'bg-[#FF4D00]/15 border-2 border-[#FF4D00]/40'
-                                                    : 'bg-white/[0.02] border border-white/[0.06] hover:border-white/[0.12]'}`}>
-                                                <p className="text-sm font-bold text-white">{v.name}</p>
-                                                <p className="text-xs text-slate-500">{v.gender} · {v.desc}</p>
+                                                    ? 'bg-[#FF4D00]/15 border border-[#FF4D00]/40'
+                                                    : 'bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:border-[var(--sys-border)]'}`}>
+                                                <p className="text-sm font-bold text-[var(--sys-text)]">{v.name}</p>
+                                                <p className="text-xs text-[var(--sys-text-muted)]">{v.gender} · {v.desc}</p>
                                             </button>
                                         ))}
                                     </div>
@@ -1348,38 +1348,38 @@ export default function VideoStudio() {
                                         {sarvamVoiceList.map(v => (
                                             <button key={v.voice_id} onClick={() => setSelectedVoVoice(v)}
                                                 className={`text-left p-3 rounded-xl transition-all cursor-pointer ${selectedVoVoice?.voice_id === v.voice_id
-                                                    ? 'bg-amber-500/15 border-2 border-amber-500/40'
-                                                    : 'bg-white/[0.02] border border-white/[0.06] hover:border-white/[0.12]'}`}>
-                                                <p className="text-sm font-bold text-white">{v.name}</p>
-                                                <p className="text-xs text-slate-500">{v.language} · {v.gender}</p>
+                                                    ? 'bg-[var(--sys-primary-dim)] border border-[var(--sys-border)]'
+                                                    : 'bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:border-[var(--sys-border)]'}`}>
+                                                <p className="text-sm font-bold text-[var(--sys-text)]">{v.name}</p>
+                                                <p className="text-xs text-[var(--sys-text-muted)]">{v.language} · {v.gender}</p>
                                             </button>
                                         ))}
                                         {sarvamVoiceList.length === 0 && (
-                                            <p className="text-sm text-slate-500 col-span-full text-center py-4">Loading voices...</p>
+                                            <p className="text-sm text-[var(--sys-text-muted)] col-span-full text-center py-4">Loading voices...</p>
                                         )}
                                     </div>
                                 )}
 
                                 {/* Speed Control */}
-                                <div className="flex items-center gap-3 mt-4 pt-4 border-t border-white/[0.06]">
-                                    <span className="text-sm text-slate-500">Speed:</span>
+                                <div className="flex items-center gap-3 mt-4 pt-4 border-t border-[var(--sys-border)]">
+                                    <span className="text-sm text-[var(--sys-text-muted)]">Speed:</span>
                                     <input type="range" min="0.5" max="2" step="0.1" value={voSpeed}
                                         onChange={e => setVoSpeed(parseFloat(e.target.value))}
                                         className="flex-1 accent-cyan-500" />
-                                    <span className="text-sm font-medium text-cyan-400 w-10 text-right">{voSpeed}x</span>
+                                    <span className="text-sm font-medium text-primary w-10 text-right">{voSpeed}x</span>
                                 </div>
                             </div>
 
                             {/* Audio Player (if generated) */}
                             {voiceoverAudioUrl && (
-                                <div className="glass-panel rounded-2xl p-5 border border-emerald-500/20">
+                                <div className="glass-panel rounded-2xl p-5 border border-[var(--sys-border)]">
                                     <div className="flex items-center gap-2 mb-3">
-                                        <span className="material-symbols-outlined text-emerald-400">headphones</span>
-                                        <h3 className="text-sm font-bold text-white">Voice Over Preview</h3>
-                                        <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300">Ready</span>
+                                        <span className="material-symbols-outlined text-primary">headphones</span>
+                                        <h3 className="text-sm font-bold text-[var(--sys-text)]">Voice Over Preview</h3>
+                                        <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--sys-primary-dim)] text-[var(--sys-primary)]">Ready</span>
                                     </div>
                                     <audio controls src={voiceoverAudioUrl} className="w-full" style={{ filter: 'invert(1) hue-rotate(180deg)', borderRadius: 12 }} />
-                                    <p className="text-xs text-slate-500 mt-2">Listen to the voice over and approve, or try a different voice.</p>
+                                    <p className="text-xs text-[var(--sys-text-muted)] mt-2">Listen to the voice over and approve, or try a different voice.</p>
                                 </div>
                             )}
 
@@ -1387,7 +1387,7 @@ export default function VideoStudio() {
                             <div className="flex gap-3">
                                 <button onClick={handleGenerateVoiceover}
                                     disabled={voiceoverLoading || (!selectedVoVoice && selectedVoProvider !== 'minimax')}
-                                    className="flex-1 py-4 rounded-2xl bg-gradient-to-r from-cyan-600 to-[#FF7A00] text-white font-bold hover:shadow-xl hover:shadow-cyan-500/20 transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-3">
+                                    className="flex-1 py-4 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] font-bold hover:shadow-xl hover:shadow-none transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-3">
                                     {voiceoverLoading ? (
                                         <><span className="material-symbols-outlined animate-spin">progress_activity</span>Generating voice over...</>
                                     ) : voiceoverAudioUrl ? (
@@ -1401,13 +1401,13 @@ export default function VideoStudio() {
                             <div className="flex gap-3">
                                 {voiceoverAudioUrl && (
                                     <button onClick={() => { setVoiceoverSkipped(false); setStep(4) }}
-                                        className="flex-1 py-4 rounded-2xl bg-gradient-to-r from-emerald-600 to-cyan-600 text-white font-bold hover:shadow-xl hover:shadow-emerald-500/20 transition-all cursor-pointer flex items-center justify-center gap-3">
+                                        className="flex-1 py-4 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] font-bold hover:shadow-xl hover:shadow-none transition-all cursor-pointer flex items-center justify-center gap-3">
                                         <span className="material-symbols-outlined">check_circle</span>
                                         Approve & Continue to Model Selection
                                     </button>
                                 )}
                                 <button onClick={() => { setVoiceoverSkipped(true); setStep(4) }}
-                                    className="px-6 py-4 rounded-2xl bg-white/[0.04] border border-white/[0.08] text-slate-300 font-medium hover:text-white hover:bg-white/[0.08] transition-all flex items-center gap-2 cursor-pointer">
+                                    className="px-6 py-4 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text-muted)] font-medium hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)] transition-all flex items-center gap-2 cursor-pointer">
                                     <span className="material-symbols-outlined">skip_next</span>
                                     Skip
                                 </button>
@@ -1420,11 +1420,11 @@ export default function VideoStudio() {
                     {/* ════════════════════════════════════════════════════════════ */}
                     {step === 4 && routing && (
                         <div className="space-y-6">
-                            <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                                <span className="material-symbols-outlined text-emerald-400">payments</span>
+                            <h2 className="text-lg font-bold text-[var(--sys-text)] flex items-center gap-2">
+                                <span className="material-symbols-outlined text-primary">payments</span>
                                 Choose Video Model & Review Cost
                             </h2>
-                            <p className="text-sm text-slate-400 -mt-3">
+                            <p className="text-sm text-[var(--sys-text-muted)] -mt-3">
                                 AI recommended <strong className="text-[#FF7A00]">{
                                     routing.selectedModel === 'veo-3.1' ? 'Google Veo 3.1' :
                                         routing.selectedModel === 'veo-3.1-fast' ? 'Google Veo 3.1 Fast' :
@@ -1440,11 +1440,11 @@ export default function VideoStudio() {
                                 <div className="glass-panel rounded-2xl p-4 border border-[#FF4D00]/20">
                                     <div className="flex items-center gap-2 mb-3">
                                         <span className="material-symbols-outlined text-[#FF4D00]">image</span>
-                                        <p className="text-sm font-bold text-white">Auto-Generated First Frame</p>
+                                        <p className="text-sm font-bold text-[var(--sys-text)]">Auto-Generated First Frame</p>
                                         <span className="text-xs px-2 py-0.5 rounded-full bg-[#FF4D00]/20 text-[#FF7A00]">AI Generated</span>
                                     </div>
-                                    <img src={images.find(i => i.source === 'ai-first-frame')?.url} alt="First frame" className="w-full max-w-md rounded-xl border border-white/[0.08]" />
-                                    <p className="text-xs text-slate-500 mt-2">This image will be used as the first frame of your video for visual consistency.</p>
+                                    <img src={images.find(i => i.source === 'ai-first-frame')?.url} alt="First frame" className="w-full max-w-md rounded-xl border border-[var(--sys-border)]" />
+                                    <p className="text-xs text-[var(--sys-text-muted)] mt-2">This image will be used as the first frame of your video for visual consistency.</p>
                                 </div>
                             )}
 
@@ -1464,30 +1464,35 @@ export default function VideoStudio() {
                                         }}
                                         disabled={!m.available}
                                         className={`text-left p-5 rounded-2xl transition-all cursor-pointer relative ${routing.selectedModel === m.id
-                                            ? 'bg-[#FF4D00]/10 border-2 border-[#FF4D00]/40 shadow-lg shadow-[#FF4D00]/10'
+                                            ? 'bg-[#FF4D00]/10 border border-[#FF4D00]/40 shadow-none'
                                             : m.available
-                                                ? 'bg-white/[0.02] border border-white/[0.08] hover:border-white/[0.15] hover:bg-white/[0.03]'
-                                                : 'bg-white/[0.01] border border-white/[0.05] opacity-50 cursor-not-allowed'
+                                                ? 'bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:border-[var(--sys-border)] hover:bg-[var(--sys-surface)]'
+                                                : 'bg-[var(--sys-surface)] border border-[var(--sys-border)] opacity-50 cursor-not-allowed'
                                             }`}>
                                         {m.recommended && (
-                                            <span className="absolute -top-2 right-3 text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold border border-emerald-500/30 flex items-center gap-1">
+                                            <span className="absolute -top-2 right-3 text-xs px-2 py-0.5 rounded-full bg-[var(--sys-primary-dim)] text-primary font-bold border border-[var(--sys-border)] flex items-center gap-1">
                                                 <span className="material-symbols-outlined text-[10px]">star</span> Recommended
                                             </span>
                                         )}
                                         {!m.available && (
-                                            <span className="absolute -top-2 right-3 text-xs px-2 py-0.5 rounded-full bg-slate-500/20 text-slate-400 font-bold border border-slate-500/30 flex items-center gap-1">
+                                            <span className="absolute -top-2 right-3 text-xs px-2 py-0.5 rounded-full bg-[var(--sys-border)]/20 text-[var(--sys-text-muted)] font-bold border border-[var(--sys-border)] flex items-center gap-1">
                                                 <span className="material-symbols-outlined text-[10px]">lock</span> Coming Soon
                                             </span>
                                         )}
                                         <div className="flex items-center gap-2 mb-2">
                                             <span className="material-symbols-outlined text-2xl" style={{ color: '#FF4D00' }}>{m.icon}</span>
-                                            <h3 className="text-base font-bold text-white">{m.name}</h3>
+                                            <h3 className="text-base font-bold text-[var(--sys-text)]">{m.name}</h3>
+                                            {modelCapabilities?.[m.id]?.activeProvider && (
+                                                <span className="px-1.5 py-0.5 ml-auto rounded text-[10px] uppercase tracking-wider font-bold bg-[var(--sys-surface)] text-[var(--sys-text-muted)] border border-[var(--sys-border)]">
+                                                    {modelCapabilities[m.id].activeProvider}
+                                                </span>
+                                            )}
                                         </div>
-                                        <p className="text-sm text-slate-400 mb-2">{m.desc}</p>
-                                        <p className="text-sm text-slate-500">Best for: {m.bestFor}</p>
+                                        <p className="text-sm text-[var(--sys-text-muted)] mb-2">{m.desc}</p>
+                                        <p className="text-sm text-[var(--sys-text-muted)]">Best for: {m.bestFor}</p>
                                         <div className="flex flex-wrap gap-1.5 mt-3">
                                             {m.features.map(f => (
-                                                <span key={f} className="text-xs px-2 py-0.5 rounded-full bg-white/[0.05] text-slate-400">{f}</span>
+                                                <span key={f} className="text-xs px-2 py-0.5 rounded-full bg-[var(--sys-surface)] text-[var(--sys-text-muted)]">{f}</span>
                                             ))}
                                         </div>
                                     </button>
@@ -1495,35 +1500,35 @@ export default function VideoStudio() {
                             </div>
 
                             {/* Cost & Config Card */}
-                            <div className="glass-panel rounded-2xl p-6 border border-emerald-500/20">
+                            <div className="glass-panel rounded-2xl p-6 border border-[var(--sys-border)]">
                                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-                                    <div className="p-3 rounded-xl bg-white/[0.03] text-center">
+                                    <div className="p-3 rounded-xl bg-[var(--sys-surface)] text-center">
                                         <p className="text-lg font-bold text-[#FF4D00]">{routing.resolution}</p>
-                                        <p className="text-sm text-slate-500">Resolution</p>
+                                        <p className="text-sm text-[var(--sys-text-muted)]">Resolution</p>
                                     </div>
-                                    <div className="p-3 rounded-xl bg-white/[0.03] text-center">
-                                        <p className="text-lg font-bold text-cyan-400">{script?.totalDuration || 5}s</p>
-                                        <p className="text-sm text-slate-500">Duration</p>
+                                    <div className="p-3 rounded-xl bg-[var(--sys-surface)] text-center">
+                                        <p className="text-lg font-bold text-primary">{script?.totalDuration || 5}s</p>
+                                        <p className="text-sm text-[var(--sys-text-muted)]">Duration</p>
                                     </div>
-                                    <div className="p-3 rounded-xl bg-white/[0.03] text-center">
-                                        <p className="text-lg font-bold text-amber-400">{routing.costPreview?.credits || 15}</p>
-                                        <p className="text-sm text-slate-500">Credits</p>
+                                    <div className="p-3 rounded-xl bg-[var(--sys-surface)] text-center">
+                                        <p className="text-lg font-bold text-primary">{routing.costPreview?.credits || 15}</p>
+                                        <p className="text-sm text-[var(--sys-text-muted)]">Credits</p>
                                     </div>
-                                    <div className="p-3 rounded-xl bg-white/[0.03] text-center">
-                                        <p className="text-lg font-bold text-emerald-400">₹{routing.costPreview?.inr || 150}</p>
-                                        <p className="text-sm text-slate-500">Est. Cost</p>
+                                    <div className="p-3 rounded-xl bg-[var(--sys-surface)] text-center">
+                                        <p className="text-lg font-bold text-primary">₹{routing.costPreview?.inr || 150}</p>
+                                        <p className="text-sm text-[var(--sys-text-muted)]">Est. Cost</p>
                                     </div>
                                 </div>
 
                                 {/* Resolution Selector */}
                                 <div className="flex items-center gap-3 mb-3 flex-wrap">
-                                    <span className="text-sm text-slate-500">Resolution:</span>
+                                    <span className="text-sm text-[var(--sys-text-muted)]">Resolution:</span>
                                     <div className="flex flex-wrap gap-2">
                                         {(modelCapabilities?.[routing.selectedModel]?.resolutions || ['720p', '1080p', '4k']).map(r => (
                                             <button key={r} onClick={() => setRouting(prev => ({ ...prev, resolution: r }))}
                                                 className={`px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-all ${routing.resolution === r
                                                     ? 'bg-[#FF4D00]/20 text-[#FF7A00] border border-[#FF4D00]/30'
-                                                    : 'bg-white/[0.03] text-slate-500 border border-white/[0.06] hover:text-white'
+                                                    : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] border border-[var(--sys-border)] hover:text-[var(--sys-text)]'
                                                     }`}>{r}</button>
                                         ))}
                                     </div>
@@ -1531,13 +1536,13 @@ export default function VideoStudio() {
 
                                 {/* Aspect Ratio Selector */}
                                 <div className="flex items-center gap-3 mb-3 flex-wrap">
-                                    <span className="text-sm text-slate-500">Ratio:</span>
+                                    <span className="text-sm text-[var(--sys-text-muted)]">Ratio:</span>
                                     <div className="flex flex-wrap gap-2">
                                         {(modelCapabilities?.[routing.selectedModel]?.aspectRatios || ['16:9', '9:16', '1:1', '4:3', '3:4']).map(r => (
                                             <button key={r} onClick={() => setRouting(prev => ({ ...prev, aspectRatio: r }))}
                                                 className={`px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-all ${(routing.aspectRatio || '16:9') === r
-                                                    ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
-                                                    : 'bg-white/[0.03] text-slate-500 border border-white/[0.06] hover:text-white'
+                                                    ? 'bg-[var(--sys-primary-dim)] text-[var(--sys-primary)] border border-[var(--sys-border)]'
+                                                    : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] border border-[var(--sys-border)] hover:text-[var(--sys-text)]'
                                                     }`}>{r}</button>
                                         ))}
                                     </div>
@@ -1545,13 +1550,13 @@ export default function VideoStudio() {
 
                                 {/* Mode Selector */}
                                 <div className="flex items-center gap-3 mb-3 flex-wrap">
-                                    <span className="text-sm text-slate-500">Mode:</span>
+                                    <span className="text-sm text-[var(--sys-text-muted)]">Mode:</span>
                                     <div className="flex flex-wrap gap-2">
                                         {['fast', 'quality'].map(m => (
                                             <button key={m} onClick={() => setRouting(prev => ({ ...prev, mode: m }))}
                                                 className={`px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-all capitalize ${routing.mode === m
-                                                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                                                    : 'bg-white/[0.03] text-slate-500 border border-white/[0.06] hover:text-white'
+                                                    ? 'bg-[var(--sys-primary-dim)] text-[var(--sys-primary)] border border-[var(--sys-border)]'
+                                                    : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] border border-[var(--sys-border)] hover:text-[var(--sys-text)]'
                                                     }`}>{m}</button>
                                         ))}
                                     </div>
@@ -1560,14 +1565,14 @@ export default function VideoStudio() {
                                 {/* Audio Generation Toggle */}
                                 {modelCapabilities?.[routing.selectedModel]?.features?.nativeAudio && (
                                     <div className="flex items-center gap-3 mb-3 flex-wrap">
-                                        <span className="text-sm text-slate-500">Audio:</span>
+                                        <span className="text-sm text-[var(--sys-text-muted)]">Audio:</span>
                                         <div className="flex items-center gap-2">
                                             <button 
                                                 onClick={() => setRouting(prev => ({ ...prev, generateAudio: true }))}
                                                 className={`px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-all ${
                                                     routing.generateAudio !== false
                                                         ? 'bg-[#FF4D00]/20 text-[#FF7A00] border border-[#FF4D00]/30'
-                                                        : 'bg-white/[0.03] text-slate-500 border border-white/[0.06] hover:text-white'
+                                                        : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] border border-[var(--sys-border)] hover:text-[var(--sys-text)]'
                                                 }`}>
                                                 <span className="flex items-center gap-1"><span className="material-symbols-outlined text-[14px]">volume_up</span> With Audio</span>
                                             </button>
@@ -1575,20 +1580,20 @@ export default function VideoStudio() {
                                                 onClick={() => setRouting(prev => ({ ...prev, generateAudio: false }))}
                                                 className={`px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-all ${
                                                     routing.generateAudio === false
-                                                        ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
-                                                        : 'bg-white/[0.03] text-slate-500 border border-white/[0.06] hover:text-white'
+                                                        ? 'bg-[var(--sys-primary-dim)] text-[var(--sys-primary)] border border-[var(--sys-border)]'
+                                                        : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] border border-[var(--sys-border)] hover:text-[var(--sys-text)]'
                                                 }`}>
                                                 <span className="flex items-center gap-1"><span className="material-symbols-outlined text-[14px]">volume_off</span> No Audio</span>
                                             </button>
                                         </div>
-                                        <span className="text-xs text-slate-500 italic ml-2">Native sound effects and ambiance</span>
+                                        <span className="text-xs text-[var(--sys-text-muted)] italic ml-2">Native sound effects and ambiance</span>
                                     </div>
                                 )}
                             </div>
 
                             {/* Generate Button */}
                             <button onClick={handleGenerate} disabled={loading}
-                                className="w-full py-4 rounded-2xl bg-gradient-to-r from-emerald-600 to-cyan-600 text-white font-bold text-base hover:shadow-xl hover:shadow-emerald-500/20 transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-3">
+                                className="w-full py-4 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] font-bold text-base hover:shadow-xl hover:shadow-none transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-3">
                                 {loading ? (
                                     <><span className="material-symbols-outlined animate-spin">progress_activity</span>Submitting to {routing.selectedModel}...</>
                                 ) : (
@@ -1616,20 +1621,20 @@ export default function VideoStudio() {
                                 <div className="absolute inset-0 w-32 h-32 rounded-full border-4 border-transparent border-t-violet-500 animate-spin" />
                             </div>
 
-                            <h2 className="text-xl font-bold text-white mb-2">Creating Your Video</h2>
-                            <p className="text-sm text-slate-400 mb-6">
+                            <h2 className="text-xl font-bold text-[var(--sys-text)] mb-2">Creating Your Video</h2>
+                            <p className="text-sm text-[var(--sys-text-muted)] mb-6">
                                 {generation?.status === 'IN_QUEUE' ? '⏳ In queue — waiting for GPU...' :
                                     generation?.status === 'IN_PROGRESS' ? '🎥 Rendering frames...' : '🎬 Processing...'}
                             </p>
 
                             {/* Progress bar */}
-                            <div className="w-full max-w-md h-3 rounded-full bg-white/[0.06] overflow-hidden mb-4">
+                            <div className="w-full max-w-md h-3 rounded-full bg-[var(--sys-surface)] overflow-hidden mb-4">
                                 <div
-                                    className="h-full rounded-full bg-gradient-to-r from-[#FF4D00] to-cyan-500 transition-all duration-1000"
+                                    className="h-full rounded-full bg-[var(--sys-surface)] border border-[var(--sys-border)] transition-all duration-1000"
                                     style={{ width: `${generation?.progress || 5}%` }}
                                 />
                             </div>
-                            <p className="text-sm text-slate-500">{generation?.progress || 5}% complete — usually takes 1-3 minutes</p>
+                            <p className="text-sm text-[var(--sys-text-muted)]">{generation?.progress || 5}% complete — usually takes 1-3 minutes</p>
                         </div>
                     )}
 
@@ -1638,14 +1643,14 @@ export default function VideoStudio() {
                     {/* ════════════════════════════════════════════════════════════ */}
                     {step === 6 && (
                         <div className="space-y-6">
-                            <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                                <span className="material-symbols-outlined text-emerald-400">rate_review</span>
+                            <h2 className="text-lg font-bold text-[var(--sys-text)] flex items-center gap-2">
+                                <span className="material-symbols-outlined text-primary">rate_review</span>
                                 Your Video is Ready
                             </h2>
 
                             {/* Video Player */}
                             {generation?.videoUrl ? (
-                                <div className="glass-panel rounded-2xl overflow-hidden border border-white/[0.08]">
+                                <div className="glass-panel rounded-2xl overflow-hidden border border-[var(--sys-border)]">
                                     <video
                                         controls
                                         className="w-full aspect-video bg-black"
@@ -1656,42 +1661,42 @@ export default function VideoStudio() {
                                     </video>
                                 </div>
                             ) : (
-                                <div className="glass-panel rounded-2xl p-12 text-center border border-white/[0.08]">
-                                    <span className="material-symbols-outlined text-4xl text-slate-600 mb-3 block">videocam_off</span>
-                                    <p className="text-sm text-slate-500">Video generation may have failed. Try editing the prompt and regenerating.</p>
+                                <div className="glass-panel rounded-2xl p-12 text-center border border-[var(--sys-border)]">
+                                    <span className="material-symbols-outlined text-4xl text-[var(--sys-text-muted)] mb-3 block">videocam_off</span>
+                                    <p className="text-sm text-[var(--sys-text-muted)]">Video generation may have failed. Try editing the prompt and regenerating.</p>
                                 </div>
                             )}
 
                             {/* Critic Feedback */}
                             {critique && (
-                                <div className="glass-panel rounded-2xl p-5 border border-white/[0.08]">
+                                <div className="glass-panel rounded-2xl p-5 border border-[var(--sys-border)]">
                                     <div className="flex items-center justify-between mb-4">
-                                        <h3 className="text-base font-bold text-white flex items-center gap-2">
-                                            <span className="material-symbols-outlined text-amber-400">grade</span>
+                                        <h3 className="text-base font-bold text-[var(--sys-text)] flex items-center gap-2">
+                                            <span className="material-symbols-outlined text-primary">grade</span>
                                             AI Critic Analysis
                                         </h3>
-                                        <span className={`text-lg font-bold ${critique.overallScore >= 8 ? 'text-emerald-400' : critique.overallScore >= 6 ? 'text-amber-400' : 'text-rose-400'}`}>
+                                        <span className={`text-lg font-bold ${critique.overallScore >= 8 ? 'text-primary' : critique.overallScore >= 6 ? 'text-primary' : 'text-primary'}`}>
                                             {critique.overallScore}/10
                                         </span>
                                     </div>
 
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         <div>
-                                            <p className="text-sm text-emerald-400 font-bold mb-2"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">check_circle</span> Strengths</p>
+                                            <p className="text-sm text-primary font-bold mb-2"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">check_circle</span> Strengths</p>
                                             <ul className="space-y-1">
                                                 {(critique.strengths || []).map((s, i) => (
-                                                    <li key={i} className="text-sm text-slate-300 flex items-start gap-1.5">
-                                                        <span className="text-emerald-400 mt-0.5">▸</span>{s}
+                                                    <li key={i} className="text-sm text-[var(--sys-text-muted)] flex items-start gap-1.5">
+                                                        <span className="text-primary mt-0.5">▸</span>{s}
                                                     </li>
                                                 ))}
                                             </ul>
                                         </div>
                                         <div>
-                                            <p className="text-sm text-amber-400 font-bold mb-2">💡 Suggestions</p>
+                                            <p className="text-sm text-primary font-bold mb-2">💡 Suggestions</p>
                                             <ul className="space-y-1">
                                                 {(critique.suggestions || []).map((s, i) => (
-                                                    <li key={i} className="text-sm text-slate-300 flex items-start gap-1.5">
-                                                        <span className="text-amber-400 mt-0.5">▸</span>{s}
+                                                    <li key={i} className="text-sm text-[var(--sys-text-muted)] flex items-start gap-1.5">
+                                                        <span className="text-primary mt-0.5">▸</span>{s}
                                                     </li>
                                                 ))}
                                             </ul>
@@ -1699,7 +1704,7 @@ export default function VideoStudio() {
                                     </div>
 
                                     {critique.technicalNotes && (
-                                        <p className="text-sm text-slate-500 mt-3 p-2 rounded-lg bg-white/[0.02] border border-white/[0.04]">
+                                        <p className="text-sm text-[var(--sys-text-muted)] mt-3 p-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)]">
                                             🔧 {critique.technicalNotes}
                                         </p>
                                     )}
@@ -1708,14 +1713,14 @@ export default function VideoStudio() {
 
                             {/* Edit Prompt + Regenerate */}
                             <div className="glass-panel rounded-2xl p-5 border border-[#FF4D00]/20">
-                                <h3 className="text-base font-bold text-white mb-3 flex items-center gap-2">
+                                <h3 className="text-base font-bold text-[var(--sys-text)] mb-3 flex items-center gap-2">
                                     <span className="material-symbols-outlined text-[#FF4D00]">code</span>
                                     Edit Prompt & Regenerate
                                 </h3>
                                 <textarea
                                     value={backendPrompt}
                                     onChange={e => setBackendPrompt(e.target.value)}
-                                    className="w-full h-32 px-4 py-3 rounded-xl bg-black/30 border border-[#FF4D00]/20 text-orange-50 text-xs font-mono outline-none focus:border-[#FF4D00]/40 resize-y"
+                                    className="w-full h-32 px-4 py-3 rounded-xl bg-[var(--sys-surface)] border border-[#FF4D00]/20 text-orange-50 text-xs font-mono outline-none focus:border-[#FF4D00]/40 resize-y"
                                 />
                                 <button onClick={handleEditAndRegenerate} disabled={loading}
                                     className="mt-3 px-6 py-2.5 rounded-xl bg-[#FF4D00]/20 text-[#FF7A00] font-medium text-sm border border-[#FF4D00]/30 hover:bg-[#FF4D00]/30 transition-all cursor-pointer disabled:opacity-50 flex items-center gap-2">
@@ -1727,13 +1732,13 @@ export default function VideoStudio() {
                             {/* Finalize */}
                             <div className="flex gap-3">
                                 <button onClick={handleFinalize} disabled={loading}
-                                    className="flex-1 py-4 rounded-2xl bg-gradient-to-r from-emerald-600 to-cyan-600 text-white font-bold hover:shadow-xl hover:shadow-emerald-500/20 transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2">
+                                    className="flex-1 py-4 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] font-bold hover:shadow-xl hover:shadow-none transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2">
                                     <span className="material-symbols-outlined">check_circle</span>
                                     Accept & Save
                                 </button>
                                 {generation?.videoUrl && (
                                     <button onClick={() => handleDownloadVideo(projectId ? `${API_BASE}/video-studio/${projectId}/video` : generation.videoUrl, 'video')}
-                                        className="px-6 py-4 rounded-2xl bg-white/[0.04] border border-white/[0.08] text-slate-300 font-medium hover:text-white hover:bg-white/[0.08] transition-all flex items-center gap-2 cursor-pointer">
+                                        className="px-6 py-4 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text-muted)] font-medium hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)] transition-all flex items-center gap-2 cursor-pointer">
                                         <span className="material-symbols-outlined">download</span>
                                         Download
                                     </button>

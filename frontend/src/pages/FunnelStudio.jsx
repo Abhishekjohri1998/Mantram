@@ -608,7 +608,7 @@ export default function FunnelStudio() {
             <DashboardLayout title="Nurture Sequences" subtitle={selectedFunnel.name}>
                 <SEOHead title={`Nurture — ${selectedFunnel.name}`} noIndex={true} />
                 {error && (
-                    <div className={`mb-6 p-4 rounded-xl border ${error.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'} text-sm flex items-center gap-2`}>
+                    <div className={`mb-6 p-4 rounded-xl border ${error.isProviderError ? 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary' : 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary'} text-sm flex items-center gap-2`}>
                         <span className="material-symbols-outlined text-base">
                             {error.isProviderError ? 'warning' : 'error'}
                         </span>
@@ -645,7 +645,7 @@ export default function FunnelStudio() {
             <DashboardLayout title="Funnel Health" subtitle={selectedFunnel.name}>
                 <SEOHead title={`Health — ${selectedFunnel.name}`} noIndex={true} />
                 {error && (
-                    <div className={`mb-6 p-4 rounded-xl border ${error.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'} text-sm flex items-center gap-2`}>
+                    <div className={`mb-6 p-4 rounded-xl border ${error.isProviderError ? 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary' : 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary'} text-sm flex items-center gap-2`}>
                         <span className="material-symbols-outlined text-base">
                             {error.isProviderError ? 'warning' : 'error'}
                         </span>
@@ -680,7 +680,7 @@ export default function FunnelStudio() {
             <DashboardLayout title="Landing Pages" subtitle={selectedFunnel.name}>
                 <SEOHead title={`Pages — ${selectedFunnel.name}`} noIndex={true} />
                 {error && (
-                    <div className={`mb-6 p-4 rounded-xl border ${error.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'} text-sm flex items-center gap-2`}>
+                    <div className={`mb-6 p-4 rounded-xl border ${error.isProviderError ? 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary' : 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary'} text-sm flex items-center gap-2`}>
                         <span className="material-symbols-outlined text-base">
                             {error.isProviderError ? 'warning' : 'error'}
                         </span>
@@ -718,7 +718,7 @@ export default function FunnelStudio() {
             <DashboardLayout title="Revenue Forecast" subtitle={selectedFunnel.name}>
                 <SEOHead title={`Forecast — ${selectedFunnel.name}`} noIndex={true} />
                 {error && (
-                    <div className={`mb-6 p-4 rounded-xl border ${error.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'} text-sm flex items-center gap-2`}>
+                    <div className={`mb-6 p-4 rounded-xl border ${error.isProviderError ? 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary' : 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary'} text-sm flex items-center gap-2`}>
                         <span className="material-symbols-outlined text-base">
                             {error.isProviderError ? 'warning' : 'error'}
                         </span>
@@ -744,7 +744,7 @@ export default function FunnelStudio() {
             <DashboardLayout title="Activity Feed" subtitle={selectedFunnel.name}>
                 <SEOHead title={`Activity — ${selectedFunnel.name}`} noIndex={true} />
                 {error && (
-                    <div className={`mb-6 p-4 rounded-xl border ${error.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'} text-sm flex items-center gap-2`}>
+                    <div className={`mb-6 p-4 rounded-xl border ${error.isProviderError ? 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary' : 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary'} text-sm flex items-center gap-2`}>
                         <span className="material-symbols-outlined text-base">
                             {error.isProviderError ? 'warning' : 'error'}
                         </span>
@@ -771,7 +771,7 @@ export default function FunnelStudio() {
             <DashboardLayout title="Webhook Integrations" subtitle={selectedFunnel.name}>
                 <SEOHead title={`Webhooks — ${selectedFunnel.name}`} noIndex={true} />
                 {error && (
-                    <div className={`mb-6 p-4 rounded-xl border ${error.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'} text-sm flex items-center gap-2`}>
+                    <div className={`mb-6 p-4 rounded-xl border ${error.isProviderError ? 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary' : 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary'} text-sm flex items-center gap-2`}>
                         <span className="material-symbols-outlined text-base">
                             {error.isProviderError ? 'warning' : 'error'}
                         </span>
@@ -812,7 +812,7 @@ export default function FunnelStudio() {
             <DashboardLayout title="Automations" subtitle={selectedFunnel.name}>
                 <SEOHead title={`Automations — ${selectedFunnel.name}`} noIndex={true} />
                 {error && (
-                    <div className={`mb-6 p-4 rounded-xl border ${error.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'} text-sm flex items-center gap-2`}>
+                    <div className={`mb-6 p-4 rounded-xl border ${error.isProviderError ? 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary' : 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary'} text-sm flex items-center gap-2`}>
                         <span className="material-symbols-outlined text-base">
                             {error.isProviderError ? 'warning' : 'error'}
                         </span>
@@ -852,12 +852,12 @@ export default function FunnelStudio() {
                 <SEOHead title="Funnel Analytics — Mantram AI" noIndex={true} />
                 <div className="flex items-center gap-3 mb-6">
                     <button onClick={() => { setView('dashboard'); setAnalytics(null) }}
-                        className="size-10 rounded-xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center hover:bg-white/[0.08] transition-all cursor-pointer">
-                        <span className="material-symbols-outlined text-slate-400">arrow_back</span>
+                        className="size-10 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] flex items-center justify-center hover:bg-[var(--sys-surface)] transition-all cursor-pointer">
+                        <span className="material-symbols-outlined text-[var(--sys-text-muted)]">arrow_back</span>
                     </button>
                     <div>
-                        <h2 className="text-white font-bold text-lg">{selectedFunnel.name}</h2>
-                        <p className="text-sm text-slate-500">Conversion Analytics</p>
+                        <h2 className="text-[var(--sys-text)] font-bold text-lg">{selectedFunnel.name}</h2>
+                        <p className="text-sm text-[var(--sys-text-muted)]">Conversion Analytics</p>
                     </div>
                 </div>
 
@@ -874,16 +874,16 @@ export default function FunnelStudio() {
                         <div key={card.label} className="glass-panel rounded-xl p-4">
                             <div className="flex items-center gap-2 mb-2">
                                 <span className="material-symbols-outlined text-sm" style={{ color: card.color }}>{card.icon}</span>
-                                <span className="text-xs text-slate-500 uppercase tracking-widest font-bold">{card.label}</span>
+                                <span className="text-xs text-[var(--sys-text-muted)] uppercase tracking-widest font-bold">{card.label}</span>
                             </div>
-                            <p className="text-2xl font-bold text-white">{card.value}</p>
+                            <p className="text-2xl font-bold text-[var(--sys-text)]">{card.value}</p>
                         </div>
                     ))}
                 </div>
 
                 {/* Stage Funnel Visualization */}
                 <div className="glass-panel rounded-2xl p-6 mb-8">
-                    <h3 className="text-white font-bold mb-6 flex items-center gap-2">
+                    <h3 className="text-[var(--sys-text)] font-bold mb-6 flex items-center gap-2">
                         <span className="material-symbols-outlined text-primary">filter_alt</span> Stage Breakdown
                     </h3>
                     <div className="space-y-3">
@@ -893,10 +893,10 @@ export default function FunnelStudio() {
                             return (
                                 <div key={stage.stageName} className="flex items-center gap-4">
                                     <div className="w-32 shrink-0 text-right">
-                                        <p className="text-sm text-white font-bold">{stage.stageName}</p>
-                                        <p className="text-xs text-slate-500">{stage.everEntered} entered</p>
+                                        <p className="text-sm text-[var(--sys-text)] font-bold">{stage.stageName}</p>
+                                        <p className="text-xs text-[var(--sys-text-muted)]">{stage.everEntered} entered</p>
                                     </div>
-                                    <div className="flex-1 h-10 bg-white/[0.02] rounded-lg overflow-hidden relative">
+                                    <div className="flex-1 h-10 bg-[var(--sys-surface)] rounded-lg overflow-hidden relative">
                                         <div className="h-full rounded-lg transition-all duration-700 flex items-center px-3"
                                             style={{ width: `${barWidth}%`, backgroundColor: `${stage.stageColor}30`, borderLeft: `3px solid ${stage.stageColor}` }}>
                                             <span className="text-sm font-bold" style={{ color: stage.stageColor }}>{stage.currentCount} active</span>
@@ -904,7 +904,7 @@ export default function FunnelStudio() {
                                     </div>
                                     <div className="w-24 shrink-0">
                                         {idx > 0 && (
-                                            <span className={`text-sm font-bold ${stage.dropOffRate > 50 ? 'text-rose-400' : stage.dropOffRate > 25 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                                            <span className={`text-sm font-bold ${stage.dropOffRate > 50 ? 'text-primary' : stage.dropOffRate > 25 ? 'text-primary' : 'text-primary'}`}>
                                                 ↓ {stage.dropOffRate}% drop
                                             </span>
                                         )}
@@ -918,16 +918,16 @@ export default function FunnelStudio() {
                 {/* Source Breakdown */}
                 {analytics.sourceBreakdown?.length > 0 && (
                     <div className="glass-panel rounded-2xl p-6">
-                        <h3 className="text-white font-bold mb-4 flex items-center gap-2">
+                        <h3 className="text-[var(--sys-text)] font-bold mb-4 flex items-center gap-2">
                             <span className="material-symbols-outlined text-primary">donut_large</span> Traffic Sources
                         </h3>
                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
                             {analytics.sourceBreakdown.map(s => (
-                                <div key={s.source} className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+                                <div key={s.source} className="flex items-center gap-3 p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
                                     <span className="material-symbols-outlined text-primary text-sm">{SOURCE_ICONS[s.source] || 'help'}</span>
                                     <div>
-                                        <p className="text-sm text-white font-bold capitalize">{s.source}</p>
-                                        <p className="text-xs text-slate-500">{s.count} entries</p>
+                                        <p className="text-sm text-[var(--sys-text)] font-bold capitalize">{s.source}</p>
+                                        <p className="text-xs text-[var(--sys-text-muted)]">{s.count} entries</p>
                                     </div>
                                 </div>
                             ))}
@@ -963,7 +963,7 @@ export default function FunnelStudio() {
                             { id: 'activity', icon: 'feed', label: 'Activity' },
                         ].map(tab => (
                             <button key={tab.id} onClick={() => setView(tab.id)}
-                                className={`flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-300 cursor-pointer ${view === tab.id ? 'studio-nav-pill text-white font-bold' : 'studio-nav-tab-inactive'}`}>
+                                className={`flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-300 cursor-pointer ${view === tab.id ? 'studio-nav-pill text-[var(--sys-text)] font-bold' : 'studio-nav-tab-inactive'}`}>
                                 <span className={`material-symbols-outlined ${view === tab.id ? 'text-lg' : 'text-base opacity-70'}`}>{tab.icon}</span>
                                 <span>{tab.label}</span>
                             </button>
@@ -982,15 +982,15 @@ export default function FunnelStudio() {
                 <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center gap-3">
                         <button onClick={() => { setView('dashboard'); setSelectedFunnel(null) }}
-                            className="size-10 rounded-xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center hover:bg-white/[0.08] transition-all cursor-pointer">
-                            <span className="material-symbols-outlined text-slate-400">arrow_back</span>
+                            className="size-10 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] flex items-center justify-center hover:bg-[var(--sys-surface)] transition-all cursor-pointer">
+                            <span className="material-symbols-outlined text-[var(--sys-text-muted)]">arrow_back</span>
                         </button>
                         <div className="size-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${selectedFunnel.color || '#6366f1'}20` }}>
                             <span className="material-symbols-outlined" style={{ color: selectedFunnel.color || '#6366f1' }}>{selectedFunnel.icon || 'filter_alt'}</span>
                         </div>
                         <div>
-                            <h2 className="text-white font-bold text-lg">{selectedFunnel.name}</h2>
-                            <p className="text-sm text-slate-500">{stages.length} stages · {Object.values(entriesByStage).flat().length} active entries</p>
+                            <h2 className="text-[var(--sys-text)] font-bold text-lg">{selectedFunnel.name}</h2>
+                            <p className="text-sm text-[var(--sys-text-muted)]">{stages.length} stages · {Object.values(entriesByStage).flat().length} active entries</p>
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
@@ -999,18 +999,18 @@ export default function FunnelStudio() {
                             <span className="material-symbols-outlined text-sm">person_add</span> Add Lead
                         </button>
                         <button onClick={() => setShowImportModal(true)}
-                            className="px-4 py-2 rounded-xl text-sm font-bold text-slate-400 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] transition-all cursor-pointer flex items-center gap-1.5">
+                            className="px-4 py-2 rounded-xl text-sm font-bold text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] bg-[var(--sys-surface)] hover:bg-[var(--sys-surface)] border border-[var(--sys-border)] transition-all cursor-pointer flex items-center gap-1.5">
                             <span className="material-symbols-outlined text-sm">download</span> Import
                         </button>
                         <button onClick={() => setFidatoOpen(!fidatoOpen)}
-                            className={`size-10 rounded-xl flex items-center justify-center transition-all cursor-pointer ${fidatoOpen ? 'bg-primary/20 text-primary border border-primary/30' : 'bg-white/[0.04] text-slate-400 hover:text-white hover:bg-white/[0.08] border border-white/[0.06]'}`}>
+                            className={`size-10 rounded-xl flex items-center justify-center transition-all cursor-pointer ${fidatoOpen ? 'bg-primary/20 text-primary border border-primary/30' : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] hover:text-white hover:bg-[var(--sys-surface)] border border-[var(--sys-border)]'}`}>
                             <span className="material-symbols-outlined text-sm">smart_toy</span>
                         </button>
                     </div>
                 </div>
 
                 {/* ── Tabbed Navigation Bar ── */}
-                <div className="flex items-center gap-1 mb-5 p-1 rounded-2xl bg-white/[0.02] border border-white/[0.04] overflow-x-auto">
+                <div className="flex items-center gap-1 mb-5 p-1 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] overflow-x-auto">
                     {[
                         { id: 'kanban', icon: 'view_kanban', label: 'Pipeline', color: '#6366f1' },
                         { id: 'intelligence', icon: 'insights', label: 'Intelligence', color: '#06b6d4' },
@@ -1031,20 +1031,20 @@ export default function FunnelStudio() {
                                     else if (tab.id === 'settings') setView('builder')
                                 }}
                                 className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${isActive
-                                    ? 'text-white shadow-lg'
-                                    : 'text-slate-400 hover:text-white hover:bg-white/[0.04]'}`}
+                                    ? 'text-[var(--sys-text)] shadow-lg'
+                                    : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)]'}`}
                                 style={isActive ? { backgroundColor: `${tab.color}20`, color: tab.color, boxShadow: `0 0 20px ${tab.color}10` } : undefined}>
                                 <span className="material-symbols-outlined text-sm">{tab.icon}</span>
                                 {tab.label}
                             </button>
                         )
                     })}
-                    <div className="w-px h-5 bg-white/[0.06] mx-1" />
+                    <div className="w-px h-5 bg-[var(--sys-surface)] mx-1" />
                     {/* Sub-tabs for active group */}
                     {view === 'pipeline' && (
                         <>
                             <button onClick={() => { fetchSuggestions() }}
-                                className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold text-amber-400 hover:bg-amber-500/10 transition-all cursor-pointer whitespace-nowrap">
+                                className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold text-primary hover:bg-[var(--sys-primary-dim)] transition-all cursor-pointer whitespace-nowrap">
                                 <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>auto_awesome</span> AI Tips
                             </button>
                         </>
@@ -1052,19 +1052,19 @@ export default function FunnelStudio() {
                     {['health', 'analytics', 'forecast'].some(v => v === view) && (
                         <>
                             <button onClick={() => { fetchHealth(selectedFunnel._id); setView('health') }}
-                                className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${view === 'health' ? 'bg-cyan-500/15 text-cyan-300' : 'text-slate-500 hover:text-white hover:bg-white/[0.04]'}`}>
+                                className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${view === 'health' ? 'bg-[var(--sys-primary-dim)] text-[var(--sys-primary)]' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)]'}`}>
                                 <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>health_and_safety</span> Health
                             </button>
                             <button onClick={() => openAnalytics(selectedFunnel)}
-                                className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${view === 'analytics' ? 'bg-cyan-500/15 text-cyan-300' : 'text-slate-500 hover:text-white hover:bg-white/[0.04]'}`}>
+                                className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${view === 'analytics' ? 'bg-[var(--sys-primary-dim)] text-[var(--sys-primary)]' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)]'}`}>
                                 <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>analytics</span> Analytics
                             </button>
                             <button onClick={async () => { try { const r = await autoApi.revenueForecast(selectedFunnel._id); setRevenueForecast(r.forecast); setView('forecast') } catch (err) { setError({ message: err.message, isProviderError: err.isProviderError, provider: err.provider }) } }}
-                                className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${view === 'forecast' ? 'bg-cyan-500/15 text-cyan-300' : 'text-slate-500 hover:text-white hover:bg-white/[0.04]'}`}>
+                                className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${view === 'forecast' ? 'bg-[var(--sys-primary-dim)] text-[var(--sys-primary)]' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)]'}`}>
                                 <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>trending_up</span> Forecast
                             </button>
                             <button onClick={async () => { try { await runScoring(); setView('health') } catch (err) { setError({ message: err.message, isProviderError: err.isProviderError, provider: err.provider }) } }}
-                                className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold text-amber-400 hover:bg-amber-500/10 transition-all cursor-pointer whitespace-nowrap">
+                                className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold text-primary hover:bg-[var(--sys-primary-dim)] transition-all cursor-pointer whitespace-nowrap">
                                 <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>score</span> Score Leads
                             </button>
                         </>
@@ -1072,19 +1072,19 @@ export default function FunnelStudio() {
                     {['nurture', 'automations', 'pages', 'activity'].some(v => v === view) && (
                         <>
                             <button onClick={() => { fetchAutomationRules(selectedFunnel._id); setView('automations') }}
-                                className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${view === 'automations' ? 'bg-emerald-500/15 text-emerald-300' : 'text-slate-500 hover:text-white hover:bg-white/[0.04]'}`}>
+                                className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${view === 'automations' ? 'bg-[var(--sys-primary-dim)] text-[var(--sys-primary)]' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)]'}`}>
                                 <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>bolt</span> Automations
                             </button>
                             <button onClick={() => { fetchNurtureSequences(selectedFunnel._id); setView('nurture') }}
-                                className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${view === 'nurture' ? 'bg-emerald-500/15 text-emerald-300' : 'text-slate-500 hover:text-white hover:bg-white/[0.04]'}`}>
+                                className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${view === 'nurture' ? 'bg-[var(--sys-primary-dim)] text-[var(--sys-primary)]' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)]'}`}>
                                 <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>mail</span> Nurture
                             </button>
                             <button onClick={() => { fetchLandingPages(selectedFunnel._id); setView('pages') }}
-                                className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${view === 'pages' ? 'bg-emerald-500/15 text-emerald-300' : 'text-slate-500 hover:text-white hover:bg-white/[0.04]'}`}>
+                                className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${view === 'pages' ? 'bg-[var(--sys-primary-dim)] text-[var(--sys-primary)]' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)]'}`}>
                                 <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>web</span> Pages
                             </button>
                             <button onClick={async () => { try { const r = await autoApi.activityFeed(selectedFunnel._id); setActivityFeed(r.feed || []); setView('activity') } catch (err) { setError({ message: err.message, isProviderError: err.isProviderError, provider: err.provider }) } }}
-                                className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${view === 'activity' ? 'bg-emerald-500/15 text-emerald-300' : 'text-slate-500 hover:text-white hover:bg-white/[0.04]'}`}>
+                                className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${view === 'activity' ? 'bg-[var(--sys-primary-dim)] text-[var(--sys-primary)]' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)]'}`}>
                                 <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>dynamic_feed</span> Feed
                             </button>
                         </>
@@ -1092,11 +1092,11 @@ export default function FunnelStudio() {
                     {['builder', 'webhooks'].some(v => v === view) && (
                         <>
                             <button onClick={() => setView('builder')}
-                                className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${view === 'builder' ? 'bg-amber-500/15 text-amber-300' : 'text-slate-500 hover:text-white hover:bg-white/[0.04]'}`}>
+                                className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${view === 'builder' ? 'bg-[var(--sys-primary-dim)] text-[var(--sys-primary)]' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)]'}`}>
                                 <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>build</span> Stage Builder
                             </button>
                             <button onClick={async () => { try { const r = await shareApi.webhookToken(selectedFunnel._id); setWebhookData(r); setView('webhooks') } catch (err) { setError({ message: err.message, isProviderError: err.isProviderError, provider: err.provider }) } }}
-                                className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${view === 'webhooks' ? 'bg-amber-500/15 text-amber-300' : 'text-slate-500 hover:text-white hover:bg-white/[0.04]'}`}>
+                                className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${view === 'webhooks' ? 'bg-[var(--sys-primary-dim)] text-[var(--sys-primary)]' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)]'}`}>
                                 <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>webhook</span> Webhooks
                             </button>
                         </>
@@ -1113,13 +1113,13 @@ export default function FunnelStudio() {
                                 <div className="flex items-center justify-between mb-3 px-1">
                                     <div className="flex items-center gap-2">
                                         <div className="w-3 h-3 rounded-full" style={{ backgroundColor: stage.color }} />
-                                        <h3 className="text-sm font-bold text-white">{stage.name}</h3>
-                                        <span className="text-xs px-1.5 py-0.5 rounded-md bg-white/[0.06] text-slate-400 font-bold">{stageEntries.length}</span>
+                                        <h3 className="text-sm font-bold text-[var(--sys-text)]">{stage.name}</h3>
+                                        <span className="text-xs px-1.5 py-0.5 rounded-md bg-[var(--sys-surface)] text-[var(--sys-text-muted)] font-bold">{stageEntries.length}</span>
                                     </div>
                                 </div>
 
                                 {/* Cards */}
-                                <div className="space-y-2 min-h-[200px] p-2 rounded-xl bg-white/[0.01] border border-white/[0.04]"
+                                <div className="space-y-2 min-h-[200px] p-2 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]"
                                     onDragOver={(e) => e.preventDefault()}
                                     onDrop={(e) => {
                                         const entryId = e.dataTransfer.getData('entryId')
@@ -1145,29 +1145,29 @@ export default function FunnelStudio() {
                                                 <div className="flex items-center gap-2 min-w-0">
                                                     {/* Score Ring Avatar */}
                                                     <div className="relative shrink-0">
-                                                        <div className="size-8 rounded-full bg-gradient-to-br from-primary/30 to-[#FF7A00]/30 flex items-center justify-center text-xs font-bold text-white"
+                                                        <div className="size-8 rounded-full bg-[var(--sys-surface)] border border-[var(--sys-border)] flex items-center justify-center text-xs font-bold text-[var(--sys-text)]"
                                                             style={{ boxShadow: `0 0 0 2px ${scoreColor}50` }}>
                                                             {(entry.name || '?')[0].toUpperCase()}
                                                         </div>
-                                                        {entry.score > 70 && <div className="absolute -top-0.5 -right-0.5 size-3 rounded-full bg-emerald-400 border-2 border-[#0f1729]" title="Hot lead" />}
+                                                        {entry.score > 70 && <div className="absolute -top-0.5 -right-0.5 size-3 rounded-full bg-[var(--sys-surface)] border border-[#0f1729]" title="Hot lead" />}
                                                     </div>
                                                     <div className="min-w-0">
-                                                        <p className="text-sm text-white font-bold truncate">{entry.name || 'Unknown'}</p>
-                                                        {entry.email && <p className="text-xs text-slate-500 truncate">{entry.email}</p>}
+                                                        <p className="text-sm text-[var(--sys-text)] font-bold truncate">{entry.name || 'Unknown'}</p>
+                                                        {entry.email && <p className="text-xs text-[var(--sys-text-muted)] truncate">{entry.email}</p>}
                                                     </div>
                                                 </div>
                                                 {/* Compact Hover Actions */}
                                                 <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
                                                     <button onClick={() => updateEntryStatus(entry._id, 'converted')} title="Convert"
-                                                        className="size-6 rounded-md flex items-center justify-center text-emerald-400 hover:bg-emerald-500/10 cursor-pointer">
+                                                        className="size-6 rounded-md flex items-center justify-center text-primary hover:bg-[var(--sys-primary-dim)] cursor-pointer">
                                                         <span className="material-symbols-outlined text-xs">check_circle</span>
                                                     </button>
                                                     <button onClick={() => updateEntryStatus(entry._id, 'lost')} title="Lost"
-                                                        className="size-6 rounded-md flex items-center justify-center text-rose-400 hover:bg-rose-500/10 cursor-pointer">
+                                                        className="size-6 rounded-md flex items-center justify-center text-primary hover:bg-[var(--sys-primary-dim)] cursor-pointer">
                                                         <span className="material-symbols-outlined text-xs">cancel</span>
                                                     </button>
                                                     <button onClick={() => deleteEntry(entry._id)} title="Delete"
-                                                        className="size-6 rounded-md flex items-center justify-center text-slate-500 hover:bg-white/[0.06] cursor-pointer">
+                                                        className="size-6 rounded-md flex items-center justify-center text-[var(--sys-text-muted)] hover:bg-[var(--sys-surface)] cursor-pointer">
                                                         <span className="material-symbols-outlined text-xs">delete</span>
                                                     </button>
                                                 </div>
@@ -1175,7 +1175,7 @@ export default function FunnelStudio() {
 
                                             {/* Deal Value + Score */}
                                             <div className="flex items-center gap-2 mb-1.5">
-                                                <div className="flex-1 h-1 rounded-full bg-white/[0.06] overflow-hidden">
+                                                <div className="flex-1 h-1 rounded-full bg-[var(--sys-surface)] overflow-hidden">
                                                     <div className="h-full rounded-full transition-all" style={{
                                                         width: `${entry.score || 0}%`,
                                                         backgroundColor: scoreColor,
@@ -1183,7 +1183,7 @@ export default function FunnelStudio() {
                                                 </div>
                                                 <span className="text-xs font-bold shrink-0" style={{ color: scoreColor }}>{entry.score || 0}</span>
                                                 {entry.dealValue && (
-                                                    <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
+                                                    <span className="text-xs font-bold text-primary bg-[var(--sys-primary-dim)] px-1.5 py-0.5 rounded">
                                                         ₹{entry.dealValue.toLocaleString()}
                                                     </span>
                                                 )}
@@ -1198,13 +1198,13 @@ export default function FunnelStudio() {
                                                     </span>
                                                 )}
                                                 {entry.company && (
-                                                    <span className="px-1.5 py-0.5 rounded text-xs bg-white/[0.06] text-slate-400">{entry.company}</span>
+                                                    <span className="px-1.5 py-0.5 rounded text-xs bg-[var(--sys-surface)] text-[var(--sys-text-muted)]">{entry.company}</span>
                                                 )}
                                                 {(entry.tags || []).slice(0, 2).map(tag => (
-                                                    <span key={tag} className="px-1.5 py-0.5 rounded text-[10px] bg-amber-500/10 text-amber-400 font-medium">{tag}</span>
+                                                    <span key={tag} className="px-1.5 py-0.5 rounded text-[10px] bg-[var(--sys-primary-dim)] text-primary font-medium">{tag}</span>
                                                 ))}
                                                 {timeAgo && (
-                                                    <span className="text-[10px] text-slate-600 ml-auto flex items-center gap-0.5">
+                                                    <span className="text-[10px] text-[var(--sys-text-muted)] ml-auto flex items-center gap-0.5">
                                                         <span className="material-symbols-outlined" style={{ fontSize: '10px' }}>schedule</span>
                                                         {timeAgo}
                                                     </span>
@@ -1217,7 +1217,7 @@ export default function FunnelStudio() {
                                                     if (s.name === stage.name) return null
                                                     return (
                                                         <button key={s.name} onClick={() => moveEntry(entry._id, s.name)} title={`Move to ${s.name}`}
-                                                            className="px-1.5 py-0.5 rounded text-xs font-medium hover:bg-white/[0.06] transition-all cursor-pointer text-slate-500 hover:text-white truncate max-w-[60px]">
+                                                            className="px-1.5 py-0.5 rounded text-xs font-medium hover:bg-[var(--sys-surface)] transition-all cursor-pointer text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] truncate max-w-[60px]">
                                                             → {s.name}
                                                         </button>
                                                     )
@@ -1227,12 +1227,12 @@ export default function FunnelStudio() {
                                         )
                                     })}
                                     {stageEntries.length === 0 && (
-                                        <div className="text-center py-6 text-slate-600">
-                                            <div className="size-10 rounded-xl bg-white/[0.03] flex items-center justify-center mx-auto mb-2">
+                                        <div className="text-center py-6 text-[var(--sys-text-muted)]">
+                                            <div className="size-10 rounded-xl bg-[var(--sys-surface)] flex items-center justify-center mx-auto mb-2">
                                                 <span className="material-symbols-outlined text-lg text-slate-700">person_add</span>
                                             </div>
-                                            <p className="text-xs font-medium text-slate-500 mb-1">No leads here</p>
-                                            <p className="text-[10px] text-slate-600">Drag leads here or add new ones</p>
+                                            <p className="text-xs font-medium text-[var(--sys-text-muted)] mb-1">No leads here</p>
+                                            <p className="text-[10px] text-[var(--sys-text-muted)]">Drag leads here or add new ones</p>
                                         </div>
                                     )}
                                 </div>
@@ -1301,14 +1301,14 @@ export default function FunnelStudio() {
                             }
                             setView(tab.id)
                         }}
-                            className={`flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-300 cursor-pointer ${view === tab.id ? 'studio-nav-pill text-white font-bold' : 'studio-nav-tab-inactive'}`}>
+                            className={`flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-300 cursor-pointer ${view === tab.id ? 'studio-nav-pill text-[var(--sys-text)] font-bold' : 'studio-nav-tab-inactive'}`}>
                             <span className={`material-symbols-outlined ${view === tab.id ? 'text-lg' : 'text-base opacity-70'}`}>{tab.icon}</span>
                             <span>{tab.label}</span>
                         </button>
                     ))}
                     <div className="ml-auto flex-shrink-0">
                         <button onClick={() => setShowAIModal(true)} disabled={loading}
-                            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-semibold studio-nav-pill text-white cursor-pointer disabled:opacity-50">
+                            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-semibold studio-nav-pill text-[var(--sys-text)] cursor-pointer disabled:opacity-50">
                             <span className="material-symbols-outlined text-base">auto_awesome</span>
                             AI Architect
                         </button>
@@ -1317,7 +1317,7 @@ export default function FunnelStudio() {
             </div>
 
             {error && (
-                <div className={`mb-6 p-4 rounded-xl border ${error.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'} text-sm flex items-center gap-2 mx-2`}>
+                <div className={`mb-6 p-4 rounded-xl border ${error.isProviderError ? 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary' : 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary'} text-sm flex items-center gap-2 mx-2`}>
                     <span className="material-symbols-outlined text-base">
                         {error.isProviderError ? 'warning' : 'error'}
                     </span>
@@ -1336,18 +1336,18 @@ export default function FunnelStudio() {
             </div>
 
             {/* ── Intelligence Hero Banner ── */}
-            <div className="glass-panel rounded-2xl p-6 mb-6" style={{ background: 'linear-gradient(135deg, #6366f108, #8b5cf608, #06b6d408)' }}>
+            <div className="glass-panel rounded-2xl p-6 mb-6" style={{ background: 'var(--sys-primary)' }}>
                 <div className="flex items-center justify-between mb-5">
                     <div>
-                        <h2 className="text-white font-bold text-xl flex items-center gap-2">
+                        <h2 className="text-[var(--sys-text)] font-bold text-xl flex items-center gap-2">
                             <span className="material-symbols-outlined text-primary">hub</span>
                             Command Center
                         </h2>
-                        <p className="text-sm text-slate-500 mt-0.5">Your funnel performance at a glance</p>
+                        <p className="text-sm text-[var(--sys-text-muted)] mt-0.5">Your funnel performance at a glance</p>
                     </div>
                     <div className="flex items-center gap-2">
                         <button onClick={() => setShowAIModal(true)}
-                            className="px-5 py-2.5 rounded-xl text-sm font-bold bg-gradient-to-r from-primary to-[#FF7A00] text-white flex items-center gap-2 cursor-pointer hover:shadow-lg hover:shadow-primary/20 transition-all">
+                            className="px-5 py-2.5 rounded-xl text-sm font-bold bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] flex items-center gap-2 cursor-pointer hover:shadow-lg hover:shadow-none transition-all">
                             <span className="material-symbols-outlined text-sm">auto_awesome</span> AI Architect
                         </button>
                     </div>
@@ -1360,15 +1360,15 @@ export default function FunnelStudio() {
                         { label: 'Conversions', value: totalConverted, icon: 'emoji_events', color: '#10b981', subtext: `${avgCvr}% avg CVR` },
                         { label: 'Pipeline Value', value: `${funnels.length > 0 ? '●●●' : '—'}`, icon: 'account_balance', color: '#f59e0b', subtext: 'Open a funnel to see' },
                     ].map(m => (
-                        <div key={m.label} className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.04] hover:border-white/[0.08] transition-all">
+                        <div key={m.label} className="p-4 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:border-[var(--sys-border)] transition-all">
                             <div className="flex items-center gap-2 mb-2">
                                 <div className="size-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${m.color}15` }}>
                                     <span className="material-symbols-outlined text-sm" style={{ color: m.color }}>{m.icon}</span>
                                 </div>
-                                <span className="text-xs text-slate-500 font-medium">{m.label}</span>
+                                <span className="text-xs text-[var(--sys-text-muted)] font-medium">{m.label}</span>
                             </div>
-                            <p className="text-2xl font-bold text-white">{m.value}</p>
-                            <p className="text-[11px] text-slate-600 mt-1">{m.subtext}</p>
+                            <p className="text-2xl font-bold text-[var(--sys-text)]">{m.value}</p>
+                            <p className="text-[11px] text-[var(--sys-text-muted)] mt-1">{m.subtext}</p>
                         </div>
                     ))}
                 </div>
@@ -1392,8 +1392,8 @@ export default function FunnelStudio() {
             {/* ── What To Do Next — Agentic Suggestions ── */}
             {funnels.length > 0 && (
                 <div className="glass-panel rounded-2xl p-5 mb-6">
-                    <h3 className="text-white font-bold text-sm mb-3 flex items-center gap-2">
-                        <span className="material-symbols-outlined text-amber-400">emoji_objects</span>
+                    <h3 className="text-[var(--sys-text)] font-bold text-sm mb-3 flex items-center gap-2">
+                        <span className="material-symbols-outlined text-primary">emoji_objects</span>
                         What To Do Next
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -1410,13 +1410,13 @@ export default function FunnelStudio() {
                                 onClick: () => { if (funnels[0]) { openFunnel(funnels[0]); setTimeout(() => { fetchAutomationRules(funnels[0]._id); setView('automations') }, 100) } } },
                         ].slice(0, 3).map((item, idx) => (
                             <button key={idx} onClick={item.onClick}
-                                className="flex items-start gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/[0.04] hover:bg-white/[0.04] hover:border-white/[0.08] transition-all cursor-pointer text-left">
+                                className="flex items-start gap-3 p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:bg-[var(--sys-surface)] hover:border-[var(--sys-border)] transition-all cursor-pointer text-left">
                                 <div className="size-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5" style={{ backgroundColor: `${item.color}15` }}>
                                     <span className="material-symbols-outlined text-sm" style={{ color: item.color }}>{item.icon}</span>
                                 </div>
                                 <div>
-                                    <p className="text-white text-xs font-bold">{item.text}</p>
-                                    <p className="text-[11px] text-slate-500 mt-0.5">{item.action}</p>
+                                    <p className="text-[var(--sys-text)] text-xs font-bold">{item.text}</p>
+                                    <p className="text-[11px] text-[var(--sys-text-muted)] mt-0.5">{item.action}</p>
                                 </div>
                             </button>
                         ))}
@@ -1427,9 +1427,9 @@ export default function FunnelStudio() {
             {/* ── Your Funnels ── */}
             <div className="mb-6">
                 <div className="flex items-center gap-2 mb-4">
-                    <span className="material-symbols-outlined text-slate-400">list_alt</span>
-                    <h2 className="text-white font-bold text-lg">Your Funnels</h2>
-                    <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-white/[0.06] text-slate-400">{funnels.length}</span>
+                    <span className="material-symbols-outlined text-[var(--sys-text-muted)]">list_alt</span>
+                    <h2 className="text-[var(--sys-text)] font-bold text-lg">Your Funnels</h2>
+                    <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-[var(--sys-surface)] text-[var(--sys-text-muted)]">{funnels.length}</span>
                 </div>
 
                 {loading ? (
@@ -1441,15 +1441,15 @@ export default function FunnelStudio() {
                         <div className="size-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
                             <span className="material-symbols-outlined text-3xl text-primary">rocket_launch</span>
                         </div>
-                        <p className="text-white font-bold text-lg mb-2">Create Your First Funnel</p>
-                        <p className="text-slate-500 text-sm mb-6 max-w-md mx-auto">Choose a template below or use AI Architect to build a custom sales funnel tailored to your brand.</p>
+                        <p className="text-[var(--sys-text)] font-bold text-lg mb-2">Create Your First Funnel</p>
+                        <p className="text-[var(--sys-text-muted)] text-sm mb-6 max-w-md mx-auto">Choose a template below or use AI Architect to build a custom sales funnel tailored to your brand.</p>
                         <div className="flex gap-3 justify-center">
                             <button onClick={() => setShowAIModal(true)}
-                                className="px-6 py-3 rounded-xl text-sm font-bold bg-gradient-to-r from-primary to-[#FF7A00] text-white flex items-center gap-2 cursor-pointer hover:shadow-lg hover:shadow-primary/20 transition-all">
+                                className="px-6 py-3 rounded-xl text-sm font-bold bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] flex items-center gap-2 cursor-pointer hover:shadow-lg hover:shadow-none transition-all">
                                 <span className="material-symbols-outlined text-sm">auto_awesome</span> AI Architect
                             </button>
                             <button onClick={() => setShowTemplates(true)}
-                                className="px-6 py-3 rounded-xl text-sm font-bold text-white bg-white/[0.06] border border-white/[0.08] flex items-center gap-2 cursor-pointer hover:bg-white/[0.1] transition-all">
+                                className="px-6 py-3 rounded-xl text-sm font-bold text-[var(--sys-text)] bg-[var(--sys-surface)] border border-[var(--sys-border)] flex items-center gap-2 cursor-pointer hover:bg-[var(--sys-surface)] transition-all">
                                 <span className="material-symbols-outlined text-sm">dashboard_customize</span> Browse Templates
                             </button>
                         </div>
@@ -1462,7 +1462,7 @@ export default function FunnelStudio() {
                                 <div key={f._id} onClick={() => openFunnel(f)}
                                     className="glass-panel rounded-2xl p-5 hover:border-primary/20 hover:bg-primary/[0.02] transition-all cursor-pointer group relative overflow-hidden">
                                     {/* Gradient Accent */}
-                                    <div className="absolute top-0 left-0 right-0 h-1 rounded-t-2xl" style={{ background: `linear-gradient(90deg, ${f.color || '#6366f1'}, ${f.color || '#6366f1'}50)` }} />
+                                    <div className="absolute top-0 left-0 right-0 h-1 rounded-t-2xl" style={{ background: `var(--sys-primary)` }} />
 
                                     {/* Top Row */}
                                     <div className="flex items-center justify-between mb-3 mt-1">
@@ -1471,8 +1471,8 @@ export default function FunnelStudio() {
                                                 <span className="material-symbols-outlined text-lg" style={{ color: f.color }}>{f.icon || 'filter_alt'}</span>
                                             </div>
                                             <div>
-                                                <p className="text-white font-bold text-sm">{f.name}</p>
-                                                <p className="text-xs text-slate-500">{f.stages?.length || 0} stages</p>
+                                                <p className="text-[var(--sys-text)] font-bold text-sm">{f.name}</p>
+                                                <p className="text-xs text-[var(--sys-text-muted)]">{f.stages?.length || 0} stages</p>
                                             </div>
                                         </div>
                                         <span className="px-2.5 py-1 rounded-lg text-xs font-bold" style={{ backgroundColor: statusStyle.bg, color: statusStyle.color }}>
@@ -1493,27 +1493,27 @@ export default function FunnelStudio() {
                                     {/* Metrics Row */}
                                     <div className="grid grid-cols-4 gap-2 text-center mb-3">
                                         <div>
-                                            <p className="text-lg font-bold text-white">{f.metrics?.totalEntries || 0}</p>
-                                            <p className="text-xs text-slate-600 uppercase">Total</p>
+                                            <p className="text-lg font-bold text-[var(--sys-text)]">{f.metrics?.totalEntries || 0}</p>
+                                            <p className="text-xs text-[var(--sys-text-muted)] uppercase">Total</p>
                                         </div>
                                         <div>
-                                            <p className="text-lg font-bold text-white">{f.metrics?.activeEntries || 0}</p>
-                                            <p className="text-xs text-slate-600 uppercase">Active</p>
+                                            <p className="text-lg font-bold text-[var(--sys-text)]">{f.metrics?.activeEntries || 0}</p>
+                                            <p className="text-xs text-[var(--sys-text-muted)] uppercase">Active</p>
                                         </div>
                                         <div>
-                                            <p className="text-lg font-bold text-emerald-400">{f.metrics?.convertedEntries || 0}</p>
-                                            <p className="text-xs text-slate-600 uppercase">Won</p>
+                                            <p className="text-lg font-bold text-primary">{f.metrics?.convertedEntries || 0}</p>
+                                            <p className="text-xs text-[var(--sys-text-muted)] uppercase">Won</p>
                                         </div>
                                         <div>
                                             <p className="text-lg font-bold text-primary">{f.metrics?.conversionRate || 0}%</p>
-                                            <p className="text-xs text-slate-600 uppercase">CVR</p>
+                                            <p className="text-xs text-[var(--sys-text-muted)] uppercase">CVR</p>
                                         </div>
                                     </div>
 
                                     {/* Actions */}
                                     <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                         <button onClick={(e) => { e.stopPropagation(); openAnalytics(f) }}
-                                            className="flex-1 py-1.5 rounded-lg text-xs font-bold text-slate-400 hover:text-white hover:bg-white/[0.06] transition-all cursor-pointer flex items-center justify-center gap-1">
+                                            className="flex-1 py-1.5 rounded-lg text-xs font-bold text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)] transition-all cursor-pointer flex items-center justify-center gap-1">
                                             <span className="material-symbols-outlined text-xs">analytics</span> Analytics
                                         </button>
                                         <button onClick={(e) => duplicateFunnel(f._id, e)} disabled={duplicating === f._id}
@@ -1522,11 +1522,11 @@ export default function FunnelStudio() {
                                         </button>
                                         <button onClick={(e) => toggleFunnelStatus(f._id, f.status, e)}
                                             className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1 ${f.status === 'active'
-                                                ? 'text-amber-400 hover:bg-amber-500/10' : 'text-emerald-400 hover:bg-emerald-500/10'}`}>
+                                                ? 'text-primary hover:bg-[var(--sys-primary-dim)]' : 'text-primary hover:bg-[var(--sys-primary-dim)]'}`}>
                                             {f.status === 'active' ? '⏸ Pause' : '▶ Activate'}
                                         </button>
                                         <button onClick={(e) => deleteFunnel(f._id, e)}
-                                            className="size-8 rounded-lg flex items-center justify-center text-slate-600 hover:text-rose-400 hover:bg-rose-500/10 transition-all cursor-pointer">
+                                            className="size-8 rounded-lg flex items-center justify-center text-[var(--sys-text-muted)] hover:text-primary hover:bg-[var(--sys-primary-dim)] transition-all cursor-pointer">
                                             <span className="material-symbols-outlined text-sm">delete</span>
                                         </button>
                                     </div>
@@ -1540,13 +1540,13 @@ export default function FunnelStudio() {
             {/* ── Templates — Collapsible ── */}
             <div className="glass-panel rounded-2xl overflow-hidden">
                 <button onClick={() => setShowTemplates(!showTemplates)}
-                    className="w-full flex items-center justify-between p-5 hover:bg-white/[0.02] transition-all cursor-pointer">
+                    className="w-full flex items-center justify-between p-5 hover:bg-[var(--sys-surface)] transition-all cursor-pointer">
                     <div className="flex items-center gap-2">
                         <span className="material-symbols-outlined text-primary">dashboard_customize</span>
-                        <span className="text-white font-bold text-sm">Funnel Templates</span>
-                        <span className="text-xs text-slate-500">Quick-start with proven templates</span>
+                        <span className="text-[var(--sys-text)] font-bold text-sm">Funnel Templates</span>
+                        <span className="text-xs text-[var(--sys-text-muted)]">Quick-start with proven templates</span>
                     </div>
-                    <span className={`material-symbols-outlined text-slate-500 transition-transform ${showTemplates ? 'rotate-180' : ''}`}>expand_more</span>
+                    <span className={`material-symbols-outlined text-[var(--sys-text-muted)] transition-transform ${showTemplates ? 'rotate-180' : ''}`}>expand_more</span>
                 </button>
                 {(showTemplates || funnels.length === 0) && (
                     <div className="px-5 pb-5 pt-0">
@@ -1558,9 +1558,9 @@ export default function FunnelStudio() {
                                         style={{ backgroundColor: `${t.color}20` }}>
                                         <span className="material-symbols-outlined text-xl" style={{ color: t.color }}>{t.icon}</span>
                                     </div>
-                                    <p className="text-white font-bold text-sm mb-1">{t.name}</p>
-                                    <p className="text-slate-500 text-xs leading-relaxed line-clamp-2">{t.description}</p>
-                                    <div className="flex items-center gap-2 mt-3 text-xs text-slate-600">
+                                    <p className="text-[var(--sys-text)] font-bold text-sm mb-1">{t.name}</p>
+                                    <p className="text-[var(--sys-text-muted)] text-xs leading-relaxed line-clamp-2">{t.description}</p>
+                                    <div className="flex items-center gap-2 mt-3 text-xs text-[var(--sys-text-muted)]">
                                         <span>{t.stages.length} stages</span>
                                     </div>
                                     {creatingTemplate === t.id && (
@@ -1597,17 +1597,17 @@ function AddEntryModal({ stages, onSubmit, onClose }) {
     const [dealValue, setDealValue] = useState('')
 
     return (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center" onClick={onClose}>
-            <div className="bg-[#1a1f35] rounded-2xl border border-white/[0.08] w-[480px] max-h-[85vh] overflow-auto shadow-2xl" onClick={e => e.stopPropagation()}>
-                <div className="flex items-center justify-between p-5 border-b border-white/[0.06]">
+        <div className="fixed inset-0 bg-[var(--sys-surface)] z-50 flex items-center justify-center" onClick={onClose}>
+            <div className="bg-[#1a1f35] rounded-2xl border border-[var(--sys-border)] w-[480px] max-h-[85vh] overflow-auto shadow-2xl" onClick={e => e.stopPropagation()}>
+                <div className="flex items-center justify-between p-5 border-b border-[var(--sys-border)]">
                     <div>
-                        <h3 className="text-white font-bold text-base flex items-center gap-2">
+                        <h3 className="text-[var(--sys-text)] font-bold text-base flex items-center gap-2">
                             <span className="material-symbols-outlined text-primary text-lg">person_add</span>
                             Add Lead
                         </h3>
-                        <p className="text-slate-500 text-xs mt-0.5">Add a new lead or contact to this funnel</p>
+                        <p className="text-[var(--sys-text-muted)] text-xs mt-0.5">Add a new lead or contact to this funnel</p>
                     </div>
-                    <button onClick={onClose} className="size-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/[0.06] transition-all cursor-pointer">
+                    <button onClick={onClose} className="size-8 rounded-lg flex items-center justify-center text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)] transition-all cursor-pointer">
                         <span className="material-symbols-outlined text-sm">close</span>
                     </button>
                 </div>
@@ -1619,41 +1619,41 @@ function AddEntryModal({ stages, onSubmit, onClose }) {
                         { label: 'Company', value: company, onChange: setCompany, placeholder: 'Company name', type: 'text' },
                     ].map(f => (
                         <div key={f.label}>
-                            <label className="block text-xs text-slate-400 font-bold uppercase tracking-wider mb-1.5">{f.label}</label>
+                            <label className="block text-xs text-[var(--sys-text-muted)] font-bold uppercase tracking-wider mb-1.5">{f.label}</label>
                             <input type={f.type} value={f.value} onChange={e => f.onChange(e.target.value)} placeholder={f.placeholder}
-                                className="w-full bg-white/[0.04] border border-white/[0.06] rounded-xl px-3 py-2.5 text-white text-sm outline-none focus:border-primary/30 transition-all placeholder-slate-600" />
+                                className="w-full bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl px-3 py-2.5 text-[var(--sys-text)] text-sm outline-none focus:border-primary/30 transition-all placeholder-slate-600" />
                         </div>
                     ))}
                     <div className="grid grid-cols-2 gap-3">
                         <div>
-                            <label className="block text-xs text-slate-400 font-bold uppercase tracking-wider mb-1.5">Source</label>
+                            <label className="block text-xs text-[var(--sys-text-muted)] font-bold uppercase tracking-wider mb-1.5">Source</label>
                             <select value={source} onChange={e => setSource(e.target.value)}
-                                className="w-full bg-white/[0.04] border border-white/[0.06] rounded-xl px-3 py-2.5 text-white text-sm outline-none focus:border-primary/30 transition-all">
+                                className="w-full bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl px-3 py-2.5 text-[var(--sys-text)] text-sm outline-none focus:border-primary/30 transition-all">
                                 {['manual', 'ad', 'seo', 'social', 'linkedin', 'website', 'telephonic', 'dm', 'direct', 'referral', 'email', 'shopify', 'other'].map(s => (
                                     <option key={s} value={s}>{s[0].toUpperCase() + s.slice(1)}</option>
                                 ))}
                             </select>
                         </div>
                         <div>
-                            <label className="block text-xs text-slate-400 font-bold uppercase tracking-wider mb-1.5">Stage</label>
+                            <label className="block text-xs text-[var(--sys-text-muted)] font-bold uppercase tracking-wider mb-1.5">Stage</label>
                             <select value={stage} onChange={e => setStage(e.target.value)}
-                                className="w-full bg-white/[0.04] border border-white/[0.06] rounded-xl px-3 py-2.5 text-white text-sm outline-none focus:border-primary/30 transition-all">
+                                className="w-full bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl px-3 py-2.5 text-[var(--sys-text)] text-sm outline-none focus:border-primary/30 transition-all">
                                 {stages.map(s => <option key={s.name} value={s.name}>{s.name}</option>)}
                             </select>
                         </div>
                     </div>
                     <div>
-                        <label className="block text-xs text-slate-400 font-bold uppercase tracking-wider mb-1.5">Deal Value (₹)</label>
+                        <label className="block text-xs text-[var(--sys-text-muted)] font-bold uppercase tracking-wider mb-1.5">Deal Value (₹)</label>
                         <input type="number" value={dealValue} onChange={e => setDealValue(e.target.value)} placeholder="e.g. 50000"
-                            className="w-full bg-white/[0.04] border border-white/[0.06] rounded-xl px-3 py-2.5 text-white text-sm outline-none focus:border-primary/30 transition-all placeholder-slate-600" />
+                            className="w-full bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl px-3 py-2.5 text-[var(--sys-text)] text-sm outline-none focus:border-primary/30 transition-all placeholder-slate-600" />
                     </div>
                     <div>
-                        <label className="block text-xs text-slate-400 font-bold uppercase tracking-wider mb-1.5">Lead Score: <span className="text-primary">{score}</span></label>
+                        <label className="block text-xs text-[var(--sys-text-muted)] font-bold uppercase tracking-wider mb-1.5">Lead Score: <span className="text-primary">{score}</span></label>
                         <input type="range" min={0} max={100} value={score} onChange={e => setScore(parseInt(e.target.value))}
                             className="w-full accent-primary" />
                     </div>
                     <button onClick={() => onSubmit({ name, email, phone, company, source, score, stage, dealValue: dealValue ? parseInt(dealValue) : undefined })}
-                        className="w-full py-3 rounded-xl text-sm font-bold bg-gradient-to-r from-primary to-[#FF7A00] text-white cursor-pointer hover:shadow-lg hover:shadow-primary/20 transition-all flex items-center justify-center gap-2 mt-2">
+                        className="w-full py-3 rounded-xl text-sm font-bold bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] cursor-pointer hover:shadow-lg hover:shadow-none transition-all flex items-center justify-center gap-2 mt-2">
                         <span className="material-symbols-outlined text-sm">person_add</span> Add Lead
                     </button>
                 </div>
@@ -1680,32 +1680,32 @@ function AIGenerateModal({ brandId, onCreated, onClose }) {
     }
 
     return (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center" onClick={onClose}>
-            <div className="bg-[#1a1f35] rounded-2xl border border-white/[0.08] w-[520px] max-h-[85vh] overflow-auto shadow-2xl" onClick={e => e.stopPropagation()}>
-                <div className="flex items-center justify-between p-5 border-b border-white/[0.06]">
+        <div className="fixed inset-0 bg-[var(--sys-surface)] z-50 flex items-center justify-center" onClick={onClose}>
+            <div className="bg-[#1a1f35] rounded-2xl border border-[var(--sys-border)] w-[520px] max-h-[85vh] overflow-auto shadow-2xl" onClick={e => e.stopPropagation()}>
+                <div className="flex items-center justify-between p-5 border-b border-[var(--sys-border)]">
                     <div>
-                        <h3 className="text-white font-bold text-base flex items-center gap-2">
-                            <span className="material-symbols-outlined text-amber-400 text-lg">auto_awesome</span>
+                        <h3 className="text-[var(--sys-text)] font-bold text-base flex items-center gap-2">
+                            <span className="material-symbols-outlined text-primary text-lg">auto_awesome</span>
                             AI Funnel Architect
                         </h3>
-                        <p className="text-slate-500 text-xs mt-0.5">Describe your goal and AI will design the perfect funnel</p>
+                        <p className="text-[var(--sys-text-muted)] text-xs mt-0.5">Describe your goal and AI will design the perfect funnel</p>
                     </div>
-                    <button onClick={onClose} className="size-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/[0.06] transition-all cursor-pointer">
+                    <button onClick={onClose} className="size-8 rounded-lg flex items-center justify-center text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)] transition-all cursor-pointer">
                         <span className="material-symbols-outlined text-sm">close</span>
                     </button>
                 </div>
                 <div className="p-5 space-y-4">
                     <div>
-                        <label className="block text-xs text-slate-400 font-bold uppercase tracking-wider mb-1.5">What do you want to achieve?</label>
+                        <label className="block text-xs text-[var(--sys-text-muted)] font-bold uppercase tracking-wider mb-1.5">What do you want to achieve?</label>
                         <textarea value={prompt} onChange={e => setPrompt(e.target.value)}
                             placeholder="e.g. I'm launching a new organic skincare line for Gen Z women. Create a funnel to generate leads through Instagram, nurture them with educational content about clean beauty, and convert them to first-time buyers with a launch discount."
                             rows={5}
-                            className="w-full bg-white/[0.04] border border-white/[0.06] rounded-xl px-3 py-3 text-white text-sm outline-none focus:border-primary/30 transition-all placeholder-slate-600 resize-none leading-relaxed" />
+                            className="w-full bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl px-3 py-3 text-[var(--sys-text)] text-sm outline-none focus:border-primary/30 transition-all placeholder-slate-600 resize-none leading-relaxed" />
                     </div>
 
                     {/* Suggestion chips */}
                     <div>
-                        <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-2">Quick Ideas:</p>
+                        <p className="text-xs text-[var(--sys-text-muted)] font-bold uppercase tracking-wider mb-2">Quick Ideas:</p>
                         <div className="flex flex-wrap gap-1.5">
                             {[
                                 'SaaS free trial to paid conversion',
@@ -1724,7 +1724,7 @@ function AIGenerateModal({ brandId, onCreated, onClose }) {
                     </div>
 
                     <button onClick={handleGenerate} disabled={generating || !prompt.trim()}
-                        className={`w-full py-3 rounded-xl text-sm font-bold text-white cursor-pointer flex items-center justify-center gap-2 transition-all ${generating ? 'bg-slate-600 cursor-not-allowed' : 'bg-gradient-to-r from-primary to-[#FF7A00] hover:shadow-lg hover:shadow-primary/20'} disabled:opacity-50`}>
+                        className={`w-full py-3 rounded-xl text-sm font-bold text-[var(--sys-text)] cursor-pointer flex items-center justify-center gap-2 transition-all ${generating ? 'bg-[var(--sys-border)] cursor-not-allowed' : 'bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:shadow-lg hover:shadow-none'} disabled:opacity-50`}>
                         {generating ? (
                             <><span className="material-symbols-outlined text-sm animate-spin">progress_activity</span> Generating funnel...</>
                         ) : (
@@ -1818,17 +1818,17 @@ function FunnelBuilderView({ funnel, onBack, saveStages }) {
             <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
                     <button onClick={onBack}
-                        className="size-10 rounded-xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center hover:bg-white/[0.08] transition-all cursor-pointer">
-                        <span className="material-symbols-outlined text-slate-400">arrow_back</span>
+                        className="size-10 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] flex items-center justify-center hover:bg-[var(--sys-surface)] transition-all cursor-pointer">
+                        <span className="material-symbols-outlined text-[var(--sys-text-muted)]">arrow_back</span>
                     </button>
                     <div>
-                        <h2 className="text-white font-bold text-lg">Edit Funnel Stages</h2>
-                        <p className="text-sm text-slate-500">Drag to reorder · Click to configure · Link Mantram studios</p>
+                        <h2 className="text-[var(--sys-text)] font-bold text-lg">Edit Funnel Stages</h2>
+                        <p className="text-sm text-[var(--sys-text-muted)]">Drag to reorder · Click to configure · Link Mantram studios</p>
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
                     <button onClick={addStage}
-                        className="px-4 py-2 rounded-xl text-sm font-bold text-slate-400 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] transition-all cursor-pointer flex items-center gap-1.5">
+                        className="px-4 py-2 rounded-xl text-sm font-bold text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] bg-[var(--sys-surface)] hover:bg-[var(--sys-surface)] border border-[var(--sys-border)] transition-all cursor-pointer flex items-center gap-1.5">
                         <span className="material-symbols-outlined text-sm">add</span> Add Stage
                     </button>
                     <button onClick={handleSave} disabled={saving}
@@ -1843,10 +1843,10 @@ function FunnelBuilderView({ funnel, onBack, saveStages }) {
             <div className="flex items-center gap-1 mb-6 px-2 overflow-x-auto">
                 {stages.map((s, idx) => (
                     <div key={idx} className="flex items-center gap-1">
-                        <div className="px-3 py-1.5 rounded-lg text-xs font-bold text-white" style={{ backgroundColor: `${s.color}40`, borderBottom: `2px solid ${s.color}` }}>
+                        <div className="px-3 py-1.5 rounded-lg text-xs font-bold text-[var(--sys-text)]" style={{ backgroundColor: `${s.color}40`, borderBottom: `2px solid ${s.color}` }}>
                             {s.name}
                         </div>
-                        {idx < stages.length - 1 && <span className="text-slate-600 text-sm">→</span>}
+                        {idx < stages.length - 1 && <span className="text-[var(--sys-text-muted)] text-sm">→</span>}
                     </div>
                 ))}
             </div>
@@ -1862,7 +1862,7 @@ function FunnelBuilderView({ funnel, onBack, saveStages }) {
                             {/* Stage Header */}
                             <div className="flex items-center justify-between mb-3">
                                 <div className="flex items-center gap-3">
-                                    <div className="flex items-center gap-1 text-slate-600">
+                                    <div className="flex items-center gap-1 text-[var(--sys-text-muted)]">
                                         <span className="material-symbols-outlined text-sm cursor-grab">drag_indicator</span>
                                         <span className="text-xs font-bold">{idx + 1}</span>
                                     </div>
@@ -1870,16 +1870,16 @@ function FunnelBuilderView({ funnel, onBack, saveStages }) {
                                     {isEditing ? (
                                         <input type="text" value={stage.name} onClick={e => e.stopPropagation()}
                                             onChange={e => updateStage(idx, 'name', e.target.value)}
-                                            className="bg-transparent border-b border-primary/40 text-white font-bold text-sm outline-none px-1 py-0.5" />
+                                            className="bg-transparent border-b border-primary/40 text-[var(--sys-text)] font-bold text-sm outline-none px-1 py-0.5" />
                                     ) : (
-                                        <h3 className="text-white font-bold text-sm">{stage.name}</h3>
+                                        <h3 className="text-[var(--sys-text)] font-bold text-sm">{stage.name}</h3>
                                     )}
-                                    <span className="px-2 py-0.5 rounded text-xs bg-white/[0.06] text-slate-500 capitalize">{stage.type}</span>
+                                    <span className="px-2 py-0.5 rounded text-xs bg-[var(--sys-surface)] text-[var(--sys-text-muted)] capitalize">{stage.type}</span>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-sm text-slate-600">{isEditing ? 'expand_less' : 'expand_more'}</span>
+                                    <span className="material-symbols-outlined text-sm text-[var(--sys-text-muted)]">{isEditing ? 'expand_less' : 'expand_more'}</span>
                                     <button onClick={(e) => { e.stopPropagation(); removeStage(idx) }} title="Remove stage"
-                                        className="size-7 rounded-md flex items-center justify-center text-slate-600 hover:text-rose-400 hover:bg-rose-500/10 transition-all cursor-pointer">
+                                        className="size-7 rounded-md flex items-center justify-center text-[var(--sys-text-muted)] hover:text-primary hover:bg-[var(--sys-primary-dim)] transition-all cursor-pointer">
                                         <span className="material-symbols-outlined text-sm">close</span>
                                     </button>
                                 </div>
@@ -1887,10 +1887,10 @@ function FunnelBuilderView({ funnel, onBack, saveStages }) {
 
                             {/* Expanded Edit Panel */}
                             {isEditing && (
-                                <div className="space-y-4 mt-4 pt-4 border-t border-white/[0.06]" onClick={e => e.stopPropagation()}>
+                                <div className="space-y-4 mt-4 pt-4 border-t border-[var(--sys-border)]" onClick={e => e.stopPropagation()}>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
-                                            <label className="block text-xs text-slate-500 font-bold uppercase mb-1">Type</label>
+                                            <label className="block text-xs text-[var(--sys-text-muted)] font-bold uppercase mb-1">Type</label>
                                             <select value={stage.type} onChange={e => updateStage(idx, 'type', e.target.value)}
                                                 style={{ width: '100%', background: '#0f172a', border: '1px solid #334155', borderRadius: '8px', padding: '0.5rem', color: '#e2e8f0', fontSize: '0.8rem', outline: 'none' }}>
                                                 {['awareness', 'interest', 'consideration', 'decision', 'retention', 'custom'].map(t =>
@@ -1899,18 +1899,18 @@ function FunnelBuilderView({ funnel, onBack, saveStages }) {
                                             </select>
                                         </div>
                                         <div>
-                                            <label className="block text-xs text-slate-500 font-bold uppercase mb-1">Color</label>
+                                            <label className="block text-xs text-[var(--sys-text-muted)] font-bold uppercase mb-1">Color</label>
                                             <div className="flex gap-1.5 flex-wrap">
                                                 {STAGE_COLORS.map(c => (
                                                     <button key={c} onClick={() => updateStage(idx, 'color', c)}
-                                                        className={`size-6 rounded-full transition-all cursor-pointer ${stage.color === c ? 'ring-2 ring-white ring-offset-2 ring-offset-slate-900 scale-110' : 'hover:scale-110'}`}
+                                                        className={`size-6 rounded-full transition-all cursor-pointer ${stage.color === c ? 'ring-2 border-[var(--sys-border)]  ring-offset-slate-900 scale-110' : 'hover:scale-110'}`}
                                                         style={{ backgroundColor: c }} />
                                                 ))}
                                             </div>
                                         </div>
                                     </div>
                                     <div>
-                                        <label className="block text-xs text-slate-500 font-bold uppercase mb-1">Description</label>
+                                        <label className="block text-xs text-[var(--sys-text-muted)] font-bold uppercase mb-1">Description</label>
                                         <textarea value={stage.description || ''} onChange={e => updateStage(idx, 'description', e.target.value)}
                                             rows={2} placeholder="What happens at this stage?"
                                             style={{ width: '100%', background: '#0f172a', border: '1px solid #334155', borderRadius: '8px', padding: '0.5rem', color: '#e2e8f0', fontSize: '0.8rem', outline: 'none', resize: 'none', boxSizing: 'border-box' }} />
@@ -1918,7 +1918,7 @@ function FunnelBuilderView({ funnel, onBack, saveStages }) {
 
                                     {/* Studio Links */}
                                     <div>
-                                        <label className="block text-xs text-slate-500 font-bold uppercase mb-2">
+                                        <label className="block text-xs text-[var(--sys-text-muted)] font-bold uppercase mb-2">
                                             <span className="material-symbols-outlined text-xs align-middle mr-1">link</span>
                                             Connected Studios
                                         </label>
@@ -1929,10 +1929,10 @@ function FunnelBuilderView({ funnel, onBack, saveStages }) {
                                                     <button key={studio.key} onClick={() => toggleStudioLink(idx, studio.key)}
                                                         className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer border ${isLinked
                                                             ? 'border-primary/30 bg-primary/[0.06] text-white'
-                                                            : 'border-white/[0.06] bg-transparent text-slate-500 hover:bg-white/[0.04]'}`}>
+                                                            : 'border-[var(--sys-border)] bg-transparent text-[var(--sys-text-muted)] hover:bg-[var(--sys-surface)]'}`}>
                                                         <span className="material-symbols-outlined text-sm" style={{ color: isLinked ? studio.color : '#64748b' }}>{studio.icon}</span>
                                                         {studio.label}
-                                                        {isLinked && <span className="material-symbols-outlined text-xs text-emerald-400 ml-auto">check_circle</span>}
+                                                        {isLinked && <span className="material-symbols-outlined text-xs text-primary ml-auto">check_circle</span>}
                                                     </button>
                                                 )
                                             })}
@@ -2028,42 +2028,42 @@ const SUGGESTION_STYLES = {
 
 function AISuggestionsPanel({ suggestions, loading, onClose }) {
     return (
-        <div className="mt-6 glass-panel rounded-2xl p-5 border-amber-500/10">
+        <div className="mt-6 glass-panel rounded-2xl p-5 border-[var(--sys-border)]">
             <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
-                    <span className="material-symbols-outlined text-amber-400">auto_awesome</span>
-                    <h3 className="text-white font-bold text-sm">AI Optimization Tips</h3>
+                    <span className="material-symbols-outlined text-primary">auto_awesome</span>
+                    <h3 className="text-[var(--sys-text)] font-bold text-sm">AI Optimization Tips</h3>
                 </div>
-                <button onClick={onClose} className="size-7 rounded-md flex items-center justify-center text-slate-500 hover:bg-white/[0.06] cursor-pointer">
+                <button onClick={onClose} className="size-7 rounded-md flex items-center justify-center text-[var(--sys-text-muted)] hover:bg-[var(--sys-surface)] cursor-pointer">
                     <span className="material-symbols-outlined text-sm">close</span>
                 </button>
             </div>
             {loading ? (
-                <div className="flex items-center gap-2 py-6 justify-center text-slate-500">
+                <div className="flex items-center gap-2 py-6 justify-center text-[var(--sys-text-muted)]">
                     <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>
                     Analyzing your funnel...
                 </div>
             ) : !suggestions?.length ? (
-                <p className="text-slate-500 text-sm text-center py-4">No suggestions available</p>
+                <p className="text-[var(--sys-text-muted)] text-sm text-center py-4">No suggestions available</p>
             ) : (
                 <div className="space-y-3">
                     {suggestions.map((s, idx) => {
                         const style = SUGGESTION_STYLES[s.type] || SUGGESTION_STYLES.opportunity
                         const studioInfo = STUDIO_OPTIONS.find(st => st.key === s.studioLink)
                         return (
-                            <div key={idx} className="flex gap-3 p-3 rounded-xl border border-white/[0.04]" style={{ backgroundColor: style.bg }}>
+                            <div key={idx} className="flex gap-3 p-3 rounded-xl border border-[var(--sys-border)]" style={{ backgroundColor: style.bg }}>
                                 <span className="material-symbols-outlined text-lg shrink-0 mt-0.5" style={{ color: style.color }}>{s.icon || style.icon}</span>
                                 <div className="min-w-0">
                                     <div className="flex items-center gap-2 mb-0.5">
-                                        <p className="text-sm text-white font-bold">{s.title}</p>
-                                        <span className={`px-1.5 py-0.5 rounded text-xs font-bold ${s.priority === 'high' ? 'bg-rose-500/10 text-rose-400'
-                                            : s.priority === 'medium' ? 'bg-amber-500/10 text-amber-400' : 'bg-slate-500/10 text-slate-400'}`}>
+                                        <p className="text-sm text-[var(--sys-text)] font-bold">{s.title}</p>
+                                        <span className={`px-1.5 py-0.5 rounded text-xs font-bold ${s.priority === 'high' ? 'bg-[var(--sys-primary-dim)] text-primary'
+                                            : s.priority === 'medium' ? 'bg-[var(--sys-primary-dim)] text-primary' : 'bg-[var(--sys-border)]/10 text-[var(--sys-text-muted)]'}`}>
                                             {s.priority}
                                         </span>
                                     </div>
-                                    <p className="text-xs text-slate-400 leading-relaxed">{s.description}</p>
+                                    <p className="text-xs text-[var(--sys-text-muted)] leading-relaxed">{s.description}</p>
                                     {studioInfo && (
-                                        <div className="flex items-center gap-1 mt-1.5 text-xs text-slate-500">
+                                        <div className="flex items-center gap-1 mt-1.5 text-xs text-[var(--sys-text-muted)]">
                                             <span className="material-symbols-outlined text-xs" style={{ color: studioInfo.color }}>{studioInfo.icon}</span>
                                             Use {studioInfo.label}
                                         </div>
@@ -2143,24 +2143,24 @@ function NurtureView({ funnel, sequences, loading, onBack, onCreate, onAIGenerat
             <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
                     <button onClick={onBack}
-                        className="size-10 rounded-xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center hover:bg-white/[0.08] transition-all cursor-pointer">
-                        <span className="material-symbols-outlined text-slate-400">arrow_back</span>
+                        className="size-10 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] flex items-center justify-center hover:bg-[var(--sys-surface)] transition-all cursor-pointer">
+                        <span className="material-symbols-outlined text-[var(--sys-text-muted)]">arrow_back</span>
                     </button>
                     <div>
-                        <h2 className="text-white font-bold text-lg flex items-center gap-2">
-                            <span className="material-symbols-outlined text-emerald-400">mail</span> Nurture Sequences
+                        <h2 className="text-[var(--sys-text)] font-bold text-lg flex items-center gap-2">
+                            <span className="material-symbols-outlined text-primary">mail</span> Nurture Sequences
                         </h2>
-                        <p className="text-sm text-slate-500">Automated multi-channel follow-ups for each funnel stage</p>
+                        <p className="text-sm text-[var(--sys-text-muted)]">Automated multi-channel follow-ups for each funnel stage</p>
                     </div>
                 </div>
                 <button onClick={onRefresh}
-                    className="px-4 py-2 rounded-xl text-sm font-bold text-slate-400 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] transition-all cursor-pointer flex items-center gap-1.5">
+                    className="px-4 py-2 rounded-xl text-sm font-bold text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] bg-[var(--sys-surface)] hover:bg-[var(--sys-surface)] border border-[var(--sys-border)] transition-all cursor-pointer flex items-center gap-1.5">
                     <span className="material-symbols-outlined text-sm">refresh</span> Refresh
                 </button>
             </div>
 
             {loading ? (
-                <div className="flex items-center gap-2 py-12 justify-center text-slate-500">
+                <div className="flex items-center gap-2 py-12 justify-center text-[var(--sys-text-muted)]">
                     <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>
                     Loading sequences...
                 </div>
@@ -2174,21 +2174,21 @@ function NurtureView({ funnel, sequences, loading, onBack, onCreate, onAIGenerat
                                 <div className="flex items-center justify-between mb-4">
                                     <div className="flex items-center gap-3">
                                         <div className="w-3 h-3 rounded-full" style={{ backgroundColor: stage.color }} />
-                                        <h3 className="text-white font-bold text-sm">{stage.name}</h3>
-                                        <span className="px-2 py-0.5 rounded text-xs bg-white/[0.06] text-slate-500 capitalize">{stage.type}</span>
+                                        <h3 className="text-[var(--sys-text)] font-bold text-sm">{stage.name}</h3>
+                                        <span className="px-2 py-0.5 rounded text-xs bg-[var(--sys-surface)] text-[var(--sys-text-muted)] capitalize">{stage.type}</span>
                                         {stageSeqs.length > 0 && (
-                                            <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-400">
+                                            <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-[var(--sys-primary-dim)] text-primary">
                                                 {stageSeqs.length} sequence{stageSeqs.length > 1 ? 's' : ''}
                                             </span>
                                         )}
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <button onClick={() => handleQuickCreate(stage.name)}
-                                            className="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-400 hover:text-white hover:bg-white/[0.06] transition-all cursor-pointer flex items-center gap-1">
+                                            className="px-3 py-1.5 rounded-lg text-xs font-bold text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)] transition-all cursor-pointer flex items-center gap-1">
                                             <span className="material-symbols-outlined text-xs">add</span> Quick
                                         </button>
                                         <button onClick={() => setAiGenStage(stage.name)}
-                                            className="px-3 py-1.5 rounded-lg text-xs font-bold text-amber-400 hover:text-amber-300 hover:bg-amber-500/10 transition-all cursor-pointer flex items-center gap-1">
+                                            className="px-3 py-1.5 rounded-lg text-xs font-bold text-primary hover:text-[var(--sys-primary)] hover:bg-[var(--sys-primary-dim)] transition-all cursor-pointer flex items-center gap-1">
                                             <span className="material-symbols-outlined text-xs">auto_awesome</span> AI Generate
                                         </button>
                                     </div>
@@ -2196,24 +2196,24 @@ function NurtureView({ funnel, sequences, loading, onBack, onCreate, onAIGenerat
 
                                 {/* Sequences for this stage */}
                                 {stageSeqs.length === 0 ? (
-                                    <p className="text-slate-600 text-xs italic py-2">No nurture sequences — add one to automate follow-ups</p>
+                                    <p className="text-[var(--sys-text-muted)] text-xs italic py-2">No nurture sequences — add one to automate follow-ups</p>
                                 ) : (
                                     <div className="space-y-3">
                                         {stageSeqs.map(seq => {
                                             const isExpanded = expandedSeq === seq._id
                                             return (
-                                                <div key={seq._id} className={`rounded-xl border transition-all ${seq.status === 'active' ? 'border-emerald-500/20 bg-emerald-500/[0.02]' : 'border-white/[0.06] bg-white/[0.02]'}`}>
+                                                <div key={seq._id} className={`rounded-xl border transition-all ${seq.status === 'active' ? 'border-[var(--sys-border)] bg-[var(--sys-surface)]/[0.02]' : 'border-[var(--sys-border)] bg-[var(--sys-surface)]'}`}>
                                                     {/* Sequence Header */}
                                                     <div className="flex items-center justify-between p-3 cursor-pointer" onClick={() => setExpandedSeq(isExpanded ? null : seq._id)}>
                                                         <div className="flex items-center gap-3 min-w-0">
-                                                            <div className={`size-8 rounded-lg flex items-center justify-center ${seq.status === 'active' ? 'bg-emerald-500/10' : 'bg-white/[0.04]'}`}>
-                                                                <span className={`material-symbols-outlined text-sm ${seq.status === 'active' ? 'text-emerald-400' : 'text-slate-500'}`}>
+                                                            <div className={`size-8 rounded-lg flex items-center justify-center ${seq.status === 'active' ? 'bg-[var(--sys-primary-dim)]' : 'bg-[var(--sys-surface)]'}`}>
+                                                                <span className={`material-symbols-outlined text-sm ${seq.status === 'active' ? 'text-primary' : 'text-[var(--sys-text-muted)]'}`}>
                                                                     {seq.status === 'active' ? 'play_circle' : 'pause_circle'}
                                                                 </span>
                                                             </div>
                                                             <div className="min-w-0">
-                                                                <p className="text-sm text-white font-bold truncate">{seq.name}</p>
-                                                                <p className="text-xs text-slate-500">{seq.steps?.length || 0} steps · {TRIGGER_LABELS[seq.triggerEvent] || seq.triggerEvent}</p>
+                                                                <p className="text-sm text-[var(--sys-text)] font-bold truncate">{seq.name}</p>
+                                                                <p className="text-xs text-[var(--sys-text-muted)]">{seq.steps?.length || 0} steps · {TRIGGER_LABELS[seq.triggerEvent] || seq.triggerEvent}</p>
                                                             </div>
                                                         </div>
                                                         <div className="flex items-center gap-2 shrink-0">
@@ -2228,22 +2228,22 @@ function NurtureView({ funnel, sequences, loading, onBack, onCreate, onAIGenerat
                                                                     )
                                                                 })}
                                                             </div>
-                                                            {seq.aiGenerated && <span className="material-symbols-outlined text-xs text-amber-400" title="AI generated">auto_awesome</span>}
+                                                            {seq.aiGenerated && <span className="material-symbols-outlined text-xs text-primary" title="AI generated">auto_awesome</span>}
                                                             <button onClick={(e) => { e.stopPropagation(); onToggle(seq._id) }}
-                                                                className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all cursor-pointer ${seq.status === 'active' ? 'bg-amber-500/10 text-amber-400 hover:bg-amber-500/15' : 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/15'}`}>
+                                                                className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all cursor-pointer ${seq.status === 'active' ? 'bg-[var(--sys-primary-dim)] text-primary hover:bg-[var(--sys-primary-dim)]' : 'bg-[var(--sys-primary-dim)] text-primary hover:bg-[var(--sys-primary-dim)]'}`}>
                                                                 {seq.status === 'active' ? 'Pause' : 'Activate'}
                                                             </button>
                                                             <button onClick={(e) => { e.stopPropagation(); onDelete(seq._id) }}
-                                                                className="size-7 rounded-md flex items-center justify-center text-slate-600 hover:text-rose-400 hover:bg-rose-500/10 transition-all cursor-pointer">
+                                                                className="size-7 rounded-md flex items-center justify-center text-[var(--sys-text-muted)] hover:text-primary hover:bg-[var(--sys-primary-dim)] transition-all cursor-pointer">
                                                                 <span className="material-symbols-outlined text-sm">delete</span>
                                                             </button>
-                                                            <span className="material-symbols-outlined text-sm text-slate-600">{isExpanded ? 'expand_less' : 'expand_more'}</span>
+                                                            <span className="material-symbols-outlined text-sm text-[var(--sys-text-muted)]">{isExpanded ? 'expand_less' : 'expand_more'}</span>
                                                         </div>
                                                     </div>
 
                                                     {/* Expanded: Step Timeline */}
                                                     {isExpanded && (
-                                                        <div className="px-4 pb-4 border-t border-white/[0.04]">
+                                                        <div className="px-4 pb-4 border-t border-[var(--sys-border)]">
                                                             <div className="relative mt-3">
                                                                 {seq.steps?.map((step, sIdx) => {
                                                                     const chMeta = CHANNEL_META[step.channel] || CHANNEL_META.dm
@@ -2254,30 +2254,30 @@ function NurtureView({ funnel, sequences, loading, onBack, onCreate, onAIGenerat
                                                                         <div key={sIdx} className="flex gap-3 mb-3 last:mb-0">
                                                                             {/* Timeline dot + line */}
                                                                             <div className="flex flex-col items-center">
-                                                                                <div className="size-7 rounded-full flex items-center justify-center border-2 shrink-0" style={{ borderColor: chMeta.color, backgroundColor: `${chMeta.color}15` }}>
+                                                                                <div className="size-7 rounded-full flex items-center justify-center border shrink-0" style={{ borderColor: chMeta.color, backgroundColor: `${chMeta.color}15` }}>
                                                                                     <span className="material-symbols-outlined text-xs" style={{ color: chMeta.color }}>{chMeta.icon}</span>
                                                                                 </div>
-                                                                                {sIdx < seq.steps.length - 1 && <div className="w-px flex-1 bg-white/[0.08] my-1" />}
+                                                                                {sIdx < seq.steps.length - 1 && <div className="w-px flex-1 bg-[var(--sys-surface)] my-1" />}
                                                                             </div>
                                                                             {/* Step content */}
                                                                             <div className="flex-1 min-w-0 pb-2">
                                                                                 <div className="flex items-center gap-2 mb-1">
-                                                                                    <p className="text-sm text-white font-bold">{step.name || `Step ${sIdx + 1}`}</p>
+                                                                                    <p className="text-sm text-[var(--sys-text)] font-bold">{step.name || `Step ${sIdx + 1}`}</p>
                                                                                     <span className="px-1.5 py-0.5 rounded text-xs font-bold" style={{ backgroundColor: `${chMeta.color}15`, color: chMeta.color }}>{chMeta.label}</span>
-                                                                                    <span className="text-xs text-slate-600">⏱ {delayLabel}</span>
+                                                                                    <span className="text-xs text-[var(--sys-text-muted)]">⏱ {delayLabel}</span>
                                                                                 </div>
-                                                                                {step.subject && <p className="text-xs text-slate-400 mb-0.5">📌 {step.subject}</p>}
-                                                                                <p className="text-xs text-slate-500 leading-relaxed line-clamp-2">{step.content}</p>
+                                                                                {step.subject && <p className="text-xs text-[var(--sys-text-muted)] mb-0.5">📌 {step.subject}</p>}
+                                                                                <p className="text-xs text-[var(--sys-text-muted)] leading-relaxed line-clamp-2">{step.content}</p>
                                                                                 {(step.onComplete?.moveToStage || step.onComplete?.addTag || step.onComplete?.updateScore) && (
                                                                                     <div className="flex gap-2 mt-1.5">
                                                                                         {step.onComplete.moveToStage && (
                                                                                             <span className="px-1.5 py-0.5 rounded text-xs bg-primary/10 text-primary">→ {step.onComplete.moveToStage}</span>
                                                                                         )}
                                                                                         {step.onComplete.addTag && (
-                                                                                            <span className="px-1.5 py-0.5 rounded text-xs bg-amber-500/10 text-amber-400">🏷 {step.onComplete.addTag}</span>
+                                                                                            <span className="px-1.5 py-0.5 rounded text-xs bg-[var(--sys-primary-dim)] text-primary">🏷 {step.onComplete.addTag}</span>
                                                                                         )}
                                                                                         {step.onComplete.updateScore > 0 && (
-                                                                                            <span className="px-1.5 py-0.5 rounded text-xs bg-emerald-500/10 text-emerald-400">+{step.onComplete.updateScore} pts</span>
+                                                                                            <span className="px-1.5 py-0.5 rounded text-xs bg-[var(--sys-primary-dim)] text-primary">+{step.onComplete.updateScore} pts</span>
                                                                                         )}
                                                                                     </div>
                                                                                 )}
@@ -2288,12 +2288,12 @@ function NurtureView({ funnel, sequences, loading, onBack, onCreate, onAIGenerat
                                                             </div>
                                                             {/* Sequence Stats */}
                                                             {seq.metrics && seq.metrics.totalRuns > 0 && (
-                                                                <div className="flex gap-4 mt-3 pt-3 border-t border-white/[0.04]">
-                                                                    <div className="text-center"><p className="text-sm text-white font-bold">{seq.metrics.totalRuns}</p><p className="text-xs text-slate-600">Runs</p></div>
-                                                                    <div className="text-center"><p className="text-sm text-white font-bold">{seq.metrics.totalSent}</p><p className="text-xs text-slate-600">Sent</p></div>
-                                                                    <div className="text-center"><p className="text-sm text-white font-bold">{seq.metrics.totalOpened}</p><p className="text-xs text-slate-600">Opened</p></div>
-                                                                    <div className="text-center"><p className="text-sm text-white font-bold">{seq.metrics.totalReplied}</p><p className="text-xs text-slate-600">Replied</p></div>
-                                                                    <div className="text-center"><p className="text-sm text-emerald-400 font-bold">{seq.metrics.conversionRate}%</p><p className="text-xs text-slate-600">Conv.</p></div>
+                                                                <div className="flex gap-4 mt-3 pt-3 border-t border-[var(--sys-border)]">
+                                                                    <div className="text-center"><p className="text-sm text-[var(--sys-text)] font-bold">{seq.metrics.totalRuns}</p><p className="text-xs text-[var(--sys-text-muted)]">Runs</p></div>
+                                                                    <div className="text-center"><p className="text-sm text-[var(--sys-text)] font-bold">{seq.metrics.totalSent}</p><p className="text-xs text-[var(--sys-text-muted)]">Sent</p></div>
+                                                                    <div className="text-center"><p className="text-sm text-[var(--sys-text)] font-bold">{seq.metrics.totalOpened}</p><p className="text-xs text-[var(--sys-text-muted)]">Opened</p></div>
+                                                                    <div className="text-center"><p className="text-sm text-[var(--sys-text)] font-bold">{seq.metrics.totalReplied}</p><p className="text-xs text-[var(--sys-text-muted)]">Replied</p></div>
+                                                                    <div className="text-center"><p className="text-sm text-primary font-bold">{seq.metrics.conversionRate}%</p><p className="text-xs text-[var(--sys-text-muted)]">Conv.</p></div>
                                                                 </div>
                                                             )}
                                                         </div>
@@ -2331,7 +2331,7 @@ function NurtureView({ funnel, sequences, loading, onBack, onCreate, onAIGenerat
                                         <button key={key}
                                             onClick={() => setAiChannels(prev => prev.includes(key) ? prev.filter(c => c !== key) : [...prev, key])}
                                             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer border ${aiChannels.includes(key)
-                                                ? 'border-primary/30 bg-primary/[0.06] text-white' : 'border-white/[0.06] text-slate-500 hover:bg-white/[0.04]'}`}>
+                                                ? 'border-primary/30 bg-primary/[0.06] text-white' : 'border-[var(--sys-border)] text-[var(--sys-text-muted)] hover:bg-[var(--sys-surface)]'}`}>
                                             <span className="material-symbols-outlined text-xs" style={{ color: aiChannels.includes(key) ? meta.color : '#64748b' }}>{meta.icon}</span>
                                             {meta.label}
                                         </button>
@@ -2367,85 +2367,85 @@ function HealthDashboardView({ funnel, health, loading, scoringResult, scoringLo
         <div>
             <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
-                    <button onClick={onBack} className="size-10 rounded-xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center hover:bg-white/[0.08] transition-all cursor-pointer">
-                        <span className="material-symbols-outlined text-slate-400">arrow_back</span>
+                    <button onClick={onBack} className="size-10 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] flex items-center justify-center hover:bg-[var(--sys-surface)] transition-all cursor-pointer">
+                        <span className="material-symbols-outlined text-[var(--sys-text-muted)]">arrow_back</span>
                     </button>
                     <div>
-                        <h2 className="text-white font-bold text-lg flex items-center gap-2">
-                            <span className="material-symbols-outlined text-cyan-400">health_and_safety</span> Funnel Health
+                        <h2 className="text-[var(--sys-text)] font-bold text-lg flex items-center gap-2">
+                            <span className="material-symbols-outlined text-primary">health_and_safety</span> Funnel Health
                         </h2>
-                        <p className="text-sm text-slate-500">Real-time diagnostics and AI-powered recommendations</p>
+                        <p className="text-sm text-[var(--sys-text-muted)]">Real-time diagnostics and AI-powered recommendations</p>
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
                     <button onClick={onRunScoring} disabled={scoringLoading}
-                        className="px-4 py-2 rounded-xl text-sm font-bold text-amber-400 hover:text-amber-300 bg-amber-500/[0.06] hover:bg-amber-500/[0.1] border border-amber-500/10 transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-50">
+                        className="px-4 py-2 rounded-xl text-sm font-bold text-primary hover:text-[var(--sys-primary)] bg-[var(--sys-surface)]/[0.06] hover:bg-[var(--sys-surface)]/[0.1] border border-[var(--sys-border)] transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-50">
                         <span className={`material-symbols-outlined text-sm ${scoringLoading ? 'animate-spin' : ''}`}>{scoringLoading ? 'progress_activity' : 'score'}</span>
                         {scoringLoading ? 'Scoring...' : 'Score Leads'}
                     </button>
-                    <button onClick={onRefresh} className="px-4 py-2 rounded-xl text-sm font-bold text-slate-400 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] transition-all cursor-pointer flex items-center gap-1.5">
+                    <button onClick={onRefresh} className="px-4 py-2 rounded-xl text-sm font-bold text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] bg-[var(--sys-surface)] hover:bg-[var(--sys-surface)] border border-[var(--sys-border)] transition-all cursor-pointer flex items-center gap-1.5">
                         <span className="material-symbols-outlined text-sm">refresh</span> Refresh
                     </button>
                 </div>
             </div>
 
             {loading ? (
-                <div className="flex items-center gap-2 py-12 justify-center text-slate-500">
+                <div className="flex items-center gap-2 py-12 justify-center text-[var(--sys-text-muted)]">
                     <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span> Analyzing funnel health...
                 </div>
             ) : !health ? (
-                <p className="text-slate-500 text-center py-12">Health data not yet loaded</p>
+                <p className="text-[var(--sys-text-muted)] text-center py-12">Health data not yet loaded</p>
             ) : (
                 <div className="space-y-5">
                     {/* Grade + Summary Row */}
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                         <div className="glass-panel rounded-2xl p-6 flex flex-col items-center justify-center">
-                            <div className="size-20 rounded-2xl flex items-center justify-center mb-3 border-2" style={{ borderColor: GRADE_COLORS[health.grade] || '#64748b', backgroundColor: `${GRADE_COLORS[health.grade] || '#64748b'}10` }}>
+                            <div className="size-20 rounded-2xl flex items-center justify-center mb-3 border" style={{ borderColor: GRADE_COLORS[health.grade] || '#64748b', backgroundColor: `${GRADE_COLORS[health.grade] || '#64748b'}10` }}>
                                 <span className="text-4xl font-black" style={{ color: GRADE_COLORS[health.grade] }}>{health.grade}</span>
                             </div>
-                            <p className="text-white font-bold text-sm">Health Score</p>
+                            <p className="text-[var(--sys-text)] font-bold text-sm">Health Score</p>
                             <p className="text-2xl font-black mt-1" style={{ color: GRADE_COLORS[health.grade] }}>{health.overallScore}/100</p>
                         </div>
                         <div className="glass-panel rounded-2xl p-5 flex flex-col justify-center">
-                            <p className="text-slate-500 text-xs uppercase font-bold mb-1">Total Entries</p>
-                            <p className="text-white text-3xl font-black">{health.totalEntries}</p>
+                            <p className="text-[var(--sys-text-muted)] text-xs uppercase font-bold mb-1">Total Entries</p>
+                            <p className="text-[var(--sys-text)] text-3xl font-black">{health.totalEntries}</p>
                         </div>
                         <div className="glass-panel rounded-2xl p-5 flex flex-col justify-center">
-                            <p className="text-slate-500 text-xs uppercase font-bold mb-1">Converted</p>
-                            <p className="text-emerald-400 text-3xl font-black">{health.convertedEntries}</p>
-                            <p className="text-emerald-400/60 text-sm font-bold">{health.conversionRate}% rate</p>
+                            <p className="text-[var(--sys-text-muted)] text-xs uppercase font-bold mb-1">Converted</p>
+                            <p className="text-primary text-3xl font-black">{health.convertedEntries}</p>
+                            <p className="text-primary/60 text-sm font-bold">{health.conversionRate}% rate</p>
                         </div>
                         <div className="glass-panel rounded-2xl p-5 flex flex-col justify-center">
-                            <p className="text-slate-500 text-xs uppercase font-bold mb-1">Lost</p>
-                            <p className="text-rose-400 text-3xl font-black">{health.lostEntries}</p>
+                            <p className="text-[var(--sys-text-muted)] text-xs uppercase font-bold mb-1">Lost</p>
+                            <p className="text-primary text-3xl font-black">{health.lostEntries}</p>
                         </div>
                     </div>
 
                     {/* Stage Health */}
                     <div className="glass-panel rounded-2xl p-6">
-                        <h3 className="text-white font-bold mb-4 flex items-center gap-2">
-                            <span className="material-symbols-outlined text-cyan-400">monitoring</span> Stage-by-Stage Health
+                        <h3 className="text-[var(--sys-text)] font-bold mb-4 flex items-center gap-2">
+                            <span className="material-symbols-outlined text-primary">monitoring</span> Stage-by-Stage Health
                         </h3>
                         <div className="space-y-2">
                             {health.stageHealth?.map((stage, idx) => (
-                                <div key={stage.stageName} className={`flex items-center gap-4 p-3 rounded-xl border ${stage.isBottleneck ? 'border-rose-500/20 bg-rose-500/[0.03]' : stage.isStagnant ? 'border-amber-500/20 bg-amber-500/[0.03]' : 'border-white/[0.04] bg-white/[0.01]'}`}>
+                                <div key={stage.stageName} className={`flex items-center gap-4 p-3 rounded-xl border ${stage.isBottleneck ? 'border-[var(--sys-border)] bg-[var(--sys-surface)]/[0.03]' : stage.isStagnant ? 'border-[var(--sys-border)] bg-[var(--sys-surface)]/[0.03]' : 'border-[var(--sys-border)] bg-[var(--sys-surface)]'}`}>
                                     <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: stage.stageColor }} />
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2">
-                                            <p className="text-sm text-white font-bold">{stage.stageName}</p>
-                                            <span className="text-xs text-slate-500 capitalize">{stage.stageType}</span>
-                                            {stage.isBottleneck && <span className="px-1.5 py-0.5 rounded text-xs font-bold bg-rose-500/10 text-rose-400">🚨 Bottleneck</span>}
-                                            {stage.isStagnant && <span className="px-1.5 py-0.5 rounded text-xs font-bold bg-amber-500/10 text-amber-400">⏳ Stagnant</span>}
+                                            <p className="text-sm text-[var(--sys-text)] font-bold">{stage.stageName}</p>
+                                            <span className="text-xs text-[var(--sys-text-muted)] capitalize">{stage.stageType}</span>
+                                            {stage.isBottleneck && <span className="px-1.5 py-0.5 rounded text-xs font-bold bg-[var(--sys-primary-dim)] text-primary">🚨 Bottleneck</span>}
+                                            {stage.isStagnant && <span className="px-1.5 py-0.5 rounded text-xs font-bold bg-[var(--sys-primary-dim)] text-primary">⏳ Stagnant</span>}
                                         </div>
                                         <div className="flex gap-4 mt-1">
-                                            <span className="text-xs text-slate-400">{stage.activeEntries} active</span>
-                                            <span className="text-xs text-slate-400">{stage.totalEverEntered} total</span>
-                                            <span className="text-xs text-slate-400">{stage.avgTimeHrs}h avg</span>
-                                            <span className="text-xs text-slate-400">{stage.studioLinksCount} links</span>
+                                            <span className="text-xs text-[var(--sys-text-muted)]">{stage.activeEntries} active</span>
+                                            <span className="text-xs text-[var(--sys-text-muted)]">{stage.totalEverEntered} total</span>
+                                            <span className="text-xs text-[var(--sys-text-muted)]">{stage.avgTimeHrs}h avg</span>
+                                            <span className="text-xs text-[var(--sys-text-muted)]">{stage.studioLinksCount} links</span>
                                         </div>
                                     </div>
                                     {idx > 0 && (
-                                        <span className={`text-sm font-bold shrink-0 ${stage.dropOffRate > 50 ? 'text-rose-400' : stage.dropOffRate > 25 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                                        <span className={`text-sm font-bold shrink-0 ${stage.dropOffRate > 50 ? 'text-primary' : stage.dropOffRate > 25 ? 'text-primary' : 'text-primary'}`}>
                                             ↓ {stage.dropOffRate}%
                                         </span>
                                     )}
@@ -2457,11 +2457,11 @@ function HealthDashboardView({ funnel, health, loading, scoringResult, scoringLo
                     {/* Issues + Recommendations */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="glass-panel rounded-2xl p-5">
-                            <h3 className="text-white font-bold mb-3 flex items-center gap-2 text-sm">
-                                <span className="material-symbols-outlined text-rose-400 text-lg">bug_report</span> Issues ({health.issues?.length || 0})
+                            <h3 className="text-[var(--sys-text)] font-bold mb-3 flex items-center gap-2 text-sm">
+                                <span className="material-symbols-outlined text-primary text-lg">bug_report</span> Issues ({health.issues?.length || 0})
                             </h3>
                             {!health.issues?.length ? (
-                                <p className="text-emerald-400 text-sm flex items-center gap-1.5"><span className="material-symbols-outlined text-sm">check_circle</span> No issues!</p>
+                                <p className="text-primary text-sm flex items-center gap-1.5"><span className="material-symbols-outlined text-sm">check_circle</span> No issues!</p>
                             ) : (
                                 <div className="space-y-2">
                                     {health.issues.map((issue, idx) => {
@@ -2469,7 +2469,7 @@ function HealthDashboardView({ funnel, health, loading, scoringResult, scoringLo
                                         return (
                                             <div key={idx} className="flex gap-2 p-2.5 rounded-lg" style={{ backgroundColor: st.bg }}>
                                                 <span className="material-symbols-outlined text-sm shrink-0 mt-0.5" style={{ color: st.color }}>{st.icon}</span>
-                                                <div><p className="text-xs text-white font-bold">{issue.message}</p><p className="text-xs text-slate-500 capitalize">{issue.type.replace(/_/g, ' ')} · {issue.severity}</p></div>
+                                                <div><p className="text-xs text-[var(--sys-text)] font-bold">{issue.message}</p><p className="text-xs text-[var(--sys-text-muted)] capitalize">{issue.type.replace(/_/g, ' ')} · {issue.severity}</p></div>
                                             </div>
                                         )
                                     })}
@@ -2477,21 +2477,21 @@ function HealthDashboardView({ funnel, health, loading, scoringResult, scoringLo
                             )}
                         </div>
                         <div className="glass-panel rounded-2xl p-5">
-                            <h3 className="text-white font-bold mb-3 flex items-center gap-2 text-sm">
-                                <span className="material-symbols-outlined text-amber-400 text-lg">tips_and_updates</span> Recommendations ({health.recommendations?.length || 0})
+                            <h3 className="text-[var(--sys-text)] font-bold mb-3 flex items-center gap-2 text-sm">
+                                <span className="material-symbols-outlined text-primary text-lg">tips_and_updates</span> Recommendations ({health.recommendations?.length || 0})
                             </h3>
                             {!health.recommendations?.length ? (
-                                <p className="text-slate-500 text-sm">No recommendations at this time</p>
+                                <p className="text-[var(--sys-text-muted)] text-sm">No recommendations at this time</p>
                             ) : (
                                 <div className="space-y-2">
                                     {health.recommendations.map((rec, idx) => (
-                                        <div key={idx} className="p-2.5 rounded-lg bg-white/[0.02] border border-white/[0.04]">
+                                        <div key={idx} className="p-2.5 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)]">
                                             <div className="flex items-center gap-2 mb-1">
-                                                <span className="material-symbols-outlined text-xs text-amber-400">lightbulb</span>
-                                                <p className="text-xs text-white font-bold">{rec.action}</p>
-                                                <span className="text-xs text-slate-600">({rec.stage})</span>
+                                                <span className="material-symbols-outlined text-xs text-primary">lightbulb</span>
+                                                <p className="text-xs text-[var(--sys-text)] font-bold">{rec.action}</p>
+                                                <span className="text-xs text-[var(--sys-text-muted)]">({rec.stage})</span>
                                             </div>
-                                            <p className="text-xs text-slate-500">{rec.description}</p>
+                                            <p className="text-xs text-[var(--sys-text-muted)]">{rec.description}</p>
                                         </div>
                                     ))}
                                 </div>
@@ -2502,18 +2502,18 @@ function HealthDashboardView({ funnel, health, loading, scoringResult, scoringLo
                     {/* Lead Scoring Results */}
                     {scoringResult && (
                         <div className="glass-panel rounded-2xl p-6">
-                            <h3 className="text-white font-bold mb-4 flex items-center gap-2">
-                                <span className="material-symbols-outlined text-amber-400">score</span> Lead Scoring
-                                <span className="text-xs text-slate-500 font-normal ml-2">{scoringResult.scored} scored</span>
+                            <h3 className="text-[var(--sys-text)] font-bold mb-4 flex items-center gap-2">
+                                <span className="material-symbols-outlined text-primary">score</span> Lead Scoring
+                                <span className="text-xs text-[var(--sys-text-muted)] font-normal ml-2">{scoringResult.scored} scored</span>
                             </h3>
                             <div className="flex gap-3 mb-4">
-                                <div className="flex-1 p-3 rounded-xl bg-rose-500/[0.06] border border-rose-500/10 text-center">
-                                    <p className="text-rose-400 text-2xl font-black">{scoringResult.summary?.hot || 0}</p>
-                                    <p className="text-rose-400/60 text-xs font-bold"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">local_fire_department</span> Hot (70+)</p>
+                                <div className="flex-1 p-3 rounded-xl bg-[var(--sys-surface)]/[0.06] border border-[var(--sys-border)] text-center">
+                                    <p className="text-primary text-2xl font-black">{scoringResult.summary?.hot || 0}</p>
+                                    <p className="text-primary/60 text-xs font-bold"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">local_fire_department</span> Hot (70+)</p>
                                 </div>
-                                <div className="flex-1 p-3 rounded-xl bg-amber-500/[0.06] border border-amber-500/10 text-center">
-                                    <p className="text-amber-400 text-2xl font-black">{scoringResult.summary?.warm || 0}</p>
-                                    <p className="text-amber-400/60 text-xs font-bold">🌡️ Warm (40-69)</p>
+                                <div className="flex-1 p-3 rounded-xl bg-[var(--sys-surface)]/[0.06] border border-[var(--sys-border)] text-center">
+                                    <p className="text-primary text-2xl font-black">{scoringResult.summary?.warm || 0}</p>
+                                    <p className="text-primary/60 text-xs font-bold">🌡️ Warm (40-69)</p>
                                 </div>
                                 <div className="flex-1 p-3 rounded-xl bg-[#FF4D00]/[0.06] border border-[#FF4D00]/10 text-center">
                                     <p className="text-[#FF4D00] text-2xl font-black">{scoringResult.summary?.cold || 0}</p>
@@ -2522,17 +2522,17 @@ function HealthDashboardView({ funnel, health, loading, scoringResult, scoringLo
                             </div>
                             <div className="space-y-1.5">
                                 {scoringResult.entries?.slice(0, 10).map((entry, idx) => (
-                                    <div key={idx} className="flex items-center gap-3 p-2 rounded-lg bg-white/[0.02]">
+                                    <div key={idx} className="flex items-center gap-3 p-2 rounded-lg bg-[var(--sys-surface)]">
                                         <div className="size-8 rounded-full flex items-center justify-center text-xs font-black" style={{
                                             backgroundColor: entry.newScore >= 70 ? '#ef444415' : entry.newScore >= 40 ? '#f59e0b15' : '#3b82f615',
                                             color: entry.newScore >= 70 ? '#ef4444' : entry.newScore >= 40 ? '#f59e0b' : '#3b82f6'
                                         }}>{entry.newScore}</div>
                                         <div className="flex-1 min-w-0">
-                                            <p className="text-sm text-white font-bold truncate">{entry.name}</p>
-                                            <p className="text-xs text-slate-500">{entry.stage} · {entry.signals?.slice(0, 2).join(', ')}</p>
+                                            <p className="text-sm text-[var(--sys-text)] font-bold truncate">{entry.name}</p>
+                                            <p className="text-xs text-[var(--sys-text-muted)]">{entry.stage} · {entry.signals?.slice(0, 2).join(', ')}</p>
                                         </div>
                                         {entry.previousScore !== entry.newScore && (
-                                            <span className={`text-xs font-bold ${entry.newScore > entry.previousScore ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                            <span className={`text-xs font-bold ${entry.newScore > entry.previousScore ? 'text-primary' : 'text-primary'}`}>
                                                 {entry.newScore > entry.previousScore ? '▲' : '▼'} {Math.abs(entry.newScore - entry.previousScore)}
                                             </span>
                                         )}
@@ -2580,40 +2580,40 @@ function LandingPagesView({ funnel, pages, loading, onBack, onRefresh, onCreate,
         <div>
             <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
-                    <button onClick={onBack} className="size-10 rounded-xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center hover:bg-white/[0.08] transition-all cursor-pointer">
-                        <span className="material-symbols-outlined text-slate-400">arrow_back</span>
+                    <button onClick={onBack} className="size-10 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] flex items-center justify-center hover:bg-[var(--sys-surface)] transition-all cursor-pointer">
+                        <span className="material-symbols-outlined text-[var(--sys-text-muted)]">arrow_back</span>
                     </button>
                     <div>
-                        <h2 className="text-white font-bold text-lg flex items-center gap-2">
+                        <h2 className="text-[var(--sys-text)] font-bold text-lg flex items-center gap-2">
                             <span className="material-symbols-outlined text-[#FF4D00]">web</span> Landing Pages
                         </h2>
-                        <p className="text-sm text-slate-500">Capture leads with branded landing pages and forms</p>
+                        <p className="text-sm text-[var(--sys-text-muted)]">Capture leads with branded landing pages and forms</p>
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
-                    <button onClick={handleQuickCreate} className="px-4 py-2 rounded-xl text-sm font-bold text-slate-400 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] transition-all cursor-pointer flex items-center gap-1.5">
+                    <button onClick={handleQuickCreate} className="px-4 py-2 rounded-xl text-sm font-bold text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] bg-[var(--sys-surface)] hover:bg-[var(--sys-surface)] border border-[var(--sys-border)] transition-all cursor-pointer flex items-center gap-1.5">
                         <span className="material-symbols-outlined text-sm">add</span> Quick Page
                     </button>
-                    <button onClick={() => setShowAiGen(true)} className="px-4 py-2 rounded-xl text-sm font-bold text-amber-400 hover:text-amber-300 bg-amber-500/[0.06] hover:bg-amber-500/[0.1] border border-amber-500/10 transition-all cursor-pointer flex items-center gap-1.5">
+                    <button onClick={() => setShowAiGen(true)} className="px-4 py-2 rounded-xl text-sm font-bold text-primary hover:text-[var(--sys-primary)] bg-[var(--sys-surface)]/[0.06] hover:bg-[var(--sys-surface)]/[0.1] border border-[var(--sys-border)] transition-all cursor-pointer flex items-center gap-1.5">
                         <span className="material-symbols-outlined text-sm">auto_awesome</span> AI Generate
                     </button>
-                    <button onClick={onRefresh} className="px-4 py-2 rounded-xl text-sm font-bold text-slate-400 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] transition-all cursor-pointer flex items-center gap-1.5">
+                    <button onClick={onRefresh} className="px-4 py-2 rounded-xl text-sm font-bold text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] bg-[var(--sys-surface)] hover:bg-[var(--sys-surface)] border border-[var(--sys-border)] transition-all cursor-pointer flex items-center gap-1.5">
                         <span className="material-symbols-outlined text-sm">refresh</span>
                     </button>
                 </div>
             </div>
 
             {loading ? (
-                <div className="flex items-center gap-2 py-12 justify-center text-slate-500">
+                <div className="flex items-center gap-2 py-12 justify-center text-[var(--sys-text-muted)]">
                     <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span> Loading pages...
                 </div>
             ) : pages.length === 0 ? (
                 <div className="glass-panel rounded-2xl p-10 text-center">
-                    <span className="material-symbols-outlined text-5xl text-slate-600 mb-3">web</span>
-                    <p className="text-white font-bold mb-1">No Landing Pages Yet</p>
-                    <p className="text-slate-500 text-sm mb-4">Create a branded landing page to capture leads into your funnel</p>
+                    <span className="material-symbols-outlined text-5xl text-[var(--sys-text-muted)] mb-3">web</span>
+                    <p className="text-[var(--sys-text)] font-bold mb-1">No Landing Pages Yet</p>
+                    <p className="text-[var(--sys-text-muted)] text-sm mb-4">Create a branded landing page to capture leads into your funnel</p>
                     <div className="flex gap-3 justify-center">
-                        <button onClick={handleQuickCreate} className="px-5 py-2.5 rounded-xl text-sm font-bold text-white bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.08] transition-all cursor-pointer flex items-center gap-1.5">
+                        <button onClick={handleQuickCreate} className="px-5 py-2.5 rounded-xl text-sm font-bold text-[var(--sys-text)] bg-[var(--sys-surface)] hover:bg-[var(--sys-surface)] border border-[var(--sys-border)] transition-all cursor-pointer flex items-center gap-1.5">
                             <span className="material-symbols-outlined text-sm">add</span> Create Page
                         </button>
                         <button onClick={() => setShowAiGen(true)} className="px-5 py-2.5 rounded-xl text-sm font-bold btn-primary flex items-center gap-1.5 cursor-pointer">
@@ -2624,36 +2624,36 @@ function LandingPagesView({ funnel, pages, loading, onBack, onRefresh, onCreate,
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {pages.map(page => (
-                        <div key={page._id} className="glass-panel rounded-2xl overflow-hidden hover:border-white/[0.1] transition-all">
+                        <div key={page._id} className="glass-panel rounded-2xl overflow-hidden hover:border-[var(--sys-border)] transition-all">
                             <div className="h-28 relative flex items-center justify-center" style={{ backgroundColor: page.style?.primaryColor ? `${page.style.primaryColor}15` : '#6366f115' }}>
                                 <div className="text-center px-4">
-                                    <p className="text-white font-bold text-sm truncate">{page.sections?.[0]?.content?.headline || page.name}</p>
-                                    <p className="text-slate-400 text-xs truncate mt-0.5">{page.sections?.[0]?.content?.subheadline || ''}</p>
+                                    <p className="text-[var(--sys-text)] font-bold text-sm truncate">{page.sections?.[0]?.content?.headline || page.name}</p>
+                                    <p className="text-[var(--sys-text-muted)] text-xs truncate mt-0.5">{page.sections?.[0]?.content?.subheadline || ''}</p>
                                 </div>
-                                <span className={`absolute top-2 right-2 px-2 py-0.5 rounded text-xs font-bold ${page.status === 'published' ? 'bg-emerald-500/10 text-emerald-400' : page.status === 'archived' ? 'bg-slate-500/10 text-slate-400' : 'bg-amber-500/10 text-amber-400'}`}>{page.status}</span>
+                                <span className={`absolute top-2 right-2 px-2 py-0.5 rounded text-xs font-bold ${page.status === 'published' ? 'bg-[var(--sys-primary-dim)] text-primary' : page.status === 'archived' ? 'bg-[var(--sys-border)]/10 text-[var(--sys-text-muted)]' : 'bg-[var(--sys-primary-dim)] text-primary'}`}>{page.status}</span>
                             </div>
                             <div className="p-4">
-                                <p className="text-white font-bold text-sm truncate">{page.name}</p>
-                                <p className="text-slate-500 text-xs mt-0.5">/{page.slug}</p>
+                                <p className="text-[var(--sys-text)] font-bold text-sm truncate">{page.name}</p>
+                                <p className="text-[var(--sys-text-muted)] text-xs mt-0.5">/{page.slug}</p>
                                 <div className="flex items-center gap-3 mt-2">
-                                    <span className="text-xs text-slate-400">→ {page.targetStage}</span>
-                                    {page.aiGenerated && <span className="material-symbols-outlined text-xs text-amber-400">auto_awesome</span>}
+                                    <span className="text-xs text-[var(--sys-text-muted)]">→ {page.targetStage}</span>
+                                    {page.aiGenerated && <span className="material-symbols-outlined text-xs text-primary">auto_awesome</span>}
                                 </div>
-                                <div className="flex gap-3 mt-3 pt-3 border-t border-white/[0.04]">
-                                    <div><p className="text-white text-sm font-bold">{page.metrics?.views || 0}</p><p className="text-xs text-slate-600">Views</p></div>
-                                    <div><p className="text-white text-sm font-bold">{page.metrics?.submissions || 0}</p><p className="text-xs text-slate-600">Leads</p></div>
-                                    <div><p className="text-emerald-400 text-sm font-bold">{page.metrics?.conversionRate || 0}%</p><p className="text-xs text-slate-600">Conv.</p></div>
+                                <div className="flex gap-3 mt-3 pt-3 border-t border-[var(--sys-border)]">
+                                    <div><p className="text-[var(--sys-text)] text-sm font-bold">{page.metrics?.views || 0}</p><p className="text-xs text-[var(--sys-text-muted)]">Views</p></div>
+                                    <div><p className="text-[var(--sys-text)] text-sm font-bold">{page.metrics?.submissions || 0}</p><p className="text-xs text-[var(--sys-text-muted)]">Leads</p></div>
+                                    <div><p className="text-primary text-sm font-bold">{page.metrics?.conversionRate || 0}%</p><p className="text-xs text-[var(--sys-text-muted)]">Conv.</p></div>
                                 </div>
                                 <div className="flex gap-1 mt-3">
                                     {page.sections?.map((s, idx) => (
-                                        <span key={idx} className="size-6 rounded flex items-center justify-center bg-white/[0.04]" title={s.type}>
-                                            <span className="material-symbols-outlined text-xs text-slate-500">{SECTION_ICONS[s.type] || 'article'}</span>
+                                        <span key={idx} className="size-6 rounded flex items-center justify-center bg-[var(--sys-surface)]" title={s.type}>
+                                            <span className="material-symbols-outlined text-xs text-[var(--sys-text-muted)]">{SECTION_ICONS[s.type] || 'article'}</span>
                                         </span>
                                     ))}
                                     {page.form?.enabled && <span className="size-6 rounded flex items-center justify-center bg-[#FF4D00]/10"><span className="material-symbols-outlined text-xs text-[#FF4D00]">description</span></span>}
                                 </div>
                                 <div className="flex gap-2 mt-3">
-                                    <button onClick={() => onDelete(page._id)} className="size-7 rounded-md flex items-center justify-center text-slate-600 hover:text-rose-400 hover:bg-rose-500/10 transition-all cursor-pointer">
+                                    <button onClick={() => onDelete(page._id)} className="size-7 rounded-md flex items-center justify-center text-[var(--sys-text-muted)] hover:text-primary hover:bg-[var(--sys-primary-dim)] transition-all cursor-pointer">
                                         <span className="material-symbols-outlined text-sm">delete</span>
                                     </button>
                                 </div>
@@ -2862,44 +2862,44 @@ function HelpDocumentationView({ onBack }) {
             <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
                     <button onClick={onBack}
-                        className="size-10 rounded-xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center hover:bg-white/[0.08] transition-all cursor-pointer">
-                        <span className="material-symbols-outlined text-slate-400">arrow_back</span>
+                        className="size-10 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] flex items-center justify-center hover:bg-[var(--sys-surface)] transition-all cursor-pointer">
+                        <span className="material-symbols-outlined text-[var(--sys-text-muted)]">arrow_back</span>
                     </button>
                     <div>
-                        <h2 className="text-white font-bold text-lg flex items-center gap-2">
+                        <h2 className="text-[var(--sys-text)] font-bold text-lg flex items-center gap-2">
                             <span className="material-symbols-outlined text-primary">menu_book</span>
                             Funnel Studio Guide
                         </h2>
-                        <p className="text-sm text-slate-500">Everything you need to build, manage, and optimize your sales funnels</p>
+                        <p className="text-sm text-[var(--sys-text-muted)]">Everything you need to build, manage, and optimize your sales funnels</p>
                     </div>
                 </div>
             </div>
 
             {/* Quick Overview */}
-            <div className="glass-panel rounded-2xl p-6 mb-6" style={{ background: 'linear-gradient(135deg, #6366f108, #8b5cf608, #06b6d408)' }}>
-                <h3 className="text-white font-bold mb-3 flex items-center gap-2">
+            <div className="glass-panel rounded-2xl p-6 mb-6" style={{ background: 'var(--sys-primary)' }}>
+                <h3 className="text-[var(--sys-text)] font-bold mb-3 flex items-center gap-2">
                     <span className="material-symbols-outlined text-primary">info</span> What is Funnel Studio?
                 </h3>
-                <p className="text-slate-400 text-sm leading-relaxed mb-4">
-                    Funnel Studio is your complete sales funnel management system. Start at the <strong className="text-white">Command Center dashboard</strong> for an intelligence-first overview of all your funnels.
-                    Open any funnel to access the <strong className="text-white">tabbed pipeline view</strong> with 4 organized tabs:
-                    <strong className="text-white"> Pipeline</strong> (Kanban board with enhanced lead cards),
-                    <strong className="text-white"> Intelligence</strong> (health, analytics, forecasts, lead scoring),
-                    <strong className="text-white"> Engage</strong> (automations, nurture, landing pages, activity feed), and
-                    <strong className="text-white"> Configure</strong> (stage builder, webhooks).
-                    Everything is connected to your Brand DNA, with <strong className="text-white">Fidato AI</strong> available at every step.
+                <p className="text-[var(--sys-text-muted)] text-sm leading-relaxed mb-4">
+                    Funnel Studio is your complete sales funnel management system. Start at the <strong className="text-[var(--sys-text)]">Command Center dashboard</strong> for an intelligence-first overview of all your funnels.
+                    Open any funnel to access the <strong className="text-[var(--sys-text)]">tabbed pipeline view</strong> with 4 organized tabs:
+                    <strong className="text-[var(--sys-text)]"> Pipeline</strong> (Kanban board with enhanced lead cards),
+                    <strong className="text-[var(--sys-text)]"> Intelligence</strong> (health, analytics, forecasts, lead scoring),
+                    <strong className="text-[var(--sys-text)]"> Engage</strong> (automations, nurture, landing pages, activity feed), and
+                    <strong className="text-[var(--sys-text)]"> Configure</strong> (stage builder, webhooks).
+                    Everything is connected to your Brand DNA, with <strong className="text-[var(--sys-text)]">Fidato AI</strong> available at every step.
                 </p>
                 <div className="flex flex-wrap gap-2">
                     {['Command Center', 'Tabbed Navigation', 'AI Architect', 'Kanban Pipeline', 'Score Rings', 'Deal Values', 'Automation Rules', 'Nurture Sequences', 'Lead Scoring', 'Landing Pages', 'Studio Links', 'Fidato AI'].map(tag => (
-                        <span key={tag} className="px-3 py-1 rounded-full text-xs font-bold bg-white/[0.04] border border-white/[0.06] text-slate-400">{tag}</span>
+                        <span key={tag} className="px-3 py-1 rounded-full text-xs font-bold bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text-muted)]">{tag}</span>
                     ))}
                 </div>
             </div>
 
             {/* Workflow Diagram */}
             <div className="glass-panel rounded-2xl p-5 mb-6">
-                <h3 className="text-white font-bold mb-4 text-sm flex items-center gap-2">
-                    <span className="material-symbols-outlined text-amber-400 text-lg">account_tree</span> Typical Workflow
+                <h3 className="text-[var(--sys-text)] font-bold mb-4 text-sm flex items-center gap-2">
+                    <span className="material-symbols-outlined text-primary text-lg">account_tree</span> Typical Workflow
                 </h3>
                 <div className="flex items-center gap-0 overflow-x-auto pb-2">
                     {[
@@ -2918,7 +2918,7 @@ function HelpDocumentationView({ onBack }) {
                                 <div className="size-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${step.color}15` }}>
                                     <span className="material-symbols-outlined text-lg" style={{ color: step.color }}>{step.icon}</span>
                                 </div>
-                                <p className="text-xs text-slate-400 text-center leading-tight font-medium">{step.label}</p>
+                                <p className="text-xs text-[var(--sys-text-muted)] text-center leading-tight font-medium">{step.label}</p>
                             </div>
                             {idx < arr.length - 1 && (
                                 <span className="material-symbols-outlined text-slate-700 text-sm mx-1 shrink-0">chevron_right</span>
@@ -2934,21 +2934,21 @@ function HelpDocumentationView({ onBack }) {
                     <div key={section.id} className="glass-panel rounded-2xl overflow-hidden">
                         <button
                             onClick={() => setExpanded(expanded === section.id ? null : section.id)}
-                            className="w-full flex items-center gap-3 p-5 text-left hover:bg-white/[0.02] transition-all cursor-pointer"
+                            className="w-full flex items-center gap-3 p-5 text-left hover:bg-[var(--sys-surface)] transition-all cursor-pointer"
                         >
                             <div className="size-10 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: `${section.color}15` }}>
                                 <span className="material-symbols-outlined" style={{ color: section.color }}>{section.icon}</span>
                             </div>
                             <div className="flex-1 min-w-0">
-                                <p className="text-white font-bold text-sm">{section.title}</p>
-                                <p className="text-slate-500 text-xs">{section.subtitle}</p>
+                                <p className="text-[var(--sys-text)] font-bold text-sm">{section.title}</p>
+                                <p className="text-[var(--sys-text-muted)] text-xs">{section.subtitle}</p>
                             </div>
-                            <span className="text-xs text-slate-600 font-bold mr-1">{section.steps.length} topics</span>
-                            <span className={`material-symbols-outlined text-slate-500 transition-transform ${expanded === section.id ? 'rotate-180' : ''}`}>expand_more</span>
+                            <span className="text-xs text-[var(--sys-text-muted)] font-bold mr-1">{section.steps.length} topics</span>
+                            <span className={`material-symbols-outlined text-[var(--sys-text-muted)] transition-transform ${expanded === section.id ? 'rotate-180' : ''}`}>expand_more</span>
                         </button>
 
                         {expanded === section.id && (
-                            <div className="px-5 pb-5 space-y-3 border-t border-white/[0.04] pt-4">
+                            <div className="px-5 pb-5 space-y-3 border-t border-[var(--sys-border)] pt-4">
                                 {section.steps.map((step, idx) => (
                                     <div key={idx} className="flex gap-3">
                                         <div className="flex flex-col items-center">
@@ -2958,8 +2958,8 @@ function HelpDocumentationView({ onBack }) {
                                             {idx < section.steps.length - 1 && <div className="w-px flex-1 mt-1" style={{ backgroundColor: `${section.color}20` }} />}
                                         </div>
                                         <div className="pb-3">
-                                            <p className="text-white font-bold text-sm mb-0.5">{step.title}</p>
-                                            <p className="text-slate-400 text-xs leading-relaxed">{step.description}</p>
+                                            <p className="text-[var(--sys-text)] font-bold text-sm mb-0.5">{step.title}</p>
+                                            <p className="text-[var(--sys-text-muted)] text-xs leading-relaxed">{step.description}</p>
                                         </div>
                                     </div>
                                 ))}
@@ -2970,15 +2970,15 @@ function HelpDocumentationView({ onBack }) {
             </div>
 
             {/* Pro Tips */}
-            <div className="glass-panel rounded-2xl p-6" style={{ background: 'linear-gradient(135deg, #f59e0b08, #ef444408)' }}>
-                <h3 className="text-white font-bold mb-4 flex items-center gap-2">
-                    <span className="material-symbols-outlined text-amber-400">emoji_objects</span> Pro Tips for Maximum Conversions
+            <div className="glass-panel rounded-2xl p-6" style={{ background: 'var(--sys-primary)' }}>
+                <h3 className="text-[var(--sys-text)] font-bold mb-4 flex items-center gap-2">
+                    <span className="material-symbols-outlined text-primary">emoji_objects</span> Pro Tips for Maximum Conversions
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {PRO_TIPS.map((tip, idx) => (
-                        <div key={idx} className="flex gap-2.5 p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
+                        <div key={idx} className="flex gap-2.5 p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
                             <span className="text-lg shrink-0 mt-0.5">{tip.icon}</span>
-                            <p className="text-xs text-slate-400 leading-relaxed">{tip.tip}</p>
+                            <p className="text-xs text-[var(--sys-text-muted)] leading-relaxed">{tip.tip}</p>
                         </div>
                     ))}
                 </div>
@@ -2986,9 +2986,9 @@ function HelpDocumentationView({ onBack }) {
 
             {/* CTA */}
             <div className="text-center mt-6 py-6">
-                <p className="text-slate-500 text-sm mb-3">Ready to get started?</p>
+                <p className="text-[var(--sys-text-muted)] text-sm mb-3">Ready to get started?</p>
                 <button onClick={onBack}
-                    className="px-6 py-3 rounded-xl text-sm font-bold bg-gradient-to-r from-primary to-[#FF7A00] text-white cursor-pointer hover:shadow-lg hover:shadow-primary/20 transition-all flex items-center gap-2 mx-auto">
+                    className="px-6 py-3 rounded-xl text-sm font-bold bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] cursor-pointer hover:shadow-lg hover:shadow-none transition-all flex items-center gap-2 mx-auto">
                     <span className="material-symbols-outlined text-sm">rocket_launch</span> Go to Dashboard
                 </button>
             </div>
@@ -3058,19 +3058,19 @@ function AutomationView({ funnel, rules, loading, running, generating, onBack, o
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                     <button onClick={onBack}
-                        className="size-10 rounded-xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center hover:bg-white/[0.08] transition-all cursor-pointer">
-                        <span className="material-symbols-outlined text-slate-400">arrow_back</span>
+                        className="size-10 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] flex items-center justify-center hover:bg-[var(--sys-surface)] transition-all cursor-pointer">
+                        <span className="material-symbols-outlined text-[var(--sys-text-muted)]">arrow_back</span>
                     </button>
                     <div>
-                        <h2 className="text-white font-bold text-lg flex items-center gap-2">
-                            <span className="material-symbols-outlined text-orange-400">bolt</span> Automation Engine
+                        <h2 className="text-[var(--sys-text)] font-bold text-lg flex items-center gap-2">
+                            <span className="material-symbols-outlined text-[var(--sys-primary)]">bolt</span> Automation Engine
                         </h2>
-                        <p className="text-sm text-slate-500">{enabledCount} active rules · {totalExec} total executions</p>
+                        <p className="text-sm text-[var(--sys-text-muted)]">{enabledCount} active rules · {totalExec} total executions</p>
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
                     <button onClick={onRefresh}
-                        className="px-4 py-2 rounded-xl text-sm font-bold text-slate-400 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] transition-all cursor-pointer flex items-center gap-1.5">
+                        className="px-4 py-2 rounded-xl text-sm font-bold text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] bg-[var(--sys-surface)] hover:bg-[var(--sys-surface)] border border-[var(--sys-border)] transition-all cursor-pointer flex items-center gap-1.5">
                         <span className="material-symbols-outlined text-sm">refresh</span> Refresh
                     </button>
                     <button onClick={() => setShowAiInput(!showAiInput)}
@@ -3078,7 +3078,7 @@ function AutomationView({ funnel, rules, loading, running, generating, onBack, o
                         <span className="material-symbols-outlined text-sm">auto_awesome</span> AI Generate
                     </button>
                     <button onClick={onRunAll} disabled={running}
-                        className="px-4 py-2 rounded-xl text-sm font-bold text-amber-400 hover:text-amber-300 bg-amber-500/[0.06] hover:bg-amber-500/[0.1] border border-amber-500/10 transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-50">
+                        className="px-4 py-2 rounded-xl text-sm font-bold text-primary hover:text-[var(--sys-primary)] bg-[var(--sys-surface)]/[0.06] hover:bg-[var(--sys-surface)]/[0.1] border border-[var(--sys-border)] transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-50">
                         <span className={`material-symbols-outlined text-sm ${running ? 'animate-spin' : ''}`}>
                             {running ? 'progress_activity' : 'play_arrow'}
                         </span> {running ? 'Running...' : 'Run All'}
@@ -3092,22 +3092,22 @@ function AutomationView({ funnel, rules, loading, running, generating, onBack, o
 
             {/* AI Generation Input */}
             {showAiInput && (
-                <div className="glass-panel rounded-2xl p-5" style={{ background: 'linear-gradient(135deg, #8b5cf610, #6366f110)' }}>
-                    <h3 className="text-white font-bold text-sm mb-3 flex items-center gap-2">
+                <div className="glass-panel rounded-2xl p-5" style={{ background: 'var(--sys-primary)' }}>
+                    <h3 className="text-[var(--sys-text)] font-bold text-sm mb-3 flex items-center gap-2">
                         <span className="material-symbols-outlined text-[#FF4D00]">auto_awesome</span>
                         AI Auto-Generate Rules
                     </h3>
-                    <p className="text-xs text-slate-500 mb-3">Describe what you want to automate, or leave blank to get smart defaults.</p>
+                    <p className="text-xs text-[var(--sys-text-muted)] mb-3">Describe what you want to automate, or leave blank to get smart defaults.</p>
                     <div className="flex gap-2">
                         <input
                             type="text"
                             value={aiPrompt}
                             onChange={(e) => setAiPrompt(e.target.value)}
                             placeholder="e.g. Auto-move hot leads to Decision stage, flag inactive leads after 7 days..."
-                            className="flex-1 px-4 py-2.5 rounded-xl bg-white/[0.06] border border-white/[0.08] text-white text-sm outline-none focus:border-[#FF4D00]/30 transition-all"
+                            className="flex-1 px-4 py-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm outline-none focus:border-[#FF4D00]/30 transition-all"
                         />
                         <button onClick={handleAIGenerate} disabled={generating}
-                            className="px-5 py-2.5 rounded-xl text-sm font-bold bg-gradient-to-r from-[#FF4D00] to-[#FF7A00] text-white cursor-pointer flex items-center gap-1.5 disabled:opacity-50">
+                            className="px-5 py-2.5 rounded-xl text-sm font-bold bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] cursor-pointer flex items-center gap-1.5 disabled:opacity-50">
                             {generating ? (
                                 <><span className="material-symbols-outlined text-sm animate-spin">progress_activity</span> Generating...</>
                             ) : (
@@ -3120,9 +3120,9 @@ function AutomationView({ funnel, rules, loading, running, generating, onBack, o
 
             {/* Create Rule Form */}
             {showCreate && (
-                <div className="glass-panel rounded-2xl p-6" style={{ background: 'linear-gradient(135deg, #f59e0b08, #ef444408)' }}>
-                    <h3 className="text-white font-bold mb-4 flex items-center gap-2">
-                        <span className="material-symbols-outlined text-orange-400">build</span> Create Automation Rule
+                <div className="glass-panel rounded-2xl p-6" style={{ background: 'var(--sys-primary)' }}>
+                    <h3 className="text-[var(--sys-text)] font-bold mb-4 flex items-center gap-2">
+                        <span className="material-symbols-outlined text-[var(--sys-primary)]">build</span> Create Automation Rule
                     </h3>
                     <div className="space-y-4">
                         {/* Name */}
@@ -3131,19 +3131,19 @@ function AutomationView({ funnel, rules, loading, running, generating, onBack, o
                             value={newRule.name}
                             onChange={(e) => setNewRule({ ...newRule, name: e.target.value })}
                             placeholder="Rule name (e.g. Hot Lead Auto-Advance)"
-                            className="w-full px-4 py-2.5 rounded-xl bg-white/[0.06] border border-white/[0.08] text-white text-sm outline-none focus:border-orange-500/30 transition-all"
+                            className="w-full px-4 py-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm outline-none focus:border-[var(--sys-border)] transition-all"
                         />
 
                         {/* Trigger */}
                         <div>
-                            <label className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-2 block">When (Trigger)</label>
+                            <label className="text-xs text-[var(--sys-text-muted)] font-bold uppercase tracking-wider mb-2 block">When (Trigger)</label>
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                                 {TRIGGER_TYPES.map(t => (
                                     <button key={t.value} onClick={() => setNewRule({ ...newRule, triggerType: t.value, triggerConfig: {} })}
                                         className={`p-3 rounded-xl text-xs font-bold border transition-all cursor-pointer text-left
                                             ${newRule.triggerType === t.value
-                                                ? 'bg-orange-500/10 border-orange-500/30 text-orange-300'
-                                                : 'bg-white/[0.02] border-white/[0.06] text-slate-400 hover:bg-white/[0.04]'}`}>
+                                                ? 'bg-[var(--sys-surface)] border-[var(--sys-border)] text-[var(--sys-primary)]'
+                                                : 'bg-[var(--sys-surface)] border-[var(--sys-border)] text-[var(--sys-text-muted)] hover:bg-[var(--sys-surface)]'}`}>
                                         <span className="material-symbols-outlined text-sm block mb-1">{t.icon}</span>
                                         {t.label}
                                     </button>
@@ -3153,7 +3153,7 @@ function AutomationView({ funnel, rules, loading, running, generating, onBack, o
                             {newRule.triggerType === 'stage_changed' && (
                                 <div className="mt-3 flex gap-2">
                                     <select value={newRule.triggerConfig.toStage || ''} onChange={e => setNewRule({ ...newRule, triggerConfig: { ...newRule.triggerConfig, toStage: e.target.value } })}
-                                        className="flex-1 px-3 py-2 rounded-xl bg-white/[0.06] border border-white/[0.08] text-white text-sm outline-none">
+                                        className="flex-1 px-3 py-2 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm outline-none">
                                         <option value="">Any stage</option>
                                         {funnel.stages?.map(s => <option key={s.name} value={s.name}>{s.name}</option>)}
                                     </select>
@@ -3162,36 +3162,36 @@ function AutomationView({ funnel, rules, loading, running, generating, onBack, o
                             {newRule.triggerType === 'score_threshold' && (
                                 <div className="mt-3 flex gap-2">
                                     <select value={newRule.triggerConfig.scoreDirection || 'above'} onChange={e => setNewRule({ ...newRule, triggerConfig: { ...newRule.triggerConfig, scoreDirection: e.target.value } })}
-                                        className="px-3 py-2 rounded-xl bg-white/[0.06] border border-white/[0.08] text-white text-sm outline-none">
+                                        className="px-3 py-2 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm outline-none">
                                         <option value="above">Score Above</option>
                                         <option value="below">Score Below</option>
                                     </select>
                                     <input type="number" min="0" max="100" placeholder="Threshold" value={newRule.triggerConfig.scoreThreshold || ''}
                                         onChange={e => setNewRule({ ...newRule, triggerConfig: { ...newRule.triggerConfig, scoreThreshold: parseInt(e.target.value) } })}
-                                        className="w-24 px-3 py-2 rounded-xl bg-white/[0.06] border border-white/[0.08] text-white text-sm outline-none" />
+                                        className="w-24 px-3 py-2 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm outline-none" />
                                 </div>
                             )}
                             {newRule.triggerType === 'inactivity' && (
                                 <div className="mt-3 flex items-center gap-2">
-                                    <span className="text-sm text-slate-400">Inactive for</span>
+                                    <span className="text-sm text-[var(--sys-text-muted)]">Inactive for</span>
                                     <input type="number" min="1" max="90" placeholder="7" value={newRule.triggerConfig.inactivityDays || ''}
                                         onChange={e => setNewRule({ ...newRule, triggerConfig: { ...newRule.triggerConfig, inactivityDays: parseInt(e.target.value) } })}
-                                        className="w-20 px-3 py-2 rounded-xl bg-white/[0.06] border border-white/[0.08] text-white text-sm outline-none" />
-                                    <span className="text-sm text-slate-400">days</span>
+                                        className="w-20 px-3 py-2 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm outline-none" />
+                                    <span className="text-sm text-[var(--sys-text-muted)]">days</span>
                                 </div>
                             )}
                         </div>
 
                         {/* Action */}
                         <div>
-                            <label className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-2 block">Then (Action)</label>
+                            <label className="text-xs text-[var(--sys-text-muted)] font-bold uppercase tracking-wider mb-2 block">Then (Action)</label>
                             <div className="grid grid-cols-3 md:grid-cols-5 gap-2">
                                 {ACTION_TYPES.map(a => (
                                     <button key={a.value} onClick={() => setNewRule({ ...newRule, actionType: a.value, actionConfig: {} })}
                                         className={`p-3 rounded-xl text-xs font-bold border transition-all cursor-pointer text-left
                                             ${newRule.actionType === a.value
-                                                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
-                                                : 'bg-white/[0.02] border-white/[0.06] text-slate-400 hover:bg-white/[0.04]'}`}>
+                                                ? 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-[var(--sys-primary)]'
+                                                : 'bg-[var(--sys-surface)] border-[var(--sys-border)] text-[var(--sys-text-muted)] hover:bg-[var(--sys-surface)]'}`}>
                                         <span className="material-symbols-outlined text-sm block mb-1">{a.icon}</span>
                                         {a.label}
                                     </button>
@@ -3200,14 +3200,14 @@ function AutomationView({ funnel, rules, loading, running, generating, onBack, o
                             {/* Action config */}
                             {newRule.actionType === 'move_stage' && (
                                 <select value={newRule.actionConfig.targetStage || ''} onChange={e => setNewRule({ ...newRule, actionConfig: { ...newRule.actionConfig, targetStage: e.target.value } })}
-                                    className="mt-3 w-full px-3 py-2 rounded-xl bg-white/[0.06] border border-white/[0.08] text-white text-sm outline-none">
+                                    className="mt-3 w-full px-3 py-2 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm outline-none">
                                     <option value="">Select target stage</option>
                                     {funnel.stages?.map(s => <option key={s.name} value={s.name}>{s.name}</option>)}
                                 </select>
                             )}
                             {newRule.actionType === 'change_status' && (
                                 <select value={newRule.actionConfig.targetStatus || ''} onChange={e => setNewRule({ ...newRule, actionConfig: { ...newRule.actionConfig, targetStatus: e.target.value } })}
-                                    className="mt-3 w-full px-3 py-2 rounded-xl bg-white/[0.06] border border-white/[0.08] text-white text-sm outline-none">
+                                    className="mt-3 w-full px-3 py-2 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm outline-none">
                                     <option value="">Select status</option>
                                     <option value="active">Active</option>
                                     <option value="converted">Converted</option>
@@ -3218,25 +3218,25 @@ function AutomationView({ funnel, rules, loading, running, generating, onBack, o
                             {newRule.actionType === 'update_score' && (
                                 <input type="number" placeholder="Score change (+10 or -5)" value={newRule.actionConfig.scoreChange || ''}
                                     onChange={e => setNewRule({ ...newRule, actionConfig: { ...newRule.actionConfig, scoreChange: parseInt(e.target.value) } })}
-                                    className="mt-3 w-full px-3 py-2 rounded-xl bg-white/[0.06] border border-white/[0.08] text-white text-sm outline-none" />
+                                    className="mt-3 w-full px-3 py-2 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm outline-none" />
                             )}
                             {(newRule.actionType === 'add_tag' || newRule.actionType === 'remove_tag') && (
                                 <input type="text" placeholder="Tag name" value={newRule.actionConfig.tagName || ''}
                                     onChange={e => setNewRule({ ...newRule, actionConfig: { ...newRule.actionConfig, tagName: e.target.value } })}
-                                    className="mt-3 w-full px-3 py-2 rounded-xl bg-white/[0.06] border border-white/[0.08] text-white text-sm outline-none" />
+                                    className="mt-3 w-full px-3 py-2 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm outline-none" />
                             )}
                             {newRule.actionType === 'send_notification' && (
                                 <input type="text" placeholder="Notification message" value={newRule.actionConfig.notificationMessage || ''}
                                     onChange={e => setNewRule({ ...newRule, actionConfig: { ...newRule.actionConfig, notificationMessage: e.target.value } })}
-                                    className="mt-3 w-full px-3 py-2 rounded-xl bg-white/[0.06] border border-white/[0.08] text-white text-sm outline-none" />
+                                    className="mt-3 w-full px-3 py-2 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm outline-none" />
                             )}
                         </div>
 
                         {/* Create Button */}
                         <div className="flex justify-end gap-2 pt-2">
-                            <button onClick={() => setShowCreate(false)} className="px-4 py-2 rounded-xl text-sm text-slate-400 hover:text-white cursor-pointer">Cancel</button>
+                            <button onClick={() => setShowCreate(false)} className="px-4 py-2 rounded-xl text-sm text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer">Cancel</button>
                             <button onClick={handleCreate}
-                                className="px-5 py-2.5 rounded-xl text-sm font-bold bg-gradient-to-r from-orange-500 to-amber-500 text-white cursor-pointer flex items-center gap-1.5">
+                                className="px-5 py-2.5 rounded-xl text-sm font-bold bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] cursor-pointer flex items-center gap-1.5">
                                 <span className="material-symbols-outlined text-sm">bolt</span> Create Rule
                             </button>
                         </div>
@@ -3247,24 +3247,24 @@ function AutomationView({ funnel, rules, loading, running, generating, onBack, o
             {/* Rules List */}
             {loading ? (
                 <div className="text-center py-12">
-                    <span className="material-symbols-outlined text-4xl text-orange-400 animate-spin">progress_activity</span>
-                    <p className="text-slate-500 mt-3">Loading automations...</p>
+                    <span className="material-symbols-outlined text-4xl text-[var(--sys-primary)] animate-spin">progress_activity</span>
+                    <p className="text-[var(--sys-text-muted)] mt-3">Loading automations...</p>
                 </div>
             ) : rules.length === 0 ? (
                 <div className="glass-panel rounded-2xl p-12 text-center">
-                    <span className="material-symbols-outlined text-5xl text-orange-400/40 mb-4 block">bolt</span>
-                    <h3 className="text-white font-bold text-lg mb-2">No Automation Rules Yet</h3>
-                    <p className="text-slate-500 text-sm mb-6 max-w-lg mx-auto">
+                    <span className="material-symbols-outlined text-5xl text-[var(--sys-primary)] mb-4 block">bolt</span>
+                    <h3 className="text-[var(--sys-text)] font-bold text-lg mb-2">No Automation Rules Yet</h3>
+                    <p className="text-[var(--sys-text-muted)] text-sm mb-6 max-w-lg mx-auto">
                         Automation rules make your funnel self-running. Create rules to auto-move leads, update scores,
                         trigger nurture sequences, and more — all based on real-time behavior.
                     </p>
                     <div className="flex gap-3 justify-center">
                         <button onClick={() => setShowAiInput(true)}
-                            className="px-5 py-2.5 rounded-xl text-sm font-bold bg-gradient-to-r from-[#FF4D00] to-[#FF7A00] text-white cursor-pointer flex items-center gap-1.5">
+                            className="px-5 py-2.5 rounded-xl text-sm font-bold bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] cursor-pointer flex items-center gap-1.5">
                             <span className="material-symbols-outlined text-sm">auto_awesome</span> AI Auto-Generate
                         </button>
                         <button onClick={() => setShowCreate(true)}
-                            className="px-5 py-2.5 rounded-xl text-sm font-bold bg-white/[0.06] border border-white/[0.08] text-white cursor-pointer flex items-center gap-1.5 hover:bg-white/[0.1] transition-all">
+                            className="px-5 py-2.5 rounded-xl text-sm font-bold bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] cursor-pointer flex items-center gap-1.5 hover:bg-[var(--sys-surface)] transition-all">
                             <span className="material-symbols-outlined text-sm">add</span> Create Manually
                         </button>
                     </div>
@@ -3278,7 +3278,7 @@ function AutomationView({ funnel, rules, loading, running, generating, onBack, o
                         return (
                             <div key={rule._id} className={`glass-panel rounded-2xl overflow-hidden transition-all ${rule.enabled ? '' : 'opacity-50'}`}>
                                 {/* Rule Header */}
-                                <div className="p-4 flex items-center justify-between cursor-pointer hover:bg-white/[0.02] transition-all"
+                                <div className="p-4 flex items-center justify-between cursor-pointer hover:bg-[var(--sys-surface)] transition-all"
                                     onClick={() => setExpandedRule(isExpanded ? null : rule._id)}>
                                     <div className="flex items-center gap-3 flex-1">
                                         <div className="size-10 rounded-xl flex items-center justify-center" style={{ background: `${rule.color || '#f59e0b'}15` }}>
@@ -3287,18 +3287,18 @@ function AutomationView({ funnel, rules, loading, running, generating, onBack, o
                                             </span>
                                         </div>
                                         <div className="flex-1 min-w-0">
-                                            <h4 className="text-white font-bold text-sm truncate flex items-center gap-2">
+                                            <h4 className="text-[var(--sys-text)] font-bold text-sm truncate flex items-center gap-2">
                                                 {rule.name}
                                                 {rule.aiGenerated && (
                                                     <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-[#FF4D00]/20 text-[#FF7A00]">AI</span>
                                                 )}
                                             </h4>
-                                            <p className="text-xs text-slate-500 truncate">
-                                                When <span className="text-orange-300">{triggerInfo.label}</span>
+                                            <p className="text-xs text-[var(--sys-text-muted)] truncate">
+                                                When <span className="text-[var(--sys-primary)]">{triggerInfo.label}</span>
                                                 {' → '}
-                                                <span className="text-emerald-300">{rule.actions?.length || 0} action{(rule.actions?.length || 0) !== 1 ? 's' : ''}</span>
+                                                <span className="text-[var(--sys-primary)]">{rule.actions?.length || 0} action{(rule.actions?.length || 0) !== 1 ? 's' : ''}</span>
                                                 {rule.executionCount > 0 && (
-                                                    <span className="ml-2 text-slate-600">· {rule.executionCount} runs</span>
+                                                    <span className="ml-2 text-[var(--sys-text-muted)]">· {rule.executionCount} runs</span>
                                                 )}
                                             </p>
                                         </div>
@@ -3307,15 +3307,15 @@ function AutomationView({ funnel, rules, loading, running, generating, onBack, o
                                         <button onClick={(e) => { e.stopPropagation(); onToggle(rule._id) }}
                                             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer
                                                 ${rule.enabled
-                                                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                                                    : 'bg-white/[0.04] text-slate-500 border border-white/[0.06]'}`}>
+                                                    ? 'bg-[var(--sys-primary-dim)] text-primary border border-[var(--sys-border)]'
+                                                    : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] border border-[var(--sys-border)]'}`}>
                                             {rule.enabled ? 'Active' : 'Paused'}
                                         </button>
                                         <button onClick={(e) => { e.stopPropagation(); onDelete(rule._id) }}
-                                            className="size-8 rounded-lg flex items-center justify-center text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-all cursor-pointer">
+                                            className="size-8 rounded-lg flex items-center justify-center text-[var(--sys-text-muted)] hover:text-primary hover:bg-[var(--sys-primary-dim)] transition-all cursor-pointer">
                                             <span className="material-symbols-outlined text-sm">delete</span>
                                         </button>
-                                        <span className={`material-symbols-outlined text-slate-500 text-sm transition-transform ${isExpanded ? 'rotate-180' : ''}`}>
+                                        <span className={`material-symbols-outlined text-[var(--sys-text-muted)] text-sm transition-transform ${isExpanded ? 'rotate-180' : ''}`}>
                                             expand_more
                                         </span>
                                     </div>
@@ -3323,36 +3323,36 @@ function AutomationView({ funnel, rules, loading, running, generating, onBack, o
 
                                 {/* Expanded Details */}
                                 {isExpanded && (
-                                    <div className="border-t border-white/[0.06] p-4 space-y-4">
+                                    <div className="border-t border-[var(--sys-border)] p-4 space-y-4">
                                         {rule.description && (
-                                            <p className="text-sm text-slate-400">{rule.description}</p>
+                                            <p className="text-sm text-[var(--sys-text-muted)]">{rule.description}</p>
                                         )}
 
                                         {/* Trigger + Actions visual */}
                                         <div className="flex items-start gap-4">
-                                            <div className="flex-1 p-3 rounded-xl bg-orange-500/5 border border-orange-500/10">
-                                                <div className="text-xs text-orange-400 font-bold uppercase tracking-wider mb-1">Trigger</div>
-                                                <div className="flex items-center gap-2 text-sm text-white">
-                                                    <span className="material-symbols-outlined text-orange-400 text-sm">{triggerInfo.icon}</span>
+                                            <div className="flex-1 p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                                                <div className="text-xs text-[var(--sys-primary)] font-bold uppercase tracking-wider mb-1">Trigger</div>
+                                                <div className="flex items-center gap-2 text-sm text-[var(--sys-text)]">
+                                                    <span className="material-symbols-outlined text-[var(--sys-primary)] text-sm">{triggerInfo.icon}</span>
                                                     {triggerInfo.label}
-                                                    {rule.trigger?.toStage && <span className="text-slate-500">→ {rule.trigger.toStage}</span>}
-                                                    {rule.trigger?.scoreThreshold && <span className="text-slate-500">{rule.trigger.scoreDirection} {rule.trigger.scoreThreshold}</span>}
-                                                    {rule.trigger?.inactivityDays && <span className="text-slate-500">{rule.trigger.inactivityDays} days</span>}
+                                                    {rule.trigger?.toStage && <span className="text-[var(--sys-text-muted)]">→ {rule.trigger.toStage}</span>}
+                                                    {rule.trigger?.scoreThreshold && <span className="text-[var(--sys-text-muted)]">{rule.trigger.scoreDirection} {rule.trigger.scoreThreshold}</span>}
+                                                    {rule.trigger?.inactivityDays && <span className="text-[var(--sys-text-muted)]">{rule.trigger.inactivityDays} days</span>}
                                                 </div>
                                             </div>
-                                            <span className="material-symbols-outlined text-slate-600 mt-3">arrow_forward</span>
-                                            <div className="flex-1 p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/10">
-                                                <div className="text-xs text-emerald-400 font-bold uppercase tracking-wider mb-1">Actions</div>
+                                            <span className="material-symbols-outlined text-[var(--sys-text-muted)] mt-3">arrow_forward</span>
+                                            <div className="flex-1 p-3 rounded-xl bg-[var(--sys-primary-dim)] border border-[var(--sys-border)]">
+                                                <div className="text-xs text-primary font-bold uppercase tracking-wider mb-1">Actions</div>
                                                 {rule.actions?.map((a, i) => {
                                                     const aInfo = ACTION_TYPES.find(at => at.value === a.type) || { label: a.type, icon: 'bolt' }
                                                     return (
-                                                        <div key={i} className="flex items-center gap-2 text-sm text-white mb-1">
-                                                            <span className="material-symbols-outlined text-emerald-400 text-sm">{aInfo.icon}</span>
+                                                        <div key={i} className="flex items-center gap-2 text-sm text-[var(--sys-text)] mb-1">
+                                                            <span className="material-symbols-outlined text-primary text-sm">{aInfo.icon}</span>
                                                             {aInfo.label}
-                                                            {a.targetStage && <span className="text-slate-500">→ "{a.targetStage}"</span>}
-                                                            {a.targetStatus && <span className="text-slate-500">→ {a.targetStatus}</span>}
-                                                            {a.scoreChange && <span className="text-slate-500">{a.scoreChange > 0 ? '+' : ''}{a.scoreChange}</span>}
-                                                            {a.tagName && <span className="text-slate-500">"{a.tagName}"</span>}
+                                                            {a.targetStage && <span className="text-[var(--sys-text-muted)]">→ "{a.targetStage}"</span>}
+                                                            {a.targetStatus && <span className="text-[var(--sys-text-muted)]">→ {a.targetStatus}</span>}
+                                                            {a.scoreChange && <span className="text-[var(--sys-text-muted)]">{a.scoreChange > 0 ? '+' : ''}{a.scoreChange}</span>}
+                                                            {a.tagName && <span className="text-[var(--sys-text-muted)]">"{a.tagName}"</span>}
                                                         </div>
                                                     )
                                                 })}
@@ -3362,15 +3362,15 @@ function AutomationView({ funnel, rules, loading, running, generating, onBack, o
                                         {/* Recent Executions */}
                                         {rule.recentExecutions?.length > 0 && (
                                             <div>
-                                                <div className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-2">Recent Executions</div>
+                                                <div className="text-xs text-[var(--sys-text-muted)] font-bold uppercase tracking-wider mb-2">Recent Executions</div>
                                                 <div className="space-y-1 max-h-32 overflow-y-auto">
                                                     {rule.recentExecutions.slice(0, 5).map((ex, i) => (
-                                                        <div key={i} className="flex items-center gap-2 text-xs p-2 rounded-lg bg-white/[0.02]">
-                                                            <span className="material-symbols-outlined text-emerald-400 text-xs">check_circle</span>
-                                                            <span className="text-white font-medium">{ex.entryName}</span>
-                                                            <span className="text-slate-500">—</span>
-                                                            <span className="text-slate-400 flex-1 truncate">{ex.actionsExecuted?.join(', ')}</span>
-                                                            <span className="text-slate-600 text-[10px]">{new Date(ex.executedAt).toLocaleDateString()}</span>
+                                                        <div key={i} className="flex items-center gap-2 text-xs p-2 rounded-lg bg-[var(--sys-surface)]">
+                                                            <span className="material-symbols-outlined text-primary text-xs">check_circle</span>
+                                                            <span className="text-[var(--sys-text)] font-medium">{ex.entryName}</span>
+                                                            <span className="text-[var(--sys-text-muted)]">—</span>
+                                                            <span className="text-[var(--sys-text-muted)] flex-1 truncate">{ex.actionsExecuted?.join(', ')}</span>
+                                                            <span className="text-[var(--sys-text-muted)] text-[10px]">{new Date(ex.executedAt).toLocaleDateString()}</span>
                                                         </div>
                                                     ))}
                                                 </div>
@@ -3388,9 +3388,9 @@ function AutomationView({ funnel, rules, loading, running, generating, onBack, o
             <VisualWorkflowBuilder rules={rules} funnel={funnel} />
 
             {/* How It Works */}
-            <div className="glass-panel rounded-2xl p-6" style={{ background: 'linear-gradient(135deg, #f59e0b06, #ef444406)' }}>
-                <h3 className="text-white font-bold text-sm mb-3 flex items-center gap-2">
-                    <span className="material-symbols-outlined text-orange-400 text-sm">info</span>
+            <div className="glass-panel rounded-2xl p-6" style={{ background: 'var(--sys-primary)' }}>
+                <h3 className="text-[var(--sys-text)] font-bold text-sm mb-3 flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[var(--sys-primary)] text-sm">info</span>
                     How Automations Work
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -3400,12 +3400,12 @@ function AutomationView({ funnel, rules, loading, running, generating, onBack, o
                         { icon: 'bolt', title: 'Actions Execute', desc: 'Move stages, update scores, add tags, trigger nurture sequences — all automatically' },
                     ].map(item => (
                         <div key={item.title} className="flex gap-3">
-                            <div className="size-9 rounded-xl bg-orange-500/10 flex items-center justify-center shrink-0">
-                                <span className="material-symbols-outlined text-orange-400 text-sm">{item.icon}</span>
+                            <div className="size-9 rounded-xl bg-[var(--sys-surface)] flex items-center justify-center shrink-0">
+                                <span className="material-symbols-outlined text-[var(--sys-primary)] text-sm">{item.icon}</span>
                             </div>
                             <div>
-                                <h4 className="text-white text-xs font-bold mb-0.5">{item.title}</h4>
-                                <p className="text-[11px] text-slate-500 leading-relaxed">{item.desc}</p>
+                                <h4 className="text-[var(--sys-text)] text-xs font-bold mb-0.5">{item.title}</h4>
+                                <p className="text-[11px] text-[var(--sys-text-muted)] leading-relaxed">{item.desc}</p>
                             </div>
                         </div>
                     ))}
@@ -3420,11 +3420,11 @@ function AutomationView({ funnel, rules, loading, running, generating, onBack, o
 // #10 REVENUE FORECAST VIEW
 // ═══════════════════════════════════════════════════════════════
 function RevenueForecastView({ forecast, funnel, onBack }) {
-    if (!forecast) return <div className="text-center py-12 text-slate-500">No forecast data available</div>
+    if (!forecast) return <div className="text-center py-12 text-[var(--sys-text-muted)]">No forecast data available</div>
 
     return (
         <div className="space-y-6">
-            <button onClick={onBack} className="flex items-center gap-2 text-sm text-slate-400 hover:text-white transition-all cursor-pointer mb-2">
+            <button onClick={onBack} className="flex items-center gap-2 text-sm text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] transition-all cursor-pointer mb-2">
                 <span className="material-symbols-outlined text-sm">arrow_back</span> Back to Pipeline
             </button>
 
@@ -3441,59 +3441,59 @@ function RevenueForecastView({ forecast, funnel, onBack }) {
                             <div className="size-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${c.color}15` }}>
                                 <span className="material-symbols-outlined text-sm" style={{ color: c.color }}>{c.icon}</span>
                             </div>
-                            <span className="text-xs text-slate-500">{c.label}</span>
+                            <span className="text-xs text-[var(--sys-text-muted)]">{c.label}</span>
                         </div>
-                        <p className="text-2xl font-bold text-white">{c.value}</p>
+                        <p className="text-2xl font-bold text-[var(--sys-text)]">{c.value}</p>
                     </div>
                 ))}
             </div>
 
             {/* Conversion Metrics */}
             <div className="glass-panel rounded-2xl p-6">
-                <h3 className="text-white font-bold text-sm mb-4 flex items-center gap-2">
-                    <span className="material-symbols-outlined text-emerald-400 text-sm">insights</span>
+                <h3 className="text-[var(--sys-text)] font-bold text-sm mb-4 flex items-center gap-2">
+                    <span className="material-symbols-outlined text-primary text-sm">insights</span>
                     Pipeline Metrics
                 </h3>
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                    <div className="text-center p-3 rounded-xl bg-white/[0.02]">
-                        <p className="text-2xl font-bold text-white">{forecast.totalEntries}</p>
-                        <p className="text-xs text-slate-500">Total Entries</p>
+                    <div className="text-center p-3 rounded-xl bg-[var(--sys-surface)]">
+                        <p className="text-2xl font-bold text-[var(--sys-text)]">{forecast.totalEntries}</p>
+                        <p className="text-xs text-[var(--sys-text-muted)]">Total Entries</p>
                     </div>
-                    <div className="text-center p-3 rounded-xl bg-white/[0.02]">
-                        <p className="text-2xl font-bold text-emerald-400">{forecast.convertedEntries}</p>
-                        <p className="text-xs text-slate-500">Converted</p>
+                    <div className="text-center p-3 rounded-xl bg-[var(--sys-surface)]">
+                        <p className="text-2xl font-bold text-primary">{forecast.convertedEntries}</p>
+                        <p className="text-xs text-[var(--sys-text-muted)]">Converted</p>
                     </div>
-                    <div className="text-center p-3 rounded-xl bg-white/[0.02]">
+                    <div className="text-center p-3 rounded-xl bg-[var(--sys-surface)]">
                         <p className="text-2xl font-bold text-[#FF4D00]">{forecast.activeEntries}</p>
-                        <p className="text-xs text-slate-500">Active</p>
+                        <p className="text-xs text-[var(--sys-text-muted)]">Active</p>
                     </div>
-                    <div className="text-center p-3 rounded-xl bg-white/[0.02]">
-                        <p className="text-2xl font-bold text-amber-400">{forecast.conversionRate}%</p>
-                        <p className="text-xs text-slate-500">Conversion Rate</p>
+                    <div className="text-center p-3 rounded-xl bg-[var(--sys-surface)]">
+                        <p className="text-2xl font-bold text-primary">{forecast.conversionRate}%</p>
+                        <p className="text-xs text-[var(--sys-text-muted)]">Conversion Rate</p>
                     </div>
-                    <div className="text-center p-3 rounded-xl bg-white/[0.02]">
-                        <p className="text-2xl font-bold text-slate-300">{forecast.avgConversionDays}d</p>
-                        <p className="text-xs text-slate-500">Avg Time to Convert</p>
+                    <div className="text-center p-3 rounded-xl bg-[var(--sys-surface)]">
+                        <p className="text-2xl font-bold text-[var(--sys-text-muted)]">{forecast.avgConversionDays}d</p>
+                        <p className="text-xs text-[var(--sys-text-muted)]">Avg Time to Convert</p>
                     </div>
                 </div>
             </div>
 
             {/* Stage-by-Stage Forecast */}
             <div className="glass-panel rounded-2xl p-6">
-                <h3 className="text-white font-bold text-sm mb-4 flex items-center gap-2">
+                <h3 className="text-[var(--sys-text)] font-bold text-sm mb-4 flex items-center gap-2">
                     <span className="material-symbols-outlined text-primary text-sm">stacked_bar_chart</span>
                     Stage-by-Stage Forecast
                 </h3>
                 <div className="space-y-3">
                     {(forecast.stages || []).map(stage => (
-                        <div key={stage.stage} className="flex items-center gap-4 p-3 rounded-xl bg-white/[0.02]">
+                        <div key={stage.stage} className="flex items-center gap-4 p-3 rounded-xl bg-[var(--sys-surface)]">
                             <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: stage.color }} />
                             <div className="flex-1 min-w-0">
                                 <div className="flex items-center justify-between mb-1.5">
-                                    <span className="text-sm text-white font-bold truncate">{stage.stage}</span>
-                                    <span className="text-xs text-slate-400">{stage.activeEntries} entries</span>
+                                    <span className="text-sm text-[var(--sys-text)] font-bold truncate">{stage.stage}</span>
+                                    <span className="text-xs text-[var(--sys-text-muted)]">{stage.activeEntries} entries</span>
                                 </div>
-                                <div className="h-2 rounded-full bg-white/[0.06] overflow-hidden">
+                                <div className="h-2 rounded-full bg-[var(--sys-surface)] overflow-hidden">
                                     <div className="h-full rounded-full transition-all duration-500" style={{
                                         width: `${stage.probability}%`,
                                         backgroundColor: stage.color,
@@ -3501,7 +3501,7 @@ function RevenueForecastView({ forecast, funnel, onBack }) {
                                     }} />
                                 </div>
                                 <div className="flex items-center justify-between mt-1">
-                                    <span className="text-xs text-slate-500">{stage.probability}% close probability</span>
+                                    <span className="text-xs text-[var(--sys-text-muted)]">{stage.probability}% close probability</span>
                                     <span className="text-xs font-bold" style={{ color: stage.color }}>${stage.weightedRevenue.toLocaleString()} weighted</span>
                                 </div>
                             </div>
@@ -3530,7 +3530,7 @@ function ActivityFeedView({ feed, funnel, onBack, onRefresh }) {
     return (
         <div className="space-y-4">
             <div className="flex items-center justify-between">
-                <button onClick={onBack} className="flex items-center gap-2 text-sm text-slate-400 hover:text-white transition-all cursor-pointer">
+                <button onClick={onBack} className="flex items-center gap-2 text-sm text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] transition-all cursor-pointer">
                     <span className="material-symbols-outlined text-sm">arrow_back</span> Back to Pipeline
                 </button>
                 <button onClick={onRefresh}
@@ -3541,31 +3541,31 @@ function ActivityFeedView({ feed, funnel, onBack, onRefresh }) {
 
             {feed.length === 0 ? (
                 <div className="text-center py-16">
-                    <span className="material-symbols-outlined text-4xl text-slate-600 mb-2">dynamic_feed</span>
-                    <p className="text-slate-500 text-sm">No activity yet. Actions, automations, and touchpoints will appear here.</p>
+                    <span className="material-symbols-outlined text-4xl text-[var(--sys-text-muted)] mb-2">dynamic_feed</span>
+                    <p className="text-[var(--sys-text-muted)] text-sm">No activity yet. Actions, automations, and touchpoints will appear here.</p>
                 </div>
             ) : (
                 <div className="relative">
-                    <div className="absolute left-5 top-0 bottom-0 w-px bg-white/[0.06]" />
+                    <div className="absolute left-5 top-0 bottom-0 w-px bg-[var(--sys-surface)]" />
                     <div className="space-y-1">
                         {feed.map((item, idx) => {
                             const icon = typeIcons[item.triggerType || item.touchpointType] || 'bolt'
                             const color = typeColors[item.triggerType || item.touchpointType] || '#64748b'
                             const time = item.executedAt ? new Date(item.executedAt).toLocaleString() : ''
                             return (
-                                <div key={idx} className="flex items-start gap-4 pl-2 py-2 rounded-xl hover:bg-white/[0.02] transition-all">
+                                <div key={idx} className="flex items-start gap-4 pl-2 py-2 rounded-xl hover:bg-[var(--sys-surface)] transition-all">
                                     <div className="relative z-10 size-7 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: `${color}20` }}>
                                         <span className="material-symbols-outlined text-xs" style={{ color }}>{icon}</span>
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2 flex-wrap">
-                                            <span className="text-sm text-white font-bold">{item.entryName || 'System'}</span>
-                                            {item.ruleName && <span className="text-xs px-1.5 py-0.5 rounded bg-orange-500/10 text-orange-400">{item.ruleName}</span>}
+                                            <span className="text-sm text-[var(--sys-text)] font-bold">{item.entryName || 'System'}</span>
+                                            {item.ruleName && <span className="text-xs px-1.5 py-0.5 rounded bg-[var(--sys-surface)] text-[var(--sys-primary)]">{item.ruleName}</span>}
                                         </div>
-                                        <p className="text-xs text-slate-400 mt-0.5">
+                                        <p className="text-xs text-[var(--sys-text-muted)] mt-0.5">
                                             {item.actions?.join(', ') || item.action || 'Activity logged'}
                                         </p>
-                                        <p className="text-[10px] text-slate-600 mt-0.5">{time}</p>
+                                        <p className="text-[10px] text-[var(--sys-text-muted)] mt-0.5">{time}</p>
                                     </div>
                                 </div>
                             )
@@ -3590,22 +3590,22 @@ function WebhooksView({ webhookData, funnel, onBack }) {
         setTimeout(() => setCopied(null), 2000)
     }
 
-    if (!webhookData) return <div className="text-center py-12 text-slate-500">Loading webhook data...</div>
+    if (!webhookData) return <div className="text-center py-12 text-[var(--sys-text-muted)]">Loading webhook data...</div>
 
     const endpoints = webhookData.endpoints || {}
 
     return (
         <div className="space-y-6">
-            <button onClick={onBack} className="flex items-center gap-2 text-sm text-slate-400 hover:text-white transition-all cursor-pointer">
+            <button onClick={onBack} className="flex items-center gap-2 text-sm text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] transition-all cursor-pointer">
                 <span className="material-symbols-outlined text-sm">arrow_back</span> Back to Pipeline
             </button>
 
-            <div className="glass-panel rounded-2xl p-6" style={{ background: 'linear-gradient(135deg, #6366f106, #8b5cf606)' }}>
-                <h3 className="text-white font-bold text-sm mb-1 flex items-center gap-2">
+            <div className="glass-panel rounded-2xl p-6" style={{ background: 'var(--sys-primary)' }}>
+                <h3 className="text-[var(--sys-text)] font-bold text-sm mb-1 flex items-center gap-2">
                     <span className="material-symbols-outlined text-primary text-sm">webhook</span>
                     Webhook Integration
                 </h3>
-                <p className="text-xs text-slate-500 mb-4">Connect external systems to automatically create funnel entries.</p>
+                <p className="text-xs text-[var(--sys-text-muted)] mb-4">Connect external systems to automatically create funnel entries.</p>
 
                 <div className="space-y-3">
                     {[
@@ -3613,19 +3613,19 @@ function WebhooksView({ webhookData, funnel, onBack }) {
                         { key: 'shopify', label: 'Shopify Orders', desc: 'Auto-capture orders and create customer entries', icon: 'shopping_cart', url: endpoints.shopify },
                         { key: 'stripe', label: 'Stripe Payments', desc: 'Track payment events and mark conversions', icon: 'credit_card', url: endpoints.stripe },
                     ].map(ep => (
-                        <div key={ep.key} className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+                        <div key={ep.key} className="p-4 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
                             <div className="flex items-center justify-between mb-2">
                                 <div className="flex items-center gap-2">
                                     <span className="material-symbols-outlined text-primary text-sm">{ep.icon}</span>
-                                    <span className="text-sm text-white font-bold">{ep.label}</span>
+                                    <span className="text-sm text-[var(--sys-text)] font-bold">{ep.label}</span>
                                 </div>
                                 <button onClick={() => copyUrl(ep.key, ep.url)}
                                     className="px-3 py-1 rounded-lg text-xs font-bold bg-primary/10 text-primary hover:bg-primary/20 transition-all cursor-pointer">
                                     {copied === ep.key ? '✓ Copied!' : 'Copy URL'}
                                 </button>
                             </div>
-                            <p className="text-xs text-slate-500 mb-2">{ep.desc}</p>
-                            <code className="block text-[11px] text-slate-400 bg-black/30 rounded-lg p-2 overflow-x-auto font-mono">{ep.url}</code>
+                            <p className="text-xs text-[var(--sys-text-muted)] mb-2">{ep.desc}</p>
+                            <code className="block text-[11px] text-[var(--sys-text-muted)] bg-[var(--sys-surface)] rounded-lg p-2 overflow-x-auto font-mono">{ep.url}</code>
                         </div>
                     ))}
                 </div>
@@ -3633,14 +3633,14 @@ function WebhooksView({ webhookData, funnel, onBack }) {
 
             {/* Payload Examples */}
             <div className="glass-panel rounded-2xl p-6">
-                <h3 className="text-white font-bold text-sm mb-3 flex items-center gap-2">
-                    <span className="material-symbols-outlined text-amber-400 text-sm">code</span>
+                <h3 className="text-[var(--sys-text)] font-bold text-sm mb-3 flex items-center gap-2">
+                    <span className="material-symbols-outlined text-primary text-sm">code</span>
                     Payload Examples
                 </h3>
                 <div className="space-y-3">
-                    <div className="p-3 rounded-xl bg-black/30">
-                        <p className="text-xs text-amber-400 font-bold mb-1">POST Generic Ingest</p>
-                        <pre className="text-[11px] text-slate-400 font-mono overflow-x-auto">{`{
+                    <div className="p-3 rounded-xl bg-[var(--sys-surface)]">
+                        <p className="text-xs text-primary font-bold mb-1">POST Generic Ingest</p>
+                        <pre className="text-[11px] text-[var(--sys-text-muted)] font-mono overflow-x-auto">{`{
   "name": "John Doe",
   "email": "john@example.com",
   "phone": "+1234567890",
@@ -3650,9 +3650,9 @@ function WebhooksView({ webhookData, funnel, onBack }) {
   "metadata": { "event": "webinar_signup" }
 }`}</pre>
                     </div>
-                    <div className="p-3 rounded-xl bg-black/30">
-                        <p className="text-xs text-emerald-400 font-bold mb-1">Shopify Header: X-Shopify-Topic</p>
-                        <p className="text-[11px] text-slate-400 font-mono">orders/create, orders/paid, orders/fulfilled</p>
+                    <div className="p-3 rounded-xl bg-[var(--sys-surface)]">
+                        <p className="text-xs text-primary font-bold mb-1">Shopify Header: X-Shopify-Topic</p>
+                        <p className="text-[11px] text-[var(--sys-text-muted)] font-mono">orders/create, orders/paid, orders/fulfilled</p>
                     </div>
                 </div>
             </div>
@@ -3670,7 +3670,7 @@ function SharedTemplatesView({ templates, funnels, brandId, onBack, onRefresh, o
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
-                <button onClick={onBack} className="flex items-center gap-2 text-sm text-slate-400 hover:text-white transition-all cursor-pointer">
+                <button onClick={onBack} className="flex items-center gap-2 text-sm text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] transition-all cursor-pointer">
                     <span className="material-symbols-outlined text-sm">arrow_back</span> Back to Dashboard
                 </button>
             </div>
@@ -3678,19 +3678,19 @@ function SharedTemplatesView({ templates, funnels, brandId, onBack, onRefresh, o
             {/* Share Your Funnels */}
             {funnels?.length > 0 && (
                 <div className="glass-panel rounded-2xl p-6">
-                    <h3 className="text-white font-bold text-sm mb-3 flex items-center gap-2">
-                        <span className="material-symbols-outlined text-emerald-400 text-sm">share</span>
+                    <h3 className="text-[var(--sys-text)] font-bold text-sm mb-3 flex items-center gap-2">
+                        <span className="material-symbols-outlined text-primary text-sm">share</span>
                         Share Your Funnels
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                         {funnels.map(f => (
-                            <div key={f._id} className="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+                            <div key={f._id} className="flex items-center justify-between p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
                                 <div className="flex items-center gap-2 min-w-0">
                                     <span className="material-symbols-outlined text-primary text-sm">{f.icon || 'filter_alt'}</span>
-                                    <span className="text-sm text-white font-bold truncate">{f.name}</span>
+                                    <span className="text-sm text-[var(--sys-text)] font-bold truncate">{f.name}</span>
                                 </div>
                                 <button onClick={() => onShare(f._id)}
-                                    className="px-2 py-1 rounded text-xs font-bold text-emerald-400 hover:bg-emerald-500/10 transition-all cursor-pointer">
+                                    className="px-2 py-1 rounded text-xs font-bold text-primary hover:bg-[var(--sys-primary-dim)] transition-all cursor-pointer">
                                     {f.isShared ? '✓ Shared' : 'Share'}
                                 </button>
                             </div>
@@ -3701,14 +3701,14 @@ function SharedTemplatesView({ templates, funnels, brandId, onBack, onRefresh, o
 
             {/* Browse Templates */}
             <div className="glass-panel rounded-2xl p-6">
-                <h3 className="text-white font-bold text-sm mb-3 flex items-center gap-2">
+                <h3 className="text-[var(--sys-text)] font-bold text-sm mb-3 flex items-center gap-2">
                     <span className="material-symbols-outlined text-primary text-sm">storefront</span>
                     Community Templates
                 </h3>
                 {templates.length === 0 ? (
                     <div className="text-center py-8">
-                        <span className="material-symbols-outlined text-3xl text-slate-600 mb-2">store</span>
-                        <p className="text-slate-500 text-sm">No shared templates yet. Be the first to share!</p>
+                        <span className="material-symbols-outlined text-3xl text-[var(--sys-text-muted)] mb-2">store</span>
+                        <p className="text-[var(--sys-text-muted)] text-sm">No shared templates yet. Be the first to share!</p>
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -3719,13 +3719,13 @@ function SharedTemplatesView({ templates, funnels, brandId, onBack, onRefresh, o
                                         <span className="material-symbols-outlined text-sm" style={{ color: t.color || '#6366f1' }}>{t.icon || 'filter_alt'}</span>
                                     </div>
                                     <div className="min-w-0">
-                                        <p className="text-sm text-white font-bold truncate">{t.name}</p>
-                                        <p className="text-[10px] text-slate-500">by {t.sharedBy} · {t.stages?.length || 0} stages</p>
+                                        <p className="text-sm text-[var(--sys-text)] font-bold truncate">{t.name}</p>
+                                        <p className="text-[10px] text-[var(--sys-text-muted)]">by {t.sharedBy} · {t.stages?.length || 0} stages</p>
                                     </div>
                                 </div>
-                                <p className="text-xs text-slate-400 mb-3 line-clamp-2">{t.shareDescription || t.description || 'No description'}</p>
+                                <p className="text-xs text-[var(--sys-text-muted)] mb-3 line-clamp-2">{t.shareDescription || t.description || 'No description'}</p>
                                 <div className="flex items-center justify-between">
-                                    <span className="text-[10px] text-slate-600">{t.cloneCount || 0} clones</span>
+                                    <span className="text-[10px] text-[var(--sys-text-muted)]">{t.cloneCount || 0} clones</span>
                                     <button onClick={() => onClone(t._id)}
                                         className="px-3 py-1 rounded-lg text-xs font-bold text-primary bg-primary/10 hover:bg-primary/20 transition-all cursor-pointer">
                                         Clone
@@ -3786,27 +3786,27 @@ function FidatoFunnelSidebar({ funnel, onClose, onScoreDecay, onPredictiveScore,
     }
 
     return (
-        <div className="fixed right-0 top-0 bottom-0 w-96 bg-[#0a0e1a]/95 backdrop-blur-xl border-l border-white/[0.06] z-50 flex flex-col shadow-2xl"
+        <div className="fixed right-0 top-0 bottom-0 w-96 bg-[#0a0e1a]/95 border-l border-[var(--sys-border)] z-50 flex flex-col shadow-2xl"
             style={{ animation: 'slideInRight 0.3s ease' }}>
             {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b border-white/[0.06]">
+            <div className="flex items-center justify-between p-4 border-b border-[var(--sys-border)]">
                 <div className="flex items-center gap-2">
-                    <div className="size-8 rounded-xl bg-gradient-to-br from-primary/30 to-[#FF7A00]/30 flex items-center justify-center">
+                    <div className="size-8 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] flex items-center justify-center">
                         <span className="material-symbols-outlined text-primary text-sm">smart_toy</span>
                     </div>
                     <div>
-                        <h3 className="text-white font-bold text-sm">Fidato AI</h3>
-                        <p className="text-[10px] text-slate-500">Funnel Assistant</p>
+                        <h3 className="text-[var(--sys-text)] font-bold text-sm">Fidato AI</h3>
+                        <p className="text-[10px] text-[var(--sys-text-muted)]">Funnel Assistant</p>
                     </div>
                 </div>
-                <button onClick={onClose} className="size-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/[0.06] transition-all cursor-pointer">
+                <button onClick={onClose} className="size-7 rounded-lg flex items-center justify-center text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)] transition-all cursor-pointer">
                     <span className="material-symbols-outlined text-sm">close</span>
                 </button>
             </div>
 
             {/* Quick Actions */}
-            <div className="p-3 border-b border-white/[0.06]">
-                <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-2 font-bold">Quick Actions</p>
+            <div className="p-3 border-b border-[var(--sys-border)]">
+                <p className="text-[10px] text-[var(--sys-text-muted)] uppercase tracking-wider mb-2 font-bold">Quick Actions</p>
                 <div className="space-y-1">
                     {quickActions.map(qa => (
                         <button key={qa.label} onClick={async () => {
@@ -3814,9 +3814,9 @@ function FidatoFunnelSidebar({ funnel, onClose, onScoreDecay, onPredictiveScore,
                             await qa.action()
                             setFidatoMessages(prev => [...prev, { role: 'assistant', text: ` ${qa.label} completed!` }])
                         }}
-                            className="w-full text-left px-3 py-2 rounded-lg text-xs text-slate-300 hover:text-white hover:bg-white/[0.04] transition-all cursor-pointer">
+                            className="w-full text-left px-3 py-2 rounded-lg text-xs text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)] transition-all cursor-pointer">
                             <span className="font-bold">{qa.label}</span>
-                            <p className="text-[10px] text-slate-500 mt-0.5">{qa.desc}</p>
+                            <p className="text-[10px] text-[var(--sys-text-muted)] mt-0.5">{qa.desc}</p>
                         </button>
                     ))}
                 </div>
@@ -3826,7 +3826,7 @@ function FidatoFunnelSidebar({ funnel, onClose, onScoreDecay, onPredictiveScore,
             <div className="flex-1 overflow-y-auto p-3 space-y-2">
                 {fidatoMessages.map((msg, idx) => (
                     <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                        <div className={`max-w-[85%] px-3 py-2 rounded-xl text-xs ${msg.role === 'user' ? 'bg-primary/20 text-white' : 'bg-white/[0.04] text-slate-300'}`}
+                        <div className={`max-w-[85%] px-3 py-2 rounded-xl text-xs ${msg.role === 'user' ? 'bg-primary/20 text-white' : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)]'}`}
                             style={{ whiteSpace: 'pre-line' }}>
                             {msg.text}
                         </div>
@@ -3834,18 +3834,18 @@ function FidatoFunnelSidebar({ funnel, onClose, onScoreDecay, onPredictiveScore,
                 ))}
                 {fidatoLoading && (
                     <div className="flex justify-start">
-                        <div className="px-3 py-2 rounded-xl text-xs bg-white/[0.04] text-slate-400">Thinking...</div>
+                        <div className="px-3 py-2 rounded-xl text-xs bg-[var(--sys-surface)] text-[var(--sys-text-muted)]">Thinking...</div>
                     </div>
                 )}
             </div>
 
             {/* Input */}
-            <div className="p-3 border-t border-white/[0.06]">
+            <div className="p-3 border-t border-[var(--sys-border)]">
                 <div className="flex gap-2">
                     <input value={fidatoInput} onChange={e => setFidatoInput(e.target.value)}
                         onKeyDown={e => e.key === 'Enter' && sendMessage()}
                         placeholder="Ask Fidato anything..."
-                        className="flex-1 bg-white/[0.04] border border-white/[0.06] rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 outline-none focus:border-primary/30" />
+                        className="flex-1 bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl px-3 py-2 text-xs text-[var(--sys-text)] placeholder-slate-500 outline-none focus:border-primary/30" />
                     <button onClick={sendMessage}
                         className="size-8 rounded-xl bg-primary/20 flex items-center justify-center text-primary hover:bg-primary/30 transition-all cursor-pointer">
                         <span className="material-symbols-outlined text-sm">send</span>
@@ -3866,8 +3866,8 @@ function VisualWorkflowBuilder({ rules, funnel }) {
     if (!rules || rules.length === 0) {
         return (
             <div className="text-center py-8">
-                <span className="material-symbols-outlined text-3xl text-slate-600 mb-2">account_tree</span>
-                <p className="text-slate-500 text-sm">No automation rules yet. Create rules first to see the visual workflow.</p>
+                <span className="material-symbols-outlined text-3xl text-[var(--sys-text-muted)] mb-2">account_tree</span>
+                <p className="text-[var(--sys-text-muted)] text-sm">No automation rules yet. Create rules first to see the visual workflow.</p>
             </div>
         )
     }
@@ -3884,7 +3884,7 @@ function VisualWorkflowBuilder({ rules, funnel }) {
 
     return (
         <div className="space-y-6">
-            <h3 className="text-white font-bold text-sm flex items-center gap-2">
+            <h3 className="text-[var(--sys-text)] font-bold text-sm flex items-center gap-2">
                 <span className="material-symbols-outlined text-primary text-sm">account_tree</span>
                 Visual Workflow
             </h3>
@@ -3893,9 +3893,9 @@ function VisualWorkflowBuilder({ rules, funnel }) {
                 {rules.map(rule => (
                     <div key={rule._id} className="glass-panel rounded-2xl p-4" style={{ opacity: rule.active ? 1 : 0.5 }}>
                         <div className="flex items-center gap-2 mb-3">
-                            <div className={`size-2 rounded-full ${rule.active ? 'bg-emerald-400' : 'bg-slate-600'}`} />
-                            <span className="text-sm text-white font-bold">{rule.name}</span>
-                            {!rule.active && <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-700 text-slate-400">Disabled</span>}
+                            <div className={`size-2 rounded-full ${rule.active ? 'bg-[var(--sys-surface)]' : 'bg-[var(--sys-border)]'}`} />
+                            <span className="text-sm text-[var(--sys-text)] font-bold">{rule.name}</span>
+                            {!rule.active && <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--sys-surface)] text-[var(--sys-text-muted)]">Disabled</span>}
                         </div>
 
                         {/* Node flow: Trigger → Conditions → Actions */}
@@ -3907,34 +3907,34 @@ function VisualWorkflowBuilder({ rules, funnel }) {
                                         <span className="material-symbols-outlined text-[#FF4D00] text-xs">{triggerIcons[rule.trigger?.type] || 'sensors'}</span>
                                         <span className="text-[10px] text-[#FF4D00] font-bold uppercase">Trigger</span>
                                     </div>
-                                    <p className="text-xs text-white font-bold">{(rule.trigger?.type || '').replace(/_/g, ' ')}</p>
-                                    {rule.trigger?.config?.stage && <p className="text-[10px] text-slate-400">Stage: {rule.trigger.config.stage}</p>}
+                                    <p className="text-xs text-[var(--sys-text)] font-bold">{(rule.trigger?.type || '').replace(/_/g, ' ')}</p>
+                                    {rule.trigger?.config?.stage && <p className="text-[10px] text-[var(--sys-text-muted)]">Stage: {rule.trigger.config.stage}</p>}
                                 </div>
                             </div>
 
                             {/* Arrow */}
                             <div className="flex items-center h-16 px-1 shrink-0">
-                                <div className="w-6 h-px bg-white/20" />
-                                <span className="material-symbols-outlined text-white/30 text-xs">arrow_forward</span>
+                                <div className="w-6 h-px bg-[var(--sys-surface)]" />
+                                <span className="material-symbols-outlined text-[var(--sys-text)]/30 text-xs">arrow_forward</span>
                             </div>
 
                             {/* Conditions Node (if any) */}
                             {rule.conditions?.length > 0 && (
                                 <>
                                     <div className="shrink-0 w-40">
-                                        <div className="rounded-xl p-3 bg-amber-500/10 border border-amber-500/20">
+                                        <div className="rounded-xl p-3 bg-[var(--sys-primary-dim)] border border-[var(--sys-border)]">
                                             <div className="flex items-center gap-1.5 mb-1">
-                                                <span className="material-symbols-outlined text-amber-400 text-xs">checklist</span>
-                                                <span className="text-[10px] text-amber-400 font-bold uppercase">Conditions</span>
+                                                <span className="material-symbols-outlined text-primary text-xs">checklist</span>
+                                                <span className="text-[10px] text-primary font-bold uppercase">Conditions</span>
                                             </div>
                                             {rule.conditions.map((cond, i) => (
-                                                <p key={i} className="text-[10px] text-slate-300">{cond.field} {cond.operator} {cond.value}</p>
+                                                <p key={i} className="text-[10px] text-[var(--sys-text-muted)]">{cond.field} {cond.operator} {cond.value}</p>
                                             ))}
                                         </div>
                                     </div>
                                     <div className="flex items-center h-16 px-1 shrink-0">
-                                        <div className="w-6 h-px bg-white/20" />
-                                        <span className="material-symbols-outlined text-white/30 text-xs">arrow_forward</span>
+                                        <div className="w-6 h-px bg-[var(--sys-surface)]" />
+                                        <span className="material-symbols-outlined text-[var(--sys-text)]/30 text-xs">arrow_forward</span>
                                     </div>
                                 </>
                             )}
@@ -3942,14 +3942,14 @@ function VisualWorkflowBuilder({ rules, funnel }) {
                             {/* Action Nodes — #6 Multi-Action support */}
                             <div className="flex gap-2 shrink-0">
                                 {(rule.actions || []).map((action, i) => (
-                                    <div key={i} className="w-40 rounded-xl p-3 bg-emerald-500/10 border border-emerald-500/20">
+                                    <div key={i} className="w-40 rounded-xl p-3 bg-[var(--sys-primary-dim)] border border-[var(--sys-border)]">
                                         <div className="flex items-center gap-1.5 mb-1">
-                                            <span className="material-symbols-outlined text-emerald-400 text-xs">{actionIcons[action.type] || 'bolt'}</span>
-                                            <span className="text-[10px] text-emerald-400 font-bold uppercase">Action {i + 1}</span>
+                                            <span className="material-symbols-outlined text-primary text-xs">{actionIcons[action.type] || 'bolt'}</span>
+                                            <span className="text-[10px] text-primary font-bold uppercase">Action {i + 1}</span>
                                         </div>
-                                        <p className="text-xs text-white font-bold">{(action.type || '').replace(/_/g, ' ')}</p>
+                                        <p className="text-xs text-[var(--sys-text)] font-bold">{(action.type || '').replace(/_/g, ' ')}</p>
                                         {action.config && Object.entries(action.config).slice(0, 2).map(([k, v]) => (
-                                            <p key={k} className="text-[10px] text-slate-400">{k}: {String(v)}</p>
+                                            <p key={k} className="text-[10px] text-[var(--sys-text-muted)]">{k}: {String(v)}</p>
                                         ))}
                                     </div>
                                 ))}
@@ -3958,9 +3958,9 @@ function VisualWorkflowBuilder({ rules, funnel }) {
 
                         {/* Stats */}
                         {rule.executionCount > 0 && (
-                            <div className="flex items-center gap-3 mt-2 pt-2 border-t border-white/[0.04]">
-                                <span className="text-[10px] text-slate-500">Executed {rule.executionCount} times</span>
-                                {rule.lastExecutedAt && <span className="text-[10px] text-slate-600">Last: {new Date(rule.lastExecutedAt).toLocaleDateString()}</span>}
+                            <div className="flex items-center gap-3 mt-2 pt-2 border-t border-[var(--sys-border)]">
+                                <span className="text-[10px] text-[var(--sys-text-muted)]">Executed {rule.executionCount} times</span>
+                                {rule.lastExecutedAt && <span className="text-[10px] text-[var(--sys-text-muted)]">Last: {new Date(rule.lastExecutedAt).toLocaleDateString()}</span>}
                             </div>
                         )}
                     </div>

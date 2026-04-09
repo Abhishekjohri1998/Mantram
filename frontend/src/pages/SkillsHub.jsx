@@ -35,14 +35,14 @@ const CATEGORIES = [
 ]
 
 const COLOR_MAP = {
-    emerald: { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/20', ring: 'ring-emerald-500/30' },
+    emerald: { bg: 'bg-[var(--sys-primary-dim)]', text: 'text-primary', border: 'border-[var(--sys-border)]', ring: '' },
     blue: { bg: 'bg-[#FF4D00]/10', text: 'text-[#FF4D00]', border: 'border-[#FF4D00]/20', ring: 'ring-[#FF4D00]/30' },
-    amber: { bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/20', ring: 'ring-amber-500/30' },
+    amber: { bg: 'bg-[var(--sys-primary-dim)]', text: 'text-primary', border: 'border-[var(--sys-border)]', ring: '' },
     violet: { bg: 'bg-[#FF4D00]/10', text: 'text-[#FF4D00]', border: 'border-[#FF4D00]/20', ring: 'ring-[#FF4D00]/30' },
-    rose: { bg: 'bg-rose-500/10', text: 'text-rose-400', border: 'border-rose-500/20', ring: 'ring-rose-500/30' },
-    cyan: { bg: 'bg-cyan-500/10', text: 'text-cyan-400', border: 'border-cyan-500/20', ring: 'ring-cyan-500/30' },
-    orange: { bg: 'bg-orange-500/10', text: 'text-orange-400', border: 'border-orange-500/20', ring: 'ring-orange-500/30' },
-    teal: { bg: 'bg-teal-500/10', text: 'text-teal-400', border: 'border-teal-500/20', ring: 'ring-teal-500/30' },
+    rose: { bg: 'bg-[var(--sys-primary-dim)]', text: 'text-primary', border: 'border-[var(--sys-border)]', ring: '' },
+    cyan: { bg: 'bg-[var(--sys-primary-dim)]', text: 'text-primary', border: 'border-[var(--sys-border)]', ring: '' },
+    orange: { bg: 'bg-[var(--sys-surface)]', text: 'text-[var(--sys-primary)]', border: 'border-[var(--sys-border)]', ring: '' },
+    teal: { bg: 'bg-[var(--sys-primary-dim)]', text: 'text-primary', border: 'border-[var(--sys-border)]', ring: '' },
 }
 
 function getColors(color) { return COLOR_MAP[color] || COLOR_MAP.violet }
@@ -54,7 +54,7 @@ function FormatText({ text }) {
     return (
         <span>
             {parts.map((part, i) =>
-                i % 2 === 1 ? <strong key={i} className="text-white font-bold">{part}</strong> : part
+                i % 2 === 1 ? <strong key={i} className="text-[var(--sys-text)] font-bold">{part}</strong> : part
             )}
         </span>
     )
@@ -75,24 +75,24 @@ function RenderValue({ value, depth = 0 }) {
 
     // String
     if (typeof value === 'string') {
-        return <p className="text-sm text-slate-300 whitespace-pre-wrap leading-relaxed"><FormatText text={value} /></p>
+        return <p className="text-sm text-[var(--sys-text-muted)] whitespace-pre-wrap leading-relaxed"><FormatText text={value} /></p>
     }
 
     // Number / Boolean
     if (typeof value === 'number' || typeof value === 'boolean') {
-        return <span className="text-sm text-white font-bold">{String(value)}</span>
+        return <span className="text-sm text-[var(--sys-text)] font-bold">{String(value)}</span>
     }
 
     // Array
     if (Array.isArray(value)) {
-        if (value.length === 0) return <p className="text-xs text-slate-600 italic">Empty</p>
+        if (value.length === 0) return <p className="text-xs text-[var(--sys-text-muted)] italic">Empty</p>
 
         // Array of strings → bulleted list
         if (value.every(v => typeof v === 'string')) {
             return (
                 <ul className="space-y-1.5 ml-1">
                     {value.map((item, i) => (
-                        <li key={i} className="flex gap-2 text-sm text-slate-300">
+                        <li key={i} className="flex gap-2 text-sm text-[var(--sys-text-muted)]">
                             <span className="text-primary font-bold shrink-0">{i + 1}.</span>
                             <span className="leading-relaxed"><FormatText text={item} /></span>
                         </li>
@@ -105,7 +105,7 @@ function RenderValue({ value, depth = 0 }) {
         return (
             <div className="space-y-3">
                 {value.map((item, i) => (
-                    <div key={i} className={`p-3 rounded-xl ${depth === 0 ? 'bg-white/[0.02] border border-white/[0.06]' : 'bg-white/[0.015] border border-white/[0.04]'}`}>
+                    <div key={i} className={`p-3 rounded-xl ${depth === 0 ? 'bg-[var(--sys-surface)] border border-[var(--sys-border)]' : 'bg-[var(--sys-surface)] border border-[var(--sys-border)]'}`}>
                         {typeof item === 'object' && item !== null ? (
                             <div className="space-y-2">
                                 {Object.entries(item).map(([k, v]) => (
@@ -127,10 +127,10 @@ function RenderValue({ value, depth = 0 }) {
     // Object
     if (typeof value === 'object') {
         return (
-            <div className={`space-y-2 ${depth > 0 ? 'pl-2 border-l-2 border-white/[0.06]' : ''}`}>
+            <div className={`space-y-2 ${depth > 0 ? 'pl-2 border-l-2 border-[var(--sys-border)]' : ''}`}>
                 {Object.entries(value).map(([k, v]) => (
                     <div key={k}>
-                        <span className="text-[11px] text-slate-500 font-bold uppercase">{prettyKey(k)}</span>
+                        <span className="text-[11px] text-[var(--sys-text-muted)] font-bold uppercase">{prettyKey(k)}</span>
                         <div className="mt-0.5"><RenderValue value={v} depth={depth + 1} /></div>
                     </div>
                 ))}
@@ -138,7 +138,7 @@ function RenderValue({ value, depth = 0 }) {
         )
     }
 
-    return <p className="text-sm text-slate-300">{String(value)}</p>
+    return <p className="text-sm text-[var(--sys-text-muted)]">{String(value)}</p>
 }
 
 // ── Result Renderer component ──
@@ -149,7 +149,7 @@ function ResultRenderer({ output, outputFormat }) {
     if (outputFormat === 'markdown' || outputFormat === 'html') {
         const content = typeof output === 'object' ? (output.content || JSON.stringify(output, null, 2)) : String(output)
         return (
-            <div className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap">
+            <div className="text-sm text-[var(--sys-text-muted)] leading-relaxed whitespace-pre-wrap">
                 <FormatText text={content} />
             </div>
         )
@@ -157,19 +157,19 @@ function ResultRenderer({ output, outputFormat }) {
 
     // Raw string (fallback if JSON parse failed)
     if (typeof output === 'string') {
-        return <div className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap"><FormatText text={output} /></div>
+        return <div className="text-sm text-[var(--sys-text-muted)] leading-relaxed whitespace-pre-wrap"><FormatText text={output} /></div>
     }
 
     // If there's a 'raw' key, it means JSON parse failed
     if (output.raw) {
-        return <div className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap"><FormatText text={output.raw} /></div>
+        return <div className="text-sm text-[var(--sys-text-muted)] leading-relaxed whitespace-pre-wrap"><FormatText text={output.raw} /></div>
     }
 
     // Structured JSON: render each top-level key as a section
     return (
         <div className="space-y-4">
             {Object.entries(output).map(([key, value]) => (
-                <div key={key} className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+                <div key={key} className="p-4 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
                     <h4 className="text-xs text-primary font-bold uppercase mb-3 flex items-center gap-1.5">
                         <span className="w-1.5 h-1.5 rounded-full bg-primary"></span>
                         {prettyKey(key)}
@@ -453,7 +453,7 @@ export default function SkillsHub() {
                                 setView(tab.id)
                                 if (tab.id === 'history') { loadExecutionHistory() }
                             }}
-                            className={`flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-300 cursor-pointer ${view === tab.id ? 'studio-nav-pill text-white font-bold' : 'studio-nav-tab-inactive'}`}>
+                            className={`flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-300 cursor-pointer ${view === tab.id ? 'studio-nav-pill text-[var(--sys-text)] font-bold' : 'studio-nav-tab-inactive'}`}>
                             <span className={`material-symbols-outlined ${view === tab.id ? 'text-lg' : 'text-base opacity-70'}`}>{tab.icon}</span>
                             <span>{tab.label}</span>
                         </button>
@@ -469,7 +469,7 @@ export default function SkillsHub() {
 
             {/* Error */}
             {error && (
-                <div className={`p-4 rounded-2xl border ${error.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-300'} text-sm mb-4 mx-2 flex items-center gap-2`}>
+                <div className={`p-4 rounded-2xl border ${error.isProviderError ? 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary' : 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-[var(--sys-primary)]'} text-sm mb-4 mx-2 flex items-center gap-2`}>
                     <span className="material-symbols-outlined text-base">
                         {error.isProviderError ? 'warning' : 'error'}
                     </span>
@@ -490,19 +490,19 @@ export default function SkillsHub() {
                         <div className="glass-panel rounded-2xl p-5 mb-6">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <h2 className="text-lg font-black text-white flex items-center gap-2">
+                                    <h2 className="text-lg font-black text-[var(--sys-text)] flex items-center gap-2">
                                         <span className="material-symbols-outlined text-primary text-xl">auto_awesome</span>
                                         AI Skills Library
                                     </h2>
-                                    <p className="text-xs text-slate-500 mt-0.5">{skillsList.length} skills available • Click to run, ⚡ to activate as persistent instruction</p>
+                                    <p className="text-xs text-[var(--sys-text-muted)] mt-0.5">{skillsList.length} skills available • Click to run, ⚡ to activate as persistent instruction</p>
                                 </div>
                                 <div className="flex gap-2">
                                     <button onClick={openHistory}
-                                        className="px-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.06] text-slate-400 text-xs font-bold hover:bg-white/[0.08] cursor-pointer transition-all flex items-center gap-2">
+                                        className="px-4 py-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text-muted)] text-xs font-bold hover:bg-[var(--sys-surface)] cursor-pointer transition-all flex items-center gap-2">
                                         <span className="material-symbols-outlined text-sm">history</span> History
                                     </button>
                                     <button onClick={() => setView('help')}
-                                        className="px-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.06] text-slate-400 text-xs font-bold hover:bg-white/[0.08] cursor-pointer transition-all flex items-center gap-2">
+                                        className="px-4 py-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text-muted)] text-xs font-bold hover:bg-[var(--sys-surface)] cursor-pointer transition-all flex items-center gap-2">
                                         <span className="material-symbols-outlined text-sm">menu_book</span> Guide
                                     </button>
                                     <button onClick={() => setView('build')}
@@ -518,7 +518,7 @@ export default function SkillsHub() {
                                     <div className="flex items-center gap-2 mb-2">
                                         <span className="material-symbols-outlined text-[#FF4D00] text-sm">bolt</span>
                                         <span className="text-xs font-bold text-[#FF7A00]">{activeSkillIds.size}/{activeSkillsMax} Active Skills</span>
-                                        <span className="text-[10px] text-slate-500">— Instructions injected into every Fidato conversation</span>
+                                        <span className="text-[10px] text-[var(--sys-text-muted)]">— Instructions injected into every Fidato conversation</span>
                                     </div>
                                     <div className="flex flex-wrap gap-1.5">
                                         {skillsList.filter(s => activeSkillIds.has(s._id)).map(s => {
@@ -542,8 +542,8 @@ export default function SkillsHub() {
                             {CATEGORIES.map(cat => (
                                 <button key={cat.id} onClick={() => setActiveCategory(cat.id)}
                                     className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-all ${activeCategory === cat.id
-                                        ? 'bg-primary/15 text-primary ring-1 ring-primary/30'
-                                        : 'bg-white/[0.03] text-slate-500 hover:text-slate-300 hover:bg-white/[0.06]'
+                                        ? 'bg-primary/15 text-primary  ring-primary/30'
+                                        : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] hover:text-[var(--sys-text-muted)] hover:bg-[var(--sys-surface)]'
                                         }`}>
                                     <span className="material-symbols-outlined text-sm">{cat.icon}</span>
                                     {cat.label}
@@ -555,13 +555,13 @@ export default function SkillsHub() {
                         {loading ? (
                             <div className="text-center py-20">
                                 <span className="material-symbols-outlined text-primary animate-spin text-3xl">progress_activity</span>
-                                <p className="text-sm text-slate-500 mt-3">Loading skills...</p>
+                                <p className="text-sm text-[var(--sys-text-muted)] mt-3">Loading skills...</p>
                             </div>
                         ) : filtered.length === 0 ? (
                             <div className="text-center py-20 glass-panel rounded-2xl">
-                                <span className="material-symbols-outlined text-slate-600 text-5xl block mb-3">auto_awesome</span>
-                                <h3 className="text-lg font-bold text-white mb-2">No Skills Found</h3>
-                                <p className="text-sm text-slate-400 mb-4">Create your first custom skill or wait for the library to load.</p>
+                                <span className="material-symbols-outlined text-[var(--sys-text-muted)] text-5xl block mb-3">auto_awesome</span>
+                                <h3 className="text-lg font-bold text-[var(--sys-text)] mb-2">No Skills Found</h3>
+                                <p className="text-sm text-[var(--sys-text-muted)] mb-4">Create your first custom skill or wait for the library to load.</p>
                                 <button onClick={() => setView('build')} className="btn-primary py-2.5 px-6 rounded-xl text-sm cursor-pointer">Create Skill</button>
                             </div>
                         ) : (
@@ -570,15 +570,15 @@ export default function SkillsHub() {
                                     const c = getColors(skill.color)
                                     return (
                                         <div key={skill._id}
-                                            className={`glass-panel rounded-2xl p-5 hover:bg-white/[0.04] transition-all group cursor-pointer border border-white/[0.06] hover:${c.border}`}
+                                            className={`glass-panel rounded-2xl p-5 hover:bg-[var(--sys-surface)] transition-all group cursor-pointer border border-[var(--sys-border)] hover:${c.border}`}
                                             onClick={() => openSkill(skill)}>
                                             <div className="flex items-start gap-3 mb-3">
                                                 <div className={`w-10 h-10 rounded-xl ${c.bg} flex items-center justify-center group-hover:scale-110 transition-transform`}>
                                                     <span className={`material-symbols-outlined ${c.text} text-xl`}>{skill.icon || 'auto_awesome'}</span>
                                                 </div>
                                                 <div className="flex-1 min-w-0">
-                                                    <h3 className="text-sm font-bold text-white truncate">{skill.name}</h3>
-                                                    <p className="text-[11px] text-slate-500 line-clamp-2 mt-0.5">{skill.description}</p>
+                                                    <h3 className="text-sm font-bold text-[var(--sys-text)] truncate">{skill.name}</h3>
+                                                    <p className="text-[11px] text-[var(--sys-text-muted)] line-clamp-2 mt-0.5">{skill.description}</p>
                                                 </div>
                                             </div>
                                             <div className="flex items-center justify-between">
@@ -587,8 +587,8 @@ export default function SkillsHub() {
                                                     {skill.isPrebuilt && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary font-bold">BUILT-IN</span>}
                                                 </div>
                                                 <div className="flex items-center gap-2">
-                                                    {skill.usageCount > 0 && <span className="flex items-center gap-0.5 text-[10px] text-slate-600"><span className="material-symbols-outlined text-xs">play_arrow</span>{skill.usageCount}</span>}
-                                                    {skill.avgRating > 0 && <span className="flex items-center gap-0.5 text-[10px] text-slate-600"><span className="material-symbols-outlined text-xs text-amber-400">star</span>{skill.avgRating.toFixed(1)}</span>}
+                                                    {skill.usageCount > 0 && <span className="flex items-center gap-0.5 text-[10px] text-[var(--sys-text-muted)]"><span className="material-symbols-outlined text-xs">play_arrow</span>{skill.usageCount}</span>}
+                                                    {skill.avgRating > 0 && <span className="flex items-center gap-0.5 text-[10px] text-[var(--sys-text-muted)]"><span className="material-symbols-outlined text-xs text-primary">star</span>{skill.avgRating.toFixed(1)}</span>}
                                                     {/* Activate Toggle */}
                                                     <button
                                                         onClick={(e) => toggleSkillActive(skill._id, e)}
@@ -596,8 +596,8 @@ export default function SkillsHub() {
                                                         title={activeSkillIds.has(skill._id) ? 'Deactivate (remove from persistent instructions)' : 'Activate (inject into Fidato as persistent instruction)'}
                                                         className={`size-7 rounded-lg flex items-center justify-center transition-all cursor-pointer ${
                                                             activeSkillIds.has(skill._id)
-                                                                ? 'bg-[#FF4D00]/20 text-[#FF4D00] ring-1 ring-[#FF4D00]/30'
-                                                                : 'bg-white/[0.04] text-slate-600 hover:text-[#FF4D00] hover:bg-[#FF4D00]/10'
+                                                                ? 'bg-[#FF4D00]/20 text-[#FF4D00]  ring-[#FF4D00]/30'
+                                                                : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] hover:text-[#FF4D00] hover:bg-[#FF4D00]/10'
                                                         }`}>
                                                         {togglingSkill === skill._id
                                                             ? <span className="material-symbols-outlined text-xs animate-spin">progress_activity</span>
@@ -623,7 +623,7 @@ export default function SkillsHub() {
                 {/* ═══ RUN SKILL VIEW ═══ */}
                 {view === 'run' && selectedSkill && (
                     <div className="animate-fade-in">
-                        <button onClick={goHome} className="flex items-center gap-2 text-slate-400 hover:text-white text-sm font-bold mb-6 cursor-pointer transition-all">
+                        <button onClick={goHome} className="flex items-center gap-2 text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] text-sm font-bold mb-6 cursor-pointer transition-all">
                             <span className="material-symbols-outlined text-sm">arrow_back</span> Back to Skills
                         </button>
 
@@ -636,15 +636,15 @@ export default function SkillsHub() {
                                             <span className={`material-symbols-outlined ${c.text} text-3xl`}>{selectedSkill.icon}</span>
                                         </div>
                                         <div className="flex-1">
-                                            <h2 className="text-xl font-black text-white">{selectedSkill.name}</h2>
-                                            <p className="text-sm text-slate-400 mt-1">{selectedSkill.description}</p>
+                                            <h2 className="text-xl font-black text-[var(--sys-text)]">{selectedSkill.name}</h2>
+                                            <p className="text-sm text-[var(--sys-text-muted)] mt-1">{selectedSkill.description}</p>
                                             <div className="flex items-center gap-3 mt-3">
                                                 <span className={`text-xs px-2 py-0.5 rounded-full ${c.bg} ${c.text} font-bold uppercase`}>{selectedSkill.category}</span>
-                                                {selectedSkill.tags?.map((t, i) => <span key={i} className="text-xs px-2 py-0.5 rounded-full bg-white/5 text-slate-500">{t}</span>)}
+                                                {selectedSkill.tags?.map((t, i) => <span key={i} className="text-xs px-2 py-0.5 rounded-full bg-[var(--sys-surface)] text-[var(--sys-text-muted)]">{t}</span>)}
                                             </div>
                                         </div>
                                         <div className="flex gap-2">
-                                            <button onClick={() => cloneSkill(selectedSkill._id)} className="px-3 py-1.5 rounded-lg bg-white/5 text-xs text-slate-400 hover:bg-primary/10 hover:text-primary cursor-pointer transition-all flex items-center gap-1">
+                                            <button onClick={() => cloneSkill(selectedSkill._id)} className="px-3 py-1.5 rounded-lg bg-[var(--sys-surface)] text-xs text-[var(--sys-text-muted)] hover:bg-primary/10 hover:text-primary cursor-pointer transition-all flex items-center gap-1">
                                                 <span className="material-symbols-outlined text-xs">content_copy</span> Clone
                                             </button>
                                         </div>
@@ -656,14 +656,14 @@ export default function SkillsHub() {
                         {/* Input Form */}
                         {!result && !executing && (
                             <div className="glass-panel rounded-2xl p-6 mb-6">
-                                <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2">
+                                <h3 className="text-base font-bold text-[var(--sys-text)] mb-4 flex items-center gap-2">
                                     <span className="material-symbols-outlined text-primary text-sm">input</span> Inputs
                                 </h3>
 
                                 {activeBrand && (
                                     <div className="flex items-center gap-2 p-3 rounded-xl bg-primary/5 border border-primary/10 mb-4">
                                         <span className="material-symbols-outlined text-primary text-sm">domain</span>
-                                        <span className="text-xs text-slate-300">Running with brand: <strong className="text-white">{activeBrand.name}</strong></span>
+                                        <span className="text-xs text-[var(--sys-text-muted)]">Running with brand: <strong className="text-[var(--sys-text)]">{activeBrand.name}</strong></span>
                                     </div>
                                 )}
 
@@ -671,20 +671,20 @@ export default function SkillsHub() {
                                     <div className="space-y-4">
                                         {selectedSkill.inputFields.map((field, i) => (
                                             <div key={i}>
-                                                <label className="text-xs text-slate-400 font-bold mb-1.5 block">
-                                                    {field.label} {field.required && <span className="text-rose-400">*</span>}
+                                                <label className="text-xs text-[var(--sys-text-muted)] font-bold mb-1.5 block">
+                                                    {field.label} {field.required && <span className="text-primary">*</span>}
                                                 </label>
 
                                                 {/* ── Textarea ── */}
                                                 {field.type === 'textarea' ? (
                                                     <textarea value={inputs[field.name] || ''} onChange={e => setInputs({ ...inputs, [field.name]: e.target.value })}
                                                         placeholder={field.placeholder} rows={3}
-                                                        className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-sm text-white focus:border-primary focus:outline-none resize-none" />
+                                                        className="w-full px-4 py-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-sm text-[var(--sys-text)] focus:border-primary focus:outline-none resize-none" />
 
                                                 /* ── Select ── */
                                                 ) : field.type === 'select' ? (
                                                     <select value={inputs[field.name] || ''} onChange={e => setInputs({ ...inputs, [field.name]: e.target.value })}
-                                                        className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-sm text-white focus:border-primary focus:outline-none cursor-pointer">
+                                                        className="w-full px-4 py-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-sm text-[var(--sys-text)] focus:border-primary focus:outline-none cursor-pointer">
                                                         <option value="">{field.placeholder || 'Select...'}</option>
                                                         {field.options?.map((opt, j) => <option key={j} value={opt}>{opt}</option>)}
                                                     </select>
@@ -695,14 +695,14 @@ export default function SkillsHub() {
                                                         {inputs[field.name] ? (
                                                             <div className="relative group">
                                                                 <img src={inputs[field.name]} alt={field.label}
-                                                                    className="w-full max-h-48 object-contain rounded-xl border border-white/10 bg-white/[0.02]" />
-                                                                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl flex items-center justify-center gap-3">
+                                                                    className="w-full max-h-48 object-contain rounded-xl border border-[var(--sys-border)] bg-[var(--sys-surface)]" />
+                                                                <div className="absolute inset-0 bg-[var(--sys-surface)] opacity-0 group-hover:opacity-100 transition-opacity rounded-xl flex items-center justify-center gap-3">
                                                                     <button onClick={() => setInputs({ ...inputs, [field.name]: '' })}
-                                                                        className="px-3 py-1.5 rounded-lg bg-rose-500/20 text-rose-400 text-xs font-bold cursor-pointer hover:bg-rose-500/30 transition-all">
+                                                                        className="px-3 py-1.5 rounded-lg bg-[var(--sys-primary-dim)] text-primary text-xs font-bold cursor-pointer hover:bg-[var(--sys-primary-dim)] transition-all">
                                                                         Remove
                                                                     </button>
                                                                     <button onClick={() => fileInputRefs.current[field.name]?.click()}
-                                                                        className="px-3 py-1.5 rounded-lg bg-white/10 text-white text-xs font-bold cursor-pointer hover:bg-white/20 transition-all">
+                                                                        className="px-3 py-1.5 rounded-lg bg-[var(--sys-surface)] text-[var(--sys-text)] text-xs font-bold cursor-pointer hover:bg-[var(--sys-surface)] transition-all">
                                                                         Replace
                                                                     </button>
                                                                 </div>
@@ -713,10 +713,10 @@ export default function SkillsHub() {
                                                                 onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('border-primary', 'bg-primary/5') }}
                                                                 onDragLeave={(e) => { e.currentTarget.classList.remove('border-primary', 'bg-primary/5') }}
                                                                 onDrop={(e) => { e.preventDefault(); e.currentTarget.classList.remove('border-primary', 'bg-primary/5'); handleImageUpload(field.name, e.dataTransfer.files[0]) }}
-                                                                className="w-full py-8 rounded-xl border-2 border-dashed border-white/10 bg-white/[0.02] flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-primary/40 hover:bg-primary/5 transition-all">
-                                                                <span className="material-symbols-outlined text-3xl text-slate-500">cloud_upload</span>
-                                                                <p className="text-xs text-slate-400 font-medium">Click or drag & drop image</p>
-                                                                <p className="text-[10px] text-slate-600">PNG, JPG, WEBP up to 10MB</p>
+                                                                className="w-full py-8 rounded-xl border border-dashed border-[var(--sys-border)] bg-[var(--sys-surface)] flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-primary/40 hover:bg-primary/5 transition-all">
+                                                                <span className="material-symbols-outlined text-3xl text-[var(--sys-text-muted)]">cloud_upload</span>
+                                                                <p className="text-xs text-[var(--sys-text-muted)] font-medium">Click or drag & drop image</p>
+                                                                <p className="text-[10px] text-[var(--sys-text-muted)]">PNG, JPG, WEBP up to 10MB</p>
                                                             </div>
                                                         )}
                                                         <input
@@ -731,37 +731,37 @@ export default function SkillsHub() {
                                                         {inputs[field.name] ? (
                                                             <div className="relative group">
                                                                 <img src={inputs[field.name]} alt={field.label}
-                                                                    className="w-full max-h-48 object-contain rounded-xl border border-white/10 bg-white/[0.02]" />
-                                                                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl flex items-center justify-center gap-3">
+                                                                    className="w-full max-h-48 object-contain rounded-xl border border-[var(--sys-border)] bg-[var(--sys-surface)]" />
+                                                                <div className="absolute inset-0 bg-[var(--sys-surface)] opacity-0 group-hover:opacity-100 transition-opacity rounded-xl flex items-center justify-center gap-3">
                                                                     <button onClick={() => setInputs({ ...inputs, [field.name]: '' })}
-                                                                        className="px-3 py-1.5 rounded-lg bg-rose-500/20 text-rose-400 text-xs font-bold cursor-pointer hover:bg-rose-500/30 transition-all">
+                                                                        className="px-3 py-1.5 rounded-lg bg-[var(--sys-primary-dim)] text-primary text-xs font-bold cursor-pointer hover:bg-[var(--sys-primary-dim)] transition-all">
                                                                         Remove
                                                                     </button>
                                                                     <button onClick={() => { setLibraryOpen(field.name); loadLibraryImages() }}
-                                                                        className="px-3 py-1.5 rounded-lg bg-white/10 text-white text-xs font-bold cursor-pointer hover:bg-white/20 transition-all">
+                                                                        className="px-3 py-1.5 rounded-lg bg-[var(--sys-surface)] text-[var(--sys-text)] text-xs font-bold cursor-pointer hover:bg-[var(--sys-surface)] transition-all">
                                                                         Change
                                                                     </button>
                                                                 </div>
                                                             </div>
                                                         ) : (
                                                             <button onClick={() => { setLibraryOpen(field.name); loadLibraryImages() }}
-                                                                className="w-full py-6 rounded-xl border-2 border-dashed border-white/10 bg-white/[0.02] flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-[#FF4D00]/40 hover:bg-[#FF4D00]/5 transition-all">
+                                                                className="w-full py-6 rounded-xl border border-dashed border-[var(--sys-border)] bg-[var(--sys-surface)] flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-[#FF4D00]/40 hover:bg-[#FF4D00]/5 transition-all">
                                                                 <span className="material-symbols-outlined text-3xl text-[#FF4D00]">photo_library</span>
-                                                                <p className="text-xs text-slate-400 font-medium">Select from Creative Library</p>
-                                                                <p className="text-[10px] text-slate-600">Choose from your generated images</p>
+                                                                <p className="text-xs text-[var(--sys-text-muted)] font-medium">Select from Creative Library</p>
+                                                                <p className="text-[10px] text-[var(--sys-text-muted)]">Choose from your generated images</p>
                                                             </button>
                                                         )}
 
                                                         {/* ── Library Picker Modal ── */}
                                                         {libraryOpen === field.name && (
-                                                            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={() => setLibraryOpen(null)}>
-                                                                <div className="bg-[#0c0e1a] rounded-2xl border border-white/10 w-full max-w-2xl max-h-[80vh] overflow-hidden" onClick={e => e.stopPropagation()}>
-                                                                    <div className="flex items-center justify-between p-5 border-b border-white/[0.06]">
-                                                                        <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                                                            <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--sys-surface)] " onClick={() => setLibraryOpen(null)}>
+                                                                <div className="bg-[#0c0e1a] rounded-2xl border border-[var(--sys-border)] w-full max-w-2xl max-h-[80vh] overflow-hidden" onClick={e => e.stopPropagation()}>
+                                                                    <div className="flex items-center justify-between p-5 border-b border-[var(--sys-border)]">
+                                                                        <h3 className="text-sm font-bold text-[var(--sys-text)] flex items-center gap-2">
                                                                             <span className="material-symbols-outlined text-[#FF4D00] text-lg">photo_library</span>
                                                                             Select Image — {field.label}
                                                                         </h3>
-                                                                        <button onClick={() => setLibraryOpen(null)} className="text-slate-500 hover:text-white cursor-pointer transition-all">
+                                                                        <button onClick={() => setLibraryOpen(null)} className="text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer transition-all">
                                                                             <span className="material-symbols-outlined">close</span>
                                                                         </button>
                                                                     </div>
@@ -772,24 +772,24 @@ export default function SkillsHub() {
                                                                             </div>
                                                                         ) : libraryImages.length === 0 ? (
                                                                             <div className="text-center py-12">
-                                                                                <span className="material-symbols-outlined text-slate-600 text-4xl block mb-2">image_not_supported</span>
-                                                                                <p className="text-sm text-slate-400">No images in library yet.</p>
-                                                                                <p className="text-xs text-slate-600 mt-1">Generate images in Creative Studio first.</p>
+                                                                                <span className="material-symbols-outlined text-[var(--sys-text-muted)] text-4xl block mb-2">image_not_supported</span>
+                                                                                <p className="text-sm text-[var(--sys-text-muted)]">No images in library yet.</p>
+                                                                                <p className="text-xs text-[var(--sys-text-muted)] mt-1">Generate images in Creative Studio first.</p>
                                                                             </div>
                                                                         ) : (
                                                                             <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
                                                                                 {libraryImages.map((img) => (
                                                                                     <button key={img._id}
                                                                                         onClick={() => { setInputs(prev => ({ ...prev, [field.name]: img.imageUrl })); setLibraryOpen(null) }}
-                                                                                        className={`group relative rounded-xl overflow-hidden border-2 transition-all cursor-pointer aspect-square ${
+                                                                                        className={`group relative rounded-xl overflow-hidden border transition-all cursor-pointer aspect-square ${
                                                                                             inputs[field.name] === img.imageUrl
                                                                                                 ? 'border-primary ring-2 ring-primary/30'
-                                                                                                : 'border-white/[0.06] hover:border-primary/40'
+                                                                                                : 'border-[var(--sys-border)] hover:border-primary/40'
                                                                                         }`}>
                                                                                         <img src={img.imageUrl} alt={img.prompt?.slice(0, 30) || 'Creative'}
                                                                                             className="w-full h-full object-cover" loading="lazy" />
-                                                                                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-2">
-                                                                                            <p className="text-[10px] text-white font-medium line-clamp-2">{img.prompt?.slice(0, 60) || 'Untitled'}</p>
+                                                                                        <div className="absolute inset-0 bg-[var(--sys-surface)] border border-[var(--sys-border)] opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-2">
+                                                                                            <p className="text-[10px] text-[var(--sys-text)] font-medium line-clamp-2">{img.prompt?.slice(0, 60) || 'Untitled'}</p>
                                                                                         </div>
                                                                                     </button>
                                                                                 ))}
@@ -797,9 +797,9 @@ export default function SkillsHub() {
                                                                         )}
                                                                     </div>
                                                                     {/* Upload alternative */}
-                                                                    <div className="p-4 border-t border-white/[0.06] flex items-center justify-between">
-                                                                        <p className="text-[11px] text-slate-500">Or upload directly:</p>
-                                                                        <label className="px-4 py-2 rounded-lg bg-white/5 text-xs text-slate-300 font-bold hover:bg-white/10 cursor-pointer transition-all flex items-center gap-1.5">
+                                                                    <div className="p-4 border-t border-[var(--sys-border)] flex items-center justify-between">
+                                                                        <p className="text-[11px] text-[var(--sys-text-muted)]">Or upload directly:</p>
+                                                                        <label className="px-4 py-2 rounded-lg bg-[var(--sys-surface)] text-xs text-[var(--sys-text-muted)] font-bold hover:bg-[var(--sys-surface)] cursor-pointer transition-all flex items-center gap-1.5">
                                                                             <span className="material-symbols-outlined text-sm">cloud_upload</span> Upload Image
                                                                             <input type="file" accept="image/*" className="hidden"
                                                                                 onChange={(e) => { handleImageUpload(field.name, e.target.files[0]); setLibraryOpen(null) }} />
@@ -818,14 +818,14 @@ export default function SkillsHub() {
                                                             return (
                                                                 <button key={sz.value}
                                                                     onClick={() => setInputs({ ...inputs, [field.name]: sz.value })}
-                                                                    className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all cursor-pointer ${
+                                                                    className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border transition-all cursor-pointer ${
                                                                         isSelected
-                                                                            ? 'border-primary bg-primary/10 ring-1 ring-primary/20'
-                                                                            : 'border-white/[0.06] bg-white/[0.02] hover:border-primary/30 hover:bg-primary/5'
+                                                                            ? 'border-primary bg-primary/10  ring-primary/20'
+                                                                            : 'border-[var(--sys-border)] bg-[var(--sys-surface)] hover:border-primary/30 hover:bg-primary/5'
                                                                     }`}>
-                                                                    <span className={`material-symbols-outlined text-lg ${isSelected ? 'text-primary' : 'text-slate-500'}`}>{sz.icon}</span>
-                                                                    <span className={`text-[11px] font-bold ${isSelected ? 'text-white' : 'text-slate-400'}`}>{sz.label}</span>
-                                                                    {sz.w && <span className="text-[9px] text-slate-600">{sz.w}×{sz.h}</span>}
+                                                                    <span className={`material-symbols-outlined text-lg ${isSelected ? 'text-primary' : 'text-[var(--sys-text-muted)]'}`}>{sz.icon}</span>
+                                                                    <span className={`text-[11px] font-bold ${isSelected ? 'text-[var(--sys-text)]' : 'text-[var(--sys-text-muted)]'}`}>{sz.label}</span>
+                                                                    {sz.w && <span className="text-[9px] text-[var(--sys-text-muted)]">{sz.w}×{sz.h}</span>}
                                                                 </button>
                                                             )
                                                         })}
@@ -833,11 +833,11 @@ export default function SkillsHub() {
                                                             <div className="col-span-full flex gap-2 mt-2">
                                                                 <input type="number" placeholder="Width" value={inputs[`${field.name}_w`] || ''}
                                                                     onChange={e => setInputs({ ...inputs, [`${field.name}_w`]: e.target.value })}
-                                                                    className="flex-1 px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-xs text-white focus:border-primary focus:outline-none" />
-                                                                <span className="text-slate-500 self-center text-xs">×</span>
+                                                                    className="flex-1 px-3 py-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-xs text-[var(--sys-text)] focus:border-primary focus:outline-none" />
+                                                                <span className="text-[var(--sys-text-muted)] self-center text-xs">×</span>
                                                                 <input type="number" placeholder="Height" value={inputs[`${field.name}_h`] || ''}
                                                                     onChange={e => setInputs({ ...inputs, [`${field.name}_h`]: e.target.value })}
-                                                                    className="flex-1 px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-xs text-white focus:border-primary focus:outline-none" />
+                                                                    className="flex-1 px-3 py-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-xs text-[var(--sys-text)] focus:border-primary focus:outline-none" />
                                                             </div>
                                                         )}
                                                     </div>
@@ -847,17 +847,17 @@ export default function SkillsHub() {
                                                     <input type={field.type === 'number' ? 'number' : field.type === 'url' ? 'url' : 'text'}
                                                         value={inputs[field.name] || ''} onChange={e => setInputs({ ...inputs, [field.name]: e.target.value })}
                                                         placeholder={field.placeholder}
-                                                        className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-sm text-white focus:border-primary focus:outline-none" />
+                                                        className="w-full px-4 py-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-sm text-[var(--sys-text)] focus:border-primary focus:outline-none" />
                                                 )}
                                             </div>
                                         ))}
                                     </div>
                                 ) : (
-                                    <p className="text-xs text-slate-500">This skill doesn't require any inputs — it uses your brand context.</p>
+                                    <p className="text-xs text-[var(--sys-text-muted)]">This skill doesn't require any inputs — it uses your brand context.</p>
                                 )}
 
                                 <button onClick={executeSkill}
-                                    className="mt-6 w-full py-3 px-6 rounded-xl bg-primary text-white text-sm font-bold hover:bg-primary-light cursor-pointer transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary/20">
+                                    className="mt-6 w-full py-3 px-6 rounded-xl bg-primary text-white text-sm font-bold hover:bg-primary-light cursor-pointer transition-all flex items-center justify-center gap-2 shadow-none">
                                     <span className="material-symbols-outlined text-sm">play_arrow</span> Run Skill
                                 </button>
                             </div>
@@ -866,10 +866,10 @@ export default function SkillsHub() {
                         {/* Loading */}
                         {executing && (
                             <div className="flex flex-col items-center justify-center py-20 animate-fade-in">
-                                <div className="w-20 h-20 rounded-full border-4 border-white/5 flex items-center justify-center mb-6">
+                                <div className="w-20 h-20 rounded-full border-4 border-[var(--sys-border)] flex items-center justify-center mb-6">
                                     <span className="material-symbols-outlined text-primary text-3xl animate-spin">progress_activity</span>
                                 </div>
-                                <h3 className="text-base font-bold text-white mb-2">Running {selectedSkill.name}...</h3>
+                                <h3 className="text-base font-bold text-[var(--sys-text)] mb-2">Running {selectedSkill.name}...</h3>
                                 <p className="text-sm text-primary animate-pulse">{executingStage}</p>
                             </div>
                         )}
@@ -878,14 +878,14 @@ export default function SkillsHub() {
                         {result && !executing && (
                             <div className="glass-panel rounded-2xl p-6 animate-fade-in">
                                 <div className="flex items-center justify-between mb-4">
-                                    <h3 className="text-base font-bold text-white flex items-center gap-2">
-                                        <span className="material-symbols-outlined text-emerald-400 text-sm">check_circle</span> Result
+                                    <h3 className="text-base font-bold text-[var(--sys-text)] flex items-center gap-2">
+                                        <span className="material-symbols-outlined text-primary text-sm">check_circle</span> Result
                                     </h3>
                                     <div className="flex items-center gap-1">
-                                        <span className="text-xs text-slate-500 mr-2">Rate:</span>
+                                        <span className="text-xs text-[var(--sys-text-muted)] mr-2">Rate:</span>
                                         {[1, 2, 3, 4, 5].map(s => (
                                             <button key={s} onClick={() => rateSkill(s)}
-                                                className={`cursor-pointer transition-all ${s <= rating ? 'text-amber-400' : 'text-slate-600 hover:text-amber-400'}`}>
+                                                className={`cursor-pointer transition-all ${s <= rating ? 'text-primary' : 'text-[var(--sys-text-muted)] hover:text-primary'}`}>
                                                 <span className="material-symbols-outlined text-lg">{s <= rating ? 'star' : 'star_border'}</span>
                                             </button>
                                         ))}
@@ -894,10 +894,10 @@ export default function SkillsHub() {
 
                                 {/* Route Success Banner */}
                                 {routeSuccess && routeSuccess.executionId === result.executionId && (
-                                    <div className="flex items-center gap-2 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 mb-4 animate-fade-in">
-                                        <span className="material-symbols-outlined text-emerald-400 text-sm">check_circle</span>
-                                        <span className="text-xs text-emerald-300 font-bold">{routeSuccess.message}</span>
-                                        <a href="/content-studio" className="ml-auto text-xs text-emerald-400 hover:underline font-bold">Open Content Studio →</a>
+                                    <div className="flex items-center gap-2 p-3 rounded-xl bg-[var(--sys-primary-dim)] border border-[var(--sys-border)] mb-4 animate-fade-in">
+                                        <span className="material-symbols-outlined text-primary text-sm">check_circle</span>
+                                        <span className="text-xs text-[var(--sys-primary)] font-bold">{routeSuccess.message}</span>
+                                        <a href="/content-studio" className="ml-auto text-xs text-primary hover:underline font-bold">Open Content Studio →</a>
                                     </div>
                                 )}
 
@@ -905,13 +905,13 @@ export default function SkillsHub() {
                                 <ResultRenderer output={result.output} outputFormat={result.outputFormat} />
 
                                 {/* Actions — Output Routing (Model B) */}
-                                <div className="flex flex-wrap gap-3 mt-6 pt-4 border-t border-white/[0.06]">
+                                <div className="flex flex-wrap gap-3 mt-6 pt-4 border-t border-[var(--sys-border)]">
                                     {/* Primary: Route to Content Studio */}
                                     {result.executionId && (
                                         <button
                                             onClick={() => routeToContentStudio(result.executionId)}
                                             disabled={routing === result.executionId || (routeSuccess && routeSuccess.executionId === result.executionId)}
-                                            className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-primary/15 to-[#FF7A00]/10 border border-primary/20 text-primary text-sm font-bold hover:from-primary/25 hover:to-[#FF7A00]/20 cursor-pointer transition-all flex items-center gap-2 disabled:opacity-40">
+                                            className="px-5 py-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] border border-primary/20 text-primary text-sm font-bold hover:from-primary/25 hover:to-[#FF7A00]/20 cursor-pointer transition-all flex items-center gap-2 disabled:opacity-40">
                                             {routing === result.executionId
                                                 ? <><span className="material-symbols-outlined text-sm animate-spin">progress_activity</span> Saving...</>
                                                 : (routeSuccess && routeSuccess.executionId === result.executionId)
@@ -920,15 +920,15 @@ export default function SkillsHub() {
                                         </button>
                                     )}
                                     <button onClick={() => { setResult(null); setInputs({}); setRouteSuccess(null) }}
-                                        className="px-4 py-2 rounded-xl bg-white/5 text-sm text-slate-400 hover:bg-primary/10 hover:text-primary cursor-pointer transition-all font-bold">
+                                        className="px-4 py-2 rounded-xl bg-[var(--sys-surface)] text-sm text-[var(--sys-text-muted)] hover:bg-primary/10 hover:text-primary cursor-pointer transition-all font-bold">
                                         Run Again
                                     </button>
                                     <button onClick={() => { navigator.clipboard.writeText(JSON.stringify(result.output, null, 2)) }}
-                                        className="px-4 py-2 rounded-xl bg-white/5 text-sm text-slate-400 hover:bg-emerald-500/10 hover:text-emerald-400 cursor-pointer transition-all font-bold flex items-center gap-1">
+                                        className="px-4 py-2 rounded-xl bg-[var(--sys-surface)] text-sm text-[var(--sys-text-muted)] hover:bg-[var(--sys-primary-dim)] hover:text-primary cursor-pointer transition-all font-bold flex items-center gap-1">
                                         <span className="material-symbols-outlined text-xs">content_copy</span> Copy
                                     </button>
                                     <button onClick={goHome}
-                                        className="px-4 py-2 rounded-xl bg-white/5 text-sm text-slate-400 hover:bg-white/10 hover:text-white cursor-pointer transition-all font-bold">
+                                        className="px-4 py-2 rounded-xl bg-[var(--sys-surface)] text-sm text-[var(--sys-text-muted)] hover:bg-[var(--sys-surface)] hover:text-[var(--sys-text)] cursor-pointer transition-all font-bold">
                                         Back
                                     </button>
                                 </div>
@@ -941,28 +941,28 @@ export default function SkillsHub() {
                 {/* ═══ EXECUTION HISTORY VIEW ═══ */}
                 {view === 'history' && (
                     <div className="animate-fade-in">
-                        <button onClick={goHome} className="flex items-center gap-2 text-slate-400 hover:text-white text-sm font-bold mb-6 cursor-pointer transition-all">
+                        <button onClick={goHome} className="flex items-center gap-2 text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] text-sm font-bold mb-6 cursor-pointer transition-all">
                             <span className="material-symbols-outlined text-sm">arrow_back</span> Back to Skills
                         </button>
 
                         <div className="glass-panel rounded-2xl p-5 mb-6">
-                            <h2 className="text-lg font-black text-white flex items-center gap-2">
+                            <h2 className="text-lg font-black text-[var(--sys-text)] flex items-center gap-2">
                                 <span className="material-symbols-outlined text-primary text-xl">history</span>
                                 Execution History
                             </h2>
-                            <p className="text-xs text-slate-500 mt-0.5">{executionsTotal} total executions{activeBrand ? ` for ${activeBrand.name}` : ''}</p>
+                            <p className="text-xs text-[var(--sys-text-muted)] mt-0.5">{executionsTotal} total executions{activeBrand ? ` for ${activeBrand.name}` : ''}</p>
                         </div>
 
                         {loadingHistory ? (
                             <div className="text-center py-20">
                                 <span className="material-symbols-outlined text-primary animate-spin text-3xl">progress_activity</span>
-                                <p className="text-sm text-slate-500 mt-3">Loading history...</p>
+                                <p className="text-sm text-[var(--sys-text-muted)] mt-3">Loading history...</p>
                             </div>
                         ) : executions.length === 0 ? (
                             <div className="text-center py-20 glass-panel rounded-2xl">
-                                <span className="material-symbols-outlined text-slate-600 text-5xl block mb-3">history</span>
-                                <h3 className="text-lg font-bold text-white mb-2">No Executions Yet</h3>
-                                <p className="text-sm text-slate-400">Run some skills to see their history here.</p>
+                                <span className="material-symbols-outlined text-[var(--sys-text-muted)] text-5xl block mb-3">history</span>
+                                <h3 className="text-lg font-bold text-[var(--sys-text)] mb-2">No Executions Yet</h3>
+                                <p className="text-sm text-[var(--sys-text-muted)]">Run some skills to see their history here.</p>
                             </div>
                         ) : (
                             <div className="space-y-3">
@@ -978,11 +978,11 @@ export default function SkillsHub() {
                                                 </div>
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-center gap-2">
-                                                        <h4 className="text-sm font-bold text-white">{exec.skillName}</h4>
+                                                        <h4 className="text-sm font-bold text-[var(--sys-text)]">{exec.skillName}</h4>
                                                         <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${c.bg} ${c.text} font-bold uppercase`}>{exec.skillCategory}</span>
-                                                        {isRouted && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 font-bold">ROUTED</span>}
+                                                        {isRouted && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--sys-primary-dim)] text-primary font-bold">ROUTED</span>}
                                                     </div>
-                                                    <p className="text-[11px] text-slate-500 mt-0.5">
+                                                    <p className="text-[11px] text-[var(--sys-text-muted)] mt-0.5">
                                                         {date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} at {date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
                                                         {exec.rating && <span className="ml-2">{'star'.repeat(exec.rating)}</span>}
                                                     </p>
@@ -1001,7 +1001,7 @@ export default function SkillsHub() {
                                                     )}
                                                     <button
                                                         onClick={() => { navigator.clipboard.writeText(JSON.stringify(exec.output, null, 2)) }}
-                                                        className="px-2.5 py-1.5 rounded-lg bg-white/5 text-slate-500 text-[11px] font-bold hover:bg-white/10 hover:text-white cursor-pointer transition-all flex items-center gap-1">
+                                                        className="px-2.5 py-1.5 rounded-lg bg-[var(--sys-surface)] text-[var(--sys-text-muted)] text-[11px] font-bold hover:bg-[var(--sys-surface)] hover:text-[var(--sys-text)] cursor-pointer transition-all flex items-center gap-1">
                                                         <span className="material-symbols-outlined text-xs">content_copy</span>
                                                     </button>
                                                 </div>
@@ -1009,8 +1009,8 @@ export default function SkillsHub() {
 
                                             {/* Collapsed output preview */}
                                             {exec.output && (
-                                                <div className="mt-3 p-3 rounded-xl bg-white/[0.02] border border-white/[0.04] max-h-32 overflow-y-auto">
-                                                    <p className="text-[11px] text-slate-500 font-mono whitespace-pre-wrap line-clamp-5">
+                                                <div className="mt-3 p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] max-h-32 overflow-y-auto">
+                                                    <p className="text-[11px] text-[var(--sys-text-muted)] font-mono whitespace-pre-wrap line-clamp-5">
                                                         {typeof exec.output === 'string' ? exec.output.slice(0, 500) : JSON.stringify(exec.output, null, 2).slice(0, 500)}...
                                                     </p>
                                                 </div>
@@ -1026,20 +1026,20 @@ export default function SkillsHub() {
                 {/* ═══ BUILD SKILL VIEW ═══ */}
                 {view === 'build' && (
                     <div className="animate-fade-in">
-                        <button onClick={goHome} className="flex items-center gap-2 text-slate-400 hover:text-white text-sm font-bold mb-6 cursor-pointer transition-all">
+                        <button onClick={goHome} className="flex items-center gap-2 text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] text-sm font-bold mb-6 cursor-pointer transition-all">
                             <span className="material-symbols-outlined text-sm">arrow_back</span> Back to Skills
                         </button>
 
                         <div className="glass-panel rounded-2xl p-6 mb-6">
-                            <h2 className="text-lg font-black text-white mb-1 flex items-center gap-2">
+                            <h2 className="text-lg font-black text-[var(--sys-text)] mb-1 flex items-center gap-2">
                                 <span className="material-symbols-outlined text-primary text-xl">build</span> Create a New Skill
                             </h2>
-                            <p className="text-xs text-slate-500">Build a reusable AI skill for your marketing workflows</p>
+                            <p className="text-xs text-[var(--sys-text-muted)]">Build a reusable AI skill for your marketing workflows</p>
                         </div>
 
                         {/* AI Generator */}
                         <div className="glass-panel rounded-2xl p-5 mb-6">
-                            <h3 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
+                            <h3 className="text-sm font-bold text-[var(--sys-text)] mb-3 flex items-center gap-2">
                                 <span className="material-symbols-outlined text-[#FF4D00] text-sm">psychology</span> AI Skill Generator
                                 <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#FF4D00]/10 text-[#FF4D00] font-bold">BETA</span>
                             </h3>
@@ -1047,7 +1047,7 @@ export default function SkillsHub() {
                                 <input type="text" value={aiPrompt} onChange={e => setAiPrompt(e.target.value)}
                                     onKeyDown={e => e.key === 'Enter' && generateSkill()}
                                     placeholder='Describe the skill, e.g. "Create a skill for generating WhatsApp broadcast messages with Hinglish tone"'
-                                    className="flex-1 px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-sm text-white focus:border-primary focus:outline-none" />
+                                    className="flex-1 px-4 py-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-sm text-[var(--sys-text)] focus:border-primary focus:outline-none" />
                                 <button onClick={generateSkill} disabled={generating || !aiPrompt.trim()}
                                     className="px-4 py-3 rounded-xl bg-[#FF4D00]/10 text-[#FF4D00] text-xs font-bold hover:bg-[#FF4D00]/20 cursor-pointer transition-all flex items-center gap-1 disabled:opacity-30">
                                     {generating ? <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span> : <span className="material-symbols-outlined text-sm">auto_awesome</span>}
@@ -1060,32 +1060,32 @@ export default function SkillsHub() {
                         <div className="glass-panel rounded-2xl p-6 space-y-5">
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="text-xs text-slate-400 font-bold mb-1.5 block">Skill Name *</label>
+                                    <label className="text-xs text-[var(--sys-text-muted)] font-bold mb-1.5 block">Skill Name *</label>
                                     <input type="text" value={buildForm.name} onChange={e => setBuildForm({ ...buildForm, name: e.target.value })}
-                                        placeholder="e.g., WhatsApp Broadcast Writer" className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-sm text-white focus:border-primary focus:outline-none" />
+                                        placeholder="e.g., WhatsApp Broadcast Writer" className="w-full px-4 py-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-sm text-[var(--sys-text)] focus:border-primary focus:outline-none" />
                                 </div>
                                 <div>
-                                    <label className="text-xs text-slate-400 font-bold mb-1.5 block">Category</label>
+                                    <label className="text-xs text-[var(--sys-text-muted)] font-bold mb-1.5 block">Category</label>
                                     <select value={buildForm.category} onChange={e => setBuildForm({ ...buildForm, category: e.target.value })}
-                                        className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-sm text-white focus:border-primary focus:outline-none cursor-pointer">
+                                        className="w-full px-4 py-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-sm text-[var(--sys-text)] focus:border-primary focus:outline-none cursor-pointer">
                                         {CATEGORIES.filter(c => c.id !== 'all').map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
                                     </select>
                                 </div>
                             </div>
 
                             <div>
-                                <label className="text-xs text-slate-400 font-bold mb-1.5 block">Description *</label>
+                                <label className="text-xs text-[var(--sys-text-muted)] font-bold mb-1.5 block">Description *</label>
                                 <input type="text" value={buildForm.description} onChange={e => setBuildForm({ ...buildForm, description: e.target.value })}
-                                    placeholder="One-line description for skill discovery..." className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-sm text-white focus:border-primary focus:outline-none" />
+                                    placeholder="One-line description for skill discovery..." className="w-full px-4 py-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-sm text-[var(--sys-text)] focus:border-primary focus:outline-none" />
                             </div>
 
                             <div>
-                                <label className="text-xs text-slate-400 font-bold mb-1.5 block">Instructions * <span className="text-slate-600 font-normal">(what the AI does when running this skill)</span></label>
+                                <label className="text-xs text-[var(--sys-text-muted)] font-bold mb-1.5 block">Instructions * <span className="text-[var(--sys-text-muted)] font-normal">(what the AI does when running this skill)</span></label>
                                 <textarea value={buildForm.instructions} onChange={e => setBuildForm({ ...buildForm, instructions: e.target.value })}
                                     placeholder="Write detailed instructions for the AI: what to produce, how to structure the output, what tone to use, quality rules..."
-                                    rows={8} className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-sm text-white focus:border-primary focus:outline-none resize-none font-mono" />
+                                    rows={8} className="w-full px-4 py-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-sm text-[var(--sys-text)] focus:border-primary focus:outline-none resize-none font-mono" />
                                 <button onClick={enhanceInstructions} disabled={enhancingInstructions || !buildForm.instructions.trim()}
-                                    className="mt-2 px-4 py-2 rounded-xl bg-gradient-to-r from-[#FF4D00]/15 to-cyan-500/10 border border-[#FF4D00]/30 text-[#FF7A00] text-xs font-bold hover:from-[#FF4D00]/25 hover:to-cyan-500/20 cursor-pointer transition-all flex items-center gap-1.5 disabled:opacity-30">
+                                    className="mt-2 px-4 py-2 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] border border-[#FF4D00]/30 text-[#FF7A00] text-xs font-bold hover:from-[#FF4D00]/25 hover:to-cyan-500/20 cursor-pointer transition-all flex items-center gap-1.5 disabled:opacity-30">
                                     {enhancingInstructions
                                         ? <><span className="material-symbols-outlined text-sm animate-spin">progress_activity</span> Enhancing...</>
                                         : <><span className="material-symbols-outlined text-sm">auto_awesome</span> Enhance with AI</>}
@@ -1094,30 +1094,30 @@ export default function SkillsHub() {
 
                             <div className="grid grid-cols-3 gap-4">
                                 <div>
-                                    <label className="text-xs text-slate-400 font-bold mb-1.5 block">Tags</label>
+                                    <label className="text-xs text-[var(--sys-text-muted)] font-bold mb-1.5 block">Tags</label>
                                     <input type="text" value={buildForm.tags} onChange={e => setBuildForm({ ...buildForm, tags: e.target.value })}
-                                        placeholder="comma, separated, tags" className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-sm text-white focus:border-primary focus:outline-none" />
+                                        placeholder="comma, separated, tags" className="w-full px-4 py-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-sm text-[var(--sys-text)] focus:border-primary focus:outline-none" />
                                 </div>
                                 <div>
-                                    <label className="text-xs text-slate-400 font-bold mb-1.5 block">Output Format</label>
+                                    <label className="text-xs text-[var(--sys-text-muted)] font-bold mb-1.5 block">Output Format</label>
                                     <select value={buildForm.outputFormat} onChange={e => setBuildForm({ ...buildForm, outputFormat: e.target.value })}
-                                        className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-sm text-white focus:border-primary focus:outline-none cursor-pointer">
+                                        className="w-full px-4 py-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-sm text-[var(--sys-text)] focus:border-primary focus:outline-none cursor-pointer">
                                         <option value="structured">Structured JSON</option>
                                         <option value="markdown">Markdown</option>
                                         <option value="html">HTML</option>
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="text-xs text-slate-400 font-bold mb-1.5 block">Temperature</label>
+                                    <label className="text-xs text-[var(--sys-text-muted)] font-bold mb-1.5 block">Temperature</label>
                                     <input type="number" value={buildForm.temperature} onChange={e => setBuildForm({ ...buildForm, temperature: e.target.value })}
-                                        min="0" max="2" step="0.1" className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-sm text-white focus:border-primary focus:outline-none" />
+                                        min="0" max="2" step="0.1" className="w-full px-4 py-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-sm text-[var(--sys-text)] focus:border-primary focus:outline-none" />
                                 </div>
                             </div>
 
                             {/* Input Fields Builder */}
                             <div>
                                 <div className="flex items-center justify-between mb-2">
-                                    <label className="text-xs text-slate-400 font-bold">Input Fields <span className="text-slate-600 font-normal">(optional — what the user fills in)</span></label>
+                                    <label className="text-xs text-[var(--sys-text-muted)] font-bold">Input Fields <span className="text-[var(--sys-text-muted)] font-normal">(optional — what the user fills in)</span></label>
                                     <button onClick={() => setBuildForm({ ...buildForm, inputFields: [...buildForm.inputFields, { name: '', label: '', type: 'text', required: false, placeholder: '' }] })}
                                         className="text-xs text-primary hover:text-primary-light cursor-pointer font-bold flex items-center gap-1">
                                         <span className="material-symbols-outlined text-xs">add</span> Add Field
@@ -1126,11 +1126,11 @@ export default function SkillsHub() {
                                 {buildForm.inputFields.map((field, i) => (
                                     <div key={i} className="flex gap-2 mb-2">
                                         <input type="text" value={field.name} onChange={e => { const f = [...buildForm.inputFields]; f[i] = { ...f[i], name: e.target.value }; setBuildForm({ ...buildForm, inputFields: f }) }}
-                                            placeholder="field_name" className="w-28 px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-xs text-white focus:border-primary focus:outline-none" />
+                                            placeholder="field_name" className="w-28 px-3 py-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-xs text-[var(--sys-text)] focus:border-primary focus:outline-none" />
                                         <input type="text" value={field.label} onChange={e => { const f = [...buildForm.inputFields]; f[i] = { ...f[i], label: e.target.value }; setBuildForm({ ...buildForm, inputFields: f }) }}
-                                            placeholder="Display Label" className="flex-1 px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-xs text-white focus:border-primary focus:outline-none" />
+                                            placeholder="Display Label" className="flex-1 px-3 py-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-xs text-[var(--sys-text)] focus:border-primary focus:outline-none" />
                                         <select value={field.type} onChange={e => { const f = [...buildForm.inputFields]; f[i] = { ...f[i], type: e.target.value }; setBuildForm({ ...buildForm, inputFields: f }) }}
-                                            className="w-32 px-2 py-2 rounded-lg bg-white/5 border border-white/10 text-xs text-white focus:border-primary focus:outline-none cursor-pointer">
+                                            className="w-32 px-2 py-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-xs text-[var(--sys-text)] focus:border-primary focus:outline-none cursor-pointer">
                                             <option value="text">Text</option>
                                             <option value="textarea">Long text</option>
                                             <option value="select">Select</option>
@@ -1141,13 +1141,13 @@ export default function SkillsHub() {
                                             <option value="size_select">📐 Size Picker</option>
                                         </select>
                                         <button onClick={() => { const f = buildForm.inputFields.filter((_, j) => j !== i); setBuildForm({ ...buildForm, inputFields: f }) }}
-                                            className="text-slate-600 hover:text-rose-400 cursor-pointer"><span className="material-symbols-outlined text-sm">close</span></button>
+                                            className="text-[var(--sys-text-muted)] hover:text-primary cursor-pointer"><span className="material-symbols-outlined text-sm">close</span></button>
                                     </div>
                                 ))}
                             </div>
 
                             <button onClick={createSkill} disabled={loading}
-                                className="w-full py-3 px-6 rounded-xl bg-primary text-white text-sm font-bold hover:bg-primary-light cursor-pointer transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary/20 disabled:opacity-50">
+                                className="w-full py-3 px-6 rounded-xl bg-primary text-white text-sm font-bold hover:bg-primary-light cursor-pointer transition-all flex items-center justify-center gap-2 shadow-none disabled:opacity-50">
                                 <span className="material-symbols-outlined text-sm">save</span> Create Skill
                             </button>
                         </div>
@@ -1244,36 +1244,36 @@ function SkillsHelpView({ onBack }) {
         <div>
             <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
-                    <button onClick={onBack} className="size-10 rounded-xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center hover:bg-white/[0.08] transition-all cursor-pointer">
-                        <span className="material-symbols-outlined text-slate-400">arrow_back</span>
+                    <button onClick={onBack} className="size-10 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] flex items-center justify-center hover:bg-[var(--sys-surface)] transition-all cursor-pointer">
+                        <span className="material-symbols-outlined text-[var(--sys-text-muted)]">arrow_back</span>
                     </button>
                     <div>
-                        <h2 className="text-white font-bold text-lg flex items-center gap-2">
+                        <h2 className="text-[var(--sys-text)] font-bold text-lg flex items-center gap-2">
                             <span className="material-symbols-outlined text-primary">menu_book</span> Skills Hub Guide
                         </h2>
-                        <p className="text-sm text-slate-500">Create, run, and manage AI-powered marketing skills</p>
+                        <p className="text-sm text-[var(--sys-text-muted)]">Create, run, and manage AI-powered marketing skills</p>
                     </div>
                 </div>
             </div>
 
-            <div className="glass-panel rounded-2xl p-6 mb-6" style={{ background: 'linear-gradient(135deg, #6366f108, #8b5cf608, #10b98108)' }}>
-                <h3 className="text-white font-bold mb-3 flex items-center gap-2"><span className="material-symbols-outlined text-primary">info</span> What is Skills Hub?</h3>
-                <p className="text-slate-400 text-sm leading-relaxed mb-4">
-                    Skills Hub is your library of <strong className="text-white">reusable AI marketing automations</strong>.
-                    Each skill is a pre-configured AI workflow — with instructions, inputs, and output format — that you can <strong className="text-white">run anytime</strong> with your brand context.
-                    <strong className="text-white"> Build custom skills</strong> from scratch, use the <strong className="text-white">AI Generator</strong> to create them from a description,
-                    or <strong className="text-white">clone and customize</strong> built-in skills.
+            <div className="glass-panel rounded-2xl p-6 mb-6" style={{ background: 'var(--sys-primary)' }}>
+                <h3 className="text-[var(--sys-text)] font-bold mb-3 flex items-center gap-2"><span className="material-symbols-outlined text-primary">info</span> What is Skills Hub?</h3>
+                <p className="text-[var(--sys-text-muted)] text-sm leading-relaxed mb-4">
+                    Skills Hub is your library of <strong className="text-[var(--sys-text)]">reusable AI marketing automations</strong>.
+                    Each skill is a pre-configured AI workflow — with instructions, inputs, and output format — that you can <strong className="text-[var(--sys-text)]">run anytime</strong> with your brand context.
+                    <strong className="text-[var(--sys-text)]"> Build custom skills</strong> from scratch, use the <strong className="text-[var(--sys-text)]">AI Generator</strong> to create them from a description,
+                    or <strong className="text-[var(--sys-text)]">clone and customize</strong> built-in skills.
                 </p>
                 <div className="flex flex-wrap gap-2">
                     {['Browse Library', 'Run Skills', 'Build Custom', 'AI Generator', 'Clone & Edit', 'Rate & Review'].map(t => (
-                        <span key={t} className="px-3 py-1 rounded-full text-xs font-bold bg-white/[0.04] border border-white/[0.06] text-slate-400">{t}</span>
+                        <span key={t} className="px-3 py-1 rounded-full text-xs font-bold bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text-muted)]">{t}</span>
                     ))}
                 </div>
             </div>
 
             <div className="glass-panel rounded-2xl p-5 mb-6">
-                <h3 className="text-white font-bold mb-4 text-sm flex items-center gap-2">
-                    <span className="material-symbols-outlined text-amber-400 text-lg">account_tree</span> Typical Workflow
+                <h3 className="text-[var(--sys-text)] font-bold mb-4 text-sm flex items-center gap-2">
+                    <span className="material-symbols-outlined text-primary text-lg">account_tree</span> Typical Workflow
                 </h3>
                 <div className="flex items-center gap-0 overflow-x-auto pb-2">
                     {[
@@ -1289,7 +1289,7 @@ function SkillsHelpView({ onBack }) {
                                 <div className="size-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${step.color}15` }}>
                                     <span className="material-symbols-outlined text-lg" style={{ color: step.color }}>{step.icon}</span>
                                 </div>
-                                <p className="text-xs text-slate-400 text-center leading-tight font-medium">{step.label}</p>
+                                <p className="text-xs text-[var(--sys-text-muted)] text-center leading-tight font-medium">{step.label}</p>
                             </div>
                             {idx < arr.length - 1 && <span className="material-symbols-outlined text-slate-700 text-sm mx-1 shrink-0">chevron_right</span>}
                         </div>
@@ -1301,19 +1301,19 @@ function SkillsHelpView({ onBack }) {
                 {SKILLS_HELP_SECTIONS.map(section => (
                     <div key={section.id} className="glass-panel rounded-2xl overflow-hidden">
                         <button onClick={() => setExpanded(expanded === section.id ? null : section.id)}
-                            className="w-full flex items-center gap-3 p-5 text-left hover:bg-white/[0.02] transition-all cursor-pointer">
+                            className="w-full flex items-center gap-3 p-5 text-left hover:bg-[var(--sys-surface)] transition-all cursor-pointer">
                             <div className="size-10 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: `${section.color}15` }}>
                                 <span className="material-symbols-outlined" style={{ color: section.color }}>{section.icon}</span>
                             </div>
                             <div className="flex-1 min-w-0">
-                                <p className="text-white font-bold text-sm">{section.title}</p>
-                                <p className="text-slate-500 text-xs">{section.subtitle}</p>
+                                <p className="text-[var(--sys-text)] font-bold text-sm">{section.title}</p>
+                                <p className="text-[var(--sys-text-muted)] text-xs">{section.subtitle}</p>
                             </div>
-                            <span className="text-xs text-slate-600 font-bold mr-1">{section.steps.length} topics</span>
-                            <span className={`material-symbols-outlined text-slate-500 transition-transform ${expanded === section.id ? 'rotate-180' : ''}`}>expand_more</span>
+                            <span className="text-xs text-[var(--sys-text-muted)] font-bold mr-1">{section.steps.length} topics</span>
+                            <span className={`material-symbols-outlined text-[var(--sys-text-muted)] transition-transform ${expanded === section.id ? 'rotate-180' : ''}`}>expand_more</span>
                         </button>
                         {expanded === section.id && (
-                            <div className="px-5 pb-5 space-y-3 border-t border-white/[0.04] pt-4">
+                            <div className="px-5 pb-5 space-y-3 border-t border-[var(--sys-border)] pt-4">
                                 {section.steps.map((step, idx) => (
                                     <div key={idx} className="flex gap-3">
                                         <div className="flex flex-col items-center">
@@ -1323,8 +1323,8 @@ function SkillsHelpView({ onBack }) {
                                             {idx < section.steps.length - 1 && <div className="w-px flex-1 mt-1" style={{ backgroundColor: `${section.color}20` }} />}
                                         </div>
                                         <div className="pb-3">
-                                            <p className="text-white font-bold text-sm mb-0.5">{step.title}</p>
-                                            <p className="text-slate-400 text-xs leading-relaxed">{step.description}</p>
+                                            <p className="text-[var(--sys-text)] font-bold text-sm mb-0.5">{step.title}</p>
+                                            <p className="text-[var(--sys-text-muted)] text-xs leading-relaxed">{step.description}</p>
                                         </div>
                                     </div>
                                 ))}
@@ -1334,23 +1334,23 @@ function SkillsHelpView({ onBack }) {
                 ))}
             </div>
 
-            <div className="glass-panel rounded-2xl p-6" style={{ background: 'linear-gradient(135deg, #f59e0b08, #ef444408)' }}>
-                <h3 className="text-white font-bold mb-4 flex items-center gap-2">
-                    <span className="material-symbols-outlined text-amber-400">emoji_objects</span> Pro Tips
+            <div className="glass-panel rounded-2xl p-6" style={{ background: 'var(--sys-primary)' }}>
+                <h3 className="text-[var(--sys-text)] font-bold mb-4 flex items-center gap-2">
+                    <span className="material-symbols-outlined text-primary">emoji_objects</span> Pro Tips
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {SKILLS_PRO_TIPS.map((tip, idx) => (
-                        <div key={idx} className="flex gap-2.5 p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
+                        <div key={idx} className="flex gap-2.5 p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
                             <span className="text-lg shrink-0 mt-0.5">{tip.icon}</span>
-                            <p className="text-xs text-slate-400 leading-relaxed">{tip.tip}</p>
+                            <p className="text-xs text-[var(--sys-text-muted)] leading-relaxed">{tip.tip}</p>
                         </div>
                     ))}
                 </div>
             </div>
 
             <div className="text-center mt-6 py-6">
-                <p className="text-slate-500 text-sm mb-3">Ready to explore?</p>
-                <button onClick={onBack} className="px-6 py-3 rounded-xl text-sm font-bold bg-gradient-to-r from-primary to-[#FF7A00] text-white cursor-pointer hover:shadow-lg hover:shadow-primary/20 transition-all flex items-center gap-2 mx-auto">
+                <p className="text-[var(--sys-text-muted)] text-sm mb-3">Ready to explore?</p>
+                <button onClick={onBack} className="px-6 py-3 rounded-xl text-sm font-bold bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] cursor-pointer hover:shadow-lg hover:shadow-none transition-all flex items-center gap-2 mx-auto">
                     <span className="material-symbols-outlined text-sm">apps</span> Browse Skills
                 </button>
             </div>

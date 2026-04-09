@@ -5,7 +5,7 @@ const UnderConstruction = () => {
     return (
         <>
             <SEOHead title="Under Construction — Mantram AI" noIndex={true} />
-            <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center relative overflow-hidden font-sans">
+            <div className="min-h-screen bg-black text-[var(--sys-text)] flex flex-col items-center justify-center relative overflow-hidden font-sans">
                 {/* Background Effects */}
                 <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-[#FF4D00]/20 blur-[120px] rounded-full pointer-events-none" />
                 <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-[#FF4D00]/20 blur-[120px] rounded-full pointer-events-none" />
@@ -14,13 +14,13 @@ const UnderConstruction = () => {
                 <div className="z-10 flex flex-col items-center text-center max-w-3xl px-6">
 
                     {/* Logo Area */}
-                    <div className="mb-8 p-4 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md inline-block">
+                    <div className="mb-8 p-4 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] inline-block">
                         <svg className="w-16 h-16 text-[#FF4D00] mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
                         </svg>
                     </div>
 
-                    <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight mb-6 bg-gradient-to-r from-white via-blue-100 to-gray-400 bg-clip-text text-transparent">
+                    <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight mb-6 bg-[var(--sys-surface)] border border-[var(--sys-border)] bg-clip-text text-transparent">
                         Mantram AI is Evolving
                     </h1>
 
@@ -29,7 +29,7 @@ const UnderConstruction = () => {
                     </p>
 
                     <div className="flex flex-col sm:flex-row gap-4 w-full justify-center">
-                        <div className="px-8 py-4 rounded-xl border border-white/10 bg-white/5 backdrop-blur-sm flex items-center justify-center gap-3">
+                        <div className="px-8 py-4 rounded-xl border border-[var(--sys-border)] bg-[var(--sys-surface)] flex items-center justify-center gap-3">
                             <div className="w-3 h-3 rounded-full bg-[#FF4D00] animate-pulse"></div>
                             <span className="text-gray-300 font-medium tracking-wide">Systems Upgrading</span>
                         </div>

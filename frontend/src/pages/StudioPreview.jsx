@@ -52,7 +52,7 @@ const STUDIO_DATA = {
         name: 'Video Studio',
         tagline: 'Multi-Model Video Generation',
         icon: 'smart_display',
-        gradient: 'from-amber-500 to-orange-600',
+        gradient: 'bg-[var(--sys-surface)] border border-[var(--sys-border)]',
         accentHex: '#f59e0b',
         metaDesc: 'Generate cinematic videos with Seedance, Kling & Veo 2. Text-to-video, image-to-video & video extend — all in one studio.',
         heroLine: 'What if you could go from a text prompt to a cinematic video — with the world\'s best AI video models at your fingertips?',
@@ -72,7 +72,7 @@ const STUDIO_DATA = {
         name: 'Performance Studio',
         tagline: 'AI Ad Strategist & Campaign Builder',
         icon: 'campaign',
-        gradient: 'from-emerald-500 to-teal-600',
+        gradient: 'bg-[var(--sys-surface)] border border-[var(--sys-border)]',
         accentHex: '#10b981',
         metaDesc: 'AI-powered ad strategy, competitor research, budget planning & Meta/Google campaign generation with Mantram AI Performance Studio.',
         heroLine: 'What if your ad campaigns were built by an AI that researches competitors, plans budgets & optimizes ROAS — automatically?',
@@ -172,7 +172,7 @@ const STUDIO_DATA = {
         name: 'Smart Calendar',
         tagline: 'Marketing Intelligence Calendar',
         icon: 'calendar_month',
-        gradient: 'from-teal-500 to-emerald-600',
+        gradient: 'bg-[var(--sys-surface)] border border-[var(--sys-border)]',
         accentHex: '#14b8a6',
         metaDesc: 'AI-powered marketing calendar with trending moments, festivals & content date suggestions. Never miss a marketing moment.',
         heroLine: 'What if your content calendar automatically knew every festival, trending moment & optimal posting date — tailored for Indian D2C brands?',
@@ -264,7 +264,7 @@ export default function StudioPreview() {
         return (
             <div className="min-h-screen flex items-center justify-center" style={{ background: '#07070f' }}>
                 <div className="text-center">
-                    <h1 className="text-4xl font-black text-white mb-4">Studio Not Found</h1>
+                    <h1 className="text-4xl font-black text-[var(--sys-text)] mb-4">Studio Not Found</h1>
                     <Link to="/" className="text-primary hover:underline">← Back to Home</Link>
                 </div>
             </div>
@@ -341,15 +341,15 @@ export default function StudioPreview() {
                 <nav className="sticky top-0 z-50 w-full px-4 py-3 backdrop-blur-2xl bg-[#07070f]/80" aria-label="Studio navigation">
                     <header className="max-w-5xl mx-auto flex items-center justify-between px-6 py-2.5 rounded-2xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
                         <Link to="/" className="flex items-center gap-3" aria-label="Back to Mantram AI homepage">
-                            <div className="size-9 rounded-xl overflow-hidden shadow-lg shadow-primary/20">
+                            <div className="size-9 rounded-xl overflow-hidden shadow-none">
                                 <img src="/mantram-logo.png" alt="Mantram AI Logo" className="size-9" width="36" height="36" />
                             </div>
-                            <h2 className="text-white text-xl font-bold tracking-tight">Mantram <span className="text-primary">AI</span></h2>
+                            <h2 className="text-[var(--sys-text)] text-xl font-bold tracking-tight">Mantram <span className="text-primary">AI</span></h2>
                         </Link>
                         <div className="flex items-center gap-3">
-                            <Link to="/" className="text-slate-400 hover:text-white text-sm font-medium transition-colors">← All Studios</Link>
+                            <Link to="/" className="text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] text-sm font-medium transition-colors">← All Studios</Link>
                             <button onClick={() => document.getElementById('studio-cta')?.scrollIntoView({ behavior: 'smooth' })}
-                                className="bg-gradient-to-r from-[#FF4D00] to-primary hover:from-[#FF4D00] hover:to-primary-light text-white text-sm font-bold py-2.5 px-6 rounded-full transition-all transform hover:scale-105 active:scale-95 shadow-lg shadow-[#FF4D00]/20 cursor-pointer"
+                                className="bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:from-[#FF4D00] hover:to-primary-light text-[var(--sys-text)] text-sm font-bold py-2.5 px-6 rounded-full transition-all transform hover:scale-105 active:scale-95 shadow-none cursor-pointer"
                                 aria-label="Scroll to early access signup">
                                 Get Early Access
                             </button>
@@ -363,35 +363,35 @@ export default function StudioPreview() {
                         {/* Studio icon */}
                         <div className={`size-20 rounded-3xl bg-gradient-to-br ${studio.gradient} flex items-center justify-center mx-auto mb-8 shadow-2xl`}
                             style={{ boxShadow: `0 20px 60px ${studio.accentHex}30` }} role="img" aria-label={`${studio.name} icon`}>
-                            <span className="material-symbols-outlined text-white text-4xl" aria-hidden="true">{studio.icon}</span>
+                            <span className="material-symbols-outlined text-[var(--sys-text)] text-4xl" aria-hidden="true">{studio.icon}</span>
                         </div>
 
                         <p className="text-sm font-bold uppercase tracking-widest mb-4" style={{ color: studio.accentHex }}>{studio.tagline}</p>
 
-                        <h1 id="studio-title" className="text-5xl md:text-6xl font-black text-white mb-8 leading-tight max-w-3xl mx-auto">
+                        <h1 id="studio-title" className="text-5xl md:text-6xl font-black text-[var(--sys-text)] mb-8 leading-tight max-w-3xl mx-auto">
                             {studio.name}
                         </h1>
 
-                        <p className="text-xl md:text-2xl text-slate-300 max-w-2xl mx-auto leading-relaxed italic font-light">
+                        <p className="text-xl md:text-2xl text-[var(--sys-text-muted)] max-w-2xl mx-auto leading-relaxed italic font-light">
                             "{studio.heroLine}"
                         </p>
                     </section>
 
                     {/* ── Capabilities Grid — Blurred Tease ── */}
                     <section className="max-w-4xl mx-auto px-6 py-16" aria-labelledby="capabilities-title">
-                        <h2 id="capabilities-title" className="text-center text-2xl font-bold text-white mb-10">What's Inside</h2>
+                        <h2 id="capabilities-title" className="text-center text-2xl font-bold text-[var(--sys-text)] mb-10">What's Inside</h2>
 
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-4 relative" role="list" aria-label={`${studio.name} capabilities`}>
                             {studio.capabilities.map((c, i) => (
                                 <div key={i} className="rounded-2xl p-5 transition-all group" role="listitem"
                                     style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${studio.accentHex}15` }}>
                                     <span className="material-symbols-outlined text-2xl mb-3 block" style={{ color: studio.accentHex }} aria-hidden="true">{c.icon}</span>
-                                    <p className="text-white font-semibold text-sm">{c.label}</p>
+                                    <p className="text-[var(--sys-text)] font-semibold text-sm">{c.label}</p>
                                 </div>
                             ))}
 
                             {/* Blur overlay on bottom row */}
-                            <div className="absolute bottom-0 left-0 right-0 h-28 bg-gradient-to-t from-[#07070f] via-[#07070f]/80 to-transparent z-10 flex items-end justify-center pb-4">
+                            <div className="absolute bottom-0 left-0 right-0 h-28 bg-[var(--sys-surface)] border border-[var(--sys-border)] z-10 flex items-end justify-center pb-4">
                                 <button onClick={() => document.getElementById('studio-cta')?.scrollIntoView({ behavior: 'smooth' })}
                                     className="text-sm font-bold px-6 py-2.5 rounded-full cursor-pointer transition-all hover:scale-105"
                                     style={{ background: `${studio.accentHex}15`, border: `1px solid ${studio.accentHex}30`, color: studio.accentHex }}
@@ -406,15 +406,15 @@ export default function StudioPreview() {
                     {/* ── Teaser Quote ── */}
                     <section className="max-w-3xl mx-auto px-6 py-16 text-center" aria-label="Studio overview">
                         <div className="rounded-3xl p-8 md:p-12 relative overflow-hidden"
-                            style={{ background: `linear-gradient(135deg, ${studio.accentHex}06, ${studio.accentHex}03)`, border: `1px solid ${studio.accentHex}15` }}>
+                            style={{ background: `var(--sys-primary)`, border: `1px solid ${studio.accentHex}15` }}>
                             <div className="absolute top-4 left-6 text-6xl font-serif opacity-10" style={{ color: studio.accentHex }} aria-hidden="true">"</div>
-                            <p className="text-lg md:text-xl text-slate-300 leading-relaxed relative z-10 italic">
+                            <p className="text-lg md:text-xl text-[var(--sys-text-muted)] leading-relaxed relative z-10 italic">
                                 {studio.teaser}
                             </p>
                             <div className="mt-8 flex items-center justify-center gap-6">
                                 <div className="text-center">
-                                    <p className="text-3xl font-black text-white">{studio.stat.value}</p>
-                                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">{studio.stat.label}</p>
+                                    <p className="text-3xl font-black text-[var(--sys-text)]">{studio.stat.value}</p>
+                                    <p className="text-xs font-semibold uppercase tracking-wider text-[var(--sys-text-muted)]">{studio.stat.label}</p>
                                 </div>
                             </div>
                         </div>
@@ -425,13 +425,13 @@ export default function StudioPreview() {
                         <div className="rounded-3xl p-8 md:p-10"
                             style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
                             <div className={`size-14 rounded-2xl bg-gradient-to-br ${studio.gradient} flex items-center justify-center mx-auto mb-6 shadow-lg`}>
-                                <span className="material-symbols-outlined text-white text-2xl" aria-hidden="true">{studio.icon}</span>
+                                <span className="material-symbols-outlined text-[var(--sys-text)] text-2xl" aria-hidden="true">{studio.icon}</span>
                             </div>
 
-                            <h2 id="cta-title" className="text-3xl font-black text-white mb-3">
+                            <h2 id="cta-title" className="text-3xl font-black text-[var(--sys-text)] mb-3">
                                 Ready to try {studio.name}?
                             </h2>
-                            <p className="text-slate-400 mb-8">
+                            <p className="text-[var(--sys-text-muted)] mb-8">
                                 Join the waitlist to be among the first to experience the future of AI-powered marketing.
                             </p>
 
@@ -440,16 +440,16 @@ export default function StudioPreview() {
                                     <input type="email" value={email} onChange={e => setEmail(e.target.value)}
                                         placeholder="Enter your email" required
                                         aria-label="Email address for early access"
-                                        className="flex-1 px-5 py-3.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm focus:border-primary focus:outline-none placeholder:text-slate-600" />
+                                        className="flex-1 px-5 py-3.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm focus:border-primary focus:outline-none placeholder:text-[var(--sys-text-muted)]" />
                                     <button type="submit"
-                                        className="bg-gradient-to-r from-[#FF4D00] to-primary hover:from-[#FF4D00] hover:to-primary-light text-white font-bold py-3.5 px-7 rounded-xl transition-all transform hover:scale-105 active:scale-95 shadow-lg shadow-[#FF4D00]/20 cursor-pointer text-sm whitespace-nowrap">
+                                        className="bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:from-[#FF4D00] hover:to-primary-light text-[var(--sys-text)] font-bold py-3.5 px-7 rounded-xl transition-all transform hover:scale-105 active:scale-95 shadow-none cursor-pointer text-sm whitespace-nowrap">
                                         Get Access
                                     </button>
                                 </form>
                             ) : (
                                 <div className="rounded-xl p-5 flex items-center justify-center gap-3" role="alert" style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)' }}>
-                                    <span className="material-symbols-outlined text-emerald-400" aria-hidden="true">check_circle</span>
-                                    <p className="text-emerald-300 font-semibold">You're on the list! We'll notify you when {studio.name} is ready.</p>
+                                    <span className="material-symbols-outlined text-primary" aria-hidden="true">check_circle</span>
+                                    <p className="text-[var(--sys-primary)] font-semibold">You're on the list! We'll notify you when {studio.name} is ready.</p>
                                 </div>
                             )}
                         </div>
@@ -457,14 +457,14 @@ export default function StudioPreview() {
 
                     {/* ── Other Studios ── */}
                     <section className="max-w-5xl mx-auto px-6 pb-20" aria-labelledby="other-studios-title">
-                        <h3 id="other-studios-title" className="text-center text-lg font-bold text-slate-500 mb-8">Explore Other Studios</h3>
+                        <h3 id="other-studios-title" className="text-center text-lg font-bold text-[var(--sys-text-muted)] mb-8">Explore Other Studios</h3>
                         <nav className="flex flex-wrap justify-center gap-3" aria-label="Other Mantram AI studios">
                             {Object.entries(STUDIO_DATA).filter(([k]) => k !== slug).map(([k, s]) => (
                                 <Link key={k} to={`/studio/${k}`}
-                                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl transition-all hover:bg-white/[0.05] hover:scale-105"
+                                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl transition-all hover:bg-[var(--sys-surface)] hover:scale-105"
                                     style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
                                     <span className="material-symbols-outlined text-base" style={{ color: s.accentHex }} aria-hidden="true">{s.icon}</span>
-                                    <span className="text-slate-400 text-xs font-semibold">{s.name}</span>
+                                    <span className="text-[var(--sys-text-muted)] text-xs font-semibold">{s.name}</span>
                                 </Link>
                             ))}
                         </nav>
@@ -472,8 +472,8 @@ export default function StudioPreview() {
                 </main>
 
                 {/* Footer */}
-                <footer className="border-t border-white/[0.04] py-8 text-center relative z-10" role="contentinfo">
-                    <p className="text-slate-600 text-xs">© {new Date().getFullYear()} Mantram AI. All rights reserved.</p>
+                <footer className="border-t border-[var(--sys-border)] py-8 text-center relative z-10" role="contentinfo">
+                    <p className="text-[var(--sys-text-muted)] text-xs">© {new Date().getFullYear()} Mantram AI. All rights reserved.</p>
                 </footer>
             </div>
         </>

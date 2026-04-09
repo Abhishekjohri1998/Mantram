@@ -1169,6 +1169,55 @@ router.put('/system-settings', async (req, res) => {
 // Manage ALL video model providers: add, remove, switch, modify
 // ══════════════════════════════════════════════════════════════
 
+// ── Default registry: ALL LLM models with their known providers ──
+const LLM_PROVIDER_REGISTRY = {
+    'grok-3-mini-fast': {
+        name: 'Grok 3 Mini',
+        icon: 'psychology',
+        category: 'fast',
+        defaultProvider: 'grok',
+        providers: [
+            { id: 'grok', name: 'xAI Native', envKey: 'GROK_API_KEY', costPerSecond: 0.01, description: 'Fast standard xAI API route', builtIn: true },
+        ],
+    },
+    'gemini-2.5-flash': {
+        name: 'Gemini 2.5 Flash',
+        icon: 'memory',
+        category: 'fast',
+        defaultProvider: 'gemini',
+        providers: [
+            { id: 'gemini', name: 'Google Native', envKey: 'GEMINI_API_KEY', costPerSecond: 0.01, description: 'Fast standard Gemini route', builtIn: true },
+        ],
+    },
+    'claude-3-5-sonnet': {
+        name: 'Claude 3.5 Sonnet',
+        icon: 'psychology_alt',
+        category: 'balanced',
+        defaultProvider: 'anthropic',
+        providers: [
+            { id: 'anthropic', name: 'Anthropic Native', envKey: 'ANTHROPIC_API_KEY', costPerSecond: 0.05, description: 'Standard Claude API', builtIn: true },
+        ],
+    },
+    'gpt-4o': {
+        name: 'GPT-4o',
+        icon: 'public',
+        category: 'premium',
+        defaultProvider: 'openai',
+        providers: [
+            { id: 'openai', name: 'OpenAI Native', envKey: 'OPENAI_API_KEY', costPerSecond: 0.06, description: 'Standard OpenAI API', builtIn: true },
+        ],
+    },
+    'sarvam-llm': {
+        name: 'Sarvam Vernacular',
+        icon: 'translate',
+        category: 'specialized',
+        defaultProvider: 'sarvam',
+        providers: [
+            { id: 'sarvam', name: 'Sarvam Native', envKey: 'SARVAM_API_KEY', costPerSecond: 0.02, description: 'Indian local language capability', builtIn: true },
+        ],
+    }
+};
+
 // ── Default registry: ALL video models with their known providers ──
 // This serves as the base template; custom providers stored in DB are merged in
 const VIDEO_PROVIDER_REGISTRY = {
@@ -1228,6 +1277,7 @@ const VIDEO_PROVIDER_REGISTRY = {
         defaultProvider: 'grok',
         providers: [
             { id: 'grok', name: 'xAI (Grok)', envKey: 'GROK_API_KEY', costPerSecond: 0.08, description: 'Native xAI API — fast, 1-15s', builtIn: true },
+            { id: 'fal', name: 'fal.ai (Grok Imagine)', envKey: 'FAL_API_KEY', costPerSecond: 0.08, description: 'Grok Imagine via fal.ai', builtIn: true },
         ],
     },
     'hunyuan': {
@@ -1632,6 +1682,7 @@ const IMAGE_PROVIDER_REGISTRY = {
         defaultProvider: 'grok',
         providers: [
             { id: 'grok', name: 'xAI (Native)', envKey: 'GROK_API_KEY', costPerImage: 0.05, description: 'Native xAI Grok Imagen API — fast, single provider', builtIn: true },
+            { id: 'fal', name: 'fal.ai (Grok)', envKey: 'FAL_API_KEY', costPerImage: 0.05, description: 'Grok via fal.ai — fast, reliable', builtIn: true },
         ],
     },
 };
@@ -1854,6 +1905,211 @@ router.delete('/image-providers/provider', async (req, res) => {
 });
 
 // ══════════════════════════════════════════════════════════════
+// LLM PROVIDER MANAGEMENT
+// ══════════════════════════════════════════════════════════════
+
+async function getMergedLLMProviderRegistry() {
+    const customProviders = await getSetting('llm_provider_custom', {});
+    const merged = {};
+
+    for (const [modelId, config] of Object.entries(LLM_PROVIDER_REGISTRY)) {
+        merged[modelId] = { ...config, providers: [...config.providers] };
+    }
+
+    for (const [modelId, customData] of Object.entries(customProviders)) {
+        if (!merged[modelId]) {
+            merged[modelId] = {
+                name: customData.name || modelId,
+                icon: customData.icon || 'psychology',
+                category: customData.category || 'experimental',
+                defaultProvider: customData.defaultProvider || customData.providers?.[0]?.id,
+                providers: [],
+            };
+        }
+        if (customData.providers) {
+            for (const cp of customData.providers) {
+                const existing = merged[modelId].providers.findIndex(p => p.id === cp.id);
+                if (existing >= 0) {
+                    merged[modelId].providers[existing] = { ...merged[modelId].providers[existing], ...cp };
+                } else {
+                    merged[modelId].providers.push({ ...cp, builtIn: false });
+                }
+            }
+        }
+        if (customData.removedProviders) {
+            merged[modelId].providers = merged[modelId].providers.filter(p => !customData.removedProviders.includes(p.id));
+        }
+        if (customData.defaultProvider) {
+            merged[modelId].defaultProvider = customData.defaultProvider;
+        }
+    }
+    return merged;
+}
+
+// GET /superadmin/llm-providers
+router.get('/llm-providers', async (req, res) => {
+    try {
+        const registry = await getMergedLLMProviderRegistry();
+        const providerRoutes = await getSetting('llm_provider_routes', {});
+        const storedKeys = await getSetting('api_keys', {});
+
+        const CATEGORY_LABELS = {
+            premium: { label: 'Premium Models', color: 'amber', icon: 'diamond' },
+            balanced: { label: 'Balanced', color: 'violet', icon: 'scale' },
+            fast: { label: 'Fast & Instant', color: 'emerald', icon: 'bolt' },
+            specialized: { label: 'Specialized', color: 'cyan', icon: 'build' },
+            experimental: { label: 'Experimental', color: 'rose', icon: 'science' },
+        };
+
+        const models = Object.entries(registry).map(([modelId, config]) => {
+            const activeProvider = providerRoutes[modelId]?.active || config.defaultProvider;
+            const lastSwitched = providerRoutes[modelId]?.updatedAt || null;
+
+            const providers = config.providers.map(p => {
+                const dbKey = storedKeys[p.id]?.apiKey;
+                const envKey = process.env[p.envKey || ''];
+                return {
+                    id: p.id,
+                    name: p.name,
+                    envKey: p.envKey || '',
+                    costPerSecond: p.costPerSecond || 0,
+                    description: p.description || '',
+                    hasKey: !!(dbKey || envKey),
+                    keySource: dbKey ? 'database' : envKey ? 'env' : 'none',
+                    isActive: p.id === activeProvider,
+                    builtIn: p.builtIn !== false,
+                };
+            });
+
+            return {
+                id: modelId,
+                name: config.name,
+                icon: config.icon || 'psychology',
+                category: config.category || 'experimental',
+                activeProvider,
+                lastSwitched,
+                providers,
+                multiProvider: providers.length > 1,
+            };
+        });
+
+        res.json({ success: true, models, categories: CATEGORY_LABELS });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// PUT /superadmin/llm-providers
+router.put('/llm-providers', async (req, res) => {
+    try {
+        const { modelId, provider } = req.body;
+        if (!modelId || !provider) return res.status(400).json({ success: false, error: 'modelId and provider required' });
+
+        const registry = await getMergedLLMProviderRegistry();
+        const modelConfig = registry[modelId];
+        if (!modelConfig) return res.status(400).json({ success: false, error: `Unknown model: ${modelId}` });
+
+        const validProvider = modelConfig.providers.find(p => p.id === provider);
+        if (!validProvider) return res.status(400).json({ success: false, error: `Unknown provider '${provider}'` });
+
+        const storedKeys = await getSetting('api_keys', {});
+        const hasKey = !!(storedKeys[provider]?.apiKey || process.env[validProvider.envKey || '']);
+        if (!hasKey) return res.status(400).json({ success: false, error: `No API key configured for ${validProvider.name}` });
+
+        const providerRoutes = await getSetting('llm_provider_routes', {});
+        providerRoutes[modelId] = { active: provider, updatedAt: new Date(), updatedBy: req.user._id };
+        await setSetting('llm_provider_routes', providerRoutes, req.user._id);
+
+        await logAudit(req, { action: 'SWITCH_LLM_PROVIDER', targetModel: 'SystemSettings', targetId: modelId, severity: 'high', metadata: { modelId, provider } });
+
+        res.json({ success: true, message: `${modelConfig.name} now using ${validProvider.name}`, modelId, provider });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// POST /superadmin/llm-providers/provider
+router.post('/llm-providers/provider', async (req, res) => {
+    try {
+        const { modelId, providerId, providerName, envKey, costPerSecond, description } = req.body;
+        if (!modelId || !providerId || !providerName) return res.status(400).json({ success: false, error: 'Missing fields' });
+
+        const customProviders = await getSetting('llm_provider_custom', {});
+        if (!customProviders[modelId]) customProviders[modelId] = { providers: [] };
+        if (!customProviders[modelId].providers) customProviders[modelId].providers = [];
+        if (customProviders[modelId].removedProviders) {
+            customProviders[modelId].removedProviders = customProviders[modelId].removedProviders.filter(id => id !== providerId);
+        }
+
+        customProviders[modelId].providers = customProviders[modelId].providers.filter(p => p.id !== providerId);
+        customProviders[modelId].providers.push({
+            id: providerId,
+            name: providerName,
+            envKey: envKey || `${providerId.toUpperCase().replace(/-/g, '_')}_API_KEY`,
+            costPerSecond: parseFloat(costPerSecond) || 0,
+            description,
+            builtIn: false,
+        });
+
+        await setSetting('llm_provider_custom', customProviders, req.user._id);
+        res.json({ success: true, message: `Provider ${providerName} added successfully` });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// PATCH /superadmin/llm-providers/provider
+router.patch('/llm-providers/provider', async (req, res) => {
+    try {
+        const { modelId, providerId, updates } = req.body;
+        if (!modelId || !providerId || !updates) return res.status(400).json({ success: false, error: 'Missing fields' });
+
+        const customProviders = await getSetting('llm_provider_custom', {});
+        if (!customProviders[modelId]) customProviders[modelId] = { providers: [] };
+        if (!customProviders[modelId].providers) customProviders[modelId].providers = [];
+
+        const index = customProviders[modelId].providers.findIndex(p => p.id === providerId);
+        if (index >= 0) {
+            customProviders[modelId].providers[index] = { ...customProviders[modelId].providers[index], ...updates };
+        } else {
+            customProviders[modelId].providers.push({ id: providerId, ...updates, builtIn: true });
+        }
+
+        await setSetting('llm_provider_custom', customProviders, req.user._id);
+        res.json({ success: true, message: `Provider updated successfully` });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// DELETE /superadmin/llm-providers/provider
+router.delete('/llm-providers/provider', async (req, res) => {
+    try {
+        const { modelId, providerId } = req.body;
+        if (!modelId || !providerId) return res.status(400).json({ success: false, error: 'Missing fields' });
+
+        const providerRoutes = await getSetting('llm_provider_routes', {});
+        if (providerRoutes[modelId]?.active === providerId) return res.status(400).json({ success: false, error: 'Cannot remove active provider' });
+
+        const customProviders = await getSetting('llm_provider_custom', {});
+        if (!customProviders[modelId]) customProviders[modelId] = {};
+
+        const builtIn = LLM_PROVIDER_REGISTRY[modelId]?.providers?.find(p => p.id === providerId);
+        if (builtIn) {
+            if (!customProviders[modelId].removedProviders) customProviders[modelId].removedProviders = [];
+            if (!customProviders[modelId].removedProviders.includes(providerId)) customProviders[modelId].removedProviders.push(providerId);
+        } else {
+            if (customProviders[modelId].providers) customProviders[modelId].providers = customProviders[modelId].providers.filter(p => p.id !== providerId);
+        }
+
+        await setSetting('llm_provider_custom', customProviders, req.user._id);
+        res.json({ success: true, message: `Provider removed` });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// ══════════════════════════════════════════════════════════════
 // WATERMARK MANAGEMENT
 // ══════════════════════════════════════════════════════════════
 
@@ -1975,7 +2231,7 @@ router.get('/provider-usage', async (req, res) => {
             openai: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo'],
             anthropic: ['claude-3-opus-20240229', 'claude-3-opus', 'claude-3-5-sonnet', 'claude-3-haiku'],
             gemini: ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-flash-image'],
-            grok: ['grok-3', 'grok-3-mini', 'grok-beta'],
+            grok: ['grok-3', 'grok-3-mini', 'grok-imagine-video', 'grok-2-latest'],
             piapi: ['seedance-2.0', 'kling-v2'],
             fal: ['kling-fal', 'fast-sdxl'],
             sarvam: ['bulbul', 'saaras', 'sarvam-2b'],

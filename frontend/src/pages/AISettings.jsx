@@ -156,24 +156,24 @@ export default function AISettings() {
             <SEOHead title="AI Settings — Mantram AI" noIndex={true} />
             <div className="flex items-center gap-1 mb-6 p-1 glass-panel rounded-xl w-fit">
                 <button onClick={() => navigate('/conversations')}
-                    className="px-5 py-2 rounded-lg text-sm font-bold text-slate-400 hover:text-white hover:bg-white/[0.04] transition-all flex items-center gap-2 cursor-pointer">
+                    className="px-5 py-2 rounded-lg text-sm font-bold text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)] transition-all flex items-center gap-2 cursor-pointer">
                     <span className="material-symbols-outlined text-sm">inbox</span> Inbox
                 </button>
                 <button onClick={() => navigate('/conversations/automations')}
-                    className="px-5 py-2 rounded-lg text-sm font-bold text-slate-400 hover:text-white hover:bg-white/[0.04] transition-all flex items-center gap-2 cursor-pointer">
+                    className="px-5 py-2 rounded-lg text-sm font-bold text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)] transition-all flex items-center gap-2 cursor-pointer">
                     <span className="material-symbols-outlined text-sm">bolt</span> Automations
                 </button>
                 <button className="px-5 py-2 rounded-lg text-sm font-bold bg-primary/10 text-primary flex items-center gap-2 cursor-pointer">
                     <span className="material-symbols-outlined text-sm">psychology</span> AI Settings
                 </button>
                 <button onClick={() => navigate('/conversations/insights')}
-                    className="px-5 py-2 rounded-lg text-sm font-bold text-slate-400 hover:text-white hover:bg-white/[0.04] transition-all flex items-center gap-2 cursor-pointer">
+                    className="px-5 py-2 rounded-lg text-sm font-bold text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)] transition-all flex items-center gap-2 cursor-pointer">
                     <span className="material-symbols-outlined text-sm">insights</span> Insights
                 </button>
             </div>
 
             {error && (
-                <div className={`mb-6 p-4 rounded-xl border ${error.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'} text-sm flex items-center gap-2`}>
+                <div className={`mb-6 p-4 rounded-xl border ${error.isProviderError ? 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary' : 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary'} text-sm flex items-center gap-2`}>
                     <span className="material-symbols-outlined text-base">
                         {error.isProviderError ? 'warning' : 'error'}
                     </span>
@@ -349,7 +349,7 @@ export default function AISettings() {
                             )}
 
                             {testResult?.error && (
-                                <div className={`p-4 rounded-xl border ${testResult.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'} text-sm flex items-center gap-2`}>
+                                <div className={`p-4 rounded-xl border ${testResult.isProviderError ? 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary' : 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary'} text-sm flex items-center gap-2`}>
                                     <span className="material-symbols-outlined text-base">
                                         {testResult.isProviderError ? 'warning' : 'error'}
                                     </span>

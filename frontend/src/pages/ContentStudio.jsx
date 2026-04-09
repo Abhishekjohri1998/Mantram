@@ -19,7 +19,7 @@ const GOALS = [
     {
         id: 'promote', icon: 'campaign', label: 'Promote Something',
         desc: 'Product, service, offer, sale, or discount',
-        glow: 'glow-amber', iconColor: 'text-amber-400', accent: '#F59E0B',
+        glow: 'glow-amber', iconColor: 'text-primary', accent: '#F59E0B',
         subTypes: [
             { id: 'product', icon: 'inventory_2', label: 'Product Push' },
             { id: 'service', icon: 'handyman', label: 'Service Highlight' },
@@ -58,7 +58,7 @@ const GOALS = [
     {
         id: 'educate', icon: 'school', label: 'Educate / Inform',
         desc: 'Blog, SEO article, thought leadership, how-to guide',
-        glow: 'glow-emerald', iconColor: 'text-emerald-400', accent: '#10B981',
+        glow: 'glow-emerald', iconColor: 'text-primary', accent: '#10B981',
         subTypes: [
             { id: 'seo_blog', icon: 'search', label: 'SEO Blog Article' },
             { id: 'thought_leader', icon: 'psychology', label: 'Thought Leadership' },
@@ -84,7 +84,7 @@ const GOALS = [
     {
         id: 'blog', icon: 'edit_note', label: 'Write Blog / Article',
         desc: 'Long-form blogs, SEO articles, listicles, pillar content',
-        glow: 'glow-teal', iconColor: 'text-teal-400', accent: '#14B8A6',
+        glow: 'glow-teal', iconColor: 'text-primary', accent: '#14B8A6',
         subTypes: [
             { id: 'seo_blog', icon: 'search', label: 'SEO Blog Article' },
             { id: 'long_form', icon: 'article', label: 'Long-form Article' },
@@ -103,7 +103,7 @@ const GOALS = [
     {
         id: 'press_release', icon: 'newspaper', label: 'Write Press Release',
         desc: 'Professional PR for launches, announcements, events',
-        glow: 'glow-rose', iconColor: 'text-rose-400', accent: '#F43F5E',
+        glow: 'glow-rose', iconColor: 'text-primary', accent: '#F43F5E',
         subTypes: [
             { id: 'product_pr', icon: 'new_releases', label: 'Product / Service Launch' },
             { id: 'partnership_pr', icon: 'handshake', label: 'Partnership / Collaboration' },
@@ -118,7 +118,7 @@ const GOALS = [
     {
         id: 'product_content', icon: 'shopping_bag', label: 'Write Product Content',
         desc: 'Platform-specific product descriptions, listings & pages',
-        glow: 'glow-cyan', iconColor: 'text-cyan-400', accent: '#06B6D4',
+        glow: 'glow-cyan', iconColor: 'text-primary', accent: '#06B6D4',
         subTypes: [
             { id: 'amazon', icon: 'shopping_cart', label: 'Amazon Listing' },
             { id: 'flipkart', icon: 'storefront', label: 'Flipkart Listing' },
@@ -132,7 +132,7 @@ const GOALS = [
     {
         id: 'youtube_content', icon: 'smart_display', label: 'YouTube Content',
         desc: 'Scripts, titles, descriptions, tags for Videos & Shorts',
-        glow: 'glow-red', iconColor: 'text-red-400', accent: '#FF0000',
+        glow: 'glow-red', iconColor: 'text-primary', accent: '#FF0000',
         subTypes: [
             { id: 'youtube_seo', icon: 'rocket_launch', label: 'Publish Optimizer', desc: 'Title, description, tags & keywords — SEO only, no script' },
             { id: 'video_script', icon: 'movie', label: 'Video Script', desc: 'Full script + all metadata' },
@@ -251,7 +251,7 @@ function SmartInput({ onParse, onSkip }) {
                     </button>
                 </div>
             </div>
-            <p className="text-xs text-on-surface-variant/50 mt-2.5">
+            <p className="text-xs text-[var(--sys-text-muted)]/50 mt-2.5">
                 <span className="material-symbols-outlined text-xs align-middle mr-0.5">mic</span>
                 Speak in Hindi, Tamil, Spanish, or any language • Or type below ↓
             </p>
@@ -270,7 +270,7 @@ function StepGoal({ onSelect }) {
                         <span className={`material-symbols-outlined ${g.iconColor} text-lg`}>{g.icon}</span>
                     </div>
                     <h3 className="text-base font-bold text-on-surface mb-1">{g.label}</h3>
-                    <p className="text-sm text-on-surface-variant leading-relaxed">{g.desc}</p>
+                    <p className="text-sm text-[var(--sys-text-muted)] leading-relaxed">{g.desc}</p>
                 </button>
             ))}
         </div>
@@ -281,7 +281,7 @@ function StepSubType({ goal, onSelect, onBack }) {
     const goalData = GOALS.find(g => g.id === goal)
     return (
         <div className="animate-fade-in max-w-3xl mx-auto">
-            <button onClick={onBack} className="text-slate-500 text-sm flex items-center gap-1 mb-6 hover:text-white transition-colors cursor-pointer">
+            <button onClick={onBack} className="text-[var(--sys-text-muted)] text-sm flex items-center gap-1 mb-6 hover:text-[var(--sys-text)] transition-colors cursor-pointer">
                 <span className="material-symbols-outlined text-sm">arrow_back</span> Back
             </button>
             <div className="flex items-center gap-3 mb-6">
@@ -289,8 +289,8 @@ function StepSubType({ goal, onSelect, onBack }) {
                     <span className={`material-symbols-outlined text-xl ${goalData?.iconColor}`}>{goalData?.icon}</span>
                 </div>
                 <div>
-                    <h3 className="text-xl font-extrabold text-white">{goalData?.label}</h3>
-                    <p className="text-sm text-slate-400">What specifically?</p>
+                    <h3 className="text-xl font-extrabold text-[var(--sys-text)]">{goalData?.label}</h3>
+                    <p className="text-sm text-[var(--sys-text-muted)]">What specifically?</p>
                 </div>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
@@ -298,8 +298,8 @@ function StepSubType({ goal, onSelect, onBack }) {
                     <button key={st.id} onClick={() => onSelect(st.id)}
                         className="glass-card p-4 text-left cursor-pointer animate-fade-in group"
                         style={{ animationDelay: `${i * 60}ms` }}>
-                        <span className="material-symbols-outlined text-xl text-slate-400 group-hover:text-primary transition-colors mb-2 block">{st.icon}</span>
-                        <p className="text-base font-bold text-white">{st.label}</p>
+                        <span className="material-symbols-outlined text-xl text-[var(--sys-text-muted)] group-hover:text-primary transition-colors mb-2 block">{st.icon}</span>
+                        <p className="text-base font-bold text-[var(--sys-text)]">{st.label}</p>
                     </button>
                 ))}
             </div>
@@ -325,23 +325,23 @@ function StepChannel({ onSelect, onBack, goal }) {
 
     return (
         <div className="animate-fade-in max-w-3xl mx-auto">
-            <button onClick={onBack} className="text-slate-500 text-sm flex items-center gap-1 mb-6 hover:text-white transition-colors cursor-pointer">
+            <button onClick={onBack} className="text-[var(--sys-text-muted)] text-sm flex items-center gap-1 mb-6 hover:text-[var(--sys-text)] transition-colors cursor-pointer">
                 <span className="material-symbols-outlined text-sm">arrow_back</span> Back
             </button>
-            <h3 className="text-xl font-extrabold text-white mb-2">Where will this be <span className="text-primary">published?</span></h3>
-            <p className="text-sm text-slate-400 mb-6">Content will be auto-optimized for the selected platform{selected.length > 1 ? 's' : ''}.</p>
+            <h3 className="text-xl font-extrabold text-[var(--sys-text)] mb-2">Where will this be <span className="text-primary">published?</span></h3>
+            <p className="text-sm text-[var(--sys-text-muted)] mb-6">Content will be auto-optimized for the selected platform{selected.length > 1 ? 's' : ''}.</p>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 {CHANNELS.map((ch, i) => (
                     <button key={ch.id} onClick={() => handleToggle(ch.id)}
                         className={`glass-panel rounded-xl p-4 text-center transition-all cursor-pointer animate-fade-in ${selected.includes(ch.id) || (ch.id === 'multi' && selected.length > 2)
                             ? 'bg-primary/15 border-primary/40'
-                            : 'hover:bg-white/[0.05] hover:border-white/[0.15]'
+                            : 'hover:bg-[var(--sys-surface)] hover:border-[var(--sys-border)]'
                             }`}
                         style={{ animationDelay: `${i * 50}ms` }}>
                         <span className="material-symbols-outlined text-2xl mb-1.5 block" style={{
                             color: selected.includes(ch.id) ? '#2B4BEE' : '#64748b'
                         }}>{ch.fallbackIcon}</span>
-                        <p className={`text-xs font-bold ${selected.includes(ch.id) ? 'text-white' : 'text-slate-400'} `}>{ch.label}</p>
+                        <p className={`text-xs font-bold ${selected.includes(ch.id) ? 'text-[var(--sys-text)]' : 'text-[var(--sys-text-muted)]'} `}>{ch.label}</p>
                     </button>
                 ))}
             </div>
@@ -475,11 +475,11 @@ function StepContext({ onComplete, onBack, goal, subType, initialImage, brandId 
 
     return (
         <div className="animate-fade-in max-w-2xl mx-auto">
-            <button onClick={onBack} className="text-slate-500 text-sm flex items-center gap-1 mb-6 hover:text-white transition-colors cursor-pointer">
+            <button onClick={onBack} className="text-[var(--sys-text-muted)] text-sm flex items-center gap-1 mb-6 hover:text-[var(--sys-text)] transition-colors cursor-pointer">
                 <span className="material-symbols-outlined text-sm">arrow_back</span> Back
             </button>
-            <h3 className="text-xl font-extrabold text-white mb-2">Add <span className="text-primary">context</span></h3>
-            <p className="text-sm text-slate-400 mb-6">The more details you provide, the better the output.</p>
+            <h3 className="text-xl font-extrabold text-[var(--sys-text)] mb-2">Add <span className="text-primary">context</span></h3>
+            <p className="text-sm text-[var(--sys-text-muted)] mb-6">The more details you provide, the better the output.</p>
 
             {/* Context type tabs */}
             <div className="flex gap-2 mb-6 flex-wrap">
@@ -490,11 +490,11 @@ function StepContext({ onComplete, onBack, goal, subType, initialImage, brandId 
                     { id: 'library', icon: 'photo_library', label: 'Image Bank' },
                 ].map(t => (
                     <button key={t.id} onClick={() => setContextType(t.id)}
-                        className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${contextType === t.id ? 'bg-primary text-white' : 'glass-panel text-slate-400 hover:text-white'
+                        className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${contextType === t.id ? 'bg-primary text-white' : 'glass-panel text-[var(--sys-text-muted)] hover:text-white'
                             } `}>
                         <span className="material-symbols-outlined text-sm">{t.icon}</span> {t.label}
                         {t.id === 'library' && libraryCounts.all > 0 && (
-                            <span className="bg-white/20 text-xs px-1.5 py-0.5 rounded-full">{libraryCounts.all}</span>
+                            <span className="bg-[var(--sys-surface)] text-xs px-1.5 py-0.5 rounded-full">{libraryCounts.all}</span>
                         )}
                     </button>
                 ))}
@@ -505,7 +505,7 @@ function StepContext({ onComplete, onBack, goal, subType, initialImage, brandId 
                 <div className="relative">
                     <textarea value={details} onChange={e => setDetails(e.target.value)}
                         placeholder={placeholder}
-                        className="input-glass w-full py-4 pr-14 resize-none text-white" rows={5} autoFocus />
+                        className="input-glass w-full py-4 pr-14 resize-none text-[var(--sys-text)]" rows={5} autoFocus />
                     <div className="absolute right-3 top-3">
                         <VoiceInput
                             onResult={(text) => setDetails(prev => prev ? prev + ' ' + text : text)}
@@ -519,7 +519,7 @@ function StepContext({ onComplete, onBack, goal, subType, initialImage, brandId 
             {contextType === 'url' && (
                 <div className="space-y-3">
                     <div className="relative">
-                        <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-500">link</span>
+                        <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-[var(--sys-text-muted)]">link</span>
                         <input value={url} onChange={e => setUrl(e.target.value)}
                             placeholder="Paste product, page, or article URL"
                             className="input-glass w-full pl-12 py-3" autoFocus />
@@ -545,10 +545,10 @@ function StepContext({ onComplete, onBack, goal, subType, initialImage, brandId 
                                 reader.readAsDataURL(file)
                             }
                         }} onDragOver={e => e.preventDefault()}
-                            className="border-2 border-dashed border-white/[0.1] rounded-2xl p-10 text-center hover:border-primary/40 transition-colors">
-                            <span className="material-symbols-outlined text-4xl text-slate-600 mb-3 block">add_photo_alternate</span>
-                            <p className="text-slate-400 mb-2 text-sm">Drag & drop a product image or creative</p>
-                            <p className="text-xs text-slate-600 mb-3">AI will analyze the image and create a content brief</p>
+                            className="border border-dashed border-[var(--sys-border)] rounded-2xl p-10 text-center hover:border-primary/40 transition-colors">
+                            <span className="material-symbols-outlined text-4xl text-[var(--sys-text-muted)] mb-3 block">add_photo_alternate</span>
+                            <p className="text-[var(--sys-text-muted)] mb-2 text-sm">Drag & drop a product image or creative</p>
+                            <p className="text-xs text-[var(--sys-text-muted)] mb-3">AI will analyze the image and create a content brief</p>
                             <label className="btn-primary py-2 px-5 rounded-xl text-xs cursor-pointer inline-block">
                                 Choose Image
                                 <input type="file" className="hidden" onChange={(e) => {
@@ -569,14 +569,14 @@ function StepContext({ onComplete, onBack, goal, subType, initialImage, brandId 
                         <div className="animate-fade-in">
                             {/* Preview */}
                             <div className="relative rounded-2xl overflow-hidden mb-4">
-                                <img src={imagePreview} alt="Uploaded" className="w-full max-h-64 object-contain bg-black/20 rounded-2xl" />
+                                <img src={imagePreview} alt="Uploaded" className="w-full max-h-64 object-contain bg-[var(--sys-surface)] rounded-2xl" />
                                 <button onClick={() => { setImagePreview(null); setFiles([]); setImageAnalysis(''); setAnalysisError('') }}
-                                    className="absolute top-3 right-3 p-1.5 rounded-lg bg-black/60 text-white hover:bg-rose-500/80 transition-colors cursor-pointer">
+                                    className="absolute top-3 right-3 p-1.5 rounded-lg bg-[var(--sys-surface)] text-[var(--sys-text)] hover:bg-[var(--sys-primary-dim)] transition-colors cursor-pointer">
                                     <span className="material-symbols-outlined text-sm">close</span>
                                 </button>
                                 {files[0] && (
-                                    <div className="absolute bottom-3 left-3 bg-black/60 rounded-lg px-2.5 py-1">
-                                        <span className="text-sm text-white">{files[0].name} • {(files[0].size / 1024).toFixed(0)} KB</span>
+                                    <div className="absolute bottom-3 left-3 bg-[var(--sys-surface)] rounded-lg px-2.5 py-1">
+                                        <span className="text-sm text-[var(--sys-text)]">{files[0].name} • {(files[0].size / 1024).toFixed(0)} KB</span>
                                     </div>
                                 )}
                             </div>
@@ -616,7 +616,7 @@ function StepContext({ onComplete, onBack, goal, subType, initialImage, brandId 
 
                             {/* Analysis Error */}
                             {analysisError && (
-                                <div className={`p-3 rounded-xl border ${analysisError.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'} text-sm mb-4`}>
+                                <div className={`p-3 rounded-xl border ${analysisError.isProviderError ? 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary' : 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary'} text-sm mb-4`}>
                                     <span className="material-symbols-outlined align-middle mr-1 text-sm">
                                         {analysisError.isProviderError ? 'warning' : 'error'}
                                     </span> 
@@ -629,11 +629,11 @@ function StepContext({ onComplete, onBack, goal, subType, initialImage, brandId 
                             {imageAnalysis && (
                                 <div className="glass-panel rounded-2xl p-5 mb-4 animate-fade-in">
                                     <div className="flex items-center gap-2 mb-3">
-                                        <span className="material-symbols-outlined text-emerald-400">check_circle</span>
-                                        <h4 className="text-base font-bold text-white">AI Image Analysis</h4>
-                                        <span className="text-sm text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded-full font-bold">Gemini Vision</span>
+                                        <span className="material-symbols-outlined text-primary">check_circle</span>
+                                        <h4 className="text-base font-bold text-[var(--sys-text)]">AI Image Analysis</h4>
+                                        <span className="text-sm text-primary bg-[var(--sys-primary-dim)] px-2 py-0.5 rounded-full font-bold">Gemini Vision</span>
                                     </div>
-                                    <div className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap max-h-48 overflow-y-auto">
+                                    <div className="text-sm text-[var(--sys-text-muted)] leading-relaxed whitespace-pre-wrap max-h-48 overflow-y-auto">
                                         {imageAnalysis}
                                     </div>
                                 </div>
@@ -670,7 +670,7 @@ function StepContext({ onComplete, onBack, goal, subType, initialImage, brandId 
                             { id: 'generated', label: 'AI Generated', count: libraryCounts.generated },
                         ].map(cat => (
                             <button key={cat.id} onClick={() => { setLibraryCategory(cat.id); loadLibrary(cat.id) }}
-                                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${libraryCategory === cat.id ? 'bg-primary/20 text-primary border border-primary/30' : 'glass-panel text-slate-400 hover:text-white'} `}>
+                                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${libraryCategory === cat.id ? 'bg-primary/20 text-primary border border-primary/30' : 'glass-panel text-[var(--sys-text-muted)] hover:text-white'} `}>
                                 {cat.label}
                                 <span className="ml-1.5 text-xs opacity-60">{cat.count}</span>
                             </button>
@@ -681,7 +681,7 @@ function StepContext({ onComplete, onBack, goal, subType, initialImage, brandId 
                     {libraryLoading && (
                         <div className="text-center py-8">
                             <span className="material-symbols-outlined text-3xl text-primary animate-spin block mb-2">progress_activity</span>
-                            <p className="text-sm text-slate-400">Loading your image library...</p>
+                            <p className="text-sm text-[var(--sys-text-muted)]">Loading your image library...</p>
                         </div>
                     )}
 
@@ -689,8 +689,8 @@ function StepContext({ onComplete, onBack, goal, subType, initialImage, brandId 
                     {!libraryLoading && libraryImages.length === 0 && (
                         <div className="text-center py-10 glass-panel rounded-2xl">
                             <span className="material-symbols-outlined text-4xl text-slate-700 mb-3 block">photo_library</span>
-                            <h4 className="text-sm font-bold text-slate-500 mb-1">No images yet</h4>
-                            <p className="text-xs text-slate-600">Generate images in AI Photoshoot or upload images to build your library.</p>
+                            <h4 className="text-sm font-bold text-[var(--sys-text-muted)] mb-1">No images yet</h4>
+                            <p className="text-xs text-[var(--sys-text-muted)]">Generate images in AI Photoshoot or upload images to build your library.</p>
                         </div>
                     )}
 
@@ -712,17 +712,17 @@ function StepContext({ onComplete, onBack, goal, subType, initialImage, brandId 
                                         .catch(err => setAnalysisError(err.message || 'Analysis failed'))
                                         .finally(() => setAnalyzing(false))
                                 }}
-                                    className="group relative rounded-xl overflow-hidden bg-black/20 cursor-pointer transition-all hover:ring-2 hover:ring-primary/50 aspect-square">
+                                    className="group relative rounded-xl overflow-hidden bg-[var(--sys-surface)] cursor-pointer transition-all hover:ring-2 hover:ring-primary/50 aspect-square">
                                     <img src={img.thumbnailUrl || img.imageUrl} alt={img.title}
                                         className="w-full h-full object-cover" />
-                                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                                    <div className="absolute inset-0 bg-black/60 border border-[var(--sys-border)] opacity-0 group-hover:opacity-100 transition-opacity" />
                                     <div className="absolute bottom-0 left-0 right-0 p-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <p className="text-sm text-white font-bold truncate">{img.title || 'Untitled'}</p>
+                                        <p className="text-sm text-[var(--sys-text)] font-bold truncate">{img.title || 'Untitled'}</p>
                                         <div className="flex items-center gap-1 mt-0.5">
-                                            <span className={`text-[8px] px-1.5 py-0.5 rounded-full font-bold ${img.type === 'uploaded' ? 'bg-[#FF4D00]/30 text-[#FF7A00]' : img.type === 'ai-photoshoot' ? 'bg-amber-500/30 text-amber-300' : 'bg-emerald-500/30 text-emerald-300'} `}>
+                                            <span className={`text-[8px] px-1.5 py-0.5 rounded-full font-bold ${img.type === 'uploaded' ? 'bg-[#FF4D00]/30 text-[#FF7A00]' : img.type === 'ai-photoshoot' ? 'bg-[var(--sys-primary-dim)] text-[var(--sys-primary)]' : 'bg-[var(--sys-primary-dim)] text-[var(--sys-primary)]'} `}>
                                                 {img.type === 'uploaded' ? 'Uploaded' : img.type === 'ai-photoshoot' ? 'Photoshoot' : 'Generated'}
                                             </span>
-                                            <span className="text-[8px] text-slate-400">{new Date(img.createdAt).toLocaleDateString()}</span>
+                                            <span className="text-[8px] text-[var(--sys-text-muted)]">{new Date(img.createdAt).toLocaleDateString()}</span>
                                         </div>
                                     </div>
                                     <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
@@ -740,7 +740,7 @@ function StepContext({ onComplete, onBack, goal, subType, initialImage, brandId 
                 <div className="mt-5">
                     {!showProductPanel && !loadingSuggestions && suggestedProducts.length === 0 && details.length > 5 && (
                         <button onClick={fetchSuggestions}
-                            className="glass-panel w-full py-3 rounded-xl text-xs font-bold text-cyan-400 hover:bg-cyan-400/10 border border-cyan-400/20 flex items-center justify-center gap-2 cursor-pointer transition-all">
+                            className="glass-panel w-full py-3 rounded-xl text-xs font-bold text-primary hover:bg-[var(--sys-primary-dim)] border border-[var(--sys-border)] flex items-center justify-center gap-2 cursor-pointer transition-all">
                             <span className="material-symbols-outlined text-sm">smart_toy</span>
                             Find matching products from your catalog
                         </button>
@@ -758,11 +758,11 @@ function StepContext({ onComplete, onBack, goal, subType, initialImage, brandId 
                         <div className="animate-fade-in">
                             <div className="flex items-center justify-between mb-3">
                                 <div className="flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-sm text-cyan-400">smart_toy</span>
-                                    <h4 className="text-base font-bold text-white">AI Product Match</h4>
-                                    <span className="bg-cyan-500/20 text-cyan-400 text-xs px-2 py-0.5 rounded-full font-bold">{suggestedProducts.length} found</span>
+                                    <span className="material-symbols-outlined text-sm text-primary">smart_toy</span>
+                                    <h4 className="text-base font-bold text-[var(--sys-text)]">AI Product Match</h4>
+                                    <span className="bg-[var(--sys-primary-dim)] text-primary text-xs px-2 py-0.5 rounded-full font-bold">{suggestedProducts.length} found</span>
                                 </div>
-                                <button onClick={() => setShowProductPanel(false)} className="text-slate-500 hover:text-white cursor-pointer">
+                                <button onClick={() => setShowProductPanel(false)} className="text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer">
                                     <span className="material-symbols-outlined text-sm">close</span>
                                 </button>
                             </div>
@@ -771,20 +771,20 @@ function StepContext({ onComplete, onBack, goal, subType, initialImage, brandId 
                                     const isAttached = attachedProducts.some(ap => ap._id === p._id)
                                     return (
                                         <button key={p._id} onClick={() => toggleProduct(p)}
-                                            className={`glass-panel rounded-xl p-2.5 text-left transition-all cursor-pointer border ${isAttached ? 'border-cyan-400/50 bg-cyan-400/5 ring-1 ring-cyan-400/30' : 'border-white/5 hover:border-cyan-400/20'
+                                            className={`glass-panel rounded-xl p-2.5 text-left transition-all cursor-pointer border ${isAttached ? 'border-[var(--sys-border)] bg-[var(--sys-primary-dim)] ' : 'border-[var(--sys-border)] hover:border-[var(--sys-border)]'
                                                 } `}>
                                             {p.images?.[0]?.url && (
                                                 <img src={p.images[0].url} alt={p.title}
-                                                    className="w-full h-20 object-cover rounded-lg mb-2 bg-white/5" />
+                                                    className="w-full h-20 object-cover rounded-lg mb-2 bg-[var(--sys-surface)]" />
                                             )}
-                                            <p className="text-sm font-bold text-white truncate">{p.title}</p>
+                                            <p className="text-sm font-bold text-[var(--sys-text)] truncate">{p.title}</p>
                                             {p.price?.amount > 0 && (
-                                                <p className="text-sm text-emerald-400 mt-0.5">₹{p.price.amount}</p>
+                                                <p className="text-sm text-primary mt-0.5">₹{p.price.amount}</p>
                                             )}
                                             {isAttached && (
                                                 <div className="flex items-center gap-1 mt-1.5">
-                                                    <span className="material-symbols-outlined text-sm text-cyan-400">check_circle</span>
-                                                    <span className="text-sm text-cyan-400 font-bold">Attached</span>
+                                                    <span className="material-symbols-outlined text-sm text-primary">check_circle</span>
+                                                    <span className="text-sm text-primary font-bold">Attached</span>
                                                 </div>
                                             )}
                                         </button>
@@ -792,7 +792,7 @@ function StepContext({ onComplete, onBack, goal, subType, initialImage, brandId 
                                 })}
                             </div>
                             {attachedProducts.length > 0 && (
-                                <p className="text-sm text-cyan-400/70 mt-2 flex items-center gap-1">
+                                <p className="text-sm text-primary/70 mt-2 flex items-center gap-1">
                                     <span className="material-symbols-outlined text-xs">inventory_2</span>
                                     {attachedProducts.length} product{attachedProducts.length > 1 ? 's' : ''} will be included in your content
                                 </p>
@@ -805,7 +805,7 @@ function StepContext({ onComplete, onBack, goal, subType, initialImage, brandId 
             <button onClick={handleContextComplete}
                 className="btn-primary w-full py-3.5 rounded-xl mt-6 text-sm font-bold flex items-center justify-center gap-2">
                 {attachedProducts.length > 0 && (
-                    <span className="bg-white/20 text-xs px-2 py-0.5 rounded-full">{attachedProducts.length} product{attachedProducts.length > 1 ? 's' : ''}</span>
+                    <span className="bg-[var(--sys-surface)] text-xs px-2 py-0.5 rounded-full">{attachedProducts.length} product{attachedProducts.length > 1 ? 's' : ''}</span>
                 )}
                 Continue →
             </button>
@@ -870,15 +870,15 @@ function StepTone({ onComplete, onBack, goal, activeBrand, availableProviders, m
 
     return (
         <div className="animate-fade-in max-w-2xl mx-auto">
-            <button onClick={onBack} className="text-slate-500 text-sm flex items-center gap-1 mb-6 hover:text-white transition-colors cursor-pointer">
+            <button onClick={onBack} className="text-[var(--sys-text-muted)] text-sm flex items-center gap-1 mb-6 hover:text-[var(--sys-text)] transition-colors cursor-pointer">
                 <span className="material-symbols-outlined text-sm">arrow_back</span> Back
             </button>
-            <h3 className="text-xl font-extrabold text-white mb-2">Set the <span className="text-primary">vibe</span></h3>
-            <p className="text-sm text-slate-400 mb-6">Language, tone, and style controls layer on top of your brand's voice.</p>
+            <h3 className="text-xl font-extrabold text-[var(--sys-text)] mb-2">Set the <span className="text-primary">vibe</span></h3>
+            <p className="text-sm text-[var(--sys-text-muted)] mb-6">Language, tone, and style controls layer on top of your brand's voice.</p>
 
             {/* Language Selector */}
             <div className="mb-6">
-                <p className="text-sm text-slate-500 uppercase tracking-widest font-bold mb-3">
+                <p className="text-sm text-[var(--sys-text-muted)] uppercase tracking-widest font-bold mb-3">
                     <span className="material-symbols-outlined text-xs align-middle mr-1">translate</span>
                     Language
                 </p>
@@ -886,7 +886,7 @@ function StepTone({ onComplete, onBack, goal, activeBrand, availableProviders, m
                     {LANGUAGES.map(l => (
                         <button key={l.id} onClick={() => setLanguage(l.id)}
                             className={`px-3 py-2 rounded-xl text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5
-                                ${language === l.id ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'bg-white/[0.04] text-slate-400 hover:bg-white/[0.06] border border-white/[0.06]'} `}>
+                                ${language === l.id ? 'bg-primary text-white shadow-none' : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] hover:bg-[var(--sys-surface)] border border-[var(--sys-border)]'} `}>
                             <span className="text-sm">{l.flag}</span> {l.label}
                         </button>
                     ))}
@@ -898,10 +898,10 @@ function StepTone({ onComplete, onBack, goal, activeBrand, availableProviders, m
                         {LANG_STYLES.map(s => (
                             <button key={s.id} onClick={() => setLangStyle(s.id)}
                                 className={`glass-panel rounded-xl p-3 text-center transition-all cursor-pointer
-                                    ${langStyle === s.id ? 'bg-primary/15 border-primary/40' : 'hover:bg-white/[0.05]'} `}>
-                                <span className={`material-symbols-outlined text-lg block mb-1 ${langStyle === s.id ? 'text-primary' : 'text-slate-500'} `}>{s.icon}</span>
-                                <p className={`text-xs font-bold ${langStyle === s.id ? 'text-white' : 'text-slate-400'} `}>{s.label}</p>
-                                <p className="text-xs text-slate-600">{s.desc}</p>
+                                    ${langStyle === s.id ? 'bg-primary/15 border-primary/40' : 'hover:bg-[var(--sys-surface)]'} `}>
+                                <span className={`material-symbols-outlined text-lg block mb-1 ${langStyle === s.id ? 'text-primary' : 'text-[var(--sys-text-muted)]'} `}>{s.icon}</span>
+                                <p className={`text-xs font-bold ${langStyle === s.id ? 'text-[var(--sys-text)]' : 'text-[var(--sys-text-muted)]'} `}>{s.label}</p>
+                                <p className="text-xs text-[var(--sys-text-muted)]">{s.desc}</p>
                             </button>
                         ))}
                     </div>
@@ -910,7 +910,7 @@ function StepTone({ onComplete, onBack, goal, activeBrand, availableProviders, m
                 {/* Script / Font — only for non-Latin regional languages */}
                 {language !== 'english' && (
                     <div className="mt-4 animate-fade-in">
-                        <p className="text-sm text-slate-500 uppercase tracking-widest font-bold mb-2">
+                        <p className="text-sm text-[var(--sys-text-muted)] uppercase tracking-widest font-bold mb-2">
                             <span className="material-symbols-outlined text-xs align-middle mr-1">font_download</span>
                             Script / Font
                         </p>
@@ -918,10 +918,10 @@ function StepTone({ onComplete, onBack, goal, activeBrand, availableProviders, m
                             {SCRIPT_OPTIONS.map(s => (
                                 <button key={s.id} onClick={() => setScriptType(s.id)}
                                     className={`glass-panel rounded-xl p-3 text-center transition-all cursor-pointer
-                                        ${scriptType === s.id ? 'bg-primary/15 border-primary/40' : 'hover:bg-white/[0.05]'} `}>
-                                    <span className={`material-symbols-outlined text-lg block mb-1 ${scriptType === s.id ? 'text-primary' : 'text-slate-500'} `}>{s.icon}</span>
-                                    <p className={`text-xs font-bold ${scriptType === s.id ? 'text-white' : 'text-slate-400'} `}>{s.label}</p>
-                                    <p className="text-xs text-slate-600 mt-0.5">{s.desc}</p>
+                                        ${scriptType === s.id ? 'bg-primary/15 border-primary/40' : 'hover:bg-[var(--sys-surface)]'} `}>
+                                    <span className={`material-symbols-outlined text-lg block mb-1 ${scriptType === s.id ? 'text-primary' : 'text-[var(--sys-text-muted)]'} `}>{s.icon}</span>
+                                    <p className={`text-xs font-bold ${scriptType === s.id ? 'text-[var(--sys-text)]' : 'text-[var(--sys-text-muted)]'} `}>{s.label}</p>
+                                    <p className="text-xs text-[var(--sys-text-muted)] mt-0.5">{s.desc}</p>
                                 </button>
                             ))}
                         </div>
@@ -931,14 +931,14 @@ function StepTone({ onComplete, onBack, goal, activeBrand, availableProviders, m
 
             {/* Tone */}
             <div className="mb-6">
-                <p className="text-sm text-slate-500 uppercase tracking-widest font-bold mb-3">Tone & Style</p>
+                <p className="text-sm text-[var(--sys-text-muted)] uppercase tracking-widest font-bold mb-3">Tone & Style</p>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                     {TONES.map(t => (
                         <button key={t.id} onClick={() => setTone(t.id)}
-                            className={`glass-panel rounded-xl p-3 text-center transition-all cursor-pointer ${tone === t.id ? 'bg-primary/15 border-primary/40' : 'hover:bg-white/[0.05]'
+                            className={`glass-panel rounded-xl p-3 text-center transition-all cursor-pointer ${tone === t.id ? 'bg-primary/15 border-primary/40' : 'hover:bg-[var(--sys-surface)]'
                                 } `}>
-                            <span className={`material-symbols-outlined text-lg block mb-1 ${tone === t.id ? 'text-primary' : 'text-slate-500'} `}>{t.icon}</span>
-                            <p className={`text-xs font-bold ${tone === t.id ? 'text-white' : 'text-slate-400'} `}>{t.label}</p>
+                            <span className={`material-symbols-outlined text-lg block mb-1 ${tone === t.id ? 'text-primary' : 'text-[var(--sys-text-muted)]'} `}>{t.icon}</span>
+                            <p className={`text-xs font-bold ${tone === t.id ? 'text-[var(--sys-text)]' : 'text-[var(--sys-text-muted)]'} `}>{t.label}</p>
                         </button>
                     ))}
                 </div>
@@ -946,15 +946,15 @@ function StepTone({ onComplete, onBack, goal, activeBrand, availableProviders, m
 
             {/* Length */}
             <div className="mb-6">
-                <p className="text-sm text-slate-500 uppercase tracking-widest font-bold mb-3">Length</p>
+                <p className="text-sm text-[var(--sys-text-muted)] uppercase tracking-widest font-bold mb-3">Length</p>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                     {LENGTHS.map(l => (
                         <button key={l.id} onClick={() => setLength(l.id)}
-                            className={`glass-panel rounded-xl p-3 text-center transition-all cursor-pointer ${length === l.id ? 'bg-primary/15 border-primary/40' : 'hover:bg-white/[0.05]'
+                            className={`glass-panel rounded-xl p-3 text-center transition-all cursor-pointer ${length === l.id ? 'bg-primary/15 border-primary/40' : 'hover:bg-[var(--sys-surface)]'
                                 } `}>
-                            <span className={`material-symbols-outlined text-lg block mb-1 ${length === l.id ? 'text-primary' : 'text-slate-500'} `}>{l.icon}</span>
-                            <p className={`text-xs font-bold ${length === l.id ? 'text-white' : 'text-slate-400'} `}>{l.label}</p>
-                            <p className="text-xs text-slate-600">{l.desc}</p>
+                            <span className={`material-symbols-outlined text-lg block mb-1 ${length === l.id ? 'text-primary' : 'text-[var(--sys-text-muted)]'} `}>{l.icon}</span>
+                            <p className={`text-xs font-bold ${length === l.id ? 'text-[var(--sys-text)]' : 'text-[var(--sys-text-muted)]'} `}>{l.label}</p>
+                            <p className="text-xs text-[var(--sys-text-muted)]">{l.desc}</p>
                         </button>
                     ))}
                 </div>
@@ -963,14 +963,14 @@ function StepTone({ onComplete, onBack, goal, activeBrand, availableProviders, m
             {/* Sell Style (for promote/launch) */}
             {showSellStyle && (
                 <div className="mb-6">
-                    <p className="text-sm text-slate-500 uppercase tracking-widest font-bold mb-3">Selling Approach</p>
+                    <p className="text-sm text-[var(--sys-text-muted)] uppercase tracking-widest font-bold mb-3">Selling Approach</p>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                         {SELL_STYLES.map(s => (
                             <button key={s.id} onClick={() => setSellStyle(s.id)}
-                                className={`glass-panel rounded-xl p-3 text-center transition-all cursor-pointer ${sellStyle === s.id ? 'bg-primary/15 border-primary/40' : 'hover:bg-white/[0.05]'
+                                className={`glass-panel rounded-xl p-3 text-center transition-all cursor-pointer ${sellStyle === s.id ? 'bg-primary/15 border-primary/40' : 'hover:bg-[var(--sys-surface)]'
                                     } `}>
-                                <p className={`text-xs font-bold ${sellStyle === s.id ? 'text-white' : 'text-slate-400'} `}>{s.label}</p>
-                                <p className="text-xs text-slate-600 mt-0.5">{s.desc}</p>
+                                <p className={`text-xs font-bold ${sellStyle === s.id ? 'text-[var(--sys-text)]' : 'text-[var(--sys-text-muted)]'} `}>{s.label}</p>
+                                <p className="text-xs text-[var(--sys-text-muted)] mt-0.5">{s.desc}</p>
                             </button>
                         ))}
                     </div>
@@ -980,11 +980,11 @@ function StepTone({ onComplete, onBack, goal, activeBrand, availableProviders, m
             {/* ── AI Model (Advanced — collapsed by default) ── */}
             <div className="mb-6">
                 <button onClick={() => setShowAdvanced(!showAdvanced)}
-                    className="flex items-center gap-1.5 text-xs text-slate-600 hover:text-slate-400 transition-colors cursor-pointer w-full">
+                    className="flex items-center gap-1.5 text-xs text-[var(--sys-text-muted)] hover:text-[var(--sys-text-muted)] transition-colors cursor-pointer w-full">
                     <span className="material-symbols-outlined text-xs">{showAdvanced ? 'expand_less' : 'tune'}</span>
                     <span className="uppercase tracking-widest font-bold">AI Model</span>
-                    <span className="flex-1 h-px bg-white/[0.06]" />
-                    <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${modelOverride === 'auto' ? 'bg-primary/10 text-primary' : 'bg-amber-400/10 text-amber-400'} `}>
+                    <span className="flex-1 h-px bg-[var(--sys-surface)]" />
+                    <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${modelOverride === 'auto' ? 'bg-primary/10 text-primary' : 'bg-[var(--sys-primary-dim)] text-primary'} `}>
                         {modelOverride === 'auto' ? 'Auto' : `${(availableProviders.find(p => p.id === modelOverride)?.label || modelOverride)} `}
                     </span>
                 </button>
@@ -993,41 +993,41 @@ function StepTone({ onComplete, onBack, goal, activeBrand, availableProviders, m
                         <div className="grid grid-cols-2 gap-2">
                             {availableProviders.map(p => (
                                 <button key={p.id} onClick={() => setModelOverride(p.id)}
-                                    className={`glass-panel rounded-xl p-3 text-left transition-all cursor-pointer ${modelOverride === p.id ? 'bg-primary/15 border-primary/40' : 'hover:bg-white/[0.05]'} `}>
+                                    className={`glass-panel rounded-xl p-3 text-left transition-all cursor-pointer ${modelOverride === p.id ? 'bg-primary/15 border-primary/40' : 'hover:bg-[var(--sys-surface)]'} `}>
                                     <div className="flex items-center gap-2 mb-1">
-                                        <span className={`material-symbols-outlined text-base ${modelOverride === p.id ? 'text-primary' : 'text-slate-500'} `}>{p.icon}</span>
-                                        <span className={`text-xs font-bold ${modelOverride === p.id ? 'text-white' : 'text-slate-400'} `}>{p.label}</span>
+                                        <span className={`material-symbols-outlined text-base ${modelOverride === p.id ? 'text-primary' : 'text-[var(--sys-text-muted)]'} `}>{p.icon}</span>
+                                        <span className={`text-xs font-bold ${modelOverride === p.id ? 'text-[var(--sys-text)]' : 'text-[var(--sys-text-muted)]'} `}>{p.label}</span>
                                     </div>
-                                    <p className="text-xs text-slate-600">{p.desc}</p>
+                                    <p className="text-xs text-[var(--sys-text-muted)]">{p.desc}</p>
                                 </button>
                             ))}
                         </div>
-                        <p className="text-xs text-slate-600 mt-2 text-center">Auto mode picks the best model based on your language and content type</p>
+                        <p className="text-xs text-[var(--sys-text-muted)] mt-2 text-center">Auto mode picks the best model based on your language and content type</p>
                     </div>
                 )}
             </div>
 
             {/* ── Research Depth Toggle ── */}
             <div className="mb-6">
-                <p className="text-sm text-slate-500 uppercase tracking-widest font-bold mb-3">
+                <p className="text-sm text-[var(--sys-text-muted)] uppercase tracking-widest font-bold mb-3">
                     <span className="material-symbols-outlined text-xs align-middle mr-1">neurology</span>
                     Research Depth
                 </p>
                 <div className="grid grid-cols-2 gap-2">
                     <button onClick={() => setResearchDepth('quick')}
-                        className={`glass-panel rounded-xl p-3 text-center transition-all cursor-pointer ${researchDepth === 'quick' ? 'bg-primary/15 border-primary/40' : 'hover:bg-white/[0.05]'}`}>
-                        <span className={`material-symbols-outlined text-lg block mb-1 ${researchDepth === 'quick' ? 'text-primary' : 'text-slate-500'}`}>bolt</span>
-                        <p className={`text-xs font-bold ${researchDepth === 'quick' ? 'text-white' : 'text-slate-400'}`}>Quick Research</p>
-                        <p className="text-xs text-slate-600 mt-0.5">Fast + trending data</p>
+                        className={`glass-panel rounded-xl p-3 text-center transition-all cursor-pointer ${researchDepth === 'quick' ? 'bg-primary/15 border-primary/40' : 'hover:bg-[var(--sys-surface)]'}`}>
+                        <span className={`material-symbols-outlined text-lg block mb-1 ${researchDepth === 'quick' ? 'text-primary' : 'text-[var(--sys-text-muted)]'}`}>bolt</span>
+                        <p className={`text-xs font-bold ${researchDepth === 'quick' ? 'text-[var(--sys-text)]' : 'text-[var(--sys-text-muted)]'}`}>Quick Research</p>
+                        <p className="text-xs text-[var(--sys-text-muted)] mt-0.5">Fast + trending data</p>
                     </button>
                     <button onClick={() => setResearchDepth('deep')}
-                        className={`glass-panel rounded-xl p-3 text-center transition-all cursor-pointer ${researchDepth === 'deep' ? 'bg-[#FF4D00]/15 border-[#FF4D00]/40' : 'hover:bg-white/[0.05]'}`}>
-                        <span className={`material-symbols-outlined text-lg block mb-1 ${researchDepth === 'deep' ? 'text-[#FF4D00]' : 'text-slate-500'}`}>psychology</span>
-                        <p className={`text-xs font-bold ${researchDepth === 'deep' ? 'text-white' : 'text-slate-400'}`}>Deep Research</p>
-                        <p className="text-xs text-slate-600 mt-0.5">Web search + competitor + SEO</p>
+                        className={`glass-panel rounded-xl p-3 text-center transition-all cursor-pointer ${researchDepth === 'deep' ? 'bg-[#FF4D00]/15 border-[#FF4D00]/40' : 'hover:bg-[var(--sys-surface)]'}`}>
+                        <span className={`material-symbols-outlined text-lg block mb-1 ${researchDepth === 'deep' ? 'text-[#FF4D00]' : 'text-[var(--sys-text-muted)]'}`}>psychology</span>
+                        <p className={`text-xs font-bold ${researchDepth === 'deep' ? 'text-[var(--sys-text)]' : 'text-[var(--sys-text-muted)]'}`}>Deep Research</p>
+                        <p className="text-xs text-[var(--sys-text-muted)] mt-0.5">Web search + competitor + SEO</p>
                     </button>
                 </div>
-                <p className="text-xs text-slate-600 mt-2 text-center">
+                <p className="text-xs text-[var(--sys-text-muted)] mt-2 text-center">
                     {researchDepth === 'quick' ? 'Uses Grok for fast trending intelligence' : 'Uses Perplexity + full web research for deeper insights'}
                 </p>
             </div>
@@ -1118,19 +1118,19 @@ function StepPressRelease({ onComplete, onBack, activeBrand, goal, availableProv
     return (
         <div className="animate-fade-in max-w-2xl mx-auto">
             <button onClick={prStep === 0 ? onBack : () => setPrStep(prStep - 1)}
-                className="text-slate-500 text-sm flex items-center gap-1 mb-6 hover:text-white transition-colors cursor-pointer">
+                className="text-[var(--sys-text-muted)] text-sm flex items-center gap-1 mb-6 hover:text-[var(--sys-text)] transition-colors cursor-pointer">
                 <span className="material-symbols-outlined text-sm">arrow_back</span> Back
             </button>
 
-            <h3 className="text-xl font-extrabold text-white mb-1">
-                <span className="text-rose-400">Press Release</span> — {stepTitles[prStep]}
+            <h3 className="text-xl font-extrabold text-[var(--sys-text)] mb-1">
+                <span className="text-primary">Press Release</span> — {stepTitles[prStep]}
             </h3>
-            <p className="text-sm text-slate-400 mb-6">Step {prStep + 1} of 4</p>
+            <p className="text-sm text-[var(--sys-text-muted)] mb-6">Step {prStep + 1} of 4</p>
 
             {/* Progress dots */}
             <div className="flex gap-1 mb-8">
                 {stepTitles.map((_, i) => (
-                    <div key={i} className={`h-1.5 flex-1 rounded-full transition-all ${i <= prStep ? 'bg-rose-400' : 'bg-white/[0.06]'} `} />
+                    <div key={i} className={`h-1.5 flex-1 rounded-full transition-all ${i <= prStep ? 'bg-[var(--sys-surface)]' : 'bg-[var(--sys-surface)]'} `} />
                 ))}
             </div>
 
@@ -1138,38 +1138,38 @@ function StepPressRelease({ onComplete, onBack, activeBrand, goal, availableProv
             {prStep === 0 && (
                 <div className="space-y-5">
                     <div>
-                        <p className="text-sm text-slate-500 uppercase tracking-widest font-bold mb-2">Headline</p>
+                        <p className="text-sm text-[var(--sys-text-muted)] uppercase tracking-widest font-bold mb-2">Headline</p>
                         <input value={headline} onChange={e => setHeadline(e.target.value)}
                             placeholder="e.g. XYZ Corp Launches AI-Powered Platform for SMBs"
                             className="input-glass w-full py-3 px-4 rounded-xl text-sm" />
-                        <p className="text-xs text-slate-600 mt-1">Leave blank to auto-generate from your description</p>
+                        <p className="text-xs text-[var(--sys-text-muted)] mt-1">Leave blank to auto-generate from your description</p>
                     </div>
                     <div>
-                        <p className="text-sm text-slate-500 uppercase tracking-widest font-bold mb-2">What is this press release about?</p>
+                        <p className="text-sm text-[var(--sys-text-muted)] uppercase tracking-widest font-bold mb-2">What is this press release about?</p>
                         <textarea value={purpose} onChange={e => setPurpose(e.target.value)} rows={4}
                             placeholder="Describe the announcement in detail. What happened? Why is this important? Include key facts, numbers, dates."
                             className="input-glass w-full py-3 px-4 rounded-xl text-sm resize-none" />
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                         <div>
-                            <p className="text-sm text-slate-500 uppercase tracking-widest font-bold mb-2">Language</p>
+                            <p className="text-sm text-[var(--sys-text-muted)] uppercase tracking-widest font-bold mb-2">Language</p>
                             <div className="flex gap-2">
                                 {LANGUAGES.map(l => (
                                     <button key={l.id} onClick={() => setLanguage(l.id)}
                                         className={`px-3 py-2 rounded-xl text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5
-                                            ${language === l.id ? 'bg-rose-500 text-white' : 'bg-white/[0.04] text-slate-400 hover:bg-white/[0.06] border border-white/[0.06]'} `}>
+                                            ${language === l.id ? 'bg-[var(--sys-surface)] text-[var(--sys-text)]' : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] hover:bg-[var(--sys-surface)] border border-[var(--sys-border)]'} `}>
                                         <span className="text-sm">{l.flag}</span> {l.label}
                                     </button>
                                 ))}
                             </div>
                         </div>
                         <div>
-                            <p className="text-sm text-slate-500 uppercase tracking-widest font-bold mb-2">Tone</p>
+                            <p className="text-sm text-[var(--sys-text-muted)] uppercase tracking-widest font-bold mb-2">Tone</p>
                             <div className="flex gap-2 flex-wrap">
                                 {PR_TONES.map(t => (
                                     <button key={t.id} onClick={() => setTone(t.id)}
                                         className={`px-3 py-2 rounded-xl text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5
-                                            ${tone === t.id ? 'bg-rose-500 text-white' : 'bg-white/[0.04] text-slate-400 hover:bg-white/[0.06] border border-white/[0.06]'} `}>
+                                            ${tone === t.id ? 'bg-[var(--sys-surface)] text-[var(--sys-text)]' : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] hover:bg-[var(--sys-surface)] border border-[var(--sys-border)]'} `}>
                                         <span className="material-symbols-outlined text-xs">{t.icon}</span> {t.label}
                                     </button>
                                 ))}
@@ -1186,19 +1186,19 @@ function StepPressRelease({ onComplete, onBack, activeBrand, goal, availableProv
             {/* Step 1: Distribution Channels */}
             {prStep === 1 && (
                 <div className="space-y-5">
-                    <p className="text-sm text-slate-500 uppercase tracking-widest font-bold mb-3">
-                        Where will this be distributed? <span className="text-slate-600 normal-case">Select all that apply</span>
+                    <p className="text-sm text-[var(--sys-text-muted)] uppercase tracking-widest font-bold mb-3">
+                        Where will this be distributed? <span className="text-[var(--sys-text-muted)] normal-case">Select all that apply</span>
                     </p>
                     <div className="grid grid-cols-2 gap-3">
                         {PR_DISTRIBUTION.map(d => (
                             <button key={d.id} onClick={() => toggleDistribution(d.id)}
-                                className={`glass-panel rounded-xl p-4 text-left transition-all cursor-pointer ${distribution.includes(d.id) ? 'bg-rose-500/15 border-rose-400/40' : 'hover:bg-white/[0.05]'} `}>
+                                className={`glass-panel rounded-xl p-4 text-left transition-all cursor-pointer ${distribution.includes(d.id) ? 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)]' : 'hover:bg-[var(--sys-surface)]'} `}>
                                 <div className="flex items-center gap-2 mb-1">
-                                    <span className={`material-symbols-outlined text-lg ${distribution.includes(d.id) ? 'text-rose-400' : 'text-slate-500'} `}>{d.icon}</span>
-                                    <span className={`text-xs font-bold ${distribution.includes(d.id) ? 'text-white' : 'text-slate-400'} `}>{d.label}</span>
-                                    {distribution.includes(d.id) && <span className="material-symbols-outlined text-rose-400 text-sm ml-auto">check_circle</span>}
+                                    <span className={`material-symbols-outlined text-lg ${distribution.includes(d.id) ? 'text-primary' : 'text-[var(--sys-text-muted)]'} `}>{d.icon}</span>
+                                    <span className={`text-xs font-bold ${distribution.includes(d.id) ? 'text-[var(--sys-text)]' : 'text-[var(--sys-text-muted)]'} `}>{d.label}</span>
+                                    {distribution.includes(d.id) && <span className="material-symbols-outlined text-primary text-sm ml-auto">check_circle</span>}
                                 </div>
-                                <p className="text-xs text-slate-600">{d.desc}</p>
+                                <p className="text-xs text-[var(--sys-text-muted)]">{d.desc}</p>
                             </button>
                         ))}
                     </div>
@@ -1212,15 +1212,15 @@ function StepPressRelease({ onComplete, onBack, activeBrand, goal, availableProv
             {/* Step 2: Spokesperson Quotes */}
             {prStep === 2 && (
                 <div className="space-y-5">
-                    <p className="text-sm text-slate-500 uppercase tracking-widest font-bold mb-1">Spokesperson Quotes</p>
-                    <p className="text-xs text-slate-600 mb-3">Add quotes from key people. AI can also draft quotes if you leave the quote field blank.</p>
+                    <p className="text-sm text-[var(--sys-text-muted)] uppercase tracking-widest font-bold mb-1">Spokesperson Quotes</p>
+                    <p className="text-xs text-[var(--sys-text-muted)] mb-3">Add quotes from key people. AI can also draft quotes if you leave the quote field blank.</p>
 
                     {quotes.map((q, idx) => (
                         <div key={idx} className="glass-panel rounded-xl p-4 space-y-3">
                             <div className="flex items-center justify-between">
-                                <span className="text-sm text-white font-bold">Quote #{idx + 1}</span>
+                                <span className="text-sm text-[var(--sys-text)] font-bold">Quote #{idx + 1}</span>
                                 {quotes.length > 1 && (
-                                    <button onClick={() => removeQuote(idx)} className="text-slate-600 hover:text-rose-400 cursor-pointer">
+                                    <button onClick={() => removeQuote(idx)} className="text-[var(--sys-text-muted)] hover:text-primary cursor-pointer">
                                         <span className="material-symbols-outlined text-sm">close</span>
                                     </button>
                                 )}
@@ -1237,7 +1237,7 @@ function StepPressRelease({ onComplete, onBack, activeBrand, goal, availableProv
                         </div>
                     ))}
                     <button onClick={addQuote}
-                        className="text-sm text-rose-400 hover:text-rose-300 flex items-center gap-1 cursor-pointer">
+                        className="text-sm text-primary hover:text-[var(--sys-primary)] flex items-center gap-1 cursor-pointer">
                         <span className="material-symbols-outlined text-sm">add</span> Add Another Quote
                     </button>
                     <button onClick={() => setPrStep(3)}
@@ -1252,12 +1252,12 @@ function StepPressRelease({ onComplete, onBack, activeBrand, goal, availableProv
                 <div className="space-y-5">
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <p className="text-sm text-slate-500 uppercase tracking-widest font-bold mb-2">City / Dateline</p>
+                            <p className="text-sm text-[var(--sys-text-muted)] uppercase tracking-widest font-bold mb-2">City / Dateline</p>
                             <input value={city} onChange={e => setCity(e.target.value)}
                                 placeholder="e.g. Mumbai, New Delhi" className="input-glass w-full py-2.5 px-3 rounded-lg text-xs" />
                         </div>
                         <div>
-                            <p className="text-sm text-slate-500 uppercase tracking-widest font-bold mb-2">Date</p>
+                            <p className="text-sm text-[var(--sys-text-muted)] uppercase tracking-widest font-bold mb-2">Date</p>
                             <input value={dateline} onChange={e => setDateline(e.target.value)}
                                 className="input-glass w-full py-2.5 px-3 rounded-lg text-xs" />
                         </div>
@@ -1269,8 +1269,8 @@ function StepPressRelease({ onComplete, onBack, activeBrand, goal, availableProv
                             <input type="checkbox" checked={embargo} onChange={e => setEmbargo(e.target.checked)}
                                 className="accent-rose-500" />
                             <div>
-                                <p className="text-sm text-white font-bold">Embargoed Release</p>
-                                <p className="text-xs text-slate-600">Not for publication until a specific date</p>
+                                <p className="text-sm text-[var(--sys-text)] font-bold">Embargoed Release</p>
+                                <p className="text-xs text-[var(--sys-text-muted)]">Not for publication until a specific date</p>
                             </div>
                         </label>
                         {embargo && (
@@ -1281,7 +1281,7 @@ function StepPressRelease({ onComplete, onBack, activeBrand, goal, availableProv
 
                     {/* Company Boilerplate */}
                     <div>
-                        <p className="text-sm text-slate-500 uppercase tracking-widest font-bold mb-2">About the Company (Boilerplate)</p>
+                        <p className="text-sm text-[var(--sys-text-muted)] uppercase tracking-widest font-bold mb-2">About the Company (Boilerplate)</p>
                         <textarea value={boilerplate} onChange={e => setBoilerplate(e.target.value)} rows={3}
                             placeholder="Brief company description — auto-filled from brand profile if available"
                             className="input-glass w-full py-2 px-3 rounded-xl text-xs resize-none" />
@@ -1289,7 +1289,7 @@ function StepPressRelease({ onComplete, onBack, activeBrand, goal, availableProv
 
                     {/* Media Contact */}
                     <div>
-                        <p className="text-sm text-slate-500 uppercase tracking-widest font-bold mb-2">Media Contact</p>
+                        <p className="text-sm text-[var(--sys-text-muted)] uppercase tracking-widest font-bold mb-2">Media Contact</p>
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                             <input value={contactName} onChange={e => setContactName(e.target.value)}
                                 placeholder="Contact Name" className="input-glass py-2 px-3 rounded-lg text-xs" />
@@ -1302,7 +1302,7 @@ function StepPressRelease({ onComplete, onBack, activeBrand, goal, availableProv
 
                     {/* CTA */}
                     <div>
-                        <p className="text-sm text-slate-500 uppercase tracking-widest font-bold mb-2">Call to Action (Optional)</p>
+                        <p className="text-sm text-[var(--sys-text-muted)] uppercase tracking-widest font-bold mb-2">Call to Action (Optional)</p>
                         <input value={cta} onChange={e => setCta(e.target.value)}
                             placeholder="e.g. Visit www.example.com for more info"
                             className="input-glass w-full py-2.5 px-3 rounded-lg text-xs" />
@@ -1311,11 +1311,11 @@ function StepPressRelease({ onComplete, onBack, activeBrand, goal, availableProv
                     {/* ── AI Model (Advanced — collapsed by default) ── */}
                     <div className="mb-6">
                         <button onClick={() => setShowAdvanced(!showAdvanced)}
-                            className="flex items-center gap-1.5 text-xs text-slate-600 hover:text-slate-400 transition-colors cursor-pointer w-full">
+                            className="flex items-center gap-1.5 text-xs text-[var(--sys-text-muted)] hover:text-[var(--sys-text-muted)] transition-colors cursor-pointer w-full">
                             <span className="material-symbols-outlined text-xs">{showAdvanced ? 'expand_less' : 'tune'}</span>
                             <span className="uppercase tracking-widest font-bold">AI Model</span>
-                            <span className="flex-1 h-px bg-white/[0.06]" />
-                            <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${modelOverride === 'auto' ? 'bg-primary/10 text-primary' : 'bg-amber-400/10 text-amber-400'} `}>
+                            <span className="flex-1 h-px bg-[var(--sys-surface)]" />
+                            <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${modelOverride === 'auto' ? 'bg-primary/10 text-primary' : 'bg-[var(--sys-primary-dim)] text-primary'} `}>
                                 {modelOverride === 'auto' ? 'Auto' : `${(availableProviders.find(p => p.id === modelOverride)?.label || modelOverride)} `}
                             </span>
                         </button>
@@ -1324,23 +1324,23 @@ function StepPressRelease({ onComplete, onBack, activeBrand, goal, availableProv
                                 <div className="grid grid-cols-2 gap-2">
                                     {availableProviders.map(p => (
                                         <button key={p.id} onClick={() => setModelOverride(p.id)}
-                                            className={`glass-panel rounded-xl p-3 text-left transition-all cursor-pointer ${modelOverride === p.id ? 'bg-primary/15 border-primary/40' : 'hover:bg-white/[0.05]'} `}>
+                                            className={`glass-panel rounded-xl p-3 text-left transition-all cursor-pointer ${modelOverride === p.id ? 'bg-primary/15 border-primary/40' : 'hover:bg-[var(--sys-surface)]'} `}>
                                             <div className="flex items-center gap-2 mb-1">
-                                                <span className={`material-symbols-outlined text-base ${modelOverride === p.id ? 'text-primary' : 'text-slate-500'} `}>{p.icon}</span>
-                                                <span className={`text-xs font-bold ${modelOverride === p.id ? 'text-white' : 'text-slate-400'} `}>{p.label}</span>
+                                                <span className={`material-symbols-outlined text-base ${modelOverride === p.id ? 'text-primary' : 'text-[var(--sys-text-muted)]'} `}>{p.icon}</span>
+                                                <span className={`text-xs font-bold ${modelOverride === p.id ? 'text-[var(--sys-text)]' : 'text-[var(--sys-text-muted)]'} `}>{p.label}</span>
                                             </div>
-                                            <p className="text-xs text-slate-600">{p.desc}</p>
+                                            <p className="text-xs text-[var(--sys-text-muted)]">{p.desc}</p>
                                         </button>
                                     ))}
                                 </div>
-                                <p className="text-xs text-slate-600 mt-2 text-center">Auto mode picks the best model based on your language and content type</p>
+                                <p className="text-xs text-[var(--sys-text-muted)] mt-2 text-center">Auto mode picks the best model based on your language and content type</p>
                             </div>
                         )}
                     </div>
 
                     <CreditTooltipWrapper action="content">
                         <button onClick={handleSubmit}
-                            className="btn-primary w-full py-3.5 rounded-xl text-sm font-bold bg-rose-500 hover:bg-rose-600">
+                            className="btn-primary w-full py-3.5 rounded-xl text-sm font-bold bg-[var(--sys-surface)] hover:bg-[var(--sys-surface)]">
                             <span className="material-symbols-outlined text-sm">auto_awesome</span> Generate Press Release <CreditBadge action="content" />
                         </button>
                     </CreditTooltipWrapper>
@@ -1355,7 +1355,7 @@ function StepPressRelease({ onComplete, onBack, activeBrand, goal, availableProv
 // ============================================================================
 
 const YT_FORMATS = [
-    { id: 'video', icon: 'movie', label: 'YouTube Video', desc: 'Long-form (5-60 min)', color: 'from-red-500/20 to-rose-500/10' },
+    { id: 'video', icon: 'movie', label: 'YouTube Video', desc: 'Long-form (5-60 min)', color: 'bg-[var(--sys-surface)] border border-[var(--sys-border)]' },
     { id: 'shorts', icon: 'slow_motion_video', label: 'YouTube Shorts', desc: 'Under 60 seconds', color: 'from-[#FF4D00]/20 to-rose-500/10' },
 ]
 
@@ -1399,47 +1399,47 @@ function StepYouTubeWizard({ onComplete, onBack, activeBrand, availableProviders
 
     return (
         <div className="animate-fade-in max-w-2xl mx-auto">
-            <button onClick={onBack} className="text-slate-500 text-sm flex items-center gap-1 mb-6 hover:text-white transition-colors cursor-pointer">
+            <button onClick={onBack} className="text-[var(--sys-text-muted)] text-sm flex items-center gap-1 mb-6 hover:text-[var(--sys-text)] transition-colors cursor-pointer">
                 <span className="material-symbols-outlined text-sm">arrow_back</span> Back
             </button>
 
             {/* Header */}
             <div className="flex items-center gap-3 mb-6">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-red-500/20 to-rose-500/10 flex items-center justify-center">
-                    <span className="material-symbols-outlined text-2xl text-red-400">smart_display</span>
+                <div className="w-12 h-12 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] flex items-center justify-center">
+                    <span className="material-symbols-outlined text-2xl text-primary">smart_display</span>
                 </div>
                 <div>
-                    <h3 className="text-xl font-extrabold text-white">YouTube <span className="text-red-400">Content Creator</span></h3>
-                    <p className="text-sm text-slate-400">Script, title, description, tags & keywords — YouTube algorithm optimized</p>
+                    <h3 className="text-xl font-extrabold text-[var(--sys-text)]">YouTube <span className="text-primary">Content Creator</span></h3>
+                    <p className="text-sm text-[var(--sys-text-muted)]">Script, title, description, tags & keywords — YouTube algorithm optimized</p>
                 </div>
             </div>
 
             {/* Brief Input */}
             <div className="mb-5">
-                <label className="text-sm font-bold text-slate-300 mb-2 block">Video Brief *</label>
+                <label className="text-sm font-bold text-[var(--sys-text-muted)] mb-2 block">Video Brief *</label>
                 <div className="relative">
                     <textarea
                         value={brief} onChange={e => setBrief(e.target.value)}
                         placeholder="Describe your video idea... e.g. '5 productivity hacks for 2026 that actually work — backed by science'"
-                        className="input-glass w-full py-4 pr-14 resize-none text-white" rows={4} autoFocus
+                        className="input-glass w-full py-4 pr-14 resize-none text-[var(--sys-text)]" rows={4} autoFocus
                     />
                     <div className="absolute right-3 top-3">
                         <VoiceInput onResult={(text) => setBrief(prev => prev ? prev + ' ' + text : text)} size="small" />
                     </div>
                 </div>
-                <p className="text-xs text-slate-600 mt-1.5 flex items-center gap-0.5"><span className="material-symbols-outlined text-[10px]">lightbulb</span> Be specific — include the hook, key points, or angle you want</p>
+                <p className="text-xs text-[var(--sys-text-muted)] mt-1.5 flex items-center gap-0.5"><span className="material-symbols-outlined text-[10px]">lightbulb</span> Be specific — include the hook, key points, or angle you want</p>
             </div>
 
             {/* Format Selection */}
             <div className="mb-5">
-                <label className="text-sm font-bold text-slate-300 mb-2 block">Format</label>
+                <label className="text-sm font-bold text-[var(--sys-text-muted)] mb-2 block">Format</label>
                 <div className="grid grid-cols-2 gap-3">
                     {YT_FORMATS.map(f => (
                         <button key={f.id} onClick={() => setFormat(f.id)}
-                            className={`glass-panel rounded-xl p-4 text-left transition-all cursor-pointer ${format === f.id ? 'bg-red-500/15 border-red-500/40 ring-1 ring-red-500/30' : 'hover:bg-white/[0.05]'}`}>
+                            className={`glass-panel rounded-xl p-4 text-left transition-all cursor-pointer ${format === f.id ? 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] ' : 'hover:bg-[var(--sys-surface)]'}`}>
                             <span className="material-symbols-outlined text-xl mb-2 block" style={{ color: format === f.id ? '#EF4444' : '#64748b' }}>{f.icon}</span>
-                            <p className="text-sm font-bold text-white">{f.label}</p>
-                            <p className="text-xs text-slate-500">{f.desc}</p>
+                            <p className="text-sm font-bold text-[var(--sys-text)]">{f.label}</p>
+                            <p className="text-xs text-[var(--sys-text-muted)]">{f.desc}</p>
                         </button>
                     ))}
                 </div>
@@ -1448,14 +1448,14 @@ function StepYouTubeWizard({ onComplete, onBack, activeBrand, availableProviders
             {/* Video Length (only for long-form) */}
             {format === 'video' && (
                 <div className="mb-5 animate-fade-in">
-                    <label className="text-sm font-bold text-slate-300 mb-2 block">Target Length</label>
+                    <label className="text-sm font-bold text-[var(--sys-text-muted)] mb-2 block">Target Length</label>
                     <div className="flex gap-2">
                         {YT_LENGTHS.map(l => (
                             <button key={l.id} onClick={() => setVideoLength(l.id)}
-                                className={`flex-1 glass-panel rounded-xl p-3 text-center transition-all cursor-pointer ${videoLength === l.id ? 'bg-red-500/15 border-red-500/40' : 'hover:bg-white/[0.05]'}`}>
+                                className={`flex-1 glass-panel rounded-xl p-3 text-center transition-all cursor-pointer ${videoLength === l.id ? 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)]' : 'hover:bg-[var(--sys-surface)]'}`}>
                                 <span className="material-symbols-outlined text-sm mb-1 block" style={{ color: videoLength === l.id ? '#EF4444' : '#64748b' }}>{l.icon}</span>
-                                <p className="text-xs font-bold text-white">{l.label}</p>
-                                <p className="text-[10px] text-slate-500">{l.desc}</p>
+                                <p className="text-xs font-bold text-[var(--sys-text)]">{l.label}</p>
+                                <p className="text-[10px] text-[var(--sys-text-muted)]">{l.desc}</p>
                             </button>
                         ))}
                     </div>
@@ -1464,11 +1464,11 @@ function StepYouTubeWizard({ onComplete, onBack, activeBrand, availableProviders
 
             {/* Style */}
             <div className="mb-5">
-                <label className="text-sm font-bold text-slate-300 mb-2 block">Content Style</label>
+                <label className="text-sm font-bold text-[var(--sys-text-muted)] mb-2 block">Content Style</label>
                 <div className="flex flex-wrap gap-2">
                     {YT_STYLES.map(s => (
                         <button key={s.id} onClick={() => setStyle(s.id)}
-                            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${style === s.id ? 'bg-red-500/15 text-red-400 border border-red-500/30' : 'glass-panel text-slate-400 hover:text-white'}`}>
+                            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${style === s.id ? 'bg-[var(--sys-primary-dim)] text-primary border border-[var(--sys-border)]' : 'glass-panel text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]'}`}>
                             <span className="material-symbols-outlined text-sm">{s.icon}</span> {s.label}
                         </button>
                     ))}
@@ -1477,20 +1477,20 @@ function StepYouTubeWizard({ onComplete, onBack, activeBrand, availableProviders
 
             {/* Target Audience */}
             <div className="mb-5">
-                <label className="text-sm font-bold text-slate-300 mb-2 block">Target Audience <span className="text-slate-600 font-normal">(optional)</span></label>
+                <label className="text-sm font-bold text-[var(--sys-text-muted)] mb-2 block">Target Audience <span className="text-[var(--sys-text-muted)] font-normal">(optional)</span></label>
                 <input value={targetAudience} onChange={e => setTargetAudience(e.target.value)}
                     placeholder="e.g. Entrepreneurs aged 25-40, tech enthusiasts, students"
-                    className="input-glass w-full py-3 text-white"
+                    className="input-glass w-full py-3 text-[var(--sys-text)]"
                 />
             </div>
 
             {/* Language */}
             <div className="mb-6">
-                <label className="text-sm font-bold text-slate-300 mb-2 block">Language</label>
+                <label className="text-sm font-bold text-[var(--sys-text-muted)] mb-2 block">Language</label>
                 <div className="flex flex-wrap gap-2">
                     {LANGUAGES.map(l => (
                         <button key={l.id} onClick={() => setLanguage(l.id)}
-                            className={`px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${language === l.id ? 'bg-primary/20 text-primary border border-primary/30' : 'glass-panel text-slate-400 hover:text-white'}`}>
+                            className={`px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${language === l.id ? 'bg-primary/20 text-primary border border-primary/30' : 'glass-panel text-[var(--sys-text-muted)] hover:text-white'}`}>
                             {l.flag} {l.label}
                         </button>
                     ))}
@@ -1500,13 +1500,13 @@ function StepYouTubeWizard({ onComplete, onBack, activeBrand, availableProviders
             {/* Model Override */}
             {availableProviders.length > 1 && (
                 <div className="mb-6 glass-panel rounded-xl p-4">
-                    <label className="text-xs font-bold text-slate-400 mb-2 block flex items-center gap-1">
+                    <label className="text-xs font-bold text-[var(--sys-text-muted)] mb-2 block flex items-center gap-1">
                         <span className="material-symbols-outlined text-xs">tune</span> AI Model
                     </label>
                     <div className="flex flex-wrap gap-2">
                         {availableProviders.map(p => (
                             <button key={p.id} onClick={() => setModelOverride(p.id)}
-                                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${modelOverride === p.id ? 'bg-primary/20 text-primary' : 'text-slate-500 hover:text-white'}`}>
+                                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${modelOverride === p.id ? 'bg-primary/20 text-primary' : 'text-[var(--sys-text-muted)] hover:text-white'}`}>
                                 {p.label}
                             </button>
                         ))}
@@ -1573,19 +1573,19 @@ function YouTubeResultView({ result, youtubeData, onNewContent, generating, acti
         setExpandedSections(prev => ({ ...prev, [key]: !prev[key] }))
     }
 
-    const SectionHeader = ({ icon, title, count, sectionKey, copyText, color = 'text-red-400' }) => (
+    const SectionHeader = ({ icon, title, count, sectionKey, copyText, color = 'text-primary' }) => (
         <div className="flex items-center justify-between mb-3">
             <button onClick={() => toggleSection(sectionKey)} className="flex items-center gap-2 cursor-pointer group">
                 <span className={`material-symbols-outlined text-lg ${color}`}>{icon}</span>
-                <h4 className="text-base font-bold text-white">{title}</h4>
-                {count && <span className="text-xs bg-white/10 text-slate-400 px-2 py-0.5 rounded-full">{count}</span>}
-                <span className="material-symbols-outlined text-sm text-slate-600 group-hover:text-white transition-colors">
+                <h4 className="text-base font-bold text-[var(--sys-text)]">{title}</h4>
+                {count && <span className="text-xs bg-[var(--sys-surface)] text-[var(--sys-text-muted)] px-2 py-0.5 rounded-full">{count}</span>}
+                <span className="material-symbols-outlined text-sm text-[var(--sys-text-muted)] group-hover:text-[var(--sys-text)] transition-colors">
                     {expandedSections[sectionKey] ? 'expand_less' : 'expand_more'}
                 </span>
             </button>
             {copyText && (
                 <button onClick={() => copySection(copyText, sectionKey)}
-                    className="flex items-center gap-1 text-xs text-slate-500 hover:text-white transition-colors cursor-pointer">
+                    className="flex items-center gap-1 text-xs text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] transition-colors cursor-pointer">
                     <span className="material-symbols-outlined text-sm">{copiedSection === sectionKey ? 'check' : 'content_copy'}</span>
                     {copiedSection === sectionKey ? 'Copied!' : 'Copy'}
                 </button>
@@ -1598,23 +1598,23 @@ function YouTubeResultView({ result, youtubeData, onNewContent, generating, acti
             {/* Header */}
             <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-red-500/20 to-rose-500/10 flex items-center justify-center">
-                        <span className="material-symbols-outlined text-2xl text-red-400">smart_display</span>
+                    <div className="w-12 h-12 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] flex items-center justify-center">
+                        <span className="material-symbols-outlined text-2xl text-primary">smart_display</span>
                     </div>
                     <div>
-                        <h3 className="text-xl font-extrabold text-white">YouTube Content <span className="text-red-400">Ready</span></h3>
+                        <h3 className="text-xl font-extrabold text-[var(--sys-text)]">YouTube Content <span className="text-primary">Ready</span></h3>
                         <div className="flex items-center gap-2 mt-0.5">
-                            {estimatedDuration && <span className="text-xs bg-red-500/10 text-red-400 px-2 py-0.5 rounded-full font-bold">{estimatedDuration}</span>}
-                            <span className="text-xs text-slate-500">{script.split(/\s+/).length} words</span>
+                            {estimatedDuration && <span className="text-xs bg-[var(--sys-primary-dim)] text-primary px-2 py-0.5 rounded-full font-bold">{estimatedDuration}</span>}
+                            <span className="text-xs text-[var(--sys-text-muted)]">{script.split(/\s+/).length} words</span>
                         </div>
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
-                    <button onClick={copyAll} className="glass-panel px-3 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white flex items-center gap-1 cursor-pointer transition-all">
+                    <button onClick={copyAll} className="glass-panel px-3 py-2 rounded-xl text-xs font-bold text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] flex items-center gap-1 cursor-pointer transition-all">
                         <span className="material-symbols-outlined text-sm">{copiedSection === 'all' ? 'check' : 'content_copy'}</span>
                         {copiedSection === 'all' ? 'Copied All!' : 'Copy All'}
                     </button>
-                    <button onClick={onNewContent} className="glass-panel px-3 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white flex items-center gap-1 cursor-pointer transition-all">
+                    <button onClick={onNewContent} className="glass-panel px-3 py-2 rounded-xl text-xs font-bold text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] flex items-center gap-1 cursor-pointer transition-all">
                         <span className="material-symbols-outlined text-sm">add</span> New
                     </button>
                 </div>
@@ -1622,16 +1622,16 @@ function YouTubeResultView({ result, youtubeData, onNewContent, generating, acti
 
             {/* Hook callout */}
             {hookScript && (
-                <div className="glass-panel rounded-2xl p-4 mb-4 border border-amber-500/20 bg-amber-500/5 animate-fade-in">
+                <div className="glass-panel rounded-2xl p-4 mb-4 border border-[var(--sys-border)] bg-[var(--sys-primary-dim)] animate-fade-in">
                     <div className="flex items-center gap-2 mb-2">
-                        <span className="material-symbols-outlined text-amber-400">bolt</span>
-                        <h4 className="text-sm font-bold text-amber-400">Opening Hook — First 5 Seconds</h4>
+                        <span className="material-symbols-outlined text-primary">bolt</span>
+                        <h4 className="text-sm font-bold text-primary">Opening Hook — First 5 Seconds</h4>
                         <button onClick={() => copySection(hookScript, 'hook')}
-                            className="ml-auto text-xs text-slate-500 hover:text-white cursor-pointer">
+                            className="ml-auto text-xs text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer">
                             <span className="material-symbols-outlined text-sm">{copiedSection === 'hook' ? 'check' : 'content_copy'}</span>
                         </button>
                     </div>
-                    <p className="text-sm text-amber-200/80 italic leading-relaxed">"{hookScript}"</p>
+                    <p className="text-sm border-[var(--sys-border)] italic leading-relaxed">"{hookScript}"</p>
                 </div>
             )}
 
@@ -1640,9 +1640,9 @@ function YouTubeResultView({ result, youtubeData, onNewContent, generating, acti
                 <SectionHeader icon="title" title="Video Title" sectionKey="title" copyText={videoTitle} color="text-[#FF4D00]" />
                 {expandedSections.title && (
                     <div className="animate-fade-in">
-                        <p className="text-lg font-bold text-white leading-relaxed">{videoTitle}</p>
+                        <p className="text-lg font-bold text-[var(--sys-text)] leading-relaxed">{videoTitle}</p>
                         <div className="flex items-center gap-2 mt-2">
-                            <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${videoTitle.length <= 70 ? 'bg-emerald-500/10 text-emerald-400' : videoTitle.length <= 100 ? 'bg-amber-500/10 text-amber-400' : 'bg-rose-500/10 text-rose-400'}`}>
+                            <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${videoTitle.length <= 70 ? 'bg-[var(--sys-primary-dim)] text-primary' : videoTitle.length <= 100 ? 'bg-[var(--sys-primary-dim)] text-primary' : 'bg-[var(--sys-primary-dim)] text-primary'}`}>
                                 {videoTitle.length} chars {videoTitle.length <= 70 ? '✓ Optimal' : videoTitle.length <= 100 ? '⚠ Long' : '❌ Too long'}
                             </span>
                         </div>
@@ -1654,7 +1654,7 @@ function YouTubeResultView({ result, youtubeData, onNewContent, generating, acti
             <div className="glass-panel rounded-2xl p-5 mb-4">
                 <SectionHeader icon="movie" title="Video Script" count={`${script.split(/\s+/).length} words`} sectionKey="script" copyText={script} />
                 {expandedSections.script && (
-                    <div className="animate-fade-in text-sm text-slate-300 leading-relaxed whitespace-pre-wrap max-h-96 overflow-y-auto pr-2 custom-scrollbar">
+                    <div className="animate-fade-in text-sm text-[var(--sys-text-muted)] leading-relaxed whitespace-pre-wrap max-h-96 overflow-y-auto pr-2 custom-scrollbar">
                         {script}
                     </div>
                 )}
@@ -1662,9 +1662,9 @@ function YouTubeResultView({ result, youtubeData, onNewContent, generating, acti
 
             {/* Description Section */}
             <div className="glass-panel rounded-2xl p-5 mb-4">
-                <SectionHeader icon="description" title="YouTube Description" sectionKey="description" copyText={description} color="text-emerald-400" />
+                <SectionHeader icon="description" title="YouTube Description" sectionKey="description" copyText={description} color="text-primary" />
                 {expandedSections.description && (
-                    <div className="animate-fade-in text-sm text-slate-300 leading-relaxed whitespace-pre-wrap max-h-64 overflow-y-auto pr-2 custom-scrollbar">
+                    <div className="animate-fade-in text-sm text-[var(--sys-text-muted)] leading-relaxed whitespace-pre-wrap max-h-64 overflow-y-auto pr-2 custom-scrollbar">
                         {description}
                     </div>
                 )}
@@ -1691,25 +1691,25 @@ function YouTubeResultView({ result, youtubeData, onNewContent, generating, acti
             {(keywords.primary?.length > 0 || keywords.secondary?.length > 0) && (
                 <div className="glass-panel rounded-2xl p-5 mb-4">
                     <SectionHeader icon="key" title="Keywords" sectionKey="keywords"
-                        copyText={`Primary: ${(keywords.primary || []).join(', ')}\nSecondary: ${(keywords.secondary || []).join(', ')}`} color="text-cyan-400" />
+                        copyText={`Primary: ${(keywords.primary || []).join(', ')}\nSecondary: ${(keywords.secondary || []).join(', ')}`} color="text-primary" />
                     {expandedSections.keywords && (
                         <div className="animate-fade-in space-y-3">
                             {keywords.primary?.length > 0 && (
                                 <div>
-                                    <p className="text-xs font-bold text-cyan-400 mb-1.5 flex items-center gap-0.5"><span className="material-symbols-outlined text-xs">target</span> Primary Keywords</p>
+                                    <p className="text-xs font-bold text-primary mb-1.5 flex items-center gap-0.5"><span className="material-symbols-outlined text-xs">target</span> Primary Keywords</p>
                                     <div className="flex flex-wrap gap-2">
                                         {keywords.primary.map((kw, i) => (
-                                            <span key={i} className="px-3 py-1.5 rounded-lg bg-cyan-500/10 text-cyan-300 text-xs font-bold border border-cyan-500/20">{kw}</span>
+                                            <span key={i} className="px-3 py-1.5 rounded-lg bg-[var(--sys-primary-dim)] text-[var(--sys-primary)] text-xs font-bold border border-[var(--sys-border)]">{kw}</span>
                                         ))}
                                     </div>
                                 </div>
                             )}
                             {keywords.secondary?.length > 0 && (
                                 <div>
-                                    <p className="text-xs font-bold text-slate-500 mb-1.5">📌 Secondary Keywords</p>
+                                    <p className="text-xs font-bold text-[var(--sys-text-muted)] mb-1.5">📌 Secondary Keywords</p>
                                     <div className="flex flex-wrap gap-2">
                                         {keywords.secondary.map((kw, i) => (
-                                            <span key={i} className="px-3 py-1.5 rounded-lg bg-white/5 text-slate-400 text-xs font-medium border border-white/10">{kw}</span>
+                                            <span key={i} className="px-3 py-1.5 rounded-lg bg-[var(--sys-surface)] text-[var(--sys-text-muted)] text-xs font-medium border border-[var(--sys-border)]">{kw}</span>
                                         ))}
                                     </div>
                                 </div>
@@ -1725,18 +1725,18 @@ function YouTubeResultView({ result, youtubeData, onNewContent, generating, acti
                 {timestamps.length > 0 && (
                     <div className="glass-panel rounded-2xl p-5">
                         <div className="flex items-center gap-2 mb-3">
-                            <span className="material-symbols-outlined text-lg text-orange-400">schedule</span>
-                            <h4 className="text-sm font-bold text-white">Timestamps</h4>
+                            <span className="material-symbols-outlined text-lg text-[var(--sys-primary)]">schedule</span>
+                            <h4 className="text-sm font-bold text-[var(--sys-text)]">Timestamps</h4>
                             <button onClick={() => copySection(timestamps.map(t => `${t.time} ${t.label}`).join('\n'), 'timestamps')}
-                                className="ml-auto text-xs text-slate-500 hover:text-white cursor-pointer">
+                                className="ml-auto text-xs text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer">
                                 <span className="material-symbols-outlined text-sm">{copiedSection === 'timestamps' ? 'check' : 'content_copy'}</span>
                             </button>
                         </div>
                         <div className="space-y-1.5">
                             {timestamps.map((ts, i) => (
                                 <div key={i} className="flex items-center gap-2 text-xs">
-                                    <span className="text-orange-400 font-mono font-bold min-w-[40px]">{ts.time}</span>
-                                    <span className="text-slate-300">{ts.label}</span>
+                                    <span className="text-[var(--sys-primary)] font-mono font-bold min-w-[40px]">{ts.time}</span>
+                                    <span className="text-[var(--sys-text-muted)]">{ts.label}</span>
                                 </div>
                             ))}
                         </div>
@@ -1748,13 +1748,13 @@ function YouTubeResultView({ result, youtubeData, onNewContent, generating, acti
                     <div className="glass-panel rounded-2xl p-5">
                         <div className="flex items-center gap-2 mb-3">
                             <span className="material-symbols-outlined text-lg text-[#FF7A00]">image</span>
-                            <h4 className="text-sm font-bold text-white">Thumbnail Ideas</h4>
+                            <h4 className="text-sm font-bold text-[var(--sys-text)]">Thumbnail Ideas</h4>
                         </div>
                         <div className="space-y-2">
                             {thumbnailIdeas.map((idea, i) => (
                                 <div key={i} className="flex items-start gap-2 text-xs">
                                     <span className="text-[#FF7A00] font-bold mt-0.5">{i + 1}.</span>
-                                    <span className="text-slate-300 leading-relaxed">{idea}</span>
+                                    <span className="text-[var(--sys-text-muted)] leading-relaxed">{idea}</span>
                                 </div>
                             ))}
                         </div>
@@ -1768,7 +1768,7 @@ function YouTubeResultView({ result, youtubeData, onNewContent, generating, acti
                     <div className="flex flex-wrap items-center gap-3">
                         {hashtags.length > 0 && (
                             <div className="flex-1">
-                                <p className="text-xs font-bold text-slate-500 mb-1.5">Hashtags</p>
+                                <p className="text-xs font-bold text-[var(--sys-text-muted)] mb-1.5">Hashtags</p>
                                 <div className="flex flex-wrap gap-1.5">
                                     {hashtags.map((h, i) => (
                                         <span key={i} className="text-xs text-[#FF4D00] bg-[#FF4D00]/10 px-2 py-1 rounded-lg font-medium">{h}</span>
@@ -1778,8 +1778,8 @@ function YouTubeResultView({ result, youtubeData, onNewContent, generating, acti
                         )}
                         {ctaText && (
                             <div className="flex-1 min-w-[200px]">
-                                <p className="text-xs font-bold text-slate-500 mb-1.5">CTA</p>
-                                <p className="text-sm text-emerald-300 bg-emerald-500/10 px-3 py-2 rounded-xl font-medium leading-relaxed">{ctaText}</p>
+                                <p className="text-xs font-bold text-[var(--sys-text-muted)] mb-1.5">CTA</p>
+                                <p className="text-sm text-[var(--sys-primary)] bg-[var(--sys-primary-dim)] px-3 py-2 rounded-xl font-medium leading-relaxed">{ctaText}</p>
                             </div>
                         )}
                     </div>
@@ -1789,18 +1789,18 @@ function YouTubeResultView({ result, youtubeData, onNewContent, generating, acti
             {/* Action Buttons */}
             <div className="grid grid-cols-2 gap-4 mt-6">
                 <button onClick={copyAll}
-                    className="glass-panel rounded-2xl p-5 hover:bg-white/[0.05] hover:border-emerald-500/30 transition-all cursor-pointer text-center group border border-white/[0.06]">
-                    <span className="material-symbols-outlined text-2xl text-emerald-400 mb-2 block group-hover:scale-110 transition-transform">
+                    className="glass-panel rounded-2xl p-5 hover:bg-[var(--sys-surface)] hover:border-[var(--sys-border)] transition-all cursor-pointer text-center group border border-[var(--sys-border)]">
+                    <span className="material-symbols-outlined text-2xl text-primary mb-2 block group-hover:scale-110 transition-transform">
                         {copiedSection === 'all' ? 'check_circle' : 'content_copy'}
                     </span>
-                    <p className="text-sm font-bold text-white">{copiedSection === 'all' ? 'Copied!' : 'Copy Everything'}</p>
-                    <p className="text-[10px] text-slate-500 mt-0.5">Title + Script + Description + Tags</p>
+                    <p className="text-sm font-bold text-[var(--sys-text)]">{copiedSection === 'all' ? 'Copied!' : 'Copy Everything'}</p>
+                    <p className="text-[10px] text-[var(--sys-text-muted)] mt-0.5">Title + Script + Description + Tags</p>
                 </button>
                 <button onClick={onNewContent}
-                    className="glass-panel rounded-2xl p-5 hover:bg-white/[0.05] hover:border-red-500/30 transition-all cursor-pointer text-center group border border-white/[0.06]">
-                    <span className="material-symbols-outlined text-2xl text-red-400 mb-2 block group-hover:scale-110 transition-transform">smart_display</span>
-                    <p className="text-sm font-bold text-white">Create Another</p>
-                    <p className="text-[10px] text-slate-500 mt-0.5">Start a new YouTube content</p>
+                    className="glass-panel rounded-2xl p-5 hover:bg-[var(--sys-surface)] hover:border-[var(--sys-border)] transition-all cursor-pointer text-center group border border-[var(--sys-border)]">
+                    <span className="material-symbols-outlined text-2xl text-primary mb-2 block group-hover:scale-110 transition-transform">smart_display</span>
+                    <p className="text-sm font-bold text-[var(--sys-text)]">Create Another</p>
+                    <p className="text-[10px] text-[var(--sys-text-muted)] mt-0.5">Start a new YouTube content</p>
                 </button>
             </div>
         </div>
@@ -1846,60 +1846,60 @@ function StepYouTubeSeoWizard({ onComplete, onBack, activeBrand, availableProvid
 
     return (
         <div className="animate-fade-in max-w-2xl mx-auto">
-            <button onClick={onBack} className="text-slate-500 text-sm flex items-center gap-1 mb-6 hover:text-white transition-colors cursor-pointer">
+            <button onClick={onBack} className="text-[var(--sys-text-muted)] text-sm flex items-center gap-1 mb-6 hover:text-[var(--sys-text)] transition-colors cursor-pointer">
                 <span className="material-symbols-outlined text-sm">arrow_back</span> Back
             </button>
 
             {/* Header */}
             <div className="flex items-center gap-3 mb-6">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500/20 to-teal-500/10 flex items-center justify-center">
-                    <span className="material-symbols-outlined text-2xl text-emerald-400">rocket_launch</span>
+                <div className="w-12 h-12 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] flex items-center justify-center">
+                    <span className="material-symbols-outlined text-2xl text-primary">rocket_launch</span>
                 </div>
                 <div>
-                    <h3 className="text-xl font-extrabold text-white">YouTube <span className="text-emerald-400">Publish Optimizer</span></h3>
-                    <p className="text-sm text-slate-400">Algorithm-optimized title, description, tags & keywords — no script needed</p>
+                    <h3 className="text-xl font-extrabold text-[var(--sys-text)]">YouTube <span className="text-primary">Publish Optimizer</span></h3>
+                    <p className="text-sm text-[var(--sys-text-muted)]">Algorithm-optimized title, description, tags & keywords — no script needed</p>
                 </div>
             </div>
 
             {/* Info callout */}
-            <div className="glass-panel rounded-xl p-4 mb-5 border border-emerald-500/20 bg-emerald-500/5">
+            <div className="glass-panel rounded-xl p-4 mb-5 border border-[var(--sys-border)] bg-[var(--sys-primary-dim)]">
                 <div className="flex items-start gap-2">
-                    <span className="material-symbols-outlined text-emerald-400 text-lg mt-0.5">info</span>
+                    <span className="material-symbols-outlined text-primary text-lg mt-0.5">info</span>
                     <div>
-                        <p className="text-xs text-emerald-300 font-bold mb-1">Already have your video? Just need the SEO metadata.</p>
-                        <p className="text-xs text-slate-400">We'll analyze YouTube search trends and generate 3 title options, a perfectly structured description, 20-30 tags, and keyword strategy — all optimized for the latest YouTube algorithm.</p>
+                        <p className="text-xs text-[var(--sys-primary)] font-bold mb-1">Already have your video? Just need the SEO metadata.</p>
+                        <p className="text-xs text-[var(--sys-text-muted)]">We'll analyze YouTube search trends and generate 3 title options, a perfectly structured description, 20-30 tags, and keyword strategy — all optimized for the latest YouTube algorithm.</p>
                     </div>
                 </div>
             </div>
 
             {/* Topic/Brief */}
             <div className="mb-5">
-                <label className="text-sm font-bold text-slate-300 mb-2 block">What's your video about? *</label>
+                <label className="text-sm font-bold text-[var(--sys-text-muted)] mb-2 block">What's your video about? *</label>
                 <div className="relative">
                     <textarea
                         value={brief} onChange={e => setBrief(e.target.value)}
                         placeholder="e.g. 'Rambha Ho music video by Usha Uthup' or 'iPhone 17 Pro full review and comparison'"
-                        className="input-glass w-full py-4 pr-14 resize-none text-white" rows={3} autoFocus
+                        className="input-glass w-full py-4 pr-14 resize-none text-[var(--sys-text)]" rows={3} autoFocus
                     />
                     <div className="absolute right-3 top-3">
                         <VoiceInput onResult={(text) => setBrief(prev => prev ? prev + ' ' + text : text)} size="small" />
                     </div>
                 </div>
-                <p className="text-xs text-slate-600 mt-1.5 flex items-center gap-0.5"><span className="material-symbols-outlined text-[10px]">lightbulb</span> Include specific names — artists, products, brands, topics. We'll research them for accurate metadata</p>
+                <p className="text-xs text-[var(--sys-text-muted)] mt-1.5 flex items-center gap-0.5"><span className="material-symbols-outlined text-[10px]">lightbulb</span> Include specific names — artists, products, brands, topics. We'll research them for accurate metadata</p>
             </div>
 
             {/* Video Category — CRITICAL for context-aware output */}
             <div className="mb-5">
-                <label className="text-sm font-bold text-slate-300 mb-2 block">Video Category *</label>
-                <p className="text-xs text-slate-500 mb-3">This determines the metadata format — music videos get different SEO than tutorials</p>
+                <label className="text-sm font-bold text-[var(--sys-text-muted)] mb-2 block">Video Category *</label>
+                <p className="text-xs text-[var(--sys-text-muted)] mb-3">This determines the metadata format — music videos get different SEO than tutorials</p>
                 <div className="grid grid-cols-2 gap-2">
                     {VIDEO_CATEGORIES.map(cat => (
                         <button key={cat.id} onClick={() => setVideoCategory(cat.id)}
                             className={`glass-panel rounded-xl p-3 text-left transition-all cursor-pointer ${videoCategory === cat.id
-                                ? 'bg-emerald-500/15 border-emerald-500/40 ring-1 ring-emerald-500/30'
-                                : 'hover:bg-white/[0.05]'}`}>
-                            <p className="text-sm font-bold text-white">{cat.label}</p>
-                            <p className="text-[10px] text-slate-500 mt-0.5">{cat.desc}</p>
+                                ? 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] '
+                                : 'hover:bg-[var(--sys-surface)]'}`}>
+                            <p className="text-sm font-bold text-[var(--sys-text)]">{cat.label}</p>
+                            <p className="text-[10px] text-[var(--sys-text-muted)] mt-0.5">{cat.desc}</p>
                         </button>
                     ))}
                 </div>
@@ -1907,14 +1907,14 @@ function StepYouTubeSeoWizard({ onComplete, onBack, activeBrand, availableProvid
 
             {/* Format */}
             <div className="mb-5">
-                <label className="text-sm font-bold text-slate-300 mb-2 block">Format</label>
+                <label className="text-sm font-bold text-[var(--sys-text-muted)] mb-2 block">Format</label>
                 <div className="grid grid-cols-2 gap-3">
                     {YT_FORMATS.map(f => (
                         <button key={f.id} onClick={() => setFormat(f.id)}
-                            className={`glass-panel rounded-xl p-4 text-left transition-all cursor-pointer ${format === f.id ? 'bg-emerald-500/15 border-emerald-500/40 ring-1 ring-emerald-500/30' : 'hover:bg-white/[0.05]'}`}>
+                            className={`glass-panel rounded-xl p-4 text-left transition-all cursor-pointer ${format === f.id ? 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] ' : 'hover:bg-[var(--sys-surface)]'}`}>
                             <span className="material-symbols-outlined text-xl mb-2 block" style={{ color: format === f.id ? '#10B981' : '#64748b' }}>{f.icon}</span>
-                            <p className="text-sm font-bold text-white">{f.label}</p>
-                            <p className="text-xs text-slate-500">{f.desc}</p>
+                            <p className="text-sm font-bold text-[var(--sys-text)]">{f.label}</p>
+                            <p className="text-xs text-[var(--sys-text-muted)]">{f.desc}</p>
                         </button>
                     ))}
                 </div>
@@ -1922,20 +1922,20 @@ function StepYouTubeSeoWizard({ onComplete, onBack, activeBrand, availableProvid
 
             {/* Target Audience */}
             <div className="mb-5">
-                <label className="text-sm font-bold text-slate-300 mb-2 block">Target Audience <span className="text-slate-600 font-normal">(optional)</span></label>
+                <label className="text-sm font-bold text-[var(--sys-text-muted)] mb-2 block">Target Audience <span className="text-[var(--sys-text-muted)] font-normal">(optional)</span></label>
                 <input value={targetAudience} onChange={e => setTargetAudience(e.target.value)}
                     placeholder="e.g. Entrepreneurs, tech enthusiasts, beginners, students"
-                    className="input-glass w-full py-3 text-white"
+                    className="input-glass w-full py-3 text-[var(--sys-text)]"
                 />
             </div>
 
             {/* Language */}
             <div className="mb-6">
-                <label className="text-sm font-bold text-slate-300 mb-2 block">Language</label>
+                <label className="text-sm font-bold text-[var(--sys-text-muted)] mb-2 block">Language</label>
                 <div className="flex flex-wrap gap-2">
                     {LANGUAGES.map(l => (
                         <button key={l.id} onClick={() => setLanguage(l.id)}
-                            className={`px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${language === l.id ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'glass-panel text-slate-400 hover:text-white'}`}>
+                            className={`px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${language === l.id ? 'bg-[var(--sys-primary-dim)] text-primary border border-[var(--sys-border)]' : 'glass-panel text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]'}`}>
                             {l.flag} {l.label}
                         </button>
                     ))}
@@ -1945,7 +1945,7 @@ function StepYouTubeSeoWizard({ onComplete, onBack, activeBrand, availableProvid
             {/* Generate Button */}
             <CreditTooltipWrapper action="content">
                 <button onClick={handleSubmit} disabled={!brief.trim() || !videoCategory}
-                    className="w-full py-4 rounded-xl text-sm font-bold disabled:opacity-30 flex items-center justify-center gap-2 cursor-pointer bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white transition-all shadow-lg shadow-emerald-500/20">
+                    className="w-full py-4 rounded-xl text-sm font-bold disabled:opacity-30 flex items-center justify-center gap-2 cursor-pointer bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:from-emerald-500 hover:to-teal-500 text-[var(--sys-text)] transition-all shadow-none">
                     <span className="material-symbols-outlined text-lg">rocket_launch</span>
                     Optimize for YouTube
                     <CreditBadge action="content" />
@@ -1993,9 +1993,9 @@ function YouTubeSeoResultView({ result, youtubeSeoData, onNewContent }) {
     }
 
     const getTitleColor = (charCount) => {
-        if (charCount <= 55) return { bg: 'bg-emerald-500/10', text: 'text-emerald-400', label: '✓ Optimal', border: 'border-emerald-500/30' }
-        if (charCount <= 70) return { bg: 'bg-amber-500/10', text: 'text-amber-400', label: '⚠ Slightly long', border: 'border-amber-500/30' }
-        return { bg: 'bg-rose-500/10', text: 'text-rose-400', label: '❌ Too long', border: 'border-rose-500/30' }
+        if (charCount <= 55) return { bg: 'bg-[var(--sys-primary-dim)]', text: 'text-primary', label: '✓ Optimal', border: 'border-[var(--sys-border)]' }
+        if (charCount <= 70) return { bg: 'bg-[var(--sys-primary-dim)]', text: 'text-primary', label: '⚠ Slightly long', border: 'border-[var(--sys-border)]' }
+        return { bg: 'bg-[var(--sys-primary-dim)]', text: 'text-primary', label: '❌ Too long', border: 'border-[var(--sys-border)]' }
     }
 
     return (
@@ -2003,20 +2003,20 @@ function YouTubeSeoResultView({ result, youtubeSeoData, onNewContent }) {
             {/* Header */}
             <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500/20 to-teal-500/10 flex items-center justify-center">
-                        <span className="material-symbols-outlined text-2xl text-emerald-400">rocket_launch</span>
+                    <div className="w-12 h-12 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] flex items-center justify-center">
+                        <span className="material-symbols-outlined text-2xl text-primary">rocket_launch</span>
                     </div>
                     <div>
-                        <h3 className="text-xl font-extrabold text-white">YouTube SEO <span className="text-emerald-400">Ready</span></h3>
-                        <p className="text-xs text-slate-500 mt-0.5">Copy-paste directly into YouTube Studio</p>
+                        <h3 className="text-xl font-extrabold text-[var(--sys-text)]">YouTube SEO <span className="text-primary">Ready</span></h3>
+                        <p className="text-xs text-[var(--sys-text-muted)] mt-0.5">Copy-paste directly into YouTube Studio</p>
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
-                    <button onClick={copyAll} className="glass-panel px-3 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white flex items-center gap-1 cursor-pointer transition-all">
+                    <button onClick={copyAll} className="glass-panel px-3 py-2 rounded-xl text-xs font-bold text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] flex items-center gap-1 cursor-pointer transition-all">
                         <span className="material-symbols-outlined text-sm">{copiedSection === 'all' ? 'check' : 'content_copy'}</span>
                         {copiedSection === 'all' ? 'Copied All!' : 'Copy All'}
                     </button>
-                    <button onClick={onNewContent} className="glass-panel px-3 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white flex items-center gap-1 cursor-pointer transition-all">
+                    <button onClick={onNewContent} className="glass-panel px-3 py-2 rounded-xl text-xs font-bold text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] flex items-center gap-1 cursor-pointer transition-all">
                         <span className="material-symbols-outlined text-sm">add</span> New
                     </button>
                 </div>
@@ -2027,12 +2027,12 @@ function YouTubeSeoResultView({ result, youtubeSeoData, onNewContent }) {
                 <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2">
                         <span className="material-symbols-outlined text-lg text-[#FF4D00]">title</span>
-                        <h4 className="text-base font-bold text-white">Title Options</h4>
+                        <h4 className="text-base font-bold text-[var(--sys-text)]">Title Options</h4>
                         <span className="text-xs bg-[#FF4D00]/10 text-[#FF4D00] px-2 py-0.5 rounded-full font-bold">{titles.length} options</span>
                     </div>
                     {titles[selectedTitle]?.text && (
                         <button onClick={() => copySection(titles[selectedTitle].text, 'title')}
-                            className="flex items-center gap-1 text-xs text-slate-500 hover:text-white transition-colors cursor-pointer">
+                            className="flex items-center gap-1 text-xs text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] transition-colors cursor-pointer">
                             <span className="material-symbols-outlined text-sm">{copiedSection === 'title' ? 'check' : 'content_copy'}</span>
                             {copiedSection === 'title' ? 'Copied!' : 'Copy Selected'}
                         </button>
@@ -2044,20 +2044,20 @@ function YouTubeSeoResultView({ result, youtubeSeoData, onNewContent }) {
                         const color = getTitleColor(charCount)
                         return (
                             <button key={i} onClick={() => setSelectedTitle(i)}
-                                className={`w-full text-left p-4 rounded-xl border-2 transition-all cursor-pointer ${selectedTitle === i
-                                    ? `${color.bg} ${color.border} ring-1 ring-white/10`
-                                    : 'border-transparent bg-white/[0.02] hover:bg-white/[0.04]'}`}>
+                                className={`w-full text-left p-4 rounded-xl border transition-all cursor-pointer ${selectedTitle === i
+                                    ? `${color.bg} ${color.border}  border-[var(--sys-border)]`
+                                    : 'border-transparent bg-[var(--sys-surface)] hover:bg-[var(--sys-surface)]'}`}>
                                 <div className="flex items-start justify-between gap-3">
                                     <div className="flex-1">
-                                        <p className="text-base font-bold text-white leading-relaxed">{t.text}</p>
-                                        {t.strategy && <p className="text-xs text-slate-500 mt-1.5 italic flex items-center gap-0.5"><span className="material-symbols-outlined text-[10px]">lightbulb</span> {t.strategy}</p>}
+                                        <p className="text-base font-bold text-[var(--sys-text)] leading-relaxed">{t.text}</p>
+                                        {t.strategy && <p className="text-xs text-[var(--sys-text-muted)] mt-1.5 italic flex items-center gap-0.5"><span className="material-symbols-outlined text-[10px]">lightbulb</span> {t.strategy}</p>}
                                     </div>
                                     <div className="flex flex-col items-end gap-1 flex-shrink-0">
                                         <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${color.bg} ${color.text}`}>
                                             {charCount} chars {color.label}
                                         </span>
                                         {selectedTitle === i && (
-                                            <span className="text-[10px] text-emerald-400 font-bold">✓ Selected</span>
+                                            <span className="text-[10px] text-primary font-bold">✓ Selected</span>
                                         )}
                                     </div>
                                 </div>
@@ -2071,21 +2071,21 @@ function YouTubeSeoResultView({ result, youtubeSeoData, onNewContent }) {
             <div className="glass-panel rounded-2xl p-5 mb-4">
                 <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
-                        <span className="material-symbols-outlined text-lg text-emerald-400">description</span>
-                        <h4 className="text-base font-bold text-white">YouTube Description</h4>
+                        <span className="material-symbols-outlined text-lg text-primary">description</span>
+                        <h4 className="text-base font-bold text-[var(--sys-text)]">YouTube Description</h4>
                     </div>
                     <button onClick={() => copySection(description, 'description')}
-                        className="flex items-center gap-1 text-xs text-slate-500 hover:text-white transition-colors cursor-pointer">
+                        className="flex items-center gap-1 text-xs text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] transition-colors cursor-pointer">
                         <span className="material-symbols-outlined text-sm">{copiedSection === 'description' ? 'check' : 'content_copy'}</span>
                         {copiedSection === 'description' ? 'Copied!' : 'Copy'}
                     </button>
                 </div>
-                <div className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap max-h-64 overflow-y-auto pr-2 custom-scrollbar bg-white/[0.02] rounded-xl p-4">
+                <div className="text-sm text-[var(--sys-text-muted)] leading-relaxed whitespace-pre-wrap max-h-64 overflow-y-auto pr-2 custom-scrollbar bg-[var(--sys-surface)] rounded-xl p-4">
                     {description}
                 </div>
                 <div className="flex items-center gap-3 mt-2">
-                    <span className="text-xs text-slate-600">{description.length} chars • {description.split(/\s+/).length} words</span>
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${description.length >= 300 && description.length <= 500 ? 'bg-emerald-500/10 text-emerald-400' : description.length > 500 ? 'bg-amber-500/10 text-amber-400' : 'bg-rose-500/10 text-rose-400'}`}>
+                    <span className="text-xs text-[var(--sys-text-muted)]">{description.length} chars • {description.split(/\s+/).length} words</span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${description.length >= 300 && description.length <= 500 ? 'bg-[var(--sys-primary-dim)] text-primary' : description.length > 500 ? 'bg-[var(--sys-primary-dim)] text-primary' : 'bg-[var(--sys-primary-dim)] text-primary'}`}>
                         {description.length >= 300 && description.length <= 500 ? '✓ Optimal length' : description.length > 500 ? '✓ Good length' : '⚠ Short — aim for 300-500 words'}
                     </span>
                 </div>
@@ -2097,11 +2097,11 @@ function YouTubeSeoResultView({ result, youtubeSeoData, onNewContent }) {
                     <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2">
                             <span className="material-symbols-outlined text-lg text-[#FF4D00]">sell</span>
-                            <h4 className="text-base font-bold text-white">Tags</h4>
+                            <h4 className="text-base font-bold text-[var(--sys-text)]">Tags</h4>
                             <span className="text-xs bg-[#FF4D00]/10 text-[#FF4D00] px-2 py-0.5 rounded-full font-bold">{tags.length} tags</span>
                         </div>
                         <button onClick={() => copySection(tags.join(', '), 'tags')}
-                            className="flex items-center gap-1 text-xs text-slate-500 hover:text-white transition-colors cursor-pointer">
+                            className="flex items-center gap-1 text-xs text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] transition-colors cursor-pointer">
                             <span className="material-symbols-outlined text-sm">{copiedSection === 'tags' ? 'check' : 'content_copy'}</span>
                             {copiedSection === 'tags' ? 'Copied!' : 'Copy All Tags'}
                         </button>
@@ -2110,10 +2110,10 @@ function YouTubeSeoResultView({ result, youtubeSeoData, onNewContent }) {
                         {tags.map((tag, i) => (
                             <button key={i} onClick={() => copySection(tag, `tag-${i}`)}
                                 className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer border ${i === 0
-                                    ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30 font-bold'
+                                    ? 'bg-[var(--sys-primary-dim)] text-[var(--sys-primary)] border-[var(--sys-border)] font-bold'
                                     : 'bg-[#FF4D00]/10 text-[#FF7A00] hover:bg-[#FF4D00]/20 border-[#FF4D00]/20'}`}>
                                 {copiedSection === `tag-${i}` ? '✓' : ''} {tag}
-                                {i === 0 && <span className="ml-1 text-[8px] text-emerald-400">PRIMARY</span>}
+                                {i === 0 && <span className="ml-1 text-[8px] text-primary">PRIMARY</span>}
                             </button>
                         ))}
                     </div>
@@ -2125,11 +2125,11 @@ function YouTubeSeoResultView({ result, youtubeSeoData, onNewContent }) {
                 <div className="glass-panel rounded-2xl p-5 mb-4">
                     <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2">
-                            <span className="material-symbols-outlined text-lg text-cyan-400">key</span>
-                            <h4 className="text-base font-bold text-white">Keywords Strategy</h4>
+                            <span className="material-symbols-outlined text-lg text-primary">key</span>
+                            <h4 className="text-base font-bold text-[var(--sys-text)]">Keywords Strategy</h4>
                         </div>
                         <button onClick={() => copySection(`Primary: ${(keywords.primary || []).join(', ')}\nSecondary: ${(keywords.secondary || []).join(', ')}`, 'keywords')}
-                            className="flex items-center gap-1 text-xs text-slate-500 hover:text-white transition-colors cursor-pointer">
+                            className="flex items-center gap-1 text-xs text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] transition-colors cursor-pointer">
                             <span className="material-symbols-outlined text-sm">{copiedSection === 'keywords' ? 'check' : 'content_copy'}</span>
                             {copiedSection === 'keywords' ? 'Copied!' : 'Copy'}
                         </button>
@@ -2137,20 +2137,20 @@ function YouTubeSeoResultView({ result, youtubeSeoData, onNewContent }) {
                     <div className="space-y-3">
                         {keywords.primary?.length > 0 && (
                             <div>
-                                <p className="text-xs font-bold text-cyan-400 mb-1.5 flex items-center gap-0.5"><span className="material-symbols-outlined text-xs">target</span> Primary — High Volume Search Terms</p>
+                                <p className="text-xs font-bold text-primary mb-1.5 flex items-center gap-0.5"><span className="material-symbols-outlined text-xs">target</span> Primary — High Volume Search Terms</p>
                                 <div className="flex flex-wrap gap-2">
                                     {keywords.primary.map((kw, i) => (
-                                        <span key={i} className="px-3 py-1.5 rounded-lg bg-cyan-500/10 text-cyan-300 text-xs font-bold border border-cyan-500/20">{kw}</span>
+                                        <span key={i} className="px-3 py-1.5 rounded-lg bg-[var(--sys-primary-dim)] text-[var(--sys-primary)] text-xs font-bold border border-[var(--sys-border)]">{kw}</span>
                                     ))}
                                 </div>
                             </div>
                         )}
                         {keywords.secondary?.length > 0 && (
                             <div>
-                                <p className="text-xs font-bold text-slate-500 mb-1.5">📌 Secondary — Long-Tail & LSI</p>
+                                <p className="text-xs font-bold text-[var(--sys-text-muted)] mb-1.5">📌 Secondary — Long-Tail & LSI</p>
                                 <div className="flex flex-wrap gap-2">
                                     {keywords.secondary.map((kw, i) => (
-                                        <span key={i} className="px-3 py-1.5 rounded-lg bg-white/5 text-slate-400 text-xs font-medium border border-white/10">{kw}</span>
+                                        <span key={i} className="px-3 py-1.5 rounded-lg bg-[var(--sys-surface)] text-[var(--sys-text-muted)] text-xs font-medium border border-[var(--sys-border)]">{kw}</span>
                                     ))}
                                 </div>
                             </div>
@@ -2165,18 +2165,18 @@ function YouTubeSeoResultView({ result, youtubeSeoData, onNewContent }) {
                 {seoScore.overallScore && (
                     <div className="glass-panel rounded-2xl p-5">
                         <div className="flex items-center gap-2 mb-3">
-                            <span className="material-symbols-outlined text-lg text-amber-400">analytics</span>
-                            <h4 className="text-sm font-bold text-white">SEO Score</h4>
+                            <span className="material-symbols-outlined text-lg text-primary">analytics</span>
+                            <h4 className="text-sm font-bold text-[var(--sys-text)]">SEO Score</h4>
                         </div>
                         <div className="flex items-center justify-center mb-4">
-                            <div className={`w-20 h-20 rounded-full flex items-center justify-center text-2xl font-black border-4 ${seoScore.overallScore >= 8 ? 'border-emerald-500 text-emerald-400 bg-emerald-500/10' : seoScore.overallScore >= 6 ? 'border-amber-500 text-amber-400 bg-amber-500/10' : 'border-rose-500 text-rose-400 bg-rose-500/10'}`}>
+                            <div className={`w-20 h-20 rounded-full flex items-center justify-center text-2xl font-black border-4 ${seoScore.overallScore >= 8 ? 'border-[var(--sys-border)] text-primary bg-[var(--sys-primary-dim)]' : seoScore.overallScore >= 6 ? 'border-[var(--sys-border)] text-primary bg-[var(--sys-primary-dim)]' : 'border-[var(--sys-border)] text-primary bg-[var(--sys-primary-dim)]'}`}>
                                 {seoScore.overallScore}/10
                             </div>
                         </div>
                         <div className="space-y-1.5 text-xs">
-                            {seoScore.titleOptimization && <p className="text-slate-400 flex items-center gap-0.5"><span className="material-symbols-outlined text-xs">push_pin</span> Title: <span className="text-white">{seoScore.titleOptimization}</span></p>}
-                            {seoScore.descriptionOptimization && <p className="text-slate-400 flex items-center gap-0.5"><span className="material-symbols-outlined text-xs">description</span> Desc: <span className="text-white">{seoScore.descriptionOptimization}</span></p>}
-                            {seoScore.tagCoverage && <p className="text-slate-400 flex items-center gap-0.5"><span className="material-symbols-outlined text-xs">sell</span> Tags: <span className="text-white">{seoScore.tagCoverage}</span></p>}
+                            {seoScore.titleOptimization && <p className="text-[var(--sys-text-muted)] flex items-center gap-0.5"><span className="material-symbols-outlined text-xs">push_pin</span> Title: <span className="text-[var(--sys-text)]">{seoScore.titleOptimization}</span></p>}
+                            {seoScore.descriptionOptimization && <p className="text-[var(--sys-text-muted)] flex items-center gap-0.5"><span className="material-symbols-outlined text-xs">description</span> Desc: <span className="text-[var(--sys-text)]">{seoScore.descriptionOptimization}</span></p>}
+                            {seoScore.tagCoverage && <p className="text-[var(--sys-text-muted)] flex items-center gap-0.5"><span className="material-symbols-outlined text-xs">sell</span> Tags: <span className="text-[var(--sys-text)]">{seoScore.tagCoverage}</span></p>}
                         </div>
                     </div>
                 )}
@@ -2186,9 +2186,9 @@ function YouTubeSeoResultView({ result, youtubeSeoData, onNewContent }) {
                     <div className="glass-panel rounded-2xl p-5">
                         <div className="flex items-center gap-2 mb-3">
                             <span className="material-symbols-outlined text-lg text-[#FF7A00]">psychology</span>
-                            <h4 className="text-sm font-bold text-white">Competitor Insight</h4>
+                            <h4 className="text-sm font-bold text-[var(--sys-text)]">Competitor Insight</h4>
                         </div>
-                        <p className="text-sm text-slate-300 leading-relaxed">{competitorInsight}</p>
+                        <p className="text-sm text-[var(--sys-text-muted)] leading-relaxed">{competitorInsight}</p>
                     </div>
                 )}
             </div>
@@ -2199,10 +2199,10 @@ function YouTubeSeoResultView({ result, youtubeSeoData, onNewContent }) {
                     <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2">
                             <span className="material-symbols-outlined text-lg text-[#FF4D00]">tag</span>
-                            <h4 className="text-sm font-bold text-white">Hashtags</h4>
+                            <h4 className="text-sm font-bold text-[var(--sys-text)]">Hashtags</h4>
                         </div>
                         <button onClick={() => copySection(hashtags.join(' '), 'hashtags')}
-                            className="flex items-center gap-1 text-xs text-slate-500 hover:text-white transition-colors cursor-pointer">
+                            className="flex items-center gap-1 text-xs text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] transition-colors cursor-pointer">
                             <span className="material-symbols-outlined text-sm">{copiedSection === 'hashtags' ? 'check' : 'content_copy'}</span>
                             {copiedSection === 'hashtags' ? 'Copied!' : 'Copy'}
                         </button>
@@ -2218,18 +2218,18 @@ function YouTubeSeoResultView({ result, youtubeSeoData, onNewContent }) {
             {/* Actions */}
             <div className="grid grid-cols-2 gap-4 mt-6">
                 <button onClick={copyAll}
-                    className="glass-panel rounded-2xl p-5 hover:bg-white/[0.05] hover:border-emerald-500/30 transition-all cursor-pointer text-center group border border-white/[0.06]">
-                    <span className="material-symbols-outlined text-2xl text-emerald-400 mb-2 block group-hover:scale-110 transition-transform">
+                    className="glass-panel rounded-2xl p-5 hover:bg-[var(--sys-surface)] hover:border-[var(--sys-border)] transition-all cursor-pointer text-center group border border-[var(--sys-border)]">
+                    <span className="material-symbols-outlined text-2xl text-primary mb-2 block group-hover:scale-110 transition-transform">
                         {copiedSection === 'all' ? 'check_circle' : 'content_copy'}
                     </span>
-                    <p className="text-sm font-bold text-white">{copiedSection === 'all' ? 'Copied!' : 'Copy Everything'}</p>
-                    <p className="text-[10px] text-slate-500 mt-0.5">Title + Description + Tags + Keywords</p>
+                    <p className="text-sm font-bold text-[var(--sys-text)]">{copiedSection === 'all' ? 'Copied!' : 'Copy Everything'}</p>
+                    <p className="text-[10px] text-[var(--sys-text-muted)] mt-0.5">Title + Description + Tags + Keywords</p>
                 </button>
                 <button onClick={onNewContent}
-                    className="glass-panel rounded-2xl p-5 hover:bg-white/[0.05] hover:border-emerald-500/30 transition-all cursor-pointer text-center group border border-white/[0.06]">
-                    <span className="material-symbols-outlined text-2xl text-emerald-400 mb-2 block group-hover:scale-110 transition-transform">rocket_launch</span>
-                    <p className="text-sm font-bold text-white">Optimize Another</p>
-                    <p className="text-[10px] text-slate-500 mt-0.5">Generate SEO for a new video</p>
+                    className="glass-panel rounded-2xl p-5 hover:bg-[var(--sys-surface)] hover:border-[var(--sys-border)] transition-all cursor-pointer text-center group border border-[var(--sys-border)]">
+                    <span className="material-symbols-outlined text-2xl text-primary mb-2 block group-hover:scale-110 transition-transform">rocket_launch</span>
+                    <p className="text-sm font-bold text-[var(--sys-text)]">Optimize Another</p>
+                    <p className="text-[10px] text-[var(--sys-text-muted)] mt-0.5">Generate SEO for a new video</p>
                 </button>
             </div>
         </div>
@@ -2245,7 +2245,8 @@ function StepBlogWizard({ activeBrand, blogType, onGenerate, onBack, generating 
     const [targetWordCount, setTargetWordCount] = useState(1500)
     const [keywords, setKeywords] = useState('')
     const [audience, setAudience] = useState('')
-    const [tone, setTone] = useState('professional')
+    const defaultLang = activeBrand?.dna?.defaultLanguage?.toLowerCase() || 'english'
+    const [language, setLanguage] = useState(defaultLang)
 
     const TONES = ['professional', 'conversational', 'authoritative', 'friendly', 'witty', 'inspirational']
     const WORD_MARKS = [800, 1200, 1500, 2000, 2500, 3000]
@@ -2253,47 +2254,47 @@ function StepBlogWizard({ activeBrand, blogType, onGenerate, onBack, generating 
     return (
         <div className="max-w-3xl mx-auto animate-fade-in">
             <div className="flex items-center gap-3 mb-6">
-                <button onClick={onBack} className="size-10 rounded-xl glass-panel flex items-center justify-center hover:bg-white/[0.08] transition-colors cursor-pointer">
-                    <span className="material-symbols-outlined text-lg text-slate-400">arrow_back</span>
+                <button onClick={onBack} className="size-10 rounded-xl glass-panel flex items-center justify-center hover:bg-[var(--sys-surface)] transition-colors cursor-pointer">
+                    <span className="material-symbols-outlined text-lg text-[var(--sys-text-muted)]">arrow_back</span>
                 </button>
                 <div>
-                    <h3 className="text-xl font-extrabold text-white"><span className="material-symbols-outlined text-xl align-middle mr-1">edit_note</span> Blog <span className="text-primary">Editor</span></h3>
-                    <p className="text-sm text-slate-500">AI-powered blog generation with research intelligence</p>
+                    <h3 className="text-xl font-extrabold text-[var(--sys-text)]"><span className="material-symbols-outlined text-xl align-middle mr-1">edit_note</span> Blog <span className="text-primary">Editor</span></h3>
+                    <p className="text-sm text-[var(--sys-text-muted)]">AI-powered blog generation with research intelligence</p>
                 </div>
             </div>
 
 
             {/* Topic */}
             <div className="glass-panel rounded-2xl p-6 mb-4">
-                <label className="text-sm font-bold text-white mb-2 block">What's your blog about?</label>
+                <label className="text-sm font-bold text-[var(--sys-text)] mb-2 block">What's your blog about?</label>
                 <textarea
                     value={topic} onChange={(e) => setTopic(e.target.value)}
                     placeholder="e.g., '10 ways AI is transforming digital marketing in 2025' or 'Complete guide to building a D2C brand from scratch'"
-                    className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 resize-none focus:border-primary/40 focus:outline-none transition-colors"
+                    className="w-full bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl px-4 py-3 text-sm text-[var(--sys-text)] placeholder-slate-600 resize-none focus:border-primary/40 focus:outline-none transition-colors"
                     rows={3}
                 />
             </div>
 
             {/* Keywords */}
             <div className="glass-panel rounded-2xl p-6 mb-4">
-                <label className="text-sm font-bold text-white mb-2 block">Target Keywords <span className="text-slate-600 font-normal">(comma separated, optional)</span></label>
+                <label className="text-sm font-bold text-[var(--sys-text)] mb-2 block">Target Keywords <span className="text-[var(--sys-text-muted)] font-normal">(comma separated, optional)</span></label>
                 <input
                     value={keywords} onChange={(e) => setKeywords(e.target.value)}
                     placeholder="e.g., digital marketing, AI marketing tools, D2C branding"
-                    className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-600 focus:border-primary/40 focus:outline-none transition-colors"
+                    className="w-full bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl px-4 py-2.5 text-sm text-[var(--sys-text)] placeholder-slate-600 focus:border-primary/40 focus:outline-none transition-colors"
                 />
             </div>
 
             <div className="grid grid-cols-2 gap-4 mb-4">
                 {/* Word Count */}
                 <div className="glass-panel rounded-2xl p-5">
-                    <label className="text-sm font-bold text-white mb-3 block">Word Count: <span className="text-primary">{targetWordCount}+</span></label>
+                    <label className="text-sm font-bold text-[var(--sys-text)] mb-3 block">Word Count: <span className="text-primary">{targetWordCount}+</span></label>
                     <input type="range" min={800} max={3000} step={100} value={targetWordCount}
                         onChange={(e) => setTargetWordCount(Number(e.target.value))}
                         className="w-full accent-primary" />
                     <div className="flex justify-between mt-1">
                         {WORD_MARKS.map(w => (
-                            <span key={w} className={`text-[10px] cursor-pointer ${targetWordCount === w ? 'text-primary font-bold' : 'text-slate-600'}`}
+                            <span key={w} className={`text-[10px] cursor-pointer ${targetWordCount === w ? 'text-primary font-bold' : 'text-[var(--sys-text-muted)]'}`}
                                 onClick={() => setTargetWordCount(w)}>{w >= 1000 ? `${w/1000}k` : w}</span>
                         ))}
                     </div>
@@ -2301,30 +2302,43 @@ function StepBlogWizard({ activeBrand, blogType, onGenerate, onBack, generating 
 
                 {/* Audience */}
                 <div className="glass-panel rounded-2xl p-5">
-                    <label className="text-sm font-bold text-white mb-2 block">Target Audience</label>
+                    <label className="text-sm font-bold text-[var(--sys-text)] mb-2 block">Target Audience</label>
                     <input value={audience} onChange={(e) => setAudience(e.target.value)}
                         placeholder="e.g., Startup founders, Marketing managers"
-                        className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-600 focus:border-primary/40 focus:outline-none transition-colors" />
+                        className="w-full bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl px-4 py-2.5 text-sm text-[var(--sys-text)] placeholder-slate-600 focus:border-primary/40 focus:outline-none transition-colors" />
                 </div>
             </div>
 
             {/* Tone */}
             <div className="glass-panel rounded-2xl p-5 mb-6">
-                <label className="text-sm font-bold text-white mb-3 block">Tone</label>
+                <label className="text-sm font-bold text-[var(--sys-text)] mb-3 block">Tone</label>
                 <div className="flex flex-wrap gap-2">
                     {TONES.map(t => (
                         <button key={t} onClick={() => setTone(t)}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${tone === t ? 'bg-primary/20 text-primary border border-primary/30' : 'bg-white/[0.04] text-slate-400 border border-white/[0.06] hover:bg-white/[0.08]'}`}>
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${tone === t ? 'bg-[var(--sys-primary-dim)] text-primary border border-[var(--sys-border)]' : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] border border-[var(--sys-border)] hover:bg-[var(--sys-surface)]'}`}>
                             {t.charAt(0).toUpperCase() + t.slice(1)}
                         </button>
                     ))}
                 </div>
             </div>
 
+            {/* Language Selection */}
+            <div className="glass-panel rounded-2xl p-5 mb-6">
+                <label className="text-sm font-bold text-[var(--sys-text)] mb-3 block">Language</label>
+                <div className="flex flex-wrap gap-2">
+                    {[{id: 'english', label: 'English'}, {id: 'hindi', label: 'Hindi'}, {id: 'hinglish', label: 'Hinglish'}, {id: 'regional', label: 'Regional'}].map(l => (
+                        <button key={l.id} onClick={() => setLanguage(l.id)}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${language === l.id ? 'bg-[var(--sys-primary-dim)] text-primary border border-[var(--sys-border)]' : 'glass-panel text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]'}`}>
+                            {l.label}
+                        </button>
+                    ))}
+                </div>
+            </div>
+
             {/* Generate */}
-            <button onClick={() => onGenerate({ topic, blogType, targetWordCount, keywords: keywords.split(',').map(k => k.trim()).filter(Boolean), targetAudience: audience, tone })}
+            <button onClick={() => onGenerate({ topic, blogType, targetWordCount, keywords: keywords.split(',').map(k => k.trim()).filter(Boolean), targetAudience: audience, tone, language })}
                 disabled={!topic.trim() || generating}
-                className="w-full py-4 rounded-2xl bg-gradient-to-r from-primary to-[#FF7A00] text-white font-bold text-base disabled:opacity-30 hover:shadow-lg hover:shadow-primary/20 transition-all cursor-pointer flex items-center justify-center gap-2">
+                className="w-full py-4 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] font-bold text-base disabled:opacity-30 hover:shadow-lg hover:shadow-none transition-all cursor-pointer flex items-center justify-center gap-2">
                 <span className="material-symbols-outlined">{generating ? 'progress_activity' : 'auto_awesome'}</span>
                 {generating ? 'Generating your blog...' : 'Generate Blog Article'}
             </button>
@@ -2520,24 +2534,24 @@ function SmartBlogWriter({ activeBrand, onBack, onGenerateImage }) {
         <div className="w-full animate-fade-in" style={{ padding: '0 2rem 2rem' }}>
             {/* Header */}
             <div className="flex items-center gap-3 mb-8">
-                <button onClick={onBack} className="size-10 rounded-xl glass-panel flex items-center justify-center hover:bg-white/[0.08] transition-colors cursor-pointer">
-                    <span className="material-symbols-outlined text-lg text-slate-400">arrow_back</span>
+                <button onClick={onBack} className="size-10 rounded-xl glass-panel flex items-center justify-center hover:bg-[var(--sys-surface)] transition-colors cursor-pointer">
+                    <span className="material-symbols-outlined text-lg text-[var(--sys-text-muted)]">arrow_back</span>
                 </button>
                 <div className="flex-1">
-                    <h3 className="text-xl font-extrabold text-white flex items-center gap-2">
-                        <span className="material-symbols-outlined text-xl text-emerald-400">draw</span>
+                    <h3 className="text-xl font-extrabold text-[var(--sys-text)] flex items-center gap-2">
+                        <span className="material-symbols-outlined text-xl text-primary">draw</span>
                         Smart Blog Writer
                         <span className="text-[10px] px-2 py-0.5 rounded-full font-bold" style={{ background: 'rgba(16,185,129,0.15)', color: '#34d399', border: '1px solid rgba(16,185,129,0.2)' }}>AI Assisted</span>
                     </h3>
-                    <p className="text-xs text-slate-500">{totalWords} words · {sections.length} sections · Real-time AI suggestions</p>
+                    <p className="text-xs text-[var(--sys-text-muted)]">{totalWords} words · {sections.length} sections · Real-time AI suggestions</p>
                 </div>
                 <div className="flex gap-2">
-                    <button onClick={exportMarkdown} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-colors text-slate-400 hover:text-white" style={{ background: 'rgba(255,255,255,0.04)' }}>
+                    <button onClick={exportMarkdown} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-colors text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]" style={{ background: 'rgba(255,255,255,0.04)' }}>
                         <span className="material-symbols-outlined text-sm">{copied === 'md' ? 'check' : 'description'}</span>
                         {copied === 'md' ? 'Copied!' : 'Export MD'}
                     </button>
                     <button onClick={() => setShowAssistPanel(p => !p)}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-colors ${showAssistPanel ? 'text-primary' : 'text-slate-400 hover:text-white'}`}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-colors ${showAssistPanel ? 'text-primary' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]'}`}
                         style={{ background: showAssistPanel ? 'rgba(129,140,248,0.12)' : 'rgba(255,255,255,0.04)' }}>
                         <span className="material-symbols-outlined text-sm">psychology</span>
                         AI Panel
@@ -2550,21 +2564,21 @@ function SmartBlogWriter({ activeBrand, onBack, onGenerateImage }) {
                 {heroImageUrl ? (
                     <div className="relative group" style={{ background: 'rgba(0,0,0,0.2)' }}>
                         <img src={heroImageUrl} alt="Cover" style={{ width: '100%', display: 'block', objectFit: 'contain' }} />
-                        <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity bg-black/40 flex items-center justify-center gap-3">
-                            <button onClick={() => setImageStylePicker(-1)} className="px-4 py-2 rounded-xl text-xs font-bold text-white cursor-pointer" style={{ background: 'rgba(129,140,248,0.8)' }}>
+                        <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity bg-black/60 flex items-center justify-center gap-3">
+                            <button onClick={() => setImageStylePicker(-1)} className="px-4 py-2 rounded-xl text-xs font-bold text-[var(--sys-text)] cursor-pointer" style={{ background: 'rgba(129,140,248,0.8)' }}>
                                 <span className="material-symbols-outlined text-sm align-middle mr-1">refresh</span>Regenerate
                             </button>
-                            <button onClick={() => setHeroImageUrl('')} className="px-3 py-2 rounded-xl text-xs text-white/70 cursor-pointer" style={{ background: 'rgba(0,0,0,0.5)' }}>
+                            <button onClick={() => setHeroImageUrl('')} className="px-3 py-2 rounded-xl text-xs text-[var(--sys-text)]/70 cursor-pointer" style={{ background: 'rgba(0,0,0,0.5)' }}>
                                 <span className="material-symbols-outlined text-sm">delete</span>
                             </button>
                         </div>
                     </div>
                 ) : (
                     <button onClick={() => setImageStylePicker(-1)} className="w-full py-10 flex flex-col items-center gap-2 cursor-pointer group transition-all">
-                        <span className={`material-symbols-outlined text-3xl text-slate-600 group-hover:text-primary transition-colors ${generatingImage === -1 ? 'animate-spin' : ''}`}>
+                        <span className={`material-symbols-outlined text-3xl text-[var(--sys-text-muted)] group-hover:text-primary transition-colors ${generatingImage === -1 ? 'animate-spin' : ''}`}>
                             {generatingImage === -1 ? 'progress_activity' : 'add_photo_alternate'}
                         </span>
-                        <span className="text-sm font-semibold text-slate-500 group-hover:text-white transition-colors">
+                        <span className="text-sm font-semibold text-[var(--sys-text-muted)] group-hover:text-[var(--sys-text)] transition-colors">
                             {generatingImage === -1 ? 'Generating cover image...' : 'Generate Cover Image (16:9)'}
                         </span>
                     </button>
@@ -2575,22 +2589,22 @@ function SmartBlogWriter({ activeBrand, onBack, onGenerateImage }) {
             {imageStylePicker === -1 && (
                 <div className="mb-4 animate-fade-in rounded-2xl p-5" style={{ background: 'rgba(129,140,248,0.04)', border: '1px solid rgba(129,140,248,0.15)' }}>
                     <div className="flex items-center justify-between mb-3">
-                        <span className="text-sm font-bold text-white">Cover Image Style</span>
-                        <button onClick={() => setImageStylePicker(null)} className="text-slate-500 hover:text-white cursor-pointer"><span className="material-symbols-outlined text-sm">close</span></button>
+                        <span className="text-sm font-bold text-[var(--sys-text)]">Cover Image Style</span>
+                        <button onClick={() => setImageStylePicker(null)} className="text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer"><span className="material-symbols-outlined text-sm">close</span></button>
                     </div>
                     <div className="flex gap-2 mb-3">
                         {IMAGE_STYLES.map(s => (
                             <button key={s.id} onClick={() => setSelectedImageStyle(s.id)}
-                                className={`flex-1 py-2 rounded-xl text-center text-[11px] font-bold cursor-pointer transition-all ${selectedImageStyle === s.id ? 'ring-2 ring-primary text-white' : 'text-slate-500'}`}
+                                className={`flex-1 py-2 rounded-xl text-center text-[11px] font-bold cursor-pointer transition-all ${selectedImageStyle === s.id ? 'ring-2 ring-primary text-[var(--sys-text)]' : 'text-[var(--sys-text-muted)]'}`}
                                 style={{ background: selectedImageStyle === s.id ? 'rgba(129,140,248,0.15)' : 'rgba(255,255,255,0.02)', border: '1px solid ' + (selectedImageStyle === s.id ? 'rgba(129,140,248,0.3)' : 'rgba(255,255,255,0.05)') }}>
                                 <span className="material-symbols-outlined text-base block mb-0.5">{s.icon}</span>{s.label}
                             </button>
                         ))}
                     </div>
-                    <p className="text-[10px] text-slate-600 mb-3 flex items-center gap-1"><span className="material-symbols-outlined text-xs">lock</span>Hero images are always 16:9 landscape</p>
+                    <p className="text-[10px] text-[var(--sys-text-muted)] mb-3 flex items-center gap-1"><span className="material-symbols-outlined text-xs">lock</span>Hero images are always 16:9 landscape</p>
                     <button onClick={() => handleGenerateSectionImage(-1)} disabled={generatingImage !== null}
-                        className="w-full py-3 rounded-xl text-sm font-bold text-white cursor-pointer flex items-center justify-center gap-2"
-                        style={{ background: 'linear-gradient(135deg, #818cf8, #6366f1)' }}>
+                        className="w-full py-3 rounded-xl text-sm font-bold text-[var(--sys-text)] cursor-pointer flex items-center justify-center gap-2"
+                        style={{ background: 'var(--sys-primary)' }}>
                         <span className={`material-symbols-outlined text-sm ${generatingImage === -1 ? 'animate-spin' : ''}`}>{generatingImage === -1 ? 'progress_activity' : 'auto_awesome'}</span>
                         {generatingImage === -1 ? 'Generating...' : `Generate Cover · 16:9`}
                     </button>
@@ -2599,7 +2613,7 @@ function SmartBlogWriter({ activeBrand, onBack, onGenerateImage }) {
 
             {/* Title */}
             <input value={title} onChange={e => setTitle(e.target.value)}
-                className="w-full bg-transparent text-white focus:outline-none mb-8"
+                className="w-full bg-transparent text-[var(--sys-text)] focus:outline-none mb-8"
                 style={{ fontSize: '2.2rem', fontWeight: 800, lineHeight: 1.2, letterSpacing: '-0.02em' }}
                 placeholder="Your blog title..." />
 
@@ -2608,10 +2622,10 @@ function SmartBlogWriter({ activeBrand, onBack, onGenerateImage }) {
                 <div key={i} className="mb-6 relative group/sbw" style={{ paddingLeft: '2rem' }}>
                     {/* Section number + remove */}
                     <div className="absolute left-0 top-0 flex flex-col items-center gap-1 opacity-0 group-hover/sbw:opacity-100 transition-opacity">
-                        <span className="text-[9px] font-mono text-slate-600">{String(i + 1).padStart(2, '0')}</span>
+                        <span className="text-[9px] font-mono text-[var(--sys-text-muted)]">{String(i + 1).padStart(2, '0')}</span>
                         {sections.length > 1 && (
-                            <button onClick={() => removeSection(i)} className="p-0.5 rounded hover:bg-rose-500/20 cursor-pointer">
-                                <span className="material-symbols-outlined text-xs text-slate-600 hover:text-rose-400">close</span>
+                            <button onClick={() => removeSection(i)} className="p-0.5 rounded hover:bg-[var(--sys-primary-dim)] cursor-pointer">
+                                <span className="material-symbols-outlined text-xs text-[var(--sys-text-muted)] hover:text-primary">close</span>
                             </button>
                         )}
                     </div>
@@ -2619,23 +2633,23 @@ function SmartBlogWriter({ activeBrand, onBack, onGenerateImage }) {
                     {/* Section heading */}
                     <input value={section.heading} onChange={e => updateSection(i, 'heading', e.target.value)}
                         onClick={() => setActiveSection(i)}
-                        className="w-full bg-transparent text-white focus:outline-none mb-3"
+                        className="w-full bg-transparent text-[var(--sys-text)] focus:outline-none mb-3"
                         style={{ fontSize: '1.5rem', fontWeight: 700, lineHeight: 1.3 }}
                         placeholder="Section heading..." />
 
                     {/* Toolbar — visible when active */}
                     {activeSection === i && (
                         <div className="flex items-center gap-1 mb-2 py-1.5 px-2 rounded-lg animate-fade-in" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                            <button onMouseDown={e => e.preventDefault()} onClick={() => handleRephrase(i)} disabled={assistLoading === 'rephrase'} className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-semibold cursor-pointer transition-colors hover:bg-white/10 text-slate-400 hover:text-primary" title="Rephrase selection or full section">
+                            <button onMouseDown={e => e.preventDefault()} onClick={() => handleRephrase(i)} disabled={assistLoading === 'rephrase'} className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-semibold cursor-pointer transition-colors hover:bg-[var(--sys-surface)] text-[var(--sys-text-muted)] hover:text-primary" title="Rephrase selection or full section">
                                 <span className={`material-symbols-outlined text-xs ${assistLoading === 'rephrase' ? 'animate-spin' : ''}`}>{assistLoading === 'rephrase' ? 'progress_activity' : 'autorenew'}</span>
                                 Rephrase
                             </button>
-                            <button onMouseDown={e => e.preventDefault()} onClick={() => handleExpand(i)} disabled={assistLoading === 'expand'} className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-semibold cursor-pointer transition-colors hover:bg-white/10 text-slate-400 hover:text-emerald-400" title="Expand this section">
+                            <button onMouseDown={e => e.preventDefault()} onClick={() => handleExpand(i)} disabled={assistLoading === 'expand'} className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-semibold cursor-pointer transition-colors hover:bg-[var(--sys-surface)] text-[var(--sys-text-muted)] hover:text-primary" title="Expand this section">
                                 <span className={`material-symbols-outlined text-xs ${assistLoading === 'expand' ? 'animate-spin' : ''}`}>{assistLoading === 'expand' ? 'progress_activity' : 'expand_content'}</span>
                                 Expand
                             </button>
                             <span className="w-px h-4 mx-1" style={{ background: 'rgba(255,255,255,0.08)' }} />
-                            <button onMouseDown={e => e.preventDefault()} onClick={() => setImageStylePicker(i)} className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-semibold cursor-pointer transition-colors hover:bg-white/10 text-slate-400 hover:text-white">
+                            <button onMouseDown={e => e.preventDefault()} onClick={() => setImageStylePicker(i)} className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-semibold cursor-pointer transition-colors hover:bg-[var(--sys-surface)] text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]">
                                 <span className="material-symbols-outlined text-xs">add_photo_alternate</span>
                                 Image
                             </button>
@@ -2646,14 +2660,14 @@ function SmartBlogWriter({ activeBrand, onBack, onGenerateImage }) {
                                     Fix {grammarIssues[i].length} issue{grammarIssues[i].length > 1 ? 's' : ''}
                                 </button>
                             )}
-                            <span className="text-[10px] text-slate-600 font-mono">{(section.body || '').split(/\s+/).filter(Boolean).length}w</span>
+                            <span className="text-[10px] text-[var(--sys-text-muted)] font-mono">{(section.body || '').split(/\s+/).filter(Boolean).length}w</span>
                         </div>
                     )}
 
                     {/* Synonym chips */}
                     {activeSection === i && synonyms.length > 0 && (
                         <div className="flex items-center gap-1.5 mb-2 animate-fade-in flex-wrap">
-                            <span className="text-[10px] text-slate-600 font-medium">Synonyms:</span>
+                            <span className="text-[10px] text-[var(--sys-text-muted)] font-medium">Synonyms:</span>
                             {synonyms.map(syn => (
                                 <button key={syn} onClick={() => insertSynonym(i, syn)}
                                     className="text-[11px] px-2 py-0.5 rounded-full font-semibold cursor-pointer transition-all hover:scale-105"
@@ -2661,7 +2675,7 @@ function SmartBlogWriter({ activeBrand, onBack, onGenerateImage }) {
                                     {syn}
                                 </button>
                             ))}
-                            <button onClick={() => setSynonyms([])} className="text-[10px] text-slate-600 hover:text-white cursor-pointer">✕</button>
+                            <button onClick={() => setSynonyms([])} className="text-[10px] text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer">✕</button>
                         </div>
                     )}
 
@@ -2670,7 +2684,7 @@ function SmartBlogWriter({ activeBrand, onBack, onGenerateImage }) {
                         <div className="mb-2 flex items-center gap-2 text-[11px] px-3 py-1.5 rounded-lg animate-fade-in" style={{ background: 'rgba(234,179,8,0.08)', border: '1px solid rgba(234,179,8,0.2)', color: '#f59e0b' }}>
                             <span className="material-symbols-outlined text-xs">warning</span>
                             {grammarIssues[i].length} grammar issue{grammarIssues[i].length > 1 ? 's' : ''} detected
-                            <button onClick={() => applyGrammarFix(i)} className="ml-auto font-bold hover:text-white cursor-pointer">Fix now</button>
+                            <button onClick={() => applyGrammarFix(i)} className="ml-auto font-bold hover:text-[var(--sys-text)] cursor-pointer">Fix now</button>
                         </div>
                     )}
 
@@ -2679,14 +2693,14 @@ function SmartBlogWriter({ activeBrand, onBack, onGenerateImage }) {
                         <div className="mb-3 animate-fade-in rounded-xl p-3" style={{ background: 'rgba(129,140,248,0.05)', border: '1px solid rgba(129,140,248,0.15)' }}>
                             <div className="flex items-center justify-between mb-2">
                                 <span className="text-xs font-bold text-primary">Rephrase options</span>
-                                <button onClick={() => setRephraseSuggestions(null)} className="text-slate-500 hover:text-white cursor-pointer"><span className="material-symbols-outlined text-xs">close</span></button>
+                                <button onClick={() => setRephraseSuggestions(null)} className="text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer"><span className="material-symbols-outlined text-xs">close</span></button>
                             </div>
                             {rephraseSuggestions.versions.map(v => (
-                                <div key={v.version} className="mb-2 p-2.5 rounded-lg cursor-pointer hover:bg-white/[0.06] transition-colors" onClick={() => applyRephrase(v)} style={{ border: '1px solid rgba(255,255,255,0.05)' }}>
+                                <div key={v.version} className="mb-2 p-2.5 rounded-lg cursor-pointer hover:bg-[var(--sys-surface)] transition-colors" onClick={() => applyRephrase(v)} style={{ border: '1px solid rgba(255,255,255,0.05)' }}>
                                     <div className="flex items-center gap-2 mb-1">
                                         <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded" style={{ background: 'rgba(129,140,248,0.15)', color: '#818cf8' }}>{v.style}</span>
                                     </div>
-                                    <p className="text-xs text-slate-300 leading-relaxed">{v.text}</p>
+                                    <p className="text-xs text-[var(--sys-text-muted)] leading-relaxed">{v.text}</p>
                                 </div>
                             ))}
                         </div>
@@ -2696,10 +2710,10 @@ function SmartBlogWriter({ activeBrand, onBack, onGenerateImage }) {
                     {expandResult?.idx === i && (
                         <div className="mb-3 animate-fade-in rounded-xl p-3" style={{ background: 'rgba(16,185,129,0.05)', border: '1px solid rgba(16,185,129,0.15)' }}>
                             <div className="flex items-center justify-between mb-2">
-                                <span className="text-xs font-bold text-emerald-400">Expanded version</span>
-                                <button onClick={() => setExpandResult(null)} className="text-slate-500 hover:text-white cursor-pointer"><span className="material-symbols-outlined text-xs">close</span></button>
+                                <span className="text-xs font-bold text-primary">Expanded version</span>
+                                <button onClick={() => setExpandResult(null)} className="text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer"><span className="material-symbols-outlined text-xs">close</span></button>
                             </div>
-                            <p className="text-xs text-slate-300 leading-relaxed mb-2">{expandResult.expanded}</p>
+                            <p className="text-xs text-[var(--sys-text-muted)] leading-relaxed mb-2">{expandResult.expanded}</p>
                             <button onClick={() => { updateSection(i, 'body', expandResult.expanded); setExpandResult(null) }}
                                 className="text-xs font-bold px-3 py-1.5 rounded-lg cursor-pointer" style={{ background: 'rgba(16,185,129,0.2)', color: '#34d399' }}>
                                 Use this version
@@ -2715,8 +2729,8 @@ function SmartBlogWriter({ activeBrand, onBack, onGenerateImage }) {
                         onKeyUp={e => handleBodyKeyUp(i, e)}
                         onFocus={() => setActiveSection(i)}
                         onBlur={() => handleBodyBlur(i)}
-                        className="w-full bg-transparent resize-none focus:outline-none"
-                        style={{ fontSize: '1.05rem', lineHeight: 2, color: 'rgba(203,213,225,0.9)', minHeight: '180px' }}
+                        className="w-full bg-transparent text-[var(--sys-text)] opacity-90 resize-none focus:outline-none"
+                        style={{ fontSize: '1.05rem', lineHeight: 2, minHeight: '180px' }}
                         rows={Math.max(7, Math.ceil((section.body || '').length / 90))}
                         placeholder="Start writing here... press Space after a word for synonym suggestions"
                     />
@@ -2728,7 +2742,7 @@ function SmartBlogWriter({ activeBrand, onBack, onGenerateImage }) {
                             {section.imageRatio && (
                                 <span className="absolute top-2 left-2 text-[9px] font-mono font-bold px-1.5 py-0.5 rounded" style={{ background: 'rgba(0,0,0,0.55)', color: 'rgba(129,140,248,0.9)' }}>{section.imageRatio}</span>
                             )}
-                            <button onClick={() => setImageStylePicker(i)} className="absolute top-2 right-2 px-2.5 py-1 rounded-lg text-[11px] text-white cursor-pointer opacity-0 group-hover/img:opacity-100 transition-opacity" style={{ background: 'rgba(0,0,0,0.6)' }}>
+                            <button onClick={() => setImageStylePicker(i)} className="absolute top-2 right-2 px-2.5 py-1 rounded-lg text-[11px] text-[var(--sys-text)] cursor-pointer opacity-0 group-hover/img:opacity-100 transition-opacity" style={{ background: 'rgba(0,0,0,0.6)' }}>
                                 <span className="material-symbols-outlined text-xs mr-1">refresh</span>Regenerate
                             </button>
                         </div>
@@ -2738,15 +2752,15 @@ function SmartBlogWriter({ activeBrand, onBack, onGenerateImage }) {
                     {imageStylePicker === i && (
                         <div className="my-3 animate-fade-in rounded-2xl p-4" style={{ background: 'rgba(129,140,248,0.04)', border: '1px solid rgba(129,140,248,0.15)' }}>
                             <div className="flex items-center justify-between mb-3">
-                                <span className="text-xs font-bold text-white">Section {i + 1} Image</span>
-                                <button onClick={() => setImageStylePicker(null)} className="text-slate-500 hover:text-white cursor-pointer"><span className="material-symbols-outlined text-xs">close</span></button>
+                                <span className="text-xs font-bold text-[var(--sys-text)]">Section {i + 1} Image</span>
+                                <button onClick={() => setImageStylePicker(null)} className="text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer"><span className="material-symbols-outlined text-xs">close</span></button>
                             </div>
                             {/* AR picker */}
-                            <p className="text-[10px] text-slate-500 uppercase tracking-wide font-semibold mb-2">Ratio</p>
+                            <p className="text-[10px] text-[var(--sys-text-muted)] uppercase tracking-wide font-semibold mb-2">Ratio</p>
                             <div className="flex gap-2 mb-3">
                                 {IMAGE_RATIOS.map(r => (
                                     <button key={r.id} onClick={() => setSelectedImageRatio(r.id)}
-                                        className={`flex-1 flex flex-col items-center py-1.5 rounded-xl cursor-pointer transition-all text-center ${selectedImageRatio === r.id ? 'ring-2 ring-primary text-white' : 'text-slate-500'}`}
+                                        className={`flex-1 flex flex-col items-center py-1.5 rounded-xl cursor-pointer transition-all text-center ${selectedImageRatio === r.id ? 'ring-2 ring-primary text-[var(--sys-text)]' : 'text-[var(--sys-text-muted)]'}`}
                                         style={{ background: selectedImageRatio === r.id ? 'rgba(129,140,248,0.1)' : 'rgba(255,255,255,0.02)', border: '1px solid ' + (selectedImageRatio === r.id ? 'rgba(129,140,248,0.3)' : 'rgba(255,255,255,0.05)') }}>
                                         <span className="material-symbols-outlined text-sm">{r.icon}</span>
                                         <span className="text-[11px] font-bold">{r.label}</span>
@@ -2757,15 +2771,15 @@ function SmartBlogWriter({ activeBrand, onBack, onGenerateImage }) {
                             <div className="flex gap-2 mb-3">
                                 {IMAGE_STYLES.map(s => (
                                     <button key={s.id} onClick={() => setSelectedImageStyle(s.id)}
-                                        className={`flex-1 py-1.5 rounded-xl text-center text-[11px] font-bold cursor-pointer transition-all ${selectedImageStyle === s.id ? 'ring-2 ring-primary text-white' : 'text-slate-500'}`}
+                                        className={`flex-1 py-1.5 rounded-xl text-center text-[11px] font-bold cursor-pointer transition-all ${selectedImageStyle === s.id ? 'ring-2 ring-primary text-[var(--sys-text)]' : 'text-[var(--sys-text-muted)]'}`}
                                         style={{ background: selectedImageStyle === s.id ? 'rgba(129,140,248,0.12)' : 'rgba(255,255,255,0.02)', border: '1px solid ' + (selectedImageStyle === s.id ? 'rgba(129,140,248,0.25)' : 'rgba(255,255,255,0.05)') }}>
                                         <span className="material-symbols-outlined text-sm block mb-0.5">{s.icon}</span>{s.label}
                                     </button>
                                 ))}
                             </div>
                             <button onClick={() => handleGenerateSectionImage(i)} disabled={generatingImage !== null}
-                                className="w-full py-2.5 rounded-xl text-xs font-bold text-white cursor-pointer flex items-center justify-center gap-2"
-                                style={{ background: 'linear-gradient(135deg, #818cf8, #6366f1)' }}>
+                                className="w-full py-2.5 rounded-xl text-xs font-bold text-[var(--sys-text)] cursor-pointer flex items-center justify-center gap-2"
+                                style={{ background: 'var(--sys-primary)' }}>
                                 <span className={`material-symbols-outlined text-xs ${generatingImage === i ? 'animate-spin' : ''}`}>{generatingImage === i ? 'progress_activity' : 'auto_awesome'}</span>
                                 {generatingImage === i ? 'Generating...' : `Generate · ${selectedImageRatio}`}
                             </button>
@@ -2774,7 +2788,7 @@ function SmartBlogWriter({ activeBrand, onBack, onGenerateImage }) {
 
                     {/* Add image button if no image */}
                     {!section.imageUrl && imageStylePicker !== i && (
-                        <button onClick={() => setImageStylePicker(i)} className="mt-2 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-slate-500 hover:text-primary cursor-pointer transition-colors" style={{ background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.07)' }}>
+                        <button onClick={() => setImageStylePicker(i)} className="mt-2 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-[var(--sys-text-muted)] hover:text-primary cursor-pointer transition-colors" style={{ background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.07)' }}>
                             <span className="material-symbols-outlined text-sm">add_photo_alternate</span>
                             Add image to section
                         </button>
@@ -2788,18 +2802,18 @@ function SmartBlogWriter({ activeBrand, onBack, onGenerateImage }) {
             ))}
 
             {/* Add Section */}
-            <button onClick={addSection} className="mb-6 flex items-center gap-2 px-4 py-2 rounded-xl text-sm text-slate-500 hover:text-white transition-colors cursor-pointer" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+            <button onClick={addSection} className="mb-6 flex items-center gap-2 px-4 py-2 rounded-xl text-sm text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] transition-colors cursor-pointer" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
                 <span className="material-symbols-outlined text-sm">add</span>
                 Add Section
             </button>
 
             {/* AI Assist Bar */}
             {showAssistPanel && (
-                <div className="sticky bottom-0 pb-4 pt-2" style={{ background: 'linear-gradient(to top, rgba(9,9,19,1) 0%, rgba(9,9,19,0) 100%)' }}>
+                <div className="sticky bottom-0 pb-4 pt-2" style={{ background: 'var(--sys-primary) 0%, rgba(9,9,19,0) 100%)' }}>
                     <div className="rounded-2xl p-3 flex items-center gap-3" style={{ background: 'rgba(129,140,248,0.06)', border: '1px solid rgba(129,140,248,0.2)', backdropFilter: 'blur(8px)' }}>
                         <span className="material-symbols-outlined text-primary text-lg">psychology</span>
                         <input value={assistQuery} onChange={e => setAssistQuery(e.target.value)}
-                            className="flex-1 bg-transparent text-sm text-white focus:outline-none placeholder-slate-600"
+                            className="flex-1 bg-transparent text-sm text-[var(--sys-text)] focus:outline-none placeholder-slate-600"
                             placeholder={`Ask AI to help with Section ${activeSection + 1}... (e.g. "make this more engaging", "add statistics")`}
                             onKeyDown={async e => {
                                 if (e.key !== 'Enter' || !assistQuery.trim()) return
@@ -2812,7 +2826,7 @@ function SmartBlogWriter({ activeBrand, onBack, onGenerateImage }) {
                                 finally { setAssistLoading('') }
                             }} />
                         {assistLoading && <span className="material-symbols-outlined text-primary animate-spin text-sm">progress_activity</span>}
-                        <div className="flex items-center gap-1 text-[10px] text-slate-600">
+                        <div className="flex items-center gap-1 text-[10px] text-[var(--sys-text-muted)]">
                             <span className="material-symbols-outlined text-xs">keyboard_return</span>
                             Enter
                         </div>
@@ -2979,10 +2993,10 @@ function BlogEditorView({ content, activeBrand, onNewContent, onGenerateImage })
         return text
             .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
             .replace(/\*(.+?)\*/g, '<em>$1</em>')
-            .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener" style="color:#818cf8;text-decoration:underline;text-underline-offset:3px">$1</a>')
+            .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener" style="color:var(--sys-primary);text-decoration:underline;text-underline-offset:3px">$1</a>')
             .replace(/^- (.+)$/gm, '<li style="margin-left:1.5rem;list-style:disc;margin-bottom:0.25rem">$1</li>')
-            .replace(/^> (.+)$/gm, '<blockquote style="border-left:3px solid rgba(129,140,248,0.4);padding-left:1rem;margin:1rem 0;color:rgba(148,163,184,1);font-style:italic">$1</blockquote>')
-            .replace(/^### (.+)$/gm, '<h3 style="font-size:1.15rem;font-weight:700;color:white;margin:1.5rem 0 0.5rem">$1</h3>')
+            .replace(/^> (.+)$/gm, '<blockquote style="border-left:3px solid rgba(129,140,248,0.4);padding-left:1rem;margin:1rem 0;color:var(--sys-text-muted);font-style:italic">$1</blockquote>')
+            .replace(/^### (.+)$/gm, '<h3 style="font-size:1.15rem;font-weight:700;color:var(--sys-text);margin:1.5rem 0 0.5rem">$1</h3>')
             .replace(/\n\n/g, '</p><p style="margin-bottom:1rem">')
             .replace(/\n/g, '<br />')
             .replace(/^/, '<p style="margin-bottom:1rem">')
@@ -3055,11 +3069,11 @@ function BlogEditorView({ content, activeBrand, onNewContent, onGenerateImage })
         return (
         <div className="my-4 animate-fade-in rounded-2xl p-5" style={{ background: 'rgba(129,140,248,0.04)', border: '1px solid rgba(129,140,248,0.15)' }}>
             <div className="flex items-center justify-between mb-4">
-                <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                <h4 className="text-sm font-bold text-[var(--sys-text)] flex items-center gap-2">
                     <span className="material-symbols-outlined text-sm text-primary">palette</span>
                     {isHeroSection ? 'Hero Image' : `Section ${sectionIndex + 1} Image`}
                 </h4>
-                <button onClick={() => setImageStylePicker(null)} className="text-slate-500 hover:text-white cursor-pointer">
+                <button onClick={() => setImageStylePicker(null)} className="text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer">
                     <span className="material-symbols-outlined text-sm">close</span>
                 </button>
             </div>
@@ -3067,12 +3081,12 @@ function BlogEditorView({ content, activeBrand, onNewContent, onGenerateImage })
             {/* Tab Switcher */}
             <div className="flex gap-1 mb-4 p-1 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)' }}>
                 <button onClick={() => setPickerTab('ai')}
-                    className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold cursor-pointer transition-all ${pickerTab === 'ai' ? 'text-white' : 'text-slate-500 hover:text-slate-300'}`}
+                    className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold cursor-pointer transition-all ${pickerTab === 'ai' ? 'text-[var(--sys-text)]' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text-muted)]'}`}
                     style={pickerTab === 'ai' ? { background: 'rgba(129,140,248,0.15)', border: '1px solid rgba(129,140,248,0.2)' } : {}}>
                     <span className="material-symbols-outlined text-sm">auto_awesome</span> AI Generate
                 </button>
                 <button onClick={() => setPickerTab('brand')}
-                    className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold cursor-pointer transition-all ${pickerTab === 'brand' ? 'text-white' : 'text-slate-500 hover:text-slate-300'}`}
+                    className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold cursor-pointer transition-all ${pickerTab === 'brand' ? 'text-[var(--sys-text)]' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text-muted)]'}`}
                     style={pickerTab === 'brand' ? { background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.2)' } : {}}>
                     <span className="material-symbols-outlined text-sm">photo_library</span> Brand Gallery
                     {brandImages.length > 0 && <span className="text-[9px] px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(16,185,129,0.2)', color: '#34d399' }}>{brandImages.length}</span>}
@@ -3085,11 +3099,11 @@ function BlogEditorView({ content, activeBrand, onNewContent, onGenerateImage })
                     {/* Aspect Ratio Selector — hero is locked to 16:9, sections can change */}
                     {!isHeroSection && (
                         <div className="mb-4">
-                            <p className="text-[10px] text-slate-500 uppercase tracking-wide font-semibold mb-2">Image Ratio</p>
+                            <p className="text-[10px] text-[var(--sys-text-muted)] uppercase tracking-wide font-semibold mb-2">Image Ratio</p>
                             <div className="flex gap-2">
                                 {IMAGE_RATIOS.map(r => (
                                     <button key={r.id} onClick={() => setSelectedImageRatio(r.id)}
-                                        className={`flex-1 flex flex-col items-center py-2 px-1 rounded-xl cursor-pointer transition-all text-center ${selectedImageRatio === r.id ? 'ring-2 ring-primary' : 'hover:bg-white/[0.04]'}`}
+                                        className={`flex-1 flex flex-col items-center py-2 px-1 rounded-xl cursor-pointer transition-all text-center ${selectedImageRatio === r.id ? 'ring-2 ring-primary' : 'hover:bg-[var(--sys-surface)]'}`}
                                         style={{ background: selectedImageRatio === r.id ? 'rgba(129,140,248,0.1)' : 'rgba(255,255,255,0.02)', border: '1px solid ' + (selectedImageRatio === r.id ? 'rgba(129,140,248,0.3)' : 'rgba(255,255,255,0.05)') }}>
                                         <span className="material-symbols-outlined text-base mb-0.5" style={{ color: selectedImageRatio === r.id ? '#818cf8' : '#64748b' }}>{r.icon}</span>
                                         <span className="text-[11px] font-bold" style={{ color: selectedImageRatio === r.id ? 'white' : '#94a3b8' }}>{r.label}</span>
@@ -3101,15 +3115,15 @@ function BlogEditorView({ content, activeBrand, onNewContent, onGenerateImage })
                     )}
                     {isHeroSection && (
                         <div className="mb-3 flex items-center gap-2">
-                            <span className="material-symbols-outlined text-xs text-slate-600">lock</span>
-                            <span className="text-[10px] text-slate-600">Hero images are always 16:9 landscape</span>
+                            <span className="material-symbols-outlined text-xs text-[var(--sys-text-muted)]">lock</span>
+                            <span className="text-[10px] text-[var(--sys-text-muted)]">Hero images are always 16:9 landscape</span>
                         </div>
                     )}
 
                     <div className="grid grid-cols-4 gap-2 mb-4">
                         {IMAGE_STYLES.map(style => (
                             <button key={style.id} onClick={() => setSelectedImageStyle(style.id)}
-                                className={`p-3 rounded-xl text-center cursor-pointer transition-all ${selectedImageStyle === style.id ? 'ring-2 ring-primary' : 'hover:bg-white/[0.03]'}`}
+                                className={`p-3 rounded-xl text-center cursor-pointer transition-all ${selectedImageStyle === style.id ? 'ring-2 ring-primary' : 'hover:bg-[var(--sys-surface)]'}`}
                                 style={{ background: selectedImageStyle === style.id ? 'rgba(129,140,248,0.1)' : 'rgba(255,255,255,0.02)', border: '1px solid ' + (selectedImageStyle === style.id ? 'rgba(129,140,248,0.3)' : 'rgba(255,255,255,0.05)') }}>
                                 <span className="material-symbols-outlined text-xl block mb-1" style={{ color: selectedImageStyle === style.id ? '#818cf8' : '#64748b' }}>{style.icon}</span>
                                 <span className="text-[11px] font-semibold block" style={{ color: selectedImageStyle === style.id ? 'white' : '#94a3b8' }}>{style.label}</span>
@@ -3119,8 +3133,8 @@ function BlogEditorView({ content, activeBrand, onNewContent, onGenerateImage })
                     </div>
                     <button onClick={() => handleGenerateImage(sectionIndex, selectedImageStyle)}
                         disabled={generatingSection !== null}
-                        className="w-full py-3 rounded-xl text-sm font-bold text-white cursor-pointer transition-all flex items-center justify-center gap-2"
-                        style={{ background: 'linear-gradient(135deg, #818cf8, #6366f1)' }}>
+                        className="w-full py-3 rounded-xl text-sm font-bold text-[var(--sys-text)] cursor-pointer transition-all flex items-center justify-center gap-2"
+                        style={{ background: 'var(--sys-primary)' }}>
                         <span className={`material-symbols-outlined text-sm ${generatingSection !== null ? 'animate-spin' : ''}`}>
                             {generatingSection !== null ? 'progress_activity' : 'auto_awesome'}
                         </span>
@@ -3138,21 +3152,21 @@ function BlogEditorView({ content, activeBrand, onNewContent, onGenerateImage })
                                 <div key={idx} className="group/brand rounded-xl overflow-hidden relative" style={{ border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)' }}>
                                     <img src={img.url} alt={img.label} className="w-full h-24 object-cover" loading="lazy" />
                                     <div className="p-2">
-                                        <p className="text-[10px] text-slate-500 truncate">{img.label}</p>
-                                        <p className="text-[8px] text-slate-600 uppercase">{img.source}</p>
+                                        <p className="text-[10px] text-[var(--sys-text-muted)] truncate">{img.label}</p>
+                                        <p className="text-[8px] text-[var(--sys-text-muted)] uppercase">{img.source}</p>
                                     </div>
                                     {/* Action overlay */}
                                     <div className="absolute inset-0 bg-black/60 opacity-0 group-hover/brand:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2">
                                         <button onClick={() => handleUseBrandImageDirect(sectionIndex, img.url)}
                                             disabled={generatingSection !== null}
-                                            className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-[10px] font-bold text-white cursor-pointer transition-all"
+                                            className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-[10px] font-bold text-[var(--sys-text)] cursor-pointer transition-all"
                                             style={{ background: 'rgba(16,185,129,0.8)' }}>
                                             <span className="material-symbols-outlined text-xs">add_photo_alternate</span>
                                             Use Directly
                                         </button>
                                         <button onClick={() => handleUseBrandImageAI(sectionIndex, img.url, selectedImageStyle)}
                                             disabled={generatingSection !== null}
-                                            className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-[10px] font-bold text-white cursor-pointer transition-all"
+                                            className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-[10px] font-bold text-[var(--sys-text)] cursor-pointer transition-all"
                                             style={{ background: 'rgba(129,140,248,0.8)' }}>
                                             <span className={`material-symbols-outlined text-xs ${generatingSection !== null ? 'animate-spin' : ''}`}>
                                                 {generatingSection !== null ? 'progress_activity' : 'auto_awesome'}
@@ -3166,12 +3180,12 @@ function BlogEditorView({ content, activeBrand, onNewContent, onGenerateImage })
                     ) : (
                         <div className="text-center py-8">
                             <span className="material-symbols-outlined text-3xl text-slate-700 block mb-2">photo_library</span>
-                            <p className="text-sm text-slate-500">No brand images found</p>
-                            <p className="text-xs text-slate-600 mt-1">Brand images are extracted when you scan a website during brand setup</p>
+                            <p className="text-sm text-[var(--sys-text-muted)]">No brand images found</p>
+                            <p className="text-xs text-[var(--sys-text-muted)] mt-1">Brand images are extracted when you scan a website during brand setup</p>
                         </div>
                     )}
-                    <p className="text-[10px] text-slate-600 text-center">
-                        <span className="text-emerald-500 font-bold">Use Directly</span> = place brand image as-is · <span className="text-primary font-bold">AI Enhance</span> = NanoBanana 2 creates a new image inspired by the brand visual + section context
+                    <p className="text-[10px] text-[var(--sys-text-muted)] text-center">
+                        <span className="text-primary font-bold">Use Directly</span> = place brand image as-is · <span className="text-primary font-bold">AI Enhance</span> = NanoBanana 2 creates a new image inspired by the brand visual + section context
                     </p>
                 </>
             )}
@@ -3221,28 +3235,28 @@ function BlogEditorView({ content, activeBrand, onNewContent, onGenerateImage })
             {/* Top Action Bar */}
             <div className="flex items-center justify-between mb-8 pb-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
                 <div className="flex items-center gap-3">
-                    <button onClick={onNewContent} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-slate-400 hover:text-white transition-colors cursor-pointer" style={{ background: 'rgba(255,255,255,0.04)' }}>
+                    <button onClick={onNewContent} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] transition-colors cursor-pointer" style={{ background: 'rgba(255,255,255,0.04)' }}>
                         <span className="material-symbols-outlined text-sm">arrow_back</span> Back
                     </button>
-                    <span className="text-slate-600 text-xs">|</span>
-                    <span className="text-xs text-slate-500">{totalWords} words</span>
+                    <span className="text-[var(--sys-text-muted)] text-xs">|</span>
+                    <span className="text-xs text-[var(--sys-text-muted)]">{totalWords} words</span>
                     <span className="text-slate-700">·</span>
-                    <span className="text-xs text-slate-500">{readTime} min read</span>
+                    <span className="text-xs text-[var(--sys-text-muted)]">{readTime} min read</span>
                     <span className="text-slate-700">·</span>
-                    <span className="text-xs text-slate-500">{blogData.sections.length} sections</span>
+                    <span className="text-xs text-[var(--sys-text-muted)]">{blogData.sections.length} sections</span>
                 </div>
                 <div className="flex gap-2">
                     <button onClick={() => setShowSeo(!showSeo)}
-                        className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-all ${showSeo ? 'text-emerald-400' : 'text-slate-500 hover:text-white'}`}
+                        className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-all ${showSeo ? 'text-primary' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]'}`}
                         style={showSeo ? { background: 'rgba(16,185,129,0.12)' } : { background: 'rgba(255,255,255,0.04)' }}>
                         <span className="material-symbols-outlined text-sm">search</span> SEO
                     </button>
                     <button onClick={copyAsHtml}
-                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs text-slate-500 hover:text-white cursor-pointer transition-colors" style={{ background: 'rgba(255,255,255,0.04)' }}>
+                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer transition-colors" style={{ background: 'rgba(255,255,255,0.04)' }}>
                         <span className="material-symbols-outlined text-sm">{copied === 'html' ? 'check' : 'code'}</span> {copied === 'html' ? 'Copied!' : 'HTML'}
                     </button>
                     <button onClick={copyAsMarkdown}
-                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs text-slate-500 hover:text-white cursor-pointer transition-colors" style={{ background: 'rgba(255,255,255,0.04)' }}>
+                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer transition-colors" style={{ background: 'rgba(255,255,255,0.04)' }}>
                         <span className="material-symbols-outlined text-sm">{copied === 'md' ? 'check' : 'description'}</span> {copied === 'md' ? 'Copied!' : 'MD'}
                     </button>
                     <button onClick={async () => {
@@ -3251,8 +3265,8 @@ function BlogEditorView({ content, activeBrand, onNewContent, onGenerateImage })
                             if (res.success) { navigator.clipboard.writeText(res.html); setCopied('publish'); setTimeout(() => setCopied(''), 3000) }
                         } catch (e) { console.error(e) }
                     }}
-                        className="flex items-center gap-1 px-4 py-1.5 rounded-lg text-xs font-bold text-white cursor-pointer transition-all hover:shadow-lg"
-                        style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
+                        className="flex items-center gap-1 px-4 py-1.5 rounded-lg text-xs font-bold text-[var(--sys-text)] cursor-pointer transition-all hover:shadow-lg"
+                        style={{ background: 'var(--sys-primary)' }}>
                         <span className="material-symbols-outlined text-sm">{copied === 'publish' ? 'check_circle' : 'content_copy'}</span>
                         {copied === 'publish' ? 'Exported!' : 'Export HTML'}
                     </button>
@@ -3262,28 +3276,28 @@ function BlogEditorView({ content, activeBrand, onNewContent, onGenerateImage })
             {/* SEO Panel */}
             {showSeo && (
                 <div className="mb-8 animate-fade-in rounded-2xl p-5" style={{ background: 'rgba(16,185,129,0.04)', border: '1px solid rgba(16,185,129,0.15)' }}>
-                    <h4 className="text-sm font-bold text-emerald-400 mb-4 flex items-center gap-2">
+                    <h4 className="text-sm font-bold text-primary mb-4 flex items-center gap-2">
                         <span className="material-symbols-outlined text-sm">search</span> SEO Metadata
                     </h4>
                     <div className="grid grid-cols-2 gap-4 mb-4">
                         <div>
-                            <label className="text-[10px] text-slate-500 mb-1 block uppercase tracking-wide">URL Slug</label>
+                            <label className="text-[10px] text-[var(--sys-text-muted)] mb-1 block uppercase tracking-wide">URL Slug</label>
                             <input value={blogData.slug} onChange={(e) => setBlogData(p => ({ ...p, slug: e.target.value }))}
-                                className="w-full rounded-lg px-3 py-2 text-sm text-white focus:outline-none" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }} />
+                                className="w-full rounded-lg px-3 py-2 text-sm text-[var(--sys-text)] focus:outline-none" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }} />
                         </div>
                         <div>
-                            <label className="text-[10px] text-slate-500 mb-1 block uppercase tracking-wide">Meta Title <span className="text-slate-600">({(blogData.metaTitle || '').length}/60)</span></label>
+                            <label className="text-[10px] text-[var(--sys-text-muted)] mb-1 block uppercase tracking-wide">Meta Title <span className="text-[var(--sys-text-muted)]">({(blogData.metaTitle || '').length}/60)</span></label>
                             <input value={blogData.metaTitle} onChange={(e) => setBlogData(p => ({ ...p, metaTitle: e.target.value }))}
-                                className="w-full rounded-lg px-3 py-2 text-sm text-white focus:outline-none" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }} />
+                                className="w-full rounded-lg px-3 py-2 text-sm text-[var(--sys-text)] focus:outline-none" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }} />
                         </div>
                     </div>
                     <div className="mb-4">
-                        <label className="text-[10px] text-slate-500 mb-1 block uppercase tracking-wide">Meta Description <span className="text-slate-600">({(blogData.metaDescription || '').length}/160)</span></label>
+                        <label className="text-[10px] text-[var(--sys-text-muted)] mb-1 block uppercase tracking-wide">Meta Description <span className="text-[var(--sys-text-muted)]">({(blogData.metaDescription || '').length}/160)</span></label>
                         <textarea value={blogData.metaDescription} onChange={(e) => setBlogData(p => ({ ...p, metaDescription: e.target.value }))} rows={2}
-                            className="w-full rounded-lg px-3 py-2 text-sm text-white resize-none focus:outline-none" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }} />
+                            className="w-full rounded-lg px-3 py-2 text-sm text-[var(--sys-text)] resize-none focus:outline-none" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }} />
                     </div>
                     <div>
-                        <label className="text-[10px] text-slate-500 mb-1 block uppercase tracking-wide">Keywords</label>
+                        <label className="text-[10px] text-[var(--sys-text-muted)] mb-1 block uppercase tracking-wide">Keywords</label>
                         <div className="flex flex-wrap gap-1.5">
                             {blogData.keywords.map((kw, i) => (
                                 <span key={i} className="text-[10px] px-2.5 py-1 rounded-full font-medium" style={{ background: 'rgba(16,185,129,0.1)', color: '#34d399', border: '1px solid rgba(16,185,129,0.2)' }}>{kw}</span>
@@ -3299,16 +3313,16 @@ function BlogEditorView({ content, activeBrand, onNewContent, onGenerateImage })
                     <div className="relative group" style={{ borderRadius: '16px', overflow: 'hidden', background: 'rgba(0,0,0,0.2)' }}>
                         {/* Hero always 16:9 — full display, no crop */}
                         <img src={blogData.heroImageUrl} alt={blogData.heroImageAlt || blogData.title} style={{ width: '100%', display: 'block', objectFit: 'contain' }} />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                        <div className="absolute inset-0 bg-black/60 border border-[var(--sys-border)] opacity-0 group-hover:opacity-100 transition-opacity" />
                         <div className="absolute bottom-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                             <button onClick={() => openImageStylePicker(-1)} disabled={generatingSection === -1}
-                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-white cursor-pointer"
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-[var(--sys-text)] cursor-pointer"
                                 style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)' }}>
                                 <span className={`material-symbols-outlined text-sm ${generatingSection === -1 ? 'animate-spin' : ''}`}>{generatingSection === -1 ? 'progress_activity' : 'refresh'}</span>
                                 Regenerate
                             </button>
                             <button onClick={() => setBlogData(p => ({ ...p, heroImageUrl: '', heroImageAlt: '' }))}
-                                className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs text-white/70 cursor-pointer"
+                                className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs text-[var(--sys-text)]/70 cursor-pointer"
                                 style={{ background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(8px)' }}>
                                 <span className="material-symbols-outlined text-sm">delete</span>
                             </button>
@@ -3316,7 +3330,7 @@ function BlogEditorView({ content, activeBrand, onNewContent, onGenerateImage })
                         {/* SEO alt text badge */}
                         {blogData.heroImageAlt && (
                             <div className="absolute bottom-4 left-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <span className="text-[10px] px-2 py-1 rounded-full text-white/60" style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}>
+                                <span className="text-[10px] px-2 py-1 rounded-full text-[var(--sys-text)]/60" style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}>
                                     alt: {blogData.heroImageAlt.substring(0, 50)}...
                                 </span>
                             </div>
@@ -3326,13 +3340,13 @@ function BlogEditorView({ content, activeBrand, onNewContent, onGenerateImage })
                     <button onClick={() => openImageStylePicker(-1)} disabled={generatingSection === -1}
                         className="w-full flex flex-col items-center justify-center gap-3 cursor-pointer transition-all group"
                         style={{ padding: '3rem 2rem', borderRadius: '16px', border: '2px dashed rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.01)' }}>
-                        <span className={`material-symbols-outlined text-4xl text-slate-600 group-hover:text-primary transition-colors ${generatingSection === -1 ? 'animate-spin' : ''}`}>
+                        <span className={`material-symbols-outlined text-4xl text-[var(--sys-text-muted)] group-hover:text-primary transition-colors ${generatingSection === -1 ? 'animate-spin' : ''}`}>
                             {generatingSection === -1 ? 'progress_activity' : 'add_photo_alternate'}
                         </span>
-                        <span className="text-sm font-semibold text-slate-500 group-hover:text-white transition-colors">
+                        <span className="text-sm font-semibold text-[var(--sys-text-muted)] group-hover:text-[var(--sys-text)] transition-colors">
                             {generatingSection === -1 ? 'Generating hero image...' : 'Generate AI Hero Image'}
                         </span>
-                        <span className="text-xs text-slate-600">Choose style & NanoBanana 2 generates a contextual image</span>
+                        <span className="text-xs text-[var(--sys-text-muted)]">Choose style & NanoBanana 2 generates a contextual image</span>
                     </button>
                 )}
                 {/* Hero image style picker — appears RIGHT HERE, below the hero */}
@@ -3342,7 +3356,7 @@ function BlogEditorView({ content, activeBrand, onNewContent, onGenerateImage })
             {/* Title */}
             <div className="mb-2">
                 <input value={blogData.title} onChange={(e) => setBlogData(p => ({ ...p, title: e.target.value }))}
-                    className="w-full bg-transparent text-white focus:outline-none"
+                    className="w-full bg-transparent text-[var(--sys-text)] focus:outline-none"
                     style={{ fontSize: '2.5rem', fontWeight: 800, lineHeight: 1.15, letterSpacing: '-0.02em' }}
                     placeholder="Your blog title..." />
             </div>
@@ -3350,21 +3364,21 @@ function BlogEditorView({ content, activeBrand, onNewContent, onGenerateImage })
             {/* Subtitle */}
             <div className="mb-10">
                 <input value={blogData.subtitle} onChange={(e) => setBlogData(p => ({ ...p, subtitle: e.target.value }))}
-                    className="w-full bg-transparent focus:outline-none"
-                    style={{ fontSize: '1.25rem', color: 'rgba(148,163,184,0.8)', lineHeight: 1.6 }}
+                    className="w-full bg-transparent text-[var(--sys-text-muted)] focus:outline-none"
+                    style={{ fontSize: '1.25rem', lineHeight: 1.6 }}
                     placeholder="Add a subtitle to hook your readers..." />
             </div>
 
             {/* Table of Contents */}
             {blogData.sections.length > 2 && (
                 <div className="mb-10 py-5 px-6 rounded-xl" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
-                    <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Contents</p>
+                    <p className="text-xs font-bold text-[var(--sys-text-muted)] uppercase tracking-widest mb-3">Contents</p>
                     <div className="flex flex-col gap-1.5">
                         {blogData.sections.map((s, i) => (
                             <a key={i} href={`#blog-section-${i}`}
                                 className="text-sm hover:text-primary transition-colors cursor-pointer flex items-center gap-2"
                                 style={{ color: 'rgba(129,140,248,0.7)' }}>
-                                <span className="text-[10px] text-slate-600 font-mono">{String(i + 1).padStart(2, '0')}</span>
+                                <span className="text-[10px] text-[var(--sys-text-muted)] font-mono">{String(i + 1).padStart(2, '0')}</span>
                                 {s.heading}
                             </a>
                         ))}
@@ -3380,7 +3394,7 @@ function BlogEditorView({ content, activeBrand, onNewContent, onGenerateImage })
                     <div className="flex items-baseline gap-3 mb-3">
                         <input value={section.heading} onChange={(e) => updateSection(i, 'heading', e.target.value)}
                             onClick={() => setEditingSection(i)}
-                            className="flex-1 bg-transparent text-white focus:outline-none"
+                            className="flex-1 bg-transparent text-[var(--sys-text)] focus:outline-none"
                             style={{ fontSize: '1.65rem', fontWeight: 700, lineHeight: 1.3, letterSpacing: '-0.01em' }}
                             placeholder="Section heading..." />
                     </div>
@@ -3392,8 +3406,8 @@ function BlogEditorView({ content, activeBrand, onNewContent, onGenerateImage })
                                 { icon: 'format_bold', fmt: 'bold', tip: 'Bold (**text**)' },
                                 { icon: 'format_italic', fmt: 'italic', tip: 'Italic (*text*)' },
                             ].map(b => (
-                                <button key={b.fmt} onMouseDown={preventBlur} onClick={() => applyFormatting(i, b.fmt)} className="p-1.5 rounded hover:bg-white/10 cursor-pointer transition-colors" title={b.tip}>
-                                    <span className="material-symbols-outlined text-sm text-slate-400">{b.icon}</span>
+                                <button key={b.fmt} onMouseDown={preventBlur} onClick={() => applyFormatting(i, b.fmt)} className="p-1.5 rounded hover:bg-[var(--sys-surface)] cursor-pointer transition-colors" title={b.tip}>
+                                    <span className="material-symbols-outlined text-sm text-[var(--sys-text-muted)]">{b.icon}</span>
                                 </button>
                             ))}
                             <span className="w-px h-4 mx-1" style={{ background: 'rgba(255,255,255,0.08)' }} />
@@ -3402,21 +3416,21 @@ function BlogEditorView({ content, activeBrand, onNewContent, onGenerateImage })
                                 { icon: 'format_list_bulleted', fmt: 'list', tip: 'Bullet List (-)' },
                                 { icon: 'format_quote', fmt: 'quote', tip: 'Blockquote (>)' },
                             ].map(b => (
-                                <button key={b.fmt} onMouseDown={preventBlur} onClick={() => applyFormatting(i, b.fmt)} className="p-1.5 rounded hover:bg-white/10 cursor-pointer transition-colors" title={b.tip}>
-                                    <span className="material-symbols-outlined text-sm text-slate-400">{b.icon}</span>
+                                <button key={b.fmt} onMouseDown={preventBlur} onClick={() => applyFormatting(i, b.fmt)} className="p-1.5 rounded hover:bg-[var(--sys-surface)] cursor-pointer transition-colors" title={b.tip}>
+                                    <span className="material-symbols-outlined text-sm text-[var(--sys-text-muted)]">{b.icon}</span>
                                 </button>
                             ))}
                             <span className="w-px h-4 mx-1" style={{ background: 'rgba(255,255,255,0.08)' }} />
-                            <button onMouseDown={preventBlur} onClick={() => applyFormatting(i, 'link')} className="p-1.5 rounded hover:bg-white/10 cursor-pointer transition-colors" title="Insert Link [text](url)">
-                                <span className="material-symbols-outlined text-sm text-slate-400">link</span>
+                            <button onMouseDown={preventBlur} onClick={() => applyFormatting(i, 'link')} className="p-1.5 rounded hover:bg-[var(--sys-surface)] cursor-pointer transition-colors" title="Insert Link [text](url)">
+                                <span className="material-symbols-outlined text-sm text-[var(--sys-text-muted)]">link</span>
                             </button>
-                            <button onMouseDown={preventBlur} onClick={() => openImageStylePicker(i)} disabled={generatingSection === i} className="p-1.5 rounded hover:bg-white/10 cursor-pointer transition-colors" title="Generate Image for Section">
-                                <span className={`material-symbols-outlined text-sm text-slate-400 ${generatingSection === i ? 'animate-spin' : ''}`}>
+                            <button onMouseDown={preventBlur} onClick={() => openImageStylePicker(i)} disabled={generatingSection === i} className="p-1.5 rounded hover:bg-[var(--sys-surface)] cursor-pointer transition-colors" title="Generate Image for Section">
+                                <span className={`material-symbols-outlined text-sm text-[var(--sys-text-muted)] ${generatingSection === i ? 'animate-spin' : ''}`}>
                                     {generatingSection === i ? 'progress_activity' : 'add_photo_alternate'}
                                 </span>
                             </button>
                             <div className="flex-1" />
-                            <span className="text-[10px] text-slate-600 font-mono">{(section.body || '').split(/\s+/).filter(Boolean).length}w</span>
+                            <span className="text-[10px] text-[var(--sys-text-muted)] font-mono">{(section.body || '').split(/\s+/).filter(Boolean).length}w</span>
                         </div>
                     )}
 
@@ -3425,17 +3439,17 @@ function BlogEditorView({ content, activeBrand, onNewContent, onGenerateImage })
                         <div className="mb-3 p-3 rounded-xl animate-fade-in" style={{ background: 'rgba(129,140,248,0.05)', border: '1px solid rgba(129,140,248,0.15)' }}>
                             <div className="flex gap-2 items-end">
                                 <div className="flex-1">
-                                    <label className="text-[10px] text-slate-500 mb-1 block">Link Text</label>
+                                    <label className="text-[10px] text-[var(--sys-text-muted)] mb-1 block">Link Text</label>
                                     <input value={linkText} onChange={(e) => setLinkText(e.target.value)} placeholder="Display text"
-                                        className="w-full rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }} />
+                                        className="w-full rounded-lg px-2.5 py-1.5 text-xs text-[var(--sys-text)] focus:outline-none" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }} />
                                 </div>
                                 <div className="flex-1">
-                                    <label className="text-[10px] text-slate-500 mb-1 block">URL</label>
+                                    <label className="text-[10px] text-[var(--sys-text-muted)] mb-1 block">URL</label>
                                     <input value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} placeholder="https://..."
-                                        className="w-full rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }} />
+                                        className="w-full rounded-lg px-2.5 py-1.5 text-xs text-[var(--sys-text)] focus:outline-none" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }} />
                                 </div>
-                                <button onClick={() => insertLink(i)} className="px-3 py-1.5 rounded-lg text-xs font-bold text-white cursor-pointer" style={{ background: '#818cf8' }}>Insert</button>
-                                <button onClick={() => setLinkDialog(null)} className="px-2 py-1.5 rounded-lg text-xs text-slate-500 cursor-pointer hover:text-white">✕</button>
+                                <button onClick={() => insertLink(i)} className="px-3 py-1.5 rounded-lg text-xs font-bold text-[var(--sys-text)] cursor-pointer" style={{ background: '#818cf8' }}>Insert</button>
+                                <button onClick={() => setLinkDialog(null)} className="px-2 py-1.5 rounded-lg text-xs text-[var(--sys-text-muted)] cursor-pointer hover:text-[var(--sys-text)]">✕</button>
                             </div>
                         </div>
                     )}
@@ -3452,17 +3466,17 @@ function BlogEditorView({ content, activeBrand, onNewContent, onGenerateImage })
                                 setTimeout(() => setEditingSection(null), 300)
                             }}
                             autoFocus
-                            className="w-full bg-transparent resize-none focus:outline-none"
-                            style={{ fontSize: '1.05rem', lineHeight: 1.85, color: 'rgba(203,213,225,0.9)', minHeight: '200px' }}
+                            className="w-full bg-transparent text-[var(--sys-text)] resize-none focus:outline-none opacity-90"
+                            style={{ fontSize: '1.05rem', lineHeight: 1.85, minHeight: '200px' }}
                             rows={Math.max(8, Math.ceil((section.body || '').length / 80))}
                             placeholder="Write your content here... Use **bold**, *italic*, [link text](url), - bullet lists, > blockquotes"
                         />
                     ) : (
                         <div
                             onClick={() => setEditingSection(i)}
-                            className="cursor-text rounded-lg transition-colors -mx-2 px-2 py-1"
-                            style={{ fontSize: '1.05rem', lineHeight: 1.85, color: 'rgba(203,213,225,0.9)', minHeight: '60px' }}
-                            dangerouslySetInnerHTML={{ __html: renderMarkdown(section.body) || '<span style="color:rgba(100,116,139,0.5)">Click to start writing...</span>' }}
+                            className="cursor-text rounded-lg transition-colors -mx-2 px-2 py-1 text-[var(--sys-text)] opacity-90"
+                            style={{ fontSize: '1.05rem', lineHeight: 1.85, minHeight: '60px' }}
+                            dangerouslySetInnerHTML={{ __html: renderMarkdown(section.body) || '<span style="color:var(--sys-text-muted);opacity:0.5">Click to start writing...</span>' }}
                         />
                     )}
 
@@ -3476,9 +3490,9 @@ function BlogEditorView({ content, activeBrand, onNewContent, onGenerateImage })
                                     <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded" style={{ background: 'rgba(0,0,0,0.55)', color: 'rgba(129,140,248,0.9)' }}>{section.imageRatio}</span>
                                 </div>
                             )}
-                            <figcaption className="text-center py-2 text-xs" style={{ color: 'rgba(148,163,184,0.5)' }}>{section.imageAlt || section.heading}</figcaption>
+                            <figcaption className="text-center py-2 text-xs text-[var(--sys-text-muted)] opacity-70">{section.imageAlt || section.heading}</figcaption>
                             <button onClick={() => openImageStylePicker(i)} disabled={generatingSection === i}
-                                className="absolute top-3 right-3 flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] text-white cursor-pointer opacity-0 group-hover/img:opacity-100 transition-opacity"
+                                className="absolute top-3 right-3 flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] text-[var(--sys-text)] cursor-pointer opacity-0 group-hover/img:opacity-100 transition-opacity"
                                 style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(6px)' }}>
                                 <span className={`material-symbols-outlined text-xs ${generatingSection === i ? 'animate-spin' : ''}`}>{generatingSection === i ? 'progress_activity' : 'refresh'}</span>
                                 Regenerate
@@ -3486,7 +3500,7 @@ function BlogEditorView({ content, activeBrand, onNewContent, onGenerateImage })
                             {/* SEO alt badge */}
                             {section.imageAlt && (
                                 <div className="absolute bottom-8 left-3 opacity-0 group-hover/img:opacity-100 transition-opacity">
-                                    <span className="text-[9px] px-2 py-0.5 rounded-full text-white/50" style={{ background: 'rgba(0,0,0,0.4)' }}>
+                                    <span className="text-[9px] px-2 py-0.5 rounded-full text-[var(--sys-text)]/50" style={{ background: 'rgba(0,0,0,0.4)' }}>
                                         alt: {section.imageAlt.substring(0, 40)}...
                                     </span>
                                 </div>
@@ -3500,7 +3514,7 @@ function BlogEditorView({ content, activeBrand, onNewContent, onGenerateImage })
                     {/* Generate image button (when no image yet) */}
                     {!section.imageUrl && imageStylePicker !== i && (
                         <button onClick={() => openImageStylePicker(i)} disabled={generatingSection === i}
-                            className="mt-3 flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-slate-500 hover:text-primary cursor-pointer transition-colors"
+                            className="mt-3 flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-[var(--sys-text-muted)] hover:text-primary cursor-pointer transition-colors"
                             style={{ background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.08)' }}>
                             <span className={`material-symbols-outlined text-sm ${generatingSection === i ? 'animate-spin' : ''}`}>
                                 {generatingSection === i ? 'progress_activity' : 'add_photo_alternate'}
@@ -3511,14 +3525,14 @@ function BlogEditorView({ content, activeBrand, onNewContent, onGenerateImage })
 
                     {/* Section Controls — hover sidebar */}
                     <div className="absolute left-0 top-0 flex flex-col gap-1 opacity-0 group-hover/section:opacity-100 transition-opacity" style={{ width: '1.5rem' }}>
-                        <button onClick={() => moveSection(i, -1)} className="p-0.5 rounded hover:bg-white/10 cursor-pointer" title="Move up">
-                            <span className="material-symbols-outlined text-xs text-slate-600">arrow_upward</span>
+                        <button onClick={() => moveSection(i, -1)} className="p-0.5 rounded hover:bg-[var(--sys-surface)] cursor-pointer" title="Move up">
+                            <span className="material-symbols-outlined text-xs text-[var(--sys-text-muted)]">arrow_upward</span>
                         </button>
-                        <button onClick={() => moveSection(i, 1)} className="p-0.5 rounded hover:bg-white/10 cursor-pointer" title="Move down">
-                            <span className="material-symbols-outlined text-xs text-slate-600">arrow_downward</span>
+                        <button onClick={() => moveSection(i, 1)} className="p-0.5 rounded hover:bg-[var(--sys-surface)] cursor-pointer" title="Move down">
+                            <span className="material-symbols-outlined text-xs text-[var(--sys-text-muted)]">arrow_downward</span>
                         </button>
-                        <button onClick={() => deleteSection(i)} className="p-0.5 rounded hover:bg-rose-500/20 cursor-pointer" title="Delete">
-                            <span className="material-symbols-outlined text-xs text-slate-600 hover:text-rose-400">close</span>
+                        <button onClick={() => deleteSection(i)} className="p-0.5 rounded hover:bg-[var(--sys-primary-dim)] cursor-pointer" title="Delete">
+                            <span className="material-symbols-outlined text-xs text-[var(--sys-text-muted)] hover:text-primary">close</span>
                         </button>
                     </div>
 
@@ -3526,7 +3540,7 @@ function BlogEditorView({ content, activeBrand, onNewContent, onGenerateImage })
                     <div className="relative my-4 group/add" style={{ marginLeft: '-2.5rem' }}>
                         <div style={{ height: '1px', background: 'rgba(255,255,255,0.04)' }} />
                         <button onClick={() => addSection(i)}
-                            className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center gap-1 px-3 py-1 rounded-full text-[10px] text-slate-600 opacity-0 group-hover/add:opacity-100 transition-all cursor-pointer"
+                            className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center gap-1 px-3 py-1 rounded-full text-[10px] text-[var(--sys-text-muted)] opacity-0 group-hover/add:opacity-100 transition-all cursor-pointer"
                             style={{ background: 'rgba(15,23,42,0.95)', border: '1px solid rgba(255,255,255,0.08)' }}>
                             <span className="material-symbols-outlined text-xs">add</span> Add Section
                         </button>
@@ -3540,7 +3554,7 @@ function BlogEditorView({ content, activeBrand, onNewContent, onGenerateImage })
                     <span className="material-symbols-outlined text-sm align-middle mr-1">auto_awesome</span>
                     AI-powered blog — images by NanoBanana 2 · SEO optimized with alt tags
                 </p>
-                <p className="text-[10px] mt-1" style={{ color: 'rgba(100,116,139,0.5)' }}>
+                <p className="text-[10px] mt-1 text-[var(--sys-text-muted)] opacity-70">
                     Click any text to edit · Format with toolbar · Choose image style before generating
                 </p>
             </div>
@@ -3621,69 +3635,69 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
         return (
             <div className="max-w-3xl mx-auto animate-fade-in">
                 <div className="text-center mb-8">
-                    <div className="size-16 rounded-full bg-emerald-400/20 flex items-center justify-center mx-auto mb-4">
-                        <span className="material-symbols-outlined text-3xl text-emerald-400">check_circle</span>
+                    <div className="size-16 rounded-full bg-[var(--sys-primary-dim)] flex items-center justify-center mx-auto mb-4">
+                        <span className="material-symbols-outlined text-3xl text-primary">check_circle</span>
                     </div>
-                    <h3 className="text-2xl font-extrabold text-white">Content <span className="text-emerald-400">Saved!</span></h3>
-                    <p className="text-sm text-slate-400 mt-2">Your content has been saved to history. What would you like to do next?</p>
+                    <h3 className="text-2xl font-extrabold text-[var(--sys-text)]">Content <span className="text-primary">Saved!</span></h3>
+                    <p className="text-sm text-[var(--sys-text-muted)] mt-2">Your content has been saved to history. What would you like to do next?</p>
                 </div>
 
                 <div className="glass-panel rounded-2xl p-6 mb-6">
                     <div className="flex items-center gap-2 mb-3">
-                        <span className="text-sm text-emerald-400 font-bold bg-emerald-400/10 px-2.5 py-1 rounded-lg">✓ Approved</span>
+                        <span className="text-sm text-primary font-bold bg-[var(--sys-primary-dim)] px-2.5 py-1 rounded-lg">✓ Approved</span>
                         <span className="text-sm text-primary font-bold bg-primary/10 px-2.5 py-1 rounded-lg">{result.type}</span>
-                        <span className="text-sm text-slate-500">{result.content?.split(/\s+/).length} words</span>
+                        <span className="text-sm text-[var(--sys-text-muted)]">{result.content?.split(/\s+/).length} words</span>
                     </div>
-                    <p className="text-sm text-slate-300 leading-relaxed line-clamp-3">{result.content}</p>
+                    <p className="text-sm text-[var(--sys-text-muted)] leading-relaxed line-clamp-3">{result.content}</p>
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
                     <button onClick={onCreateVisual}
-                        className="glass-panel rounded-2xl p-5 hover:bg-white/[0.05] hover:border-primary/30 transition-all cursor-pointer text-left group border border-white/[0.06]">
+                        className="glass-panel rounded-2xl p-5 hover:bg-[var(--sys-surface)] hover:border-primary/30 transition-all cursor-pointer text-left group border border-[var(--sys-border)]">
                         <div className="size-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary mb-3 group-hover:scale-110 transition-transform">
                             <span className="material-symbols-outlined text-2xl">image</span>
                         </div>
-                        <h4 className="text-base font-bold text-white mb-1">Create Matching Visual</h4>
-                        <p className="text-[11px] text-slate-500">Generate an image that matches this content in Creative Studio</p>
+                        <h4 className="text-base font-bold text-[var(--sys-text)] mb-1">Create Matching Visual</h4>
+                        <p className="text-[11px] text-[var(--sys-text-muted)]">Generate an image that matches this content in Creative Studio</p>
                     </button>
                     <button onClick={() => { navigator.clipboard.writeText(stripMarkdown(result.content)); setCopied(true); setTimeout(() => setCopied(false), 2000) }}
-                        className="glass-panel rounded-2xl p-5 hover:bg-white/[0.05] hover:border-emerald-500/30 transition-all cursor-pointer text-left group border border-white/[0.06]">
-                        <div className="size-12 rounded-xl bg-emerald-400/10 flex items-center justify-center text-emerald-400 mb-3 group-hover:scale-110 transition-transform">
+                        className="glass-panel rounded-2xl p-5 hover:bg-[var(--sys-surface)] hover:border-[var(--sys-border)] transition-all cursor-pointer text-left group border border-[var(--sys-border)]">
+                        <div className="size-12 rounded-xl bg-[var(--sys-primary-dim)] flex items-center justify-center text-primary mb-3 group-hover:scale-110 transition-transform">
                             <span className="material-symbols-outlined text-2xl">{copied ? 'check' : 'content_copy'}</span>
                         </div>
-                        <h4 className="text-base font-bold text-white mb-1">{copied ? 'Copied!' : 'Copy to Clipboard'}</h4>
-                        <p className="text-[11px] text-slate-500">Copy the content to paste on your platform</p>
+                        <h4 className="text-base font-bold text-[var(--sys-text)] mb-1">{copied ? 'Copied!' : 'Copy to Clipboard'}</h4>
+                        <p className="text-[11px] text-[var(--sys-text-muted)]">Copy the content to paste on your platform</p>
                     </button>
                     <button onClick={onNewContent}
-                        className="glass-panel rounded-2xl p-5 hover:bg-white/[0.05] hover:border-[#FF4D00]/30 transition-all cursor-pointer text-left group border border-white/[0.06]">
+                        className="glass-panel rounded-2xl p-5 hover:bg-[var(--sys-surface)] hover:border-[#FF4D00]/30 transition-all cursor-pointer text-left group border border-[var(--sys-border)]">
                         <div className="size-12 rounded-xl bg-[#FF4D00]/10 flex items-center justify-center text-[#FF4D00] mb-3 group-hover:scale-110 transition-transform">
                             <span className="material-symbols-outlined text-2xl">add_circle</span>
                         </div>
-                        <h4 className="text-base font-bold text-white mb-1">Create New Content</h4>
-                        <p className="text-[11px] text-slate-500">Start a new content generation from scratch</p>
+                        <h4 className="text-base font-bold text-[var(--sys-text)] mb-1">Create New Content</h4>
+                        <p className="text-[11px] text-[var(--sys-text-muted)]">Start a new content generation from scratch</p>
                     </button>
                     {result?._id && (
                         <button onClick={onABTest} disabled={abTestLoading}
-                            className="glass-panel rounded-2xl p-5 hover:bg-white/[0.05] hover:border-[#FF4D00]/30 transition-all cursor-pointer text-left group border border-white/[0.06] disabled:opacity-40">
+                            className="glass-panel rounded-2xl p-5 hover:bg-[var(--sys-surface)] hover:border-[#FF4D00]/30 transition-all cursor-pointer text-left group border border-[var(--sys-border)] disabled:opacity-40">
                             <div className="size-12 rounded-xl bg-[#FF4D00]/10 flex items-center justify-center text-[#FF4D00] mb-3 group-hover:scale-110 transition-transform">
                                 <span className={`material-symbols-outlined text-2xl ${abTestLoading ? 'animate-spin' : ''}`}>{abTestLoading ? 'progress_activity' : 'science'}</span>
                             </div>
-                            <h4 className="text-base font-bold text-white mb-1 flex items-center gap-1">{abTestLoading ? 'Creating...' : <><span className="material-symbols-outlined text-sm">science</span> A/B Test</>}</h4>
-                            <p className="text-[11px] text-slate-500">Generate 2-3 variants to test what performs best</p>
+                            <h4 className="text-base font-bold text-[var(--sys-text)] mb-1 flex items-center gap-1">{abTestLoading ? 'Creating...' : <><span className="material-symbols-outlined text-sm">science</span> A/B Test</>}</h4>
+                            <p className="text-[11px] text-[var(--sys-text-muted)]">Generate 2-3 variants to test what performs best</p>
                         </button>
                     )}
                     <button onClick={() => setShowPublish(true)}
-                        className="glass-panel rounded-2xl p-5 hover:bg-white/[0.05] hover:border-[#FF4D00]/30 transition-all cursor-pointer text-left group border border-white/[0.06]">
+                        className="glass-panel rounded-2xl p-5 hover:bg-[var(--sys-surface)] hover:border-[#FF4D00]/30 transition-all cursor-pointer text-left group border border-[var(--sys-border)]">
                         <div className="size-12 rounded-xl bg-[#FF4D00]/10 flex items-center justify-center text-[#FF4D00] mb-3 group-hover:scale-110 transition-transform">
                             <span className="material-symbols-outlined text-2xl">share</span>
                         </div>
-                        <h4 className="text-base font-bold text-white mb-1">Publish Now</h4>
-                        <p className="text-[11px] text-slate-500">Post directly to your social media accounts</p>
+                        <h4 className="text-base font-bold text-[var(--sys-text)] mb-1">Publish Now</h4>
+                        <p className="text-[11px] text-[var(--sys-text-muted)]">Post directly to your social media accounts</p>
                     </button>
                 </div>
                 <div className="p-3 rounded-xl bg-primary/5 border border-primary/10 text-center">
                     <p className="text-sm text-primary font-bold flex items-center gap-1"><span className="material-symbols-outlined text-sm">psychology</span> AI is learning from your acceptance</p>
-                    <p className="text-sm text-slate-500">Future content will align closer to this style and tone</p>
+                    <p className="text-sm text-[var(--sys-text-muted)]">Future content will align closer to this style and tone</p>
                 </div>
 
                 {/* A/B Test Variants in accepted view */}
@@ -3691,28 +3705,28 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
                     <div className="mt-6 glass-panel rounded-2xl p-5 border border-[#FF4D00]/20">
                         <div className="flex items-center gap-2 mb-4">
                             <span className="material-symbols-outlined text-[#FF4D00]">science</span>
-                            <h4 className="text-sm font-bold text-white">A/B Test Variants</h4>
+                            <h4 className="text-sm font-bold text-[var(--sys-text)]">A/B Test Variants</h4>
                             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#FF4D00]/10 text-[#FF4D00] border border-[#FF4D00]/20">
                                 {abTestData.variants.length} variants generated
                             </span>
                         </div>
                         <div className="space-y-3">
                             {abTestData.variants.map((v, i) => (
-                                <div key={i} className={`rounded-xl p-4 border transition-all ${v.isControl ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-white/[0.02] border-white/[0.06]'}`}>
+                                <div key={i} className={`rounded-xl p-4 border transition-all ${v.isControl ? 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)]' : 'bg-[var(--sys-surface)] border-[var(--sys-border)]'}`}>
                                     <div className="flex items-center gap-2 mb-2">
-                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${v.isControl ? 'bg-emerald-400/10 text-emerald-400' : 'bg-[#FF4D00]/10 text-[#FF4D00]'}`}>
+                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${v.isControl ? 'bg-[var(--sys-primary-dim)] text-primary' : 'bg-[#FF4D00]/10 text-[#FF4D00]'}`}>
                                             {v.variantLabel || `Variant ${String.fromCharCode(65 + i)}`}
                                         </span>
                                         {v.abTestChangeType && v.abTestChangeType !== 'control' && (
-                                            <span className="text-[10px] text-slate-500">{v.abTestChangeType} change</span>
+                                            <span className="text-[10px] text-[var(--sys-text-muted)]">{v.abTestChangeType} change</span>
                                         )}
                                     </div>
-                                    <p className="text-sm text-slate-300 whitespace-pre-line line-clamp-4">{v.content}</p>
+                                    <p className="text-sm text-[var(--sys-text-muted)] whitespace-pre-line line-clamp-4">{v.content}</p>
                                     {v.abTestHypothesis && (
-                                        <p className="text-xs text-slate-500 mt-2 italic flex items-center gap-0.5"><span className="material-symbols-outlined text-[10px]">lightbulb</span> {v.abTestHypothesis}</p>
+                                        <p className="text-xs text-[var(--sys-text-muted)] mt-2 italic flex items-center gap-0.5"><span className="material-symbols-outlined text-[10px]">lightbulb</span> {v.abTestHypothesis}</p>
                                     )}
                                     <button onClick={() => { navigator.clipboard.writeText(v.content); }}
-                                        className="mt-2 text-xs text-slate-500 hover:text-white flex items-center gap-1 transition-colors cursor-pointer">
+                                        className="mt-2 text-xs text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] flex items-center gap-1 transition-colors cursor-pointer">
                                         <span className="material-symbols-outlined text-xs">content_copy</span> Copy variant
                                     </button>
                                 </div>
@@ -3737,20 +3751,20 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
             {/* Header */}
             <div className="flex items-center justify-between mb-6">
                 <div>
-                    <h3 className="text-xl font-extrabold text-white">Your Content is <span className="text-primary">Ready</span></h3>
-                    <p className="text-sm text-slate-400 mt-1">
+                    <h3 className="text-xl font-extrabold text-[var(--sys-text)]">Your Content is <span className="text-primary">Ready</span></h3>
+                    <p className="text-sm text-[var(--sys-text-muted)] mt-1">
                         Generated for {activeBrand?.name} • Brand voice: {activeBrand?.dna?.voice?.personality || 'Active'}
                     </p>
                     {/* Intelligence Sources */}
                     {result?.agenticData?.research?.sources && result.agenticData.research.sources.length > 0 && (
                         <div className="flex items-center gap-1.5 mt-2">
-                            <span className="text-[10px] text-slate-600">Powered by:</span>
+                            <span className="text-[10px] text-[var(--sys-text-muted)]">Powered by:</span>
                             {result.agenticData.research.sources.map(s => (
                                 <span key={s} className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium border ${
                                     s === 'Playbook' ? 'bg-[#FF4D00]/10 text-[#FF4D00] border-[#FF4D00]/20' :
                                     s === 'GA4' ? 'bg-[#FF4D00]/10 text-[#FF4D00] border-[#FF4D00]/20' :
-                                    s === 'Competitors' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' :
-                                    'bg-white/[0.04] text-slate-400 border-white/[0.06]'
+                                    s === 'Competitors' ? 'bg-[var(--sys-surface)] text-[var(--sys-primary)] border-[var(--sys-border)]' :
+                                    'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] border-[var(--sys-border)]'
                                 }`}>
                                     {s === 'Playbook' ? '' : s === 'GA4' ? '' : s === 'Competitors' ? '' : s === 'Trending' ? '' : s === 'SEO Audit' ? '' : s === 'Web' ? '' : ''} {s}
                                 </span>
@@ -3760,11 +3774,11 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
                 </div>
                 <div className="flex gap-2">
                     <button onClick={() => { setEditing(!editing); if (!editing) setTimeout(() => refineRef.current?.focus(), 100) }}
-                        className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${editing ? 'bg-amber-400/20 text-amber-400 border border-amber-400/30' : 'glass-panel text-slate-400 hover:text-white border border-white/[0.1]'} `}>
+                        className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${editing ? 'bg-[var(--sys-primary-dim)] text-primary border border-[var(--sys-border)]' : 'glass-panel text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] border border-[var(--sys-border)]'} `}>
                         <span className="material-symbols-outlined text-sm">{editing ? 'edit_off' : 'edit'}</span>
                         {editing ? 'Done Editing' : 'Edit & Refine'}
                     </button>
-                    <button onClick={onNewContent} className="btn-glass px-4 py-2 rounded-xl text-sm text-slate-400 hover:text-white border border-white/[0.1] cursor-pointer">
+                    <button onClick={onNewContent} className="btn-glass px-4 py-2 rounded-xl text-sm text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] border border-[var(--sys-border)] cursor-pointer">
                         <span className="material-symbols-outlined text-sm">add</span> New
                     </button>
                 </div>
@@ -3773,17 +3787,17 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
             {/* Content Card */}
             <div className="glass-panel rounded-2xl p-8 mb-4">
                 {/* Meta */}
-                <div className="flex items-center gap-3 mb-4 pb-4 border-b border-white/[0.06]">
+                <div className="flex items-center gap-3 mb-4 pb-4 border-b border-[var(--sys-border)]">
                     <span className="text-sm text-primary font-bold bg-primary/10 px-2.5 py-1 rounded-lg">{result.type}</span>
-                    <span className="text-sm text-slate-500">{(editing ? editContent : result.content)?.split(/\s+/).length} words</span>
+                    <span className="text-sm text-[var(--sys-text-muted)]">{(editing ? editContent : result.content)?.split(/\s+/).length} words</span>
                     {result.aiMeta?.provider && (
-                        <span className="text-sm text-slate-500 bg-white/[0.04] px-2 py-0.5 rounded-full flex items-center gap-1">
+                        <span className="text-sm text-[var(--sys-text-muted)] bg-[var(--sys-surface)] px-2 py-0.5 rounded-full flex items-center gap-1">
                             {result.aiMeta.routingIcon || ''} {result.aiMeta.provider}
-                            {result.aiMeta.routingReason && <span className="text-slate-600">— {result.aiMeta.routingReason}</span>}
+                            {result.aiMeta.routingReason && <span className="text-[var(--sys-text-muted)]">— {result.aiMeta.routingReason}</span>}
                         </span>
                     )}
                     {result.aiMeta?.brandAlignmentScore && (
-                        <span className="ml-auto text-xs font-bold text-emerald-400 bg-emerald-400/10 px-2.5 py-1 rounded-lg">
+                        <span className="ml-auto text-xs font-bold text-primary bg-[var(--sys-primary-dim)] px-2.5 py-1 rounded-lg">
                             {result.aiMeta.brandAlignmentScore}% Brand Match
                         </span>
                     )}
@@ -3792,10 +3806,10 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
                 {/* Content — editable or read-only */}
                 {editing ? (
                     <textarea value={editContent} onChange={e => setEditContent(e.target.value)}
-                        className="w-full bg-transparent text-white text-base leading-relaxed border border-white/[0.1] rounded-xl p-4 resize-none focus:border-primary/40 focus:outline-none transition-colors"
+                        className="w-full bg-transparent text-[var(--sys-text)] text-base leading-relaxed border border-[var(--sys-border)] rounded-xl p-4 resize-none focus:border-primary/40 focus:outline-none transition-colors"
                         rows={Math.max(6, editContent.split('\n').length + 2)} />
                 ) : (
-                    <div className="text-white text-base leading-relaxed whitespace-pre-wrap">
+                    <div className="text-[var(--sys-text)] text-base leading-relaxed whitespace-pre-wrap">
                         {stripMarkdown(result.content)}
                     </div>
                 )}
@@ -3804,14 +3818,14 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
             {/* AI Refine Bar — always visible when editing */}
             {editing && (
                 <div className="glass-panel rounded-2xl p-4 mb-4 animate-fade-in">
-                    <p className="text-sm text-amber-400 font-bold mb-3 flex items-center gap-1">
+                    <p className="text-sm text-primary font-bold mb-3 flex items-center gap-1">
                         <span className="material-symbols-outlined text-sm">auto_fix_high</span> AI Refine
                     </p>
                     {/* Quick suggestions */}
                     <div className="flex flex-wrap gap-1.5 mb-3">
                         {REFINE_SUGGESTIONS.map(s => (
                             <button key={s} onClick={() => { setRefineInput(s); }}
-                                className="text-xs px-2.5 py-1 rounded-full bg-white/[0.04] text-slate-400 hover:bg-amber-400/10 hover:text-amber-400 transition-all cursor-pointer border border-white/[0.06] font-medium">
+                                className="text-xs px-2.5 py-1 rounded-full bg-[var(--sys-surface)] text-[var(--sys-text-muted)] hover:bg-[var(--sys-primary-dim)] hover:text-primary transition-all cursor-pointer border border-[var(--sys-border)] font-medium">
                                 {s}
                             </button>
                         ))}
@@ -3838,13 +3852,13 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
             {/* Actions */}
             <div className="flex gap-3 mb-4">
                 <button onClick={handleCopy}
-                    className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all cursor-pointer ${copied ? 'bg-emerald-400/20 text-emerald-400 border border-emerald-400/30' : 'glass-panel text-white hover:bg-white/[0.06]'} `}>
+                    className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all cursor-pointer ${copied ? 'bg-[var(--sys-primary-dim)] text-primary border border-[var(--sys-border)]' : 'glass-panel text-[var(--sys-text)] hover:bg-[var(--sys-surface)]'} `}>
                     <span className="material-symbols-outlined text-lg">{copied ? 'check' : 'content_copy'}</span>
                     {copied ? 'Copied!' : 'Copy'}
                 </button>
                 {editing ? (
                     <button onClick={handleSaveEdit}
-                        className="flex-1 btn-primary py-3 rounded-xl text-sm font-bold bg-amber-500 hover:bg-amber-600">
+                        className="flex-1 btn-primary py-3 rounded-xl text-sm font-bold bg-[var(--sys-surface)] hover:bg-[var(--sys-surface)]">
                         <span className="material-symbols-outlined text-lg">save</span> Save Edits
                     </button>
                 ) : (
@@ -3881,21 +3895,21 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
             <div className="flex gap-2">
                 <button onClick={() => onFeedback('thumbs', { thumbs: 'up' })}
                     className={`flex-1 glass-panel py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${contentFeedback === 'liked'
-                        ? 'text-emerald-400 bg-emerald-400/15 border border-emerald-400/30'
-                        : 'text-slate-400 hover:text-emerald-400 hover:bg-emerald-400/5'
+                        ? 'text-primary bg-[var(--sys-primary-dim)] border border-[var(--sys-border)]'
+                        : 'text-[var(--sys-text-muted)] hover:text-primary hover:bg-[var(--sys-primary-dim)]'
                         } `}>
                     <span className="material-symbols-outlined text-sm">thumb_up</span> {contentFeedback === 'liked' ? 'Liked ✓' : 'Good'}
                 </button>
                 <button onClick={() => onFeedback('thumbs', { thumbs: 'down' })}
                     className={`flex-1 glass-panel py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${contentFeedback === 'disliked'
-                        ? 'text-rose-400 bg-rose-400/15 border border-rose-400/30'
-                        : 'text-slate-400 hover:text-rose-400 hover:bg-rose-400/5'
+                        ? 'text-primary bg-[var(--sys-primary-dim)] border border-[var(--sys-border)]'
+                        : 'text-[var(--sys-text-muted)] hover:text-primary hover:bg-[var(--sys-primary-dim)]'
                         } `}>
                     <span className="material-symbols-outlined text-sm">thumb_down</span> {contentFeedback === 'disliked' ? 'Noted ✓' : 'Not Right'}
                 </button>
                 <CreditTooltipWrapper action="contentRefine">
                     <button onClick={onRegenerate} disabled={generating}
-                        className="flex-1 glass-panel py-2.5 rounded-xl text-sm text-slate-400 hover:text-white hover:bg-white/[0.06] transition-all cursor-pointer font-bold disabled:opacity-30">
+                        className="flex-1 glass-panel py-2.5 rounded-xl text-sm text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)] transition-all cursor-pointer font-bold disabled:opacity-30">
                         <span className={`material-symbols-outlined text-sm ${generating ? 'animate-spin' : ''}`}>{generating ? 'progress_activity' : 'refresh'}</span>
                         {generating ? 'Regenerating...' : 'Regenerate'} {!generating && <CreditBadge action="contentRefine" />}
                     </button>
@@ -3907,7 +3921,7 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
                 <div className="mt-6 glass-panel rounded-2xl p-5 border border-[#FF4D00]/20">
                     <div className="flex items-center gap-2 mb-4">
                         <span className="material-symbols-outlined text-[#FF4D00]">science</span>
-                        <h4 className="text-sm font-bold text-white">A/B Test Variants</h4>
+                        <h4 className="text-sm font-bold text-[var(--sys-text)]">A/B Test Variants</h4>
                         <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#FF4D00]/10 text-[#FF4D00] border border-[#FF4D00]/20">
                             {abTestData.testPlan?.primaryMetric?.replace('_', ' ')} • {abTestData.testPlan?.testDuration}
                         </span>
@@ -3915,22 +3929,22 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
                     <div className="space-y-3">
                         {abTestData.variants.map((v, i) => (
                             <div key={i} className={`rounded-xl p-4 border transition-all ${
-                                v.isControl ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-white/[0.02] border-white/[0.06] hover:border-[#FF4D00]/30'
+                                v.isControl ? 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)]' : 'bg-[var(--sys-surface)] border-[var(--sys-border)] hover:border-[#FF4D00]/30'
                             }`}>
                                 <div className="flex items-center gap-2 mb-2">
-                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${v.isControl ? 'bg-emerald-400/10 text-emerald-400' : 'bg-[#FF4D00]/10 text-[#FF4D00]'}`}>
+                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${v.isControl ? 'bg-[var(--sys-primary-dim)] text-primary' : 'bg-[#FF4D00]/10 text-[#FF4D00]'}`}>
                                         {v.variantLabel || `Variant ${String.fromCharCode(65 + i)}`}
                                     </span>
                                     {v.abTestChangeType && v.abTestChangeType !== 'control' && (
-                                        <span className="text-[10px] text-slate-500">{v.abTestChangeType} change</span>
+                                        <span className="text-[10px] text-[var(--sys-text-muted)]">{v.abTestChangeType} change</span>
                                     )}
                                 </div>
-                                <p className="text-sm text-slate-300 whitespace-pre-line line-clamp-4">{v.content}</p>
+                                <p className="text-sm text-[var(--sys-text-muted)] whitespace-pre-line line-clamp-4">{v.content}</p>
                                 {v.abTestHypothesis && (
-                                    <p className="text-xs text-slate-500 mt-2 italic">💡 {v.abTestHypothesis}</p>
+                                    <p className="text-xs text-[var(--sys-text-muted)] mt-2 italic">💡 {v.abTestHypothesis}</p>
                                 )}
                                 <button onClick={() => { navigator.clipboard.writeText(v.content); }}
-                                    className="mt-2 text-xs text-slate-500 hover:text-white flex items-center gap-1 transition-colors cursor-pointer">
+                                    className="mt-2 text-xs text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] flex items-center gap-1 transition-colors cursor-pointer">
                                     <span className="material-symbols-outlined text-xs">content_copy</span> Copy variant
                                 </button>
                             </div>
@@ -3942,9 +3956,9 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
             {/* Intelligence Sources */}
             {result?.agenticData?.research?.sources && result.agenticData.research.sources.length > 0 && (
                 <div className="mt-4 flex items-center gap-2 flex-wrap">
-                    <span className="text-[10px] text-slate-600 font-medium">Data sources:</span>
+                    <span className="text-[10px] text-[var(--sys-text-muted)] font-medium">Data sources:</span>
                     {result.agenticData.research.sources.map(s => (
-                        <span key={s} className="text-[10px] px-2 py-0.5 rounded-full bg-white/[0.04] text-slate-400 border border-white/[0.06] font-medium">
+                        <span key={s} className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--sys-surface)] text-[var(--sys-text-muted)] border border-[var(--sys-border)] font-medium">
                             {s === 'Playbook' ? '📊 ' : s === 'GA4' ? '📈 ' : s === 'Competitors' ? '🔍 ' : s === 'Trending' ? '📰 ' : s === 'SEO Audit' ? '🔧 ' : ''}{s}
                         </span>
                     ))}
@@ -3954,7 +3968,7 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
             {/* Learning note */}
             <div className="mt-6 p-3 rounded-xl bg-primary/5 border border-primary/10 text-center">
                 <p className="text-sm text-primary font-bold"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">psychology</span> Every action teaches the AI your preferences</p>
-                <p className="text-sm text-slate-500">Accept → AI replicates style • Edit → AI learns your preferences • Refine → AI adapts to your feedback</p>
+                <p className="text-sm text-[var(--sys-text-muted)]">Accept → AI replicates style • Edit → AI learns your preferences • Refine → AI adapts to your feedback</p>
             </div>
         </div>
     )
@@ -3984,15 +3998,15 @@ function ContentHistory({ brandId, onSelect, visible, onToggle }) {
     return (
         <>
             {/* Backdrop overlay */}
-            <div className="fixed inset-0 bg-black/40 z-40 animate-fade-in" onClick={onToggle} />
-            <div className="fixed right-0 top-0 h-screen w-80 bg-[#0c0f1a]/95 backdrop-blur-xl border-l border-white/[0.08] z-50 flex flex-col animate-fade-in shadow-2xl">
+            <div className="fixed inset-0 bg-[var(--sys-surface)] z-40 animate-fade-in" onClick={onToggle} />
+            <div className="fixed right-0 top-0 h-screen w-80 bg-[#0c0f1a]/95 border-l border-[var(--sys-border)] z-50 flex flex-col animate-fade-in shadow-2xl">
                 {/* Header */}
-                <div className="flex items-center justify-between p-4 border-b border-white/[0.06]">
+                <div className="flex items-center justify-between p-4 border-b border-[var(--sys-border)]">
                     <div className="flex items-center gap-2">
                         <span className="material-symbols-outlined text-primary">history</span>
-                        <h3 className="text-base font-bold text-white">Content History</h3>
+                        <h3 className="text-base font-bold text-[var(--sys-text)]">Content History</h3>
                     </div>
-                    <button onClick={onToggle} className="text-slate-500 hover:text-white transition-colors cursor-pointer">
+                    <button onClick={onToggle} className="text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] transition-colors cursor-pointer">
                         <span className="material-symbols-outlined text-sm">close</span>
                     </button>
                 </div>
@@ -4002,13 +4016,13 @@ function ContentHistory({ brandId, onSelect, visible, onToggle }) {
                     {loading ? (
                         <div className="text-center py-12">
                             <span className="material-symbols-outlined text-2xl text-primary animate-spin">progress_activity</span>
-                            <p className="text-sm text-slate-500 mt-2">Loading history...</p>
+                            <p className="text-sm text-[var(--sys-text-muted)] mt-2">Loading history...</p>
                         </div>
                     ) : items.length === 0 ? (
                         <div className="text-center py-12">
                             <span className="material-symbols-outlined text-4xl text-slate-700 block mb-2">inbox</span>
-                            <p className="text-sm text-slate-500">No content generated yet</p>
-                            <p className="text-xs text-slate-600 mt-1">Generated content will appear here</p>
+                            <p className="text-sm text-[var(--sys-text-muted)]">No content generated yet</p>
+                            <p className="text-xs text-[var(--sys-text-muted)] mt-1">Generated content will appear here</p>
                         </div>
                     ) : items.map(item => {
                         const typeLabels = { blog: '📝 Blog', social: '💬 Social', youtube: '▶️ YouTube', press_release: '📰 Press Release', product: '🛍️ Product', youtube_seo: '▶️ YT SEO' }
@@ -4016,16 +4030,16 @@ function ContentHistory({ brandId, onSelect, visible, onToggle }) {
                         const preview = item.title || item.content || item.prompt || '(no preview)'
                         return (
                         <button key={item._id} onClick={() => onSelect(item)}
-                            className="w-full text-left glass-panel rounded-xl p-3 hover:bg-white/[0.05] transition-all cursor-pointer border border-white/[0.06] group">
+                            className="w-full text-left glass-panel rounded-xl p-3 hover:bg-[var(--sys-surface)] transition-all cursor-pointer border border-[var(--sys-border)] group">
                             <div className="flex items-center gap-2 mb-1.5">
-                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${item.status === 'approved' ? 'bg-emerald-400/10 text-emerald-400' : 'bg-primary/10 text-primary'}`}>
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${item.status === 'approved' ? 'bg-[var(--sys-primary-dim)] text-primary' : 'bg-primary/10 text-primary'}`}>
                                     {item.status === 'approved' ? '✓ Approved' : typeLabel}
                                 </span>
-                                {item.platform && <span className="text-[10px] text-slate-500 capitalize">{item.platform}</span>}
-                                {item.brand?.name && <span className="text-[10px] text-slate-600 ml-auto truncate max-w-[80px]">{item.brand.name}</span>}
+                                {item.platform && <span className="text-[10px] text-[var(--sys-text-muted)] capitalize">{item.platform}</span>}
+                                {item.brand?.name && <span className="text-[10px] text-[var(--sys-text-muted)] ml-auto truncate max-w-[80px]">{item.brand.name}</span>}
                             </div>
-                            <p className="text-sm text-white line-clamp-2 mb-1 leading-snug">{preview}</p>
-                            <p className="text-xs text-slate-600">
+                            <p className="text-sm text-[var(--sys-text)] line-clamp-2 mb-1 leading-snug">{preview}</p>
+                            <p className="text-xs text-[var(--sys-text-muted)]">
                                 {new Date(item.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                             </p>
                         </button>
@@ -4062,21 +4076,21 @@ function StepProductPicker({ brandId, selectedProduct, onSelect, onBack }) {
     return (
         <div className="max-w-3xl mx-auto animate-fade-in">
             <div className="mb-6 text-center">
-                <h3 className="text-xl font-extrabold text-white mb-1">
+                <h3 className="text-xl font-extrabold text-[var(--sys-text)] mb-1">
                     <span className="material-symbols-outlined text-primary align-middle mr-2">inventory_2</span>
                     Select a Product
                 </h3>
-                <p className="text-sm text-slate-400">Choose a product from your catalog to generate platform-specific content</p>
+                <p className="text-sm text-[var(--sys-text-muted)]">Choose a product from your catalog to generate platform-specific content</p>
             </div>
 
             <div className="flex items-center gap-3 mb-5">
                 <div className="relative flex-1">
                     <input value={search} onChange={e => setSearch(e.target.value)}
                         placeholder="Search products..."
-                        className="input-glass w-full py-2.5 pl-9 pr-3 rounded-xl text-sm bg-white/[0.04]" />
-                    <span className="material-symbols-outlined text-sm text-slate-500 absolute left-3 top-1/2 -translate-y-1/2">search</span>
+                        className="input-glass w-full py-2.5 pl-9 pr-3 rounded-xl text-sm bg-[var(--sys-surface)]" />
+                    <span className="material-symbols-outlined text-sm text-[var(--sys-text-muted)] absolute left-3 top-1/2 -translate-y-1/2">search</span>
                 </div>
-                <button onClick={onBack} className="glass-panel py-2.5 px-4 rounded-xl text-xs font-bold text-slate-400 hover:text-white transition-all cursor-pointer">
+                <button onClick={onBack} className="glass-panel py-2.5 px-4 rounded-xl text-xs font-bold text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] transition-all cursor-pointer">
                     <span className="material-symbols-outlined text-sm mr-1 align-middle">arrow_back</span> Back
                 </button>
             </div>
@@ -4084,15 +4098,15 @@ function StepProductPicker({ brandId, selectedProduct, onSelect, onBack }) {
             {loading ? (
                 <div className="flex items-center justify-center py-16 gap-3">
                     <span className="material-symbols-outlined text-2xl text-primary animate-spin">progress_activity</span>
-                    <span className="text-slate-400 text-sm">Loading products...</span>
+                    <span className="text-[var(--sys-text-muted)] text-sm">Loading products...</span>
                 </div>
             ) : filtered.length === 0 ? (
                 <div className="text-center py-12 glass-panel rounded-2xl">
-                    <span className="material-symbols-outlined text-5xl text-slate-600 mb-3">inbox</span>
-                    <p className="text-slate-400 text-sm mb-1">
+                    <span className="material-symbols-outlined text-5xl text-[var(--sys-text-muted)] mb-3">inbox</span>
+                    <p className="text-[var(--sys-text-muted)] text-sm mb-1">
                         {productsList.length === 0 ? 'No products in your catalog yet.' : 'No products match your search.'}
                     </p>
-                    <p className="text-slate-600 text-xs mb-4">Add products in Brand DNA → Products & Services</p>
+                    <p className="text-[var(--sys-text-muted)] text-xs mb-4">Add products in Brand DNA → Products & Services</p>
                     <button onClick={() => onSelect(null)}
                         className="glass-panel py-2.5 px-6 rounded-xl text-sm font-bold text-primary hover:bg-primary/10 transition-all cursor-pointer">
                         <span className="material-symbols-outlined text-sm mr-1 align-middle">edit_note</span>
@@ -4106,20 +4120,20 @@ function StepProductPicker({ brandId, selectedProduct, onSelect, onBack }) {
                             const isSelected = selectedProduct?._id === p._id
                             return (
                                 <button key={p._id} onClick={() => onSelect(p)}
-                                    className={`text-left glass-panel rounded-xl overflow-hidden transition-all cursor-pointer hover:scale-[1.02] ${isSelected ? 'ring-2 ring-primary border-primary/40' : 'hover:border-white/20'
+                                    className={`text-left glass-panel rounded-xl overflow-hidden transition-all cursor-pointer hover:scale-[1.02] ${isSelected ? 'ring-2 ring-primary border-primary/40' : 'hover:border-[var(--sys-border)]'
                                         } `}>
-                                    <div className="h-28 bg-gradient-to-br from-white/[0.03] to-white/[0.01] flex items-center justify-center overflow-hidden">
+                                    <div className="h-28 bg-[var(--sys-surface)] border border-[var(--sys-border)] flex items-center justify-center overflow-hidden">
                                         {p.images?.[0]?.url ? (
                                             <img src={p.images[0].url} alt={p.title} className="w-full h-full object-cover" />
                                         ) : (
-                                            <span className="material-symbols-outlined text-3xl text-slate-600">
+                                            <span className="material-symbols-outlined text-3xl text-[var(--sys-text-muted)]">
                                                 {p.type === 'service' ? 'handyman' : 'inventory_2'}
                                             </span>
                                         )}
                                     </div>
                                     <div className="p-3">
-                                        <p className="text-sm font-bold text-white truncate">{p.title}</p>
-                                        {p.category && <p className="text-sm text-slate-500 mt-0.5">{p.category}</p>}
+                                        <p className="text-sm font-bold text-[var(--sys-text)] truncate">{p.title}</p>
+                                        {p.category && <p className="text-sm text-[var(--sys-text-muted)] mt-0.5">{p.category}</p>}
                                         {p.price?.amount > 0 && (
                                             <p className="text-xs font-bold text-primary mt-1">₹{p.price.amount.toLocaleString()}</p>
                                         )}
@@ -4132,7 +4146,7 @@ function StepProductPicker({ brandId, selectedProduct, onSelect, onBack }) {
                     {/* Skip option */}
                     <div className="text-center mt-5">
                         <button onClick={() => onSelect(null)}
-                            className="text-sm text-slate-500 hover:text-white transition-colors cursor-pointer underline underline-offset-4">
+                            className="text-sm text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] transition-colors cursor-pointer underline underline-offset-4">
                             or write product content without selecting a specific product
                         </button>
                     </div>
@@ -4653,6 +4667,7 @@ SPOKESPERSON QUOTES:`
                 keywords: blogSettings.keywords,
                 targetAudience: blogSettings.targetAudience,
                 tone: blogSettings.tone,
+                language: blogSettings.language,
             })
             if (data.success && data.content) {
                 setBlogResult(data.content)
@@ -4787,22 +4802,22 @@ SPOKESPERSON QUOTES:`
             {/* Progress Stepper (shown at steps 1-4) */}
             {step > 0 && step < 5 && (
                 <div className="flex items-center gap-2 mb-8 max-w-3xl mx-auto">
-                    <button onClick={resetAll} className="text-slate-400 hover:text-white transition-colors cursor-pointer">
+                    <button onClick={resetAll} className="text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] transition-colors cursor-pointer">
                         <span className="material-symbols-outlined text-sm">arrow_back</span>
                     </button>
                     {stepLabels.slice(0, 5).map((lbl, i) => (
                         <div key={lbl} className="flex items-center gap-2">
                             <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all
-                                ${step > i ? 'bg-primary text-white' : step === i ? 'bg-primary/20 text-primary border border-primary/40' : 'bg-white/5 text-slate-600'}`}>
+                                ${step > i ? 'bg-primary text-white' : step === i ? 'bg-primary/20 text-primary border border-primary/40' : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)]'}`}>
                                 {step > i ? '✓' : i + 1}
                             </div>
-                            <span className={`text-xs font-bold ${step >= i ? 'text-slate-300' : 'text-slate-600'}`}>{lbl}</span>
-                            {i < 4 && <div className={`w-8 h-px ${step > i ? 'bg-primary/40' : 'bg-white/5'}`} />}
+                            <span className={`text-xs font-bold ${step >= i ? 'text-[var(--sys-text-muted)]' : 'text-[var(--sys-text-muted)]'}`}>{lbl}</span>
+                            {i < 4 && <div className={`w-8 h-px ${step > i ? 'bg-primary/40' : 'bg-[var(--sys-surface)]'}`} />}
                         </div>
                     ))}
                     <div className="ml-auto">
                         <button onClick={() => setShowHistory(!showHistory)}
-                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer ${showHistory ? 'bg-primary/20 text-primary' : 'glass-panel text-slate-400 hover:text-white'}`}>
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer ${showHistory ? 'bg-primary/20 text-primary' : 'glass-panel text-[var(--sys-text-muted)] hover:text-white'}`}>
                             <span className="material-symbols-outlined text-sm">history</span>
                             History
                         </button>
@@ -4817,7 +4832,7 @@ SPOKESPERSON QUOTES:`
                     <div className="text-center mb-8">
                         <span className="material-symbols-outlined text-4xl text-primary-fixed mb-2 block">edit_note</span>
                         <h2 className="text-2xl font-headline font-bold text-on-surface mb-1.5">What do you want to <span className="text-primary-fixed">create?</span></h2>
-                        <p className="text-sm text-on-surface-variant max-w-lg mx-auto">Tell us what you need — we'll handle the rest.</p>
+                        <p className="text-sm text-[var(--sys-text-muted)] max-w-lg mx-auto">Tell us what you need — we'll handle the rest.</p>
                     </div>
 
                     {/* Smart Input */}
@@ -4826,7 +4841,7 @@ SPOKESPERSON QUOTES:`
                     {/* Divider */}
                     <div className="flex items-center gap-3 max-w-4xl mx-auto mb-5">
                         <div className="flex-1 h-px bg-outline-variant/20" />
-                        <span className="text-xs text-on-surface-variant font-bold uppercase tracking-wider">Or pick your content type</span>
+                        <span className="text-xs text-[var(--sys-text-muted)] font-bold uppercase tracking-wider">Or pick your content type</span>
                         <div className="flex-1 h-px bg-outline-variant/20" />
                     </div>
 
@@ -4836,11 +4851,11 @@ SPOKESPERSON QUOTES:`
                             <div className="flex items-center gap-3 p-4 rounded-xl bg-primary/10 border border-primary/20">
                                 <span className="text-2xl">{prefilledOccasion.emoji || 'ads_click'}</span>
                                 <div className="flex-1">
-                                    <p className="text-base font-bold text-white">Creating content for <span className="text-primary">{prefilledOccasion.name}</span></p>
-                                    <p className="text-sm text-slate-400 mt-0.5">Suggested tone: {prefilledOccasion.tone || 'festive'} • Select your channel below</p>
+                                    <p className="text-base font-bold text-[var(--sys-text)]">Creating content for <span className="text-primary">{prefilledOccasion.name}</span></p>
+                                    <p className="text-sm text-[var(--sys-text-muted)] mt-0.5">Suggested tone: {prefilledOccasion.tone || 'festive'} • Select your channel below</p>
                                 </div>
                                 <button onClick={() => { setPrefilledOccasion(null); setStep(0); setGoal(null); setContext(null) }}
-                                    className="text-sm text-slate-500 hover:text-white transition-colors cursor-pointer">
+                                    className="text-sm text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] transition-colors cursor-pointer">
                                     <span className="material-symbols-outlined text-sm">close</span>
                                 </button>
                             </div>
@@ -4899,7 +4914,7 @@ SPOKESPERSON QUOTES:`
                         estimatedDuration={45}
                     />
                     {error && (
-                        <div className={`max-w-2xl mx-auto mt-4 p-4 rounded-xl border ${error.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'} text-sm text-center`}>
+                        <div className={`max-w-2xl mx-auto mt-4 p-4 rounded-xl border ${error.isProviderError ? 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary' : 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary'} text-sm text-center`}>
                             <span className="material-symbols-outlined align-middle mr-1">
                                 {error.isProviderError ? 'warning' : 'error'}
                             </span>
@@ -4929,7 +4944,7 @@ SPOKESPERSON QUOTES:`
                         estimatedDuration={45}
                     />
                     {error && (
-                        <div className={`max-w-2xl mx-auto mt-4 p-4 rounded-xl border ${error.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'} text-sm text-center`}>
+                        <div className={`max-w-2xl mx-auto mt-4 p-4 rounded-xl border ${error.isProviderError ? 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary' : 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary'} text-sm text-center`}>
                             <span className="material-symbols-outlined align-middle mr-1">
                                 {error.isProviderError ? 'warning' : 'error'}
                             </span>
@@ -4991,7 +5006,7 @@ SPOKESPERSON QUOTES:`
                         estimatedDuration={60}
                     />
                     {error && (
-                        <div className={`max-w-2xl mx-auto mt-4 p-4 rounded-xl border ${error.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'} text-sm text-center`}>
+                        <div className={`max-w-2xl mx-auto mt-4 p-4 rounded-xl border ${error.isProviderError ? 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary' : 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary'} text-sm text-center`}>
                             <span className="material-symbols-outlined align-middle mr-1">
                                 {error.isProviderError ? 'warning' : 'error'}
                             </span>
@@ -5032,7 +5047,7 @@ SPOKESPERSON QUOTES:`
                         estimatedDuration={60}
                     />
                     {error && (
-                        <div className={`max-w-2xl mx-auto mt-4 p-4 rounded-xl border ${error.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'} text-sm text-center`}>
+                        <div className={`max-w-2xl mx-auto mt-4 p-4 rounded-xl border ${error.isProviderError ? 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary' : 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary'} text-sm text-center`}>
                             <span className="material-symbols-outlined align-middle mr-1">
                                 {error.isProviderError ? 'warning' : 'error'}
                             </span>
@@ -5070,7 +5085,7 @@ SPOKESPERSON QUOTES:`
                         estimatedDuration={60}
                     />
                     {error && (
-                        <div className={`max-w-2xl mx-auto mt-4 p-4 rounded-xl border ${error.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'} text-sm text-center`}>
+                        <div className={`max-w-2xl mx-auto mt-4 p-4 rounded-xl border ${error.isProviderError ? 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary' : 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary'} text-sm text-center`}>
                             <span className="material-symbols-outlined align-middle mr-1">
                                 {error.isProviderError ? 'warning' : 'error'}
                             </span>

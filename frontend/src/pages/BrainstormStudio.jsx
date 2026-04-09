@@ -9,13 +9,13 @@ import { useAuth } from '../context/AuthContext'
 // ── Topic quick-starts ────────────────────────────────────────────────────────
 const TOPICS = [
   { id: 'ad-film',        icon: 'movie', label: 'Ad Film',        hint: "let's make an ad film" },
-  { id: 'campaign',       icon: '🎯', label: 'Campaign',       hint: "help me plan a marketing campaign" },
+  { id: 'campaign',       icon: 'campaign', label: 'Campaign',       hint: "help me plan a marketing campaign" },
   { id: 'product-launch', icon: 'rocket_launch', label: 'Product Launch', hint: "I'm launching a new product" },
-  { id: 'naming',         icon: '🏷',  label: 'Naming',         hint: "I need help naming something" },
+  { id: 'naming',         icon: 'sell',  label: 'Naming',         hint: "I need help naming something" },
   { id: 'brand-strategy', icon: 'trending_up', label: 'Brand Strategy', hint: "let's build a brand strategy" },
-  { id: 'festival',       icon: '🎪', label: 'Festival',       hint: "I want a festival campaign" },
-  { id: 'offer',          icon: '💰', label: 'Offer Strategy', hint: "help me design an offer" },
-  { id: 'custom',         icon: '💡', label: 'Something Else', hint: "I have an idea I want to brainstorm" },
+  { id: 'festival',       icon: 'festival', label: 'Festival',       hint: "I want a festival campaign" },
+  { id: 'offer',          icon: 'payments', label: 'Offer Strategy', hint: "help me design an offer" },
+  { id: 'custom',         icon: 'lightbulb', label: 'Something Else', hint: "I have an idea I want to brainstorm" },
 ]
 
 const SCORE_KEYS_FILM = [
@@ -33,9 +33,9 @@ const SCORE_KEYS_CAMP = [
 
 // ── Phase labels ──────────────────────────────────────────────────────────────
 const PHASES = {
-  explore:   { label: 'Exploring',  icon: '🔍', color: '#8b5cf6' },
-  ideate:    { label: 'Ideating',   icon: '💡', color: '#f59e0b' },
-  scripting: { label: 'Scripting',  icon: '✍️',  color: '#06b6d4' },
+  explore:   { label: 'Exploring',  icon: 'search', color: '#8b5cf6' },
+  ideate:    { label: 'Ideating',   icon: 'emoji_objects', color: '#f59e0b' },
+  scripting: { label: 'Scripting',  icon: 'draw',  color: '#06b6d4' },
   deliver:   { label: 'Delivered',  icon: 'ads_click', color: '#22c55e' },
 }
 
@@ -788,7 +788,7 @@ export default function BrainstormStudio() {
             {Object.entries(PHASES).map(([key, p]) => (
               <div key={key} className={`bs-phase-step ${phase === key ? 'active' : ''}`}
                 style={{ '--phase-color': p.color }}>
-                <span>{p.icon}</span>
+                <span className="material-symbols-outlined text-[1em]">{p.icon}</span>
                 <span>{p.label}</span>
               </div>
             ))}
@@ -816,7 +816,7 @@ export default function BrainstormStudio() {
                 {TOPICS.map(t => (
                   <button key={t.id} className="bs-topic-chip"
                     onClick={() => sendMessage(t.hint)}>
-                    <span className="bs-topic-icon">{t.icon}</span>
+                    <span className="bs-topic-icon material-symbols-outlined">{t.icon}</span>
                     <span>{t.label}</span>
                   </button>
                 ))}

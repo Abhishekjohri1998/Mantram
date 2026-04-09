@@ -205,20 +205,20 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                             </span>
                             <div className="flex gap-2">
                                 <button onClick={() => navigator.clipboard.writeText(result)}
-                                    className="text-[10px] px-2 py-1 rounded-md bg-white/[0.05] text-slate-300 font-bold cursor-pointer hover:bg-white/[0.1] flex items-center gap-1 border border-white/[0.08]">
+                                    className="text-[10px] px-2 py-1 rounded-md bg-white/[0.05] text-[var(--sys-text-muted)] font-bold cursor-pointer hover:bg-white/[0.1] flex items-center gap-1 border border-[var(--sys-border)]/[0.08]">
                                     <span className="material-symbols-outlined text-[10px]">content_copy</span> Copy
                                 </button>
                                 <button onClick={() => { setContentFixes(prev => { const n = { ...prev }; delete n[fixKey]; return n; }); generateContentFix(fixKey, { issueTitle, issueDescription, pageUrl: pUrl, fixType, currentContent, targetKeyword }); }}
-                                    className="text-[10px] px-2 py-1 rounded-md bg-white/[0.05] text-slate-300 font-bold cursor-pointer hover:bg-white/[0.1] flex items-center gap-1 border border-white/[0.08]">
+                                    className="text-[10px] px-2 py-1 rounded-md bg-white/[0.05] text-[var(--sys-text-muted)] font-bold cursor-pointer hover:bg-white/[0.1] flex items-center gap-1 border border-[var(--sys-border)]/[0.08]">
                                     <span className="material-symbols-outlined text-[10px]">refresh</span> Regenerate
                                 </button>
                                 <button onClick={() => setContentFixes(prev => { const n = { ...prev }; delete n[fixKey]; return n; })}
-                                    className="text-[10px] px-2 py-1 rounded-md bg-white/[0.05] text-slate-400 font-bold cursor-pointer hover:bg-white/[0.1] border border-white/[0.08]">
+                                    className="text-[10px] px-2 py-1 rounded-md bg-white/[0.05] text-[var(--sys-text-muted)] font-bold cursor-pointer hover:bg-white/[0.1] border border-[var(--sys-border)]/[0.08]">
                                     ✕
                                 </button>
                             </div>
                         </div>
-                        <div className="text-sm text-slate-200 whitespace-pre-wrap leading-relaxed">{result}</div>
+                        <div className="text-sm text-[var(--sys-text)] whitespace-pre-wrap leading-relaxed">{result}</div>
                     </div>
                 )}
             </div>
@@ -237,7 +237,7 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
         const isBusy = !!loadingAction;
         return (
             <button onClick={onClick} disabled={disabled || isBusy}
-                className="group px-6 py-3 rounded-xl text-white text-sm font-bold cursor-pointer transition-all duration-300 flex items-center gap-2.5 disabled:opacity-30 hover:scale-[1.02] active:scale-[0.98]"
+                className="group px-6 py-3 rounded-xl text-[var(--sys-text)] text-sm font-bold cursor-pointer transition-all duration-300 flex items-center gap-2.5 disabled:opacity-30 hover:scale-[1.02] active:scale-[0.98]"
                 style={{ background: isMe ? 'rgba(99,102,241,0.2)' : isBusy ? 'rgba(99,102,241,0.12)' : 'linear-gradient(135deg, #6366f1 0%, #FF4D00 50%, #FF4D00 100%)', boxShadow: isBusy ? 'none' : '0 4px 20px rgba(99,102,241,0.35), inset 0 1px 0 rgba(255,255,255,0.1)' }}>
                 <span className="material-symbols-outlined text-sm" style={isMe ? { animation: 'spin 1s linear infinite' } : {}}>{isMe ? 'sync' : icon}</span>
                 {isMe ? loadingMsg : label}
@@ -256,8 +256,8 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
             <div className="relative inline-flex items-center justify-center w-20 h-20 rounded-2xl mb-5" style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.12) 0%, rgba(255, 77, 0,0.08) 100%)', border: '1px solid rgba(99,102,241,0.15)' }}>
                 <span className="material-symbols-outlined text-4xl" style={{ color: '#a78bfa' }}>{icon}</span>
             </div>
-            <h3 className="text-xl font-bold text-white mb-2">{title}</h3>
-            <p className="text-sm text-slate-400 mb-7 max-w-lg mx-auto leading-relaxed">{desc}</p>
+            <h3 className="text-xl font-bold text-[var(--sys-text)] mb-2">{title}</h3>
+            <p className="text-sm text-[var(--sys-text-muted)] mb-7 max-w-lg mx-auto leading-relaxed">{desc}</p>
             <div className="flex justify-center gap-3 flex-wrap">{children}</div>
         </div>
     );
@@ -271,7 +271,7 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                         style={{ background: accent || 'linear-gradient(135deg, rgba(99,102,241,0.15), rgba(255, 77, 0,0.1))' }}>
                         <span className="material-symbols-outlined text-sm" style={{ color: '#a78bfa' }}>{icon}</span>
                     </div>}
-                    <h3 className="text-sm font-bold text-white tracking-wide">{title}</h3>
+                    <h3 className="text-sm font-bold text-[var(--sys-text)] tracking-wide">{title}</h3>
                 </div>
             )}
             {children}
@@ -287,8 +287,8 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                     <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(255,255,255,0.04)" strokeWidth="5" />
                     <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth="5" strokeLinecap="round" strokeDasharray={c} strokeDashoffset={offset} style={{ transition: 'stroke-dashoffset 1s ease', filter: `drop-shadow(0 0 4px ${color}40)` }} />
                 </svg>
-                <span className="text-xl font-black text-white -mt-14">{score || 0}</span>
-                {label && <p className="text-[11px] text-slate-500 mt-2 font-bold uppercase tracking-wider">{label}</p>}
+                <span className="text-xl font-black text-[var(--sys-text)] -mt-14">{score || 0}</span>
+                {label && <p className="text-[11px] text-[var(--sys-text-muted)] mt-2 font-bold uppercase tracking-wider">{label}</p>}
             </div>
         );
     };
@@ -297,11 +297,11 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
         <div className="overflow-x-auto rounded-xl" style={{ border: '1px solid rgba(255,255,255,0.06)' }}>
             <table className="w-full text-left text-sm">
                 <thead><tr style={{ background: 'rgba(255,255,255,0.03)' }}>
-                    {columns.map(c => <th key={c.key} className="px-4 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">{c.label}</th>)}
+                    {columns.map(c => <th key={c.key} className="px-4 py-3 text-[11px] font-bold text-[var(--sys-text-muted)] uppercase tracking-wider">{c.label}</th>)}
                 </tr></thead>
                 <tbody>{(rows || []).map((r, i) => (
                     <tr key={i} className="transition-colors hover:bg-white/[0.02]" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
-                        {columns.map(c => <td key={c.key} className="px-4 py-3 text-slate-300">{r[c.key]}</td>)}
+                        {columns.map(c => <td key={c.key} className="px-4 py-3 text-[var(--sys-text-muted)]">{r[c.key]}</td>)}
                     </tr>
                 ))}</tbody>
             </table>
@@ -332,38 +332,38 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
 
                         {/* ═══ LIVE ANALYTICS DASHBOARD (Primary Content) ═══ */}
                         {isLoading && (
-                            <div className="glass-panel rounded-2xl p-10 text-center border border-white/[0.08] relative overflow-hidden">
+                            <div className="glass-panel rounded-2xl p-10 text-center border border-[var(--sys-border)]/[0.08] relative overflow-hidden">
                                 <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-[#FF7A00]/5 pointer-events-none" />
                                 <div className="relative z-10 flex flex-col items-center">
-                                    <div className="w-16 h-16 rounded-2xl bg-white/[0.03] border border-white/[0.05] flex items-center justify-center mb-5 relative group">
+                                    <div className="w-16 h-16 rounded-2xl bg-white/[0.03] border border-[var(--sys-border)]/[0.05] flex items-center justify-center mb-5 relative group">
                                         <div className="absolute inset-0 bg-primary/20 rounded-2xl blur-xl group-hover:bg-primary/30 transition-all" />
                                         <span className="material-symbols-outlined text-3xl text-primary animate-spin">progress_activity</span>
                                     </div>
-                                    <h3 className="text-lg text-white font-bold tracking-wide mb-1">Loading Analytics Dashboard...</h3>
-                                    <p className="text-sm text-slate-400">Fetching live data from Google Analytics & Search Console</p>
+                                    <h3 className="text-lg text-[var(--sys-text)] font-bold tracking-wide mb-1">Loading Analytics Dashboard...</h3>
+                                    <p className="text-sm text-[var(--sys-text-muted)]">Fetching live data from Google Analytics & Search Console</p>
                                 </div>
                             </div>
                         )}
 
                         {gaConnected && !hasAnalytics && !isLoading && (
                             <div className="rounded-2xl p-6 text-center" style={{ background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.15)' }}>
-                                <span className="material-symbols-outlined text-3xl text-amber-400 block mb-3">warning</span>
-                                <p className="text-sm text-white font-bold">Google Analytics Connected — No Data Yet</p>
-                                <p className="text-xs text-slate-400 mt-1">Make sure a GA4 property and Search Console site are linked to your Google account. The data will load automatically.</p>
+                                <span className="material-symbols-outlined text-3xl text-[var(--sys-primary)] block mb-3">warning</span>
+                                <p className="text-sm text-[var(--sys-text)] font-bold">Google Analytics Connected — No Data Yet</p>
+                                <p className="text-xs text-[var(--sys-text-muted)] mt-1">Make sure a GA4 property and Search Console site are linked to your Google account. The data will load automatically.</p>
                             </div>
                         )}
 
                         {gaConnected && (gaProperties?.length > 0 || gaSites?.length > 0) && (
-                            <div className="flex flex-col sm:flex-row gap-4 bg-white/[0.02] p-4 rounded-xl border border-white/[0.05]">
+                            <div className="flex flex-col sm:flex-row gap-4 bg-white/[0.02] p-4 rounded-xl border border-[var(--sys-border)]/[0.05]">
                                 {gaProperties?.length > 0 && (
                                     <div className="flex-1">
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                                        <label className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
                                             <span className="material-symbols-outlined text-[14px]">analytics</span> GA4 Property
                                         </label>
                                         <select 
                                             value={gaSelectedProp} 
                                             onChange={e => { setGaSelectedProp(e.target.value); loadGAReport(e.target.value); }}
-                                            className="w-full bg-[#08080C] border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all cursor-pointer"
+                                            className="w-full bg-[#08080C] border border-[var(--sys-border)] rounded-lg px-3 py-2 text-sm text-[var(--sys-text)] focus:border-primary focus: focus:ring-primary outline-none transition-all cursor-pointer"
                                         >
                                             <option value="">Select Property...</option>
                                             {gaProperties.map(p => (
@@ -374,13 +374,13 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                                 )}
                                 {gaSites?.length > 0 && (
                                     <div className="flex-1">
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                                        <label className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
                                             <span className="material-symbols-outlined text-[14px]">travel_explore</span> Search Console Site
                                         </label>
                                         <select 
                                             value={gaSelectedSite} 
                                             onChange={e => { setGaSelectedSite(e.target.value); loadGSCReport(e.target.value); }}
-                                            className="w-full bg-[#08080C] border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all cursor-pointer"
+                                            className="w-full bg-[#08080C] border border-[var(--sys-border)] rounded-lg px-3 py-2 text-sm text-[var(--sys-text)] focus:border-primary focus: focus:ring-primary outline-none transition-all cursor-pointer"
                                         >
                                             <option value="">Select Site...</option>
                                             {gaSites.map(s => (
@@ -406,10 +406,10 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                                             { l: 'Bounce Rate', v: `${((gaReport.summary?.avgBounceRate || 0) * 100).toFixed(1)}%`, icon: 'exit_to_app', color: '#fb7185' },
                                             { l: 'Avg Duration', v: (() => { const avg = gaReport.traffic?.length ? gaReport.traffic.reduce((s, t) => s + (t.avgDuration || 0), 0) / gaReport.traffic.length : 0; return avg >= 60 ? `${Math.floor(avg / 60)}m ${Math.round(avg % 60)}s` : `${Math.round(avg)}s`; })(), icon: 'timer', color: '#f97316' },
                                         ].map(s => (
-                                            <div key={s.l} className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.05] text-center">
+                                            <div key={s.l} className="p-3 rounded-xl bg-white/[0.03] border border-[var(--sys-border)]/[0.05] text-center">
                                                 <span className="material-symbols-outlined text-sm mb-1 block" style={{ color: s.color }}>{s.icon}</span>
-                                                <p className="text-lg font-black text-white">{s.v || '—'}</p>
-                                                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">{s.l}</p>
+                                                <p className="text-lg font-black text-[var(--sys-text)]">{s.v || '—'}</p>
+                                                <p className="text-[10px] text-[var(--sys-text-muted)] font-bold uppercase tracking-wider">{s.l}</p>
                                             </div>
                                         ))}
                                     </div>
@@ -444,9 +444,9 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                                                 );
                                             })()}
                                         </div>
-                                        <div className="flex justify-between text-[10px] text-slate-600 mt-1 px-1">
+                                        <div className="flex justify-between text-[10px] text-[var(--sys-text-muted)] mt-1 px-1">
                                             <span>{gaReport.traffic[0]?.date?.replace(/(\d{4})(\d{2})(\d{2})/, '$2/$3')}</span>
-                                            <span className="text-slate-400 font-bold">{Math.max(...gaReport.traffic.map(t => t.users)).toLocaleString()} peak</span>
+                                            <span className="text-[var(--sys-text-muted)] font-bold">{Math.max(...gaReport.traffic.map(t => t.users)).toLocaleString()} peak</span>
                                             <span>{gaReport.traffic[gaReport.traffic.length - 1]?.date?.replace(/(\d{4})(\d{2})(\d{2})/, '$2/$3')}</span>
                                         </div>
                                     </SectionCard>
@@ -468,12 +468,12 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                                                     const color = channelColors[ch.channel] || '#94a3b8';
                                                     return (
                                                         <div key={i} className="flex items-center gap-3">
-                                                            <span className="text-xs text-slate-300 font-medium w-28 truncate">{ch.channel}</span>
+                                                            <span className="text-xs text-[var(--sys-text-muted)] font-medium w-28 truncate">{ch.channel}</span>
                                                             <div className="flex-1 h-5 rounded-full bg-white/[0.04] overflow-hidden relative">
                                                                 <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, background: color, minWidth: '4px' }} />
                                                             </div>
-                                                            <span className="text-xs text-slate-400 font-bold w-12 text-right">{pct}%</span>
-                                                            <span className="text-[10px] text-slate-500 w-16 text-right">{ch.sessions.toLocaleString()}</span>
+                                                            <span className="text-xs text-[var(--sys-text-muted)] font-bold w-12 text-right">{pct}%</span>
+                                                            <span className="text-[10px] text-[var(--sys-text-muted)] w-16 text-right">{ch.sessions.toLocaleString()}</span>
                                                         </div>
                                                     );
                                                 });
@@ -492,17 +492,17 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                                                     const color = d.device.toLowerCase() === 'mobile' ? '#34d399' : d.device.toLowerCase() === 'tablet' ? '#fbbf24' : '#60a5fa';
                                                     const pct = ((d.sessions / gaReport.summary.totalSessions) * 100).toFixed(1);
                                                     return (
-                                                        <div key={i} className="flex items-center gap-3 bg-white/[0.02] p-3 rounded-xl border border-white/[0.05]">
+                                                        <div key={i} className="flex items-center gap-3 bg-white/[0.02] p-3 rounded-xl border border-[var(--sys-border)]/[0.05]">
                                                             <span className="material-symbols-outlined text-xl" style={{ color }}>{icon}</span>
                                                             <div className="flex-1">
-                                                                <p className="text-xs font-bold text-white uppercase">{d.device}</p>
+                                                                <p className="text-xs font-bold text-[var(--sys-text)] uppercase">{d.device}</p>
                                                                 <div className="mt-1 h-1.5 rounded-full bg-white/[0.04] overflow-hidden">
                                                                     <div className="h-full bg-gradient-to-r transition-all duration-700 rounded-full" style={{ width: `${pct}%`, backgroundColor: color }} />
                                                                 </div>
                                                             </div>
                                                             <div className="text-right">
-                                                                <p className="text-sm font-bold text-white">{pct}%</p>
-                                                                <p className="text-[10px] text-slate-500">{d.sessions.toLocaleString()} sessions</p>
+                                                                <p className="text-sm font-bold text-[var(--sys-text)]">{pct}%</p>
+                                                                <p className="text-[10px] text-[var(--sys-text-muted)]">{d.sessions.toLocaleString()} sessions</p>
                                                             </div>
                                                         </div>
                                                     )
@@ -567,17 +567,17 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                                                 { l: 'Avg CTR', v: `${((gscReport.summary?.avgCtr || 0) * 100).toFixed(2)}%`, icon: 'percent', color: '#fbbf24' },
                                                 { l: 'Avg Position', v: (gscReport.summary?.avgPosition || 0).toFixed(1), icon: 'format_list_numbered', color: '#a78bfa' },
                                             ].map(s => (
-                                                <div key={s.l} className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.05] text-center relative group">
+                                                <div key={s.l} className="p-3 rounded-xl bg-white/[0.03] border border-[var(--sys-border)]/[0.05] text-center relative group">
                                                     <span className="material-symbols-outlined text-sm mb-1 block" style={{ color: s.color }}>{s.icon}</span>
-                                                    <p className="text-lg font-black text-white flex items-center justify-center gap-2">
+                                                    <p className="text-lg font-black text-[var(--sys-text)] flex items-center justify-center gap-2">
                                                         {s.v || '—'}
                                                         {s.delta !== undefined && s.delta !== 0 && (
-                                                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${s.delta > 0 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}`}>
+                                                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${s.delta > 0 ? 'bg-[var(--sys-surface)] text-[var(--sys-primary)]' : 'bg-[var(--sys-surface)] text-[var(--sys-primary)]'}`}>
                                                                 {s.delta > 0 ? '▲' : '▼'} {Math.abs(s.delta).toFixed(1)}%
                                                             </span>
                                                         )}
                                                     </p>
-                                                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">{s.l}</p>
+                                                    <p className="text-[10px] text-[var(--sys-text-muted)] font-bold uppercase tracking-wider">{s.l}</p>
                                                 </div>
                                             ))
                                         })()}
@@ -613,9 +613,9 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                                                 );
                                             })()}
                                         </div>
-                                        <div className="flex justify-between text-[10px] text-slate-600 mt-1 px-1">
+                                        <div className="flex justify-between text-[10px] text-[var(--sys-text-muted)] mt-1 px-1">
                                             <span>{gscReport.daily[0]?.date?.replace(/(\d{4})-(\d{2})-(\d{2})/, '$2/$3')}</span>
-                                            <span className="text-emerald-400 font-bold">{Math.max(...gscReport.daily.map(d => d.clicks)).toLocaleString()} peak</span>
+                                            <span className="text-[var(--sys-primary)] font-bold">{Math.max(...gscReport.daily.map(d => d.clicks)).toLocaleString()} peak</span>
                                             <span>{gscReport.daily[gscReport.daily.length - 1]?.date?.replace(/(\d{4})-(\d{2})-(\d{2})/, '$2/$3')}</span>
                                         </div>
                                     </SectionCard>
@@ -635,22 +635,22 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                                             clicks: k.clicks?.toLocaleString(),
                                             impressions: k.impressions?.toLocaleString(),
                                             ctr: `${((k.ctr || 0) * 100).toFixed(1)}%`,
-                                            position: <span className={`font-bold ${k.position <= 3 ? 'text-emerald-400' : k.position <= 10 ? 'text-[#FF4D00]' : k.position <= 20 ? 'text-amber-400' : 'text-slate-400'}`}>{k.position?.toFixed(1)}</span>,
+                                            position: <span className={`font-bold ${k.position <= 3 ? 'text-[var(--sys-primary)]' : k.position <= 10 ? 'text-[#FF4D00]' : k.position <= 20 ? 'text-[var(--sys-primary)]' : 'text-[var(--sys-text-muted)]'}`}>{k.position?.toFixed(1)}</span>,
                                         }))} />
                                         {/* Striking distance */}
                                         {(() => {
                                             const striking = gscReport.keywords.filter(k => k.position >= 4 && k.position <= 20 && k.impressions > 50);
                                             if (striking.length === 0) return null;
                                             return (
-                                                <div className="mt-4 p-3 rounded-xl bg-amber-500/5 border border-amber-500/10">
-                                                    <p className="text-xs font-bold text-amber-400 mb-2 flex items-center gap-1.5">
+                                                <div className="mt-4 p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                                                    <p className="text-xs font-bold text-[var(--sys-primary)] mb-2 flex items-center gap-1.5">
                                                         <span className="material-symbols-outlined text-sm">trending_up</span>
                                                         Striking Distance ({striking.length} keywords near page 1)
                                                     </p>
                                                     <div className="flex flex-wrap gap-1.5">
                                                         {striking.slice(0, 10).map((k, i) => (
-                                                            <span key={i} className="text-[11px] px-2 py-1 rounded-lg bg-amber-500/10 text-amber-300 border border-amber-500/15">
-                                                                {k.keyword} <span className="text-amber-500">#{k.position?.toFixed(0)}</span>
+                                                            <span key={i} className="text-[11px] px-2 py-1 rounded-lg bg-[var(--sys-surface)] text-[var(--sys-primary)] border border-[var(--sys-border)]">
+                                                                {k.keyword} <span className="text-[var(--sys-primary)]">#{k.position?.toFixed(0)}</span>
                                                             </span>
                                                         ))}
                                                     </div>
@@ -691,18 +691,18 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                                             const droppingKeywords = gscReport.keywords?.filter(k => k.position > 10 && k.impressions > 100 && k.ctr < 0.02) || [];
 
                                             return (
-                                                <div className="p-4 bg-rose-500/5 border border-rose-500/10 rounded-xl relative overflow-hidden group">
-                                                    <div className="absolute top-0 right-0 w-24 h-24 bg-rose-500/10 blur-2xl rounded-full -mr-10 -mt-10 transition-transform group-hover:scale-150" />
-                                                    <h4 className="text-sm font-bold text-rose-400 flex items-center gap-2 mb-2">
+                                                <div className="p-4 bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl relative overflow-hidden group">
+                                                    <div className="absolute top-0 right-0 w-24 h-24 bg-[var(--sys-surface)] blur-2xl rounded-full -mr-10 -mt-10 transition-transform group-hover:scale-150" />
+                                                    <h4 className="text-sm font-bold text-[var(--sys-primary)] flex items-center gap-2 mb-2">
                                                         <span className="material-symbols-outlined text-base">warning</span>
                                                         Traffic Decay Risk
                                                     </h4>
                                                     {cDelta < -5 ? (
-                                                        <p className="text-xs text-slate-300 mb-2">Search clicks are down <span className="font-bold text-rose-400">{Math.abs(cDelta).toFixed(1)}%</span> period-over-period. Review top losing pages.</p>
+                                                        <p className="text-xs text-[var(--sys-text-muted)] mb-2">Search clicks are down <span className="font-bold text-[var(--sys-primary)]">{Math.abs(cDelta).toFixed(1)}%</span> period-over-period. Review top losing pages.</p>
                                                     ) : droppingKeywords.length > 0 ? (
-                                                        <p className="text-xs text-slate-300 mb-2">You have <span className="font-bold text-rose-400">{droppingKeywords.length}</span> high-impression keywords with poor CTR (&lt;2%) ranking past page 1.</p>
+                                                        <p className="text-xs text-[var(--sys-text-muted)] mb-2">You have <span className="font-bold text-[var(--sys-primary)]">{droppingKeywords.length}</span> high-impression keywords with poor CTR (&lt;2%) ranking past page 1.</p>
                                                     ) : (
-                                                        <p className="text-xs text-emerald-400 mb-2">Traffic trends are stable or growing. No immediate decay detected.</p>
+                                                        <p className="text-xs text-[var(--sys-primary)] mb-2">Traffic trends are stable or growing. No immediate decay detected.</p>
                                                     )}
                                                 </div>
                                             );
@@ -714,16 +714,16 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                                             const desktopSplit = gaReport?.deviceSplit?.find(d => d.device.toLowerCase() === 'desktop');
                                             
                                             return (
-                                                <div className="p-4 bg-amber-500/5 border border-amber-500/10 rounded-xl relative overflow-hidden group">
-                                                    <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/10 blur-2xl rounded-full -mr-10 -mt-10 transition-transform group-hover:scale-150" />
-                                                    <h4 className="text-sm font-bold text-amber-400 flex items-center gap-2 mb-2">
+                                                <div className="p-4 bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl relative overflow-hidden group">
+                                                    <div className="absolute top-0 right-0 w-24 h-24 bg-[var(--sys-surface)] blur-2xl rounded-full -mr-10 -mt-10 transition-transform group-hover:scale-150" />
+                                                    <h4 className="text-sm font-bold text-[var(--sys-primary)] flex items-center gap-2 mb-2">
                                                         <span className="material-symbols-outlined text-base">devices_other</span>
                                                         Mobile vs Desktop Gap
                                                     </h4>
                                                     {(mobileSplit && desktopSplit && mobileSplit.sessions > desktopSplit.sessions * 1.5) ? (
-                                                        <p className="text-xs text-slate-300 mb-2">Mobile traffic is significantly higher than desktop. Ensure your site's mobile experience and Core Web Vitals are fully optimized.</p>
+                                                        <p className="text-xs text-[var(--sys-text-muted)] mb-2">Mobile traffic is significantly higher than desktop. Ensure your site's mobile experience and Core Web Vitals are fully optimized.</p>
                                                     ) : (
-                                                        <p className="text-xs text-slate-300 mb-2">Device distribution is balanced. Continue monitoring mobile usability issues in Search Console.</p>
+                                                        <p className="text-xs text-[var(--sys-text-muted)] mb-2">Device distribution is balanced. Continue monitoring mobile usability issues in Search Console.</p>
                                                     )}
                                                 </div>
                                             );
@@ -737,22 +737,22 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                         {!gaConnected && (
                             <>
                                 {gaAuthError ? (
-                                    <div className="rounded-2xl p-6 text-center bg-rose-500/10 border border-rose-500/20">
-                                        <span className="material-symbols-outlined text-4xl mb-3 block text-rose-400">gpp_bad</span>
-                                        <h3 className="text-base font-bold text-white mb-1">Connection Expired</h3>
-                                        <p className="text-sm text-slate-400 max-w-md mx-auto mb-4">{gaAuthError}</p>
+                                    <div className="rounded-2xl p-6 text-center bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                                        <span className="material-symbols-outlined text-4xl mb-3 block text-[var(--sys-primary)]">gpp_bad</span>
+                                        <h3 className="text-base font-bold text-[var(--sys-text)] mb-1">Connection Expired</h3>
+                                        <p className="text-sm text-[var(--sys-text-muted)] max-w-md mx-auto mb-4">{gaAuthError}</p>
                                         <button onClick={reconnectGA}
-                                            className="px-6 py-2.5 rounded-xl text-sm font-bold text-white bg-rose-500 hover:bg-rose-600 cursor-pointer transition-all shadow-[0_4px_20px_rgba(244,63,94,0.35)] flex items-center gap-2 mx-auto">
+                                            className="px-6 py-2.5 rounded-xl text-sm font-bold text-[var(--sys-text)] bg-[var(--sys-surface)] hover:bg-[var(--sys-surface)] cursor-pointer transition-all shadow-[0_4px_20px_rgba(244,63,94,0.35)] flex items-center gap-2 mx-auto">
                                             <span className="material-symbols-outlined text-sm">refresh</span> Re-authenticate
                                         </button>
                                     </div>
                                 ) : (
                                     <div className="rounded-2xl p-6 text-center" style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.06), rgba(255, 77, 0,0.03))', border: '1px dashed rgba(99,102,241,0.25)' }}>
                                         <span className="material-symbols-outlined text-4xl mb-3 block" style={{ color: '#818cf8' }}>link</span>
-                                        <h3 className="text-base font-bold text-white mb-1">Connect Google Analytics & Search Console</h3>
-                                        <p className="text-xs text-slate-400 max-w-md mx-auto mb-4">See live traffic, top pages, search keywords, and performance data. Just like your Google dashboard — right here in SEO Studio.</p>
+                                        <h3 className="text-base font-bold text-[var(--sys-text)] mb-1">Connect Google Analytics & Search Console</h3>
+                                        <p className="text-xs text-[var(--sys-text-muted)] max-w-md mx-auto mb-4">See live traffic, top pages, search keywords, and performance data. Just like your Google dashboard — right here in SEO Studio.</p>
                                         <button onClick={() => window.location.href = '/integrations'}
-                                            className="px-6 py-2.5 rounded-xl text-sm font-bold text-white cursor-pointer transition-all hover:shadow-lg flex items-center gap-2 mx-auto"
+                                            className="px-6 py-2.5 rounded-xl text-sm font-bold text-[var(--sys-text)] cursor-pointer transition-all hover:shadow-lg flex items-center gap-2 mx-auto"
                                             style={{ background: 'linear-gradient(135deg, #6366f1, #FF4D00)', boxShadow: '0 4px 20px rgba(99,102,241,0.35)' }}>
                                             <span className="material-symbols-outlined text-sm">link</span> Go to Integrations
                                         </button>
@@ -766,7 +766,7 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                             <>
                                 <div className="flex items-center gap-2 mt-4 pt-4" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
                                     <span className="material-symbols-outlined text-sm text-primary">health_and_safety</span>
-                                    <h3 className="text-sm font-bold text-white">SEO Health Check</h3>
+                                    <h3 className="text-sm font-bold text-[var(--sys-text)]">SEO Health Check</h3>
                                 </div>
                                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
                                     {[{ s: d.seoHealthScore, l: 'SEO Health', c: '#34d399' }, { s: d.aiVisibilityScore, l: 'AI Visibility', c: '#a78bfa' },
@@ -777,9 +777,9 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                                 </div>
                                 {d.summary && <SectionCard title="Summary" icon="description"><FormattedText text={d.summary} /></SectionCard>}
                                 {d.topOpportunity && (
-                                    <div className="rounded-xl p-4 border border-emerald-500/20 bg-emerald-500/5">
-                                        <span className="text-xs font-bold text-emerald-400 uppercase">Top Opportunity</span>
-                                        <p className="text-sm text-white mt-1">{d.topOpportunity}</p>
+                                    <div className="rounded-xl p-4 border border-[var(--sys-border)] bg-[var(--sys-surface)]">
+                                        <span className="text-xs font-bold text-[var(--sys-primary)] uppercase">Top Opportunity</span>
+                                        <p className="text-sm text-[var(--sys-text)] mt-1">{d.topOpportunity}</p>
                                     </div>
                                 )}
                                 {d.fixNow?.length > 0 && (
@@ -789,7 +789,7 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                                             const desc = typeof f === 'object' ? (f.description || f.whyFirst || '') : '';
                                             return (
                                                 <div key={i}>
-                                                    <div className="flex items-start gap-2 text-sm"><span className="text-rose-400 mt-0.5">●</span><span className="text-slate-300">{title}</span></div>
+                                                    <div className="flex items-start gap-2 text-sm"><span className="text-[var(--sys-primary)] mt-0.5">●</span><span className="text-[var(--sys-text-muted)]">{title}</span></div>
                                                     <FixWithAI fixKey={`fixnow-${i}`} issueTitle={title} issueDescription={desc} fixType="content-rewrite" label="Fix with AI" />
                                                 </div>
                                             );
@@ -834,7 +834,7 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                         <div className="flex gap-2 flex-wrap">
                             {['all', 'critical', 'high', 'medium', 'low'].map(s => (
                                 <button key={s} onClick={() => setIssueFilter(s)}
-                                    className={`px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-all ${issueFilter === s ? 'bg-primary/20 text-primary border border-primary/30' : 'bg-white/[0.03] text-slate-400 border border-white/[0.06]'}`}>
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-all ${issueFilter === s ? 'bg-primary/20 text-primary border border-primary/30' : 'bg-white/[0.03] text-[var(--sys-text-muted)] border border-[var(--sys-border)]/[0.06]'}`}>
                                     {s === 'all' ? `All (${issues.length})` : `${s} (${counts[s]})`}
                                 </button>
                             ))}
@@ -848,11 +848,11 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                                     <span className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0" style={{ background: SEVERITY_COLORS[issue.severity] || '#94a3b8' }} />
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2 mb-1">
-                                            <span className="text-sm font-bold text-white">{issue.title || issue.issue}</span>
+                                            <span className="text-sm font-bold text-[var(--sys-text)]">{issue.title || issue.issue}</span>
                                             <span className="text-xs px-1.5 py-0.5 rounded-full font-bold uppercase" style={{ background: `${SEVERITY_COLORS[issue.severity]}15`, color: SEVERITY_COLORS[issue.severity] }}>{issue.severity}</span>
                                         </div>
-                                        <p className="text-xs text-slate-400">{issue.description || issue.fix}</p>
-                                        {issue.affectedPages && <p className="text-xs text-slate-600 mt-1">Affected: {issue.affectedPages}</p>}
+                                        <p className="text-xs text-[var(--sys-text-muted)]">{issue.description || issue.fix}</p>
+                                        {issue.affectedPages && <p className="text-xs text-[var(--sys-text-muted)] mt-1">Affected: {issue.affectedPages}</p>}
                                         {isContentIssue && (
                                             <FixWithAI fixKey={`audit-${i}`} issueTitle={issue.title || issue.issue} issueDescription={issue.description || issue.fix}
                                                 fixType={/title/i.test(issue.title || '') ? 'meta-title' : /meta.*desc/i.test(issue.title || '') ? 'meta-description' : /h1/i.test(issue.title || '') ? 'h1' : /thin/i.test(issue.title || '') ? 'content-expand' : 'content-rewrite'}
@@ -883,13 +883,13 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                         {data.keywordClusters?.length > 0 && (
                             <SectionCard title="Keyword Clusters" icon="hub">
                                 <div className="space-y-3">{data.keywordClusters.map((cluster, i) => (
-                                    <div key={i} className="rounded-xl p-4 bg-white/[0.02] border border-white/[0.04]">
+                                    <div key={i} className="rounded-xl p-4 bg-white/[0.02] border border-[var(--sys-border)]/[0.04]">
                                         <div className="flex items-center justify-between mb-2">
-                                            <h4 className="text-sm font-bold text-white">{cluster.topic || cluster.cluster}</h4>
+                                            <h4 className="text-sm font-bold text-[var(--sys-text)]">{cluster.topic || cluster.cluster}</h4>
                                             {cluster.totalSearchVolume && <span className="text-xs text-primary font-bold">{cluster.totalSearchVolume?.toLocaleString()} vol</span>}
                                         </div>
                                         <div className="flex flex-wrap gap-1.5">{(cluster.keywords || []).map((kw, j) => (
-                                            <span key={j} className="text-xs px-2 py-1 rounded-lg bg-white/[0.04] text-slate-300 border border-white/[0.06]">{typeof kw === 'string' ? kw : kw.keyword}</span>
+                                            <span key={j} className="text-xs px-2 py-1 rounded-lg bg-white/[0.04] text-[var(--sys-text-muted)] border border-[var(--sys-border)]/[0.06]">{typeof kw === 'string' ? kw : kw.keyword}</span>
                                         ))}</div>
                                     </div>
                                 ))}</div>
@@ -912,12 +912,12 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                                 <div className="space-y-3">{data.contentGaps.map((gap, i) => {
                                     const gapTitle = gap.topic || gap.title || (typeof gap === 'string' ? gap : '');
                                     return (
-                                        <div key={i} className="p-3 rounded-lg bg-amber-500/5 border border-amber-500/10">
+                                        <div key={i} className="p-3 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)]">
                                             <div className="flex items-start gap-2">
-                                                <span className="text-amber-400 text-sm">💡</span>
+                                                <span className="text-[var(--sys-primary)] text-sm">💡</span>
                                                 <div className="flex-1">
-                                                    <p className="text-sm font-bold text-white">{gapTitle}</p>
-                                                    {gap.reason && <p className="text-xs text-slate-400 mt-0.5">{gap.reason}</p>}
+                                                    <p className="text-sm font-bold text-[var(--sys-text)]">{gapTitle}</p>
+                                                    {gap.reason && <p className="text-xs text-[var(--sys-text-muted)] mt-0.5">{gap.reason}</p>}
                                                     <FixWithAI fixKey={`kw-gap-${i}`} issueTitle={gapTitle} issueDescription={gap.reason || ''}
                                                         fixType="new-content" targetKeyword={gap.keyword || gapTitle} label="Generate Content" />
                                                 </div>
@@ -931,7 +931,7 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                         {/* Real GSC Ranking Keywords */}
                         {gscReport?.keywords?.length > 0 && (
                             <SectionCard title={`Your Ranking Keywords — Search Console (${gscReport.keywords.length})`} icon="travel_explore">
-                                <p className="text-xs text-slate-400 mb-3">Real keyword performance data from Google Search Console. Keywords in <span className="text-amber-400 font-bold">amber</span> are in "striking distance" (positions 4-20) — focus content efforts here for quick wins.</p>
+                                <p className="text-xs text-[var(--sys-text-muted)] mb-3">Real keyword performance data from Google Search Console. Keywords in <span className="text-[var(--sys-primary)] font-bold">amber</span> are in "striking distance" (positions 4-20) — focus content efforts here for quick wins.</p>
                                 <DataTable columns={[
                                     { key: 'keyword', label: 'Keyword' },
                                     { key: 'clicks', label: 'Clicks' },
@@ -939,11 +939,11 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                                     { key: 'ctr', label: 'CTR' },
                                     { key: 'position', label: 'Position' },
                                 ]} rows={gscReport.keywords.slice(0, 30).map(k => ({
-                                    keyword: <span className={`text-xs font-medium ${k.position >= 4 && k.position <= 20 ? 'text-amber-300' : ''}`}>{k.keyword}</span>,
+                                    keyword: <span className={`text-xs font-medium ${k.position >= 4 && k.position <= 20 ? 'text-[var(--sys-primary)]' : ''}`}>{k.keyword}</span>,
                                     clicks: k.clicks?.toLocaleString(),
                                     impressions: k.impressions?.toLocaleString(),
                                     ctr: `${((k.ctr || 0) * 100).toFixed(1)}%`,
-                                    position: <span className={`font-bold ${k.position <= 3 ? 'text-emerald-400' : k.position <= 10 ? 'text-[#FF4D00]' : k.position <= 20 ? 'text-amber-400' : 'text-slate-400'}`}>{k.position?.toFixed(1)}</span>,
+                                    position: <span className={`font-bold ${k.position <= 3 ? 'text-[var(--sys-primary)]' : k.position <= 10 ? 'text-[#FF4D00]' : k.position <= 20 ? 'text-[var(--sys-primary)]' : 'text-[var(--sys-text-muted)]'}`}>{k.position?.toFixed(1)}</span>,
                                 }))} />
                             </SectionCard>
                         )}
@@ -970,10 +970,10 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{data.topicSuggestions.map((t, i) => {
                                     const topic = t.title || t.topic || (typeof t === 'string' ? t : '');
                                     return (
-                                        <div key={i} className="rounded-xl p-4 bg-white/[0.02] border border-white/[0.04]">
-                                            <h4 className="text-sm font-bold text-white mb-1">{topic}</h4>
-                                            {t.reason && <p className="text-xs text-slate-400">{t.reason}</p>}
-                                            {t.estimatedTraffic && <span className="text-xs text-emerald-400 font-bold mt-1 inline-block">~{t.estimatedTraffic} monthly visits</span>}
+                                        <div key={i} className="rounded-xl p-4 bg-white/[0.02] border border-[var(--sys-border)]/[0.04]">
+                                            <h4 className="text-sm font-bold text-[var(--sys-text)] mb-1">{topic}</h4>
+                                            {t.reason && <p className="text-xs text-[var(--sys-text-muted)]">{t.reason}</p>}
+                                            {t.estimatedTraffic && <span className="text-xs text-[var(--sys-primary)] font-bold mt-1 inline-block">~{t.estimatedTraffic} monthly visits</span>}
                                             <FixWithAI fixKey={`topic-${i}`} issueTitle={topic} issueDescription={t.reason || ''}
                                                 fixType="new-content" targetKeyword={t.keyword || topic} label="Generate Content" />
                                         </div>
@@ -992,9 +992,9 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                                             <div className="flex items-start gap-2">
                                                 <span className="text-[#FF4D00] mt-0.5">◆</span>
                                                 <div className="flex-1">
-                                                    <p className="text-sm font-bold text-white">{gapTitle}</p>
-                                                    {gap.competitorUrl && <p className="text-xs text-slate-500 mt-0.5">Competitor: {gap.competitorUrl}</p>}
-                                                    {gap.reason && <p className="text-xs text-slate-400 mt-0.5">{gap.reason}</p>}
+                                                    <p className="text-sm font-bold text-[var(--sys-text)]">{gapTitle}</p>
+                                                    {gap.competitorUrl && <p className="text-xs text-[var(--sys-text-muted)] mt-0.5">Competitor: {gap.competitorUrl}</p>}
+                                                    {gap.reason && <p className="text-xs text-[var(--sys-text-muted)] mt-0.5">{gap.reason}</p>}
                                                     <FixWithAI fixKey={`content-gap-${i}`} issueTitle={gapTitle} issueDescription={gap.reason || ''}
                                                         fixType="new-content" targetKeyword={gap.keyword || gapTitle} label="Generate Content" />
                                                 </div>
@@ -1010,9 +1010,9 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                             <SectionCard title="Long-Tail Keyword Clusters" icon="hub">
                                 {data.keywordClusters.slice(0, 5).map((c, i) => (
                                     <div key={i} className="mb-3 last:mb-0">
-                                        <p className="text-sm font-bold text-white mb-1">{c.topic || c.cluster}</p>
+                                        <p className="text-sm font-bold text-[var(--sys-text)] mb-1">{c.topic || c.cluster}</p>
                                         <div className="flex flex-wrap gap-1">{(c.keywords || []).slice(0, 8).map((kw, j) => (
-                                            <span key={j} className="text-xs px-2 py-0.5 rounded bg-white/[0.04] text-slate-300">{typeof kw === 'string' ? kw : kw.keyword}</span>
+                                            <span key={j} className="text-xs px-2 py-0.5 rounded bg-white/[0.04] text-[var(--sys-text-muted)]">{typeof kw === 'string' ? kw : kw.keyword}</span>
                                         ))}</div>
                                     </div>
                                 ))}
@@ -1052,15 +1052,15 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                         {data.probeResults?.length > 0 && (
                             <SectionCard title="LLM Brand Mentions" icon="psychology">
                                 <div className="space-y-3">{data.probeResults.map((pr, i) => (
-                                    <div key={i} className="rounded-xl p-4 bg-white/[0.02] border border-white/[0.04]">
+                                    <div key={i} className="rounded-xl p-4 bg-white/[0.02] border border-[var(--sys-border)]/[0.04]">
                                         <div className="flex items-center justify-between mb-2">
-                                            <span className="text-sm font-bold text-white">{pr.model || pr.llm}</span>
-                                            <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${pr.mentioned ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
+                                            <span className="text-sm font-bold text-[var(--sys-text)]">{pr.model || pr.llm}</span>
+                                            <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${pr.mentioned ? 'bg-[var(--sys-surface)] text-[var(--sys-primary)]' : 'bg-[var(--sys-surface)] text-[var(--sys-primary)]'}`}>
                                                 {pr.mentioned ? '✓ Mentioned' : '✗ Not Found'}
                                             </span>
                                         </div>
-                                        <p className="text-xs text-slate-400">{pr.prompt || pr.query}</p>
-                                        {pr.response && <p className="text-xs text-slate-500 mt-1 line-clamp-3">{pr.response}</p>}
+                                        <p className="text-xs text-[var(--sys-text-muted)]">{pr.prompt || pr.query}</p>
+                                        {pr.response && <p className="text-xs text-[var(--sys-text-muted)] mt-1 line-clamp-3">{pr.response}</p>}
                                     </div>
                                 ))}</div>
                             </SectionCard>
@@ -1070,10 +1070,10 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                             <SectionCard title="AI Citation by Category" icon="category">
                                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                                     {data.promptCategories.map((cat, i) => (
-                                        <div key={`cat-${i}`} className="rounded-xl p-4 bg-white/[0.02] border border-white/[0.04]">
-                                            <p className="text-[10px] text-slate-500 uppercase font-bold mb-1">{cat.category}</p>
-                                            <p className="text-xl font-bold text-white mb-1">{cat.currentCitationRate}</p>
-                                            <p className="text-xs text-slate-400">{cat.totalPrompts} prompts analyzed</p>
+                                        <div key={`cat-${i}`} className="rounded-xl p-4 bg-white/[0.02] border border-[var(--sys-border)]/[0.04]">
+                                            <p className="text-[10px] text-[var(--sys-text-muted)] uppercase font-bold mb-1">{cat.category}</p>
+                                            <p className="text-xl font-bold text-[var(--sys-text)] mb-1">{cat.currentCitationRate}</p>
+                                            <p className="text-xs text-[var(--sys-text-muted)]">{cat.totalPrompts} prompts analyzed</p>
                                         </div>
                                     ))}
                                 </div>
@@ -1084,20 +1084,20 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                         {data.minedPrompts?.length > 0 && (
                             <SectionCard title="Mined Prompt Opportunities" icon="troubleshoot">
                                 <div className="space-y-3">{data.minedPrompts.map((mp, i) => (
-                                    <div key={`mp-${i}`} className="rounded-xl p-4 bg-white/[0.02] border border-white/[0.04]">
+                                    <div key={`mp-${i}`} className="rounded-xl p-4 bg-white/[0.02] border border-[var(--sys-border)]/[0.04]">
                                         <div className="flex items-center gap-2 mb-2">
-                                            {mp.priority && <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${mp.priority === 'critical' ? 'bg-rose-500/15 text-rose-400' : mp.priority === 'high' ? 'bg-amber-500/15 text-amber-400' : 'bg-[#FF4D00]/15 text-[#FF4D00]'}`}>{mp.priority}</span>}
-                                            <span className="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase bg-white/10 text-slate-300">{mp.category}</span>
-                                            {mp.currentlyCited && <span className="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase bg-emerald-500/15 text-emerald-400">Cited</span>}
+                                            {mp.priority && <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${mp.priority === 'critical' ? 'bg-[var(--sys-surface)] text-[var(--sys-primary)]' : mp.priority === 'high' ? 'bg-[var(--sys-surface)] text-[var(--sys-primary)]' : 'bg-[#FF4D00]/15 text-[#FF4D00]'}`}>{mp.priority}</span>}
+                                            <span className="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase bg-white/10 text-[var(--sys-text-muted)]">{mp.category}</span>
+                                            {mp.currentlyCited && <span className="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase bg-[var(--sys-surface)] text-[var(--sys-primary)]">Cited</span>}
                                         </div>
-                                        <p className="text-sm font-bold text-white mb-2">"{mp.prompt}"</p>
+                                        <p className="text-sm font-bold text-[var(--sys-text)] mb-2">"{mp.prompt}"</p>
                                         
                                         {!mp.currentlyCited && mp.competitorsCited?.length > 0 && (
                                             <div className="mb-3">
-                                                <p className="text-[10px] text-slate-500 uppercase font-bold mb-1">Competitors Cited Instead:</p>
+                                                <p className="text-[10px] text-[var(--sys-text-muted)] uppercase font-bold mb-1">Competitors Cited Instead:</p>
                                                 <div className="flex flex-wrap gap-1">
                                                     {mp.competitorsCited.map((comp, cIdx) => (
-                                                        <span key={`comp-${cIdx}`} className="text-xs px-2 py-1 rounded bg-rose-500/10 text-rose-300">{comp}</span>
+                                                        <span key={`comp-${cIdx}`} className="text-xs px-2 py-1 rounded bg-[var(--sys-surface)] text-[var(--sys-primary)]">{comp}</span>
                                                     ))}
                                                 </div>
                                             </div>
@@ -1105,12 +1105,12 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                                         
                                         <div className="grid grid-cols-2 gap-2 mb-3">
                                             <div className="rounded-lg p-2 bg-white/[0.02]">
-                                                <p className="text-[10px] text-slate-500 uppercase font-bold">Why not cited</p>
-                                                <p className="text-xs text-slate-300">{mp.whyNotCited || 'N/A'}</p>
+                                                <p className="text-[10px] text-[var(--sys-text-muted)] uppercase font-bold">Why not cited</p>
+                                                <p className="text-xs text-[var(--sys-text-muted)]">{mp.whyNotCited || 'N/A'}</p>
                                             </div>
-                                            <div className="rounded-lg p-2 bg-emerald-500/5 border border-emerald-500/10">
-                                                <p className="text-[10px] text-emerald-500/70 uppercase font-bold">Content Needed</p>
-                                                <p className="text-xs text-emerald-400">{mp.contentNeeded}</p>
+                                            <div className="rounded-lg p-2 bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                                                <p className="text-[10px] text-[var(--sys-primary)] uppercase font-bold">Content Needed</p>
+                                                <p className="text-xs text-[var(--sys-primary)]">{mp.contentNeeded}</p>
                                             </div>
                                         </div>
                                         
@@ -1127,22 +1127,22 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                                 <div className="space-y-3">{(data.optimizations || data.recommendations || []).map((opt, i) => (
                                     <div key={i} className="rounded-xl p-4 bg-[#FF4D00]/5 border border-[#FF4D00]/10">
                                         <div className="flex items-center gap-2 mb-2">
-                                            {opt.priority && <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${opt.priority === 'critical' ? 'bg-rose-500/15 text-rose-400' : opt.priority === 'high' ? 'bg-amber-500/15 text-amber-400' : 'bg-[#FF4D00]/15 text-[#FF4D00]'}`}>{opt.priority}</span>}
-                                            <p className="text-sm font-bold text-white">{opt.title || opt.action || opt}</p>
+                                            {opt.priority && <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${opt.priority === 'critical' ? 'bg-[var(--sys-surface)] text-[var(--sys-primary)]' : opt.priority === 'high' ? 'bg-[var(--sys-surface)] text-[var(--sys-primary)]' : 'bg-[#FF4D00]/15 text-[#FF4D00]'}`}>{opt.priority}</span>}
+                                            <p className="text-sm font-bold text-[var(--sys-text)]">{opt.title || opt.action || opt}</p>
                                         </div>
-                                        {opt.description && <p className="text-xs text-slate-400 mb-3">{opt.description}</p>}
+                                        {opt.description && <p className="text-xs text-[var(--sys-text-muted)] mb-3">{opt.description}</p>}
                                         {(opt.kpi || opt.baseline || opt.target) && (
                                             <div className="grid grid-cols-3 gap-2 mb-2">
-                                                {opt.kpi && <div className="rounded-lg p-2 bg-white/[0.02]"><p className="text-[10px] text-slate-500 uppercase font-bold">KPI</p><p className="text-xs text-slate-300">{opt.kpi}</p></div>}
-                                                {opt.baseline && <div className="rounded-lg p-2 bg-white/[0.02]"><p className="text-[10px] text-slate-500 uppercase font-bold">Baseline</p><p className="text-xs text-rose-400">{opt.baseline}</p></div>}
-                                                {opt.target && <div className="rounded-lg p-2 bg-white/[0.02]"><p className="text-[10px] text-slate-500 uppercase font-bold">Target</p><p className="text-xs text-emerald-400">{opt.target}</p></div>}
+                                                {opt.kpi && <div className="rounded-lg p-2 bg-white/[0.02]"><p className="text-[10px] text-[var(--sys-text-muted)] uppercase font-bold">KPI</p><p className="text-xs text-[var(--sys-text-muted)]">{opt.kpi}</p></div>}
+                                                {opt.baseline && <div className="rounded-lg p-2 bg-white/[0.02]"><p className="text-[10px] text-[var(--sys-text-muted)] uppercase font-bold">Baseline</p><p className="text-xs text-[var(--sys-primary)]">{opt.baseline}</p></div>}
+                                                {opt.target && <div className="rounded-lg p-2 bg-white/[0.02]"><p className="text-[10px] text-[var(--sys-text-muted)] uppercase font-bold">Target</p><p className="text-xs text-[var(--sys-primary)]">{opt.target}</p></div>}
                                             </div>
                                         )}
                                         <div className="flex flex-wrap gap-3 text-[11px]">
-                                            {opt.timeline && <span className="text-slate-500">⏱ {opt.timeline}</span>}
-                                            {opt.proofMethod && <span className="text-slate-500">✓ {opt.proofMethod}</span>}
+                                            {opt.timeline && <span className="text-[var(--sys-text-muted)]">⏱ {opt.timeline}</span>}
+                                            {opt.proofMethod && <span className="text-[var(--sys-text-muted)]">✓ {opt.proofMethod}</span>}
                                         </div>
-                                        {opt.expectedROI && <p className="text-xs text-emerald-400/80 mt-2 font-medium mb-3">📈 {opt.expectedROI}</p>}
+                                        {opt.expectedROI && <p className="text-xs text-[var(--sys-primary)] mt-2 font-medium mb-3">📈 {opt.expectedROI}</p>}
                                         <FixWithAI fixKey={`geo-opt-${i}`} issueTitle={opt.title || opt.action || opt} issueDescription={opt.description || ''}
                                             fixType="geo-optimization" label="Generate SEO Fix" />
                                     </div>
@@ -1171,7 +1171,7 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                                 {isDiscovering ? 'Discovering...' : 'Auto-Discover Competitors'}
                             </button>
                         </div>
-                        {!competitors?.length && <p className="text-[10px] text-slate-500 mt-4 text-center">Add competitors in the sidebar setup or use Auto-Discover to get started.</p>}
+                        {!competitors?.length && <p className="text-[10px] text-[var(--sys-text-muted)] mt-4 text-center">Add competitors in the sidebar setup or use Auto-Discover to get started.</p>}
                     </EmptyState>
                 );
                 return (
@@ -1203,7 +1203,7 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                         {data.keywordGaps?.length > 0 && (
                             <SectionCard title="Keyword Gaps (they rank, you don't)" icon="compare_arrows">
                                 <div className="flex flex-wrap gap-1.5">{data.keywordGaps.slice(0, 30).map((kw, i) => (
-                                    <span key={i} className="text-xs px-2 py-1 rounded-lg bg-rose-500/5 text-rose-300 border border-rose-500/10">{typeof kw === 'string' ? kw : kw.keyword}</span>
+                                    <span key={i} className="text-xs px-2 py-1 rounded-lg bg-[var(--sys-surface)] text-[var(--sys-primary)] border border-[var(--sys-border)]">{typeof kw === 'string' ? kw : kw.keyword}</span>
                                 ))}</div>
                             </SectionCard>
                         )}
@@ -1214,8 +1214,8 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                                 <div className="space-y-2">{data.outrankPlan.map((step, i) => (
                                     <div key={i} className="flex items-start gap-3 p-3 rounded-lg bg-white/[0.02]">
                                         <span className="text-primary font-bold text-sm mt-0.5">{i + 1}</span>
-                                        <div><p className="text-sm text-white font-bold">{step.action || step.title || step}</p>
-                                            {step.impact && <p className="text-xs text-emerald-400 mt-0.5">Impact: {step.impact}</p>}
+                                        <div><p className="text-sm text-[var(--sys-text)] font-bold">{step.action || step.title || step}</p>
+                                            {step.impact && <p className="text-xs text-[var(--sys-primary)] mt-0.5">Impact: {step.impact}</p>}
                                         </div>
                                     </div>
                                 ))}</div>
@@ -1235,7 +1235,7 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                         <SectionCard title="Audit a Page" icon="tune">
                             <div className="flex gap-3">
                                 <input type="text" value={pageUrl} onChange={e => setPageUrl(e.target.value)} placeholder="Enter page URL to audit (e.g., /pricing, /about)"
-                                    className="flex-1 px-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none focus:border-primary/50" />
+                                    className="flex-1 px-4 py-2.5 rounded-xl bg-white/[0.04] border border-[var(--sys-border)]/[0.08] text-[var(--sys-text)] text-sm outline-none focus:border-primary/50" />
                                 <RunButton onClick={() => runAnalysis('on-page', seoAPI.auditPage, buildPayload({ pageUrl: pageUrl.startsWith('http') ? pageUrl : `${website}${pageUrl.startsWith('/') ? '' : '/'}${pageUrl}` }), 'Auditing page...')} label="Audit" icon="search" disabled={!pageUrl.trim()} />
                             </div>
                         </SectionCard>
@@ -1253,11 +1253,11 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                                                     <circle cx="40" cy="40" r="34" fill="none" strokeWidth="6" strokeLinecap="round" strokeDasharray={`${(data.pageScore / 100) * 213.6} 213.6`}
                                                         stroke={data.pageScore >= 80 ? '#34d399' : data.pageScore >= 50 ? '#fbbf24' : '#fb7185'} />
                                                 </svg>
-                                                <span className="absolute text-xl font-black text-white">{data.pageScore}</span>
+                                                <span className="absolute text-xl font-black text-[var(--sys-text)]">{data.pageScore}</span>
                                             </div>
                                             <div className="flex-1">
-                                                <p className="text-sm text-slate-400 mb-1">Overall on-page SEO score</p>
-                                                <p className="text-xs text-slate-500">{data.pageScore >= 80 ? 'Great! This page is well-optimized.' : data.pageScore >= 50 ? 'Needs improvement — review the suggestions below.' : 'Critical issues found — address the suggestions below urgently.'}</p>
+                                                <p className="text-sm text-[var(--sys-text-muted)] mb-1">Overall on-page SEO score</p>
+                                                <p className="text-xs text-[var(--sys-text-muted)]">{data.pageScore >= 80 ? 'Great! This page is well-optimized.' : data.pageScore >= 50 ? 'Needs improvement — review the suggestions below.' : 'Critical issues found — address the suggestions below urgently.'}</p>
                                             </div>
                                         </div>
                                     </SectionCard>
@@ -1268,15 +1268,15 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                                     <SectionCard title="Title Tag" icon="title">
                                         {data.currentTitle && (
                                             <div className="mb-3">
-                                                <p className="text-xs text-slate-500 mb-1 font-bold uppercase tracking-wider">Current</p>
-                                                <p className="text-sm text-slate-300 bg-white/[0.03] p-3 rounded-lg border border-white/[0.06]">{data.currentTitle}</p>
+                                                <p className="text-xs text-[var(--sys-text-muted)] mb-1 font-bold uppercase tracking-wider">Current</p>
+                                                <p className="text-sm text-[var(--sys-text-muted)] bg-white/[0.03] p-3 rounded-lg border border-[var(--sys-border)]/[0.06]">{data.currentTitle}</p>
                                             </div>
                                         )}
                                         {data.suggestedTitle && (
                                             <div>
-                                                <p className="text-xs text-emerald-400 mb-1 font-bold uppercase tracking-wider">✨ Suggested</p>
+                                                <p className="text-xs text-[var(--sys-primary)] mb-1 font-bold uppercase tracking-wider">✨ Suggested</p>
                                                 <div className="flex items-center gap-2">
-                                                    <p className="text-sm text-white bg-emerald-500/[0.07] p-3 rounded-lg border border-emerald-500/20 flex-1">{data.suggestedTitle}</p>
+                                                    <p className="text-sm text-[var(--sys-text)] bg-[var(--sys-surface)]/[0.07] p-3 rounded-lg border border-[var(--sys-border)] flex-1">{data.suggestedTitle}</p>
                                                     <button onClick={() => navigator.clipboard.writeText(data.suggestedTitle)} className="text-xs text-primary font-bold cursor-pointer hover:underline whitespace-nowrap flex items-center gap-1">
                                                         <span className="material-symbols-outlined text-xs">content_copy</span> Copy
                                                     </button>
@@ -1291,15 +1291,15 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                                     <SectionCard title="Meta Description" icon="description">
                                         {data.currentMeta && (
                                             <div className="mb-3">
-                                                <p className="text-xs text-slate-500 mb-1 font-bold uppercase tracking-wider">Current</p>
-                                                <p className="text-sm text-slate-300 bg-white/[0.03] p-3 rounded-lg border border-white/[0.06]">{data.currentMeta}</p>
+                                                <p className="text-xs text-[var(--sys-text-muted)] mb-1 font-bold uppercase tracking-wider">Current</p>
+                                                <p className="text-sm text-[var(--sys-text-muted)] bg-white/[0.03] p-3 rounded-lg border border-[var(--sys-border)]/[0.06]">{data.currentMeta}</p>
                                             </div>
                                         )}
                                         {data.suggestedMeta && (
                                             <div>
-                                                <p className="text-xs text-emerald-400 mb-1 font-bold uppercase tracking-wider">✨ Suggested</p>
+                                                <p className="text-xs text-[var(--sys-primary)] mb-1 font-bold uppercase tracking-wider">✨ Suggested</p>
                                                 <div className="flex items-center gap-2">
-                                                    <p className="text-sm text-white bg-emerald-500/[0.07] p-3 rounded-lg border border-emerald-500/20 flex-1">{data.suggestedMeta}</p>
+                                                    <p className="text-sm text-[var(--sys-text)] bg-[var(--sys-surface)]/[0.07] p-3 rounded-lg border border-[var(--sys-border)] flex-1">{data.suggestedMeta}</p>
                                                     <button onClick={() => navigator.clipboard.writeText(data.suggestedMeta)} className="text-xs text-primary font-bold cursor-pointer hover:underline whitespace-nowrap flex items-center gap-1">
                                                         <span className="material-symbols-outlined text-xs">content_copy</span> Copy
                                                     </button>
@@ -1313,7 +1313,7 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                                 {data.h1Suggestion && (
                                     <SectionCard title="H1 Heading Suggestion" icon="format_h1">
                                         <div className="flex items-center gap-2">
-                                            <p className="text-sm text-white bg-[#FF4D00]/[0.07] p-3 rounded-lg border border-[#FF4D00]/20 flex-1">{data.h1Suggestion}</p>
+                                            <p className="text-sm text-[var(--sys-text)] bg-[#FF4D00]/[0.07] p-3 rounded-lg border border-[#FF4D00]/20 flex-1">{data.h1Suggestion}</p>
                                             <button onClick={() => navigator.clipboard.writeText(data.h1Suggestion)} className="text-xs text-primary font-bold cursor-pointer hover:underline whitespace-nowrap flex items-center gap-1">
                                                 <span className="material-symbols-outlined text-xs">content_copy</span> Copy
                                             </button>
@@ -1325,10 +1325,10 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                                 {data.h2Suggestions?.length > 0 && (
                                     <SectionCard title="H2 Heading Suggestions" icon="format_h2">
                                         <div className="space-y-2">{data.h2Suggestions.map((h2, i) => (
-                                            <div key={i} className="flex items-center gap-2 p-2.5 rounded-lg bg-white/[0.02] border border-white/[0.04]">
+                                            <div key={i} className="flex items-center gap-2 p-2.5 rounded-lg bg-white/[0.02] border border-[var(--sys-border)]/[0.04]">
                                                 <span className="text-xs text-primary font-bold bg-primary/10 size-6 rounded-full flex items-center justify-center">{i + 1}</span>
-                                                <p className="text-sm text-white flex-1">{h2}</p>
-                                                <button onClick={() => navigator.clipboard.writeText(h2)} className="text-xs text-slate-400 hover:text-primary cursor-pointer">
+                                                <p className="text-sm text-[var(--sys-text)] flex-1">{h2}</p>
+                                                <button onClick={() => navigator.clipboard.writeText(h2)} className="text-xs text-[var(--sys-text-muted)] hover:text-primary cursor-pointer">
                                                     <span className="material-symbols-outlined text-xs">content_copy</span>
                                                 </button>
                                             </div>
@@ -1340,12 +1340,12 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                                 {data.contentImprovements?.length > 0 && (
                                     <SectionCard title="Content Improvements" icon="edit_note">
                                         <div className="space-y-3">{data.contentImprovements.map((item, i) => (
-                                            <div key={i} className="p-3 rounded-lg bg-white/[0.02] border border-white/[0.04]">
-                                                <p className="text-sm font-bold text-white mb-1">{item.section}</p>
-                                                <p className="text-xs text-rose-400 mb-1 flex items-center gap-1">
+                                            <div key={i} className="p-3 rounded-lg bg-white/[0.02] border border-[var(--sys-border)]/[0.04]">
+                                                <p className="text-sm font-bold text-[var(--sys-text)] mb-1">{item.section}</p>
+                                                <p className="text-xs text-[var(--sys-primary)] mb-1 flex items-center gap-1">
                                                     <span className="material-symbols-outlined text-xs">warning</span> {item.issue}
                                                 </p>
-                                                <p className="text-xs text-emerald-400 flex items-center gap-1">
+                                                <p className="text-xs text-[var(--sys-primary)] flex items-center gap-1">
                                                     <span className="material-symbols-outlined text-xs">lightbulb</span> {item.suggestion}
                                                 </p>
                                                 <FixWithAI fixKey={`onpage-ci-${i}`} issueTitle={item.section} issueDescription={`${item.issue}. ${item.suggestion}`}
@@ -1359,11 +1359,11 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                                 {data.faqBlocks?.length > 0 && (
                                     <SectionCard title="Suggested FAQ Schema" icon="quiz">
                                         <div className="space-y-3">{data.faqBlocks.map((faq, i) => (
-                                            <div key={i} className="p-3 rounded-lg bg-white/[0.02] border border-white/[0.04]">
-                                                <p className="text-sm font-bold text-white mb-1 flex items-center gap-1.5">
+                                            <div key={i} className="p-3 rounded-lg bg-white/[0.02] border border-[var(--sys-border)]/[0.04]">
+                                                <p className="text-sm font-bold text-[var(--sys-text)] mb-1 flex items-center gap-1.5">
                                                     <span className="material-symbols-outlined text-sm text-primary">help</span> {faq.question}
                                                 </p>
-                                                <p className="text-xs text-slate-300 pl-6">{faq.answer}</p>
+                                                <p className="text-xs text-[var(--sys-text-muted)] pl-6">{faq.answer}</p>
                                             </div>
                                         ))}</div>
                                         <button onClick={() => { const schema = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: data.faqBlocks.map(f => ({ '@type': 'Question', name: f.question, acceptedAnswer: { '@type': 'Answer', text: f.answer } })) }; navigator.clipboard.writeText(JSON.stringify(schema, null, 2)) }}
@@ -1377,11 +1377,11 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                                 {data.internalLinkSuggestions?.length > 0 && (
                                     <SectionCard title="Internal Linking Suggestions" icon="link">
                                         <div className="space-y-2">{data.internalLinkSuggestions.map((link, i) => (
-                                            <div key={i} className="flex items-start gap-3 p-3 rounded-lg bg-white/[0.02] border border-white/[0.04]">
-                                                <span className="material-symbols-outlined text-sm text-cyan-400 mt-0.5">arrow_outward</span>
+                                            <div key={i} className="flex items-start gap-3 p-3 rounded-lg bg-white/[0.02] border border-[var(--sys-border)]/[0.04]">
+                                                <span className="material-symbols-outlined text-sm text-[var(--sys-primary)] mt-0.5">arrow_outward</span>
                                                 <div className="flex-1">
-                                                    <p className="text-sm text-white font-bold">"{link.anchorText}" → <span className="text-cyan-400">{link.targetPage}</span></p>
-                                                    <p className="text-xs text-slate-400 mt-0.5">{link.reason}</p>
+                                                    <p className="text-sm text-[var(--sys-text)] font-bold">"{link.anchorText}" → <span className="text-[var(--sys-primary)]">{link.targetPage}</span></p>
+                                                    <p className="text-xs text-[var(--sys-text-muted)] mt-0.5">{link.reason}</p>
                                                 </div>
                                             </div>
                                         ))}</div>
@@ -1393,8 +1393,8 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                                     <SectionCard title="Schema Markup Recommendations" icon="data_object">
                                         <div className="space-y-2">{data.schemaRecommendations.map((rec, i) => (
                                             <div key={i} className="flex items-start gap-2 p-2.5 rounded-lg bg-white/[0.02]">
-                                                <span className="material-symbols-outlined text-xs text-amber-400 mt-0.5">star</span>
-                                                <p className="text-sm text-slate-300">{rec}</p>
+                                                <span className="material-symbols-outlined text-xs text-[var(--sys-primary)] mt-0.5">star</span>
+                                                <p className="text-sm text-[var(--sys-text-muted)]">{rec}</p>
                                             </div>
                                         ))}</div>
                                     </SectionCard>
@@ -1404,7 +1404,7 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                                 {data.snippetParagraph && (
                                     <SectionCard title="Optimized Snippet Paragraph" icon="auto_awesome">
                                         <div className="flex items-start gap-2">
-                                            <p className="text-sm text-white bg-primary/[0.05] p-4 rounded-lg border border-primary/20 flex-1 leading-relaxed">{data.snippetParagraph}</p>
+                                            <p className="text-sm text-[var(--sys-text)] bg-primary/[0.05] p-4 rounded-lg border border-primary/20 flex-1 leading-relaxed">{data.snippetParagraph}</p>
                                             <button onClick={() => navigator.clipboard.writeText(data.snippetParagraph)} className="text-xs text-primary font-bold cursor-pointer hover:underline whitespace-nowrap flex items-center gap-1 mt-1">
                                                 <span className="material-symbols-outlined text-xs">content_copy</span> Copy
                                             </button>
@@ -1422,8 +1422,8 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                                                 <div className="flex items-start gap-2">
                                                     <span className="w-2 h-2 rounded-full mt-1.5" style={{ background: SEVERITY_COLORS[issue.severity] || '#94a3b8' }} />
                                                     <div className="flex-1">
-                                                        <p className="text-sm font-bold text-white">{issue.title || issue.issue}</p>
-                                                        <p className="text-xs text-slate-400">{issue.fix || issue.description}</p>
+                                                        <p className="text-sm font-bold text-[var(--sys-text)]">{issue.title || issue.issue}</p>
+                                                        <p className="text-xs text-[var(--sys-text-muted)]">{issue.fix || issue.description}</p>
                                                         <FixWithAI fixKey={`onpage-issue-${i}`} issueTitle={issue.title || issue.issue} issueDescription={issue.fix || issue.description}
                                                             pageUrl={pageUrl} fixType="content-rewrite" label="Rewrite with AI" />
                                                     </div>
@@ -1436,9 +1436,9 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                                 {data.fixes?.length > 0 && (
                                     <SectionCard title="Copy-Paste Fixes" icon="code">
                                         <div className="space-y-3">{data.fixes.map((fix, i) => (
-                                            <div key={i} className="rounded-xl p-4 bg-white/[0.02] border border-white/[0.04]">
-                                                <p className="text-sm font-bold text-white mb-2">{fix.title || fix.description}</p>
-                                                <pre className="text-xs text-emerald-300 bg-black/40 p-3 rounded-lg overflow-x-auto whitespace-pre-wrap font-mono">{fix.code || fix.snippet}</pre>
+                                            <div key={i} className="rounded-xl p-4 bg-white/[0.02] border border-[var(--sys-border)]/[0.04]">
+                                                <p className="text-sm font-bold text-[var(--sys-text)] mb-2">{fix.title || fix.description}</p>
+                                                <pre className="text-xs text-[var(--sys-primary)] bg-black/40 p-3 rounded-lg overflow-x-auto whitespace-pre-wrap font-mono">{fix.code || fix.snippet}</pre>
                                                 <button onClick={() => navigator.clipboard.writeText(fix.code || fix.snippet || '')}
                                                     className="mt-2 text-xs text-primary font-bold cursor-pointer hover:underline flex items-center gap-1">
                                                     <span className="material-symbols-outlined text-xs">content_copy</span> Copy to clipboard
@@ -1450,7 +1450,7 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
 
                                 {data.metaTags && (
                                     <SectionCard title="Suggested Meta Tags" icon="sell">
-                                        <pre className="text-xs text-cyan-300 bg-black/40 p-3 rounded-lg overflow-x-auto whitespace-pre-wrap font-mono">{typeof data.metaTags === 'string' ? data.metaTags : JSON.stringify(data.metaTags, null, 2)}</pre>
+                                        <pre className="text-xs text-[var(--sys-primary)] bg-black/40 p-3 rounded-lg overflow-x-auto whitespace-pre-wrap font-mono">{typeof data.metaTags === 'string' ? data.metaTags : JSON.stringify(data.metaTags, null, 2)}</pre>
                                     </SectionCard>
                                 )}
                             </>
@@ -1480,8 +1480,8 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                                 ].map((m, i) => (
                                     <div key={i} className="flex items-center gap-2 text-xs">
                                         <span className="material-symbols-outlined text-sm" style={{ color: '#a78bfa' }}>{m.icon}</span>
-                                        <span className="text-slate-500">{m.label}:</span>
-                                        <span className="text-white font-bold">{m.value}</span>
+                                        <span className="text-[var(--sys-text-muted)]">{m.label}:</span>
+                                        <span className="text-[var(--sys-text)] font-bold">{m.value}</span>
                                     </div>
                                 ))}
                             </div>
@@ -1501,8 +1501,8 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                                 ].map((m, i) => (
                                     <div key={i} className="rounded-xl p-4 text-center" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
                                         <span className="material-symbols-outlined text-lg mb-1 block" style={{ color: '#a78bfa' }}>{m.icon}</span>
-                                        <p className="text-lg font-bold text-white">{m.value}</p>
-                                        <p className="text-[10px] text-slate-500 uppercase tracking-wider">{m.label}</p>
+                                        <p className="text-lg font-bold text-[var(--sys-text)]">{m.value}</p>
+                                        <p className="text-[10px] text-[var(--sys-text-muted)] uppercase tracking-wider">{m.label}</p>
                                     </div>
                                 ))}
                             </div>
@@ -1530,18 +1530,18 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-center gap-2 flex-wrap">
                                                     <a href={bl.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-[#FF4D00] hover:text-[#FF7A00] truncate max-w-[400px]">{bl.sourceDomain || bl.sourceUrl}</a>
-                                                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold uppercase ${bl.linkType === 'dofollow' ? 'text-emerald-400 bg-emerald-400/10' : bl.linkType === 'nofollow' ? 'text-amber-400 bg-amber-400/10' : 'text-slate-400 bg-slate-400/10'}`}>
+                                                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold uppercase ${bl.linkType === 'dofollow' ? 'text-[var(--sys-primary)] bg-[var(--sys-surface)]' : bl.linkType === 'nofollow' ? 'text-[var(--sys-primary)] bg-[var(--sys-surface)]' : 'text-[var(--sys-text-muted)] bg-[var(--sys-border)]/10'}`}>
                                                         {bl.linkType || 'link'}
                                                     </span>
-                                                    {bl.status === 'verified-live' && <span className="text-[10px] px-1.5 py-0.5 rounded font-bold text-emerald-400 bg-emerald-400/10">VERIFIED</span>}
-                                                    <span className={`text-[10px] px-1.5 py-0.5 rounded ${bl.estimatedAuthority === 'high' ? 'text-[#FF4D00] bg-[#FF4D00]/10' : bl.estimatedAuthority === 'medium' ? 'text-sky-400 bg-sky-400/10' : 'text-slate-400 bg-slate-400/10'}`}>
+                                                    {bl.status === 'verified-live' && <span className="text-[10px] px-1.5 py-0.5 rounded font-bold text-[var(--sys-primary)] bg-[var(--sys-surface)]">VERIFIED</span>}
+                                                    <span className={`text-[10px] px-1.5 py-0.5 rounded ${bl.estimatedAuthority === 'high' ? 'text-[#FF4D00] bg-[#FF4D00]/10' : bl.estimatedAuthority === 'medium' ? 'text-sky-400 bg-sky-400/10' : 'text-[var(--sys-text-muted)] bg-[var(--sys-border)]/10'}`}>
                                                         {bl.estimatedAuthority || 'unknown'} authority
                                                     </span>
                                                 </div>
-                                                <p className="text-xs text-slate-400 mt-1">{bl.context}</p>
-                                                {bl.anchorText && <p className="text-[11px] text-slate-500 mt-0.5">Anchor: <span className="text-slate-300">{bl.verifiedAnchorText || bl.anchorText}</span></p>}
+                                                <p className="text-xs text-[var(--sys-text-muted)] mt-1">{bl.context}</p>
+                                                {bl.anchorText && <p className="text-[11px] text-[var(--sys-text-muted)] mt-0.5">Anchor: <span className="text-[var(--sys-text-muted)]">{bl.verifiedAnchorText || bl.anchorText}</span></p>}
                                             </div>
-                                            <span className="text-[10px] px-2 py-1 rounded-lg bg-white/[0.03] text-slate-500 flex-shrink-0">{bl.category}</span>
+                                            <span className="text-[10px] px-2 py-1 rounded-lg bg-white/[0.03] text-[var(--sys-text-muted)] flex-shrink-0">{bl.category}</span>
                                         </div>
                                     ))}
                                 </div>
@@ -1551,19 +1551,19 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                         {/* Competitor Link Gap */}
                         {data.competitorLinkGap?.length > 0 && (
                             <SectionCard title={`Competitor Link Gap (${data.competitorLinkGap.length})`} icon="compare_arrows">
-                                <p className="text-xs text-slate-400 mb-3">Sites that link to your competitors but not to you — your biggest opportunities.</p>
+                                <p className="text-xs text-[var(--sys-text-muted)] mb-3">Sites that link to your competitors but not to you — your biggest opportunities.</p>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                     {data.competitorLinkGap.map((gap, i) => (
                                         <div key={i} className="p-4 rounded-xl" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
                                             <div className="flex items-center justify-between mb-2">
-                                                <span className="text-sm font-medium text-white">{gap.domain}</span>
+                                                <span className="text-sm font-medium text-[var(--sys-text)]">{gap.domain}</span>
                                                 <div className="flex items-center gap-1">
-                                                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${gap.difficulty === 'easy' ? 'text-emerald-400 bg-emerald-400/10' : gap.difficulty === 'medium' ? 'text-amber-400 bg-amber-400/10' : 'text-rose-400 bg-rose-400/10'}`}>{gap.difficulty}</span>
+                                                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${gap.difficulty === 'easy' ? 'text-[var(--sys-primary)] bg-[var(--sys-surface)]' : gap.difficulty === 'medium' ? 'text-[var(--sys-primary)] bg-[var(--sys-surface)]' : 'text-[var(--sys-primary)] bg-[var(--sys-surface)]'}`}>{gap.difficulty}</span>
                                                     <span className="text-[10px] px-1.5 py-0.5 rounded text-[#FF4D00] bg-[#FF4D00]/10 font-bold">{gap.impactScore}/10</span>
                                                 </div>
                                             </div>
-                                            <p className="text-xs text-slate-500 mb-1">Competitor: <span className="text-slate-400">{gap.competitorLinkedFrom}</span></p>
-                                            <p className="text-xs text-slate-400">{gap.howToGetLink}</p>
+                                            <p className="text-xs text-[var(--sys-text-muted)] mb-1">Competitor: <span className="text-[var(--sys-text-muted)]">{gap.competitorLinkedFrom}</span></p>
+                                            <p className="text-xs text-[var(--sys-text-muted)]">{gap.howToGetLink}</p>
                                         </div>
                                     ))}
                                 </div>
@@ -1579,17 +1579,17 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                                             <div className="flex items-start justify-between gap-3">
                                                 <div className="flex-1">
                                                     <div className="flex items-center gap-2 flex-wrap mb-1">
-                                                        <span className="text-sm font-medium text-white">{opp.title}</span>
+                                                        <span className="text-sm font-medium text-[var(--sys-text)]">{opp.title}</span>
                                                         <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#FF4D00]/10 text-[#FF4D00] font-bold uppercase">{opp.type?.replace(/-/g, ' ')}</span>
                                                     </div>
-                                                    <p className="text-xs text-slate-400 mb-2">{opp.description}</p>
-                                                    {opp.strategy && <p className="text-xs text-slate-500 italic">{opp.strategy}</p>}
+                                                    <p className="text-xs text-[var(--sys-text-muted)] mb-2">{opp.description}</p>
+                                                    {opp.strategy && <p className="text-xs text-[var(--sys-text-muted)] italic">{opp.strategy}</p>}
                                                     {opp.targetUrl && <a href={opp.targetUrl} target="_blank" rel="noopener noreferrer" className="text-[11px] text-[#FF4D00] hover:text-[#FF7A00] mt-1 inline-block">{opp.targetUrl}</a>}
                                                 </div>
                                                 <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                                                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${opp.difficulty === 'easy' ? 'text-emerald-400 bg-emerald-400/10' : opp.difficulty === 'medium' ? 'text-amber-400 bg-amber-400/10' : 'text-rose-400 bg-rose-400/10'}`}>{opp.difficulty}</span>
+                                                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${opp.difficulty === 'easy' ? 'text-[var(--sys-primary)] bg-[var(--sys-surface)]' : opp.difficulty === 'medium' ? 'text-[var(--sys-primary)] bg-[var(--sys-surface)]' : 'text-[var(--sys-primary)] bg-[var(--sys-surface)]'}`}>{opp.difficulty}</span>
                                                     <span className="text-[10px] px-1.5 py-0.5 rounded text-[#FF4D00] bg-[#FF4D00]/10 font-bold">Impact: {opp.impactScore}/10</span>
-                                                    {opp.estimatedTimeline && <span className="text-[10px] text-slate-500">{opp.estimatedTimeline}</span>}
+                                                    {opp.estimatedTimeline && <span className="text-[10px] text-[var(--sys-text-muted)]">{opp.estimatedTimeline}</span>}
                                                 </div>
                                             </div>
                                         </div>
@@ -1606,10 +1606,10 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                                         <div key={i} className="flex items-start gap-3 p-3 rounded-lg" style={{ background: t.severity === 'high' ? 'rgba(244,63,94,0.06)' : 'rgba(255,255,255,0.02)', border: `1px solid ${t.severity === 'high' ? 'rgba(244,63,94,0.15)' : 'rgba(255,255,255,0.06)'}` }}>
                                             <span className="material-symbols-outlined text-sm mt-0.5" style={{ color: t.severity === 'high' ? '#fb7185' : t.severity === 'medium' ? '#fbbf24' : '#94a3b8' }}>warning</span>
                                             <div>
-                                                <p className="text-sm text-white">{t.concern}</p>
-                                                <p className="text-xs text-slate-400 mt-0.5">{t.action}</p>
+                                                <p className="text-sm text-[var(--sys-text)]">{t.concern}</p>
+                                                <p className="text-xs text-[var(--sys-text-muted)] mt-0.5">{t.action}</p>
                                             </div>
-                                            <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ml-auto flex-shrink-0 ${t.severity === 'high' ? 'text-rose-400 bg-rose-400/10' : t.severity === 'medium' ? 'text-amber-400 bg-amber-400/10' : 'text-slate-400 bg-slate-400/10'}`}>{t.severity}</span>
+                                            <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ml-auto flex-shrink-0 ${t.severity === 'high' ? 'text-[var(--sys-primary)] bg-[var(--sys-surface)]' : t.severity === 'medium' ? 'text-[var(--sys-primary)] bg-[var(--sys-surface)]' : 'text-[var(--sys-text-muted)] bg-[var(--sys-border)]/10'}`}>{t.severity}</span>
                                         </div>
                                     ))}
                                 </div>
@@ -1625,14 +1625,14 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                                             <summary className="flex items-center gap-3 p-4 cursor-pointer hover:bg-white/[0.02] transition-colors">
                                                 <span className="material-symbols-outlined text-sm" style={{ color: '#a78bfa' }}>drafts</span>
                                                 <div className="flex-1">
-                                                    <p className="text-sm font-medium text-white">{tmpl.subject}</p>
-                                                    <p className="text-[11px] text-slate-500">{tmpl.type?.replace(/-/g, ' ')} — {tmpl.whenToUse}</p>
+                                                    <p className="text-sm font-medium text-[var(--sys-text)]">{tmpl.subject}</p>
+                                                    <p className="text-[11px] text-[var(--sys-text-muted)]">{tmpl.type?.replace(/-/g, ' ')} — {tmpl.whenToUse}</p>
                                                 </div>
-                                                {tmpl.successRate && <span className="text-[10px] text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded font-bold">{tmpl.successRate}</span>}
-                                                <span className="material-symbols-outlined text-sm text-slate-500 group-open:rotate-180 transition-transform">expand_more</span>
+                                                {tmpl.successRate && <span className="text-[10px] text-[var(--sys-primary)] bg-[var(--sys-surface)] px-2 py-0.5 rounded font-bold">{tmpl.successRate}</span>}
+                                                <span className="material-symbols-outlined text-sm text-[var(--sys-text-muted)] group-open:rotate-180 transition-transform">expand_more</span>
                                             </summary>
                                             <div className="px-4 pb-4 pt-0">
-                                                <pre className="text-xs text-slate-300 whitespace-pre-wrap p-3 rounded-lg mt-2" style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.04)' }}>{tmpl.body}</pre>
+                                                <pre className="text-xs text-[var(--sys-text-muted)] whitespace-pre-wrap p-3 rounded-lg mt-2" style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.04)' }}>{tmpl.body}</pre>
                                             </div>
                                         </details>
                                     ))}
@@ -1647,13 +1647,13 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                                     {data.thirtyDayPlan.map((w, i) => (
                                         <div key={i} className="p-4 rounded-xl" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
                                             <div className="flex items-center gap-2 mb-2">
-                                                <span className="w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold text-white" style={{ background: 'linear-gradient(135deg, #6366f1, #FF4D00)' }}>{w.week}</span>
-                                                <span className="text-sm font-medium text-white">{w.focus}</span>
+                                                <span className="w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold text-[var(--sys-text)]" style={{ background: 'linear-gradient(135deg, #6366f1, #FF4D00)' }}>{w.week}</span>
+                                                <span className="text-sm font-medium text-[var(--sys-text)]">{w.focus}</span>
                                             </div>
                                             <div className="space-y-1">
                                                 {w.actions?.map((a, j) => (
-                                                    <p key={j} className="text-xs text-slate-400 flex items-start gap-1.5">
-                                                        <span className="text-slate-600 mt-0.5">•</span> {a}
+                                                    <p key={j} className="text-xs text-[var(--sys-text-muted)] flex items-start gap-1.5">
+                                                        <span className="text-[var(--sys-text-muted)] mt-0.5">•</span> {a}
                                                     </p>
                                                 ))}
                                             </div>
@@ -1670,15 +1670,15 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                                 <div className="space-y-2">{data.quickWins.map((q, i) => (
                                     <div key={i} className="flex items-start gap-3 p-3 rounded-lg bg-white/[0.02]">
                                         <span className="w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5" style={{ background: 'rgba(34,197,94,0.12)' }}>
-                                            <span className="material-symbols-outlined text-sm text-emerald-400">bolt</span>
+                                            <span className="material-symbols-outlined text-sm text-[var(--sys-primary)]">bolt</span>
                                         </span>
                                         <div className="flex-1">
-                                            <p className="text-sm text-white">{q.action}</p>
-                                            {q.whyQuick && <p className="text-xs text-slate-400 mt-0.5">{q.whyQuick}</p>}
+                                            <p className="text-sm text-[var(--sys-text)]">{q.action}</p>
+                                            {q.whyQuick && <p className="text-xs text-[var(--sys-text-muted)] mt-0.5">{q.whyQuick}</p>}
                                         </div>
                                         <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                                            {q.estimatedTime && <span className="text-[10px] text-slate-500">{q.estimatedTime}</span>}
-                                            <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${q.expectedImpact === 'high' ? 'text-emerald-400 bg-emerald-400/10' : 'text-amber-400 bg-amber-400/10'}`}>{q.expectedImpact} impact</span>
+                                            {q.estimatedTime && <span className="text-[10px] text-[var(--sys-text-muted)]">{q.estimatedTime}</span>}
+                                            <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${q.expectedImpact === 'high' ? 'text-[var(--sys-primary)] bg-[var(--sys-surface)]' : 'text-[var(--sys-primary)] bg-[var(--sys-surface)]'}`}>{q.expectedImpact} impact</span>
                                         </div>
                                     </div>
                                 ))}</div>
@@ -1695,7 +1695,7 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                 return (
                     <div className="space-y-5 animate-fade-in">
                         <SectionCard title="Generate SEO Reports" icon="summarize">
-                            <p className="text-sm text-slate-400 mb-4">Generate branded interactive reports with charts, KPIs, and recommendations. Download as PDF or present as a slideshow.</p>
+                            <p className="text-sm text-[var(--sys-text-muted)] mb-4">Generate branded interactive reports with charts, KPIs, and recommendations. Download as PDF or present as a slideshow.</p>
                             <StudioReportButton studio="seo" brandId={brandId} />
                         </SectionCard>
 
@@ -1706,9 +1706,9 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                                 { icon: '📈', title: 'Traffic Report', desc: 'Organic traffic trends, keyword rankings, and device breakdown' },
                                 { icon: '🤖', title: 'AI Visibility Report', desc: 'AI/LLM citation tracking, sentiment analysis, and GEO optimization' },
                                 ].map((r, i) => (
-                                    <div key={i} className="flex items-start gap-3 p-4 rounded-xl bg-white/[0.02] border border-white/[0.04]">
+                                    <div key={i} className="flex items-start gap-3 p-4 rounded-xl bg-white/[0.02] border border-[var(--sys-border)]/[0.04]">
                                         <span className="text-2xl">{r.icon}</span>
-                                        <div><p className="text-sm font-bold text-white">{r.title}</p><p className="text-xs text-slate-400">{r.desc}</p></div>
+                                        <div><p className="text-sm font-bold text-[var(--sys-text)]">{r.title}</p><p className="text-xs text-[var(--sys-text-muted)]">{r.desc}</p></div>
                                     </div>
                                 ))}
                             </div>
@@ -1716,7 +1716,7 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
 
                         {/* Quick action plan */}
                         <SectionCard title="Quick Action Plan" icon="task_alt">
-                            <p className="text-sm text-slate-400 mb-3">Run these analyses to build your SEO strategy:</p>
+                            <p className="text-sm text-[var(--sys-text-muted)] mb-3">Run these analyses to build your SEO strategy:</p>
                             <div className="space-y-2">
                                 {[{ step: 'Run Site Audit to identify technical issues', done: !!tabData['site-audit'] },
                                 { step: 'Run Keyword Research to find opportunities', done: !!tabData['keywords'] },
@@ -1725,8 +1725,8 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                                 { step: 'Run Backlink Analysis for link opportunities', done: !!tabData['backlinks'] },
                                 ].map((a, i) => (
                                     <div key={i} className="flex items-center gap-2">
-                                        <span className={`material-symbols-outlined text-sm ${a.done ? 'text-emerald-400' : 'text-slate-600'}`}>{a.done ? 'check_circle' : 'radio_button_unchecked'}</span>
-                                        <span className={`text-sm ${a.done ? 'text-emerald-400' : 'text-slate-400'}`}>{a.step}</span>
+                                        <span className={`material-symbols-outlined text-sm ${a.done ? 'text-[var(--sys-primary)]' : 'text-[var(--sys-text-muted)]'}`}>{a.done ? 'check_circle' : 'radio_button_unchecked'}</span>
+                                        <span className={`text-sm ${a.done ? 'text-[var(--sys-primary)]' : 'text-[var(--sys-text-muted)]'}`}>{a.step}</span>
                                     </div>
                                 ))}
                             </div>
@@ -1759,7 +1759,7 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
         <div className="animate-fade-in">
             {/* Back nav — hidden when parent provides sidebar */}
             {!hideNav && (
-            <button onClick={onBack} className="group flex items-center gap-2 text-slate-400 hover:text-white text-sm font-bold mb-6 cursor-pointer transition-all">
+            <button onClick={onBack} className="group flex items-center gap-2 text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] text-sm font-bold mb-6 cursor-pointer transition-all">
                 <div className="w-7 h-7 rounded-lg flex items-center justify-center transition-all group-hover:bg-white/[0.05]"
                     style={{ border: '1px solid rgba(255,255,255,0.08)' }}>
                     <span className="material-symbols-outlined text-sm group-hover:-translate-x-0.5 transition-transform">arrow_back</span>
@@ -1776,11 +1776,11 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                         style={{ background: 'rgba(255,255,255,0.015)', border: '1px solid rgba(255,255,255,0.06)' }}>
                         <div className="h-1" style={{ background: 'linear-gradient(90deg, #6366f1, #FF4D00, #FF4D00, #ec4899)' }} />
                         <div className="p-3">
-                            <p className="text-[10px] text-slate-600 font-bold uppercase tracking-[0.15em] px-2.5 mb-2 mt-1">Navigation</p>
+                            <p className="text-[10px] text-[var(--sys-text-muted)] font-bold uppercase tracking-[0.15em] px-2.5 mb-2 mt-1">Navigation</p>
                             {TABS.map((t, idx) => (
                                 <button key={t.id} onClick={() => setAdvPage(t.id)}
                                     className={`w-full text-left px-3 py-2.5 rounded-xl text-[13px] font-medium flex items-center gap-2.5 cursor-pointer transition-all duration-200 mb-0.5
-                                        ${advPage === t.id ? 'text-white' : 'text-slate-500 hover:text-slate-300 hover:bg-white/[0.03]'}`}
+                                        ${advPage === t.id ? 'text-[var(--sys-text)]' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text-muted)] hover:bg-white/[0.03]'}`}
                                     style={advPage === t.id ? { background: 'linear-gradient(135deg, rgba(99,102,241,0.18), rgba(255, 77, 0,0.08))', border: '1px solid rgba(99,102,241,0.25)', boxShadow: '0 2px 8px rgba(99,102,241,0.12)' } : { border: '1px solid transparent' }}>
                                     <span className={`material-symbols-outlined text-[16px] transition-colors ${advPage === t.id ? '' : ''}`} style={advPage === t.id ? { color: '#a78bfa' } : {}}>{t.icon}</span>
                                     <span className="flex-1">{t.label}</span>
@@ -1799,7 +1799,7 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                     {TABS.map(t => (
                         <button key={t.id} onClick={() => setAdvPage(t.id)}
                             className={`flex flex-col items-center gap-0.5 px-3 py-2 rounded-lg text-xs whitespace-nowrap cursor-pointer transition-all flex-shrink-0
-                                ${advPage === t.id ? 'text-primary' : 'text-slate-500'}`}
+                                ${advPage === t.id ? 'text-primary' : 'text-[var(--sys-text-muted)]'}`}
                             style={advPage === t.id ? { background: 'rgba(99,102,241,0.12)' } : {}}>
                             <span className="material-symbols-outlined text-sm">{t.icon}</span>
                             {t.label}
@@ -1818,15 +1818,15 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                         <div className="relative flex items-center gap-4">
                             <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
                                 style={{ background: 'linear-gradient(135deg, #6366f1, #FF4D00)', boxShadow: '0 4px 20px rgba(99,102,241,0.4)' }}>
-                                <span className="material-symbols-outlined text-white text-xl">{currentTab?.icon}</span>
+                                <span className="material-symbols-outlined text-[var(--sys-text)] text-xl">{currentTab?.icon}</span>
                             </div>
                             <div className="flex-1">
-                                <h2 className="text-xl font-bold text-white">{currentTab?.label || 'Advanced Tools'}</h2>
-                                <p className="text-xs text-slate-400 mt-0.5">{TAB_DESCS[advPage] || ''}</p>
+                                <h2 className="text-xl font-bold text-[var(--sys-text)]">{currentTab?.label || 'Advanced Tools'}</h2>
+                                <p className="text-xs text-[var(--sys-text-muted)] mt-0.5">{TAB_DESCS[advPage] || ''}</p>
                             </div>
                             <div className="text-right hidden sm:block">
-                                <p className="text-[11px] text-slate-500 font-bold">{brand?.name}</p>
-                                <p className="text-[10px] text-slate-600">{website}</p>
+                                <p className="text-[11px] text-[var(--sys-text-muted)] font-bold">{brand?.name}</p>
+                                <p className="text-[10px] text-[var(--sys-text-muted)]">{website}</p>
                                 {cachedAt && hasData && (
                                     <p className="text-[9px] mt-1 px-2 py-0.5 rounded-full inline-flex items-center gap-1" style={{ background: 'rgba(99,102,241,0.1)', color: '#a78bfa' }}>
                                         <span className="material-symbols-outlined" style={{ fontSize: '10px' }}>schedule</span>
@@ -1838,7 +1838,7 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                     </div>
 
                     {data?.error && (
-                        <div className="rounded-xl p-4 mb-5 text-sm text-rose-400 flex items-center gap-3"
+                        <div className="rounded-xl p-4 mb-5 text-sm text-[var(--sys-primary)] flex items-center gap-3"
                             style={{ background: 'rgba(244,63,94,0.06)', border: '1px solid rgba(244,63,94,0.12)' }}>
                             <span className="material-symbols-outlined text-lg">error</span>
                             {data.error}

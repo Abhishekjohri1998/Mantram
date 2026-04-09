@@ -9,6 +9,7 @@ import { submitMuApiVideoGeneration } from './muapiClient.js';
 import { ensureS3Url } from '../../utils/s3.js';
 import { isLaozhangAvailable, submitLaozhangVideoGeneration } from './laozhangClient.js';
 import { getSetting } from '../../models/SystemSettings.js';
+import { getActiveProvider } from '../../ai/providerRouting.js';
 
 const FAL_BASE_URL = 'https://queue.fal.run';
 const GROK_BASE_URL = 'https://api.x.ai/v1';
@@ -20,6 +21,7 @@ const MODEL_ENDPOINTS = {
     'seedance-1.0': { textToVideo: 'fal-ai/bytedance/seedance/v1/lite/text-to-video', imageToVideo: 'fal-ai/bytedance/seedance/v1/lite/image-to-video' },
     'seedance-2.0': { textToVideo: 'fal-ai/bytedance/seedance/v2/pro/text-to-video', imageToVideo: 'fal-ai/bytedance/seedance/v2/pro/image-to-video' },
     'hunyuan': { textToVideo: 'fal-ai/hunyuan-video/video-to-video', imageToVideo: 'fal-ai/hunyuan-video/image-to-video' },
+    'grok-imagine': { textToVideo: 'xai/grok-imagine-video/text-to-video', imageToVideo: 'xai/grok-imagine-video/image-to-video' },
 };
 
 export const MODEL_AVAILABLE = {
@@ -208,6 +210,7 @@ function buildPayload(model, { prompt, imageUrl, duration, resolution, mode, sho
     if (model === 'seedance-1.0') return { prompt, duration: dur >= 8 ? '10' : '5', aspect_ratio: '16:9', seed: Math.floor(Math.random() * 999999) };
     if (model === 'seedance-2.0') return { prompt, duration: String(dur), aspect_ratio: '16:9', generate_audio: generateAudio !== false, seed: Math.floor(Math.random() * 999999) };
     if (model === 'hunyuan') return { prompt, video_length: dur, seed: Math.floor(Math.random() * 999999), resolution: resolution === '1080p' ? '1080p' : '720p' };
+    if (model === 'grok-imagine') return { prompt };
     throw new Error(`Unknown fal.ai model: ${model}`);
 }
 
@@ -290,10 +293,9 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
     ]);
     let activeProvider = null;
     try {
-        const providerRoutes = await getSetting('video_provider_routes', {});
-        activeProvider = providerRoutes[model]?.active || null;
+        activeProvider = await getActiveProvider('video', model);
     } catch (e) {
-        console.warn('⚠️ Could not read video_provider_routes from DB:', e.message);
+        console.warn('⚠️ Could not read video_provider from cache:', e.message);
     }
     if (model === 'seedance-2.0') {
         const provider = activeProvider || 'muapi';
@@ -354,20 +356,24 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
     }
 
     if (model === 'grok-imagine') {
-        const result = await submitGrokVideoGeneration({
-            prompt: safePrompt,
-            imageUrl: s3ImageUrl,
-            duration,
-            resolution,
-            aspectRatio: aspectRatio || '16:9'
-        });
-        return {
-            requestId: result.requestId,
-            endpoint: 'grok-beta',
-            statusUrl: null,
-            resultUrl: null,
-            provider: 'grok'
-        };
+        const provider = activeProvider || 'grok';
+        if (provider === 'grok') {
+            const result = await submitGrokVideoGeneration({
+                prompt: safePrompt,
+                imageUrl: s3ImageUrl,
+                duration,
+                resolution,
+                aspectRatio: aspectRatio || '16:9'
+            });
+            return {
+                requestId: result.requestId,
+                endpoint: 'grok-imagine-video',
+                statusUrl: null,
+                resultUrl: null,
+                provider: 'grok'
+            };
+        }
+        // If provider !== 'grok', it will fall through to fal.ai routing below.
     }
 
     const apiKey = getApiKey();
@@ -406,8 +412,7 @@ export async function extendVideo({ videoUrl, prompt, duration = 7 }) {
 }
 
 export async function extendVideoGeneration({ model, parentTaskId, prompt, duration = 5, qualityMode = 'fast', aspectRatio = '16:9' }) {
-    const routes = await getSetting('video_provider_routes') || {};
-    const activeProvider = routes[model]?.active || null;
+    const activeProvider = await getActiveProvider('video', model);
     if (activeProvider === 'piapi' || !activeProvider) {
         try {
             const result = await submitPiApiVideoExtend({ parentTaskId, prompt, duration, qualityMode });
@@ -434,7 +439,10 @@ export async function getGenerationStatus(requestId, statusUrl, resultUrl) {
 async function fetchFalResult(apiKey, resultUrl) {
     const res = await fetch(resultUrl, { headers: { 'Authorization': `Key ${apiKey}` } });
     const data = await res.json();
-    const videoUrl = data.video?.url || data.output?.url || '';
+    const videoUrl = data.video?.url || data.output?.url || data.video_url || data.url || data.images?.[0]?.url || data.data?.[0]?.url || '';
+    if (!videoUrl) {
+        console.warn(`⚠️ [FalResult] extracted empty videoUrl from:`, JSON.stringify(data).substring(0, 300));
+    }
     return { status: 'COMPLETED', progress: 100, videoUrl };
 }
 
@@ -444,7 +452,7 @@ async function fetchFalResult(apiKey, resultUrl) {
 export async function submitGrokVideoGeneration({ prompt, imageUrl, duration = 5, resolution = '720p', aspectRatio = '16:9' }) {
     const apiKey = getGrokApiKey();
     const payload = {
-        model: 'grok-beta',
+        model: 'grok-imagine-video',
         messages: [{
             role: 'user',
             content: [

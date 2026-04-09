@@ -233,10 +233,10 @@ export default function VoiceInput({ onResult, language = 'english', className =
                     relative flex items-center justify-center rounded-xl transition-all cursor-pointer overflow-hidden
                     ${isSmall ? 'p-1.5' : 'p-2.5'}
                     ${processing
-                        ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                        ? 'bg-[var(--sys-primary-dim)] text-primary border border-[var(--sys-border)]'
                         : recording
-                            ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30 shadow-lg shadow-rose-500/10'
-                            : 'bg-white/[0.04] text-slate-400 hover:text-primary hover:bg-primary/10 border border-white/[0.06]'
+                            ? 'bg-[var(--sys-primary-dim)] text-primary border border-[var(--sys-border)] shadow-none'
+                            : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] hover:text-primary hover:bg-primary/10 border border-[var(--sys-border)]'
                     }
                     disabled:cursor-wait
                 `}
@@ -245,15 +245,15 @@ export default function VoiceInput({ onResult, language = 'english', className =
             >
                 {/* Audio Level Meter Overlay */}
                 {recording && (
-                    <div className="absolute inset-0 bg-rose-500/20 transition-transform duration-100"
+                    <div className="absolute inset-0 bg-[var(--sys-primary-dim)] transition-transform duration-100"
                          style={{ transform: `scaleY(${Math.min(audioLevel / 50, 1)})`, transformOrigin: 'bottom' }} />
                 )}
 
                 {/* Pulse animation when recording */}
                 {recording && (
                     <>
-                        <span className="absolute inset-0 rounded-xl bg-rose-500/20 animate-ping" style={{ animationDuration: '1.5s' }} />
-                        <span className="absolute inset-0 rounded-xl bg-rose-500/10 animate-pulse" />
+                        <span className="absolute inset-0 rounded-xl bg-[var(--sys-primary-dim)] animate-ping" style={{ animationDuration: '1.5s' }} />
+                        <span className="absolute inset-0 rounded-xl bg-[var(--sys-primary-dim)] animate-pulse" />
                     </>
                 )}
                 <span className={`material-symbols-outlined relative z-10 ${isSmall ? 'text-sm' : 'text-lg'}`}>
@@ -269,14 +269,14 @@ export default function VoiceInput({ onResult, language = 'english', className =
             {/* Recording indicator with duration */}
             {recording && (
                 <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 whitespace-nowrap z-50">
-                    <div className="bg-rose-500/10 border border-rose-500/20 rounded-lg px-3 py-1.5 flex items-center gap-2">
+                    <div className="bg-[var(--sys-primary-dim)] border border-[var(--sys-border)] rounded-lg px-3 py-1.5 flex items-center gap-2">
                         <span className="flex gap-0.5">
-                            <span className="w-1 h-3 bg-rose-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                            <span className="w-1 h-4 bg-rose-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                            <span className="w-1 h-2 bg-rose-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                            <span className="w-1 h-3 bg-rose-400 rounded-full animate-bounce" style={{ animationDelay: '450ms' }} />
+                            <span className="w-1 h-3 bg-[var(--sys-surface)] rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                            <span className="w-1 h-4 bg-[var(--sys-surface)] rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                            <span className="w-1 h-2 bg-[var(--sys-surface)] rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                            <span className="w-1 h-3 bg-[var(--sys-surface)] rounded-full animate-bounce" style={{ animationDelay: '450ms' }} />
                         </span>
-                        <span className="text-sm text-rose-400 font-bold font-mono">{formatDuration(duration)}</span>
+                        <span className="text-sm text-primary font-bold font-mono">{formatDuration(duration)}</span>
                     </div>
                 </div>
             )}
@@ -284,9 +284,9 @@ export default function VoiceInput({ onResult, language = 'english', className =
             {/* Processing indicator */}
             {processing && (
                 <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 whitespace-nowrap z-50">
-                    <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-1.5 flex items-center gap-1.5">
-                        <span className="material-symbols-outlined text-sm text-amber-400 animate-spin">progress_activity</span>
-                        <span className="text-sm text-amber-400 font-bold">Whisper AI transcribing...</span>
+                    <div className="bg-[var(--sys-primary-dim)] border border-[var(--sys-border)] rounded-lg px-3 py-1.5 flex items-center gap-1.5">
+                        <span className="material-symbols-outlined text-sm text-primary animate-spin">progress_activity</span>
+                        <span className="text-sm text-primary font-bold">Whisper AI transcribing...</span>
                     </div>
                 </div>
             )}
@@ -294,8 +294,8 @@ export default function VoiceInput({ onResult, language = 'english', className =
             {/* Error */}
             {error && (
                 <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 whitespace-nowrap z-50">
-                    <div className="bg-rose-500/10 border border-rose-500/20 rounded-lg px-3 py-1.5">
-                        <span className="text-sm text-rose-400 font-bold">{error}</span>
+                    <div className="bg-[var(--sys-primary-dim)] border border-[var(--sys-border)] rounded-lg px-3 py-1.5">
+                        <span className="text-sm text-primary font-bold">{error}</span>
                     </div>
                 </div>
             )}

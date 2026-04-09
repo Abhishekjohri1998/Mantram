@@ -1,6 +1,7 @@
 import { NavLink } from 'react-router-dom'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
+import { useSidebar } from './DashboardLayout'
 
 const navItems = [
     { icon: 'dashboard', label: 'Dashboard', to: '/dashboard' },
@@ -9,8 +10,8 @@ const navItems = [
     { icon: 'auto_fix_high', label: 'Creative Studio', to: '/creative-studio', studioKey: 'creativeStudio' },
     { icon: 'draw', label: 'AI Canvas', to: '/ai-canvas', studioKey: 'creativeStudio' },
     { icon: 'movie', label: 'Video Studio', to: '/video-studio', studioKey: 'videoStudio' },
-    { icon: 'share', label: 'Social Media Studio', to: '/social-media-studio', studioKey: 'socialMediaStudio', superAdminOnly: true },
-    { icon: 'forum', label: 'Conversation Studio', to: '/conversations', studioKey: 'conversationStudio', superAdminOnly: true },
+    { icon: 'share', label: 'Social Media Studio', to: '/social-media-studio', studioKey: 'socialMediaStudio' },
+    { icon: 'forum', label: 'Conversation Studio', to: '/conversations', studioKey: 'conversationStudio' },
     { icon: 'travel_explore', label: 'SEO Studio', to: '/seo-studio', studioKey: 'seoStudio' },
     { icon: 'monitoring', label: 'Performance Studio', to: '/performance-marketing', studioKey: 'adStudio' },
     { icon: 'filter_alt', label: 'Funnel Studio', to: '/funnel-studio', studioKey: 'funnelStudio', superAdminOnly: true },
@@ -28,6 +29,7 @@ const bottomItems = [
 function filterNavByAccess(items, studioAccess, isSuperAdmin) {
     return items.filter(item => {
         if (item.superAdminOnly && !isSuperAdmin) return false
+        if (isSuperAdmin) return true
         if (!studioAccess) return true
         if (!item.studioKey) return true
         return studioAccess[item.studioKey] !== false
@@ -36,6 +38,7 @@ function filterNavByAccess(items, studioAccess, isSuperAdmin) {
 
 export default function Sidebar({ mobileOpen, onClose }) {
     const { user } = useAuth()
+    const { isCollapsed, setIsCollapsed } = useSidebar()
 
     const handleNavClick = () => { if (onClose) onClose() }
 
@@ -54,74 +57,87 @@ export default function Sidebar({ mobileOpen, onClose }) {
         return () => { document.body.style.overflow = '' }
     }, [mobileOpen])
 
+    // --- Core Theme Logic ---
+    const [themeVal, setThemeVal] = useState(() => localStorage.getItem('mantram-theme') || 'auto');
+
+    useEffect(() => {
+        localStorage.setItem('mantram-theme', themeVal);
+        
+        const updateClass = (isLight) => {
+            if (isLight) document.documentElement.classList.add('theme-light');
+            else document.documentElement.classList.remove('theme-light');
+        };
+
+        if (themeVal === 'auto') {
+            const mql = window.matchMedia('(prefers-color-scheme: light)');
+            updateClass(mql.matches);
+            const listener = (e) => updateClass(e.matches);
+            mql.addEventListener('change', listener);
+            return () => mql.removeEventListener('change', listener);
+        } else {
+            updateClass(themeVal === 'light');
+        }
+    }, [themeVal]);
+
     const isSuperAdmin = user?.role?.trim() === 'superadmin'
 
     const sidebarContent = (
         <>
-            {/* ── Antigravity Logo / Wordmark ── */}
-            <div className="p-5 flex items-center gap-3 border-b border-outline-variant/10">
-                <div className="size-9 rounded-xl overflow-hidden flex-shrink-0 molten-glow">
-                    <img src="/mantram-logo.png" alt="Mantram AI" className="size-9" />
-                </div>
-                <div className="min-w-0 flex-1">
-                    <h1 className="text-base font-bold leading-tight text-white truncate tracking-tight font-headline">
-                        Mantram<span className="text-primary-fixed">.</span><span className="text-primary-fixed">AI</span>
-                    </h1>
-                    <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-primary-fixed/50">Brand OS</p>
-                </div>
-                {/* Mobile close */}
-                <button
-                    onClick={onClose}
-                    className="lg:hidden p-1.5 rounded-lg heavy-in-soft-out text-outline-variant hover:text-white hover:bg-white/5 cursor-pointer"
-                >
-                    <span className="material-symbols-outlined text-xl">close</span>
-                </button>
-            </div>
-
             {/* ── Main Nav ── */}
             <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto custom-scrollbar">
-                <p className="px-3 pt-2 pb-2 text-[9px] uppercase tracking-[0.2em] font-black text-outline-variant/40 font-mono">Create</p>
+                <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-between px-3'} pt-1 pb-2 mb-1 border-b border-[var(--sys-border)]`}>
+                    {!isCollapsed && <p className="text-[9px] uppercase tracking-[0.2em] font-black text-[var(--sys-text-muted)] font-mono">Create</p>}
+                    <button onClick={() => setIsCollapsed(!isCollapsed)} className="p-1 rounded-lg hover:bg-[var(--sys-surface)] text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] transition-colors cursor-pointer hidden lg:flex items-center justify-center" title="Toggle Sidebar">
+                        <span className="material-symbols-outlined text-[18px]">{isCollapsed ? 'menu_open' : 'keyboard_double_arrow_left'}</span>
+                    </button>
+                    {/* Mobile close */}
+                    <button onClick={onClose} className="lg:hidden p-1 rounded-lg hover:bg-[var(--sys-surface)] text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] transition-colors cursor-pointer">
+                        <span className="material-symbols-outlined text-[18px]">close</span>
+                    </button>
+                </div>
                 {filterNavByAccess(navItems, user?.studioAccess, isSuperAdmin).map((item) => (
                     <NavLink
                         key={item.label}
                         to={item.to}
                         onClick={handleNavClick}
+                        title={isCollapsed ? item.label : undefined}
                         className={({ isActive }) =>
-                            `flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] font-medium heavy-in-soft-out transition-all duration-300 cursor-pointer group relative ${
+                            `flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-[13px] font-medium heavy-in-soft-out transition-all duration-300 cursor-pointer group relative ${
                                 isActive
                                     ? 'bg-primary-fixed/10 text-primary-fixed border-r-2 border-primary-fixed'
-                                    : 'text-outline-variant hover:text-on-surface-variant hover:bg-white/5'
+                                    : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)]'
                             }`
                         }
                     >
                         {({ isActive }) => (
                             <>
                                 <span className={`material-symbols-outlined text-[20px] flex-shrink-0 ${isActive ? 'text-primary-fixed' : 'group-hover:text-tertiary'}`}>{item.icon}</span>
-                                <span className="truncate text-xs uppercase tracking-widest font-label">{item.label}</span>
+                                {!isCollapsed && <span className="truncate text-xs uppercase tracking-widest font-label">{item.label}</span>}
                             </>
                         )}
                     </NavLink>
                 ))}
 
-                <div className="my-3 mx-2 border-t border-outline-variant/10" />
-                <p className="px-3 pb-2 text-[9px] uppercase tracking-[0.2em] font-black text-outline-variant/40 font-mono">Manage</p>
+                <div className="my-3 mx-2 border-t border-[var(--sys-border)]" />
+                {!isCollapsed && <p className="px-3 pb-2 text-[9px] uppercase tracking-[0.2em] font-black text-[var(--sys-text-muted)] font-mono">Manage</p>}
                 {bottomItems.map((item) => (
                     <NavLink
                         key={item.label}
                         to={item.to}
                         onClick={handleNavClick}
+                        title={isCollapsed ? item.label : undefined}
                         className={({ isActive }) =>
-                            `flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] font-medium heavy-in-soft-out transition-all duration-300 cursor-pointer relative ${
+                            `flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-[13px] font-medium heavy-in-soft-out transition-all duration-300 cursor-pointer relative ${
                                 isActive
                                     ? 'bg-primary-fixed/10 text-primary-fixed border-r-2 border-primary-fixed'
-                                    : 'text-outline-variant hover:text-on-surface-variant hover:bg-white/5'
+                                    : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)]'
                             }`
                         }
                     >
                         {({ isActive }) => (
                             <>
                                 <span className={`material-symbols-outlined text-[20px] flex-shrink-0 ${isActive ? 'text-primary-fixed' : 'group-hover:text-tertiary'}`}>{item.icon}</span>
-                                <span className="truncate text-xs uppercase tracking-widest font-label">{item.label}</span>
+                                {!isCollapsed && <span className="truncate text-xs uppercase tracking-widest font-label">{item.label}</span>}
                             </>
                         )}
                     </NavLink>
@@ -134,37 +150,57 @@ export default function Sidebar({ mobileOpen, onClose }) {
                         <NavLink
                             to="/superadmin"
                             onClick={handleNavClick}
+                            title={isCollapsed ? "Super Admin" : undefined}
                             className={({ isActive }) =>
-                                `flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] font-medium heavy-in-soft-out transition-all duration-300 cursor-pointer relative ${isActive
-                                    ? 'text-amber-400 bg-amber-400/8 border border-amber-400/20'
-                                    : 'text-amber-400/40 hover:text-amber-400 border border-transparent'
+                                `flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-[13px] font-medium heavy-in-soft-out transition-all duration-300 cursor-pointer relative ${isActive
+                                    ? 'text-primary bg-[var(--sys-primary-dim)] border border-[var(--sys-border)]'
+                                    : 'text-primary/40 hover:text-primary border border-transparent'
                                 }`
                             }
                         >
                             <span className="material-symbols-outlined text-[20px] flex-shrink-0">shield_person</span>
-                            <span>Super Admin</span>
+                            {!isCollapsed && <span>Super Admin</span>}
                         </NavLink>
                     </>
                 )}
             </nav>
 
             {/* ── Bottom CTA + Plan indicator ── */}
-            <div className="p-3 space-y-2 border-t border-outline-variant/10">
+            <div className={`p-3 space-y-2 border-t border-[var(--sys-border)] flex flex-col ${isCollapsed ? 'items-center px-1' : ''}`}>
                 <NavLink
                     to="/onboarding"
                     onClick={handleNavClick}
-                    className="w-full py-3 px-4 bg-primary-fixed-dim text-black text-xs font-bold uppercase tracking-tighter rounded-lg heavy-in-soft-out transition-all flex items-center justify-center gap-2 cursor-pointer molten-glow font-headline active:scale-95"
+                    title={isCollapsed ? "New Brand" : undefined}
+                    className={`bg-primary text-white text-xs font-bold uppercase tracking-tighter rounded-lg heavy-in-soft-out transition-all flex items-center justify-center gap-2 cursor-pointer font-headline active:scale-95 ${isCollapsed ? 'w-10 h-10 p-0 rounded-full' : 'w-full py-3 px-4'}`}
                 >
                     <span className="material-symbols-outlined text-sm">add</span>
-                    New Brand
+                    {!isCollapsed && "New Brand"}
                 </NavLink>
 
+                {/* Theme Toggle */}
+                {!isCollapsed && (
+                    <div className="flex bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-lg p-1 mt-2">
+                        <button onClick={() => setThemeVal('light')} title="Light Mode"
+                            className={`flex-1 py-1.5 rounded-md flex items-center justify-center transition-all cursor-pointer ${themeVal === 'light' ? 'bg-[var(--sys-border)] text-primary shadow-sm' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]'}`}>
+                            <span className="material-symbols-outlined text-[16px]">light_mode</span>
+                        </button>
+                        <button onClick={() => setThemeVal('dark')} title="Dark Mode"
+                            className={`flex-1 py-1.5 rounded-md flex items-center justify-center transition-all cursor-pointer ${themeVal === 'dark' ? 'bg-[var(--sys-border)] text-primary shadow-sm' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]'}`}>
+                            <span className="material-symbols-outlined text-[16px]">dark_mode</span>
+                        </button>
+                        <button onClick={() => setThemeVal('auto')} title="Auto (System Default)"
+                            className={`flex-1 py-1.5 rounded-md flex items-center justify-center transition-all cursor-pointer ${themeVal === 'auto' ? 'bg-[var(--sys-border)] text-primary shadow-sm' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]'}`}>
+                            <span className="material-symbols-outlined text-[16px]">hdr_auto</span>
+                        </button>
+                    </div>
+                )}
+
                 {/* Plan Indicator */}
-                {!isSuperAdmin && (
-                    <div className="px-3 py-2.5 rounded-lg flex items-center justify-between bg-white/[0.02] border border-outline-variant/10">
+                {!isSuperAdmin && !isCollapsed && (
+                    <div className="px-3 py-2.5 rounded-lg flex items-center justify-between bg-[var(--sys-surface)] border border-[var(--sys-border)]">
                         <div className="min-w-0 flex-1">
-                            <p className="text-[8px] font-black uppercase tracking-[0.2em] leading-none mb-1 text-outline-variant/40 font-mono">Current Plan</p>
-                            <p className="text-xs font-semibold text-on-surface-variant truncate capitalize">{user?.plan || 'Free'} Tier</p>
+                            <p className="text-[8px] font-black uppercase tracking-[0.2em] leading-none mb-1 text-[var(--sys-text-muted)] font-mono">Current Plan</p>
+                            <p className="text-xs font-semibold text-[var(--sys-text-muted)] truncate capitalize">{user?.plan || 'Free'} Tier</p>
                         </div>
                         <NavLink to="/credits" className="px-2 py-1 rounded-lg text-[10px] font-black uppercase heavy-in-soft-out whitespace-nowrap bg-primary-fixed/10 text-primary-fixed border border-primary-fixed/20 hover:bg-primary-fixed/20">
                             Upgrade
@@ -179,18 +215,18 @@ export default function Sidebar({ mobileOpen, onClose }) {
         <>
             {/* ── Desktop Sidebar (lg+) ── */}
             <aside
-                className="hidden lg:flex w-64 flex-shrink-0 flex-col h-screen fixed top-0 left-0 z-20 bg-[#0e0e12] border-r border-outline-variant/10 backdrop-blur-xl"
+                className={`hidden lg:flex flex-shrink-0 flex-col h-screen fixed top-0 left-0 pt-16 z-20 bg-[var(--sys-bg)] border-r border-[var(--sys-border)] transition-all duration-300 ${isCollapsed ? 'w-20' : 'w-64'}`}
             >
                 {sidebarContent}
             </aside>
 
             {/* ── Mobile Sidebar Drawer (< lg) ── */}
             <div
-                className={`lg:hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-40 transition-opacity duration-300 ${mobileOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+                className={`lg:hidden fixed inset-0 bg-[var(--sys-surface)] z-40 transition-opacity duration-300 ${mobileOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
                 onClick={onClose}
             />
             <aside
-                className={`lg:hidden fixed top-0 left-0 h-full w-72 flex flex-col z-50 transform heavy-in-soft-out transition-transform duration-300 bg-[#0e0e12] border-r border-outline-variant/10 backdrop-blur-xl ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}
+                className={`lg:hidden fixed top-0 left-0 h-full w-72 pt-16 flex flex-col z-50 transform heavy-in-soft-out transition-transform duration-300 bg-[var(--sys-bg)] border-r border-[var(--sys-border)] ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}
             >
                 {sidebarContent}
             </aside>

@@ -55,26 +55,26 @@ export default function VerifyEmail() {
             <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-[#FF4D00]/10 rounded-full blur-[120px] animate-pulse delay-700" />
             
             <div className="w-full max-w-md relative z-10 text-center">
-                <div className="glass-panel p-10 rounded-[32px] border border-white/[0.08] shadow-2xl backdrop-blur-xl">
+                <div className="glass-panel p-10 rounded-[32px] border border-[var(--sys-border)] shadow-2xl ">
                     <div className="mb-8">
-                        <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-gradient-to-tr from-primary/20 to-[#FF7A00]/20 border border-white/10 mb-6 group">
+                        <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-[var(--sys-surface)] border border-[var(--sys-border)] border border-[var(--sys-border)] mb-6 group">
                             {status === 'verifying' && (
                                 <span className="material-symbols-outlined text-4xl text-primary animate-spin">sync</span>
                             )}
                             {status === 'success' && (
-                                <span className="material-symbols-outlined text-4xl text-emerald-400 group-hover:scale-110 transition-transform">verified_user</span>
+                                <span className="material-symbols-outlined text-4xl text-primary group-hover:scale-110 transition-transform">verified_user</span>
                             )}
                             {status === 'error' && (
-                                <span className="material-symbols-outlined text-4xl text-rose-400 group-hover:scale-110 transition-transform">error</span>
+                                <span className="material-symbols-outlined text-4xl text-primary group-hover:scale-110 transition-transform">error</span>
                             )}
                         </div>
                         
-                        <h1 className="text-3xl font-extrabold text-white mb-3">
+                        <h1 className="text-3xl font-extrabold text-[var(--sys-text)] mb-3">
                             {status === 'verifying' && 'Verifying Your Account'}
                             {status === 'success' && 'Account Verified!'}
                             {status === 'error' && 'Verification Issue'}
                         </h1>
-                        <p className="text-slate-400 leading-relaxed px-4">
+                        <p className="text-[var(--sys-text-muted)] leading-relaxed px-4">
                             {status === 'verifying' && 'Please wait while we secure your access to Mantram AI...'}
                             {status === 'success' && 'Great news! Your email has been confirmed. You now have full access to our AI agents.'}
                             {status === 'error' && message}
@@ -84,7 +84,7 @@ export default function VerifyEmail() {
                     {status === 'success' && (
                         <Link 
                             to="/dashboard"
-                            className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-primary to-[#FF7A00] text-white font-bold text-lg hover:shadow-[0_0_30px_rgba(99,102,241,0.4)] hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2 group"
+                            className="w-full py-4 px-6 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] font-bold text-lg hover:shadow-[0_0_30px_rgba(99,102,241,0.4)] hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2 group"
                         >
                             Get Started Now
                             <span className="material-symbols-outlined text-xl group-hover:translate-x-1 transition-transform">arrow_forward</span>
@@ -95,18 +95,18 @@ export default function VerifyEmail() {
                         <div className="space-y-4">
                             <button 
                                 onClick={handleResend}
-                                className="w-full py-4 px-6 rounded-2xl bg-white/[0.05] border border-white/10 text-white font-bold hover:bg-white/[0.08] transition-all"
+                                className="w-full py-4 px-6 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] font-bold hover:bg-[var(--sys-surface)] transition-all"
                             >
                                 Back to Login
                             </button>
-                            <Link to="/" className="block text-sm text-slate-500 hover:text-white transition-colors">
+                            <Link to="/" className="block text-sm text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] transition-colors">
                                 Return to Home
                             </Link>
                         </div>
                     )}
                 </div>
                 
-                <p className="mt-8 text-xs text-slate-600 font-medium">
+                <p className="mt-8 text-xs text-[var(--sys-text-muted)] font-medium">
                     &copy; 2024 Mantram AI. Secure AI for modern brands.
                 </p>
             </div>

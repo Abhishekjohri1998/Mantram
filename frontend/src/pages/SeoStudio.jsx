@@ -59,8 +59,8 @@ function ScoreRing({ score, size = 100, label, color = 'primary' }) {
                     strokeWidth="6" strokeLinecap="round" strokeDasharray={c} strokeDashoffset={offset}
                     style={{ transition: 'stroke-dashoffset 1s ease' }} />
             </svg>
-            <span className="text-2xl font-black text-white -mt-16">{score}</span>
-            {label && <p className="text-sm text-slate-500 mt-3 font-bold">{label}</p>}
+            <span className="text-2xl font-black text-[var(--sys-text)] -mt-16">{score}</span>
+            {label && <p className="text-sm text-[var(--sys-text-muted)] mt-3 font-bold">{label}</p>}
         </div>
     )
 }
@@ -746,16 +746,16 @@ body{font-family:'Inter',system-ui,sans-serif;color:#1e293b;padding:0;font-size:
 .report-header{display:flex;justify-content:space-between;align-items:center;padding-bottom:20px}
 .header-left{display:flex;align-items:center;gap:14px}
 .brand-logo{width:52px;height:52px;object-fit:contain;border-radius:10px;border:1px solid #e2e8f0}
-.brand-initial{width:52px;height:52px;border-radius:10px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:900}
+.brand-initial{width:52px;height:52px;border-radius:10px;background:var(--sys-primary);color:#fff;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:900}
 .brand-name{font-size:22px;font-weight:800;color:#0f172a;letter-spacing:-0.5px}
 .brand-url{font-size:11px;color:#64748b;margin-top:2px}
 .header-right{text-align:right}
-.report-badge{display:inline-block;padding:6px 16px;border-radius:20px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px}
+.report-badge{display:inline-block;padding:6px 16px;border-radius:20px;background:var(--sys-primary);color:#fff;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px}
 .report-date{font-size:10px;color:#94a3b8;margin-top:6px}
-.divider{height:2px;background:linear-gradient(90deg,#6366f1 0%,#8b5cf6 50%,#e2e8f0 100%);margin-bottom:24px;border-radius:2px}
+.divider{height:2px;background:var(--sys-primary);margin-bottom:24px;border-radius:2px}
 
 /* ── Executive Summary ── */
-.exec-summary{background:linear-gradient(135deg,#f8fafc,#f1f5f9);border-left:4px solid #6366f1;padding:16px 20px;border-radius:0 12px 12px 0;margin-bottom:28px}
+.exec-summary{background:var(--sys-primary);border-left:4px solid #6366f1;padding:16px 20px;border-radius:0 12px 12px 0;margin-bottom:28px}
 .exec-label{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;color:#6366f1;margin-bottom:6px}
 .exec-text{font-size:13px;color:#334155;line-height:1.7}
 
@@ -777,7 +777,7 @@ body{font-family:'Inter',system-ui,sans-serif;color:#1e293b;padding:0;font-size:
 /* ── Sections ── */
 h2{font-size:15px;font-weight:800;color:#0f172a;margin:28px 0 14px;padding-bottom:8px;border-bottom:2px solid #e2e8f0;display:flex;align-items:center;gap:8px}
 .h2-icon{font-size:16px}
-.section-break{height:1px;background:linear-gradient(90deg,transparent,#cbd5e1,transparent);margin:32px 0}
+.section-break{height:1px;background:var(--sys-primary);margin:32px 0}
 .count-badge{font-size:10px;font-weight:600;background:#e0e7ff;color:#4338ca;padding:2px 10px;border-radius:12px;margin-left:auto}
 
 /* ── Stats Grid ── */
@@ -795,7 +795,7 @@ h2{font-size:15px;font-weight:800;color:#0f172a;margin:28px 0 14px;padding-botto
 
 /* ── Tables ── */
 table{width:100%;border-collapse:separate;border-spacing:0;margin:12px 0;border-radius:10px;overflow:hidden;border:1px solid #e2e8f0}
-thead{background:linear-gradient(135deg,#f1f5f9,#e2e8f0)}
+thead{background:var(--sys-primary)}
 th{padding:10px 14px;text-align:left;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:0.8px;color:#475569}
 td{padding:10px 14px;border-top:1px solid #f1f5f9;font-size:11px;vertical-align:top}
 .alt-row{background:#fafbfc}
@@ -821,7 +821,7 @@ small{color:#94a3b8;font-size:10px}
 .action-card li{margin:4px 0}
 
 /* ── AI Insights ── */
-.ai-badge{font-size:9px;background:linear-gradient(135deg,#7c3aed,#6366f1);color:#fff;padding:3px 10px;border-radius:10px;font-weight:700;margin-left:auto}
+.ai-badge{font-size:9px;background:var(--sys-primary);color:#fff;padding:3px 10px;border-radius:10px;font-weight:700;margin-left:auto}
 .ai-card{background:#faf5ff;border:1px solid #e9d5ff;border-radius:12px;padding:14px 18px;margin:10px 0}
 .ai-card-label{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:#7c3aed;margin-bottom:6px}
 .ai-card p,.ai-card li{font-size:11px;color:#4c1d95}
@@ -840,7 +840,7 @@ small{color:#94a3b8;font-size:10px}
 .paa-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.paa-card{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px;font-size:11px}
 .week-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
 .week-card{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:14px;text-align:center}
-.week-badge{display:inline-block;padding:3px 12px;border-radius:10px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;font-size:10px;font-weight:800;margin-bottom:6px}
+.week-badge{display:inline-block;padding:3px 12px;border-radius:10px;background:var(--sys-primary);color:#fff;font-size:10px;font-weight:800;margin-bottom:6px}
 .week-theme{font-size:12px;font-weight:700;color:#334155;margin-bottom:6px}
 .week-card ul{text-align:left;padding-left:16px;font-size:10px}.week-outcome{font-size:9px;color:#6366f1;margin-top:6px;font-style:italic}
 .outrank-list li{margin:10px 0;font-size:12px;line-height:1.6}
@@ -849,7 +849,7 @@ small{color:#94a3b8;font-size:10px}
 
 /* ── Cover Page ── */
 .cover-page{page-break-after:always;margin:-24px -32px 0 -32px;padding:0}
-.cover-gradient{min-height:92vh;background:linear-gradient(160deg,#0f0a2e 0%,#1e1b4b 30%,#312e81 60%,#4338ca 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:60px 40px;border-radius:0}
+.cover-gradient{min-height:92vh;background:var(--sys-primary);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:60px 40px;border-radius:0}
 .cover-logos{display:flex;align-items:center;gap:28px;margin-bottom:48px}
 .cover-mantram,.cover-brand{display:flex;flex-direction:column;align-items:center;gap:10px}
 .cover-mantram-logo{height:48px;filter:brightness(10)}
@@ -868,7 +868,7 @@ small{color:#94a3b8;font-size:10px}
 
 /* ── Mantram Masthead ── */
 .report-masthead{margin:-32px -40px 20px -40px;padding:0}
-.masthead-bar{display:flex;justify-content:space-between;align-items:center;padding:10px 40px;background:linear-gradient(135deg,#1e1b4b,#312e81);border-radius:12px 12px 0 0}
+.masthead-bar{display:flex;justify-content:space-between;align-items:center;padding:10px 40px;background:var(--sys-primary);border-radius:12px 12px 0 0}
 .masthead-left{display:flex;align-items:center;gap:10px}
 .mantram-header-logo{height:22px;filter:brightness(10)}
 .mantram-text-logo{font-size:14px;font-weight:900;color:#fff;letter-spacing:0.5px}
@@ -958,9 +958,9 @@ small{color:#94a3b8;font-size:10px}
             {!activeBrand ? (
                 <div className="max-w-7xl mx-auto">
                     <div className="glass-panel rounded-2xl p-10 mb-8 text-center">
-                        <span className="material-symbols-outlined text-slate-600 text-5xl block mb-3">domain</span>
-                        <h3 className="text-lg font-bold text-white mb-2">Select or Create a Brand</h3>
-                        <p className="text-sm text-slate-400 mb-4">SEO Studio needs a brand with a website to analyze.</p>
+                        <span className="material-symbols-outlined text-[var(--sys-text-muted)] text-5xl block mb-3">domain</span>
+                        <h3 className="text-lg font-bold text-[var(--sys-text)] mb-2">Select or Create a Brand</h3>
+                        <p className="text-sm text-[var(--sys-text-muted)] mb-4">SEO Studio needs a brand with a website to analyze.</p>
                         <button onClick={() => navigate('/onboarding')} className="btn-primary py-2.5 px-6 rounded-xl text-sm cursor-pointer">Create Brand</button>
                     </div>
                 </div>
@@ -973,14 +973,14 @@ small{color:#94a3b8;font-size:10px}
                         <div className="py-3 px-2 space-y-4">
                             {/* GA Status */}
                             {gaConnected && (
-                                <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/15 mx-1">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0" />
-                                    <span className="text-[10px] font-bold text-emerald-400 truncate">{gaEmail || 'GA Connected'}</span>
+                                <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-[var(--sys-primary-dim)] border border-[var(--sys-border)] mx-1">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-[var(--sys-surface)] flex-shrink-0" />
+                                    <span className="text-[10px] font-bold text-primary truncate">{gaEmail || 'GA Connected'}</span>
                                 </div>
                             )}
                             {SIDEBAR_SECTIONS.map(section => (
                                 <div key={section.title}>
-                                    <p className="text-[9px] font-black text-slate-600 uppercase tracking-widest px-3 mb-1.5">{section.title}</p>
+                                    <p className="text-[9px] font-black text-[var(--sys-text-muted)] uppercase tracking-widest px-3 mb-1.5">{section.title}</p>
                                     <div className="space-y-0.5">
                                         {section.items.map(item => {
                                             const isActive = activeSection === item.id
@@ -992,15 +992,15 @@ small{color:#94a3b8;font-size:10px}
                                                     onClick={() => { setActiveSection(item.id); setError(null); if (item.type === 'workflow') { setSavedResults(null) } }}
                                                     className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[12px] font-semibold transition-all duration-200 cursor-pointer text-left ${
                                                         isActive
-                                                            ? 'text-white'
-                                                            : 'text-slate-500 hover:text-slate-300 hover:bg-white/[0.03]'
+                                                            ? 'text-[var(--sys-text)]'
+                                                            : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text-muted)] hover:bg-[var(--sys-surface)]'
                                                     }`}
-                                                    style={isActive ? { background: `${item.color}15`, color: 'white' } : {}}>
+                                                    style={isActive ? { background: `${item.color}15`, color: 'var(--sys-text)' } : {}}>
                                                     <span className="material-symbols-outlined text-[16px] flex-shrink-0"
                                                         style={{ color: isActive ? item.color : undefined }}>{item.icon}</span>
                                                     <span className="flex-1 truncate">{item.label}</span>
                                                     {isRunning && <span className="material-symbols-outlined text-[12px] animate-spin flex-shrink-0" style={{ color: item.color }}>sync</span>}
-                                                    {isDone && !isRunning && <span className="material-symbols-outlined text-[12px] text-emerald-400 flex-shrink-0">check_circle</span>}
+                                                    {isDone && !isRunning && <span className="material-symbols-outlined text-[12px] text-primary flex-shrink-0">check_circle</span>}
                                                 </button>
                                             )
                                         })}
@@ -1010,8 +1010,8 @@ small{color:#94a3b8;font-size:10px}
                             {/* Guide toggle */}
                             <div>
                                 <button onClick={() => setShowGuide(!showGuide)}
-                                    className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[12px] font-semibold transition-all duration-200 cursor-pointer ${showGuide ? 'text-white' : 'text-slate-500 hover:text-slate-300 hover:bg-white/[0.03]'}`}
-                                    style={showGuide ? { background: 'rgba(99,102,241,0.15)', color: 'white' } : {}}>
+                                    className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[12px] font-semibold transition-all duration-200 cursor-pointer ${showGuide ? 'text-[var(--sys-text)]' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text-muted)] hover:bg-[var(--sys-surface)]'}`}
+                                    style={showGuide ? { background: 'rgba(99,102,241,0.15)', color: 'var(--sys-text)' } : {}}>
                                     <span className="material-symbols-outlined text-[16px]" style={{ color: showGuide ? '#6366f1' : undefined }}>menu_book</span>
                                     <span>Guide</span>
                                 </button>
@@ -1024,14 +1024,14 @@ small{color:#94a3b8;font-size:10px}
                         {/* Compact Brand Header + Ask Bar */}
                         <div className="flex items-center gap-3 mb-4">
                             <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-                                style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', boxShadow: '0 2px 12px rgba(99,102,241,0.25)' }}>
-                                <span className="material-symbols-outlined text-white text-lg">travel_explore</span>
+                                style={{ background: 'var(--sys-primary)', boxShadow: '0 2px 12px rgba(99,102,241,0.25)' }}>
+                                <span className="material-symbols-outlined text-[var(--sys-text)] text-lg">travel_explore</span>
                             </div>
                             <div className="min-w-0 mr-2 group relative">
-                                <h2 className="text-sm font-bold text-white truncate">{activeBrand.name}</h2>
+                                <h2 className="text-sm font-bold text-[var(--sys-text)] truncate">{activeBrand.name}</h2>
                                 {website ? (
-                                    <p className="text-[10px] text-slate-500 truncate flex items-center gap-1">
-                                        <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
+                                    <p className="text-[10px] text-[var(--sys-text-muted)] truncate flex items-center gap-1">
+                                        <span className="w-2 h-2 rounded-full bg-[var(--sys-surface)] shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
                                         {website}
                                     </p>
                                 ) : (
@@ -1054,15 +1054,15 @@ small{color:#94a3b8;font-size:10px}
                             <div className="flex-1 flex items-center gap-2 rounded-xl px-3 py-2" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
                                 <span className="material-symbols-outlined text-[#FF4D00] text-sm">auto_awesome</span>
                                 <input type="text" value={askQuery} onChange={e => setAskQuery(e.target.value)} onKeyDown={e => e.key === 'Enter' && runAsk()}
-                                    placeholder="Ask anything about SEO..." className="flex-1 text-xs bg-transparent text-white placeholder:text-slate-600 outline-none border-none" />
+                                    placeholder="Ask anything about SEO..." className="flex-1 text-xs bg-transparent text-[var(--sys-text)] placeholder:text-[var(--sys-text-muted)] outline-none border-none" />
                                 <button onClick={runAsk} disabled={askLoading || !askQuery.trim()}
                                     className="px-3 py-1 rounded-lg text-[10px] font-bold cursor-pointer disabled:opacity-30 transition-all"
-                                    style={{ background: askQuery.trim() ? 'linear-gradient(135deg, #6366f1, #8b5cf6)' : 'rgba(255,255,255,0.03)', color: askQuery.trim() ? 'white' : '#475569' }}>Ask</button>
+                                    style={{ background: askQuery.trim() ? 'var(--sys-primary)' : 'rgba(255,255,255,0.03)', color: askQuery.trim() ? 'white' : 'var(--sys-text-muted)' }}>Ask</button>
                             </div>
 
                             <StudioReportButton studio="seo" brandId={activeBrand?._id} />
                             <button onClick={() => setShowGuide(!showGuide)} title="How It Works"
-                                className={`size-9 rounded-xl flex items-center justify-center cursor-pointer transition-all ${showGuide ? 'bg-primary/20 text-primary' : 'bg-white/[0.04] border border-white/[0.06] text-slate-500 hover:text-white hover:bg-white/[0.08]'}`}>
+                                className={`size-9 rounded-xl flex items-center justify-center cursor-pointer transition-all ${showGuide ? 'bg-primary/20 text-primary' : 'bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)]'}`}>
                                 <span className="material-symbols-outlined text-lg">help</span>
                             </button>
                         </div>
@@ -1078,26 +1078,26 @@ small{color:#94a3b8;font-size:10px}
                         {askResult && (
                             <div className="glass-panel rounded-2xl p-5 mb-4 animate-fade-in">
                                 <div className="flex items-center justify-between mb-3">
-                                    <h3 className="text-sm font-bold text-white flex items-center gap-2"><span className="material-symbols-outlined text-primary text-sm">psychology</span> AI Answer</h3>
-                                    <button onClick={() => setAskResult(null)} className="text-slate-500 hover:text-slate-300 cursor-pointer"><span className="material-symbols-outlined text-sm">close</span></button>
+                                    <h3 className="text-sm font-bold text-[var(--sys-text)] flex items-center gap-2"><span className="material-symbols-outlined text-primary text-sm">psychology</span> AI Answer</h3>
+                                    <button onClick={() => setAskResult(null)} className="text-[var(--sys-text-muted)] hover:text-[var(--sys-text-muted)] cursor-pointer"><span className="material-symbols-outlined text-sm">close</span></button>
                                 </div>
-                                <div className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap mb-3">{askResult.answer}</div>
+                                <div className="text-sm text-[var(--sys-text-muted)] leading-relaxed whitespace-pre-wrap mb-3">{askResult.answer}</div>
                                 {askResult.actionItems?.length > 0 && (
                                     <div className="space-y-1.5 mb-3">{askResult.actionItems.map((a, i) => (
-                                        <div key={i} className="flex items-start gap-2 p-2 rounded-lg bg-white/3"><span className="text-primary text-xs mt-0.5">▸</span><div><p className="text-xs font-bold text-white">{a.title}</p><p className="text-[10px] text-slate-400">{a.description}</p></div></div>
+                                        <div key={i} className="flex items-start gap-2 p-2 rounded-lg bg-[var(--sys-surface)]"><span className="text-primary text-xs mt-0.5">▸</span><div><p className="text-xs font-bold text-[var(--sys-text)]">{a.title}</p><p className="text-[10px] text-[var(--sys-text-muted)]">{a.description}</p></div></div>
                                     ))}</div>
                                 )}
                                 {askResult.followUpQuestions?.length > 0 && (
                                     <div className="flex flex-wrap gap-2">{askResult.followUpQuestions.map((q, i) => (
                                         <button key={i} onClick={() => { setAskQuery(q); setAskResult(null) }}
-                                            className="text-xs px-3 py-1 rounded-full bg-white/5 text-slate-400 hover:bg-primary/10 hover:text-primary border border-white/5 cursor-pointer transition-all">{q}</button>
+                                            className="text-xs px-3 py-1 rounded-full bg-[var(--sys-surface)] text-[var(--sys-text-muted)] hover:bg-primary/10 hover:text-primary border border-[var(--sys-border)] cursor-pointer transition-all">{q}</button>
                                     ))}</div>
                                 )}
                             </div>
                         )}
 
                         {error && (
-                            <div className={`p-4 rounded-xl border ${error.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'} mb-4 flex items-center gap-2`}>
+                            <div className={`p-4 rounded-xl border ${error.isProviderError ? 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary' : 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary'} mb-4 flex items-center gap-2`}>
                                 <span className="material-symbols-outlined text-sm">
                                     {error.isProviderError ? 'warning' : 'error'}
                                 </span>
@@ -1125,7 +1125,7 @@ small{color:#94a3b8;font-size:10px}
                                 />
                                 <div className="absolute bottom-6 left-0 right-0 flex justify-center">
                                     <button onClick={cancelWorkflow}
-                                        className="px-4 py-1.5 rounded-lg text-xs font-bold text-slate-500 hover:text-white bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] cursor-pointer transition-all flex items-center gap-1.5 z-10">
+                                        className="px-4 py-1.5 rounded-lg text-xs font-bold text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] bg-[var(--sys-surface)] hover:bg-[var(--sys-surface)] border border-[var(--sys-border)] cursor-pointer transition-all flex items-center gap-1.5 z-10">
                                         <span className="material-symbols-outlined text-xs">close</span> Cancel
                                     </button>
                                 </div>
@@ -1135,14 +1135,14 @@ small{color:#94a3b8;font-size:10px}
                         {/* ─── Baseline data indicator ─── */}
                         {isWorkflow && !loading && results && results._isBaseline && (
                             <div className="flex items-center justify-between p-3 rounded-xl mb-4 animate-fade-in" style={{ background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.15)' }}>
-                                <div className="flex items-center gap-2 text-xs text-emerald-400">
+                                <div className="flex items-center gap-2 text-xs text-primary">
                                     <span className="material-symbols-outlined text-sm">auto_awesome</span>
-                                    <span>Auto-generated during brand onboarding • <strong className="text-white">Deterministic scoring — no AI hallucination</strong></span>
+                                    <span>Auto-generated during brand onboarding • <strong className="text-[var(--sys-text)]">Deterministic scoring — no AI hallucination</strong></span>
                                 </div>
                                 <CreditTooltipWrapper action={currentItem?.creditAction}>
                                     <button onClick={() => runWorkflow(activeSection)} disabled={loading}
-                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold text-white cursor-pointer hover:brightness-110 transition-all"
-                                        style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}>
+                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold text-[var(--sys-text)] cursor-pointer hover:brightness-110 transition-all"
+                                        style={{ background: 'var(--sys-primary)' }}>
                                         <span className="material-symbols-outlined text-xs">play_arrow</span> Run Full Health Check
                                         <CreditBadge action={currentItem?.creditAction} />
                                     </button>
@@ -1153,14 +1153,14 @@ small{color:#94a3b8;font-size:10px}
                         {/* ─── Saved-data indicator ─── */}
                         {isWorkflow && !loading && results && savedAt && !results._isBaseline && (
                             <div className="flex items-center justify-between p-3 rounded-xl mb-4 animate-fade-in" style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.12)' }}>
-                                <div className="flex items-center gap-2 text-xs text-slate-400">
+                                <div className="flex items-center gap-2 text-xs text-[var(--sys-text-muted)]">
                                     <span className="material-symbols-outlined text-primary text-sm">history</span>
-                                    <span>Last generated <strong className="text-white">{new Date(savedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</strong></span>
+                                    <span>Last generated <strong className="text-[var(--sys-text)]">{new Date(savedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</strong></span>
                                 </div>
                                 <CreditTooltipWrapper action={currentItem?.creditAction}>
                                     <button onClick={() => runWorkflow(activeSection)} disabled={loading}
-                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold text-white cursor-pointer hover:brightness-110 transition-all"
-                                        style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}>
+                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold text-[var(--sys-text)] cursor-pointer hover:brightness-110 transition-all"
+                                        style={{ background: 'var(--sys-primary)' }}>
                                         <span className="material-symbols-outlined text-xs">refresh</span> Regenerate
                                         <CreditBadge action={currentItem?.creditAction} />
                                     </button>
@@ -1175,26 +1175,26 @@ small{color:#94a3b8;font-size:10px}
                                 <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
                                     <div className="flex items-center gap-2 flex-wrap">
                                         {results.researchSources?.length > 0 && (
-                                            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/8 border border-emerald-500/12">
-                                                <span className="material-symbols-outlined text-emerald-400 text-xs">verified</span>
-                                                <span className="text-[10px] text-emerald-400 font-bold">{results.researchSources.length} pages crawled</span>
+                                            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--sys-primary-dim)] border border-[var(--sys-border)]">
+                                                <span className="material-symbols-outlined text-primary text-xs">verified</span>
+                                                <span className="text-[10px] text-primary font-bold">{results.researchSources.length} pages crawled</span>
                                             </div>
                                         )}
                                         {results.crawlIntelligence && (
                                             <>
-                                                <span className={`text-[10px] px-2 py-1 rounded-full font-bold ${results.crawlIntelligence.hasSitemap ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
+                                                <span className={`text-[10px] px-2 py-1 rounded-full font-bold ${results.crawlIntelligence.hasSitemap ? 'bg-[var(--sys-primary-dim)] text-primary' : 'bg-[var(--sys-primary-dim)] text-primary'}`}>
                                                     {results.crawlIntelligence.hasSitemap ? '✓ Sitemap' : '✗ No Sitemap'}
                                                 </span>
-                                                <span className={`text-[10px] px-2 py-1 rounded-full font-bold ${results.crawlIntelligence.hasRobotsTxt ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
+                                                <span className={`text-[10px] px-2 py-1 rounded-full font-bold ${results.crawlIntelligence.hasRobotsTxt ? 'bg-[var(--sys-primary-dim)] text-primary' : 'bg-[var(--sys-primary-dim)] text-primary'}`}>
                                                     {results.crawlIntelligence.hasRobotsTxt ? '✓ Robots.txt' : '✗ No Robots.txt'}
                                                 </span>
                                                 {results.crawlIntelligence.thinPageCount > 0 && (
-                                                    <span className="text-[10px] px-2 py-1 rounded-full font-bold bg-amber-500/10 text-amber-400">
+                                                    <span className="text-[10px] px-2 py-1 rounded-full font-bold bg-[var(--sys-primary-dim)] text-primary">
                                                         {results.crawlIntelligence.thinPageCount} thin pages
                                                     </span>
                                                 )}
                                                 {results.crawlIntelligence.duplicateContentCount > 0 && (
-                                                    <span className="text-[10px] px-2 py-1 rounded-full font-bold bg-rose-500/10 text-rose-400">
+                                                    <span className="text-[10px] px-2 py-1 rounded-full font-bold bg-[var(--sys-primary-dim)] text-primary">
                                                         {results.crawlIntelligence.duplicateContentCount} duplicates
                                                     </span>
                                                 )}
@@ -1208,8 +1208,8 @@ small{color:#94a3b8;font-size:10px}
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <button onClick={() => downloadSeoPdf(activeSection, results, activeBrand)}
-                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold text-white cursor-pointer hover:brightness-110 transition-all"
-                                            style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
+                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold text-[var(--sys-text)] cursor-pointer hover:brightness-110 transition-all"
+                                            style={{ background: 'var(--sys-primary)' }}>
                                             <span className="material-symbols-outlined text-xs">download</span> Download PDF
                                         </button>
                                     </div>
@@ -1223,15 +1223,15 @@ small{color:#94a3b8;font-size:10px}
                                         </h4>
                                         <div className="flex flex-wrap gap-2">
                                             {results.peopleAlsoAsk.map((q, i) => (
-                                                <span key={i} className="text-[11px] px-3 py-1 rounded-full bg-[#FF4D00]/8 border border-[#FF4D00]/12 text-slate-300">{q}</span>
+                                                <span key={i} className="text-[11px] px-3 py-1 rounded-full bg-[#FF4D00]/8 border border-[#FF4D00]/12 text-[var(--sys-text-muted)]">{q}</span>
                                             ))}
                                         </div>
                                         {results.relatedSearches?.length > 0 && (
-                                            <div className="mt-3 pt-2 border-t border-white/[0.04]">
-                                                <p className="text-[10px] text-slate-500 font-bold mb-1.5">Related Searches</p>
+                                            <div className="mt-3 pt-2 border-t border-[var(--sys-border)]">
+                                                <p className="text-[10px] text-[var(--sys-text-muted)] font-bold mb-1.5">Related Searches</p>
                                                 <div className="flex flex-wrap gap-1.5">
                                                     {results.relatedSearches.map((r, i) => (
-                                                        <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-white/5 text-slate-400">{r}</span>
+                                                        <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--sys-surface)] text-[var(--sys-text-muted)]">{r}</span>
                                                     ))}
                                                 </div>
                                             </div>
@@ -1256,12 +1256,12 @@ small{color:#94a3b8;font-size:10px}
                                 <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4" style={{ background: `${currentItem?.color || '#6366f1'}15` }}>
                                     <span className="material-symbols-outlined text-3xl" style={{ color: currentItem?.color || '#6366f1' }}>{currentItem?.icon || 'search'}</span>
                                 </div>
-                                <h3 className="text-lg font-bold text-white mb-1">{currentItem?.label}</h3>
-                                <p className="text-sm text-slate-500 mb-4 text-center max-w-md">{currentItem?.desc}</p>
+                                <h3 className="text-lg font-bold text-[var(--sys-text)] mb-1">{currentItem?.label}</h3>
+                                <p className="text-sm text-[var(--sys-text-muted)] mb-4 text-center max-w-md">{currentItem?.desc}</p>
                                 <CreditTooltipWrapper action={currentItem?.creditAction}>
                                     <button onClick={() => runWorkflow(activeSection)} disabled={!website}
-                                        className="px-5 py-2.5 rounded-xl text-sm font-bold text-white cursor-pointer disabled:opacity-30 transition-all hover:shadow-lg flex items-center gap-2"
-                                        style={{ background: `linear-gradient(135deg, ${currentItem?.color || '#6366f1'}, ${currentItem?.color || '#8b5cf6'}cc)` }}>
+                                        className="px-5 py-2.5 rounded-xl text-sm font-bold text-[var(--sys-text)] cursor-pointer disabled:opacity-30 transition-all hover:shadow-lg flex items-center gap-2"
+                                        style={{ background: `var(--sys-primary)` }}>
                                         <span className="material-symbols-outlined text-sm">play_arrow</span> Run {currentItem?.label}
                                         <CreditBadge action={currentItem?.creditAction} />
                                     </button>
@@ -1337,9 +1337,9 @@ function HealthCheckResults({ results }) {
     return (<>
         {/* Summary */}
         <div className="glass-panel rounded-2xl p-6 mb-6">
-            <p className="text-sm text-slate-300 leading-relaxed">{results.summary}</p>
+            <p className="text-sm text-[var(--sys-text-muted)] leading-relaxed">{results.summary}</p>
             {results.topOpportunity && <p className="text-sm text-primary font-bold mt-2">{results.topOpportunity}</p>}
-            {results.strategicBrief && <p className="text-xs text-slate-400 mt-3 leading-relaxed">{results.strategicBrief}</p>}
+            {results.strategicBrief && <p className="text-xs text-[var(--sys-text-muted)] mt-3 leading-relaxed">{results.strategicBrief}</p>}
         </div>
 
         {/* Score Cards — with trend arrows ↑/↓ when available */}
@@ -1355,7 +1355,7 @@ function HealthCheckResults({ results }) {
                         <ScoreRing score={x.s || 0} size={80} label={x.l} color={x.c} />
                         {trendData && trendData.delta !== 0 && (
                             <span className={`absolute top-2 right-2 text-[10px] font-black px-1.5 py-0.5 rounded-full ${
-                                trendData.improved ? 'bg-emerald-500/15 text-emerald-400' : 'bg-rose-500/15 text-rose-400'
+                                trendData.improved ? 'bg-[var(--sys-primary-dim)] text-primary' : 'bg-[var(--sys-primary-dim)] text-primary'
                             }`}>{trendData.label}</span>
                         )}
                     </div>
@@ -1368,7 +1368,7 @@ function HealthCheckResults({ results }) {
             <div className="glass-panel rounded-2xl p-5 mb-6 border border-primary/10">
                 <h4 className="text-xs font-bold text-primary uppercase tracking-wider mb-3 flex items-center gap-2">
                     <span className="material-symbols-outlined text-sm">trending_up</span> Changes Since Last Audit
-                    <span className="ml-auto text-[9px] text-slate-500 font-normal normal-case">{new Date(trendDelta.previousDate).toLocaleDateString()}</span>
+                    <span className="ml-auto text-[9px] text-[var(--sys-text-muted)] font-normal normal-case">{new Date(trendDelta.previousDate).toLocaleDateString()}</span>
                 </h4>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     {[
@@ -1381,27 +1381,27 @@ function HealthCheckResults({ results }) {
                         { label: 'Thin Pages', value: trendDelta.thinPageChange, suffix: '', isNegative: true },
                         { label: 'Dup. Titles', value: trendDelta.duplicateTitleChange, suffix: '', isNegative: true },
                     ].map(d => (
-                        <div key={d.label} className="flex items-center gap-2 p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.04]">
-                            <span className={`text-base font-black ${d.isCount ? (d.isPositive ? 'text-emerald-400' : (d.value > 0 ? 'text-red-400' : 'text-slate-400')) : (d.isNegative ? (d.value > 0 ? 'text-red-400' : d.value < 0 ? 'text-emerald-400' : 'text-slate-400') : (d.value > 0 ? 'text-emerald-400' : d.value < 0 ? 'text-red-400' : 'text-slate-400'))}`}>
+                        <div key={d.label} className="flex items-center gap-2 p-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                            <span className={`text-base font-black ${d.isCount ? (d.isPositive ? 'text-primary' : (d.value > 0 ? 'text-primary' : 'text-[var(--sys-text-muted)]')) : (d.isNegative ? (d.value > 0 ? 'text-primary' : d.value < 0 ? 'text-primary' : 'text-[var(--sys-text-muted)]') : (d.value > 0 ? 'text-primary' : d.value < 0 ? 'text-primary' : 'text-[var(--sys-text-muted)]'))}`}>
                                 {d.isCount ? d.value : (d.value > 0 ? '+' : '')}{d.value}{d.suffix}
                             </span>
-                            <span className="text-[9px] text-slate-500 font-bold uppercase">{d.label}</span>
+                            <span className="text-[9px] text-[var(--sys-text-muted)] font-bold uppercase">{d.label}</span>
                         </div>
                     ))}
                 </div>
                 {/* Per-issue deltas */}
                 {trendDelta.issueDeltas?.length > 0 && (
-                    <div className="mt-4 border-t border-white/[0.06] pt-3">
-                        <p className="text-[9px] font-bold text-slate-500 uppercase mb-2">Issue-Level Changes</p>
+                    <div className="mt-4 border-t border-[var(--sys-border)] pt-3">
+                        <p className="text-[9px] font-bold text-[var(--sys-text-muted)] uppercase mb-2">Issue-Level Changes</p>
                         <div className="space-y-1.5">
                             {trendDelta.issueDeltas.slice(0, 12).map((d, idx) => (
                                 <div key={idx} className="flex items-center gap-2 text-[10px]">
-                                    {d.status === 'new' && <span className="px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-400 font-black">NEW</span>}
-                                    {d.status === 'resolved' && <span className="px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 font-black">✓ RESOLVED</span>}
-                                    {d.status === 'changed' && <span className="px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 font-black">CHANGED</span>}
-                                    <span className="text-slate-300 truncate flex-1">{d.check}</span>
-                                    {d.status === 'changed' && <span className="text-slate-500 text-[9px]">{d.previousValue} → {d.currentValue}</span>}
-                                    {d.status === 'new' && <span className="text-slate-500 text-[9px]">{d.currentValue}</span>}
+                                    {d.status === 'new' && <span className="px-1.5 py-0.5 rounded bg-[var(--sys-primary-dim)] text-primary font-black">NEW</span>}
+                                    {d.status === 'resolved' && <span className="px-1.5 py-0.5 rounded bg-[var(--sys-primary-dim)] text-primary font-black">✓ RESOLVED</span>}
+                                    {d.status === 'changed' && <span className="px-1.5 py-0.5 rounded bg-[var(--sys-primary-dim)] text-primary font-black">CHANGED</span>}
+                                    <span className="text-[var(--sys-text-muted)] truncate flex-1">{d.check}</span>
+                                    {d.status === 'changed' && <span className="text-[var(--sys-text-muted)] text-[9px]">{d.previousValue} → {d.currentValue}</span>}
+                                    {d.status === 'new' && <span className="text-[var(--sys-text-muted)] text-[9px]">{d.currentValue}</span>}
                                 </div>
                             ))}
                         </div>
@@ -1412,7 +1412,7 @@ function HealthCheckResults({ results }) {
 
         {/* ── Crawl Intelligence Dashboard ── */}
         <div className="glass-panel rounded-2xl p-5 mb-6">
-            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+            <h4 className="text-xs font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-4 flex items-center gap-2">
                 <span className="material-symbols-outlined text-sm text-primary">monitoring</span> Crawl Intelligence
             </h4>
             <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
@@ -1458,11 +1458,11 @@ function HealthCheckResults({ results }) {
                     { label: 'Uncached JS/CSS', value: stats.uncachedResourceCount || 0, icon: 'cloud_off', color: (stats.uncachedResourceCount || 0) > 0 ? '#f59e0b' : '#10b981' },
                     { label: 'Unminified JS/CSS', value: stats.unminifiedResourceCount || 0, icon: 'compress', color: (stats.unminifiedResourceCount || 0) > 0 ? '#f59e0b' : '#10b981' },
                 ].map(s => (
-                    <div key={s.label} className="flex items-center gap-2.5 p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
+                    <div key={s.label} className="flex items-center gap-2.5 p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
                         <span className="material-symbols-outlined text-lg" style={{ color: s.color }}>{s.icon}</span>
                         <div>
-                            <p className="text-base font-black text-white leading-tight">{s.value}</p>
-                            <p className="text-[9px] text-slate-500 font-bold uppercase">{s.label}</p>
+                            <p className="text-base font-black text-[var(--sys-text)] leading-tight">{s.value}</p>
+                            <p className="text-[9px] text-[var(--sys-text-muted)] font-bold uppercase">{s.label}</p>
                         </div>
                     </div>
                 ))}
@@ -1471,7 +1471,7 @@ function HealthCheckResults({ results }) {
             {/* Page Status Distribution */}
             {stats.pageStatusDistribution && (
                 <div className="flex items-center gap-2 mt-4 flex-wrap">
-                    <span className="text-[9px] text-slate-600 font-bold uppercase">Status:</span>
+                    <span className="text-[9px] text-[var(--sys-text-muted)] font-bold uppercase">Status:</span>
                     {[
                         { label: '2xx', count: stats.pageStatusDistribution.status200, color: '#10b981' },
                         { label: '3xx', count: stats.pageStatusDistribution.status301, color: '#f59e0b' },
@@ -1483,10 +1483,10 @@ function HealthCheckResults({ results }) {
                         </span>
                     ))}
                     {(stats.mixedContentCount || 0) > 0 && (
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400">⚠️ {stats.mixedContentCount} mixed content</span>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[var(--sys-primary-dim)] text-primary">⚠️ {stats.mixedContentCount} mixed content</span>
                     )}
                     {(stats.noindexPageCount || 0) > 0 && (
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400">🚫 {stats.noindexPageCount} noindex</span>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[var(--sys-primary-dim)] text-primary">🚫 {stats.noindexPageCount} noindex</span>
                     )}
                 </div>
             )}
@@ -1495,19 +1495,19 @@ function HealthCheckResults({ results }) {
         {/* ── Security Headers (NEW — unique feature) ── */}
         {stats.securityHeaders?.length > 0 && (
             <div className="glass-panel rounded-2xl p-5 mb-6">
-                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                <h4 className="text-xs font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-3 flex items-center gap-2">
                     <span className="material-symbols-outlined text-sm text-[#FF4D00]">shield</span> Security Headers
                     <span className="text-[9px] text-[#FF4D00] bg-[#FF4D00]/10 px-1.5 py-0.5 rounded-full ml-auto">★ Unique to Mantram AI</span>
                 </h4>
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
                     {stats.securityHeaders.map((h, i) => (
-                        <div key={i} className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${h.present ? 'bg-emerald-500/5 border-emerald-500/10' : 'bg-rose-500/5 border-rose-500/10'}`}>
-                            <span className={`material-symbols-outlined text-sm ${h.present ? 'text-emerald-400' : 'text-rose-400'}`}>
+                        <div key={i} className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${h.present ? 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)]' : 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)]'}`}>
+                            <span className={`material-symbols-outlined text-sm ${h.present ? 'text-primary' : 'text-primary'}`}>
                                 {h.present ? 'check_circle' : 'cancel'}
                             </span>
                             <div>
-                                <p className={`text-[10px] font-bold ${h.present ? 'text-emerald-400' : 'text-rose-400'}`}>{h.name}</p>
-                                <p className="text-[8px] text-slate-600 uppercase">{h.importance}</p>
+                                <p className={`text-[10px] font-bold ${h.present ? 'text-primary' : 'text-primary'}`}>{h.name}</p>
+                                <p className="text-[8px] text-[var(--sys-text-muted)] uppercase">{h.importance}</p>
                             </div>
                         </div>
                     ))}
@@ -1533,32 +1533,32 @@ function HealthCheckResults({ results }) {
                     <div className="space-y-4 animate-fade-in">
                         {/* AI Trend Summary */}
                         {results.aiInsights.trendSummary && (
-                            <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
-                                <p className="text-[10px] font-bold text-slate-400 uppercase mb-1.5 flex items-center gap-1">
-                                    <span className="material-symbols-outlined text-xs text-amber-400">trending_up</span> AI Trend Analysis
+                            <div className="p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                                <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase mb-1.5 flex items-center gap-1">
+                                    <span className="material-symbols-outlined text-xs text-primary">trending_up</span> AI Trend Analysis
                                 </p>
-                                <p className="text-xs text-slate-300 leading-relaxed">{results.aiInsights.trendSummary}</p>
+                                <p className="text-xs text-[var(--sys-text-muted)] leading-relaxed">{results.aiInsights.trendSummary}</p>
                             </div>
                         )}
 
                         {/* AI Fix Priorities */}
                         {results.aiInsights.fixPriorities?.length > 0 && (
-                            <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
-                                <p className="text-[10px] font-bold text-slate-400 uppercase mb-2 flex items-center gap-1">
-                                    <span className="material-symbols-outlined text-xs text-emerald-400">priority_high</span> Top Fixes by Traffic Impact
+                            <div className="p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                                <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase mb-2 flex items-center gap-1">
+                                    <span className="material-symbols-outlined text-xs text-primary">priority_high</span> Top Fixes by Traffic Impact
                                 </p>
                                 <div className="space-y-2">
                                     {results.aiInsights.fixPriorities.map((fix, i) => (
-                                        <div key={i} className="flex items-start gap-2.5 p-2.5 rounded-lg bg-white/[0.02] border border-white/[0.04] hover:bg-white/[0.04] transition-all">
+                                        <div key={i} className="flex items-start gap-2.5 p-2.5 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:bg-[var(--sys-surface)] transition-all">
                                             <span className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black ${
-                                                fix.impact === 'high' ? 'bg-rose-500/20 text-rose-400' : fix.impact === 'medium' ? 'bg-amber-500/20 text-amber-400' : 'bg-slate-500/20 text-slate-400'
+                                                fix.impact === 'high' ? 'bg-[var(--sys-primary-dim)] text-primary' : fix.impact === 'medium' ? 'bg-[var(--sys-primary-dim)] text-primary' : 'bg-[var(--sys-border)]/20 text-[var(--sys-text-muted)]'
                                             }`}>#{fix.rank}</span>
                                             <div className="flex-1 min-w-0">
-                                                <p className="text-[11px] font-bold text-white">{fix.title}</p>
-                                                <p className="text-[10px] text-slate-400 mt-0.5">{fix.reason}</p>
+                                                <p className="text-[11px] font-bold text-[var(--sys-text)]">{fix.title}</p>
+                                                <p className="text-[10px] text-[var(--sys-text-muted)] mt-0.5">{fix.reason}</p>
                                             </div>
                                             {fix.estimatedScoreGain > 0 && (
-                                                <span className="flex-shrink-0 text-[10px] font-black text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">+{fix.estimatedScoreGain} pts</span>
+                                                <span className="flex-shrink-0 text-[10px] font-black text-primary bg-[var(--sys-primary-dim)] px-2 py-0.5 rounded-full">+{fix.estimatedScoreGain} pts</span>
                                             )}
                                         </div>
                                     ))}
@@ -1568,16 +1568,16 @@ function HealthCheckResults({ results }) {
 
                         {/* AI Duplicate Validation */}
                         {results.aiInsights.duplicateValidation && (
-                            <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
-                                <p className="text-[10px] font-bold text-slate-400 uppercase mb-1.5 flex items-center gap-1">
+                            <div className="p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                                <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase mb-1.5 flex items-center gap-1">
                                     <span className="material-symbols-outlined text-xs text-[#FF4D00]">content_copy</span> AI Duplicate Validation
                                 </p>
-                                <p className="text-xs text-slate-300 mb-2">{results.aiInsights.duplicateValidation.summary}</p>
+                                <p className="text-xs text-[var(--sys-text-muted)] mb-2">{results.aiInsights.duplicateValidation.summary}</p>
                                 <div className="flex gap-3">
-                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400">
+                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[var(--sys-primary-dim)] text-primary">
                                         {results.aiInsights.duplicateValidation.trueDuplicateCount} True Duplicates
                                     </span>
-                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400">
+                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[var(--sys-primary-dim)] text-primary">
                                         {results.aiInsights.duplicateValidation.falsePositiveCount} False Positives
                                     </span>
                                 </div>
@@ -1585,8 +1585,8 @@ function HealthCheckResults({ results }) {
                         )}
 
                         {/* Powered By */}
-                        <div className="flex items-center gap-2 pt-2 border-t border-white/[0.04]">
-                            <span className="text-[8px] text-slate-600 uppercase font-bold">Powered by</span>
+                        <div className="flex items-center gap-2 pt-2 border-t border-[var(--sys-border)]">
+                            <span className="text-[8px] text-[var(--sys-text-muted)] uppercase font-bold">Powered by</span>
                             {results.aiInsights.poweredBy.map((model, i) => (
                                 <span key={i} className="text-[8px] text-[#FF4D00]/60 bg-[#FF4D00]/8 px-1.5 py-0.5 rounded-full">{model}</span>
                             ))}
@@ -1607,7 +1607,7 @@ function HealthCheckResults({ results }) {
         {pageReports.length > 0 && (
             <div className="glass-panel rounded-2xl p-5 mb-6">
                 <div className="flex items-center justify-between mb-3">
-                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                    <h4 className="text-xs font-bold text-[var(--sys-text-muted)] uppercase tracking-wider flex items-center gap-2">
                         <span className="material-symbols-outlined text-sm text-[#FF4D00]">analytics</span> Per-Page Report ({pageReports.length} pages)
                     </h4>
                     <button onClick={() => setShowPageCards(!showPageCards)}
@@ -1633,27 +1633,27 @@ function HealthCheckResults({ results }) {
                             if (page.responseTimeMs > 3000) pageIssueTags.push('Slow')
 
                             return (
-                                <div key={i} className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/[0.04] hover:bg-white/[0.04] transition-all">
+                                <div key={i} className="flex items-center gap-3 p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:bg-[var(--sys-surface)] transition-all">
                                     {/* Status dot */}
-                                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${pageIssueTags.length === 0 ? 'bg-emerald-400' : pageIssueTags.length <= 2 ? 'bg-amber-400' : 'bg-rose-400'}`} />
+                                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${pageIssueTags.length === 0 ? 'bg-[var(--sys-surface)]' : pageIssueTags.length <= 2 ? 'bg-[var(--sys-surface)]' : 'bg-[var(--sys-surface)]'}`} />
                                     {/* URL + title */}
                                     <div className="flex-1 min-w-0">
-                                        <p className="text-[11px] font-bold text-white truncate">{page.title || page.url}</p>
-                                        <p className="text-[9px] text-slate-600 truncate">{page.url}</p>
+                                        <p className="text-[11px] font-bold text-[var(--sys-text)] truncate">{page.title || page.url}</p>
+                                        <p className="text-[9px] text-[var(--sys-text-muted)] truncate">{page.url}</p>
                                     </div>
                                     {/* Stats */}
                                     <div className="flex items-center gap-3 flex-shrink-0">
-                                        <span className="text-[9px] text-slate-500">{page.responseTimeMs}ms</span>
-                                        <span className="text-[9px] text-slate-500">{page.pageSizeKB}KB</span>
-                                        <span className="text-[9px] text-slate-500">{page.wordCount}w</span>
+                                        <span className="text-[9px] text-[var(--sys-text-muted)]">{page.responseTimeMs}ms</span>
+                                        <span className="text-[9px] text-[var(--sys-text-muted)]">{page.pageSizeKB}KB</span>
+                                        <span className="text-[9px] text-[var(--sys-text-muted)]">{page.wordCount}w</span>
                                     </div>
                                     {/* Issue tags */}
                                     {pageIssueTags.length > 0 && (
                                         <div className="flex gap-1 flex-shrink-0">
                                             {pageIssueTags.slice(0, 3).map((tag, ti) => (
-                                                <span key={ti} className="text-[8px] font-bold px-1.5 py-0.5 rounded-full bg-rose-500/10 text-rose-400">{tag}</span>
+                                                <span key={ti} className="text-[8px] font-bold px-1.5 py-0.5 rounded-full bg-[var(--sys-primary-dim)] text-primary">{tag}</span>
                                             ))}
-                                            {pageIssueTags.length > 3 && <span className="text-[8px] text-slate-600">+{pageIssueTags.length - 3}</span>}
+                                            {pageIssueTags.length > 3 && <span className="text-[8px] text-[var(--sys-text-muted)]">+{pageIssueTags.length - 3}</span>}
                                         </div>
                                     )}
                                 </div>
@@ -1668,46 +1668,46 @@ function HealthCheckResults({ results }) {
         {groupedIssues && (groupedIssues.errorCount > 0 || groupedIssues.warningCount > 0 || groupedIssues.noticeCount > 0) && (
             <div className="space-y-4 mb-6">
                 {[
-                    { key: 'errors', label: 'Errors', items: groupedIssues?.errors || [], color: '#f43f5e', bg: 'bg-rose-500', icon: 'error' },
-                    { key: 'warnings', label: 'Warnings', items: groupedIssues?.warnings || [], color: '#f59e0b', bg: 'bg-amber-500', icon: 'warning' },
+                    { key: 'errors', label: 'Errors', items: groupedIssues?.errors || [], color: '#f43f5e', bg: 'bg-[var(--sys-surface)]', icon: 'error' },
+                    { key: 'warnings', label: 'Warnings', items: groupedIssues?.warnings || [], color: '#f59e0b', bg: 'bg-[var(--sys-surface)]', icon: 'warning' },
                     { key: 'notices', label: 'Notices', items: groupedIssues?.notices || [], color: '#3b82f6', bg: 'bg-[#FF4D00]', icon: 'info' },
                 ].filter(g => g.items.length > 0).map(group => (
                     <details key={group.key} open={group.key === 'errors'} className="glass-panel rounded-2xl overflow-hidden">
-                        <summary className="cursor-pointer p-4 flex items-center gap-3 hover:bg-white/[0.02] transition-all">
+                        <summary className="cursor-pointer p-4 flex items-center gap-3 hover:bg-[var(--sys-surface)] transition-all">
                             <span className="material-symbols-outlined text-lg" style={{ color: group.color }}>{group.icon}</span>
-                            <span className="text-sm font-bold text-white">{group.label}</span>
-                            <span className={`text-xs px-2.5 py-0.5 rounded-full font-black text-white ${group.bg}/20`} style={{ background: `${group.color}20`, color: group.color }}>
+                            <span className="text-sm font-bold text-[var(--sys-text)]">{group.label}</span>
+                            <span className={`text-xs px-2.5 py-0.5 rounded-full font-black text-[var(--sys-text)] ${group.bg}/20`} style={{ background: `${group.color}20`, color: group.color }}>
                                 {group.items.length}
                             </span>
-                            <span className="material-symbols-outlined text-sm text-slate-600 ml-auto">expand_more</span>
+                            <span className="material-symbols-outlined text-sm text-[var(--sys-text-muted)] ml-auto">expand_more</span>
                         </summary>
                         <div className="px-4 pb-4 space-y-2">
                             {group.items.map((issue, idx) => (
-                                <details key={idx} className="rounded-xl bg-white/[0.02] border border-white/[0.06] overflow-hidden">
-                                    <summary className="cursor-pointer p-3 flex items-center gap-3 hover:bg-white/[0.02] transition-all">
+                                <details key={idx} className="rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] overflow-hidden">
+                                    <summary className="cursor-pointer p-3 flex items-center gap-3 hover:bg-[var(--sys-surface)] transition-all">
                                         <span className="w-1 h-6 rounded-full shrink-0" style={{ background: group.color }} />
                                         <div className="flex-1 min-w-0">
-                                            <p className="text-xs font-bold text-white truncate">{issue.check}</p>
-                                            <p className="text-[10px] text-slate-500">{issue.value}</p>
+                                            <p className="text-xs font-bold text-[var(--sys-text)] truncate">{issue.check}</p>
+                                            <p className="text-[10px] text-[var(--sys-text-muted)]">{issue.value}</p>
                                         </div>
-                                        <span className="material-symbols-outlined text-sm text-slate-600">chevron_right</span>
+                                        <span className="material-symbols-outlined text-sm text-[var(--sys-text-muted)]">chevron_right</span>
                                     </summary>
-                                    <div className="px-4 pb-3 border-t border-white/[0.04] mt-1 pt-3 space-y-2">
+                                    <div className="px-4 pb-3 border-t border-[var(--sys-border)] mt-1 pt-3 space-y-2">
                                         {issue.aboutThisIssue && (
                                             <div>
-                                                <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">About this issue</p>
-                                                <p className="text-xs text-slate-300 leading-relaxed">{issue.aboutThisIssue}</p>
+                                                <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase mb-1">About this issue</p>
+                                                <p className="text-xs text-[var(--sys-text-muted)] leading-relaxed">{issue.aboutThisIssue}</p>
                                             </div>
                                         )}
                                         {issue.howToFix && (
                                             <div>
-                                                <p className="text-[10px] font-bold text-emerald-400 uppercase mb-1">How to fix</p>
-                                                <p className="text-xs text-slate-300 leading-relaxed">{issue.howToFix}</p>
+                                                <p className="text-[10px] font-bold text-primary uppercase mb-1">How to fix</p>
+                                                <p className="text-xs text-[var(--sys-text-muted)] leading-relaxed">{issue.howToFix}</p>
                                             </div>
                                         )}
                                         {issue.affectedUrls?.length > 0 && (
                                             <div>
-                                                <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Affected Pages ({issue.affectedUrls.length})</p>
+                                                <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase mb-1">Affected Pages ({issue.affectedUrls.length})</p>
                                                 <div className="space-y-1">
                                                     {issue.affectedUrls.slice(0, 10).map((url, j) => (
                                                         <a key={j} href={url} target="_blank" rel="noopener noreferrer"
@@ -1728,11 +1728,11 @@ function HealthCheckResults({ results }) {
         {/* AI-Generated Issues List */}
         <div className="glass-panel rounded-2xl p-6">
             <div className="flex items-center justify-between mb-4">
-                <h3 className="text-base font-bold text-white">{issues.length} AI-Identified Issues</h3>
+                <h3 className="text-base font-bold text-[var(--sys-text)]">{issues.length} AI-Identified Issues</h3>
                 <div className="flex gap-1">
                     {['all', ...SEVERITY_ORDER].map(s => (
                         <button key={s} onClick={() => setIssueFilter(s)}
-                            className={`text-xs px-2.5 py-1 rounded-full font-bold cursor-pointer transition-all ${issueFilter === s ? 'bg-primary/20 text-primary' : 'bg-white/5 text-slate-500 hover:text-slate-300'}`}>
+                            className={`text-xs px-2.5 py-1 rounded-full font-bold cursor-pointer transition-all ${issueFilter === s ? 'bg-primary/20 text-primary' : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] hover:text-[var(--sys-text-muted)]'}`}>
                             {s === 'all' ? 'All' : s.charAt(0).toUpperCase() + s.slice(1)} {s !== 'all' && `(${issues.filter(i => i.severity === s).length})`}
                         </button>
                     ))}
@@ -1748,18 +1748,18 @@ function HealthCheckResults({ results }) {
 function TrafficResults({ results }) {
     return (<>
         <div className="glass-panel rounded-2xl p-6 mb-6">
-            <p className="text-sm text-slate-300 leading-relaxed">{results.summary}</p>
+            <p className="text-sm text-[var(--sys-text-muted)] leading-relaxed">{results.summary}</p>
         </div>
 
         {/* Quick Wins */}
         {results.quickWins?.length > 0 && (
             <div className="glass-panel rounded-2xl p-6 mb-6">
-                <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2"><span className="text-lg">⚡</span> Quick Wins</h3>
+                <h3 className="text-base font-bold text-[var(--sys-text)] mb-4 flex items-center gap-2"><span className="text-lg">⚡</span> Quick Wins</h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                     {results.quickWins.map((w, i) => (
-                        <div key={i} className="p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/10">
-                            <p className="text-xs font-bold text-emerald-400 mb-1">{w.action}</p>
-                            <p className="text-[11px] text-slate-400">{w.keyword && <span className="text-primary">"{w.keyword}" — </span>}{w.expectedImpact}</p>
+                        <div key={i} className="p-4 rounded-xl bg-[var(--sys-primary-dim)] border border-[var(--sys-border)]">
+                            <p className="text-xs font-bold text-primary mb-1">{w.action}</p>
+                            <p className="text-[11px] text-[var(--sys-text-muted)]">{w.keyword && <span className="text-primary">"{w.keyword}" — </span>}{w.expectedImpact}</p>
                         </div>
                     ))}
                 </div>
@@ -1768,22 +1768,22 @@ function TrafficResults({ results }) {
 
         {/* Keyword Clusters */}
         <div className="glass-panel rounded-2xl p-6 mb-6">
-            <h3 className="text-base font-bold text-white mb-4">Keyword Clusters</h3>
+            <h3 className="text-base font-bold text-[var(--sys-text)] mb-4">Keyword Clusters</h3>
             <div className="space-y-4">
                 {(results.keywordClusters || []).map((cluster, i) => (
-                    <div key={i} className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+                    <div key={i} className="p-4 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
                         <div className="flex items-center justify-between mb-2">
-                            <h4 className="text-sm font-bold text-white">{cluster.clusterName}</h4>
+                            <h4 className="text-sm font-bold text-[var(--sys-text)]">{cluster.clusterName}</h4>
                             <div className="flex items-center gap-2">
-                                <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${cluster.difficulty === 'easy' ? 'bg-emerald-500/10 text-emerald-400' : cluster.difficulty === 'medium' ? 'bg-amber-500/10 text-amber-400' : 'bg-rose-500/10 text-rose-400'}`}>{cluster.difficulty}</span>
+                                <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${cluster.difficulty === 'easy' ? 'bg-[var(--sys-primary-dim)] text-primary' : cluster.difficulty === 'medium' ? 'bg-[var(--sys-primary-dim)] text-primary' : 'bg-[var(--sys-primary-dim)] text-primary'}`}>{cluster.difficulty}</span>
                                 <span className="text-xs px-2 py-0.5 rounded-full bg-[#FF4D00]/10 text-[#FF4D00] font-bold">{cluster.intent}</span>
                                 <span className="text-sm text-primary font-bold">{cluster.opportunityScore}/100</span>
                             </div>
                         </div>
                         <div className="flex flex-wrap gap-1.5 mb-2">{cluster.keywords?.map((k, j) => (
-                            <span key={j} className="text-xs px-2 py-0.5 rounded-full bg-white/5 text-slate-400">{typeof k === 'string' ? k : k.keyword}</span>
+                            <span key={j} className="text-xs px-2 py-0.5 rounded-full bg-[var(--sys-surface)] text-[var(--sys-text-muted)]">{typeof k === 'string' ? k : k.keyword}</span>
                         ))}</div>
-                        {cluster.suggestedTitle && <p className="text-[11px] text-slate-500">📝 <span className="text-slate-300">{cluster.suggestedTitle}</span> ({cluster.recommendedPageType})</p>}
+                        {cluster.suggestedTitle && <p className="text-[11px] text-[var(--sys-text-muted)]">📝 <span className="text-[var(--sys-text-muted)]">{cluster.suggestedTitle}</span> ({cluster.recommendedPageType})</p>}
                     </div>
                 ))}
             </div>
@@ -1793,22 +1793,22 @@ function TrafficResults({ results }) {
         <div className="grid grid-cols-2 gap-4 mb-6">
             {results.risingKeywords?.length > 0 && (
                 <div className="glass-panel rounded-2xl p-6">
-                    <h3 className="text-base font-bold text-white mb-3"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">trending_up</span> Rising Keywords</h3>
+                    <h3 className="text-base font-bold text-[var(--sys-text)] mb-3"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">trending_up</span> Rising Keywords</h3>
                     <div className="space-y-2">{results.risingKeywords.map((k, i) => (
-                        <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-white/3">
-                            <span className="text-sm text-white font-medium">{k.keyword}</span>
-                            <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${k.trend === 'breakout' ? 'bg-rose-500/10 text-rose-400' : 'bg-emerald-500/10 text-emerald-400'}`}>{k.trend}</span>
+                        <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-[var(--sys-surface)]">
+                            <span className="text-sm text-[var(--sys-text)] font-medium">{k.keyword}</span>
+                            <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${k.trend === 'breakout' ? 'bg-[var(--sys-primary-dim)] text-primary' : 'bg-[var(--sys-primary-dim)] text-primary'}`}>{k.trend}</span>
                         </div>
                     ))}</div>
                 </div>
             )}
             {results.seasonalPeaks?.length > 0 && (
                 <div className="glass-panel rounded-2xl p-6">
-                    <h3 className="text-base font-bold text-white mb-3">🗓️ Seasonal Peaks</h3>
+                    <h3 className="text-base font-bold text-[var(--sys-text)] mb-3">🗓️ Seasonal Peaks</h3>
                     <div className="space-y-2">{results.seasonalPeaks.map((p, i) => (
-                        <div key={i} className="p-2 rounded-lg bg-white/3">
-                            <p className="text-sm text-white font-medium">{p.keyword} <span className="text-primary text-xs">→ {p.peakMonth}</span></p>
-                            <p className="text-sm text-slate-500">{p.reason}</p>
+                        <div key={i} className="p-2 rounded-lg bg-[var(--sys-surface)]">
+                            <p className="text-sm text-[var(--sys-text)] font-medium">{p.keyword} <span className="text-primary text-xs">→ {p.peakMonth}</span></p>
+                            <p className="text-sm text-[var(--sys-text-muted)]">{p.reason}</p>
                         </div>
                     ))}</div>
                 </div>
@@ -1818,11 +1818,11 @@ function TrafficResults({ results }) {
         {/* 30-day plan */}
         {results.thirtyDayPlan?.length > 0 && (
             <div className="glass-panel rounded-2xl p-6">
-                <h3 className="text-base font-bold text-white mb-4"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">calendar_month</span> 30-Day Traffic Plan</h3>
+                <h3 className="text-base font-bold text-[var(--sys-text)] mb-4"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">calendar_month</span> 30-Day Traffic Plan</h3>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">{results.thirtyDayPlan.map((w, i) => (
-                    <div key={i} className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+                    <div key={i} className="p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
                         <p className="text-sm text-primary font-bold mb-2">Week {w.week}</p>
-                        <ul className="space-y-1">{w.actions?.map((a, j) => <li key={j} className="text-[11px] text-slate-400 flex items-start gap-1"><span className="text-primary mt-0.5">▸</span>{a}</li>)}</ul>
+                        <ul className="space-y-1">{w.actions?.map((a, j) => <li key={j} className="text-[11px] text-[var(--sys-text-muted)] flex items-start gap-1"><span className="text-primary mt-0.5">▸</span>{a}</li>)}</ul>
                     </div>
                 ))}</div>
             </div>
@@ -1832,37 +1832,37 @@ function TrafficResults({ results }) {
 
 function CompetitorResults({ results }) {
     return (<>
-        <div className="glass-panel rounded-2xl p-6 mb-6"><p className="text-sm text-slate-300 leading-relaxed">{results.summary}</p></div>
+        <div className="glass-panel rounded-2xl p-6 mb-6"><p className="text-sm text-[var(--sys-text-muted)] leading-relaxed">{results.summary}</p></div>
 
         {/* Competitors */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
             {(results.competitors || []).map((c, i) => (
                 <div key={i} className="glass-panel rounded-2xl p-5">
                     <div className="flex items-center justify-between mb-3">
-                        <h4 className="text-base font-bold text-white">{c.name}</h4>
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${c.estimatedAuthority === 'high' ? 'bg-rose-500/10 text-rose-400' : c.estimatedAuthority === 'medium' ? 'bg-amber-500/10 text-amber-400' : 'bg-emerald-500/10 text-emerald-400'}`}>{c.estimatedAuthority} authority</span>
+                        <h4 className="text-base font-bold text-[var(--sys-text)]">{c.name}</h4>
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${c.estimatedAuthority === 'high' ? 'bg-[var(--sys-primary-dim)] text-primary' : c.estimatedAuthority === 'medium' ? 'bg-[var(--sys-primary-dim)] text-primary' : 'bg-[var(--sys-primary-dim)] text-primary'}`}>{c.estimatedAuthority} authority</span>
                     </div>
-                    <p className="text-sm text-slate-500 mb-3">{c.url} • {c.contentVelocity}</p>
+                    <p className="text-sm text-[var(--sys-text-muted)] mb-3">{c.url} • {c.contentVelocity}</p>
                     <div className="grid grid-cols-2 gap-4 mb-3">
-                        <div className="p-2 rounded-lg bg-white/[0.03] border border-white/[0.06]">
-                            <p className="text-[10px] text-slate-500 font-bold uppercase mb-1">Benchmarking</p>
+                        <div className="p-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                            <p className="text-[10px] text-[var(--sys-text-muted)] font-bold uppercase mb-1">Benchmarking</p>
                             <div className="grid grid-cols-2 gap-x-3 gap-y-1">
                                 {['technical', 'content', 'authority', 'aiReadiness'].map(k => (
                                     <div key={k} className="flex items-center justify-between">
-                                        <span className="text-[9px] text-slate-500 capitalize">{k.replace('aiReadiness', 'AI Ready')}</span>
-                                        <span className={`text-[9px] font-bold ${c.scores?.[k] >= 70 ? 'text-emerald-400' : c.scores?.[k] >= 40 ? 'text-amber-400' : 'text-rose-400'}`}>{c.scores?.[k] || '—'}</span>
+                                        <span className="text-[9px] text-[var(--sys-text-muted)] capitalize">{k.replace('aiReadiness', 'AI Ready')}</span>
+                                        <span className={`text-[9px] font-bold ${c.scores?.[k] >= 70 ? 'text-primary' : c.scores?.[k] >= 40 ? 'text-primary' : 'text-primary'}`}>{c.scores?.[k] || '—'}</span>
                                     </div>
                                 ))}
                             </div>
                         </div>
-                        <div className="p-2 rounded-lg bg-white/[0.03] border border-white/[0.06] flex flex-col justify-center items-center">
-                            <p className="text-[10px] text-slate-500 font-bold uppercase mb-1">Overall</p>
-                            <p className={`text-xl font-black ${c.scores?.overall >= 70 ? 'text-emerald-400' : c.scores?.overall >= 40 ? 'text-amber-400' : 'text-rose-400'}`}>{c.scores?.overall || '—'}</p>
+                        <div className="p-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] flex flex-col justify-center items-center">
+                            <p className="text-[10px] text-[var(--sys-text-muted)] font-bold uppercase mb-1">Overall</p>
+                            <p className={`text-xl font-black ${c.scores?.overall >= 70 ? 'text-primary' : c.scores?.overall >= 40 ? 'text-primary' : 'text-primary'}`}>{c.scores?.overall || '—'}</p>
                         </div>
                     </div>
                     <div className="grid grid-cols-2 gap-2">
-                        <div><p className="text-[10px] text-emerald-400 font-bold mb-1 uppercase">Strengths</p>{c.strengths?.map((s, j) => <p key={j} className="text-[10px] text-slate-400 flex items-start gap-1"><span className="text-emerald-500/50 mt-0.5">+</span>{s}</p>)}</div>
-                        <div><p className="text-[10px] text-rose-400 font-bold mb-1 uppercase">Weaknesses</p>{c.weaknesses?.map((w, j) => <p key={j} className="text-[10px] text-slate-400 flex items-start gap-1"><span className="text-rose-500/50 mt-0.5">-</span>{w}</p>)}</div>
+                        <div><p className="text-[10px] text-primary font-bold mb-1 uppercase">Strengths</p>{c.strengths?.map((s, j) => <p key={j} className="text-[10px] text-[var(--sys-text-muted)] flex items-start gap-1"><span className="text-primary/50 mt-0.5">+</span>{s}</p>)}</div>
+                        <div><p className="text-[10px] text-primary font-bold mb-1 uppercase">Weaknesses</p>{c.weaknesses?.map((w, j) => <p key={j} className="text-[10px] text-[var(--sys-text-muted)] flex items-start gap-1"><span className="text-primary/50 mt-0.5">-</span>{w}</p>)}</div>
                     </div>
                 </div>
             ))}
@@ -1871,21 +1871,21 @@ function CompetitorResults({ results }) {
         {/* Why They Win + Outrank Plan */}
         <div className="grid grid-cols-2 gap-4 mb-6">
             <div className="glass-panel rounded-2xl p-6">
-                <h3 className="text-base font-bold text-white mb-3"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">cancel</span> Why They Win</h3>
+                <h3 className="text-base font-bold text-[var(--sys-text)] mb-3"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">cancel</span> Why They Win</h3>
                 <div className="space-y-3">{(results.whyTheyWin || []).map((w, i) => (
-                    <div key={i} className="p-3 rounded-xl bg-rose-500/5 border border-rose-500/10">
-                        <p className="text-xs font-bold text-rose-400 mb-1">{w.reason}</p>
-                        <p className="text-sm text-slate-400 mb-1">{w.evidence}</p>
-                        <p className="text-sm text-emerald-400">✓ Fix: {w.fix}</p>
+                    <div key={i} className="p-3 rounded-xl bg-[var(--sys-primary-dim)] border border-[var(--sys-border)]">
+                        <p className="text-xs font-bold text-primary mb-1">{w.reason}</p>
+                        <p className="text-sm text-[var(--sys-text-muted)] mb-1">{w.evidence}</p>
+                        <p className="text-sm text-primary">✓ Fix: {w.fix}</p>
                     </div>
                 ))}</div>
             </div>
             <div className="glass-panel rounded-2xl p-6">
-                <h3 className="text-base font-bold text-white mb-3"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">ads_click</span> Outrank Plan</h3>
+                <h3 className="text-base font-bold text-[var(--sys-text)] mb-3"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">ads_click</span> Outrank Plan</h3>
                 <div className="space-y-2">{(results.outrankPlan || []).map((p, i) => (
-                    <div key={i} className="flex items-start gap-3 p-2 rounded-lg bg-white/3">
+                    <div key={i} className="flex items-start gap-3 p-2 rounded-lg bg-[var(--sys-surface)]">
                         <span className="text-xs font-black text-primary w-5">{p.priority}</span>
-                        <div><p className="text-sm font-bold text-white">{p.action}</p><p className="text-sm text-slate-500">{p.timeline} • {p.effort}</p></div>
+                        <div><p className="text-sm font-bold text-[var(--sys-text)]">{p.action}</p><p className="text-sm text-[var(--sys-text-muted)]">{p.timeline} • {p.effort}</p></div>
                     </div>
                 ))}</div>
             </div>
@@ -1894,12 +1894,12 @@ function CompetitorResults({ results }) {
         {/* Gap Opportunities */}
         {results.gapOpportunities?.length > 0 && (
             <div className="glass-panel rounded-2xl p-6">
-                <h3 className="text-base font-bold text-white mb-3">💡 Gap Opportunities</h3>
+                <h3 className="text-base font-bold text-[var(--sys-text)] mb-3">💡 Gap Opportunities</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">{results.gapOpportunities.map((g, i) => (
-                    <div key={i} className="p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/10">
-                        <p className="text-sm font-bold text-white mb-1">{g.topic}</p>
-                        <p className="text-sm text-slate-400">{g.strategy}</p>
-                        <p className="text-sm text-emerald-400 mt-1">→ {g.suggestedContent}</p>
+                    <div key={i} className="p-3 rounded-xl bg-[var(--sys-primary-dim)] border border-[var(--sys-border)]">
+                        <p className="text-sm font-bold text-[var(--sys-text)] mb-1">{g.topic}</p>
+                        <p className="text-sm text-[var(--sys-text-muted)]">{g.strategy}</p>
+                        <p className="text-sm text-primary mt-1">→ {g.suggestedContent}</p>
                     </div>
                 ))}</div>
             </div>
@@ -1918,15 +1918,15 @@ function AIVisibilityResults({ results }) {
     ]
     return (<>
         <div className="glass-panel rounded-2xl p-6 mb-6">
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 items-center border-b border-white/[0.04] pb-6 mb-6">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 items-center border-b border-[var(--sys-border)] pb-6 mb-6">
                 <ScoreRing score={results.aiVisibilityScore || 0} size={100} label="AI Visibility" color="violet" />
                 <ScoreRing score={results.schemaScore ?? bd.schemaReadiness?.score ?? 0} size={100} label="Schema & Data" color="emerald" />
                 <ScoreRing score={results.contentScore ?? bd.qnaPresence?.score ?? bd.snippetStructure?.score ?? 0} size={100} label="Content" color="amber" />
                 <ScoreRing score={results.authorityScore ?? bd.entityCoverage?.score ?? bd.trustSignals?.score ?? 0} size={100} label="Authority" color="blue" />
             </div>
             <div className="flex-1">
-                <p className="text-sm text-slate-300 leading-relaxed">{results.summary}</p>
-                {results.scoreBreakdown && <p className="text-[10px] text-slate-600 mt-2">Score: {results.scoreBreakdown.formula} — On-page: {results.scoreBreakdown.onPageAnalysis}, Probe: {results.scoreBreakdown.realProbeScore}{results.scoreBreakdown.margin > 0 ? ` ±${results.scoreBreakdown.margin}` : ''} <span className={`ml-2 px-1.5 py-0.5 rounded-full ${results.scoreBreakdown.confidence === 'high' ? 'bg-emerald-500/15 text-emerald-400' : results.scoreBreakdown.confidence === 'medium' ? 'bg-amber-500/15 text-amber-400' : 'bg-red-500/15 text-red-400'}`}>{results.scoreBreakdown.confidence || 'unknown'} confidence</span></p>}
+                <p className="text-sm text-[var(--sys-text-muted)] leading-relaxed">{results.summary}</p>
+                {results.scoreBreakdown && <p className="text-[10px] text-[var(--sys-text-muted)] mt-2">Score: {results.scoreBreakdown.formula} — On-page: {results.scoreBreakdown.onPageAnalysis}, Probe: {results.scoreBreakdown.realProbeScore}{results.scoreBreakdown.margin > 0 ? ` ±${results.scoreBreakdown.margin}` : ''} <span className={`ml-2 px-1.5 py-0.5 rounded-full ${results.scoreBreakdown.confidence === 'high' ? 'bg-[var(--sys-primary-dim)] text-primary' : results.scoreBreakdown.confidence === 'medium' ? 'bg-[var(--sys-primary-dim)] text-primary' : 'bg-[var(--sys-primary-dim)] text-primary'}`}>{results.scoreBreakdown.confidence || 'unknown'} confidence</span></p>}
             </div>
         </div>
 
@@ -1947,11 +1947,11 @@ function AIVisibilityResults({ results }) {
                         { label: 'Total Probes', value: results.geoProbe.totalProbes, icon: 'query_stats', color: '#8b5cf6' },
                         { label: 'Score', value: results.geoProbe.scoreCI ? `${results.geoProbe.realScore}±${results.geoProbe.scoreCI.margin}` : results.geoProbe.realScore, icon: 'verified', color: results.geoProbe.realScore > 50 ? '#10b981' : '#f59e0b' },
                     ].map(s => (
-                        <div key={s.label} className="flex items-center gap-2.5 p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
+                        <div key={s.label} className="flex items-center gap-2.5 p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
                             <span className="material-symbols-outlined text-lg" style={{ color: s.color }}>{s.icon}</span>
                             <div>
-                                <p className="text-base font-black text-white leading-tight">{s.value}</p>
-                                <p className="text-[9px] text-slate-500 font-bold uppercase">{s.label}</p>
+                                <p className="text-base font-black text-[var(--sys-text)] leading-tight">{s.value}</p>
+                                <p className="text-[9px] text-[var(--sys-text-muted)] font-bold uppercase">{s.label}</p>
                             </div>
                         </div>
                     ))}
@@ -1961,14 +1961,14 @@ function AIVisibilityResults({ results }) {
                 {results.geoProbe.modelBreakdown && (
                     <div className="flex gap-3 mb-4 flex-wrap">
                         {Object.entries(results.geoProbe.modelBreakdown).map(([model, data]) => (
-                            <div key={model} className="flex-1 min-w-[140px] p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
-                                <p className="text-[10px] text-slate-500 font-bold uppercase mb-1">{model}</p>
-                                <p className="text-lg font-black text-white">{data.mentionRate}%</p>
-                                <p className="text-[9px] text-slate-600">{data.mentioned}/{data.probed} probes mentioned brand</p>
+                            <div key={model} className="flex-1 min-w-[140px] p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                                <p className="text-[10px] text-[var(--sys-text-muted)] font-bold uppercase mb-1">{model}</p>
+                                <p className="text-lg font-black text-[var(--sys-text)]">{data.mentionRate}%</p>
+                                <p className="text-[9px] text-[var(--sys-text-muted)]">{data.mentioned}/{data.probed} probes mentioned brand</p>
                                 <div className="flex gap-1 mt-1">
-                                    {data.sentiment.positive > 0 && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400">{data.sentiment.positive} positive</span>}
-                                    {data.sentiment.neutral > 0 && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-slate-500/10 text-slate-400">{data.sentiment.neutral} neutral</span>}
-                                    {data.sentiment.negative > 0 && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-red-500/10 text-red-400">{data.sentiment.negative} negative</span>}
+                                    {data.sentiment.positive > 0 && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[var(--sys-primary-dim)] text-primary">{data.sentiment.positive} positive</span>}
+                                    {data.sentiment.neutral > 0 && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[var(--sys-border)]/10 text-[var(--sys-text-muted)]">{data.sentiment.neutral} neutral</span>}
+                                    {data.sentiment.negative > 0 && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[var(--sys-primary-dim)] text-primary">{data.sentiment.negative} negative</span>}
                                 </div>
                             </div>
                         ))}
@@ -1978,18 +1978,18 @@ function AIVisibilityResults({ results }) {
                 {/* Sentiment Distribution */}
                 {results.geoProbe.sentimentDistribution && (
                     <div className="mb-4">
-                        <p className="text-[10px] text-slate-500 font-bold uppercase mb-2">Sentiment Distribution</p>
-                        <div className="h-3 rounded-full overflow-hidden flex bg-[#121217]">
+                        <p className="text-[10px] text-[var(--sys-text-muted)] font-bold uppercase mb-2">Sentiment Distribution</p>
+                        <div className="h-3 rounded-full overflow-hidden flex bg-[var(--sys-surface)]">
                             {(() => { const sd = results.geoProbe.sentimentDistribution; const total = Math.max(1, (sd.positive || 0) + (sd.neutral || 0) + (sd.negative || 0)); return (<>
-                                {sd.positive > 0 && <div className="bg-emerald-500 transition-all" style={{ width: `${(sd.positive / total) * 100}%` }} />}
-                                {sd.neutral > 0 && <div className="bg-slate-500 transition-all" style={{ width: `${(sd.neutral / total) * 100}%` }} />}
-                                {sd.negative > 0 && <div className="bg-red-500 transition-all" style={{ width: `${(sd.negative / total) * 100}%` }} />}
+                                {sd.positive > 0 && <div className="bg-[var(--sys-surface)] transition-all" style={{ width: `${(sd.positive / total) * 100}%` }} />}
+                                {sd.neutral > 0 && <div className="bg-[var(--sys-border)] transition-all" style={{ width: `${(sd.neutral / total) * 100}%` }} />}
+                                {sd.negative > 0 && <div className="bg-[var(--sys-surface)] transition-all" style={{ width: `${(sd.negative / total) * 100}%` }} />}
                             </>); })()}
                         </div>
                         <div className="flex gap-4 mt-1">
-                            <span className="text-[9px] text-emerald-400">● Positive: {results.geoProbe.sentimentDistribution.positive}</span>
-                            <span className="text-[9px] text-slate-400">● Neutral: {results.geoProbe.sentimentDistribution.neutral}</span>
-                            <span className="text-[9px] text-red-400">● Negative: {results.geoProbe.sentimentDistribution.negative}</span>
+                            <span className="text-[9px] text-primary">● Positive: {results.geoProbe.sentimentDistribution.positive}</span>
+                            <span className="text-[9px] text-[var(--sys-text-muted)]">● Neutral: {results.geoProbe.sentimentDistribution.neutral}</span>
+                            <span className="text-[9px] text-primary">● Negative: {results.geoProbe.sentimentDistribution.negative}</span>
                         </div>
                     </div>
                 )}
@@ -1997,15 +1997,15 @@ function AIVisibilityResults({ results }) {
                 {/* Share of Voice */}
                 {results.geoProbe.shareOfVoice && Object.keys(results.geoProbe.shareOfVoice).length > 0 && (
                     <div className="mb-4">
-                        <p className="text-[10px] text-slate-500 font-bold uppercase mb-2">Share of Voice (across AI models)</p>
+                        <p className="text-[10px] text-[var(--sys-text-muted)] font-bold uppercase mb-2">Share of Voice (across AI models)</p>
                         <div className="space-y-1.5">
                             {Object.entries(results.geoProbe.shareOfVoice).sort((a, b) => b[1] - a[1]).map(([name, pct]) => (
                                 <div key={name} className="flex items-center gap-2">
-                                    <span className="text-[10px] text-slate-400 w-24 truncate">{name}</span>
-                                    <div className="flex-1 h-2 bg-[#121217] rounded-full overflow-hidden">
+                                    <span className="text-[10px] text-[var(--sys-text-muted)] w-24 truncate">{name}</span>
+                                    <div className="flex-1 h-2 bg-[var(--sys-surface)] rounded-full overflow-hidden">
                                         <div className="h-full rounded-full bg-[#FF4D00] transition-all" style={{ width: `${pct}%` }} />
                                     </div>
-                                    <span className="text-[10px] text-white font-bold w-8 text-right">{pct}%</span>
+                                    <span className="text-[10px] text-[var(--sys-text)] font-bold w-8 text-right">{pct}%</span>
                                 </div>
                             ))}
                         </div>
@@ -2014,21 +2014,21 @@ function AIVisibilityResults({ results }) {
                 {/* Citation Drift (vs previous probe) */}
                 {results.geoProbe.citationDrift && (
                     <div className="mb-4">
-                        <p className="text-[10px] text-slate-500 font-bold uppercase mb-2">Citation Drift (vs Previous Probe)</p>
+                        <p className="text-[10px] text-[var(--sys-text-muted)] font-bold uppercase mb-2">Citation Drift (vs Previous Probe)</p>
                         <div className="flex gap-3 mb-2">
-                            <span className="text-[9px] px-2 py-1 rounded-lg bg-emerald-500/10 text-emerald-400">{results.geoProbe.citationDrift.newCitations?.length || 0} new</span>
-                            <span className="text-[9px] px-2 py-1 rounded-lg bg-red-500/10 text-red-400">{results.geoProbe.citationDrift.lostCitations?.length || 0} lost</span>
-                            <span className="text-[9px] px-2 py-1 rounded-lg bg-slate-500/10 text-slate-400">{results.geoProbe.citationDrift.retained || 0} retained</span>
-                            <span className={`text-[9px] px-2 py-1 rounded-lg ${results.geoProbe.citationDrift.driftRate > 50 ? 'bg-red-500/10 text-red-400' : results.geoProbe.citationDrift.driftRate > 20 ? 'bg-amber-500/10 text-amber-400' : 'bg-emerald-500/10 text-emerald-400'}`}>{results.geoProbe.citationDrift.driftRate}% drift rate</span>
+                            <span className="text-[9px] px-2 py-1 rounded-lg bg-[var(--sys-primary-dim)] text-primary">{results.geoProbe.citationDrift.newCitations?.length || 0} new</span>
+                            <span className="text-[9px] px-2 py-1 rounded-lg bg-[var(--sys-primary-dim)] text-primary">{results.geoProbe.citationDrift.lostCitations?.length || 0} lost</span>
+                            <span className="text-[9px] px-2 py-1 rounded-lg bg-[var(--sys-border)]/10 text-[var(--sys-text-muted)]">{results.geoProbe.citationDrift.retained || 0} retained</span>
+                            <span className={`text-[9px] px-2 py-1 rounded-lg ${results.geoProbe.citationDrift.driftRate > 50 ? 'bg-[var(--sys-primary-dim)] text-primary' : results.geoProbe.citationDrift.driftRate > 20 ? 'bg-[var(--sys-primary-dim)] text-primary' : 'bg-[var(--sys-primary-dim)] text-primary'}`}>{results.geoProbe.citationDrift.driftRate}% drift rate</span>
                         </div>
                         {results.geoProbe.citationDrift.newCitations?.length > 0 && (
-                            <div className="text-[9px] text-slate-500 mb-1">
-                                <strong className="text-emerald-400">New citations:</strong> {results.geoProbe.citationDrift.newCitations.slice(0, 5).join(', ')}
+                            <div className="text-[9px] text-[var(--sys-text-muted)] mb-1">
+                                <strong className="text-primary">New citations:</strong> {results.geoProbe.citationDrift.newCitations.slice(0, 5).join(', ')}
                             </div>
                         )}
                         {results.geoProbe.citationDrift.lostCitations?.length > 0 && (
-                            <div className="text-[9px] text-slate-500">
-                                <strong className="text-red-400">Lost citations:</strong> {results.geoProbe.citationDrift.lostCitations.slice(0, 5).join(', ')}
+                            <div className="text-[9px] text-[var(--sys-text-muted)]">
+                                <strong className="text-primary">Lost citations:</strong> {results.geoProbe.citationDrift.lostCitations.slice(0, 5).join(', ')}
                             </div>
                         )}
                     </div>
@@ -2037,12 +2037,12 @@ function AIVisibilityResults({ results }) {
                 {/* Real AI Snippets */}
                 {results.geoProbe.topSnippets?.length > 0 && (
                     <div>
-                        <p className="text-[10px] text-slate-500 font-bold uppercase mb-2">What AI Models Say About Your Brand</p>
+                        <p className="text-[10px] text-[var(--sys-text-muted)] font-bold uppercase mb-2">What AI Models Say About Your Brand</p>
                         <div className="space-y-2">
                             {results.geoProbe.topSnippets.map((s, i) => (
                                 <div key={i} className="p-3 rounded-lg bg-[#FF4D00]/5 border border-[#FF4D00]/10">
                                     <p className="text-[9px] text-[#FF4D00] font-bold mb-1">{s.model} — "{s.prompt}"</p>
-                                    <p className="text-[11px] text-slate-300 italic leading-relaxed">"{s.snippet}"</p>
+                                    <p className="text-[11px] text-[var(--sys-text-muted)] italic leading-relaxed">"{s.snippet}"</p>
                                 </div>
                             ))}
                         </div>
@@ -2056,13 +2056,13 @@ function AIVisibilityResults({ results }) {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
                 {/* Competitive Position */}
                 <div className="glass-panel rounded-2xl p-4 text-center">
-                    <p className="text-[10px] text-slate-500 font-bold uppercase mb-2">AI Market Position</p>
+                    <p className="text-[10px] text-[var(--sys-text-muted)] font-bold uppercase mb-2">AI Market Position</p>
                     <span className={`text-lg font-black px-4 py-1.5 rounded-full ${
-                        results.geoProbe.competitivePosition === 'Leader' ? 'bg-emerald-500/15 text-emerald-400' :
-                        results.geoProbe.competitivePosition === 'Challenger' ? 'bg-amber-500/15 text-amber-400' :
-                        'bg-slate-500/15 text-slate-400'
+                        results.geoProbe.competitivePosition === 'Leader' ? 'bg-[var(--sys-primary-dim)] text-primary' :
+                        results.geoProbe.competitivePosition === 'Challenger' ? 'bg-[var(--sys-primary-dim)] text-primary' :
+                        'bg-[var(--sys-border)]/15 text-[var(--sys-text-muted)]'
                     }`}>{results.geoProbe.competitivePosition || 'Niche'}</span>
-                    <p className="text-[9px] text-slate-600 mt-2">{
+                    <p className="text-[9px] text-[var(--sys-text-muted)] mt-2">{
                         results.geoProbe.competitivePosition === 'Leader' ? 'Dominant AI visibility (40%+ SoV)' :
                         results.geoProbe.competitivePosition === 'Challenger' ? 'Growing AI presence (20-40% SoV)' :
                         'Low AI visibility (<20% SoV) — needs optimization'
@@ -2072,16 +2072,16 @@ function AIVisibilityResults({ results }) {
                 {/* Entity Confidence */}
                 {results.geoProbe.entityConfidence && (
                     <div className="glass-panel rounded-2xl p-4 text-center">
-                        <p className="text-[10px] text-slate-500 font-bold uppercase mb-2">Entity Recognition</p>
-                        <p className="text-2xl font-black text-white">{results.geoProbe.entityConfidence.recognitionRate}%</p>
-                        <p className="text-[9px] text-slate-600">AI recognizes your brand in {results.geoProbe.entityConfidence.recognized}/{results.geoProbe.entityConfidence.probed} brand-specific probes</p>
+                        <p className="text-[10px] text-[var(--sys-text-muted)] font-bold uppercase mb-2">Entity Recognition</p>
+                        <p className="text-2xl font-black text-[var(--sys-text)]">{results.geoProbe.entityConfidence.recognitionRate}%</p>
+                        <p className="text-[9px] text-[var(--sys-text-muted)]">AI recognizes your brand in {results.geoProbe.entityConfidence.recognized}/{results.geoProbe.entityConfidence.probed} brand-specific probes</p>
                     </div>
                 )}
 
                 {/* Citations Found */}
                 {results.geoProbe.citations?.length > 0 && (
                     <div className="glass-panel rounded-2xl p-4">
-                        <p className="text-[10px] text-slate-500 font-bold uppercase mb-2">Citation Sources ({results.geoProbe.citations.length})</p>
+                        <p className="text-[10px] text-[var(--sys-text-muted)] font-bold uppercase mb-2">Citation Sources ({results.geoProbe.citations.length})</p>
                         <div className="space-y-1 max-h-24 overflow-y-auto">
                             {results.geoProbe.citations.map((url, i) => (
                                 <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="block text-[10px] text-[#FF4D00] hover:text-[#FF7A00] truncate">{url.replace(/^https?:\/\//, '')}</a>
@@ -2094,18 +2094,18 @@ function AIVisibilityResults({ results }) {
 
         {/* ═══ Content Gaps — prompts where competitors appear but brand doesn't ═══ */}
         {results.geoProbe?.contentGaps?.length > 0 && (
-            <div className="glass-panel rounded-2xl p-5 mb-6 border border-amber-500/10">
-                <h4 className="text-xs font-bold text-amber-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+            <div className="glass-panel rounded-2xl p-5 mb-6 border border-[var(--sys-border)]">
+                <h4 className="text-xs font-bold text-primary uppercase tracking-wider mb-3 flex items-center gap-2">
                     <span className="material-symbols-outlined text-sm">warning</span> Content Gaps — Your Competitors Appear, You Don't
                 </h4>
                 <div className="space-y-2">
                     {results.geoProbe.contentGaps.map((gap, i) => (
-                        <div key={i} className="p-3 rounded-lg bg-amber-500/5 border border-amber-500/10">
-                            <p className="text-[11px] text-white font-bold">"{gap.prompt}"</p>
-                            <p className="text-[9px] text-slate-500 mt-1">
-                                <span className="text-amber-400">{(gap.models || [gap.model]).join(', ')}</span> — Competitors found: <span className="text-red-400">{gap.competitorsFound.join(', ')}</span>
+                        <div key={i} className="p-3 rounded-lg bg-[var(--sys-primary-dim)] border border-[var(--sys-border)]">
+                            <p className="text-[11px] text-[var(--sys-text)] font-bold">"{gap.prompt}"</p>
+                            <p className="text-[9px] text-[var(--sys-text-muted)] mt-1">
+                                <span className="text-primary">{(gap.models || [gap.model]).join(', ')}</span> — Competitors found: <span className="text-primary">{gap.competitorsFound.join(', ')}</span>
                             </p>
-                            <p className="text-[9px] text-emerald-400 mt-0.5">{gap.opportunity}</p>
+                            <p className="text-[9px] text-primary mt-0.5">{gap.opportunity}</p>
                         </div>
                     ))}
                 </div>
@@ -2115,8 +2115,8 @@ function AIVisibilityResults({ results }) {
             {sections.map(s => bd[s.key] && (
                 <div key={s.key} className="glass-panel rounded-2xl p-4 text-center">
                     <span className="text-lg">{s.icon}</span>
-                    <p className="text-xl font-black text-white mt-1">{bd[s.key].score}</p>
-                    <p className="text-sm text-slate-500">{s.label}</p>
+                    <p className="text-xl font-black text-[var(--sys-text)] mt-1">{bd[s.key].score}</p>
+                    <p className="text-sm text-[var(--sys-text-muted)]">{s.label}</p>
                 </div>
             ))}
         </div>
@@ -2125,25 +2125,25 @@ function AIVisibilityResults({ results }) {
         <div className="space-y-4 mb-6">
             {sections.map(s => bd[s.key] && (
                 <div key={s.key} className="glass-panel rounded-2xl p-5">
-                    <h4 className="text-sm font-bold text-white mb-2">{s.icon} {s.label} — <span className="text-primary">{bd[s.key].score}/100</span></h4>
-                    <p className="text-[11px] text-slate-400 mb-3">{bd[s.key].currentState}</p>
+                    <h4 className="text-sm font-bold text-[var(--sys-text)] mb-2">{s.icon} {s.label} — <span className="text-primary">{bd[s.key].score}/100</span></h4>
+                    <p className="text-[11px] text-[var(--sys-text-muted)] mb-3">{bd[s.key].currentState}</p>
                     {bd[s.key].recommendations && <div className="space-y-4">{(Array.isArray(bd[s.key].recommendations) ? bd[s.key].recommendations : []).map((r, i) => (
-                        <div key={i} className="text-[11px] text-slate-300 bg-white/[0.02] border border-white/[0.04] p-3 rounded-xl overflow-hidden">
+                        <div key={i} className="text-[11px] text-[var(--sys-text-muted)] bg-[var(--sys-surface)] border border-[var(--sys-border)] p-3 rounded-xl overflow-hidden">
                             <div className="flex items-start gap-2 mb-2">
-                                <span className="text-emerald-400 mt-0.5">✓</span>
+                                <span className="text-primary mt-0.5">✓</span>
                                 <div className="flex-1">
                                     {typeof r === 'string' ? <p>{r}</p> : (
                                         <>
-                                            <p className="font-bold text-white text-sm mb-1">{r.title || r.description}</p>
+                                            <p className="font-bold text-[var(--sys-text)] text-sm mb-1">{r.title || r.description}</p>
                                             {r.aiImpact && <p className="text-[#FF4D00] text-[10px] mb-2">{r.aiImpact}</p>}
                                             {r.codeSnippet && (
                                                 <div className="relative group mt-3">
-                                                    <p className="text-[9px] font-bold text-slate-500 uppercase mb-1">Generated Fix Code</p>
-                                                    <pre className="p-3 rounded-lg bg-[#080a14] border border-white/[0.06] overflow-x-auto text-[10px] text-slate-300 font-mono">
+                                                    <p className="text-[9px] font-bold text-[var(--sys-text-muted)] uppercase mb-1">Generated Fix Code</p>
+                                                    <pre className="p-3 rounded-lg bg-[#080a14] border border-[var(--sys-border)] overflow-x-auto text-[10px] text-[var(--sys-text-muted)] font-mono">
                                                         <code>{r.codeSnippet}</code>
                                                     </pre>
                                                     <button onClick={() => navigator.clipboard.writeText(r.codeSnippet)}
-                                                        className="absolute top-6 right-2 p-1.5 rounded bg-white/10 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white/20"
+                                                        className="absolute top-6 right-2 p-1.5 rounded bg-[var(--sys-surface)] text-[var(--sys-text)] opacity-0 group-hover:opacity-100 transition-opacity hover:bg-[var(--sys-surface)]"
                                                         title="Copy Code">
                                                         <span className="material-symbols-outlined text-[14px]">content_copy</span>
                                                     </button>
@@ -2156,7 +2156,7 @@ function AIVisibilityResults({ results }) {
                         </div>
                     ))}</div>}
                     {bd[s.key].suggestions && <div className="space-y-2 mt-2">{bd[s.key].suggestions.map((sg, i) => (
-                        <div key={i} className="text-[11px] text-slate-300 flex items-start gap-2"><span className="text-primary">▸</span>{typeof sg === 'string' ? sg : sg.question}</div>
+                        <div key={i} className="text-[11px] text-[var(--sys-text-muted)] flex items-start gap-2"><span className="text-primary">▸</span>{typeof sg === 'string' ? sg : sg.question}</div>
                     ))}</div>}
                 </div>
             ))}
@@ -2165,13 +2165,13 @@ function AIVisibilityResults({ results }) {
         {/* AI-Ready Templates */}
         {results.aiReadyTemplates?.length > 0 && (
             <div className="glass-panel rounded-2xl p-6 mb-6">
-                <h3 className="text-base font-bold text-white mb-4">📝 AI-Ready Templates</h3>
+                <h3 className="text-base font-bold text-[var(--sys-text)] mb-4">📝 AI-Ready Templates</h3>
                 <div className="space-y-3">{results.aiReadyTemplates.map((t, i) => (
                     <div key={i} className="p-4 rounded-xl bg-[#FF4D00]/5 border border-[#FF4D00]/10">
                         <p className="text-xs font-bold text-[#FF4D00] mb-1">{t.name}</p>
-                        <p className="text-sm text-slate-500 mb-2">{t.description}</p>
-                        <pre className="text-sm text-slate-300 bg-black/30 rounded-lg p-3 overflow-x-auto whitespace-pre-wrap">{t.template}</pre>
-                        {t.example && <div className="mt-2"><p className="text-xs text-slate-600 font-bold">EXAMPLE:</p><p className="text-sm text-slate-400 italic">{t.example}</p></div>}
+                        <p className="text-sm text-[var(--sys-text-muted)] mb-2">{t.description}</p>
+                        <pre className="text-sm text-[var(--sys-text-muted)] bg-[var(--sys-surface)] rounded-lg p-3 overflow-x-auto whitespace-pre-wrap">{t.template}</pre>
+                        {t.example && <div className="mt-2"><p className="text-xs text-[var(--sys-text-muted)] font-bold">EXAMPLE:</p><p className="text-sm text-[var(--sys-text-muted)] italic">{t.example}</p></div>}
                     </div>
                 ))}</div>
             </div>
@@ -2180,12 +2180,12 @@ function AIVisibilityResults({ results }) {
         {/* Priority Actions */}
         {results.priorityActions?.length > 0 && (
             <div className="glass-panel rounded-2xl p-6">
-                <h3 className="text-base font-bold text-white mb-3"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">ads_click</span> Priority Actions</h3>
+                <h3 className="text-base font-bold text-[var(--sys-text)] mb-3"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">ads_click</span> Priority Actions</h3>
                 <div className="space-y-2">{results.priorityActions.map((p, i) => (
-                    <div key={i} className="flex items-start gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+                    <div key={i} className="flex items-start gap-3 p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
                         <span className="text-xs font-black text-primary w-5">{p.priority}</span>
-                        <div className="flex-1"><p className="text-sm font-bold text-white">{p.action}</p><p className="text-sm text-slate-400">{p.details}</p></div>
-                        <div className="flex gap-1"><span className={`text-xs px-2 py-0.5 rounded-full font-bold ${p.impact === 'high' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'}`}>{p.impact}</span></div>
+                        <div className="flex-1"><p className="text-sm font-bold text-[var(--sys-text)]">{p.action}</p><p className="text-sm text-[var(--sys-text-muted)]">{p.details}</p></div>
+                        <div className="flex gap-1"><span className={`text-xs px-2 py-0.5 rounded-full font-bold ${p.impact === 'high' ? 'bg-[var(--sys-primary-dim)] text-primary' : 'bg-[var(--sys-primary-dim)] text-primary'}`}>{p.impact}</span></div>
                     </div>
                 ))}</div>
             </div>
@@ -2199,11 +2199,11 @@ function AIVisibilityResults({ results }) {
 function ActionBucket({ title, items, color }) {
     return (
         <div className={`glass-panel rounded-2xl p-5 border border-${color}-500/10`}>
-            <h4 className="text-sm font-bold text-white mb-3">{title}</h4>
+            <h4 className="text-sm font-bold text-[var(--sys-text)] mb-3">{title}</h4>
             <div className="space-y-2">{(items || []).map((item, i) => (
-                <div key={i} className="p-2 rounded-lg bg-white/3">
-                    <p className="text-[11px] font-bold text-white">{item.title}</p>
-                    <p className="text-sm text-slate-500">{item.description || item.keyword || item.metric}</p>
+                <div key={i} className="p-2 rounded-lg bg-[var(--sys-surface)]">
+                    <p className="text-[11px] font-bold text-[var(--sys-text)]">{item.title}</p>
+                    <p className="text-sm text-[var(--sys-text-muted)]">{item.description || item.keyword || item.metric}</p>
                 </div>
             ))}</div>
         </div>
@@ -2244,50 +2244,50 @@ function IssueCard({ issue, brandId, url }) {
     }
 
     return (
-        <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06] hover:bg-white/[0.04] transition-all">
+        <div className="p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:bg-[var(--sys-surface)] transition-all">
             <div className="flex items-center gap-3 cursor-pointer" onClick={() => setExpanded(!expanded)}>
                 <SeverityBadge severity={issue.severity} />
-                <span className={`text-xs px-1.5 py-0.5 rounded-full bg-white/5 text-slate-500`}>{issue.category}</span>
-                <p className="text-sm text-white font-medium flex-1">{issue.title}</p>
-                <span className="material-symbols-outlined text-slate-600 text-sm">{expanded ? 'expand_less' : 'expand_more'}</span>
+                <span className={`text-xs px-1.5 py-0.5 rounded-full bg-[var(--sys-surface)] text-[var(--sys-text-muted)]`}>{issue.category}</span>
+                <p className="text-sm text-[var(--sys-text)] font-medium flex-1">{issue.title}</p>
+                <span className="material-symbols-outlined text-[var(--sys-text-muted)] text-sm">{expanded ? 'expand_less' : 'expand_more'}</span>
             </div>
             {expanded && (
                 <div className="mt-3 ml-6 space-y-2 animate-fade-in">
-                    <p className="text-[11px] text-slate-400">{issue.description}</p>
-                    {issue.impact && <p className="text-[11px] text-amber-400">⚡ Impact: {issue.impact}</p>}
-                    {issue.fix && <p className="text-[11px] text-emerald-400">✓ Fix: {issue.fix}</p>}
-                    {issue.effort && <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${issue.effort === 'quick-fix' ? 'bg-emerald-500/10 text-emerald-400' : issue.effort === 'moderate' ? 'bg-amber-500/10 text-amber-400' : 'bg-rose-500/10 text-rose-400'}`}>{issue.effort}</span>}
+                    <p className="text-[11px] text-[var(--sys-text-muted)]">{issue.description}</p>
+                    {issue.impact && <p className="text-[11px] text-primary">⚡ Impact: {issue.impact}</p>}
+                    {issue.fix && <p className="text-[11px] text-primary">✓ Fix: {issue.fix}</p>}
+                    {issue.effort && <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${issue.effort === 'quick-fix' ? 'bg-[var(--sys-primary-dim)] text-primary' : issue.effort === 'moderate' ? 'bg-[var(--sys-primary-dim)] text-primary' : 'bg-[var(--sys-primary-dim)] text-primary'}`}>{issue.effort}</span>}
                     {/* ── Semrush parity: About this issue + How to fix ── */}
                     {issue.aboutThisIssue && (
-                        <div className="mt-2 p-2.5 rounded-lg bg-white/[0.02] border border-white/[0.04]">
-                            <p className="text-[9px] font-bold text-slate-500 uppercase mb-1">About this issue</p>
-                            <p className="text-[11px] text-slate-300 leading-relaxed">{issue.aboutThisIssue}</p>
+                        <div className="mt-2 p-2.5 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                            <p className="text-[9px] font-bold text-[var(--sys-text-muted)] uppercase mb-1">About this issue</p>
+                            <p className="text-[11px] text-[var(--sys-text-muted)] leading-relaxed">{issue.aboutThisIssue}</p>
                         </div>
                     )}
                     {issue.howToFix && (
-                        <div className="p-2.5 rounded-lg bg-emerald-500/[0.03] border border-emerald-500/[0.08]">
-                            <p className="text-[9px] font-bold text-emerald-400 uppercase mb-1">How to fix</p>
-                            <p className="text-[11px] text-slate-300 leading-relaxed">{issue.howToFix}</p>
+                        <div className="p-2.5 rounded-lg bg-[var(--sys-surface)]/[0.03] border border-[var(--sys-border)]/[0.08]">
+                            <p className="text-[9px] font-bold text-primary uppercase mb-1">How to fix</p>
+                            <p className="text-[11px] text-[var(--sys-text-muted)] leading-relaxed">{issue.howToFix}</p>
                         </div>
                     )}
                     {issue.affectedUrls?.length > 0 && (
                         <div>
-                            <p className="text-[9px] font-bold text-slate-500 uppercase mb-1">Affected Pages ({issue.affectedUrls.length})</p>
+                            <p className="text-[9px] font-bold text-[var(--sys-text-muted)] uppercase mb-1">Affected Pages ({issue.affectedUrls.length})</p>
                             <div className="space-y-0.5">
                                 {issue.affectedUrls.slice(0, 5).map((url, j) => (
                                     <a key={j} href={url} target="_blank" rel="noopener noreferrer"
                                         className="block text-[10px] text-primary/60 hover:text-primary truncate transition-colors">{url}</a>
                                 ))}
-                                {issue.affectedUrls.length > 5 && <p className="text-[9px] text-slate-600">+{issue.affectedUrls.length - 5} more</p>}
+                                {issue.affectedUrls.length > 5 && <p className="text-[9px] text-[var(--sys-text-muted)]">+{issue.affectedUrls.length - 5} more</p>}
                             </div>
                         </div>
                     )}
 
                     {/* ── Auto-Fix Engine UI ── */}
-                    <div className="mt-4 pt-3 border-t border-white/[0.04]">
+                    <div className="mt-4 pt-3 border-t border-[var(--sys-border)]">
                         {!fixData && !fixing ? (
                             <button onClick={handleAutoFix}
-                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-primary/20 to-[#FF7A00]/20 border border-primary/30 text-primary text-[11px] font-bold hover:from-primary/30 transition-all cursor-pointer">
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] border border-primary/30 text-primary text-[11px] font-bold hover:from-primary/30 transition-all cursor-pointer">
                                 <span className="material-symbols-outlined text-[14px]">auto_awesome</span>
                                 Auto-Fix Issue with AI
                             </button>
@@ -2299,17 +2299,17 @@ function IssueCard({ issue, brandId, url }) {
                         ) : fixData && (
                             <div className="space-y-2 animate-fade-in">
                                 <div className="flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-[14px] text-emerald-400">check_circle</span>
-                                    <span className="text-[11px] font-bold text-emerald-400">Code Fix Generated</span>
+                                    <span className="material-symbols-outlined text-[14px] text-primary">check_circle</span>
+                                    <span className="text-[11px] font-bold text-primary">Code Fix Generated</span>
                                 </div>
-                                {fixData.instructions && <p className="text-[10px] text-slate-400 mb-2">{fixData.instructions}</p>}
-                                {fixData.whereToAdd && <p className="text-[10px] text-slate-400 mb-2"><strong>Location:</strong> {fixData.whereToAdd}</p>}
+                                {fixData.instructions && <p className="text-[10px] text-[var(--sys-text-muted)] mb-2">{fixData.instructions}</p>}
+                                {fixData.whereToAdd && <p className="text-[10px] text-[var(--sys-text-muted)] mb-2"><strong>Location:</strong> {fixData.whereToAdd}</p>}
                                 <div className="relative group">
-                                    <pre className="p-3 rounded-lg bg-[#080a14] border border-white/[0.06] overflow-x-auto text-[10px] text-slate-300 font-mono">
+                                    <pre className="p-3 rounded-lg bg-[#080a14] border border-[var(--sys-border)] overflow-x-auto text-[10px] text-[var(--sys-text-muted)] font-mono">
                                         <code>{fixData.code}</code>
                                     </pre>
                                     <button onClick={() => navigator.clipboard.writeText(fixData.code)}
-                                        className="absolute top-2 right-2 p-1.5 rounded bg-white/10 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white/20"
+                                        className="absolute top-2 right-2 p-1.5 rounded bg-[var(--sys-surface)] text-[var(--sys-text)] opacity-0 group-hover:opacity-100 transition-opacity hover:bg-[var(--sys-surface)]"
                                         title="Copy Code">
                                         <span className="material-symbols-outlined text-[14px]">content_copy</span>
                                     </button>
@@ -2338,21 +2338,21 @@ function WarRoomResults({ results }) {
             {/* Executive Summary */}
             <div className="glass-panel rounded-2xl p-6">
                 <div className="flex items-center gap-3 mb-3">
-                    <span className="material-symbols-outlined text-rose-400 text-2xl">shield</span>
-                    <h2 className="text-xl font-black text-white">Competitor War Room</h2>
+                    <span className="material-symbols-outlined text-primary text-2xl">shield</span>
+                    <h2 className="text-xl font-black text-[var(--sys-text)]">Competitor War Room</h2>
                     <span className={`px-3 py-1 rounded-full text-xs font-bold bg-${verdictColor}-500/15 text-${verdictColor}-400 uppercase`}>{r.overallVerdict}</span>
                 </div>
-                <p className="text-sm text-slate-300 leading-relaxed">{r.executiveSummary}</p>
+                <p className="text-sm text-[var(--sys-text-muted)] leading-relaxed">{r.executiveSummary}</p>
             </div>
 
             {/* Scoring Matrix */}
             {r.brandScore && (
                 <div className="glass-panel rounded-2xl p-6">
-                    <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2"><span className="material-symbols-outlined text-sm text-primary">grid_view</span> Scoring Matrix</h3>
+                    <h3 className="text-base font-bold text-[var(--sys-text)] mb-4 flex items-center gap-2"><span className="material-symbols-outlined text-sm text-primary">grid_view</span> Scoring Matrix</h3>
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm">
                             <thead>
-                                <tr className="text-slate-500 text-xs text-left">
+                                <tr className="text-[var(--sys-text-muted)] text-xs text-left">
                                     <th className="p-2">Entity</th>
                                     {['technical', 'content', 'schema', 'aiReadiness', 'authority', 'overall'].map(k => (
                                         <th key={k} className="p-2 text-center capitalize">{k.replace('aiReadiness', 'AI Ready')}</th>
@@ -2360,20 +2360,20 @@ function WarRoomResults({ results }) {
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr className="border-t border-white/5">
-                                    <td className="p-2 text-white font-bold flex items-center gap-1"><span className="material-symbols-outlined text-primary text-xs">star</span> Your Brand</td>
+                                <tr className="border-t border-[var(--sys-border)]">
+                                    <td className="p-2 text-[var(--sys-text)] font-bold flex items-center gap-1"><span className="material-symbols-outlined text-primary text-xs">star</span> Your Brand</td>
                                     {['technical', 'content', 'schema', 'aiReadiness', 'authority', 'overall'].map(k => (
                                         <td key={k} className="p-2 text-center">
-                                            <span className={`inline-block px-2 py-0.5 rounded text-xs font-bold ${r.brandScore[k] >= 70 ? 'bg-emerald-400/10 text-emerald-400' : r.brandScore[k] >= 40 ? 'bg-amber-400/10 text-amber-400' : 'bg-rose-400/10 text-rose-400'}`}>{r.brandScore[k]}</span>
+                                            <span className={`inline-block px-2 py-0.5 rounded text-xs font-bold ${r.brandScore[k] >= 70 ? 'bg-[var(--sys-primary-dim)] text-primary' : r.brandScore[k] >= 40 ? 'bg-[var(--sys-primary-dim)] text-primary' : 'bg-[var(--sys-primary-dim)] text-primary'}`}>{r.brandScore[k]}</span>
                                         </td>
                                     ))}
                                 </tr>
                                 {r.competitorScores?.map((c, i) => (
-                                    <tr key={i} className="border-t border-white/5">
-                                        <td className="p-2 text-slate-300 font-medium">{c.name}</td>
+                                    <tr key={i} className="border-t border-[var(--sys-border)]">
+                                        <td className="p-2 text-[var(--sys-text-muted)] font-medium">{c.name}</td>
                                         {['technical', 'content', 'schema', 'aiReadiness', 'authority', 'overall'].map(k => (
                                             <td key={k} className="p-2 text-center">
-                                                <span className={`inline-block px-2 py-0.5 rounded text-xs font-bold ${c.scores?.[k] >= 70 ? 'bg-emerald-400/10 text-emerald-400' : c.scores?.[k] >= 40 ? 'bg-amber-400/10 text-amber-400' : 'bg-rose-400/10 text-rose-400'}`}>{c.scores?.[k] || '—'}</span>
+                                                <span className={`inline-block px-2 py-0.5 rounded text-xs font-bold ${c.scores?.[k] >= 70 ? 'bg-[var(--sys-primary-dim)] text-primary' : c.scores?.[k] >= 40 ? 'bg-[var(--sys-primary-dim)] text-primary' : 'bg-[var(--sys-primary-dim)] text-primary'}`}>{c.scores?.[k] || '—'}</span>
                                             </td>
                                         ))}
                                     </tr>
@@ -2387,19 +2387,19 @@ function WarRoomResults({ results }) {
             {/* Keyword Battles */}
             {r.keywordBattles?.length > 0 && (
                 <div className="glass-panel rounded-2xl p-6">
-                    <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2"><span className="material-symbols-outlined text-sm text-amber-400">flash_on</span> Keyword Battles</h3>
+                    <h3 className="text-base font-bold text-[var(--sys-text)] mb-4 flex items-center gap-2"><span className="material-symbols-outlined text-sm text-primary">flash_on</span> Keyword Battles</h3>
                     <div className="space-y-3">
                         {r.keywordBattles.map((kb, i) => (
-                            <div key={i} className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+                            <div key={i} className="p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
                                 <div className="flex items-center justify-between mb-2">
                                     <div className="flex items-center gap-2">
-                                        <span className="text-sm font-bold text-white">{kb.keyword}</span>
-                                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${kb.priority === 'critical' ? 'bg-rose-400/10 text-rose-400' : kb.priority === 'high' ? 'bg-amber-400/10 text-amber-400' : 'bg-slate-500/10 text-slate-400'}`}>{kb.priority}</span>
+                                        <span className="text-sm font-bold text-[var(--sys-text)]">{kb.keyword}</span>
+                                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${kb.priority === 'critical' ? 'bg-[var(--sys-primary-dim)] text-primary' : kb.priority === 'high' ? 'bg-[var(--sys-primary-dim)] text-primary' : 'bg-[var(--sys-border)]/10 text-[var(--sys-text-muted)]'}`}>{kb.priority}</span>
                                     </div>
-                                    <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${kb.brandPosition === 'dominant' || kb.brandPosition === 'strong' ? 'bg-emerald-400/10 text-emerald-400' : kb.brandPosition === 'absent' ? 'bg-rose-400/10 text-rose-400' : 'bg-amber-400/10 text-amber-400'}`}>You: {kb.brandPosition}</span>
+                                    <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${kb.brandPosition === 'dominant' || kb.brandPosition === 'strong' ? 'bg-[var(--sys-primary-dim)] text-primary' : kb.brandPosition === 'absent' ? 'bg-[var(--sys-primary-dim)] text-primary' : 'bg-[var(--sys-primary-dim)] text-primary'}`}>You: {kb.brandPosition}</span>
                                 </div>
                                 {kb.competitors?.map((c, j) => (
-                                    <p key={j} className="text-[11px] text-slate-500"><span className="text-slate-400 font-bold">{c.name}</span>: {c.position} — {c.whyTheyRank}</p>
+                                    <p key={j} className="text-[11px] text-[var(--sys-text-muted)]"><span className="text-[var(--sys-text-muted)] font-bold">{c.name}</span>: {c.position} — {c.whyTheyRank}</p>
                                 ))}
                                 <p className="text-xs text-primary mt-1 font-medium">→ {kb.winStrategy}</p>
                             </div>
@@ -2426,8 +2426,8 @@ function WarRoomResults({ results }) {
             {/* 90-Day Plan */}
             {r.ninety_day_battleplan && (
                 <div className="glass-panel rounded-2xl p-6">
-                    <h3 className="text-base font-bold text-white mb-3 flex items-center gap-2"><span className="material-symbols-outlined text-sm text-cyan-400">calendar_month</span> 90-Day Battle Plan</h3>
-                    <p className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap">{r.ninety_day_battleplan}</p>
+                    <h3 className="text-base font-bold text-[var(--sys-text)] mb-3 flex items-center gap-2"><span className="material-symbols-outlined text-sm text-primary">calendar_month</span> 90-Day Battle Plan</h3>
+                    <p className="text-sm text-[var(--sys-text-muted)] leading-relaxed whitespace-pre-wrap">{r.ninety_day_battleplan}</p>
                 </div>
             )}
         </div>
@@ -2446,42 +2446,42 @@ function LLMProbeResults({ results }) {
             {/* Visibility Dashboard */}
             <div className="glass-panel rounded-2xl p-6">
                 <div className="flex items-center gap-3 mb-4">
-                    <span className="material-symbols-outlined text-cyan-400 text-2xl">psychology</span>
-                    <h2 className="text-xl font-black text-white">LLM Brand Probe — {r.brandName}</h2>
+                    <span className="material-symbols-outlined text-primary text-2xl">psychology</span>
+                    <h2 className="text-xl font-black text-[var(--sys-text)]">LLM Brand Probe — {r.brandName}</h2>
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                    <div className="text-center p-4 rounded-xl bg-white/[0.03]">
+                    <div className="text-center p-4 rounded-xl bg-[var(--sys-surface)]">
                         <ScoreRing score={r.visibilityScore} size={70} label="Visibility" color={r.visibilityScore >= 50 ? 'emerald' : r.visibilityScore >= 25 ? 'amber' : 'rose'} />
                     </div>
-                    <div className="text-center p-4 rounded-xl bg-white/[0.03]">
+                    <div className="text-center p-4 rounded-xl bg-[var(--sys-surface)]">
                         <ScoreRing score={r.sentimentScore} size={70} label="Sentiment" color={r.sentimentScore >= 50 ? 'emerald' : 'amber'} />
                     </div>
-                    <div className="text-center p-4 rounded-xl bg-white/[0.03]">
-                        <p className="text-3xl font-black text-white">{r.mentionCount}<span className="text-lg text-slate-500">/{r.totalProbes}</span></p>
-                        <p className="text-xs text-slate-500 mt-1">Mentions</p>
+                    <div className="text-center p-4 rounded-xl bg-[var(--sys-surface)]">
+                        <p className="text-3xl font-black text-[var(--sys-text)]">{r.mentionCount}<span className="text-lg text-[var(--sys-text-muted)]">/{r.totalProbes}</span></p>
+                        <p className="text-xs text-[var(--sys-text-muted)] mt-1">Mentions</p>
                     </div>
-                    <div className="text-center p-4 rounded-xl bg-white/[0.03]">
-                        <p className="text-sm font-bold text-slate-400">{r.industry}</p>
-                        <p className="text-xs text-slate-600">{r.location}</p>
+                    <div className="text-center p-4 rounded-xl bg-[var(--sys-surface)]">
+                        <p className="text-sm font-bold text-[var(--sys-text-muted)]">{r.industry}</p>
+                        <p className="text-xs text-[var(--sys-text-muted)]">{r.location}</p>
                     </div>
                 </div>
             </div>
 
             {/* Probe Results */}
             <div className="glass-panel rounded-2xl p-6">
-                <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2"><span className="material-symbols-outlined text-sm text-cyan-400">quiz</span> Probe Results</h3>
+                <h3 className="text-base font-bold text-[var(--sys-text)] mb-4 flex items-center gap-2"><span className="material-symbols-outlined text-sm text-primary">quiz</span> Probe Results</h3>
                 <div className="space-y-3">
                     {r.probeResults?.map((p, i) => (
-                        <div key={i} className={`p-4 rounded-xl border transition-all ${p.mentioned ? 'bg-emerald-400/5 border-emerald-400/20' : 'bg-white/[0.02] border-white/[0.06]'}`}>
+                        <div key={i} className={`p-4 rounded-xl border transition-all ${p.mentioned ? 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)]' : 'bg-[var(--sys-surface)] border-[var(--sys-border)]'}`}>
                             <div className="flex items-center justify-between mb-2">
-                                <p className="text-sm text-white font-medium">"{p.prompt}"</p>
-                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${p.mentioned ? 'bg-emerald-400/10 text-emerald-400' : 'bg-rose-400/10 text-rose-400'}`}>
+                                <p className="text-sm text-[var(--sys-text)] font-medium">"{p.prompt}"</p>
+                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${p.mentioned ? 'bg-[var(--sys-primary-dim)] text-primary' : 'bg-[var(--sys-primary-dim)] text-primary'}`}>
                                     {p.mentioned ? '✓ MENTIONED' : '✗ NOT FOUND'}
                                 </span>
                             </div>
-                            {p.mentioned && <p className="text-xs text-slate-500">Sentiment: <span className={`font-bold ${p.sentiment === 'positive' ? 'text-emerald-400' : p.sentiment === 'mixed' ? 'text-amber-400' : 'text-slate-400'}`}>{p.sentiment}</span> | Position: {p.position}</p>}
-                            {p.competitorsMentioned?.length > 0 && <p className="text-xs text-amber-400 mt-1">⚠ Competitors also cited: {p.competitorsMentioned.join(', ')}</p>}
-                            {p.responseSnippet && <p className="text-xs text-slate-600 mt-2 italic line-clamp-2">{p.responseSnippet}</p>}
+                            {p.mentioned && <p className="text-xs text-[var(--sys-text-muted)]">Sentiment: <span className={`font-bold ${p.sentiment === 'positive' ? 'text-primary' : p.sentiment === 'mixed' ? 'text-primary' : 'text-[var(--sys-text-muted)]'}`}>{p.sentiment}</span> | Position: {p.position}</p>}
+                            {p.competitorsMentioned?.length > 0 && <p className="text-xs text-primary mt-1">⚠ Competitors also cited: {p.competitorsMentioned.join(', ')}</p>}
+                            {p.responseSnippet && <p className="text-xs text-[var(--sys-text-muted)] mt-2 italic line-clamp-2">{p.responseSnippet}</p>}
                         </div>
                     ))}
                 </div>
@@ -2490,8 +2490,8 @@ function LLMProbeResults({ results }) {
             {/* Strategic Analysis */}
             {r.strategicAnalysis && (
                 <div className="glass-panel rounded-2xl p-6">
-                    <h3 className="text-base font-bold text-white mb-3 flex items-center gap-2"><span className="material-symbols-outlined text-sm text-[#FF4D00]">strategy</span> Strategic Analysis</h3>
-                    <p className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap">{r.strategicAnalysis}</p>
+                    <h3 className="text-base font-bold text-[var(--sys-text)] mb-3 flex items-center gap-2"><span className="material-symbols-outlined text-sm text-[#FF4D00]">strategy</span> Strategic Analysis</h3>
+                    <p className="text-sm text-[var(--sys-text-muted)] leading-relaxed whitespace-pre-wrap">{r.strategicAnalysis}</p>
                 </div>
             )}
 
@@ -2505,20 +2505,20 @@ function LLMProbeResults({ results }) {
             {/* Content to Create */}
             {r.contentToCreate?.length > 0 && (
                 <div className="glass-panel rounded-2xl p-6">
-                    <h3 className="text-base font-bold text-white mb-3">📝 Content to Create for AI Citation</h3>
+                    <h3 className="text-base font-bold text-[var(--sys-text)] mb-3">📝 Content to Create for AI Citation</h3>
                     <div className="space-y-2">
                         {r.contentToCreate.map((c, i) => (
-                            <div key={i} className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+                            <div key={i} className="p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
                                 <div className="flex items-center gap-2 mb-2">
-                                    <span className="text-cyan-400 text-xs">▸</span>
-                                    <p className="text-sm text-white font-bold">{typeof c === 'string' ? c : c.title}</p>
-                                    {c.format && <span className="text-[10px] px-1.5 py-0.5 rounded bg-cyan-400/10 text-cyan-400 font-bold uppercase">{c.format}</span>}
+                                    <span className="text-primary text-xs">▸</span>
+                                    <p className="text-sm text-[var(--sys-text)] font-bold">{typeof c === 'string' ? c : c.title}</p>
+                                    {c.format && <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--sys-primary-dim)] text-primary font-bold uppercase">{c.format}</span>}
                                 </div>
-                                {c.purpose && <p className="text-xs text-slate-400 mb-2">{c.purpose}</p>}
+                                {c.purpose && <p className="text-xs text-[var(--sys-text-muted)] mb-2">{c.purpose}</p>}
                                 {c.targetPrompts?.length > 0 && (
                                     <div className="flex flex-wrap gap-1 mt-1">
                                         {c.targetPrompts.map((p, pi) => (
-                                            <span key={pi} className="text-[9px] text-slate-500 bg-white/5 px-1.5 py-0.5 rounded italic">"{p}"</span>
+                                            <span key={pi} className="text-[9px] text-[var(--sys-text-muted)] bg-[var(--sys-surface)] px-1.5 py-0.5 rounded italic">"{p}"</span>
                                         ))}
                                     </div>
                                 )}
@@ -2550,22 +2550,22 @@ function AutoFixResults({ results }) {
         <div className="space-y-6">
             <div className="glass-panel rounded-2xl p-6">
                 <div className="flex items-center gap-3 mb-2">
-                    <span className="material-symbols-outlined text-teal-400 text-2xl">build</span>
-                    <h2 className="text-xl font-black text-white">Auto-Fix — Ready-to-Implement</h2>
+                    <span className="material-symbols-outlined text-primary text-2xl">build</span>
+                    <h2 className="text-xl font-black text-[var(--sys-text)]">Auto-Fix — Ready-to-Implement</h2>
                 </div>
-                {r.priorityOrder && <p className="text-sm text-slate-400 mb-4">{r.priorityOrder}</p>}
+                {r.priorityOrder && <p className="text-sm text-[var(--sys-text-muted)] mb-4">{r.priorityOrder}</p>}
             </div>
 
             {/* Combined Schema Block */}
             {r.combinedSchemaBlock && (
                 <div className="glass-panel rounded-2xl p-6">
                     <div className="flex items-center justify-between mb-3">
-                        <h3 className="text-base font-bold text-white flex items-center gap-2"><span className="material-symbols-outlined text-sm text-[#FF4D00]">data_object</span> Combined Schema Block</h3>
+                        <h3 className="text-base font-bold text-[var(--sys-text)] flex items-center gap-2"><span className="material-symbols-outlined text-sm text-[#FF4D00]">data_object</span> Combined Schema Block</h3>
                         <button onClick={() => copyCode(r.combinedSchemaBlock, 'combined')} className="px-3 py-1 rounded-lg bg-primary/10 text-primary text-xs font-bold hover:bg-primary/20 cursor-pointer transition-all">
                             {copiedIdx === 'combined' ? '✓ Copied!' : 'Copy All Schema'}
                         </button>
                     </div>
-                    <pre className="bg-[#0a0d1a] rounded-xl p-4 overflow-x-auto text-xs text-slate-300 font-mono border border-white/5">{r.combinedSchemaBlock}</pre>
+                    <pre className="bg-[#0a0d1a] rounded-xl p-4 overflow-x-auto text-xs text-[var(--sys-text-muted)] font-mono border border-[var(--sys-border)]">{r.combinedSchemaBlock}</pre>
                 </div>
             )}
 
@@ -2575,23 +2575,23 @@ function AutoFixResults({ results }) {
                     <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2">
                             <SeverityBadge severity={fix.severity} />
-                            <span className="text-xs px-1.5 py-0.5 rounded-full bg-teal-400/10 text-teal-400 font-bold">{fix.fixType}</span>
-                            <h4 className="text-sm font-bold text-white">{fix.issueTitle}</h4>
+                            <span className="text-xs px-1.5 py-0.5 rounded-full bg-[var(--sys-primary-dim)] text-primary font-bold">{fix.fixType}</span>
+                            <h4 className="text-sm font-bold text-[var(--sys-text)]">{fix.issueTitle}</h4>
                         </div>
-                        <span className="text-xs text-slate-500">{fix.effort}</span>
+                        <span className="text-xs text-[var(--sys-text-muted)]">{fix.effort}</span>
                     </div>
-                    <p className="text-xs text-slate-400 mb-3">{fix.description}</p>
+                    <p className="text-xs text-[var(--sys-text-muted)] mb-3">{fix.description}</p>
 
                     {/* Code Block */}
                     <div className="relative mb-3">
                         <button onClick={() => copyCode(fix.code, i)}
-                            className="absolute top-2 right-2 px-2 py-1 rounded-lg bg-white/10 text-xs text-slate-300 hover:bg-primary/20 hover:text-primary cursor-pointer transition-all z-10">
+                            className="absolute top-2 right-2 px-2 py-1 rounded-lg bg-[var(--sys-surface)] text-xs text-[var(--sys-text-muted)] hover:bg-primary/20 hover:text-primary cursor-pointer transition-all z-10">
                             {copiedIdx === i ? '✓ Copied!' : 'Copy'}
                         </button>
-                        <pre className="bg-[#0a0d1a] rounded-xl p-4 overflow-x-auto text-xs text-emerald-300 font-mono border border-white/5 max-h-60">{fix.code}</pre>
+                        <pre className="bg-[#0a0d1a] rounded-xl p-4 overflow-x-auto text-xs text-[var(--sys-primary)] font-mono border border-[var(--sys-border)] max-h-60">{fix.code}</pre>
                     </div>
 
-                    <div className="flex items-center gap-4 text-[11px] text-slate-500">
+                    <div className="flex items-center gap-4 text-[11px] text-[var(--sys-text-muted)]">
                         <span><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">location_on</span> {fix.implementationGuide}</span>
                         <span><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">trending_up</span> {fix.expectedImpact}</span>
                     </div>
@@ -2615,34 +2615,34 @@ function PromptMiningResults({ results }) {
             {/* Summary + Citation Score */}
             <div className="glass-panel rounded-2xl p-6">
                 <div className="flex items-center gap-3 mb-4">
-                    <span className="material-symbols-outlined text-orange-400 text-2xl">chat_bubble</span>
+                    <span className="material-symbols-outlined text-[var(--sys-primary)] text-2xl">chat_bubble</span>
                     <div>
-                        <h2 className="text-xl font-black text-white">AI Prompt Mining</h2>
-                        <p className="text-xs text-slate-500">{r.totalPromptsAnalyzed || 0} prompts analyzed</p>
+                        <h2 className="text-xl font-black text-[var(--sys-text)]">AI Prompt Mining</h2>
+                        <p className="text-xs text-[var(--sys-text-muted)]">{r.totalPromptsAnalyzed || 0} prompts analyzed</p>
                     </div>
                     {r.citationScore != null && (
                         <div className="ml-auto text-center">
-                            <p className={`text-3xl font-black ${r.citationScore >= 60 ? 'text-emerald-400' : r.citationScore >= 30 ? 'text-amber-400' : 'text-rose-400'}`}>{r.citationScore}</p>
-                            <p className="text-[10px] text-slate-500 font-bold">CITATION SCORE</p>
+                            <p className={`text-3xl font-black ${r.citationScore >= 60 ? 'text-primary' : r.citationScore >= 30 ? 'text-primary' : 'text-primary'}`}>{r.citationScore}</p>
+                            <p className="text-[10px] text-[var(--sys-text-muted)] font-bold">CITATION SCORE</p>
                         </div>
                     )}
                 </div>
-                {r.summary && <p className="text-sm text-slate-300 leading-relaxed">{r.summary}</p>}
+                {r.summary && <p className="text-sm text-[var(--sys-text-muted)] leading-relaxed">{r.summary}</p>}
             </div>
 
             {/* Category Overview Cards */}
             {r.promptCategories?.length > 0 && (
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                     {r.promptCategories.map((cat, ci) => (
-                        <div key={ci} className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06]">
-                            <p className="text-sm font-bold text-white mb-2">{cat.category}</p>
+                        <div key={ci} className="p-4 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                            <p className="text-sm font-bold text-[var(--sys-text)] mb-2">{cat.category}</p>
                             <div className="flex items-baseline gap-2">
-                                <span className="text-lg font-black text-orange-400">{cat.totalPrompts || 0}</span>
-                                <span className="text-[10px] text-slate-500">prompts</span>
+                                <span className="text-lg font-black text-[var(--sys-primary)]">{cat.totalPrompts || 0}</span>
+                                <span className="text-[10px] text-[var(--sys-text-muted)]">prompts</span>
                             </div>
-                            <p className="text-[10px] text-slate-500 mt-1">Citation: {cat.currentCitationRate || '0%'}</p>
+                            <p className="text-[10px] text-[var(--sys-text-muted)] mt-1">Citation: {cat.currentCitationRate || '0%'}</p>
                             {cat.opportunity && (
-                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold mt-2 inline-block ${cat.opportunity === 'high' ? 'bg-emerald-400/10 text-emerald-400' : cat.opportunity === 'medium' ? 'bg-amber-400/10 text-amber-400' : 'bg-slate-400/10 text-slate-400'}`}>
+                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold mt-2 inline-block ${cat.opportunity === 'high' ? 'bg-[var(--sys-primary-dim)] text-primary' : cat.opportunity === 'medium' ? 'bg-[var(--sys-primary-dim)] text-primary' : 'bg-[var(--sys-border)]/10 text-[var(--sys-text-muted)]'}`}>
                                     {cat.opportunity.toUpperCase()} OPP
                                 </span>
                             )}
@@ -2654,32 +2654,32 @@ function PromptMiningResults({ results }) {
             {/* Mined Prompts — the actual individual prompts */}
             {r.minedPrompts?.length > 0 && (
                 <div className="glass-panel rounded-2xl p-6">
-                    <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2">
-                        <span className="material-symbols-outlined text-sm text-orange-400">mining</span> Mined Prompts ({r.minedPrompts.length})
+                    <h3 className="text-base font-bold text-[var(--sys-text)] mb-4 flex items-center gap-2">
+                        <span className="material-symbols-outlined text-sm text-[var(--sys-primary)]">mining</span> Mined Prompts ({r.minedPrompts.length})
                     </h3>
                     <div className="space-y-3">
                         {r.minedPrompts.map((p, pi) => {
                             const prColor = PRIORITY_COLORS[p.priority] || '#94a3b8'
                             return (
-                                <div key={pi} className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06] hover:bg-white/[0.04] transition-colors">
+                                <div key={pi} className="p-4 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:bg-[var(--sys-surface)] transition-colors">
                                     <div className="flex items-start justify-between gap-3 mb-2">
-                                        <p className="text-sm text-white font-medium flex-1">"{p.prompt}"</p>
+                                        <p className="text-sm text-[var(--sys-text)] font-medium flex-1">"{p.prompt}"</p>
                                         <span className="text-[10px] px-2 py-0.5 rounded-full font-bold whitespace-nowrap" style={{ background: `${prColor}15`, color: prColor }}>
                                             {p.priority?.toUpperCase()}
                                         </span>
                                     </div>
                                     <div className="flex flex-wrap gap-2 mb-2">
                                         {p.category && <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#FF4D00]/10 text-[#FF4D00] font-bold">{p.category}</span>}
-                                        {p.searchVolume && <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/[0.05] text-slate-400 font-bold">Vol: {p.searchVolume}</span>}
+                                        {p.searchVolume && <span className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--sys-surface)] text-[var(--sys-text-muted)] font-bold">Vol: {p.searchVolume}</span>}
                                         {p.contentFormat && <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#FF4D00]/10 text-[#FF4D00] font-bold">{p.contentFormat}</span>}
-                                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${p.currentlyCited ? 'bg-emerald-400/10 text-emerald-400' : 'bg-rose-400/10 text-rose-400'}`}>
+                                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${p.currentlyCited ? 'bg-[var(--sys-primary-dim)] text-primary' : 'bg-[var(--sys-primary-dim)] text-primary'}`}>
                                             {p.currentlyCited ? '✓ Cited' : '✗ Not Cited'}
                                         </span>
                                     </div>
-                                    {p.whyNotCited && <p className="text-xs text-slate-500 mb-1"><span className="text-rose-400 font-bold">Why not cited:</span> {p.whyNotCited}</p>}
+                                    {p.whyNotCited && <p className="text-xs text-[var(--sys-text-muted)] mb-1"><span className="text-primary font-bold">Why not cited:</span> {p.whyNotCited}</p>}
                                     {p.contentNeeded && <p className="text-xs text-primary font-medium mb-1">→ {p.contentNeeded}</p>}
-                                    {p.estimatedImpact && <p className="text-[10px] text-slate-600">Impact: {p.estimatedImpact}</p>}
-                                    {p.competitorsCited?.length > 0 && <p className="text-[10px] text-amber-400 mt-1">Competitors cited: {p.competitorsCited.join(', ')}</p>}
+                                    {p.estimatedImpact && <p className="text-[10px] text-[var(--sys-text-muted)]">Impact: {p.estimatedImpact}</p>}
+                                    {p.competitorsCited?.length > 0 && <p className="text-[10px] text-primary mt-1">Competitors cited: {p.competitorsCited.join(', ')}</p>}
                                 </div>
                             )
                         })}
@@ -2690,15 +2690,15 @@ function PromptMiningResults({ results }) {
             {/* Quick Wins */}
             {r.quickWins?.length > 0 && (
                 <div className="glass-panel rounded-2xl p-6">
-                    <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2">
-                        <span className="material-symbols-outlined text-sm text-emerald-400">bolt</span> Quick Wins
+                    <h3 className="text-base font-bold text-[var(--sys-text)] mb-4 flex items-center gap-2">
+                        <span className="material-symbols-outlined text-sm text-primary">bolt</span> Quick Wins
                     </h3>
                     <div className="space-y-3">
                         {r.quickWins.map((w, i) => (
-                            <div key={i} className="p-3 rounded-xl bg-emerald-400/5 border border-emerald-400/10">
-                                <p className="text-sm text-white font-medium">{w.action}</p>
-                                <p className="text-xs text-slate-500 mt-1">Target: "{w.targetPrompt}" • Effort: {w.effort} • Impact: {w.expectedImpact}</p>
-                                {w.proofMethod && <p className="text-[10px] text-emerald-400/70 mt-1">Verify: {w.proofMethod}</p>}
+                            <div key={i} className="p-3 rounded-xl bg-[var(--sys-primary-dim)] border border-[var(--sys-border)]">
+                                <p className="text-sm text-[var(--sys-text)] font-medium">{w.action}</p>
+                                <p className="text-xs text-[var(--sys-text-muted)] mt-1">Target: "{w.targetPrompt}" • Effort: {w.effort} • Impact: {w.expectedImpact}</p>
+                                {w.proofMethod && <p className="text-[10px] text-primary/70 mt-1">Verify: {w.proofMethod}</p>}
                             </div>
                         ))}
                     </div>
@@ -2708,30 +2708,30 @@ function PromptMiningResults({ results }) {
             {/* Content Calendar */}
             {r.contentCalendar?.length > 0 && (
                 <div className="glass-panel rounded-2xl p-6">
-                    <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2"><span className="material-symbols-outlined text-sm text-[#FF4D00]">event</span> Content Calendar</h3>
+                    <h3 className="text-base font-bold text-[var(--sys-text)] mb-4 flex items-center gap-2"><span className="material-symbols-outlined text-sm text-[#FF4D00]">event</span> Content Calendar</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {r.contentCalendar.map((w, i) => (
-                            <div key={i} className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+                            <div key={i} className="p-4 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
                                 <div className="flex items-center justify-between mb-2">
                                     <p className="text-xs text-primary font-bold">WEEK {w.week}</p>
-                                    {w.theme && <p className="text-[10px] text-slate-500">{w.theme}</p>}
+                                    {w.theme && <p className="text-[10px] text-[var(--sys-text-muted)]">{w.theme}</p>}
                                 </div>
                                 {/* Handle both flat and nested content structures */}
                                 {w.contentPieces?.length > 0 ? (
                                     <div className="space-y-2">
                                         {w.contentPieces.map((cp, j) => (
                                             <div key={j} className="pl-3 border-l-2 border-primary/30">
-                                                <p className="text-sm text-white font-medium">{cp.title}</p>
-                                                <p className="text-xs text-slate-500">Format: {cp.format}{cp.publishBy ? ` • By: ${cp.publishBy}` : ''}</p>
-                                                {cp.targetPrompts?.length > 0 && <p className="text-[10px] text-slate-600 mt-0.5">Targets: {cp.targetPrompts.join(', ').substring(0, 120)}</p>}
+                                                <p className="text-sm text-[var(--sys-text)] font-medium">{cp.title}</p>
+                                                <p className="text-xs text-[var(--sys-text-muted)]">Format: {cp.format}{cp.publishBy ? ` • By: ${cp.publishBy}` : ''}</p>
+                                                {cp.targetPrompts?.length > 0 && <p className="text-[10px] text-[var(--sys-text-muted)] mt-0.5">Targets: {cp.targetPrompts.join(', ').substring(0, 120)}</p>}
                                             </div>
                                         ))}
                                     </div>
                                 ) : (
                                     /* Fallback for flat structure */
                                     <>
-                                        {w.content && <p className="text-sm text-white font-bold mb-1">{w.content}</p>}
-                                        <p className="text-xs text-slate-500">Format: {w.format || '—'} | Targets: {w.targetPrompts?.join(', ').substring(0, 80) || '—'}</p>
+                                        {w.content && <p className="text-sm text-[var(--sys-text)] font-bold mb-1">{w.content}</p>}
+                                        <p className="text-xs text-[var(--sys-text-muted)]">Format: {w.format || '—'} | Targets: {w.targetPrompts?.join(', ').substring(0, 80) || '—'}</p>
                                     </>
                                 )}
                             </div>
@@ -2743,22 +2743,22 @@ function PromptMiningResults({ results }) {
             {/* Optimizations */}
             {r.optimizations?.length > 0 && (
                 <div className="glass-panel rounded-2xl p-6">
-                    <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2">
+                    <h3 className="text-base font-bold text-[var(--sys-text)] mb-4 flex items-center gap-2">
                         <span className="material-symbols-outlined text-sm text-[#FF4D00]">trending_up</span> Strategic Optimizations
                     </h3>
                     <div className="space-y-4">
                         {r.optimizations.map((opt, i) => (
-                            <div key={i} className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+                            <div key={i} className="p-4 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
                                 <div className="flex items-center gap-2 mb-2">
-                                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${opt.priority === 'critical' ? 'bg-rose-400/10 text-rose-400' : opt.priority === 'high' ? 'bg-orange-400/10 text-orange-400' : 'bg-amber-400/10 text-amber-400'}`}>{opt.priority?.toUpperCase()}</span>
-                                    <h4 className="text-sm font-bold text-white">{opt.title}</h4>
+                                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${opt.priority === 'critical' ? 'bg-[var(--sys-primary-dim)] text-primary' : opt.priority === 'high' ? 'bg-[var(--sys-surface)] text-[var(--sys-primary)]' : 'bg-[var(--sys-primary-dim)] text-primary'}`}>{opt.priority?.toUpperCase()}</span>
+                                    <h4 className="text-sm font-bold text-[var(--sys-text)]">{opt.title}</h4>
                                 </div>
-                                <p className="text-xs text-slate-400 mb-2">{opt.description}</p>
+                                <p className="text-xs text-[var(--sys-text-muted)] mb-2">{opt.description}</p>
                                 <div className="grid grid-cols-2 gap-2 text-[10px]">
-                                    {opt.kpi && <div><span className="text-slate-600">KPI:</span> <span className="text-slate-400">{opt.kpi}</span></div>}
-                                    {opt.baseline && <div><span className="text-slate-600">Baseline:</span> <span className="text-slate-400">{opt.baseline}</span></div>}
-                                    {opt.target && <div><span className="text-slate-600">Target:</span> <span className="text-emerald-400">{opt.target}</span></div>}
-                                    {opt.timeline && <div><span className="text-slate-600">Timeline:</span> <span className="text-slate-400">{opt.timeline}</span></div>}
+                                    {opt.kpi && <div><span className="text-[var(--sys-text-muted)]">KPI:</span> <span className="text-[var(--sys-text-muted)]">{opt.kpi}</span></div>}
+                                    {opt.baseline && <div><span className="text-[var(--sys-text-muted)]">Baseline:</span> <span className="text-[var(--sys-text-muted)]">{opt.baseline}</span></div>}
+                                    {opt.target && <div><span className="text-[var(--sys-text-muted)]">Target:</span> <span className="text-primary">{opt.target}</span></div>}
+                                    {opt.timeline && <div><span className="text-[var(--sys-text-muted)]">Timeline:</span> <span className="text-[var(--sys-text-muted)]">{opt.timeline}</span></div>}
                                 </div>
                                 {opt.expectedROI && <p className="text-[10px] text-primary mt-1">ROI: {opt.expectedROI}</p>}
                             </div>
@@ -3014,37 +3014,37 @@ function SeoHelpView({ onBack }) {
         <div>
             <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
-                    <button onClick={onBack} className="size-10 rounded-xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center hover:bg-white/[0.08] transition-all cursor-pointer">
-                        <span className="material-symbols-outlined text-slate-400">arrow_back</span>
+                    <button onClick={onBack} className="size-10 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] flex items-center justify-center hover:bg-[var(--sys-surface)] transition-all cursor-pointer">
+                        <span className="material-symbols-outlined text-[var(--sys-text-muted)]">arrow_back</span>
                     </button>
                     <div>
-                        <h2 className="text-white font-bold text-lg flex items-center gap-2">
+                        <h2 className="text-[var(--sys-text)] font-bold text-lg flex items-center gap-2">
                             <span className="material-symbols-outlined text-primary">menu_book</span> SEO Studio Guide
                         </h2>
-                        <p className="text-sm text-slate-500">Master AI-powered SEO intelligence for your brand</p>
+                        <p className="text-sm text-[var(--sys-text-muted)]">Master AI-powered SEO intelligence for your brand</p>
                     </div>
                 </div>
             </div>
 
-            <div className="glass-panel rounded-2xl p-6 mb-6" style={{ background: 'linear-gradient(135deg, #10b98108, #3b82f608, #8b5cf608)' }}>
-                <h3 className="text-white font-bold mb-3 flex items-center gap-2"><span className="material-symbols-outlined text-primary">info</span> What is SEO Studio?</h3>
-                <p className="text-slate-400 text-sm leading-relaxed mb-4">
-                    SEO Studio is your AI-powered <strong className="text-white">search intelligence hub</strong>.
-                    It has <strong className="text-white">8 specialized workflows</strong> that crawl your website, analyze competitors, and generate actionable strategies.
-                    From <strong className="text-white">health audits</strong> and <strong className="text-white">keyword discovery</strong> to
-                    <strong className="text-white"> AI visibility optimization</strong> and <strong className="text-white">auto-generated code fixes</strong>.
+            <div className="glass-panel rounded-2xl p-6 mb-6" style={{ background: 'var(--sys-primary)' }}>
+                <h3 className="text-[var(--sys-text)] font-bold mb-3 flex items-center gap-2"><span className="material-symbols-outlined text-primary">info</span> What is SEO Studio?</h3>
+                <p className="text-[var(--sys-text-muted)] text-sm leading-relaxed mb-4">
+                    SEO Studio is your AI-powered <strong className="text-[var(--sys-text)]">search intelligence hub</strong>.
+                    It has <strong className="text-[var(--sys-text)]">8 specialized workflows</strong> that crawl your website, analyze competitors, and generate actionable strategies.
+                    From <strong className="text-[var(--sys-text)]">health audits</strong> and <strong className="text-[var(--sys-text)]">keyword discovery</strong> to
+                    <strong className="text-[var(--sys-text)]"> AI visibility optimization</strong> and <strong className="text-[var(--sys-text)]">auto-generated code fixes</strong>.
                     Connected to Google Analytics & Search Console for real data.
                 </p>
                 <div className="flex flex-wrap gap-2">
                     {['8 Workflows', 'AI Ask Bar', 'Health Audit', 'Traffic Strategy', 'Competitor Analysis', 'AI Visibility', 'Auto-Fix', 'GA/GSC Data'].map(t => (
-                        <span key={t} className="px-3 py-1 rounded-full text-xs font-bold bg-white/[0.04] border border-white/[0.06] text-slate-400">{t}</span>
+                        <span key={t} className="px-3 py-1 rounded-full text-xs font-bold bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text-muted)]">{t}</span>
                     ))}
                 </div>
             </div>
 
             <div className="glass-panel rounded-2xl p-5 mb-6">
-                <h3 className="text-white font-bold mb-4 text-sm flex items-center gap-2">
-                    <span className="material-symbols-outlined text-amber-400 text-lg">account_tree</span> Typical Workflow
+                <h3 className="text-[var(--sys-text)] font-bold mb-4 text-sm flex items-center gap-2">
+                    <span className="material-symbols-outlined text-primary text-lg">account_tree</span> Typical Workflow
                 </h3>
                 <div className="flex items-center gap-0 overflow-x-auto pb-2">
                     {[
@@ -3060,7 +3060,7 @@ function SeoHelpView({ onBack }) {
                                 <div className="size-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${step.color}15` }}>
                                     <span className="material-symbols-outlined text-lg" style={{ color: step.color }}>{step.icon}</span>
                                 </div>
-                                <p className="text-xs text-slate-400 text-center leading-tight font-medium">{step.label}</p>
+                                <p className="text-xs text-[var(--sys-text-muted)] text-center leading-tight font-medium">{step.label}</p>
                             </div>
                             {idx < arr.length - 1 && <span className="material-symbols-outlined text-slate-700 text-sm mx-1 shrink-0">chevron_right</span>}
                         </div>
@@ -3072,19 +3072,19 @@ function SeoHelpView({ onBack }) {
                 {SEO_HELP_SECTIONS.map(section => (
                     <div key={section.id} className="glass-panel rounded-2xl overflow-hidden">
                         <button onClick={() => setExpanded(expanded === section.id ? null : section.id)}
-                            className="w-full flex items-center gap-3 p-5 text-left hover:bg-white/[0.02] transition-all cursor-pointer">
+                            className="w-full flex items-center gap-3 p-5 text-left hover:bg-[var(--sys-surface)] transition-all cursor-pointer">
                             <div className="size-10 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: `${section.color}15` }}>
                                 <span className="material-symbols-outlined" style={{ color: section.color }}>{section.icon}</span>
                             </div>
                             <div className="flex-1 min-w-0">
-                                <p className="text-white font-bold text-sm">{section.title}</p>
-                                <p className="text-slate-500 text-xs">{section.subtitle}</p>
+                                <p className="text-[var(--sys-text)] font-bold text-sm">{section.title}</p>
+                                <p className="text-[var(--sys-text-muted)] text-xs">{section.subtitle}</p>
                             </div>
-                            <span className="text-xs text-slate-600 font-bold mr-1">{section.steps.length} topics</span>
-                            <span className={`material-symbols-outlined text-slate-500 transition-transform ${expanded === section.id ? 'rotate-180' : ''}`}>expand_more</span>
+                            <span className="text-xs text-[var(--sys-text-muted)] font-bold mr-1">{section.steps.length} topics</span>
+                            <span className={`material-symbols-outlined text-[var(--sys-text-muted)] transition-transform ${expanded === section.id ? 'rotate-180' : ''}`}>expand_more</span>
                         </button>
                         {expanded === section.id && (
-                            <div className="px-5 pb-5 space-y-3 border-t border-white/[0.04] pt-4">
+                            <div className="px-5 pb-5 space-y-3 border-t border-[var(--sys-border)] pt-4">
                                 {section.steps.map((step, idx) => (
                                     <div key={idx} className="flex gap-3">
                                         <div className="flex flex-col items-center">
@@ -3094,8 +3094,8 @@ function SeoHelpView({ onBack }) {
                                             {idx < section.steps.length - 1 && <div className="w-px flex-1 mt-1" style={{ backgroundColor: `${section.color}20` }} />}
                                         </div>
                                         <div className="pb-3">
-                                            <p className="text-white font-bold text-sm mb-0.5">{step.title}</p>
-                                            <p className="text-slate-400 text-xs leading-relaxed">{step.description}</p>
+                                            <p className="text-[var(--sys-text)] font-bold text-sm mb-0.5">{step.title}</p>
+                                            <p className="text-[var(--sys-text-muted)] text-xs leading-relaxed">{step.description}</p>
                                         </div>
                                     </div>
                                 ))}
@@ -3105,23 +3105,23 @@ function SeoHelpView({ onBack }) {
                 ))}
             </div>
 
-            <div className="glass-panel rounded-2xl p-6" style={{ background: 'linear-gradient(135deg, #f59e0b08, #ef444408)' }}>
-                <h3 className="text-white font-bold mb-4 flex items-center gap-2">
-                    <span className="material-symbols-outlined text-amber-400">emoji_objects</span> Pro Tips
+            <div className="glass-panel rounded-2xl p-6" style={{ background: 'var(--sys-primary)' }}>
+                <h3 className="text-[var(--sys-text)] font-bold mb-4 flex items-center gap-2">
+                    <span className="material-symbols-outlined text-primary">emoji_objects</span> Pro Tips
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {SEO_PRO_TIPS.map((tip, idx) => (
-                        <div key={idx} className="flex gap-2.5 p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
+                        <div key={idx} className="flex gap-2.5 p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
                             <span className="text-lg shrink-0 mt-0.5">{tip.icon}</span>
-                            <p className="text-xs text-slate-400 leading-relaxed">{tip.tip}</p>
+                            <p className="text-xs text-[var(--sys-text-muted)] leading-relaxed">{tip.tip}</p>
                         </div>
                     ))}
                 </div>
             </div>
 
             <div className="text-center mt-6 py-6">
-                <p className="text-slate-500 text-sm mb-3">Ready to optimize?</p>
-                <button onClick={onBack} className="px-6 py-3 rounded-xl text-sm font-bold bg-gradient-to-r from-primary to-[#FF7A00] text-white cursor-pointer hover:shadow-lg hover:shadow-primary/20 transition-all flex items-center gap-2 mx-auto">
+                <p className="text-[var(--sys-text-muted)] text-sm mb-3">Ready to optimize?</p>
+                <button onClick={onBack} className="px-6 py-3 rounded-xl text-sm font-bold bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] cursor-pointer hover:shadow-lg hover:shadow-none transition-all flex items-center gap-2 mx-auto">
                     <span className="material-symbols-outlined text-sm">travel_explore</span> Go to SEO Studio
                 </button>
             </div>

@@ -19,7 +19,7 @@ const PromptArea = memo(({ value, onChange, placeholder, disabled, onKeyDown, te
             onKeyDown={onKeyDown}
             placeholder={placeholder}
             disabled={disabled}
-            className="w-full resize-none border-none bg-transparent p-0 text-lg leading-relaxed text-white placeholder-slate-500 focus:outline-none focus:ring-0"
+            className="w-full resize-none border-none bg-transparent p-0 text-lg leading-relaxed text-[var(--sys-text)] placeholder-slate-500 focus:outline-none focus:ring-0"
             rows={2}
         />
     );

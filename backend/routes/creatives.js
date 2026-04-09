@@ -22,7 +22,7 @@ import { getRouter } from '../ai/router.js';
 import { runCreativePipeline, postGenerationCriticNode } from '../agents/creativeStudio/nodes.js';
 import { startProgress, addStep, getProgress, endProgress } from '../utils/progressStore.js';
 import { laozhangImageGenerate, laozhangMultimodalImageGenerate, isLaozhangAvailable } from '../agents/videoStudio/laozhangClient.js';
-
+import { getActiveProvider } from '../ai/providerRouting.js';
 
 import { creativeQueue } from '../utils/creativeQueue.js';
 
@@ -956,8 +956,16 @@ async function geminiImageGenerate(promptText, imageParts = [], temperature = 0.
 async function routedImageGenerate(promptText, imageParts = [], temperature = 0.4, aspectRatio = '1:1', imageSize = '1K', selectedModel = 'nanobanana-2', refImageUrls = [], customSize = null) {
     const modelConfig = IMAGE_MODEL_CONFIG[selectedModel] || IMAGE_MODEL_CONFIG['nanobanana-2'];
     const router = getRouter();
+    
+    let activeProvider = modelConfig.provider;
+    try {
+        const liveProvider = await getActiveProvider('image', selectedModel);
+        if (liveProvider) activeProvider = liveProvider;
+    } catch (e) {
+        console.warn('⚠️ Could not read image provider from cache:', e.message);
+    }
 
-    console.log(`🎯 Image Model Router: ${selectedModel} → ${modelConfig.provider} (${modelConfig.name})`);
+    console.log(`🎯 Image Model Router: ${selectedModel} → ${activeProvider} (${modelConfig.name})`);
     if (customSize) console.log(`📐 Custom Size: ${customSize.width}x${customSize.height}`);
 
     // ── HARD TIMEOUT: 120 seconds max for any image generation ──
@@ -1114,13 +1122,13 @@ async function routedImageGenerate(promptText, imageParts = [], temperature = 0.
         }
 
         // Special handling for fal.ai
-        if (modelConfig.provider === 'fal') {
-            const falResult = await falImageGenerate(promptText, modelConfig.endpoint, aspectRatio, customSize);
+        if (activeProvider === 'fal') {
+            const falResult = await falImageGenerate(promptText, modelConfig.endpoint || 'xai/grok-imagine-image', aspectRatio, customSize);
             return { ...falResult, provider: 'fal' };
         }
 
         // Special handling for Grok Imagen (xAI)
-        if (modelConfig.provider === 'grok') {
+        if (activeProvider === 'grok') {
             const grokResult = await grokImageGenerate(promptText, aspectRatio);
             return { ...grokResult, provider: 'grok' };
         }

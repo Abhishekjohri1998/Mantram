@@ -169,7 +169,7 @@ export default function LandingSEOBlock() {
     }
 
     return (
-        <section className="relative py-24 border-t border-white/[0.04]" style={{ background: 'linear-gradient(180deg, transparent 0%, rgba(255, 77, 0,0.02) 50%, transparent 100%)' }}>
+        <section className="relative py-24 border-t border-[var(--sys-border)]/[0.04]" style={{ background: 'linear-gradient(180deg, transparent 0%, rgba(255, 77, 0,0.02) 50%, transparent 100%)' }}>
             {/* JSON-LD Structured Data */}
             <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }} />
             <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareSchema) }} />
@@ -179,10 +179,10 @@ export default function LandingSEOBlock() {
                 {/* Section Header */}
                 <div className="text-center mb-16">
                     <p className="text-primary text-xs font-bold uppercase tracking-[0.3em] mb-3">Deep Dive</p>
-                    <h2 className="text-3xl md:text-4xl font-black text-white mb-4">
+                    <h2 className="text-3xl md:text-4xl font-black text-[var(--sys-text)] mb-4">
                         Explore the <span className="bg-gradient-to-r from-[#FF4D00] via-primary to-cyan-400 bg-clip-text text-transparent">Mantram AI Platform</span>
                     </h2>
-                    <p className="text-slate-400 max-w-2xl mx-auto text-sm leading-relaxed">
+                    <p className="text-[var(--sys-text-muted)] max-w-2xl mx-auto text-sm leading-relaxed">
                         Learn how each AI-powered studio works together to form a complete marketing operating system — from brand intelligence extraction to published, optimized content across every channel.
                     </p>
                 </div>
@@ -191,13 +191,13 @@ export default function LandingSEOBlock() {
                 <div className="grid md:grid-cols-2 gap-5 mb-20">
                     {STUDIO_CONTENT.map((studio, i) => (
                         <div key={i} className="rounded-2xl p-6 transition-all group" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
-                            <h3 className="text-lg font-bold text-white mb-3 flex items-center gap-3">
+                            <h3 className="text-lg font-bold text-[var(--sys-text)] mb-3 flex items-center gap-3">
                                 <span className="size-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: `${studio.color}15`, border: `1px solid ${studio.color}30` }}>
                                     <span className="material-symbols-outlined text-base" style={{ color: studio.color }}>{studio.icon}</span>
                                 </span>
                                 {studio.title}
                             </h3>
-                            <div className={`text-sm text-slate-400 leading-relaxed overflow-hidden transition-all duration-300 ${expandedContent[i] ? 'max-h-[600px]' : 'max-h-20'} relative`}>
+                            <div className={`text-sm text-[var(--sys-text-muted)] leading-relaxed overflow-hidden transition-all duration-300 ${expandedContent[i] ? 'max-h-[600px]' : 'max-h-20'} relative`}>
                                 {studio.content}
                                 {!expandedContent[i] && (
                                     <div className="absolute bottom-0 left-0 right-0 h-10 bg-gradient-to-t from-[#07070f] to-transparent" />
@@ -205,7 +205,7 @@ export default function LandingSEOBlock() {
                             </div>
                             <button
                                 onClick={() => setExpandedContent(prev => ({ ...prev, [i]: !prev[i] }))}
-                                className="mt-2 text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors hover:text-white"
+                                className="mt-2 text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors hover:text-[var(--sys-text)]"
                                 style={{ color: studio.color }}
                             >
                                 {expandedContent[i] ? 'Read less' : 'Read more'}
@@ -220,8 +220,8 @@ export default function LandingSEOBlock() {
                 {/* Platform FAQ */}
                 <div className="max-w-3xl mx-auto">
                     <div className="text-center mb-10">
-                        <h2 className="text-2xl md:text-3xl font-black text-white mb-3">Frequently Asked Questions</h2>
-                        <p className="text-slate-500 text-sm">Everything you need to know about the Mantram AI platform.</p>
+                        <h2 className="text-2xl md:text-3xl font-black text-[var(--sys-text)] mb-3">Frequently Asked Questions</h2>
+                        <p className="text-[var(--sys-text-muted)] text-sm">Everything you need to know about the Mantram AI platform.</p>
                     </div>
                     <div className="space-y-3">
                         {PLATFORM_FAQS.map((faq, i) => (
@@ -230,13 +230,13 @@ export default function LandingSEOBlock() {
                                     onClick={() => setExpandedFaqs(prev => ({ ...prev, [i]: !prev[i] }))}
                                     className="w-full text-left p-5 flex items-center justify-between hover:bg-white/[0.02] transition-colors cursor-pointer"
                                 >
-                                    <span className="text-sm font-bold text-slate-200 pr-4">{faq.question}</span>
-                                    <span className={`material-symbols-outlined text-slate-500 transition-transform duration-300 flex-shrink-0 ${expandedFaqs[i] ? 'rotate-180' : ''}`}>
+                                    <span className="text-sm font-bold text-[var(--sys-text)] pr-4">{faq.question}</span>
+                                    <span className={`material-symbols-outlined text-[var(--sys-text-muted)] transition-transform duration-300 flex-shrink-0 ${expandedFaqs[i] ? 'rotate-180' : ''}`}>
                                         keyboard_arrow_down
                                     </span>
                                 </button>
                                 <div className={`overflow-hidden transition-all duration-300 ${expandedFaqs[i] ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}`}>
-                                    <div className="px-5 pb-5 text-sm text-slate-400 leading-relaxed border-t border-white/[0.03] pt-4">
+                                    <div className="px-5 pb-5 text-sm text-[var(--sys-text-muted)] leading-relaxed border-t border-[var(--sys-border)]/[0.03] pt-4">
                                         {faq.answer}
                                     </div>
                                 </div>

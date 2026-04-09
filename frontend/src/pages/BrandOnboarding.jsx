@@ -13,14 +13,14 @@ function ProgressIndicator({ step, total }) {
         <div className="flex items-center gap-2 mb-8">
             {Array.from({ length: total }, (_, i) => (
                 <div key={i} className="flex items-center gap-2">
-                    <div className={`size-8 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-500 ${i < step ? 'bg-primary text-white shadow-lg shadow-primary/30' :
-                        i === step ? 'bg-primary/20 text-primary border-2 border-primary' :
-                            'bg-white/[0.05] text-slate-600 border border-white/[0.08]'
+                    <div className={`size-8 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-500 ${i < step ? 'bg-primary text-white shadow-none' :
+                        i === step ? 'bg-primary/20 text-primary border border-primary' :
+                            'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] border border-[var(--sys-border)]'
                         }`}>
                         {i < step ? <span className="material-symbols-outlined text-sm">check</span> : i + 1}
                     </div>
                     {i < total - 1 && (
-                        <div className={`w-12 h-0.5 transition-all duration-500 ${i < step ? 'bg-primary' : 'bg-white/[0.08]'}`} />
+                        <div className={`w-12 h-0.5 transition-all duration-500 ${i < step ? 'bg-primary' : 'bg-[var(--sys-surface)]'}`} />
                     )}
                 </div>
             ))}
@@ -38,22 +38,22 @@ function ChoosePath({ onSelect }) {
     return (
         <div className="max-w-3xl mx-auto animate-fade-in">
             <h2 className="text-3xl font-extrabold text-center mb-2 tracking-tight">How should we learn <span className="text-primary">about your brand?</span></h2>
-            <p className="text-slate-400 text-center mb-10">Choose how you'd like to build your brand knowledge bank.</p>
+            <p className="text-[var(--sys-text-muted)] text-center mb-10">Choose how you'd like to build your brand knowledge bank.</p>
             <div className="grid gap-4">
                 {paths.map(p => (
                     <button key={p.id} onClick={() => onSelect(p.id)}
-                        className="glass-panel rounded-2xl p-6 flex items-center gap-5 hover:bg-white/[0.05] hover:border-primary/30 transition-all cursor-pointer text-left group">
+                        className="glass-panel rounded-2xl p-6 flex items-center gap-5 hover:bg-[var(--sys-surface)] hover:border-primary/30 transition-all cursor-pointer text-left group">
                         <div className="size-14 rounded-xl bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform shrink-0">
                             <span className="material-symbols-outlined text-3xl">{p.icon}</span>
                         </div>
                         <div className="flex-1">
                             <div className="flex items-center gap-2">
-                                <h3 className="text-lg font-bold text-white">{p.title}</h3>
+                                <h3 className="text-lg font-bold text-[var(--sys-text)]">{p.title}</h3>
                                 {p.badge && <span className="text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded">{p.badge}</span>}
                             </div>
-                            <p className="text-sm text-slate-400 mt-1">{p.desc}</p>
+                            <p className="text-sm text-[var(--sys-text-muted)] mt-1">{p.desc}</p>
                         </div>
-                        <span className="material-symbols-outlined text-slate-600 group-hover:text-primary transition-colors">arrow_forward</span>
+                        <span className="material-symbols-outlined text-[var(--sys-text-muted)] group-hover:text-primary transition-colors">arrow_forward</span>
                     </button>
                 ))}
             </div>
@@ -124,18 +124,18 @@ function WebsiteScan({ onComplete, onBack, initialUrl = '' }) {
             {!scanning ? (
                 /* ── Pre-Scan: Enter URL ── */
                 <div className="text-center">
-                    <button onClick={onBack} className="text-slate-500 text-sm flex items-center gap-1 mb-8 hover:text-white transition-colors cursor-pointer mx-auto">
+                    <button onClick={onBack} className="text-[var(--sys-text-muted)] text-sm flex items-center gap-1 mb-8 hover:text-[var(--sys-text)] transition-colors cursor-pointer mx-auto">
                         <span className="material-symbols-outlined text-sm">arrow_back</span> Back
                     </button>
 
                     <div className="glass-panel rounded-3xl p-10 max-w-lg mx-auto relative overflow-hidden">
                         {/* Subtle glow */}
-                        <div className="absolute inset-0 bg-gradient-to-br from-primary/[0.03] to-emerald-500/[0.02] pointer-events-none" />
+                        <div className="absolute inset-0 bg-[var(--sys-surface)] border border-[var(--sys-border)] pointer-events-none" />
                         <div className="relative">
                             <h2 className="text-3xl font-extrabold mb-2 tracking-tight" style={{ fontStyle: 'italic', fontFamily: 'Georgia, serif' }}>
                                 Enter your website
                             </h2>
-                            <p className="text-slate-400 text-sm mb-8">We'll analyze your business and generate your Business DNA</p>
+                            <p className="text-[var(--sys-text-muted)] text-sm mb-8">We'll analyze your business and generate your Business DNA</p>
 
                             <div className="relative mb-4">
                                 <input
@@ -143,7 +143,7 @@ function WebsiteScan({ onComplete, onBack, initialUrl = '' }) {
                                     onChange={e => setUrl(e.target.value)}
                                     onKeyDown={e => e.key === 'Enter' && handleScan()}
                                     placeholder="www.example.com"
-                                    className="w-full py-4 px-5 rounded-2xl bg-white/[0.04] border border-white/[0.08] text-white text-lg placeholder-slate-600 focus:outline-none focus:border-primary/40 focus:bg-white/[0.06] transition-all"
+                                    className="w-full py-4 px-5 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-lg placeholder-slate-600 focus:outline-none focus:border-primary/40 focus:bg-[var(--sys-surface)] transition-all"
                                     autoFocus
                                 />
                             </div>
@@ -157,7 +157,7 @@ function WebsiteScan({ onComplete, onBack, initialUrl = '' }) {
                     </div>
 
                     {error && (
-                        <div className={`mt-6 p-4 rounded-xl border ${error.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'} text-sm flex items-center gap-2 max-w-lg mx-auto`}>
+                        <div className={`mt-6 p-4 rounded-xl border ${error.isProviderError ? 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary' : 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary'} text-sm flex items-center gap-2 max-w-lg mx-auto`}>
                             <span className="material-symbols-outlined text-lg">
                                 {error.isProviderError ? 'warning' : 'error'}
                             </span>
@@ -179,14 +179,14 @@ function WebsiteScan({ onComplete, onBack, initialUrl = '' }) {
                     <div className="glass-panel rounded-3xl p-10 max-w-lg w-full text-center relative overflow-hidden">
                         {/* Animated glow border */}
                         <div className="absolute inset-0 rounded-3xl pointer-events-none" style={{
-                            background: 'linear-gradient(135deg, rgba(var(--primary-rgb, 43, 75, 238), 0.1), transparent 40%, transparent 60%, rgba(16, 185, 129, 0.08))',
+                            background: 'var(--sys-primary), 0.1), transparent 40%, transparent 60%, rgba(16, 185, 129, 0.08))',
                         }} />
 
                         <div className="relative">
                             <h2 className="text-3xl font-extrabold mb-3 tracking-tight" style={{ fontStyle: 'italic', fontFamily: 'Georgia, serif' }}>
                                 Generating your Business<br />DNA
                             </h2>
-                            <p className="text-slate-400 text-sm mb-8">
+                            <p className="text-[var(--sys-text-muted)] text-sm mb-8">
                                 We're researching and analyzing your business.<br />
                                 It will take several minutes. Feel free to come back later.
                             </p>
@@ -197,14 +197,14 @@ function WebsiteScan({ onComplete, onBack, initialUrl = '' }) {
                                 <span className="material-symbols-outlined text-primary text-sm animate-pulse">
                                     {stepIndex < steps.length ? steps[stepIndex]?.icon : 'check_circle'}
                                 </span>
-                                <span className="text-sm text-slate-300 font-medium">{currentStep}</span>
+                                <span className="text-sm text-[var(--sys-text-muted)] font-medium">{currentStep}</span>
                             </div>
 
                             {/* Website URL chip */}
                             <div className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl mx-auto mb-8"
                                 style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)' }}>
-                                <span className="material-symbols-outlined text-slate-500 text-sm">link</span>
-                                <span className="text-sm text-white font-medium">{url.startsWith('http') ? url : `https://${url}`}</span>
+                                <span className="material-symbols-outlined text-[var(--sys-text-muted)] text-sm">link</span>
+                                <span className="text-sm text-[var(--sys-text)] font-medium">{url.startsWith('http') ? url : `https://${url}`}</span>
                             </div>
 
                             {/* Progress indicator */}
@@ -272,11 +272,11 @@ function FileUpload({ onComplete, onBack }) {
 
     return (
         <div className="max-w-2xl mx-auto animate-fade-in">
-            <button onClick={onBack} className="text-slate-500 text-sm flex items-center gap-1 mb-6 hover:text-white transition-colors cursor-pointer">
+            <button onClick={onBack} className="text-[var(--sys-text-muted)] text-sm flex items-center gap-1 mb-6 hover:text-[var(--sys-text)] transition-colors cursor-pointer">
                 <span className="material-symbols-outlined text-sm">arrow_back</span> Back
             </button>
             <h2 className="text-3xl font-extrabold mb-2">Upload Brand <span className="text-primary">Assets</span></h2>
-            <p className="text-slate-400 mb-8">Upload your logo, brand guidelines, or any brand-related content.</p>
+            <p className="text-[var(--sys-text-muted)] mb-8">Upload your logo, brand guidelines, or any brand-related content.</p>
 
             <div className="space-y-6">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -288,12 +288,12 @@ function FileUpload({ onComplete, onBack }) {
 
                 {/* Country Picker */}
                 <div>
-                    <label className="text-sm text-slate-500 uppercase tracking-widest font-bold mb-2 block">Target Country *</label>
+                    <label className="text-sm text-[var(--sys-text-muted)] uppercase tracking-widest font-bold mb-2 block">Target Country *</label>
                     <div className="flex flex-wrap gap-2">
                         {COUNTRIES.map(c => (
                             <button key={c.id} onClick={() => setCountry(c.id)} type="button"
                                 className={`px-3 py-2 rounded-xl text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5
-                                    ${country === c.id ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'bg-white/[0.04] text-slate-400 hover:bg-white/[0.06] border border-white/[0.06]'}`}>
+                                    ${country === c.id ? 'bg-primary text-white shadow-none' : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] hover:bg-[var(--sys-surface)] border border-[var(--sys-border)]'}`}>
                                 <span className="text-sm">{c.flag}</span> {c.label}
                             </button>
                         ))}
@@ -301,25 +301,25 @@ function FileUpload({ onComplete, onBack }) {
                 </div>
 
                 <div onDrop={handleDrop} onDragOver={e => e.preventDefault()}
-                    className="border-2 border-dashed border-white/[0.1] rounded-2xl p-12 text-center hover:border-primary/40 transition-colors">
-                    <span className="material-symbols-outlined text-4xl text-slate-600 mb-4 block">cloud_upload</span>
-                    <p className="text-slate-400 mb-2">Drag & drop files here, or</p>
+                    className="border border-dashed border-[var(--sys-border)] rounded-2xl p-12 text-center hover:border-primary/40 transition-colors">
+                    <span className="material-symbols-outlined text-4xl text-[var(--sys-text-muted)] mb-4 block">cloud_upload</span>
+                    <p className="text-[var(--sys-text-muted)] mb-2">Drag & drop files here, or</p>
                     <label className="btn-primary py-2 px-6 rounded-xl cursor-pointer inline-block">
                         Browse Files
                         <input type="file" multiple className="hidden" onChange={handleDrop} accept="image/*,.pdf,.doc,.docx" />
                     </label>
-                    <p className="text-xs text-slate-600 mt-3">Logo, brand guidelines, content samples, images</p>
+                    <p className="text-xs text-[var(--sys-text-muted)] mt-3">Logo, brand guidelines, content samples, images</p>
                 </div>
 
                 {files.length > 0 && (
                     <div className="space-y-2">
                         {files.map((f, i) => (
-                            <div key={i} className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.03] border border-white/[0.05]">
+                            <div key={i} className="flex items-center gap-3 p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
                                 <span className="material-symbols-outlined text-primary text-lg">description</span>
-                                <span className="text-sm text-white flex-1">{f.name}</span>
-                                <span className="text-sm text-slate-500">{(f.size / 1024).toFixed(0)} KB</span>
+                                <span className="text-sm text-[var(--sys-text)] flex-1">{f.name}</span>
+                                <span className="text-sm text-[var(--sys-text-muted)]">{(f.size / 1024).toFixed(0)} KB</span>
                                 <button onClick={() => setFiles(prev => prev.filter((_, j) => j !== i))}
-                                    className="text-slate-600 hover:text-rose-400 transition-colors cursor-pointer">
+                                    className="text-[var(--sys-text-muted)] hover:text-primary transition-colors cursor-pointer">
                                     <span className="material-symbols-outlined text-sm">close</span>
                                 </button>
                             </div>
@@ -328,7 +328,7 @@ function FileUpload({ onComplete, onBack }) {
                 )}
 
                 {error && (
-                    <div className={`p-4 rounded-xl border ${error.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'} text-sm flex items-center gap-2`}>
+                    <div className={`p-4 rounded-xl border ${error.isProviderError ? 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary' : 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary'} text-sm flex items-center gap-2`}>
                         <span className="material-symbols-outlined text-lg">
                             {error.isProviderError ? 'warning' : 'error'}
                         </span>
@@ -477,18 +477,18 @@ function Brainstorm({ onComplete, onBack }) {
 
     return (
         <div className="max-w-3xl mx-auto animate-fade-in">
-            <button onClick={step > 0 ? () => setStep(step - 1) : onBack} className="text-slate-500 text-sm flex items-center gap-1 mb-6 hover:text-white transition-colors cursor-pointer">
+            <button onClick={step > 0 ? () => setStep(step - 1) : onBack} className="text-[var(--sys-text-muted)] text-sm flex items-center gap-1 mb-6 hover:text-[var(--sys-text)] transition-colors cursor-pointer">
                 <span className="material-symbols-outlined text-sm">arrow_back</span> Back
             </button>
             <h2 className="text-3xl font-extrabold mb-2">Build Your <span className="text-primary">Brand</span></h2>
-            <p className="text-slate-400 mb-6">Let's create your brand identity step by step.</p>
+            <p className="text-[var(--sys-text-muted)] mb-6">Let's create your brand identity step by step.</p>
 
             {/* Mini Progress */}
             <div className="flex gap-2 mb-8">
                 {['Brand Info', 'Story & Audience', 'Style & Logo', 'Preview'].map((s, i) => (
                     <div key={i} className="flex-1">
-                        <div className={`h-1 rounded-full transition-all ${i <= step ? 'bg-primary' : 'bg-white/[0.08]'}`} />
-                        <p className={`text-xs mt-1 ${i <= step ? 'text-primary' : 'text-slate-600'}`}>{s}</p>
+                        <div className={`h-1 rounded-full transition-all ${i <= step ? 'bg-primary' : 'bg-[var(--sys-surface)]'}`} />
+                        <p className={`text-xs mt-1 ${i <= step ? 'text-primary' : 'text-[var(--sys-text-muted)]'}`}>{s}</p>
                     </div>
                 ))}
             </div>
@@ -498,25 +498,25 @@ function Brainstorm({ onComplete, onBack }) {
                 <div className="space-y-6 animate-fade-in">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
-                            <label className="text-sm text-slate-500 uppercase tracking-widest font-bold mb-2 block">What's your brand name? *</label>
+                            <label className="text-sm text-[var(--sys-text-muted)] uppercase tracking-widest font-bold mb-2 block">What's your brand name? *</label>
                             <input value={brandName} onChange={e => setBrandName(e.target.value)}
                                 placeholder="e.g., Nike, Apple, Zara" className="input-glass w-full py-4 text-lg" autoFocus />
-                            <p className="text-xs text-slate-600 mt-1">This is what customers will know you as</p>
+                            <p className="text-xs text-[var(--sys-text-muted)] mt-1">This is what customers will know you as</p>
                         </div>
                         <div>
-                            <label className="text-sm text-slate-500 uppercase tracking-widest font-bold mb-2 block">Website (Optional)</label>
+                            <label className="text-sm text-[var(--sys-text-muted)] uppercase tracking-widest font-bold mb-2 block">Website (Optional)</label>
                             <input value={website} onChange={e => setWebsite(e.target.value)}
                                 placeholder="e.g., example.com" className="input-glass w-full py-4 text-lg" />
-                            <p className="text-xs text-slate-600 mt-1">Used for SEO and performance analysis</p>
+                            <p className="text-xs text-[var(--sys-text-muted)] mt-1">Used for SEO and performance analysis</p>
                         </div>
                     </div>
 
                     <div>
-                        <label className="text-sm text-slate-500 uppercase tracking-widest font-bold mb-2 block">Industry *</label>
+                        <label className="text-sm text-[var(--sys-text-muted)] uppercase tracking-widest font-bold mb-2 block">Industry *</label>
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                             {industries.map(i => (
                                 <button key={i} onClick={() => setIndustry(i)}
-                                    className={`px-3 py-2.5 rounded-xl text-xs font-medium transition-all cursor-pointer ${industry === i ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'bg-white/[0.04] text-slate-400 hover:bg-white/[0.06] border border-white/[0.06]'}`}>
+                                    className={`px-3 py-2.5 rounded-xl text-xs font-medium transition-all cursor-pointer ${industry === i ? 'bg-primary text-white shadow-none' : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] hover:bg-[var(--sys-surface)] border border-[var(--sys-border)]'}`}>
                                     {i}
                                 </button>
                             ))}
@@ -525,16 +525,16 @@ function Brainstorm({ onComplete, onBack }) {
 
                     {/* Country */}
                     <div>
-                        <label className="text-sm text-slate-500 uppercase tracking-widest font-bold mb-2 block">
+                        <label className="text-sm text-[var(--sys-text-muted)] uppercase tracking-widest font-bold mb-2 block">
                             <span className="material-symbols-outlined text-xs align-middle mr-1">public</span>
                             Target Country *
                         </label>
-                        <p className="text-xs text-slate-600 mb-2">This determines the cultural calendar, festivals, and language options for your brand</p>
+                        <p className="text-xs text-[var(--sys-text-muted)] mb-2">This determines the cultural calendar, festivals, and language options for your brand</p>
                         <div className="flex flex-wrap gap-2">
                             {COUNTRIES.map(c => (
                                 <button key={c.id} onClick={() => setCountry(c.id)} type="button"
                                     className={`px-3 py-2 rounded-xl text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5
-                                        ${country === c.id ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'bg-white/[0.04] text-slate-400 hover:bg-white/[0.06] border border-white/[0.06]'}`}>
+                                        ${country === c.id ? 'bg-primary text-white shadow-none' : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] hover:bg-[var(--sys-surface)] border border-[var(--sys-border)]'}`}>
                                     <span className="text-sm">{c.flag}</span> {c.label}
                                 </button>
                             ))}
@@ -551,7 +551,7 @@ function Brainstorm({ onComplete, onBack }) {
             {step === 1 && (
                 <div className="space-y-6 animate-fade-in">
                     <div>
-                        <label className="text-sm text-slate-500 uppercase tracking-widest font-bold mb-2 block">What does {brandName} do?</label>
+                        <label className="text-sm text-[var(--sys-text-muted)] uppercase tracking-widest font-bold mb-2 block">What does {brandName} do?</label>
                         <div className="relative">
                             <textarea value={description} onChange={e => setDescription(e.target.value)}
                                 placeholder={`Tell us about ${brandName} — what products/services do you offer? What makes you unique? Type or speak in any language 🎤`}
@@ -565,13 +565,13 @@ function Brainstorm({ onComplete, onBack }) {
                         </div>
                     </div>
                     <div>
-                        <label className="text-sm text-slate-500 uppercase tracking-widest font-bold mb-2 block">Who is your target audience?</label>
+                        <label className="text-sm text-[var(--sys-text-muted)] uppercase tracking-widest font-bold mb-2 block">Who is your target audience?</label>
                         <input value={targetAudience} onChange={e => setTargetAudience(e.target.value)}
                             placeholder="e.g., Young professionals aged 25-35, tech-savvy millennials"
                             className="input-glass w-full py-3" />
                     </div>
                     <div>
-                        <label className="text-sm text-slate-500 uppercase tracking-widest font-bold mb-2 block">Brand Keywords</label>
+                        <label className="text-sm text-[var(--sys-text-muted)] uppercase tracking-widest font-bold mb-2 block">Brand Keywords</label>
                         <div className="flex gap-2 mb-2">
                             <input value={keywordInput} onChange={e => setKeywordInput(e.target.value)}
                                 onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addKeyword() } }}
@@ -583,18 +583,18 @@ function Brainstorm({ onComplete, onBack }) {
                                 {keywords.map((k, i) => (
                                     <span key={i} className="px-3 py-1 rounded-lg bg-primary/10 text-primary text-xs flex items-center gap-1">
                                         {k}
-                                        <button onClick={() => setKeywords(keywords.filter((_, j) => j !== i))} className="material-symbols-outlined text-xs hover:text-white cursor-pointer">close</button>
+                                        <button onClick={() => setKeywords(keywords.filter((_, j) => j !== i))} className="material-symbols-outlined text-xs hover:text-[var(--sys-text)] cursor-pointer">close</button>
                                     </span>
                                 ))}
                             </div>
                         )}
                         {suggestedKeywords[industry] && (
                             <div>
-                                <p className="text-xs text-slate-600 mb-1">Suggested for {industry}:</p>
+                                <p className="text-xs text-[var(--sys-text-muted)] mb-1">Suggested for {industry}:</p>
                                 <div className="flex flex-wrap gap-1.5">
                                     {suggestedKeywords[industry].filter(k => !keywords.includes(k)).map(k => (
                                         <button key={k} onClick={() => setKeywords([...keywords, k])}
-                                            className="px-2.5 py-1 rounded-lg bg-white/[0.04] text-slate-400 text-xs hover:bg-primary/10 hover:text-primary transition-all cursor-pointer border border-white/[0.06]">
+                                            className="px-2.5 py-1 rounded-lg bg-[var(--sys-surface)] text-[var(--sys-text-muted)] text-xs hover:bg-primary/10 hover:text-primary transition-all cursor-pointer border border-[var(--sys-border)]">
                                             + {k}
                                         </button>
                                     ))}
@@ -612,11 +612,11 @@ function Brainstorm({ onComplete, onBack }) {
             {step === 2 && (
                 <div className="space-y-6 animate-fade-in">
                     <div>
-                        <label className="text-sm text-slate-500 uppercase tracking-widest font-bold mb-3 block">Brand Personality</label>
+                        <label className="text-sm text-[var(--sys-text-muted)] uppercase tracking-widest font-bold mb-3 block">Brand Personality</label>
                         <div className="grid grid-cols-2 gap-2">
                             {personalityOptions.map(p => (
                                 <button key={p.id} onClick={() => setPersonality(p.id)}
-                                    className={`flex items-center gap-3 p-3.5 rounded-xl transition-all cursor-pointer ${personality === p.id ? 'bg-primary/20 border border-primary/30 text-white' : 'bg-white/[0.03] border border-white/[0.06] text-slate-400 hover:bg-white/[0.05]'}`}>
+                                    className={`flex items-center gap-3 p-3.5 rounded-xl transition-all cursor-pointer ${personality === p.id ? 'bg-primary/20 border border-primary/30 text-white' : 'bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text-muted)] hover:bg-[var(--sys-surface)]'}`}>
                                     <span className="material-symbols-outlined text-lg">{p.icon}</span>
                                     <span className="text-sm font-medium">{p.label}</span>
                                 </button>
@@ -625,12 +625,12 @@ function Brainstorm({ onComplete, onBack }) {
                     </div>
 
                     <div className="glass-panel rounded-2xl p-5">
-                        <label className="text-sm text-slate-500 uppercase tracking-widest font-bold mb-3 block">Do you have a logo?</label>
+                        <label className="text-sm text-[var(--sys-text-muted)] uppercase tracking-widest font-bold mb-3 block">Do you have a logo?</label>
                         <div className="flex gap-3 mb-4">
-                            <button onClick={() => setHasLogo(true)} className={`flex-1 py-3 rounded-xl text-sm font-medium transition-all cursor-pointer ${hasLogo === true ? 'bg-primary text-white' : 'bg-white/[0.04] text-slate-400 border border-white/[0.06]'}`}>
+                            <button onClick={() => setHasLogo(true)} className={`flex-1 py-3 rounded-xl text-sm font-medium transition-all cursor-pointer ${hasLogo === true ? 'bg-primary text-white' : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] border border-[var(--sys-border)]'}`}>
                                 ✅ Yes, I have one
                             </button>
-                            <button onClick={() => setHasLogo(false)} className={`flex-1 py-3 rounded-xl text-sm font-medium transition-all cursor-pointer ${hasLogo === false ? 'bg-primary text-white' : 'bg-white/[0.04] text-slate-400 border border-white/[0.06]'}`}>
+                            <button onClick={() => setHasLogo(false)} className={`flex-1 py-3 rounded-xl text-sm font-medium transition-all cursor-pointer ${hasLogo === false ? 'bg-primary text-white' : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] border border-[var(--sys-border)]'}`}>
                                 🎨 Generate one for me
                             </button>
                         </div>
@@ -638,7 +638,7 @@ function Brainstorm({ onComplete, onBack }) {
                         {hasLogo === false && (
                             <div className="space-y-3 animate-fade-in">
                                 <div>
-                                    <label className="text-sm text-slate-500 mb-1 block">Describe your ideal logo</label>
+                                    <label className="text-sm text-[var(--sys-text-muted)] mb-1 block">Describe your ideal logo</label>
                                     <input value={logoKeywords} onChange={e => setLogoKeywords(e.target.value)}
                                         placeholder={`e.g., minimalist ${brandName} wordmark, geometric icon, abstract symbol`}
                                         className="input-glass w-full py-2.5 text-sm" />
@@ -654,8 +654,8 @@ function Brainstorm({ onComplete, onBack }) {
                                 </button>
                                 {generatedLogo && (
                                     <div className="mt-3 text-center animate-fade-in">
-                                        <img src={generatedLogo} alt="Generated logo" className="w-32 h-32 object-contain mx-auto rounded-xl border border-white/[0.1] bg-white p-2" />
-                                        <p className="text-sm text-slate-500 mt-2">AI-generated logo preview</p>
+                                        <img src={generatedLogo} alt="Generated logo" className="w-32 h-32 object-contain mx-auto rounded-xl border border-[var(--sys-border)] bg-white p-2" />
+                                        <p className="text-sm text-[var(--sys-text-muted)] mt-2">AI-generated logo preview</p>
                                         <button onClick={handleGenerateLogo} disabled={generatingLogo}
                                             className="text-sm text-primary hover:text-primary-light mt-1 cursor-pointer">
                                             🔄 Regenerate
@@ -666,14 +666,14 @@ function Brainstorm({ onComplete, onBack }) {
                         )}
 
                         {hasLogo === true && (
-                            <p className="text.xs text-slate-500 animate-fade-in">
+                            <p className="text.xs text-[var(--sys-text-muted)] animate-fade-in">
                                 Great! You can upload your logo later from your Brand DNA page.
                             </p>
                         )}
                     </div>
 
                     {error && (
-                        <div className={`p-4 rounded-xl border ${error.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'} text-sm flex items-center gap-2`}>
+                        <div className={`p-4 rounded-xl border ${error.isProviderError ? 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary' : 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary'} text-sm flex items-center gap-2`}>
                             <span className="material-symbols-outlined text-lg">
                                 {error.isProviderError ? 'warning' : 'error'}
                             </span>
@@ -707,33 +707,33 @@ function Brainstorm({ onComplete, onBack }) {
                     <div className="glass-panel rounded-2xl p-6">
                         <div className="flex items-center gap-4 mb-5">
                             {generatedLogo && (
-                                <img src={generatedLogo} alt="Logo" className="w-16 h-16 rounded-xl border border-white/[0.1] bg-white p-1 object-contain" />
+                                <img src={generatedLogo} alt="Logo" className="w-16 h-16 rounded-xl border border-[var(--sys-border)] bg-white p-1 object-contain" />
                             )}
                             <div>
-                                <h3 className="text-2xl font-extrabold text-white">{brandName}</h3>
+                                <h3 className="text-2xl font-extrabold text-[var(--sys-text)]">{brandName}</h3>
                                 {suggestion.tagline && <p className="text-primary italic">"{suggestion.tagline}"</p>}
                             </div>
                         </div>
                         {suggestion.personality && (
                             <div className="mb-4">
-                                <p className="text-sm text-slate-500 uppercase tracking-widest mb-1">Personality</p>
-                                <p className="text-white">{suggestion.personality}</p>
+                                <p className="text-sm text-[var(--sys-text-muted)] uppercase tracking-widest mb-1">Personality</p>
+                                <p className="text-[var(--sys-text)]">{suggestion.personality}</p>
                             </div>
                         )}
                         {suggestion.voiceDescription && (
                             <div className="mb-4">
-                                <p className="text-sm text-slate-500 uppercase tracking-widest mb-1">Brand Voice</p>
-                                <p className="text-slate-300">{suggestion.voiceDescription}</p>
+                                <p className="text-sm text-[var(--sys-text-muted)] uppercase tracking-widest mb-1">Brand Voice</p>
+                                <p className="text-[var(--sys-text-muted)]">{suggestion.voiceDescription}</p>
                             </div>
                         )}
                         {suggestion.colorSuggestions?.length > 0 && (
                             <div className="mb-4">
-                                <p className="text-sm text-slate-500 uppercase tracking-widest mb-2">Brand Colors</p>
+                                <p className="text-sm text-[var(--sys-text-muted)] uppercase tracking-widest mb-2">Brand Colors</p>
                                 <div className="flex gap-3">
                                     {suggestion.colorSuggestions.map((c, i) => (
                                         <div key={i} className="text-center">
-                                            <div className="w-12 h-12 rounded-xl border border-white/[0.1]" style={{ background: c.hex }} />
-                                            <p className="text-sm text-slate-500 mt-1">{c.name}</p>
+                                            <div className="w-12 h-12 rounded-xl border border-[var(--sys-border)]" style={{ background: c.hex }} />
+                                            <p className="text-sm text-[var(--sys-text-muted)] mt-1">{c.name}</p>
                                         </div>
                                     ))}
                                 </div>
@@ -741,7 +741,7 @@ function Brainstorm({ onComplete, onBack }) {
                         )}
                         {suggestion.keyPhrases?.length > 0 && (
                             <div>
-                                <p className="text-sm text-slate-500 uppercase tracking-widest mb-2">Key Phrases</p>
+                                <p className="text-sm text-[var(--sys-text-muted)] uppercase tracking-widest mb-2">Key Phrases</p>
                                 <div className="flex flex-wrap gap-2">
                                     {suggestion.keyPhrases.map((p, i) => (
                                         <span key={i} className="px-3 py-1 rounded-lg bg-primary/10 text-primary text-xs">{p}</span>
@@ -752,7 +752,7 @@ function Brainstorm({ onComplete, onBack }) {
                     </div>
 
                     <div className="flex gap-4">
-                        <button onClick={() => { setSuggestion(null); setStep(2) }} disabled={generating} className="btn-ghost flex-1 py-3 rounded-xl border border-white/[0.1] cursor-pointer">
+                        <button onClick={() => { setSuggestion(null); setStep(2) }} disabled={generating} className="btn-ghost flex-1 py-3 rounded-xl border border-[var(--sys-border)] cursor-pointer">
                             <span className="material-symbols-outlined text-sm">refresh</span> Regenerate
                         </button>
                         <button onClick={handleAccept} disabled={generating} className="btn-primary flex-1 py-3 rounded-xl">
@@ -804,11 +804,11 @@ function ReviewBrand({ brand, onFinish }) {
     if (saved) {
         return (
             <div className="flex flex-col items-center justify-center min-h-[60vh] animate-fade-in">
-                <div className="size-24 rounded-full bg-emerald-500/20 flex items-center justify-center mb-6 animate-[pulse_1s_ease-in-out]">
-                    <span className="material-symbols-outlined text-emerald-400 text-5xl">check_circle</span>
+                <div className="size-24 rounded-full bg-[var(--sys-primary-dim)] flex items-center justify-center mb-6 animate-[pulse_1s_ease-in-out]">
+                    <span className="material-symbols-outlined text-primary text-5xl">check_circle</span>
                 </div>
-                <h2 className="text-3xl font-extrabold text-white mb-2">Brand DNA Saved!</h2>
-                <p className="text-slate-400 text-sm">Taking you to your dashboard...</p>
+                <h2 className="text-3xl font-extrabold text-[var(--sys-text)] mb-2">Brand DNA Saved!</h2>
+                <p className="text-[var(--sys-text-muted)] text-sm">Taking you to your dashboard...</p>
             </div>
         )
     }
@@ -821,7 +821,7 @@ function ReviewBrand({ brand, onFinish }) {
                 <h2 className="text-3xl font-extrabold tracking-tight" style={{ fontStyle: 'italic', fontFamily: 'Georgia, serif' }}>
                     Your Business DNA
                 </h2>
-                <p className="text-slate-400 text-sm mt-2">
+                <p className="text-[var(--sys-text-muted)] text-sm mt-2">
                     We've analyzed your brand across {socialPlatforms > 0 ? `${socialPlatforms} social platforms, ` : ''}
                     {totalImages} images{hasVision ? ', and AI Vision' : ''}. Here's what we found.
                 </p>
@@ -830,7 +830,7 @@ function ReviewBrand({ brand, onFinish }) {
             {/* ── Intelligence Summary Chips ── */}
             <div className="flex flex-wrap gap-2 justify-center mb-8">
                 {hasVision && (
-                    <span className="px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-medium flex items-center gap-1.5">
+                    <span className="px-3 py-1.5 rounded-full bg-[var(--sys-primary-dim)] border border-[var(--sys-border)] text-primary text-xs font-medium flex items-center gap-1.5">
                         <span className="material-symbols-outlined text-sm">visibility</span> AI Vision Active
                     </span>
                 )}
@@ -844,7 +844,7 @@ function ReviewBrand({ brand, onFinish }) {
                         <span className="material-symbols-outlined text-sm">record_voice_over</span> Voice Analyzed
                     </span>
                 )}
-                <span className="px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-medium flex items-center gap-1.5">
+                <span className="px-3 py-1.5 rounded-full bg-[var(--sys-primary-dim)] border border-[var(--sys-border)] text-primary text-xs font-medium flex items-center gap-1.5">
                     <span className="material-symbols-outlined text-sm">photo_library</span> {totalImages} Images
                 </span>
             </div>
@@ -857,15 +857,15 @@ function ReviewBrand({ brand, onFinish }) {
                     <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2">
                             <span className="material-symbols-outlined text-primary text-lg">screenshot_monitor</span>
-                            <p className="text-sm text-slate-400 uppercase tracking-widest">Website Snapshot</p>
+                            <p className="text-sm text-[var(--sys-text-muted)] uppercase tracking-widest">Website Snapshot</p>
                         </div>
                         {dna.logo?.metadata?.confidence && (
                             <div className="flex items-center gap-2">
                                 <span className={`w-2 h-2 rounded-full ${
-                                    dna.logo.metadata.confidence === 'high' ? 'bg-emerald-400' :
-                                    dna.logo.metadata.confidence === 'medium' ? 'bg-yellow-400' : 'bg-red-400'
+                                    dna.logo.metadata.confidence === 'high' ? 'bg-[var(--sys-surface)]' :
+                                    dna.logo.metadata.confidence === 'medium' ? 'bg-yellow-400' : 'bg-[var(--sys-surface)]'
                                 }`} />
-                                <p className="text-xs text-slate-500">
+                                <p className="text-xs text-[var(--sys-text-muted)]">
                                     {dna.logo.metadata.confidence} confidence
                                     {dna.logo.metadata.source === 'ai-vision' && ' · AI Vision'}
                                 </p>
@@ -873,7 +873,7 @@ function ReviewBrand({ brand, onFinish }) {
                         )}
                     </div>
                     <img src={dna.websiteSnapshot} alt="Website screenshot"
-                        className="w-full rounded-xl border border-white/[0.08] shadow-lg" />
+                        className="w-full rounded-xl border border-[var(--sys-border)] shadow-lg" />
                 </div>
             )}
 
@@ -881,19 +881,19 @@ function ReviewBrand({ brand, onFinish }) {
             {/* SECTION B — Brand Identity */}
             {/* ══════════════════════════════════════════════════════════════ */}
             <div className="glass-panel rounded-3xl p-8 relative overflow-hidden mb-6">
-                <div className="absolute inset-0 bg-gradient-to-br from-primary/[0.02] to-transparent pointer-events-none" />
+                <div className="absolute inset-0 bg-[var(--sys-surface)] border border-[var(--sys-border)] pointer-events-none" />
                 <div className="relative grid grid-cols-1 lg:grid-cols-2 gap-8">
 
                     {/* ═══ LEFT: Identity ═══ */}
                     <div className="space-y-5">
                         {/* Brand Name + URL + Tagline */}
-                        <div className="p-5 rounded-2xl bg-white/[0.03] border border-white/[0.06]">
-                            <h3 className="text-2xl font-extrabold text-white mb-1">{brand.name}</h3>
+                        <div className="p-5 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                            <h3 className="text-2xl font-extrabold text-[var(--sys-text)] mb-1">{brand.name}</h3>
                             {dna.tagline && (
                                 <p className="text-sm text-primary italic mb-2">"{dna.tagline}"</p>
                             )}
                             {brand.website && (
-                                <div className="flex items-center gap-2 text-sm text-slate-400">
+                                <div className="flex items-center gap-2 text-sm text-[var(--sys-text-muted)]">
                                     <span className="material-symbols-outlined text-sm">link</span>
                                     <a href={brand.website} target="_blank" rel="noopener" className="hover:text-primary transition-colors">{brand.website}</a>
                                 </div>
@@ -907,13 +907,13 @@ function ReviewBrand({ brand, onFinish }) {
 
                         {/* Logo + Fonts side by side */}
                         <div className="grid grid-cols-2 gap-4">
-                            <div className="p-5 rounded-2xl bg-white/[0.03] border border-white/[0.06] flex flex-col items-center justify-center min-h-[100px]">
+                            <div className="p-5 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] flex flex-col items-center justify-center min-h-[100px]">
                                 {dna.logo?.url ? (
                                     <>
                                         <img src={dna.logo.url} alt="Brand Logo" className="max-w-full max-h-16 object-contain"
                                             onError={e => e.target.style.display = 'none'} />
                                         {dna.logo.metadata?.source === 'ai-vision' && (
-                                            <span className="text-[10px] text-emerald-400/60 mt-2 flex items-center gap-1">
+                                            <span className="text-[10px] text-primary/60 mt-2 flex items-center gap-1">
                                                 <span className="material-symbols-outlined text-[10px]">visibility</span> AI detected
                                             </span>
                                         )}
@@ -924,47 +924,47 @@ function ReviewBrand({ brand, onFinish }) {
                                     </div>
                                 )}
                             </div>
-                            <div className="p-5 rounded-2xl bg-white/[0.03] border border-white/[0.06]">
-                                <p className="text-sm text-slate-500 uppercase tracking-widest mb-2">Fonts</p>
-                                <p className="text-2xl text-white font-bold" style={{ fontFamily: dna.fonts?.heading?.family || 'Inter' }}>Aa</p>
-                                <p className="text-sm text-slate-400 mt-1">{dna.fonts?.heading?.family || 'Inter'}</p>
+                            <div className="p-5 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                                <p className="text-sm text-[var(--sys-text-muted)] uppercase tracking-widest mb-2">Fonts</p>
+                                <p className="text-2xl text-[var(--sys-text)] font-bold" style={{ fontFamily: dna.fonts?.heading?.family || 'Inter' }}>Aa</p>
+                                <p className="text-sm text-[var(--sys-text-muted)] mt-1">{dna.fonts?.heading?.family || 'Inter'}</p>
                                 {dna.fonts?.body?.family && dna.fonts.body.family !== dna.fonts?.heading?.family && (
-                                    <p className="text-sm text-slate-500 mt-0.5">{dna.fonts.body.family}</p>
+                                    <p className="text-sm text-[var(--sys-text-muted)] mt-0.5">{dna.fonts.body.family}</p>
                                 )}
                             </div>
                         </div>
 
                         {/* Colors */}
-                        <div className="p-5 rounded-2xl bg-white/[0.03] border border-white/[0.06]">
-                            <p className="text-sm text-slate-500 uppercase tracking-widest mb-3">Brand Colors</p>
+                        <div className="p-5 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                            <p className="text-sm text-[var(--sys-text-muted)] uppercase tracking-widest mb-3">Brand Colors</p>
                             {dna.colors?.length > 0 ? (
                                 <div className="flex gap-4 flex-wrap">
                                     {dna.colors.map((c, i) => (
                                         <div key={i} className="text-center">
-                                            <div className="w-14 h-14 rounded-full border-2 border-white/[0.1] shadow-lg"
+                                            <div className="w-14 h-14 rounded-full border border-[var(--sys-border)] shadow-lg"
                                                 style={{ background: c.hex }} />
-                                            <p className="text-[10px] text-slate-500 font-mono mt-1.5">{c.hex?.toLowerCase()}</p>
-                                            {c.name && <p className="text-[10px] text-slate-600">{c.name}</p>}
+                                            <p className="text-[10px] text-[var(--sys-text-muted)] font-mono mt-1.5">{c.hex?.toLowerCase()}</p>
+                                            {c.name && <p className="text-[10px] text-[var(--sys-text-muted)]">{c.name}</p>}
                                         </div>
                                     ))}
                                 </div>
                             ) : (
-                                <p className="text-slate-600 text-sm">No colors detected</p>
+                                <p className="text-[var(--sys-text-muted)] text-sm">No colors detected</p>
                             )}
                         </div>
                     </div>
 
                     {/* ═══ RIGHT: Images ═══ */}
                     <div>
-                        <p className="text-sm text-slate-500 uppercase tracking-widest mb-3">Images</p>
+                        <p className="text-sm text-[var(--sys-text-muted)] uppercase tracking-widest mb-3">Images</p>
                         {brandImages.length > 0 ? (
                             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                                <div className="rounded-xl border-2 border-dashed border-white/[0.08] hover:border-primary/30 flex flex-col items-center justify-center py-6 cursor-pointer transition-colors bg-white/[0.02] aspect-square">
-                                    <span className="material-symbols-outlined text-xl text-slate-600 mb-1">cloud_upload</span>
-                                    <span className="text-sm text-slate-500">Upload</span>
+                                <div className="rounded-xl border border-dashed border-[var(--sys-border)] hover:border-primary/30 flex flex-col items-center justify-center py-6 cursor-pointer transition-colors bg-[var(--sys-surface)] aspect-square">
+                                    <span className="material-symbols-outlined text-xl text-[var(--sys-text-muted)] mb-1">cloud_upload</span>
+                                    <span className="text-sm text-[var(--sys-text-muted)]">Upload</span>
                                 </div>
                                 {brandImages.map((img, i) => (
-                                    <div key={i} className="rounded-xl overflow-hidden bg-white/[0.03] border border-white/[0.06] group aspect-square">
+                                    <div key={i} className="rounded-xl overflow-hidden bg-[var(--sys-surface)] border border-[var(--sys-border)] group aspect-square">
                                         <img src={img.url} alt={img.alt || `Image ${i + 1}`}
                                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                                             onError={e => e.target.parentElement.style.display = 'none'} />
@@ -972,9 +972,9 @@ function ReviewBrand({ brand, onFinish }) {
                                 ))}
                             </div>
                         ) : (
-                            <div className="flex flex-col items-center justify-center h-full rounded-xl border-2 border-dashed border-white/[0.08] py-12">
-                                <span className="material-symbols-outlined text-3xl text-slate-600 mb-2">photo_library</span>
-                                <p className="text-slate-500 text-sm">No images found</p>
+                            <div className="flex flex-col items-center justify-center h-full rounded-xl border border-dashed border-[var(--sys-border)] py-12">
+                                <span className="material-symbols-outlined text-3xl text-[var(--sys-text-muted)] mb-2">photo_library</span>
+                                <p className="text-[var(--sys-text-muted)] text-sm">No images found</p>
                             </div>
                         )}
                     </div>
@@ -986,9 +986,9 @@ function ReviewBrand({ brand, onFinish }) {
             {/* ══════════════════════════════════════════════════════════════ */}
             {socialPlatforms > 0 && (
                 <div className="glass-panel rounded-2xl p-6 mb-6">
-                    <h3 className="font-bold text-white flex items-center gap-2 mb-5">
+                    <h3 className="font-bold text-[var(--sys-text)] flex items-center gap-2 mb-5">
                         <span className="material-symbols-outlined text-primary">share</span> Social Media Intelligence
-                        <span className="text-xs font-normal text-slate-500 ml-auto">{socialPlatforms} platforms detected</span>
+                        <span className="text-xs font-normal text-[var(--sys-text-muted)] ml-auto">{socialPlatforms} platforms detected</span>
                     </h3>
 
                     {/* Social Link Pills */}
@@ -1000,8 +1000,8 @@ function ReviewBrand({ brand, onFinish }) {
                                     className="flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all hover:scale-105"
                                     style={{ borderColor: cfg.color + '30', background: cfg.color + '10' }}>
                                     <span>{cfg.icon}</span>
-                                    <span className="text-xs font-medium text-white">{cfg.label}</span>
-                                    <span className="material-symbols-outlined text-xs text-slate-500">open_in_new</span>
+                                    <span className="text-xs font-medium text-[var(--sys-text)]">{cfg.label}</span>
+                                    <span className="material-symbols-outlined text-xs text-[var(--sys-text-muted)]">open_in_new</span>
                                 </a>
                             )
                         })}
@@ -1011,51 +1011,51 @@ function ReviewBrand({ brand, onFinish }) {
                     {(socialVoice.captionStyle || socialVoice.toneInsight) && (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                             {socialVoice.captionStyle && (
-                                <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.06]">
-                                    <p className="text-xs text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-1">
+                                <div className="p-4 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                                    <p className="text-xs text-[var(--sys-text-muted)] uppercase tracking-widest mb-2 flex items-center gap-1">
                                         <span className="material-symbols-outlined text-xs">edit_note</span> Caption Style
                                     </p>
-                                    <p className="text-sm text-slate-300">{socialVoice.captionStyle}</p>
+                                    <p className="text-sm text-[var(--sys-text-muted)]">{socialVoice.captionStyle}</p>
                                 </div>
                             )}
                             {socialVoice.toneInsight && (
-                                <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.06]">
-                                    <p className="text-xs text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-1">
+                                <div className="p-4 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                                    <p className="text-xs text-[var(--sys-text-muted)] uppercase tracking-widest mb-2 flex items-center gap-1">
                                         <span className="material-symbols-outlined text-xs">psychology</span> Tone Insight
                                     </p>
-                                    <p className="text-sm text-slate-300">{socialVoice.toneInsight}</p>
+                                    <p className="text-sm text-[var(--sys-text-muted)]">{socialVoice.toneInsight}</p>
                                 </div>
                             )}
                             {socialVoice.hashtagStrategy && (
-                                <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.06]">
-                                    <p className="text-xs text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-1">
+                                <div className="p-4 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                                    <p className="text-xs text-[var(--sys-text-muted)] uppercase tracking-widest mb-2 flex items-center gap-1">
                                         <span className="material-symbols-outlined text-xs">tag</span> Hashtag Strategy
                                     </p>
-                                    <p className="text-sm text-slate-300">{socialVoice.hashtagStrategy}</p>
+                                    <p className="text-sm text-[var(--sys-text-muted)]">{socialVoice.hashtagStrategy}</p>
                                 </div>
                             )}
                             {socialVoice.emojiUsage && (
-                                <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.06]">
-                                    <p className="text-xs text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-1">
+                                <div className="p-4 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                                    <p className="text-xs text-[var(--sys-text-muted)] uppercase tracking-widest mb-2 flex items-center gap-1">
                                         <span className="material-symbols-outlined text-xs">mood</span> Emoji Usage
                                     </p>
-                                    <p className="text-sm text-slate-300">{socialVoice.emojiUsage}</p>
+                                    <p className="text-sm text-[var(--sys-text-muted)]">{socialVoice.emojiUsage}</p>
                                 </div>
                             )}
                             {socialVoice.ctaStyle && (
-                                <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.06]">
-                                    <p className="text-xs text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-1">
+                                <div className="p-4 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                                    <p className="text-xs text-[var(--sys-text-muted)] uppercase tracking-widest mb-2 flex items-center gap-1">
                                         <span className="material-symbols-outlined text-xs">ads_click</span> CTA Patterns
                                     </p>
-                                    <p className="text-sm text-slate-300">{socialVoice.ctaStyle}</p>
+                                    <p className="text-sm text-[var(--sys-text-muted)]">{socialVoice.ctaStyle}</p>
                                 </div>
                             )}
                             {socialVoice.postingPatterns && (
-                                <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.06]">
-                                    <p className="text-xs text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-1">
+                                <div className="p-4 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                                    <p className="text-xs text-[var(--sys-text-muted)] uppercase tracking-widest mb-2 flex items-center gap-1">
                                         <span className="material-symbols-outlined text-xs">schedule</span> Posting Patterns
                                     </p>
-                                    <p className="text-sm text-slate-300">{socialVoice.postingPatterns}</p>
+                                    <p className="text-sm text-[var(--sys-text-muted)]">{socialVoice.postingPatterns}</p>
                                 </div>
                             )}
                         </div>
@@ -1064,10 +1064,10 @@ function ReviewBrand({ brand, onFinish }) {
                     {/* Sample Captions */}
                     {socialVoice.sampleCaptions?.length > 0 && (
                         <div>
-                            <p className="text-xs text-slate-500 uppercase tracking-widest mb-2">Sample Captions from Social</p>
+                            <p className="text-xs text-[var(--sys-text-muted)] uppercase tracking-widest mb-2">Sample Captions from Social</p>
                             <div className="space-y-2">
                                 {socialVoice.sampleCaptions.slice(0, 3).map((cap, i) => (
-                                    <div key={i} className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.05] text-sm text-slate-400 italic">
+                                    <div key={i} className="p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-sm text-[var(--sys-text-muted)] italic">
                                         "{cap}"
                                     </div>
                                 ))}
@@ -1082,11 +1082,11 @@ function ReviewBrand({ brand, onFinish }) {
             {/* ══════════════════════════════════════════════════════════════ */}
             {voice.personality && (
                 <div className="glass-panel rounded-2xl p-6 mb-6">
-                    <h3 className="font-bold text-white flex items-center gap-2 mb-4">
+                    <h3 className="font-bold text-[var(--sys-text)] flex items-center gap-2 mb-4">
                         <span className="material-symbols-outlined text-primary">record_voice_over</span> Brand Voice & Tone
                     </h3>
                     <p className="text-lg text-primary font-bold mb-2">{voice.personality}</p>
-                    {voice.description && <p className="text-sm text-slate-300 mb-4">{voice.description}</p>}
+                    {voice.description && <p className="text-sm text-[var(--sys-text-muted)] mb-4">{voice.description}</p>}
 
                     {/* Voice Sliders */}
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 mb-4">
@@ -1098,9 +1098,9 @@ function ReviewBrand({ brand, onFinish }) {
                             { label: 'Wit', value: voice.wit },
                         ].filter(v => v.value !== undefined).map((v, i) => (
                             <div key={i}>
-                                <p className="text-sm text-slate-500 mb-1">{v.label}</p>
+                                <p className="text-sm text-[var(--sys-text-muted)] mb-1">{v.label}</p>
                                 <div className="progress-bar"><div className="progress-bar-fill" style={{ width: `${v.value}%` }} /></div>
-                                <p className="text-xs text-right text-slate-500 mt-0.5">{v.value}%</p>
+                                <p className="text-xs text-right text-[var(--sys-text-muted)] mt-0.5">{v.value}%</p>
                             </div>
                         ))}
                     </div>
@@ -1116,23 +1116,23 @@ function ReviewBrand({ brand, onFinish }) {
 
                     {/* Photography + Writing Style */}
                     {(dna.photographyStyle || contentStyle.writingStyle || contentStyle.ctaStyle) && (
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4 pt-4 border-t border-white/[0.06]">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4 pt-4 border-t border-[var(--sys-border)]">
                             {dna.photographyStyle && (
-                                <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
-                                    <p className="text-xs text-slate-500 uppercase tracking-widest mb-1">Photography</p>
-                                    <p className="text-sm text-slate-300">{dna.photographyStyle}</p>
+                                <div className="p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                                    <p className="text-xs text-[var(--sys-text-muted)] uppercase tracking-widest mb-1">Photography</p>
+                                    <p className="text-sm text-[var(--sys-text-muted)]">{dna.photographyStyle}</p>
                                 </div>
                             )}
                             {contentStyle.writingStyle && (
-                                <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
-                                    <p className="text-xs text-slate-500 uppercase tracking-widest mb-1">Writing Style</p>
-                                    <p className="text-sm text-slate-300">{contentStyle.writingStyle}</p>
+                                <div className="p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                                    <p className="text-xs text-[var(--sys-text-muted)] uppercase tracking-widest mb-1">Writing Style</p>
+                                    <p className="text-sm text-[var(--sys-text-muted)]">{contentStyle.writingStyle}</p>
                                 </div>
                             )}
                             {contentStyle.ctaStyle && (
-                                <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
-                                    <p className="text-xs text-slate-500 uppercase tracking-widest mb-1">CTA Style</p>
-                                    <p className="text-sm text-slate-300">{contentStyle.ctaStyle}</p>
+                                <div className="p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                                    <p className="text-xs text-[var(--sys-text-muted)] uppercase tracking-widest mb-1">CTA Style</p>
+                                    <p className="text-sm text-[var(--sys-text-muted)]">{contentStyle.ctaStyle}</p>
                                 </div>
                             )}
                         </div>
@@ -1143,33 +1143,33 @@ function ReviewBrand({ brand, onFinish }) {
             {/* Content Style Do's / Don'ts */}
             {(contentStyle.dos?.length > 0 || contentStyle.donts?.length > 0) && (
                 <div className="glass-panel rounded-2xl p-6 mb-6">
-                    <h3 className="font-bold text-white flex items-center gap-2 mb-4">
+                    <h3 className="font-bold text-[var(--sys-text)] flex items-center gap-2 mb-4">
                         <span className="material-symbols-outlined text-primary">edit_note</span> Content Style Guide
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {contentStyle.dos?.length > 0 && (
-                            <div className="bg-emerald-500/5 rounded-xl p-4 border border-emerald-500/10">
-                                <p className="text-xs font-bold text-emerald-400 uppercase tracking-widest mb-2 flex items-center gap-1">
+                            <div className="bg-[var(--sys-primary-dim)] rounded-xl p-4 border border-[var(--sys-border)]">
+                                <p className="text-xs font-bold text-primary uppercase tracking-widest mb-2 flex items-center gap-1">
                                     <span className="material-symbols-outlined text-sm">check_circle</span> Do's
                                 </p>
                                 <ul className="space-y-1.5">
                                     {contentStyle.dos.map((d, i) => (
-                                        <li key={i} className="text-sm text-slate-300 flex items-start gap-2">
-                                            <span className="text-emerald-400 mt-0.5">✓</span> {d}
+                                        <li key={i} className="text-sm text-[var(--sys-text-muted)] flex items-start gap-2">
+                                            <span className="text-primary mt-0.5">✓</span> {d}
                                         </li>
                                     ))}
                                 </ul>
                             </div>
                         )}
                         {contentStyle.donts?.length > 0 && (
-                            <div className="bg-red-500/5 rounded-xl p-4 border border-red-500/10">
-                                <p className="text-xs font-bold text-red-400 uppercase tracking-widest mb-2 flex items-center gap-1">
+                            <div className="bg-[var(--sys-primary-dim)] rounded-xl p-4 border border-[var(--sys-border)]">
+                                <p className="text-xs font-bold text-primary uppercase tracking-widest mb-2 flex items-center gap-1">
                                     <span className="material-symbols-outlined text-sm">cancel</span> Don'ts
                                 </p>
                                 <ul className="space-y-1.5">
                                     {contentStyle.donts.map((d, i) => (
-                                        <li key={i} className="text-sm text-slate-300 flex items-start gap-2">
-                                            <span className="text-red-400 mt-0.5">✗</span> {d}
+                                        <li key={i} className="text-sm text-[var(--sys-text-muted)] flex items-start gap-2">
+                                            <span className="text-primary mt-0.5">✗</span> {d}
                                         </li>
                                     ))}
                                 </ul>
@@ -1180,17 +1180,17 @@ function ReviewBrand({ brand, onFinish }) {
                     {/* Content preferences row */}
                     <div className="flex flex-wrap gap-3 mt-4">
                         {contentStyle.emojiUsage && contentStyle.emojiUsage !== 'minimal' && (
-                            <span className="px-3 py-1 rounded-lg bg-white/[0.04] border border-white/[0.06] text-xs text-slate-400">
+                            <span className="px-3 py-1 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-xs text-[var(--sys-text-muted)]">
                                 Emoji: {contentStyle.emojiUsage}
                             </span>
                         )}
                         {contentStyle.hashtagStyle && contentStyle.hashtagStyle !== 'minimal' && (
-                            <span className="px-3 py-1 rounded-lg bg-white/[0.04] border border-white/[0.06] text-xs text-slate-400">
+                            <span className="px-3 py-1 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-xs text-[var(--sys-text-muted)]">
                                 Hashtags: {contentStyle.hashtagStyle}
                             </span>
                         )}
                         {contentStyle.captionLengthPreference && (
-                            <span className="px-3 py-1 rounded-lg bg-white/[0.04] border border-white/[0.06] text-xs text-slate-400">
+                            <span className="px-3 py-1 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-xs text-[var(--sys-text-muted)]">
                                 Caption length: {contentStyle.captionLengthPreference}
                             </span>
                         )}
@@ -1205,10 +1205,10 @@ function ReviewBrand({ brand, onFinish }) {
                 <div className="glass-panel rounded-2xl p-5 border border-primary/20 flex items-center justify-between gap-4"
                     style={{ backdropFilter: 'blur(20px)', background: 'rgba(10, 12, 22, 0.9)' }}>
                     <div className="flex items-center gap-3">
-                        <span className="material-symbols-outlined text-emerald-400">verified</span>
+                        <span className="material-symbols-outlined text-primary">verified</span>
                         <div>
-                            <p className="text-sm font-bold text-white">Brand DNA extracted successfully</p>
-                            <p className="text-xs text-slate-500">
+                            <p className="text-sm font-bold text-[var(--sys-text)]">Brand DNA extracted successfully</p>
+                            <p className="text-xs text-[var(--sys-text-muted)]">
                                 {hasVision ? 'AI Vision' : 'Scanner'} detected {dna.colors?.length || 0} colors,
                                 {totalImages} images{socialPlatforms > 0 ? `, ${socialPlatforms} social profiles` : ''}
                             </p>
@@ -1216,7 +1216,7 @@ function ReviewBrand({ brand, onFinish }) {
                     </div>
                     <div className="flex items-center gap-3">
                         <button onClick={handleSave} disabled={saving}
-                            className="py-3 px-8 rounded-2xl text-sm font-bold cursor-pointer transition-all bg-primary text-white hover:bg-primary/90 disabled:opacity-50 flex items-center gap-2 shadow-lg shadow-primary/30">
+                            className="py-3 px-8 rounded-2xl text-sm font-bold cursor-pointer transition-all bg-primary text-white hover:bg-primary/90 disabled:opacity-50 flex items-center gap-2 shadow-none">
                             {saving ? (
                                 <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>
                             ) : (
@@ -1306,21 +1306,21 @@ export default function BrandOnboarding() {
                     <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/15 blur-[120px] rounded-full" />
                 </div>
                 <div className="relative z-10 max-w-4xl mx-auto px-6 py-12 flex flex-col items-center justify-center min-h-[80vh] text-center animate-fade-in">
-                    <div className="size-20 rounded-2xl bg-amber-500/10 flex items-center justify-center mb-6">
-                        <span className="material-symbols-outlined text-4xl text-amber-500">diamond</span>
+                    <div className="size-20 rounded-2xl bg-[var(--sys-primary-dim)] flex items-center justify-center mb-6">
+                        <span className="material-symbols-outlined text-4xl text-primary">diamond</span>
                     </div>
-                    <h2 className="text-3xl font-extrabold text-white mb-3">Plan Limit Reached</h2>
-                    <p className="text-slate-400 mb-8 max-w-md">
+                    <h2 className="text-3xl font-extrabold text-[var(--sys-text)] mb-3">Plan Limit Reached</h2>
+                    <p className="text-[var(--sys-text-muted)] mb-8 max-w-md">
                         Your current <strong>{user?.planDetails?.name || 'Starter'}</strong> plan allows up to {maxBrands} brand{maxBrands !== 1 ? 's' : ''}. 
                         Upgrade your plan to add more brands to your portfolio.
                     </p>
                     <div className="flex flex-wrap justify-center gap-4">
                         <button onClick={() => navigate('/credits')}
-                            className="bg-primary text-white py-3 px-8 rounded-xl text-sm font-bold cursor-pointer hover:bg-primary-light transition-all shadow-lg shadow-primary/20">
+                            className="bg-primary text-white py-3 px-8 rounded-xl text-sm font-bold cursor-pointer hover:bg-primary-light transition-all shadow-none">
                             View Upgrade Plans
                         </button>
                         <button onClick={() => navigate('/brands')}
-                            className="bg-white/[0.04] border border-white/[0.08] px-8 py-3 rounded-xl text-sm font-bold text-slate-400 hover:text-white transition-all cursor-pointer">
+                            className="bg-[var(--sys-surface)] border border-[var(--sys-border)] px-8 py-3 rounded-xl text-sm font-bold text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] transition-all cursor-pointer">
                             Manage Existing Brands
                         </button>
                     </div>
@@ -1349,9 +1349,9 @@ export default function BrandOnboarding() {
                         <div className="size-8 flex items-center justify-center bg-primary/10 rounded-lg">
                             <span className="material-symbols-outlined text-primary text-2xl">auto_awesome</span>
                         </div>
-                        <h1 className="text-xl font-extrabold text-white tracking-tight">Mantram AI</h1>
+                        <h1 className="text-xl font-extrabold text-[var(--sys-text)] tracking-tight">Mantram AI</h1>
                     </div>
-                    <button onClick={() => navigate('/')} className="text-slate-500 text-sm hover:text-white transition-colors cursor-pointer">
+                    <button onClick={() => navigate('/')} className="text-[var(--sys-text-muted)] text-sm hover:text-[var(--sys-text)] transition-colors cursor-pointer">
                         ← Back to Home
                     </button>
                 </div>

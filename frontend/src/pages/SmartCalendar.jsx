@@ -185,7 +185,7 @@ export default function SmartCalendar() {
                 {/* Header */}
                 <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
                     <div className="flex items-center gap-4">
-                        <p className="text-slate-500 text-sm">Marketing intelligence calendar for <span className="text-primary font-semibold">{country}</span></p>
+                        <p className="text-[var(--sys-text-muted)] text-sm">Marketing intelligence calendar for <span className="text-primary font-semibold">{country}</span></p>
                         {/* Post Counts */}
                         {!postsLoading && (scheduledCount > 0 || publishedCount > 0) && (
                             <div className="flex items-center gap-2">
@@ -196,8 +196,8 @@ export default function SmartCalendar() {
                                     </span>
                                 )}
                                 {publishedCount > 0 && (
-                                    <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-500/20">
-                                        <span className="w-2 h-2 rounded-full bg-cyan-400" />
+                                    <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full bg-[var(--sys-primary-dim)] text-[var(--sys-primary)] border border-[var(--sys-border)]">
+                                        <span className="w-2 h-2 rounded-full bg-[var(--sys-surface)]" />
                                         {publishedCount} published
                                     </span>
                                 )}
@@ -210,20 +210,20 @@ export default function SmartCalendar() {
                             <select
                                 value={country}
                                 onChange={e => setOverrideCountry(e.target.value)}
-                                className="input-glass py-2 pl-3 pr-8 rounded-xl text-sm text-white bg-white/[0.04] cursor-pointer appearance-none min-w-[150px]"
+                                className="input-glass py-2 pl-3 pr-8 rounded-xl text-sm text-[var(--sys-text)] bg-[var(--sys-surface)] cursor-pointer appearance-none min-w-[150px]"
                             >
                                 {COUNTRIES.map(c => (
                                     <option key={c.id} value={c.id}>{c.flag} {c.label}</option>
                                 ))}
                             </select>
-                            <span className="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 text-sm pointer-events-none">expand_more</span>
+                            <span className="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 text-[var(--sys-text-muted)] text-sm pointer-events-none">expand_more</span>
                         </div>
                         {/* Event legend */}
                         <div className="hidden lg:flex items-center gap-3 ml-2">
                             {Object.entries(EVENT_COLORS).filter(([k]) => !['brand', 'published'].includes(k)).map(([key, val]) => (
                                 <div key={key} className="flex items-center gap-1.5">
                                     <div className="w-2.5 h-2.5 rounded-full" style={{ background: val.dot }} />
-                                    <span className="text-sm text-slate-500">{val.label}</span>
+                                    <span className="text-sm text-[var(--sys-text-muted)]">{val.label}</span>
                                 </div>
                             ))}
                         </div>
@@ -235,20 +235,20 @@ export default function SmartCalendar() {
                     <div className="glass-panel rounded-2xl p-5 mb-6 border border-primary/10">
                         <div className="flex items-center gap-2 mb-3">
                             <span className="material-symbols-outlined text-primary">trending_up</span>
-                            <h3 className="text-base font-bold text-white">Upcoming Opportunities</h3>
+                            <h3 className="text-base font-bold text-[var(--sys-text)]">Upcoming Opportunities</h3>
                         </div>
                         <div className="flex gap-3 overflow-x-auto pb-1 scrollbar-thin">
                             {upcoming.slice(0, 6).map((e, i) => (
                                 <button key={i} onClick={() => handleGenerateContent(e)}
-                                    className="flex-shrink-0 glass-panel rounded-xl p-3 min-w-[180px] hover:bg-white/[0.05] transition-all cursor-pointer border border-white/[0.06] group text-left">
+                                    className="flex-shrink-0 glass-panel rounded-xl p-3 min-w-[180px] hover:bg-[var(--sys-surface)] transition-all cursor-pointer border border-[var(--sys-border)] group text-left">
                                     <div className="flex items-center justify-between mb-1">
                                         <span className="text-lg">{e.emoji}</span>
-                                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${e.daysUntil <= 3 ? 'bg-rose-500/20 text-rose-400' : e.daysUntil <= 7 ? 'bg-amber-500/20 text-amber-400' : 'bg-primary/20 text-primary'}`}>
+                                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${e.daysUntil <= 3 ? 'bg-[var(--sys-primary-dim)] text-primary' : e.daysUntil <= 7 ? 'bg-[var(--sys-primary-dim)] text-primary' : 'bg-primary/20 text-primary'}`}>
                                             {e.daysUntil === 0 ? 'TODAY' : e.daysUntil === 1 ? 'TOMORROW' : `${e.daysUntil} days`}
                                         </span>
                                     </div>
-                                    <p className="text-base font-semibold text-white truncate">{e.name}</p>
-                                    <p className="text-sm text-slate-500 mt-0.5">Tone: {e.tone}</p>
+                                    <p className="text-base font-semibold text-[var(--sys-text)] truncate">{e.name}</p>
+                                    <p className="text-sm text-[var(--sys-text-muted)] mt-0.5">Tone: {e.tone}</p>
                                     <div className="flex items-center gap-1 mt-2 text-primary text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity">
                                         <span className="material-symbols-outlined text-xs">auto_awesome</span> Generate Content
                                     </div>
@@ -264,13 +264,13 @@ export default function SmartCalendar() {
                         {/* Month Navigation */}
                         <div className="flex items-center justify-between mb-4">
                             <div className="flex items-center gap-3">
-                                <button onClick={prevMonth} className="p-2 rounded-xl hover:bg-white/[0.06] transition-all cursor-pointer text-slate-400 hover:text-white">
+                                <button onClick={prevMonth} className="p-2 rounded-xl hover:bg-[var(--sys-surface)] transition-all cursor-pointer text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]">
                                     <span className="material-symbols-outlined">chevron_left</span>
                                 </button>
-                                <h2 className="text-xl font-bold text-white min-w-[200px] text-center">
+                                <h2 className="text-xl font-bold text-[var(--sys-text)] min-w-[200px] text-center">
                                     {monthNames[currentMonth]} {currentYear}
                                 </h2>
-                                <button onClick={nextMonth} className="p-2 rounded-xl hover:bg-white/[0.06] transition-all cursor-pointer text-slate-400 hover:text-white">
+                                <button onClick={nextMonth} className="p-2 rounded-xl hover:bg-[var(--sys-surface)] transition-all cursor-pointer text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]">
                                     <span className="material-symbols-outlined">chevron_right</span>
                                 </button>
                             </div>
@@ -282,24 +282,24 @@ export default function SmartCalendar() {
                         {/* Day Headers */}
                         <div className="grid grid-cols-7 gap-px mb-1">
                             {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
-                                <div key={d} className="text-center text-xs text-slate-600 font-bold py-2 uppercase tracking-wider">{d}</div>
+                                <div key={d} className="text-center text-xs text-[var(--sys-text-muted)] font-bold py-2 uppercase tracking-wider">{d}</div>
                             ))}
                         </div>
 
                         {/* Calendar Grid */}
-                        <div className="grid grid-cols-7 gap-px bg-white/[0.03] rounded-2xl overflow-hidden border border-white/[0.06]">
+                        <div className="grid grid-cols-7 gap-px bg-[var(--sys-surface)] rounded-2xl overflow-hidden border border-[var(--sys-border)]">
                             {calendarDays.map((dayObj, i) => {
                                 const totalItems = dayObj.events.length + (dayObj.scheduled?.length || 0)
                                 return (
                                     <button key={i}
                                         onClick={() => handleDateClick(dayObj)}
                                         className={`min-h-[90px] p-2 text-left transition-all cursor-pointer relative group
-                                            ${dayObj.isOtherMonth ? 'bg-[#080a14]/80 text-slate-700' : 'bg-[#0c0f1a] hover:bg-white/[0.04]'}
+                                            ${dayObj.isOtherMonth ? 'bg-[#080a14]/80 text-slate-700' : 'bg-[#0c0f1a] hover:bg-[var(--sys-surface)]'}
                                             ${dayObj.isToday ? 'ring-2 ring-primary/50 ring-inset' : ''}
                                             ${selectedDate === dayObj.day && !dayObj.isOtherMonth ? 'bg-primary/10' : ''}
                                         `}
                                     >
-                                        <span className={`text-sm font-semibold ${dayObj.isToday ? 'text-primary' : dayObj.isOtherMonth ? 'text-slate-700' : 'text-slate-300'}`}>
+                                        <span className={`text-sm font-semibold ${dayObj.isToday ? 'text-primary' : dayObj.isOtherMonth ? 'text-slate-700' : 'text-[var(--sys-text-muted)]'}`}>
                                             {dayObj.day}
                                         </span>
 
@@ -327,7 +327,7 @@ export default function SmartCalendar() {
                                                     )
                                                 })}
                                                 {totalItems > 4 && (
-                                                    <span className="text-sm text-slate-500">+{totalItems - 4} more</span>
+                                                    <span className="text-sm text-[var(--sys-text-muted)]">+{totalItems - 4} more</span>
                                                 )}
                                             </div>
                                         )}
@@ -349,10 +349,10 @@ export default function SmartCalendar() {
                         <div className="w-[340px] flex-shrink-0 animate-fade-in">
                             <div className="glass-panel rounded-2xl p-5 sticky top-24 max-h-[calc(100vh-120px)] overflow-y-auto custom-scrollbar">
                                 <div className="flex items-center justify-between mb-4">
-                                    <h3 className="text-lg font-bold text-white">
+                                    <h3 className="text-lg font-bold text-[var(--sys-text)]">
                                         {monthNames[currentMonth]} {selectedDate}
                                     </h3>
-                                    <button onClick={() => setShowPanel(false)} className="text-slate-500 hover:text-white cursor-pointer">
+                                    <button onClick={() => setShowPanel(false)} className="text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer">
                                         <span className="material-symbols-outlined text-sm">close</span>
                                     </button>
                                 </div>
@@ -372,30 +372,30 @@ export default function SmartCalendar() {
                                                 return (
                                                     <div key={post._id}
                                                         className={`group rounded-xl border transition-all duration-200 overflow-hidden ${isExpanded
-                                                            ? 'bg-[#FF4D00]/[0.08] border-[#FF4D00]/30 shadow-lg shadow-[#FF4D00]/5'
-                                                            : `border-white/[0.06] hover:border-[#FF4D00]/20 ${post.status === 'published' ? 'bg-cyan-500/[0.04]' : 'bg-white/[0.02]'}`
+                                                            ? 'bg-[#FF4D00]/[0.08] border-[#FF4D00]/30 shadow-none'
+                                                            : `border-[var(--sys-border)] hover:border-[#FF4D00]/20 ${post.status === 'published' ? 'bg-[var(--sys-surface)]/[0.04]' : 'bg-[var(--sys-surface)]'}`
                                                             }`}>
                                                         {/* Summary row */}
                                                         <button className="w-full p-3 text-left cursor-pointer" onClick={() => setPreviewPost(isExpanded ? null : post)}>
                                                             <div className="flex items-center gap-3">
                                                                 {/* Platform icon */}
                                                                 <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 bg-gradient-to-br"
-                                                                    style={{ background: `linear-gradient(135deg, ${meta.color || '#8B5CF6'}20, ${meta.color || '#8B5CF6'}40)` }}>
+                                                                    style={{ background: `var(--sys-primary)` }}>
                                                                     <span className="text-sm">{meta.icon || 'smartphone'}</span>
                                                                 </div>
                                                                 <div className="min-w-0 flex-1">
                                                                     <div className="flex items-center gap-2">
-                                                                        <span className="text-sm font-bold text-white">{meta.label || post.platform}</span>
-                                                                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${post.status === 'published' ? 'bg-cyan-500/20 text-cyan-300' : 'bg-[#FF4D00]/20 text-[#FF7A00]'
+                                                                        <span className="text-sm font-bold text-[var(--sys-text)]">{meta.label || post.platform}</span>
+                                                                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${post.status === 'published' ? 'bg-[var(--sys-primary-dim)] text-[var(--sys-primary)]' : 'bg-[#FF4D00]/20 text-[#FF7A00]'
                                                                             }`}>
                                                                             {post.status === 'published' ? '✓ SENT' : '⏰ QUEUED'}
                                                                         </span>
                                                                     </div>
-                                                                    <p className="text-xs text-slate-500 mt-0.5">
+                                                                    <p className="text-xs text-[var(--sys-text-muted)] mt-0.5">
                                                                         {post.accountName} · {post._calTime}
                                                                     </p>
                                                                 </div>
-                                                                <span className={`material-symbols-outlined text-sm text-slate-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`}>
+                                                                <span className={`material-symbols-outlined text-sm text-[var(--sys-text-muted)] transition-transform ${isExpanded ? 'rotate-180' : ''}`}>
                                                                     expand_more
                                                                 </span>
                                                             </div>
@@ -404,18 +404,18 @@ export default function SmartCalendar() {
                                                         {/* Expanded Preview */}
                                                         {isExpanded && (
                                                             <div className="px-3 pb-3 space-y-3">
-                                                                <div className="h-px bg-gradient-to-r from-transparent via-violet-500/20 to-transparent" />
+                                                                <div className="h-px bg-[var(--sys-surface)] border border-[var(--sys-border)]" />
 
                                                                 {/* Image preview */}
                                                                 {post.imageUrl && (
-                                                                    <div className="rounded-lg overflow-hidden border border-white/[0.08]">
+                                                                    <div className="rounded-lg overflow-hidden border border-[var(--sys-border)]">
                                                                         <img src={post.imageUrl} alt="" className="w-full h-40 object-cover" onError={e => e.target.style.display = 'none'} />
                                                                     </div>
                                                                 )}
 
                                                                 {/* Caption preview */}
-                                                                <div className="rounded-lg bg-black/30 p-3 border border-white/[0.06]">
-                                                                    <p className="text-xs text-slate-300 leading-relaxed whitespace-pre-wrap line-clamp-6">
+                                                                <div className="rounded-lg bg-[var(--sys-surface)] p-3 border border-[var(--sys-border)]">
+                                                                    <p className="text-xs text-[var(--sys-text-muted)] leading-relaxed whitespace-pre-wrap line-clamp-6">
                                                                         {post.caption || 'No caption'}
                                                                     </p>
                                                                 </div>
@@ -439,13 +439,13 @@ export default function SmartCalendar() {
                                                                     {post.status === 'scheduled' && (
                                                                         <button
                                                                             onClick={(e) => { e.stopPropagation(); handleCancelScheduled(post._id) }}
-                                                                            className="flex-1 py-2 rounded-lg bg-rose-500/10 text-rose-400 text-xs font-bold hover:bg-rose-500/20 transition-all cursor-pointer flex items-center justify-center gap-1.5 border border-rose-500/15">
+                                                                            className="flex-1 py-2 rounded-lg bg-[var(--sys-primary-dim)] text-primary text-xs font-bold hover:bg-[var(--sys-primary-dim)] transition-all cursor-pointer flex items-center justify-center gap-1.5 border border-[var(--sys-border)]">
                                                                             <span className="material-symbols-outlined text-sm">close</span> Cancel
                                                                         </button>
                                                                     )}
                                                                     <button
                                                                         onClick={() => navigate('/publish-schedule')}
-                                                                        className="flex-1 py-2 rounded-lg bg-white/[0.06] text-slate-300 text-xs font-medium hover:bg-white/[0.1] transition-all cursor-pointer flex items-center justify-center gap-1.5 border border-white/[0.08]">
+                                                                        className="flex-1 py-2 rounded-lg bg-[var(--sys-surface)] text-[var(--sys-text-muted)] text-xs font-medium hover:bg-[var(--sys-surface)] transition-all cursor-pointer flex items-center justify-center gap-1.5 border border-[var(--sys-border)]">
                                                                         <span className="material-symbols-outlined text-sm">open_in_new</span> View All
                                                                     </button>
                                                                 </div>
@@ -464,7 +464,7 @@ export default function SmartCalendar() {
                                         {selectedScheduled.length > 0 && (
                                             <div className="flex items-center gap-2 mb-3">
                                                 <span className="material-symbols-outlined text-primary text-sm">celebration</span>
-                                                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Events & Occasions</h4>
+                                                <h4 className="text-xs font-bold text-[var(--sys-text-muted)] uppercase tracking-widest">Events & Occasions</h4>
                                             </div>
                                         )}
                                         <div className="space-y-3">
@@ -475,12 +475,12 @@ export default function SmartCalendar() {
                                                         <div className="flex items-center gap-2 mb-2">
                                                             <span className="text-2xl">{e.emoji}</span>
                                                             <div>
-                                                                <p className="font-bold text-white text-sm">{e.name}</p>
+                                                                <p className="font-bold text-[var(--sys-text)] text-sm">{e.name}</p>
                                                                 <span className="text-xs font-medium px-2 py-0.5 rounded-full" style={{ background: color.border + '30', color: color.border }}>{color.label}</span>
                                                             </div>
                                                         </div>
-                                                        <div className="text-[11px] text-slate-400 mb-3">
-                                                            <p>Suggested tone: <span className="font-medium text-white">{e.tone}</span></p>
+                                                        <div className="text-[11px] text-[var(--sys-text-muted)] mb-3">
+                                                            <p>Suggested tone: <span className="font-medium text-[var(--sys-text)]">{e.tone}</span></p>
                                                             <p>Formats: {e.formats?.join(', ')}</p>
                                                         </div>
                                                         <div className="space-y-2">
@@ -490,7 +490,7 @@ export default function SmartCalendar() {
                                                                 Generate Content
                                                             </button>
                                                             <button onClick={() => handleGenerateCampaign(e)}
-                                                                className="w-full py-2 rounded-lg bg-white/[0.06] text-slate-300 text-xs font-medium hover:bg-white/[0.1] transition-all cursor-pointer flex items-center justify-center gap-1.5 border border-white/[0.08]">
+                                                                className="w-full py-2 rounded-lg bg-[var(--sys-surface)] text-[var(--sys-text-muted)] text-xs font-medium hover:bg-[var(--sys-surface)] transition-all cursor-pointer flex items-center justify-center gap-1.5 border border-[var(--sys-border)]">
                                                                 <span className="material-symbols-outlined text-sm">campaign</span>
                                                                 Full Campaign Plan
                                                             </button>
@@ -506,7 +506,7 @@ export default function SmartCalendar() {
                                 {selectedEvents.length === 0 && selectedScheduled.length === 0 && (
                                     <div className="text-center py-8">
                                         <span className="material-symbols-outlined text-4xl text-slate-700 mb-2">event_available</span>
-                                        <p className="text-sm text-slate-500">No events or posts on this day</p>
+                                        <p className="text-sm text-[var(--sys-text-muted)]">No events or posts on this day</p>
                                         <button onClick={() => handleGenerateContent({ name: `${monthNames[currentMonth]} ${selectedDate}`, tone: 'general', formats: ['social'] })}
                                             className="mt-3 px-4 py-2 rounded-lg bg-primary/10 text-primary text-xs font-medium hover:bg-primary/20 transition-all cursor-pointer">
                                             Create Content Anyway
