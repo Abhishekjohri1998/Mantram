@@ -16,7 +16,7 @@ export class GeminiProvider extends BaseProvider {
     }
 
     async generateText({ systemPrompt, userPrompt, temperature = 0.7, maxTokens = 2048, model, images = [] }) {
-        const modelId = model || this.config.defaultModel || 'gemini-2.5-flash';
+        const modelId = model || this.config.defaultModel || 'gemini-3-flash-preview';
         const url = `${this.baseUrl}/models/${modelId}:generateContent?key=${this.apiKey}`;
         
         const parts = [{ text: `${systemPrompt}\n\n${userPrompt}` }];
@@ -94,7 +94,7 @@ export class GeminiProvider extends BaseProvider {
      * Returns text + grounding citations (URLs, titles, snippets).
      */
     async generateTextWithSearch({ systemPrompt, userPrompt, temperature = 0.7, maxTokens = 4096, model }) {
-        const modelId = model || this.config.defaultModel || 'gemini-2.5-flash';
+        const modelId = model || this.config.defaultModel || 'gemini-3-flash-preview';
         const url = `${this.baseUrl}/models/${modelId}:generateContent?key=${this.apiKey}`;
 
         const startTime = Date.now();

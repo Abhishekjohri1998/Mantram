@@ -187,7 +187,7 @@ RESPONSE FORMAT — valid JSON only:
   "designTrend": "Name of chosen aesthetic framework",
   "suggestedHeadline": "Catchy 3-5 word headline or null",
   "productIntegration": "hero | supporting | ambient | none",
-  "primaryPrompt": "Follow this exact master structure: [Type of image], featuring [main subject], [action], in [setting], with [mood]. Use [composition], [lighting], and [brand color palette]. Include [important details/textures]. Final look should be [quality]. 100-180 words total.",
+  "primaryPrompt": "Follow this exact master structure: [Type of image], featuring [main subject], [action], in [setting], with [mood]. Use [composition], [lighting], and [brand color palette]. Include [important details/textures]. Final look should be [quality]. 80-150 words total.",
   "negativePrompt": "flat lighting, stock photo pose, centered floating product with no context, watermark, border, logo, logo text, brand name, typography, hex code, dimension labels, color swatches, poor anatomy, extra limbs, text artifacts",
   "engineeringNotes": "Design trend chosen and rationale for creative decisions"
 }`;
