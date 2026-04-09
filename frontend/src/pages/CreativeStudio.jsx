@@ -2223,7 +2223,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
             />
 
             {/* ══ Unified Studio Navigation (sticky — tabs + optional gallery sub-bar) ══ */}
-            <div className="flex flex-col gap-0 sticky z-40 border-b border-white/[0.08]" style={{ top: '3.75rem', background: '#12121a', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)', boxShadow: '0 4px 24px rgba(0,0,0,0.4)' }}>
+            <div className="flex flex-col gap-0 sticky z-40 border-b border-white/[0.08]" style={{ top: 0, background: '#12121a', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)', boxShadow: '0 4px 24px rgba(0,0,0,0.4)' }}>
                 {/* ── Row 1: Tab Buttons ── */}
                 <div className="flex items-center gap-1.5 p-2 overflow-x-auto scrollbar-hide whitespace-nowrap">
                 {[
