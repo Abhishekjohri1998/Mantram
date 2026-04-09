@@ -960,10 +960,10 @@ async function routedImageGenerate(promptText, imageParts = [], temperature = 0.
     console.log(`🎯 Image Model Router: ${selectedModel} → ${modelConfig.provider} (${modelConfig.name})`);
     if (customSize) console.log(`📐 Custom Size: ${customSize.width}x${customSize.height}`);
 
-    // ── HARD TIMEOUT: 120 seconds max for any image generation ──
-    const TIMEOUT_MS = 120_000;
+    // ── HARD TIMEOUT: 180 seconds max for any image generation ──
+    const TIMEOUT_MS = 180_000;
     const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Image generation timed out after 120 seconds. Please try again.')), TIMEOUT_MS)
+        setTimeout(() => reject(new Error('Image generation timed out after 180 seconds. Please try again.')), TIMEOUT_MS)
     );
 
     const generatePromise = (async () => {
