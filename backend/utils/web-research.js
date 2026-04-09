@@ -1174,26 +1174,40 @@ export async function researchDomain(baseUrl, options = {}) {
 
     let _cfNeeded = false;
     if (!skipCfSolve) {
-      try {
-        const probeCtrl = new AbortController();
-        const probeTimer = setTimeout(() => probeCtrl.abort(), 8000);
-        const probeResp = await fetch(cleanBase, {
-            signal: probeCtrl.signal,
-            headers: { 'User-Agent': customUA || USER_AGENT, 'Accept': 'text/html,*/*;q=0.8' },
-            redirect: 'follow',
-        });
-        clearTimeout(probeTimer);
-        const probeHtml = await probeResp.text();
-        _cfNeeded = isBotChallengePage(probeHtml);
-        if (_cfNeeded) {
-            console.log(`🛡️  Cloudflare challenge DETECTED — launching solver...`);
-            await solveCloudflare(cleanBase, customUA);
-        } else {
-            console.log(`🛡️  No Cloudflare challenge — skipping solver (saved 15-30s)`);
-        }
-      } catch (probeErr) {
-        console.log(`🛡️  Homepage probe failed (${probeErr.message}) — trying solver as fallback`);
+      if (options.stealth) {
+        console.log(`🛡️  Stealth mode enabled — forcing Playwright solver to bypass TLS fingerprinting`);
+        _cfNeeded = true;
         await solveCloudflare(cleanBase, customUA);
+      } else {
+        try {
+          const probeCtrl = new AbortController();
+          const probeTimer = setTimeout(() => probeCtrl.abort(), 8000);
+          const probeResp = await fetch(cleanBase, {
+              signal: probeCtrl.signal,
+              headers: { 'User-Agent': customUA || USER_AGENT, 'Accept': 'text/html,*/*;q=0.8' },
+              redirect: 'follow',
+          });
+          clearTimeout(probeTimer);
+          
+          if (probeResp.status === 403 || probeResp.status === 401) {
+              console.log(`🛡️  Homepage probe rejected with HTTP ${probeResp.status} — assuming WAF/TLS block. Forcing solver.`);
+              _cfNeeded = true;
+              await solveCloudflare(cleanBase, customUA);
+          } else {
+              const probeHtml = await probeResp.text();
+              _cfNeeded = isBotChallengePage(probeHtml);
+              if (_cfNeeded) {
+                  console.log(`🛡️  Cloudflare challenge DETECTED — launching solver...`);
+                  await solveCloudflare(cleanBase, customUA);
+              } else {
+                  console.log(`🛡️  No Cloudflare challenge — skipping solver (saved 15-30s)`);
+              }
+          }
+        } catch (probeErr) {
+          console.log(`🛡️  Homepage probe failed (${probeErr.message}) — trying solver as fallback`);
+          _cfNeeded = true;
+          await solveCloudflare(cleanBase, customUA);
+        }
       }
     } else {
       console.log(`🛡️  CF solve skipped (fast mode)`);
@@ -1205,6 +1219,7 @@ export async function researchDomain(baseUrl, options = {}) {
     let homepageResult, robotsTxt, sitemap, llmsTxt;
 
     const _homepageFetchFn = async () => {
+        try {
             let html, redirectChain, finalUrl, metaFetch;
 
             if (_cfSession?.initialHtml) {
@@ -1298,6 +1313,9 @@ export async function researchDomain(baseUrl, options = {}) {
                 externalUrls: links.externalUrls || [],
                 hasCacheControl: !!(metaFetch.headers?.cacheControl),
             };
+        } catch (e) {
+            return { url: cleanBase, success: false, error: e.message, redirectChain: [] };
+        }
     };
 
     if (_cfNeeded) {
