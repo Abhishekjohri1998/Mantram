@@ -333,8 +333,7 @@ Generate 8-15 critical, high-impact issues. Be STRATEGIC — every issue must ha
 
 
     // ── Inject REAL crawl data into AI results (AI only generates scores/strategy) ──
-    const si = siteResearch?.siteIntelligence || {};
-    const pages = siteResearch?.pages || [];
+    const si = siMetrics;
     parsed.siteStats = {
       pagesCrawled: si.totalPages || 0,
       totalWordCount: si.totalWordCount || 0,
