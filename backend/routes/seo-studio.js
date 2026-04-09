@@ -200,7 +200,7 @@ router.post('/health-check', protect, requireStudio('seoStudio'), requireCredits
     const reportMode = reportData.status; // 'FULL' or 'PARTIAL'
 
 
-    const siteData = formatSiteResearch(siteResearch);
+    const siteData = formatSiteResearch(siteResearch?.siteIntelligence || {});
     const pageSpeedText = formatPageSpeedForPrompt(pageSpeedData);
     const backlinkText = formatBacklinkDataForPrompt(backlinkData);
     const mozText = formatMozDataForPrompt(mozData);
