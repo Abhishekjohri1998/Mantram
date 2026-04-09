@@ -106,7 +106,13 @@ async function solveCloudflare(url) {
                   document.title.includes('Just a moment') ||
                   document.title.includes('Verifying'));
       });
-      if (!hasCfChallenge && !title.includes('Verifying') && !title.includes('Just a moment')) {
+      // Check if we are still on a challenge or block page
+      const currentTitle = title.toLowerCase();
+      const isStillBlocked = currentTitle.includes('access denied') || 
+                             currentTitle.includes('attention required') ||
+                             currentTitle.includes('one more step');
+
+      if (!hasCfChallenge && !title.includes('Verifying') && !title.includes('Just a moment') && !isStillBlocked) {
         solved = true;
         console.log(`🛡️  Cloudflare solved in ${((Date.now() - solveStart) / 1000).toFixed(1)}s — title: "${title.substring(0, 60)}"`);
         break;
@@ -1148,8 +1154,8 @@ export async function researchDomain(baseUrl, options = {}) {
     const cleanBase = normalizedUrl.replace(/\/+$/, '');
 
     // Configurable crawl limits — callers can reduce for speed
-    const MAX_PAGES = options.maxPages || 800;
-    const CRAWL_TIMEOUT_MS = options.timeout || 3600000; // 1 hour budget
+    const MAX_PAGES = options.maxPages || 1000;
+    const CRAWL_TIMEOUT_MS = options.timeout || 600000; // 10 minute default budget for 'exhaustive' requests
     const skipCfSolve = options.skipCfSolve || false;
     const customUA = options.userAgent;
 

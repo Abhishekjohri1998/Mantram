@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import Bull from 'bull';
+import Redis from 'ioredis';
 
 /**
  * SEO Crawl Pipeline Diagnostic
@@ -39,11 +40,19 @@ export async function diagnoseCrawlPipeline({
   try {
     const redisUrl = process.env.REDIS_URL;
     if (redisUrl) {
-      // Create a temporary Bull instance or Redis client to ping
-      const dummyQueue = new Bull('diag-ping', redisUrl);
-      const ping = await dummyQueue.client.ping();
-      report.redisReachable = ping === 'PONG';
-      await dummyQueue.close();
+      // Create a temporary raw Redis client to ping (fail fast)
+      const diagRedis = new Redis(redisUrl, {
+        maxRetriesPerRequest: 0,
+        connectTimeout: 2000,
+        lazyConnect: true
+      });
+      try {
+        await diagRedis.connect();
+        const ping = await diagRedis.ping();
+        report.redisReachable = ping === 'PONG';
+      } finally {
+        diagRedis.disconnect();
+      }
     } else {
       // If no Redis URL, we might be in a simplified local dev mode
       report.redisReachable = true; // Assume OK or n/a

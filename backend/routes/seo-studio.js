@@ -140,8 +140,8 @@ router.post('/health-check', protect, requireStudio('seoStudio'), requireCredits
     let [reportData, siteIntel, pageSpeedData, backlinkData, mozData] = await Promise.all([
       buildSeoHealthReport(website, { 
         jobId, // PASS JOB ID for diagnostics
-        maxPages: 200, 
-        timeout: 60000,
+        maxPages: 500, // Increased from 200 for user request
+        timeout: 300000, // 5 minutes (user requested exhaustive)
         brandContext 
       }),
       isOnPageConfigured() ? getInstantSiteIntelligence(brandDomain, { country }).catch(e => {
