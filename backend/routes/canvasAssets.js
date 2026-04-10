@@ -299,6 +299,25 @@ router.post('/ai-generate', protect, requireCredits('canvasGenerate'), async (re
             }
         }
         const refCount = parts.length
+        
+        let dynamicSynthesisPrompt = ''
+        if (refCount > 1) {
+            console.log(`🧠 MCoT Canvas: Multi-subject reference detected. Synthesizing ${refCount} images...`)
+            try {
+                const synthesis = await callMultimodalAgent(
+                    `You are an elite creative analyst. The user has provided ${refCount} reference images and asked for: "${prompt}".`,
+                    `Critically analyze each of the attached images. Identify the specific subject (person, object, animal) in EACH image. Then, write a master visual description that clearly features ALL distinct subjects interacting in the same scene as requested by the user's instruction. Be extremely descriptive.`,
+                    referenceImages.slice(0, 4),
+                    { temperature: 0.2, maxTokens: 1024, returnRaw: true }
+                )
+                if (synthesis && typeof synthesis === 'string') {
+                    dynamicSynthesisPrompt = synthesis.trim()
+                }
+            } catch (e) {
+                console.warn('MCoT Synthesis failed for multiple ref images:', e.message)
+            }
+        }
+
         const textPrompt = refCount > 0
             ? `You are an elite creative director and visual artist with 20+ years of experience at top agencies. You have extraordinary creative intelligence.
 
@@ -309,6 +328,7 @@ CREATIVE ANALYSIS PROCESS:
 
 I have provided ${refCount} reference image(s). Study them deeply. Now create a NEW masterpiece based on this instruction: ${prompt}
 ${brandVisualInjection ? `\nBRAND VISUAL DIRECTION: ${brandVisualInjection}` : ''}
+${dynamicSynthesisPrompt ? `\nSUBJECT SYNTHESIS:\n${dynamicSynthesisPrompt}\n` : ''}
 
 CREATIVE PRINCIPLES TO APPLY:
 - Color Harmony: Use complementary/analogous color schemes from the references
@@ -419,14 +439,34 @@ router.post('/ai-edit', protect, requireCredits('canvasGenerate'), async (req, r
         }
 
         const imgCount = parts.length
+        
+        let dynamicSynthesisPrompt = ''
+        if (imgCount > 1) {
+            console.log(`🧠 MCoT Canvas: Multi-subject edit detected. Synthesizing ${imgCount} images...`)
+            try {
+                const synthesis = await callMultimodalAgent(
+                    `You are an elite creative analyst. The user has provided ${imgCount} reference images and asked for: "${prompt}".`,
+                    `Critically analyze each of the attached images. Identify the specific subject (person, object, animal) in EACH image. Then, write a master visual description that clearly features ALL distinct subjects interacting in the same scene as requested by the user's instruction. Be extremely descriptive.`,
+                    [imageBase64, ...additionalImages].slice(0, 4),
+                    { temperature: 0.2, maxTokens: 1024, returnRaw: true }
+                )
+                if (synthesis && typeof synthesis === 'string') {
+                    dynamicSynthesisPrompt = synthesis.trim()
+                }
+            } catch (e) {
+                console.warn('MCoT Synthesis failed for edit payload:', e.message)
+            }
+        }
+
         const editText = imgCount > 1
             ? `You are Fidato, an elite AI creative director. Your task is to generate a new image using the provided images strictly as VISUAL REFERENCES.
 
 INSTRUCTION: "${prompt}"
+${dynamicSynthesisPrompt ? `\nSUBJECT SYNTHESIS:\n${dynamicSynthesisPrompt}\n` : ''}
 
 CREATIVE RULES:
 1. The provided images are your REFERENCE IMAGES (subject and/or style references).
-2. You MUST generate a new image that prominently features the exact subjects, products, or styles shown in these reference images.
+2. You MUST generate a new image that prominently features the exact subjects (e.g. BOTH people, if multiple people are in the synthesis), products, or styles shown in these reference images.
 3. Intelligently compose them together into a single cohesive masterpiece based on the instruction.
 4. Ensure lighting and shadows are globally consistent.
 5. Do NOT hallucinate new products or subjects that conflict with the reference images.
