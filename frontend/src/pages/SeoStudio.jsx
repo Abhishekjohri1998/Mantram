@@ -1572,7 +1572,7 @@ function HealthCheckResults({ results }) {
                     { label: 'Schema Types', value: (stats.schemaTypes || []).length > 0 ? (stats.schemaTypes || []).length : '✗', icon: 'data_object', color: (stats.schemaTypes || []).length > 0 ? '#10b981' : '#f43f5e' },
                     { label: 'Slow Pages (>3s)', value: stats.slowPageCount || 0, icon: 'hourglass_top', color: (stats.slowPageCount || 0) > 0 ? '#f43f5e' : '#10b981' },
                     { label: 'Noindex Pages', value: stats.noindexPageCount || 0, icon: 'visibility_off', color: (stats.noindexPageCount || 0) > 0 ? '#f59e0b' : '#10b981' },
-                    { label: 'No Breadcrumbs', value: stats.missingBreadcrumbsCount || 0, icon: 'flat_collaboration', color: (stats.missingBreadcrumbsCount || 0) > 0 ? '#6366f1' : '#10b981' },
+                    { label: 'No Breadcrumbs', value: stats.missingBreadcrumbsCount || 0, icon: 'account_tree', color: (stats.missingBreadcrumbsCount || 0) > 0 ? '#6366f1' : '#10b981' },
                     { label: 'Social Tags', value: stats.missingSocialTagsCount || 0, icon: 'share', color: (stats.missingSocialTagsCount || 0) > 0 ? '#6366f1' : '#10b981' },
                     ...(stats.backlinkDataAvailable ? [
                       { label: 'Referring Domains', value: (stats.referringDomains || 0).toLocaleString(), icon: 'hub', color: '#8b5cf6' },
