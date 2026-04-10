@@ -5,6 +5,7 @@
 // ═══════════════════════════════════════════════════════════════
 
 import * as fabric from 'fabric'
+import { getCorsUrl } from '../../../services/api'
 
 // ── Initialize Fabric.js Canvas ──
 export function initFabricCanvas(canvasEl, container, opts = {}) {
@@ -76,7 +77,7 @@ export function initFabricCanvas(canvasEl, container, opts = {}) {
 // ── Load image onto canvas (centered, scaled to fit) ──
 export async function loadImageToCanvas(fc, imageUrl, containerW, containerH) {
     try {
-        const img = await fabric.FabricImage.fromURL(imageUrl, { crossOrigin: 'anonymous' })
+        const img = await fabric.FabricImage.fromURL(getCorsUrl(imageUrl), { crossOrigin: 'anonymous' })
         const maxDim = Math.min(containerW * 0.8, containerH * 0.8)
         const imgScale = Math.min(maxDim / img.width, maxDim / img.height, 1)
         img.set({
@@ -446,7 +447,7 @@ export async function mergeSelected(fc) {
     const dataUrl = tmpCanvas.toDataURL('image/png')
     objects.forEach(o => fc.remove(o))
 
-    const img = await fabric.FabricImage.fromURL(dataUrl, { crossOrigin: 'anonymous' })
+    const img = await fabric.FabricImage.fromURL(getCorsUrl(dataUrl), { crossOrigin: 'anonymous' })
     img.set({ left: bounds.left, top: bounds.top })
     img._customName = 'Merged Layer'
     fc.add(img)

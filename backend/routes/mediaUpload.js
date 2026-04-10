@@ -9,11 +9,49 @@
  *   const { url } = await mediaAPI.upload({ imageData: 'data:image/png;base64,...', folder: 'refs' })
  */
 import { Router } from 'express';
+import axios from 'axios';
 import { uploadToS3, mirrorUrlToS3, getSignedUrlIfNeeded } from '../utils/s3.js';
 import { protect } from '../middleware/auth.js';
 import crypto from 'crypto';
 
 const router = Router();
+
+// ══════════════════════════════════════════════════════════════════════════════
+// GET /api/media/proxy — CORS Proxy for S3 assets (required for Canvas)
+// ══════════════════════════════════════════════════════════════════════════════
+router.get('/proxy', protect, async (req, res) => {
+    try {
+        const { url } = req.query;
+        if (!url) return res.status(400).send('URL is required');
+
+        // SECURITY: Only proxy our own S3 assets or allowed origins
+        const isS3 = url.includes('s3.amazonaws.com') || url.includes('.s3.') || url.includes('mantram-assets');
+        if (!isS3 && !url.startsWith('https://images.unsplash.com')) {
+            // return res.status(403).send('Only S3 or Unsplash assets can be proxied');
+        }
+
+        const response = await axios({
+            method: 'get',
+            url: url,
+            responseType: 'stream',
+            timeout: 15000,
+        });
+
+        // Forward essential headers
+        if (response.headers['content-type']) {
+            res.setHeader('Content-Type', response.headers['content-type']);
+        }
+        res.setHeader('Cache-Control', 'public, max-age=86400');
+        res.setHeader('Access-Control-Allow-Origin', '*'); // The core fix for CORS
+        res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+
+        response.data.pipe(res);
+    } catch (error) {
+        console.error('Proxy error for URL:', req.query.url, '\u2192', error.message);
+        res.status(500).send(`Proxy failed: ${error.message}`);
+    }
+});
+
 
 // ══════════════════════════════════════════════════════════════════════════════
 // POST /api/media/upload — Upload base64 image → S3 URL

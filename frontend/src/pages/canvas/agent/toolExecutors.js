@@ -8,6 +8,7 @@ import * as fabric from 'fabric'
 import { addShapeToCanvas } from '../tools/shapeTools'
 import { PRESETS } from '../data/presets'
 import { resizeToPreset } from '../engine/fabricEngine'
+import { getCorsUrl } from '../../../services/api'
 
 // ── Position element by named position ──
 export function positionElement(obj, position, fc) {
@@ -125,7 +126,7 @@ export async function executeToolCall(toolCall, fc, ctx = {}, deps = {}) {
             const logoUrl = brand?.dna?.logo?.url
             if (!logoUrl) return 'No brand logo available'
             try {
-                const img = await fabric.FabricImage.fromURL(logoUrl, { crossOrigin: 'anonymous' })
+                const img = await fabric.FabricImage.fromURL(getCorsUrl(logoUrl), { crossOrigin: 'anonymous' })
                 const scaleFactor = args.scale || 0.15
                 const s = (fc.width * scaleFactor) / Math.max(img.width, img.height)
                 img.set({ scaleX: s, scaleY: s, customName: 'Brand Logo', id: `logo-${Date.now()}` })
@@ -483,11 +484,11 @@ export async function executeToolCall(toolCall, fc, ctx = {}, deps = {}) {
                 if (setFidatoMessages) {
                     setFidatoMessages(prev => [...prev, { role: 'assistant', content: `🖼️ Generating reference portrait for ${characterName}...` }])
                 }
-                try {
-                    const data = await canvasAssets.aiGenerate({ prompt: referenceImagePrompt, size: '512x512' })
-                    if (data.imageUrl) {
-                        generatedThumbUrl = data.imageUrl
-                        const img = await fabric.FabricImage.fromURL(data.imageUrl, { crossOrigin: 'anonymous' })
+                    try {
+                        const data = await canvasAssets.aiGenerate({ prompt: referenceImagePrompt, size: '512x512' })
+                        if (data.imageUrl) {
+                            generatedThumbUrl = data.imageUrl
+                            const img = await fabric.FabricImage.fromURL(getCorsUrl(data.imageUrl), { crossOrigin: 'anonymous' })
                         const imgSize = 120
                         const imgScale = imgSize / Math.max(img.width, img.height)
                         img.set({

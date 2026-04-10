@@ -4,7 +4,7 @@
 // ═══════════════════════════════════════════════════════════════
 
 import * as fabric from 'fabric'
-import { mediaAPI } from '../../../../services/api'
+import { media as mediaAPI, getCorsUrl } from '../../../../services/api'
 
 /**
  * Add brand logo to canvas
@@ -15,7 +15,7 @@ export async function addLogo(fc, brand) {
     if (!logoUrl) return null
 
     try {
-        const img = await fabric.FabricImage.fromURL(logoUrl, { crossOrigin: 'anonymous' })
+        const img = await fabric.FabricImage.fromURL(getCorsUrl(logoUrl), { crossOrigin: 'anonymous' })
         const maxSize = fc.width * 0.15
         const scale = maxSize / Math.max(img.width, img.height)
         img.set({
@@ -59,7 +59,7 @@ export function uploadImage(fc) {
                 console.warn('S3 upload failed for canvas layer, using base64:', err.message)
             }
             try {
-                const img = await fabric.FabricImage.fromURL(imgUrl, { crossOrigin: 'anonymous' })
+                const img = await fabric.FabricImage.fromURL(getCorsUrl(imgUrl), { crossOrigin: 'anonymous' })
                 const maxSize = fc.width * 0.5
                 const scale = maxSize / Math.max(img.width, img.height)
                 img.set({
@@ -90,7 +90,7 @@ export function uploadImage(fc) {
 export async function addImageUrlToCanvas(fc, url, label) {
     if (!fc || !url) return null
     try {
-        const img = await fabric.FabricImage.fromURL(url, { crossOrigin: 'anonymous' })
+        const img = await fabric.FabricImage.fromURL(getCorsUrl(url), { crossOrigin: 'anonymous' })
         const maxDim = 400
         const scale = Math.min(maxDim / img.width, maxDim / img.height, 1)
         // Smart grid placement
@@ -120,7 +120,7 @@ export async function addBrandAssetToCanvas(fc, asset) {
     if (!fc || !asset) return null
     try {
         if (asset.type === 'image') {
-            const img = await fabric.FabricImage.fromURL(asset.url, { crossOrigin: 'anonymous' })
+            const img = await fabric.FabricImage.fromURL(getCorsUrl(asset.url), { crossOrigin: 'anonymous' })
             const maxDim = Math.min(fc.width, fc.height) * 0.3
             const scale = Math.min(maxDim / img.width, maxDim / img.height)
             img.set({ left: 100, top: 100, scaleX: scale, scaleY: scale })
@@ -247,7 +247,7 @@ export function applyBlurToSelected(fc, blurIntensity) {
 export async function addPhotoToCanvas(fc, photo) {
     if (!fc) return null
     try {
-        const img = await fabric.FabricImage.fromURL(photo.small || photo.regular, { crossOrigin: 'anonymous' })
+        const img = await fabric.FabricImage.fromURL(getCorsUrl(photo.small || photo.regular), { crossOrigin: 'anonymous' })
         const maxDim = Math.min(fc._logicalWidth || 1080, fc._logicalHeight || 1080) * 0.5
         const scale = Math.min(maxDim / img.width, maxDim / img.height)
         img.set({ left: 50, top: 50, scaleX: scale, scaleY: scale })
@@ -267,7 +267,7 @@ export async function addPhotoToCanvas(fc, photo) {
 export async function addTextureToCanvas(fc, texture) {
     if (!fc) return null
     try {
-        const img = await fabric.FabricImage.fromURL(texture.web || texture.large, { crossOrigin: 'anonymous' })
+        const img = await fabric.FabricImage.fromURL(getCorsUrl(texture.web || texture.large), { crossOrigin: 'anonymous' })
         const scaleX = fc.width / img.width
         const scaleY = fc.height / img.height
         const scale = Math.max(scaleX, scaleY)

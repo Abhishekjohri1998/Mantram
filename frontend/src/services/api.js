@@ -6,6 +6,27 @@
 
 export const API_BASE = (import.meta.env.VITE_API_URL || `${window.location.origin}/api`).replace(/\/$/, '');
 
+/**
+ * Utility to proxy S3 URLs through our backend to avoid CORS issues in the Canvas.
+ * Required for Fabric.js FabricImage.fromURL calls with crossOrigin: 'anonymous'.
+ */
+export const getCorsUrl = (url) => {
+    if (!url) return '';
+    if (url.startsWith('data:') || url.startsWith('blob:')) return url;
+    
+    // Check if it's an S3 URL or external asset that likely lacks CORS headers
+    const isS3 = url.includes('s3.amazonaws.com') || url.includes('.s3.') || url.includes('mantram-assets');
+    const isUnsplash = url.includes('images.unsplash.com');
+    
+    if (isS3 || isUnsplash) {
+        // Return proxied URL
+        return `${API_BASE}/media/proxy?url=${encodeURIComponent(url)}`;
+    }
+    
+    return url;
+};
+
+
 // Token management
 let authToken = localStorage.getItem('mantram_token') || '';
 let dynamicTokenProvider = null;
