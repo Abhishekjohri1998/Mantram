@@ -312,6 +312,12 @@ router.post('/ai-generate', protect, requireCredits('canvasGenerate'), async (re
                 )
                 if (synthesis && typeof synthesis === 'string') {
                     dynamicSynthesisPrompt = synthesis.trim()
+                    
+                    // CRITICAL: Drop raw image parts when fusing multiple subjects. 
+                    // Most diffusion APIs fail to composite 2+ separate raw subjects and will collapse them into one.
+                    // Relying strictly on the MCoT textual synthesis guarantees both subjects appear.
+                    console.log(`🧠 MCoT Canvas: Dropping raw image payloads for pure text-driven MCoT multi-subject fusion.`)
+                    parts.splice(0, refCount)
                 }
             } catch (e) {
                 console.warn('MCoT Synthesis failed for multiple ref images:', e.message)
@@ -452,6 +458,11 @@ router.post('/ai-edit', protect, requireCredits('canvasGenerate'), async (req, r
                 )
                 if (synthesis && typeof synthesis === 'string') {
                     dynamicSynthesisPrompt = synthesis.trim()
+                    
+                    // CRITICAL: Drop raw image parts when fusing multiple subjects.
+                    // Prevent diffusion collapse by executing pure text-driven MCoT.
+                    console.log(`🧠 MCoT Canvas: Dropping raw image payloads for pure text-driven MCoT multi-subject edit fusion.`)
+                    parts.splice(0, imgCount)
                 }
             } catch (e) {
                 console.warn('MCoT Synthesis failed for edit payload:', e.message)
