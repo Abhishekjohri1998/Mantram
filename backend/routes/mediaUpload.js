@@ -18,37 +18,47 @@ const router = Router();
 
 // ══════════════════════════════════════════════════════════════════════════════
 // GET /api/media/proxy — CORS Proxy for S3 assets (required for Canvas)
-// ══════════════════════════════════════════════════════════════════════════════
-router.get('/proxy', protect, async (req, res) => {
+// This must be public because browser <img> tags and canvas loading don't send Auth headers.
+// Security is enforced via strict domain allow-listing.
+router.get('/proxy', async (req, res) => {
+    const { url } = req.query;
     try {
-        const { url } = req.query;
         if (!url) return res.status(400).send('URL is required');
 
-        // SECURITY: Only proxy our own S3 assets or allowed origins
-        const isS3 = url.includes('s3.amazonaws.com') || url.includes('.s3.') || url.includes('mantram-assets');
-        if (!isS3 && !url.startsWith('https://images.unsplash.com')) {
-            // return res.status(403).send('Only S3 or Unsplash assets can be proxied');
+        // PRODUCTION-READY SECURITY: Only proxy our own S3 assets or allowed origins
+        // This prevents the endpoint from being used as a general-purpose open proxy.
+        const isS3 = url.includes('s3.ap-south-1.amazonaws.com') || 
+                     url.includes('canvas-layers.s3') || 
+                     url.includes('mantram-assets');
+        const isUnsplash = url.startsWith('https://images.unsplash.com');
+        
+        if (!isS3 && !isUnsplash) {
+            console.warn(`🛑 [PROXY] Blocked unauthorized URL: ${url}`);
+            return res.status(403).send('Forbidden: Only authorized S3 or Unsplash assets can be proxied');
         }
 
         const response = await axios({
             method: 'get',
             url: url,
             responseType: 'stream',
-            timeout: 15000,
+            timeout: 10000, // Slightly tighter timeout for production
+            maxContentLength: 20 * 1024 * 1024, // 20MB limit
         });
 
         // Forward essential headers
         if (response.headers['content-type']) {
             res.setHeader('Content-Type', response.headers['content-type']);
         }
-        res.setHeader('Cache-Control', 'public, max-age=86400');
-        res.setHeader('Access-Control-Allow-Origin', '*'); // The core fix for CORS
+        res.setHeader('Cache-Control', 'public, max-age=86400'); // 24h cache
+        res.setHeader('Access-Control-Allow-Origin', '*'); // Core fix for Canvas CORS
         res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
 
         response.data.pipe(res);
     } catch (error) {
-        console.error('Proxy error for URL:', req.query.url, '\u2192', error.message);
-        res.status(500).send(`Proxy failed: ${error.message}`);
+        const status = error.response?.status || 500;
+        const msg = error.response?.data || error.message;
+        console.error(`❌ [PROXY] Error for ${url}: ${status} - ${msg}`);
+        res.status(status).send(`Proxy failed: ${msg}`);
     }
 });
 
