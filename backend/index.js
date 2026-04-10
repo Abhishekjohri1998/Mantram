@@ -154,10 +154,54 @@ const server = app.listen(config.port, '0.0.0.0', () => {
 
 // ── DEFERRED INITIALIZATION (WAIT FOR DB) ─────────────────────
 connectDB().then(() => {
-    // Initialize Image Generation Worker (Bull + Redis)
-    initCreativeWorker(internalGenerateCreative);
+    const isPrimaryInstance = !process.env.NODE_APP_INSTANCE || process.env.NODE_APP_INSTANCE === '0';
 
-    // Warm up MCP Registry — connects mcpBridge to internal tool server (non-blocking)
+    if (isPrimaryInstance) {
+        console.log('⚡ Starting Singleton background agents (Primary Instance)');
+        
+        // Initialize Image Generation Worker (Bull + Redis)
+        initCreativeWorker(internalGenerateCreative);
+
+        // Start follow-up scheduler (every 4 hours — Meta Compliance)
+        import('./services/autonomousAgent.js').then(({ runFollowUpCheck }) => {
+            setInterval(() => {
+                runFollowUpCheck().catch(err => console.warn('⚠️ Follow-up check failed:', err.message));
+            }, 4 * 60 * 60 * 1000);
+            console.log('🤖 Autonomous Agent active');
+        }).catch(() => { });
+
+        // Start intelligence agent scheduler (every 6 hours — Meta Compliance)
+        import('./services/intelligenceAgent.js').then(({ runIntelMissions }) => {
+            setInterval(() => {
+                runIntelMissions().catch(err => console.warn('🕵️ Intel Agent check failed:', err.message));
+            }, 6 * 60 * 60 * 1000);
+            console.log('🕵️ Agent Intelligence active');
+        }).catch(() => { });
+
+        // Start scheduled post publisher
+        import('./services/scheduledPostPublisher.js').then(({ startScheduledPostPublisher }) => {
+            startScheduledPostPublisher();
+        }).catch((err) => { console.warn('📅 Scheduled Post Publisher failed to start:', err.message); });
+
+        // Start pricing monitor (24h checks)
+        import('./agents/pricingMonitor.js').then(({ startPricingMonitor }) => {
+            startPricingMonitor();
+        }).catch(err => console.error('❌ Failed to load pricingMonitor.js:', err));
+
+        // Start funnel scheduler (nurture sequences, automation, score decay)
+        import('./services/funnelScheduler.js').then(({ startFunnelScheduler }) => {
+            startFunnelScheduler();
+        }).catch(err => console.error('❌ Failed to load funnelScheduler.js:', err));
+
+        // Start subscription manager (hourly checks)
+        import('./agents/subscriptionManager.js').then(({ startSubscriptionManager }) => {
+            startSubscriptionManager();
+        }).catch(err => console.error('❌ Failed to load subscriptionManager.js:', err));
+    } else {
+        console.log(`📡 Secondary instance ${process.env.NODE_APP_INSTANCE} started (Background agents skipped)`);
+    }
+
+    // Warming up MCP Registry can happen on all instances (it's safe and non-blocking)
     import('./mcp/registry.js').then(({ callMcpTool }) => {
         // Trigger lazy connection by calling a no-op probe
         setTimeout(() => {
@@ -167,33 +211,7 @@ connectDB().then(() => {
         }, 8000); // Wait 8s for server to be fully ready
     }).catch(() => {});
 
-    // Start follow-up scheduler (every 4 hours — Meta Compliance)
-    import('./services/autonomousAgent.js').then(({ runFollowUpCheck }) => {
-        setInterval(() => {
-            runFollowUpCheck().catch(err => console.warn('⚠️ Follow-up check failed:', err.message));
-        }, 4 * 60 * 60 * 1000);
-        console.log('🤖 Autonomous Agent active');
-    }).catch(() => { });
-
-    // Start intelligence agent scheduler (every 6 hours — Meta Compliance)
-    import('./services/intelligenceAgent.js').then(({ runIntelMissions }) => {
-        setInterval(() => {
-            runIntelMissions().catch(err => console.warn('🕵️ Intel Agent check failed:', err.message));
-        }, 6 * 60 * 60 * 1000);
-        console.log('🕵️ Agent Intelligence active');
-    }).catch(() => { });
-
-    // Start scheduled post publisher
-    import('./services/scheduledPostPublisher.js').then(({ startScheduledPostPublisher }) => {
-        startScheduledPostPublisher();
-    }).catch((err) => { console.warn('📅 Scheduled Post Publisher failed to start:', err.message); });
-
-    // Start pricing monitor (24h checks)
-    import('./agents/pricingMonitor.js').then(({ startPricingMonitor }) => {
-        startPricingMonitor();
-    }).catch(err => console.error('❌ Failed to load pricingMonitor.js:', err));
-
-    // Auto-seed credit packs if collection is empty
+    // Auto-seed credit packs if collection is empty (Safe for multiple instances as it checks count)
     import('./models/CreditPack.js').then(async ({ default: CreditPack }) => {
         const count = await CreditPack.countDocuments();
         if (count === 0) {

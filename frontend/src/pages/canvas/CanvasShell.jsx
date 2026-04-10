@@ -42,6 +42,23 @@ import {
 import '../CanvasEditor.css'
 
 // ═══════════════════════════════════════════════════════════════
+// UTILS
+// ═══════════════════════════════════════════════════════════════
+/**
+ * Appends a cache-busting parameter to S3 URLs to ensure fresh CORS headers.
+ * Browsers often cache S3 images without CORS headers if loaded elsewhere first.
+ */
+const getCorsUrl = (url) => {
+    if (!url || typeof url !== 'string') return url
+    // Only apply to S3/External assets that might have CORS issues
+    if (url.includes('amazonaws.com') || url.includes('googleusercontent.com')) {
+        const separator = url.includes('?') ? '&' : '?'
+        return `${url}${separator}cors=1`
+    }
+    return url
+}
+
+// ═══════════════════════════════════════════════════════════════
 // INNER COMPONENT — Canvas Editor Core
 // ═══════════════════════════════════════════════════════════════
 function CanvasShellInner() {
@@ -97,7 +114,7 @@ function CanvasShellInner() {
 
     // ── Derived ──
     const mode = 'advanced'
-    const imageUrl = searchParams.get('image') || sessionStorage.getItem('canvasEditorImage') || ''
+    const imageUrl = getCorsUrl(searchParams.get('image') || sessionStorage.getItem('canvasEditorImage') || '')
     const canvasWidth = parseInt(searchParams.get('w')) || 1080
     const canvasHeight = parseInt(searchParams.get('h')) || 1080
 
@@ -220,7 +237,7 @@ function CanvasShellInner() {
 
                 // Load image if present
                 if (imageUrl) {
-                    fabric.FabricImage.fromURL(imageUrl, { crossOrigin: 'anonymous' }).then(img => {
+                    fabric.FabricImage.fromURL(getCorsUrl(imageUrl), { crossOrigin: 'anonymous' }).then(img => {
                         const maxDim = Math.min(containerW * 0.8, containerH * 0.8)
                         const imgScale = Math.min(maxDim / img.width, maxDim / img.height, 1)
                         img.set({
@@ -417,7 +434,7 @@ function CanvasShellInner() {
                 let imgUrl = ev.target.result
                 try {
                     const { url } = await mediaAPI.upload({ imageData: ev.target.result, folder: 'canvas-layers' })
-                    imgUrl = url
+                    imgUrl = getCorsUrl(url)
                 } catch (e) { console.warn('S3 upload failed, using base64:', e.message) }
                 fabric.FabricImage.fromURL(imgUrl, { crossOrigin: 'anonymous' }).then(img => {
                     const maxSize = fc.width * 0.5
@@ -444,7 +461,7 @@ function CanvasShellInner() {
     // ── Add logo ──
     const addLogo = useCallback(() => {
         const fc = fabricRef.current
-        const logoUrl = activeBrand?.dna?.logo?.url
+        const logoUrl = getCorsUrl(activeBrand?.dna?.logo?.url)
         if (!fc || !logoUrl) { showToast('⚠️ No brand logo found'); return }
         fabric.FabricImage.fromURL(logoUrl, { crossOrigin: 'anonymous' }).then(img => {
             const maxSize = fc.width * 0.15
@@ -533,7 +550,7 @@ function CanvasShellInner() {
     const addImageUrlToCanvas = useCallback((url, name) => {
         const fc = fabricRef.current
         if (!fc || !url) return Promise.resolve()
-        return fabric.FabricImage.fromURL(url, { crossOrigin: 'anonymous' }).then(img => {
+        return fabric.FabricImage.fromURL(getCorsUrl(url), { crossOrigin: 'anonymous' }).then(img => {
             const maxSize = fc.width * 0.4
             const scale = maxSize / Math.max(img.width, img.height)
             img.set({
@@ -574,7 +591,7 @@ function CanvasShellInner() {
     const addStickerToCanvas = useCallback((name) => {
         const fc = fabricRef.current; if (!fc) return
         const url = `https://api.iconify.design/lucide:${name}.svg?width=80&height=80&color=%23818cf8`
-        fabric.FabricImage.fromURL(url, { crossOrigin: 'anonymous' }).then(img => {
+        fabric.FabricImage.fromURL(getCorsUrl(url), { crossOrigin: 'anonymous' }).then(img => {
             img.set({ left: fc.width / 2, top: fc.height / 2, originX: 'center', originY: 'center', customName: name, id: `sticker-${Date.now()}` })
             fc.add(img); fc.setActiveObject(img); fc.renderAll(); saveHistory()
         }).catch(() => showToast('⚠️ Failed to load sticker'))

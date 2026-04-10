@@ -11,7 +11,20 @@ import './CanvasEditor.css'
 import StoryboardBoard from './StoryboardBoard'
 
 
-// ── Platform Size Presets ──
+// ═══════════════════════════════════════════════════════════════
+// UTILS
+// ═══════════════════════════════════════════════════════════════
+/**
+ * Appends a cache-busting parameter to S3/External URLs to ensure fresh CORS headers.
+ */
+const getCorsUrl = (url) => {
+    if (!url || typeof url !== 'string') return url
+    if (url.includes('amazonaws.com') || url.includes('googleusercontent.com') || url.includes('pixabay.com') || url.includes('unsplash.com')) {
+        const separator = url.includes('?') ? '&' : '?'
+        return `${url}${separator}cors=1`
+    }
+    return url
+}
 
 const PRESETS = [
     { id: 'ig-post', label: 'IG Post', icon: 'photo_camera', w: 1080, h: 1080 },
@@ -285,7 +298,7 @@ function CanvasEditorInner() {
     const [elementCategory, setElementCategory] = useState(null) // null=all or key from ELEMENT_CATEGORIES
 
     // Image source — read from sessionStorage (avoids 431 errors with large base64 data URIs)
-    const imageUrl = searchParams.get('image') || sessionStorage.getItem('canvasEditorImage') || ''
+    const imageUrl = getCorsUrl(searchParams.get('image') || sessionStorage.getItem('canvasEditorImage') || '')
     const canvasWidth = parseInt(searchParams.get('w')) || 1080
     const canvasHeight = parseInt(searchParams.get('h')) || 1080
 
@@ -434,7 +447,7 @@ function CanvasEditorInner() {
                 // Load the image
                 if (imageUrl) {
                     console.log('Canvas init: loading image...', imageUrl.substring(0, 80))
-                    fabric.FabricImage.fromURL(imageUrl, { crossOrigin: 'anonymous' }).then(img => {
+                    fabric.FabricImage.fromURL(getCorsUrl(imageUrl), { crossOrigin: 'anonymous' }).then(img => {
                         // Scale and center image in the canvas
                         const maxDim = Math.min(containerW * 0.8, containerH * 0.8)
                         const imgScale = Math.min(maxDim / img.width, maxDim / img.height, 1)
@@ -762,7 +775,7 @@ function CanvasEditorInner() {
             return
         }
 
-        fabric.FabricImage.fromURL(logoUrl, { crossOrigin: 'anonymous' }).then(img => {
+        fabric.FabricImage.fromURL(getCorsUrl(logoUrl), { crossOrigin: 'anonymous' }).then(img => {
             const maxSize = fc.width * 0.15
             const scale = maxSize / Math.max(img.width, img.height)
             img.set({
@@ -801,7 +814,7 @@ function CanvasEditorInner() {
                     const { url } = await mediaAPI.upload({ imageData: ev.target.result, folder: 'canvas-layers' })
                     imgUrl = url
                 } catch (e) { console.warn('S3 upload failed for canvas layer, using base64:', e.message) }
-                fabric.FabricImage.fromURL(imgUrl, { crossOrigin: 'anonymous' }).then(img => {
+                fabric.FabricImage.fromURL(getCorsUrl(imgUrl), { crossOrigin: 'anonymous' }).then(img => {
                     const maxSize = fc.width * 0.5
                     const scale = maxSize / Math.max(img.width, img.height)
                     img.set({
@@ -981,7 +994,7 @@ function CanvasEditorInner() {
         objects.forEach(o => fc.remove(o))
         
         // Add merged image
-        fabric.FabricImage.fromURL(dataUrl, { crossOrigin: 'anonymous' }).then(img => {
+        fabric.FabricImage.fromURL(getCorsUrl(dataUrl), { crossOrigin: 'anonymous' }).then(img => {
             img.set({ left: bounds.left, top: bounds.top })
             img._customName = 'Merged Layer'
             fc.add(img)
@@ -1442,7 +1455,7 @@ function CanvasEditorInner() {
         if (!fc) return
         showToast('⏳ Loading photo...')
         try {
-            const img = await fabric.FabricImage.fromURL(photo.small || photo.regular, { crossOrigin: 'anonymous' })
+            const img = await fabric.FabricImage.fromURL(getCorsUrl(photo.small || photo.regular), { crossOrigin: 'anonymous' })
             const maxDim = Math.min(fc._logicalWidth, fc._logicalHeight) * 0.5
             const scale = Math.min(maxDim / img.width, maxDim / img.height)
             img.set({ left: 50, top: 50, scaleX: scale, scaleY: scale })
@@ -1557,7 +1570,7 @@ function CanvasEditorInner() {
         if (!fc) return
         showToast('⏳ Loading texture...')
         try {
-            const img = await fabric.FabricImage.fromURL(texture.web || texture.large, { crossOrigin: 'anonymous' })
+            const img = await fabric.FabricImage.fromURL(getCorsUrl(texture.web || texture.large), { crossOrigin: 'anonymous' })
             // Scale to fill canvas as overlay
             const scaleX = fc.width / img.width
             const scaleY = fc.height / img.height
@@ -1627,7 +1640,7 @@ function CanvasEditorInner() {
         showToast('⏳ Loading brand asset...')
         try {
             if (asset.type === 'image') {
-                const img = await fabric.FabricImage.fromURL(asset.url, { crossOrigin: 'anonymous' })
+                const img = await fabric.FabricImage.fromURL(getCorsUrl(asset.url), { crossOrigin: 'anonymous' })
                 const maxDim = Math.min(fc.width, fc.height) * 0.3
                 const scale = Math.min(maxDim / img.width, maxDim / img.height)
                 img.set({ left: 100, top: 100, scaleX: scale, scaleY: scale })
@@ -1913,7 +1926,7 @@ function CanvasEditorInner() {
             }
 
             // AUTO-APPLY: Replace entire canvas content directly
-            const img = await fabric.FabricImage.fromURL(imageUrl, { crossOrigin: 'anonymous' })
+            const img = await fabric.FabricImage.fromURL(getCorsUrl(imageUrl), { crossOrigin: 'anonymous' })
             const allObjects = fc.getObjects().filter(o => o.id !== 'artboard').slice()
             allObjects.forEach(o => fc.remove(o))
             const scaleX = fc.width / img.width
@@ -1962,7 +1975,7 @@ function CanvasEditorInner() {
             const compositedUrl = await compositeWithMask(canvasDataUrl, data.imageUrl, maskDataUrl)
 
             // AUTO-APPLY: Replace canvas content directly (no preview step)
-            const img = await fabric.FabricImage.fromURL(compositedUrl, { crossOrigin: 'anonymous' })
+            const img = await fabric.FabricImage.fromURL(getCorsUrl(compositedUrl), { crossOrigin: 'anonymous' })
             const allObjects = fc.getObjects().slice()
             allObjects.forEach(o => fc.remove(o))
             const scaleX = fc.width / img.width
@@ -2012,7 +2025,7 @@ function CanvasEditorInner() {
             }
 
             // AUTO-APPLY: Replace canvas content directly (no preview step)
-            const img = await fabric.FabricImage.fromURL(finalUrl, { crossOrigin: 'anonymous' })
+            const img = await fabric.FabricImage.fromURL(getCorsUrl(finalUrl), { crossOrigin: 'anonymous' })
             const allObjects = fc.getObjects().slice()
             allObjects.forEach(o => fc.remove(o))
             const scaleX = fc.width / img.width
@@ -2047,7 +2060,7 @@ function CanvasEditorInner() {
             if (data.error) throw new Error(data.error)
 
             // AUTO-APPLY: Replace canvas content directly
-            const img = await fabric.FabricImage.fromURL(data.imageUrl, { crossOrigin: 'anonymous' })
+            const img = await fabric.FabricImage.fromURL(getCorsUrl(data.imageUrl), { crossOrigin: 'anonymous' })
             const allObjects = fc.getObjects().slice()
             allObjects.forEach(o => fc.remove(o))
             const scaleX = fc.width / img.width
@@ -2070,7 +2083,7 @@ function CanvasEditorInner() {
         if (resultData.type === 'image' && resultData.imageUrl) {
             showToast('⏳ Applying AI result...')
             try {
-                const img = await fabric.FabricImage.fromURL(resultData.imageUrl, { crossOrigin: 'anonymous' })
+                const img = await fabric.FabricImage.fromURL(getCorsUrl(resultData.imageUrl), { crossOrigin: 'anonymous' })
                 if (resultData.mode === 'inpaint') {
                     // INPAINT MODE: Replace entire canvas content with composited result
                     // Remove all existing objects (the composited image already contains everything)
@@ -2569,7 +2582,7 @@ function CanvasEditorInner() {
         ctx.fillText(data.substring(0, 30), size/2, size - 2)
 
         const dataUrl = qrCanvas.toDataURL('image/png')
-        fabric.FabricImage.fromURL(dataUrl, { crossOrigin: 'anonymous' }).then(img => {
+        fabric.FabricImage.fromURL(getCorsUrl(dataUrl), { crossOrigin: 'anonymous' }).then(img => {
             const scale = Math.min(fc.width, fc.height) * 0.3 / size
             img.set({
                 left: fc.width / 2, top: fc.height / 2,
@@ -2957,7 +2970,7 @@ function CanvasEditorInner() {
             // If background image was generated, add it
             if (data.backgroundImage) {
                 try {
-                    const bgImg = await fabric.FabricImage.fromURL(data.backgroundImage, { crossOrigin: 'anonymous' })
+                    const bgImg = await fabric.FabricImage.fromURL(getCorsUrl(data.backgroundImage), { crossOrigin: 'anonymous' })
                     const imgScale = Math.max(fc.width / bgImg.width, fc.height / bgImg.height)
                     bgImg.set({
                         scaleX: imgScale, scaleY: imgScale,
@@ -3072,7 +3085,7 @@ function CanvasEditorInner() {
             if (data.error) throw new Error(data.error)
             // Add to canvas
             if (!fc) return
-            const img = await fabric.FabricImage.fromURL(data.imageUrl, { crossOrigin: 'anonymous' })
+            const img = await fabric.FabricImage.fromURL(getCorsUrl(data.imageUrl), { crossOrigin: 'anonymous' })
             const scale = Math.min(fc.width / img.width, fc.height / img.height) * 0.8
             img.set({ left: (fc.width - img.width * scale) / 2, top: (fc.height - img.height * scale) / 2, scaleX: scale, scaleY: scale })
             img._customName = 'AI Generated'
@@ -3087,7 +3100,7 @@ function CanvasEditorInner() {
     const addImageUrlToCanvas = useCallback(async (url, label) => {
         try {
             const fc = fabricRef.current; if (!fc) return
-            const img = await fabric.FabricImage.fromURL(url, { crossOrigin: 'anonymous' })
+            const img = await fabric.FabricImage.fromURL(getCorsUrl(url), { crossOrigin: 'anonymous' })
             // Constrain image to max 400px and ensure it fits on canvas
             const maxDim = 400
             const scale = Math.min(maxDim / img.width, maxDim / img.height, 1)
@@ -3212,7 +3225,7 @@ function CanvasEditorInner() {
                     const logoUrl = activeBrand?.dna?.logo?.url
                     if (!logoUrl) return 'No brand logo available'
                     try {
-                        const img = await fabric.FabricImage.fromURL(logoUrl, { crossOrigin: 'anonymous' })
+                        const img = await fabric.FabricImage.fromURL(getCorsUrl(logoUrl), { crossOrigin: 'anonymous' })
                         const scaleFactor = args.scale || 0.15
                         const s = (fc.width * scaleFactor) / Math.max(img.width, img.height)
                         img.set({ scaleX: s, scaleY: s, customName: 'Brand Logo', id: `logo-${Date.now()}` })
@@ -3499,7 +3512,7 @@ function CanvasEditorInner() {
                             const data = await canvasAssets.aiGenerate({ prompt: referenceImagePrompt, size: '512x512' })
                             if (data.imageUrl) {
                                 generatedThumbUrl = data.imageUrl;
-                                const img = await fabric.FabricImage.fromURL(data.imageUrl, { crossOrigin: 'anonymous' })
+                                const img = await fabric.FabricImage.fromURL(getCorsUrl(data.imageUrl), { crossOrigin: 'anonymous' })
                                 const imgSize = 120
                                 const imgScale = imgSize / Math.max(img.width, img.height)
                                 img.set({
@@ -5682,7 +5695,7 @@ function CanvasEditorInner() {
                                 // Image
                                 if (scene.imageUrl) {
                                     try {
-                                        const img = await fabric.FabricImage.fromURL(scene.imageUrl, { crossOrigin: 'anonymous' })
+                                        const img = await fabric.FabricImage.fromURL(getCorsUrl(scene.imageUrl), { crossOrigin: 'anonymous' })
                                         const scale = Math.min(imgAreaW / img.width, imgAreaH / img.height)
                                         const sw = img.width * scale
                                         const sh = img.height * scale
