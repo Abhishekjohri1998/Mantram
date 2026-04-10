@@ -497,7 +497,26 @@ router.get('/jobs/:jobId', protect, async (req, res) => {
             job.result.creative.thumbnailUrl = await getSignedUrlIfNeeded(job.result.creative.thumbnailUrl);
         }
 
+        // Sign URL if it's an S3 URL
+        if (job && job.imageUrl) {
+            job.imageUrl = await getSignedUrlIfNeeded(job.imageUrl);
+        }
+        if (job && job.result?.creative) {
+            if (job.result.creative.imageUrl) job.result.creative.imageUrl = await getSignedUrlIfNeeded(job.result.creative.imageUrl);
+            if (job.result.creative.thumbnailUrl) job.result.creative.thumbnailUrl = await getSignedUrlIfNeeded(job.result.creative.thumbnailUrl);
+        }
+
+        // Sign URL if it's an S3 URL
+        if (job && job.imageUrl) {
+            job.imageUrl = await getSignedUrlIfNeeded(job.imageUrl);
+        }
+        if (job && job.result?.creative) {
+            if (job.result.creative.imageUrl) job.result.creative.imageUrl = await getSignedUrlIfNeeded(job.result.creative.imageUrl);
+            if (job.result.creative.thumbnailUrl) job.result.creative.thumbnailUrl = await getSignedUrlIfNeeded(job.result.creative.thumbnailUrl);
+        }
+
         res.json({ success: true, job });
+        console.log(`[JOBS] Returned polling status for job ${req.params.jobId}`);
     } catch (error) {
         console.error('❌ [API] GET /jobs/:id error:', error);
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
@@ -1872,6 +1891,7 @@ CRITICAL RULES:
             if (imageUrl.startsWith('data:image/')) {
                 try {
                     imageUrl = await uploadToS3(imageUrl, `vto/${brandId || 'default'}/${Date.now()}-preview.png`);
+                    imageUrl = await getSignedUrlIfNeeded(imageUrl);
                 } catch (s3Err) {
                     console.warn('⚠️ VTO Preview S3 upload failed, returning base64:', s3Err.message);
                 }
@@ -2328,7 +2348,7 @@ router.post('/upscale', protect, async (req, res) => {
 
         res.json({
             success: true,
-            imageUrl: upscaledUrl,
+            imageUrl: await getSignedUrlIfNeeded(upscaledUrl),
             scale,
             resolution: scale === '2k' ? '2048px' : '4096px',
             method,
@@ -2489,7 +2509,8 @@ CRITICAL RULES:
         req.user.updateOne({ $inc: { 'usage.creativesGenerated': 1 } }).catch(() => {});
 
         console.log(`✅ Lifestyle Mockup generated — responding immediately`);
-        res.json({ success: true, imageUrl: rawImageUrl, model: genResult.model });
+        const finalSignedUrl = await getSignedUrlIfNeeded(rawImageUrl);
+        res.json({ success: true, imageUrl: finalSignedUrl, model: genResult.model });
 
         // Background S3 upload + DB update
         (async () => {
@@ -2804,7 +2825,8 @@ STRICT RULES: No text, no people, no faces, no products, no logos, no watermarks
         // Register job and respond immediately — background processing continues async
         const carouselId = randomUUID();
         carouselJobs.set(carouselId, { status: 'generating', panels: [], panoramicUrl: panoramicResult.imageUrl, error: null, updatedAt: Date.now() });
-        res.json({ success: true, carouselId, status: 'processing', message: `Panoramic background ready. Splitting into ${slideCount} panels...`, panoramicUrl: panoramicResult.imageUrl, slideCount, provider: panoramicResult.provider });
+        const finalSignedPano = await getSignedUrlIfNeeded(panoramicResult.imageUrl);
+        res.json({ success: true, carouselId, status: 'processing', message: `Panoramic background ready. Splitting into ${slideCount} panels...`, panoramicUrl: finalSignedPano, slideCount, provider: panoramicResult.provider });
 
         // ── Async: Split panoramic, composite products, upload ──
         (async () => {
@@ -2983,11 +3005,14 @@ router.get('/carousel/:carouselId', protect, async (req, res) => {
         // Check in-memory Map first (real-time updates during processing)
         const liveJob = carouselJobs.get(carouselId);
         if (liveJob) {
+            const signedPanels = await Promise.all((liveJob.panels || []).map(p => getSignedUrlIfNeeded(p)));
+            const signedPano = await getSignedUrlIfNeeded(liveJob.panoramicUrl || '');
+            
             return res.json({
                 success: true,
                 status: liveJob.status,
-                panels: liveJob.panels || [],
-                panoramicUrl: liveJob.panoramicUrl || '',
+                panels: signedPanels,
+                panoramicUrl: signedPano,
                 error: liveJob.error || null,
             });
         }
@@ -3002,11 +3027,14 @@ router.get('/carousel/:carouselId', protect, async (req, res) => {
             return res.json({ success: true, status: 'processing', panels: [], panoramicUrl: '' });
         }
 
+        const signedPanels = await Promise.all((creative.aiMeta?.panels || []).map(p => getSignedUrlIfNeeded(p)));
+        const signedPano = await getSignedUrlIfNeeded(creative.aiMeta?.panoramicUrl || '');
+
         res.json({
             success: true,
             status: creative.aiMeta?.processingStatus || 'ready',
-            panels: creative.aiMeta?.panels || [],
-            panoramicUrl: creative.aiMeta?.panoramicUrl || '',
+            panels: signedPanels,
+            panoramicUrl: signedPano,
             slideCount: creative.aiMeta?.slideCount || 0,
             creativeId: creative._id,
         });

@@ -9,7 +9,7 @@
  *   const { url } = await mediaAPI.upload({ imageData: 'data:image/png;base64,...', folder: 'refs' })
  */
 import { Router } from 'express';
-import { uploadToS3, mirrorUrlToS3 } from '../utils/s3.js';
+import { uploadToS3, mirrorUrlToS3, getSignedUrlIfNeeded } from '../utils/s3.js';
 import { protect } from '../middleware/auth.js';
 import crypto from 'crypto';
 
@@ -34,7 +34,8 @@ router.post('/upload', protect, async (req, res) => {
             
             const s3Key = `${folder}/${req.user._id}/${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
             const s3Url = await mirrorUrlToS3(imageData, s3Key);
-            return res.json({ success: !!s3Url, url: s3Url || imageData });
+            const finalUrl = await getSignedUrlIfNeeded(s3Url || imageData);
+            return res.json({ success: !!s3Url, url: finalUrl });
         }
 
         // Validate base64 data URI format
@@ -54,10 +55,11 @@ router.post('/upload', protect, async (req, res) => {
         console.log(`📤 Media upload: ${Math.round(imageData.length / 1024)}KB → s3://${s3Key}`);
 
         const s3Url = await uploadToS3(imageData, s3Key, mimeType);
+        const finalUrl = await getSignedUrlIfNeeded(s3Url);
 
         console.log(`✅ Media uploaded: ${s3Url}`);
 
-        res.json({ success: true, url: s3Url });
+        res.json({ success: true, url: finalUrl });
     } catch (error) {
         console.error('Media upload error:', error);
         res.status(500).json({ success: false, error: `Upload failed: ${error.message}` });
