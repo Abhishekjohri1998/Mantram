@@ -934,7 +934,7 @@ When calling create_script_block, use this structure:
                 toolHandlers: {}, // No server-side tools needed — research done pre-flight
                 temperature: 0.5,
                 maxTokens: 8192,
-                model: 'claude-3-opus-20240229',
+                model: 'claude-3-5-sonnet-20240620',
             });
 
             // Attach reference images to response
@@ -976,10 +976,18 @@ Respond ONLY with valid JSON: { "reply": "friendly message", "actions": [{ "tool
                     provider: fallbackResult.provider,
                     generationTime: Date.now() - startTime,
                 });
-            } catch {
+            } catch (parseErr) {
+                console.warn('⚠️ Fallback JSON parsing failed:', parseErr.message);
+                
+                // If text contains a JSON block, don't show it to the user. Provide a clean apology.
+                let cleanReply = fallbackResult.text || 'I can help with your canvas design. Could you be more specific?';
+                if (cleanReply.includes('```json') || cleanReply.includes('"actions":')) {
+                   cleanReply = "I planned some updates for your canvas, but encountered an unexpected error formatting them. Could you try asking me to make that change again?";
+                }
+
                 return res.json({
                     success: true,
-                    reply: fallbackResult.text || 'I can help with your canvas design. Could you be more specific?',
+                    reply: cleanReply,
                     toolCalls: [],
                     fallback: true,
                     provider: fallbackResult.provider,
