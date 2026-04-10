@@ -14,7 +14,7 @@ import { requireCredits, refundCredits } from '../middleware/credits.js';
 import { addWatermark } from '../utils/watermark.js';
 import { getSetting } from '../models/SystemSettings.js';
 
-import { uploadToS3 } from '../utils/s3.js';
+import { uploadToS3, getSignedUrlIfNeeded } from '../utils/s3.js';
 import { overlayLogo, fetchImageBuffer } from '../utils/logoOverlay.js';
 import { GoogleGenAI } from '@google/genai';
 import { safeErrorMessage } from '../utils/safeError.js';
@@ -466,7 +466,14 @@ router.get('/jobs', protect, async (req, res) => {
             .limit(20)
             .lean();
 
-        res.json({ success: true, jobs });
+        // Sign S3 URLs before returning to frontend
+        const signedJobs = await Promise.all(jobs.map(async job => ({
+            ...job,
+            imageUrl: await getSignedUrlIfNeeded(job.imageUrl),
+            thumbnailUrl: await getSignedUrlIfNeeded(job.thumbnailUrl)
+        })));
+
+        res.json({ success: true, jobs: signedJobs });
     } catch (error) {
         console.error('❌ [API] GET /api/creatives/jobs error:', error.message);
         console.error('❌ Stack:', error.stack);
@@ -483,6 +490,13 @@ router.get('/jobs/:jobId', protect, async (req, res) => {
               creativeId: 1, result: 1, warnings: 1, createdAt: 1, startedAt: 1, completedAt: 1, steps: 1 }
         ).lean();
         if (!job) return res.status(404).json({ success: false, error: 'Job not found' });
+        // Sign S3 URLs before returning to frontend
+        job.imageUrl = await getSignedUrlIfNeeded(job.imageUrl);
+        if (job.result?.creative) {
+            job.result.creative.imageUrl = await getSignedUrlIfNeeded(job.result.creative.imageUrl);
+            job.result.creative.thumbnailUrl = await getSignedUrlIfNeeded(job.result.creative.thumbnailUrl);
+        }
+
         res.json({ success: true, job });
     } catch (error) {
         console.error('❌ [API] GET /jobs/:id error:', error);
@@ -1509,7 +1523,15 @@ router.get('/', protect, async (req, res) => {
             .lean();
 
         const total = await Creative.countDocuments(filter);
-        res.json({ success: true, creatives, total });
+        
+        // Sign S3 URLs before returning to frontend
+        const signedCreatives = await Promise.all(creatives.map(async c => ({
+            ...c,
+            imageUrl: await getSignedUrlIfNeeded(c.imageUrl),
+            thumbnailUrl: await getSignedUrlIfNeeded(c.thumbnailUrl)
+        })));
+
+        res.json({ success: true, creatives: signedCreatives, total });
     } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
@@ -1661,7 +1683,14 @@ router.get('/image-bank', protect, async (req, res) => {
             delete img.imageUrlPrefix;
         }
 
-        res.json({ success: true, images, total, counts: { uploaded: uploadedCount, generated: generatedCount, all: uploadedCount + generatedCount } });
+        // Sign S3 URLs before returning to frontend
+        const signedImages = await Promise.all(images.map(async img => ({
+            ...img,
+            imageUrl: await getSignedUrlIfNeeded(img.imageUrl),
+            thumbnailUrl: await getSignedUrlIfNeeded(img.thumbnailUrl)
+        })));
+
+        res.json({ success: true, images: signedImages, total, counts: { uploaded: uploadedCount, generated: generatedCount, all: uploadedCount + generatedCount } });
     } catch (error) {
         console.error('📸 image-bank error:', error);
         res.status(500).json({ success: false, error: safeErrorMessage(error) });

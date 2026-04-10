@@ -933,7 +933,7 @@ When calling create_script_block, use this structure:
                 tools: clientTools,
                 toolHandlers: {}, // No server-side tools needed — research done pre-flight
                 temperature: 0.5,
-                maxTokens: 8192,
+                maxTokens: 4096,
                 model: 'claude-3-5-sonnet-20240620',
             });
 
