@@ -33,7 +33,7 @@ export function inspectCrawlDataset(pages = []) {
   const okPages = status200.length;
 
   const empty200 = status200.filter(p => (!p.wordCount || p.wordCount === 0) && (!p.contentLength || p.contentLength === 0));
-  const zeroTime200 = status200.filter(p => p.responseTime === 0 || p.loadTime === 0);
+  const zeroTime200 = status200.filter(p => (p.responseTime === 0 || p.loadTime === 0 || p.responseTimeMs === 0) && (p.responseTime !== undefined || p.loadTime !== undefined || p.responseTimeMs !== undefined));
 
   const quality = {
     totalPages,

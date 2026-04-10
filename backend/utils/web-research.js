@@ -1572,8 +1572,12 @@ export async function researchDomain(baseUrl, options = {}) {
                     const chunk = urlsToReCrawl.slice(i, i + N_TABS);
                     const chunkResults = await Promise.all(chunk.map(async (url, idx) => {
                         const tab = tabs[idx % tabs.length];
+                        const start = Date.now();
                         try {
-                            await tab.goto(url, { waitUntil: 'networkidle', timeout: 15000 });
+                            const response = await tab.goto(url, { waitUntil: 'networkidle', timeout: 15000 });
+                            const responseTimeMs = Date.now() - start;
+                            const statusCode = response?.status() || 200;
+
                             await tab.waitForSelector('h1', { timeout: 8000 }).catch(() => {}); // Wait for H1 to render
 
                             // CHECK FOR CLOUDFLARE CHALLENGE — skip if page is a CF interstitial
@@ -1590,31 +1594,82 @@ export async function researchDomain(baseUrl, options = {}) {
 
                             const pageData = await tab.evaluate(() => {
                                 const title = document.title || '';
-                                const metaDesc = document.querySelector('meta[name="description"]')?.content || '';
-                                const h1 = Array.from(document.querySelectorAll('h1')).map(h => h.textContent?.trim()).filter(t => t && t.length > 0);
-                                const h2 = Array.from(document.querySelectorAll('h2')).map(h => h.textContent?.trim()).filter(t => t && t.length > 0);
+                                const meta = {};
+                                document.querySelectorAll('meta').forEach(m => {
+                                    const name = m.getAttribute('name') || m.getAttribute('property');
+                                    const content = m.getAttribute('content');
+                                    if (name && content) meta[name.toLowerCase()] = content;
+                                });
+
+                                const headings = [];
+                                [1,2,3,4,5,6].forEach(level => {
+                                    document.querySelectorAll('h' + level).forEach(h => {
+                                        headings.push({ level, text: h.textContent?.trim() || '' });
+                                    });
+                                });
+
+                                const jsonLd = [];
+                                document.querySelectorAll('script[type="application/ld+json"]').forEach(s => {
+                                    try { jsonLd.push(JSON.parse(s.textContent)); } catch {}
+                                });
+
                                 const bodyText = document.body?.innerText || '';
                                 const wordCount = bodyText.split(/\s+/).filter(w => w.length > 1).length;
+                                
                                 const imgs = document.querySelectorAll('img');
                                 let imgTotal = 0, imgNoAlt = 0;
                                 const srcsMissingAlt = [];
                                 imgs.forEach(img => {
                                     const src = img.src || img.getAttribute('src') || '';
                                     if (!src || src.startsWith('data:') || src === '#') return;
-                                    if (img.width < 3 || img.height < 3) return;
+                                    const rect = img.getBoundingClientRect();
+                                    if (rect.width < 3 || rect.height < 3) return;
                                     imgTotal++;
                                     if (!(img.alt || '').trim()) { imgNoAlt++; srcsMissingAlt.push(src); }
                                 });
-                                const links = [];
+
+                                const links = { internal: [], external: [] };
+                                const baseHost = location.hostname.replace(/^www\./, '');
                                 document.querySelectorAll('a[href]').forEach(a => {
-                                    try { const href = new URL(a.href, location.origin).href; if (href.startsWith(location.origin)) links.push(href); } catch {}
+                                    try {
+                                        const url = new URL(a.href, location.href);
+                                        const host = url.hostname.replace(/^www\./, '');
+                                        if (host === baseHost) links.internal.push(url.href);
+                                        else links.external.push(url.href);
+                                    } catch {}
                                 });
+
                                 const canonical = document.querySelector('link[rel="canonical"]')?.href || '';
-                                return { title, metaDesc, h1, h2, wordCount, imgTotal, imgNoAlt, srcsMissingAlt, links, canonical, bodyText: bodyText.substring(0, 500) };
+                                
+                                const hreflang = [];
+                                document.querySelectorAll('link[rel="alternate"][hreflang]').forEach(l => {
+                                    hreflang.push({ lang: l.getAttribute('hreflang'), url: l.href });
+                                });
+
+                                const mixedContent = [];
+                                if (location.protocol === 'https:') {
+                                    document.querySelectorAll('img[src^="http:"], script[src^="http:"], link[href^="http:"]').forEach(el => {
+                                        mixedContent.push(el.src || el.href);
+                                    });
+                                }
+
+                                const cssTotal = document.querySelectorAll('link[rel="stylesheet"]').length;
+                                const jsTotal = document.querySelectorAll('script[src]').length;
+
+                                return { 
+                                    title, meta, headings, jsonLd, wordCount, 
+                                    imgTotal, imgNoAlt, srcsMissingAlt, links, canonical, 
+                                    bodyText: bodyText.substring(0, 10000), // Larger snippet for duplicate detection
+                                    hreflang, mixedContent,
+                                    langAttr: document.documentElement.lang || '',
+                                    resources: { cssTotal, jsTotal },
+                                    viewport: meta['viewport'] || '',
+                                    htmlLength: document.documentElement.outerHTML.length
+                                };
                             });
 
                             // Double-check: skip pages with CF challenge H1
-                            const h1Lower = (pageData.h1?.[0] || '').toLowerCase();
+                            const h1Lower = (pageData.headings.find(h => h.level === 1)?.text || '').toLowerCase();
                             if (h1Lower.includes('verify') || h1Lower.includes('checking') ||
                                 h1Lower.includes('just a moment') || h1Lower.includes('please wait')) {
                                 return null; // CF challenge in body
@@ -1626,22 +1681,64 @@ export async function researchDomain(baseUrl, options = {}) {
                             const titleLwr = (pageData.title || '').toLowerCase();
                             const isSoft404 = titleLwr === '404' || titleLwr === '404 not found' ||
                                 titleLwr === 'page not found' || titleLwr === 'not found' ||
-                                (pageData.h1.length === 1 && /^(404|page not found|not found)$/i.test(pageData.h1[0]));
+                                (pageData.headings.filter(h => h.level === 1).some(h => /^(404|page not found|not found)$/i.test(h.text)));
+
+                            // Process robots
+                            const robotsStr = (pageData.meta['robots'] || '').toLowerCase();
+                            const metaRobots = {
+                                raw: robotsStr,
+                                noindex: robotsStr.includes('noindex'),
+                                nofollow: robotsStr.includes('nofollow'),
+                                hasDirectives: robotsStr.length > 0
+                            };
+
+                            // Validate hierarchy
+                            let lastLevel = 0;
+                            const skippedLevels = [];
+                            for (const h of pageData.headings) {
+                                if (h.level > lastLevel + 1 && lastLevel > 0) skippedLevels.push({ from: `H${lastLevel}`, to: `H${h.level}` });
+                                lastLevel = h.level;
+                            }
 
                             return {
                                 url, success: true, isSoft404, jsRendered: true,
-                                statusCode: 200, responseTimeMs: 0, pageSizeBytes: 0, pageSizeKB: 0,
-                                title: pageData.title, metaDescription: pageData.metaDesc, canonical: pageData.canonical,
-                                headings: [...pageData.h1.map(t => ({ level: 1, text: t })), ...pageData.h2.map(t => ({ level: 2, text: t }))],
-                                h1: pageData.h1, h2: pageData.h2, h3: [],
+                                statusCode, responseTimeMs, 
+                                pageSizeBytes: pageData.htmlLength, 
+                                pageSizeKB: Math.round(pageData.htmlLength / 1024),
+                                title: pageData.title, 
+                                metaDescription: pageData.meta['description'] || '',
+                                canonical: pageData.canonical,
+                                headings: pageData.headings,
+                                h1: pageData.headings.filter(h => h.level === 1).map(h => h.text),
+                                h2: pageData.headings.filter(h => h.level === 2).map(h => h.text),
+                                h3: pageData.headings.filter(h => h.level === 3).map(h => h.text),
+                                jsonLd: pageData.jsonLd,
+                                hasSchemaOrg: pageData.jsonLd.length > 0,
+                                schemaTypes: pageData.jsonLd.map(s => s['@type']).filter(Boolean),
                                 images: { total: pageData.imgTotal, withAlt: pageData.imgTotal - pageData.imgNoAlt, withoutAlt: pageData.imgNoAlt, srcsMissingAlt: pageData.srcsMissingAlt },
-                                wordCount: pageData.wordCount, contentSnippet: pageData.bodyText, bodyTextFull: pageData.bodyText,
-                                textToHtmlRatio: 50, links: { internal: pageData.links, external: [] },
-                                internalLinkCount: pageData.links.length, externalLinkCount: 0,
-                                titleLength: (pageData.title || '').length, metaDescLength: (pageData.metaDesc || '').length,
-                                viewport: 'width=device-width',
+                                wordCount: pageData.wordCount, 
+                                contentSnippet: pageData.bodyText.substring(0, 500), 
+                                bodyTextFull: pageData.bodyText,
+                                textToHtmlRatio: Math.round((pageData.bodyText.length / pageData.htmlLength) * 100) || 50,
+                                links: pageData.links,
+                                internalLinkCount: pageData.links.internal.length,
+                                externalLinkCount: pageData.links.external.length,
+                                hreflang: pageData.hreflang,
+                                hasHreflang: pageData.hreflang.length > 0,
+                                mixedContent: { hasMixed: pageData.mixedContent.length > 0, count: pageData.mixedContent.length },
+                                langAttr: pageData.langAttr,
+                                hasLangAttr: !!pageData.langAttr,
+                                resources: { ...pageData.resources, totalResources: pageData.resources.cssTotal + pageData.resources.jsTotal },
+                                headingHierarchy: { valid: skippedLevels.length === 0, skippedLevels },
+                                metaRobots,
+                                titleLength: (pageData.title || '').length,
+                                metaDescLength: (pageData.meta['description'] || '').length,
+                                viewport: pageData.viewport || 'width=device-width',
+                                urlLength: url.length,
+                                urlTooLong: url.length > 75,
                             };
-                        } catch {
+                        } catch (e) {
+                            console.error(`🖥️  Playwright re-crawl fail for ${url}: ${e.message}`);
                             return null;
                         }
                     }));
