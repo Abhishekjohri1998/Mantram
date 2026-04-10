@@ -14,17 +14,7 @@ import StoryboardBoard from './StoryboardBoard'
 // ═══════════════════════════════════════════════════════════════
 // UTILS
 // ═══════════════════════════════════════════════════════════════
-/**
- * Appends a cache-busting parameter to S3/External URLs to ensure fresh CORS headers.
- */
-const getCorsUrl = (url) => {
-    if (!url || typeof url !== 'string') return url
-    if (url.includes('amazonaws.com') || url.includes('googleusercontent.com') || url.includes('pixabay.com') || url.includes('unsplash.com')) {
-        const separator = url.includes('?') ? '&' : '?'
-        return `${url}${separator}cors=1`
-    }
-    return url
-}
+
 
 const PRESETS = [
     { id: 'ig-post', label: 'IG Post', icon: 'photo_camera', w: 1080, h: 1080 },

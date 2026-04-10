@@ -11,7 +11,7 @@ import Product from '../models/Product.js';
 import Brand from '../models/Brand.js';
 import { getOrchestrator } from '../agents/orchestrator.js';
 import { safeErrorMessage } from '../utils/safeError.js';
-import { mirrorUrlToS3 } from '../utils/s3.js';
+import { mirrorUrlToS3, getSignedUrlIfNeeded } from '../utils/s3.js';
 import { setMaxListeners } from 'events';
 
 const router = Router();
@@ -162,6 +162,22 @@ async function mirrorProductImages(images, brandId, productTitle) {
         const s3Url = await mirrorUrlToS3(img.url, targetKey);
         return s3Url ? { url: s3Url, alt: img.alt || productTitle } : img;
     }));
+}
+
+/**
+ * Sign S3 URLs for all images in a product object
+ */
+async function signProductAssets(product) {
+    if (!product) return null;
+    const p = product.toObject ? product.toObject() : product;
+    
+    if (Array.isArray(p.images)) {
+        for (const img of p.images) {
+            if (img.url) img.url = await getSignedUrlIfNeeded(img.url);
+        }
+    }
+    
+    return p;
 }
 
 // POST /api/products/scan-website — Agentic product sync from brand website
@@ -522,13 +538,15 @@ RULES:
         const sourceLabel = shopifyDetected ? 'Shopify' : 'website';
         console.log(`💾 Created ${created.length} products from ${sourceLabel}, skipped ${skipped.length} duplicates`);
 
+        const signedProducts = await Promise.all(created.map(p => signProductAssets(p)));
+
         res.json({
             success: true,
             message: `${shopifyDetected ? '🛒 Shopify store detected! ' : ''}Found ${rawProducts.length} products. Created ${created.length}, skipped ${skipped.length} duplicates.`,
             productsFound: rawProducts.length,
             productsCreated: created.length,
             productsSkipped: skipped.length,
-            products: created,
+            products: signedProducts,
             source: shopifyDetected ? 'shopify' : 'website',
         });
     } catch (error) {
@@ -675,10 +693,11 @@ RULES:
         }
 
         const matched = selectedIndices.slice(0, limit).map(i => candidates[i]).filter(Boolean);
+        const signedMatched = await Promise.all(matched.map(p => signProductAssets(p)));
 
         res.json({
             success: true,
-            products: matched,
+            products: signedMatched,
             context: searchQuery,
             totalInCatalog: allProducts.length,
         });
@@ -879,7 +898,8 @@ router.post('/', protect, async (req, res) => {
             source: 'manual',
         });
 
-        res.json({ success: true, product });
+        const signedProduct = await signProductAssets(product);
+        res.json({ success: true, product: signedProduct });
     } catch (error) {
         console.error('Product create error:', error);
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
@@ -911,9 +931,11 @@ router.get('/', protect, async (req, res) => {
         const total = await Product.countDocuments(filter);
         const categories = await Product.distinct('category', { user: req.user._id, brand: brandId, status: { $ne: 'archived' } });
 
+        const signedProducts = await Promise.all(products.map(p => signProductAssets(p)));
+
         res.json({
             success: true,
-            products,
+            products: signedProducts,
             total,
             page: parseInt(page),
             pages: Math.ceil(total / parseInt(limit)),
@@ -929,7 +951,8 @@ router.get('/:id', protect, async (req, res) => {
     try {
         const product = await Product.findOne({ _id: req.params.id, user: req.user._id });
         if (!product) return res.status(404).json({ success: false, error: 'Product not found' });
-        res.json({ success: true, product });
+        const signedProduct = await signProductAssets(product);
+        res.json({ success: true, product: signedProduct });
     } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
@@ -1032,7 +1055,8 @@ Industry: ${brand?.dna?.industry || 'General'}`,
             console.warn('AI enrich parse failed:', parseErr.message);
         }
 
-        res.json({ success: true, product });
+        const signedProduct = await signProductAssets(product);
+        res.json({ success: true, product: signedProduct });
     } catch (error) {
         console.error('AI enrich error:', error);
         res.status(500).json({ success: false, error: safeErrorMessage(error) });

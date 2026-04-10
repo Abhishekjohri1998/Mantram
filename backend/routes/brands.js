@@ -11,7 +11,7 @@ import crypto from 'crypto';
 import { getOrchestrator } from '../agents/orchestrator.js';
 import { safeErrorMessage } from '../utils/safeError.js';
 import { mirrorBrandAssets } from '../services/assetMirror.js';
-import { uploadToS3, mirrorUrlToS3 } from '../utils/s3.js';
+import { uploadToS3, mirrorUrlToS3, getSignedUrlIfNeeded } from '../utils/s3.js';
 import redis from '../utils/redisClient.js';
 
 /**
@@ -59,6 +59,50 @@ async function findBrandWithAccess(brandId, userId) {
     });
 }
 
+/**
+ * Sign all S3 URLs in the brand object (DNA assets, images, templates)
+ * to ensure they render correctly in the frontend.
+ */
+async function signBrandAssets(brand) {
+    if (!brand) return null;
+    const b = brand.toObject ? brand.toObject() : brand;
+
+    // Handle DNA assets
+    if (b.dna) {
+        if (b.dna.logo?.url) b.dna.logo.url = await getSignedUrlIfNeeded(b.dna.logo.url);
+        if (b.dna.favicon?.url) b.dna.favicon.url = await getSignedUrlIfNeeded(b.dna.favicon.url);
+        
+        if (Array.isArray(b.dna.brandImages)) {
+            for (const img of b.dna.brandImages) {
+                if (img.url) img.url = await getSignedUrlIfNeeded(img.url);
+                if (img.s3Url) img.s3Url = await getSignedUrlIfNeeded(img.s3Url);
+            }
+        }
+        
+        if (Array.isArray(b.dna.bannerImages)) {
+            for (const img of b.dna.bannerImages) {
+                if (img.url) img.url = await getSignedUrlIfNeeded(img.url);
+            }
+        }
+    }
+
+    // Handle Custom Templates
+    if (Array.isArray(b.customTemplates)) {
+        for (const t of b.customTemplates) {
+            if (t.referenceImageUrl) t.referenceImageUrl = await getSignedUrlIfNeeded(t.referenceImageUrl);
+        }
+    }
+
+    // Handle Custom Categories
+    if (Array.isArray(b.customCategories)) {
+        for (const c of b.customCategories) {
+            if (c.referenceImageUrl) c.referenceImageUrl = await getSignedUrlIfNeeded(c.referenceImageUrl);
+        }
+    }
+
+    return b;
+}
+
 // ═══════════════════════════════════════════════════════════════
 // GET /api/brands — list user's brands
 // By default, excludes archived brands.
@@ -83,7 +127,8 @@ router.get('/', protect, async (req, res) => {
         }
 
         const brands = await Brand.find(query).sort('-updatedAt');
-        res.json({ success: true, brands });
+        const signedBrands = await Promise.all(brands.map(b => signBrandAssets(b)));
+        res.json({ success: true, brands: signedBrands });
     } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
@@ -96,7 +141,8 @@ router.get('/:id', protect, async (req, res) => {
     try {
         const brand = await findBrandWithAccess(req.params.id, req.user._id);
         if (!brand) return res.status(404).json({ success: false, error: 'Brand not found' });
-        res.json({ success: true, brand });
+        const signedBrand = await signBrandAssets(brand);
+        res.json({ success: true, brand: signedBrand });
     } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
@@ -148,9 +194,10 @@ router.post('/', protect, async (req, res) => {
             await mirrorBrandAssets(req.body.dna, tempId);
         }
 
-        const brand = await Brand.create({ ...req.body, user: userId });
+        const brandData = await Brand.create({ ...req.body, user: userId });
         await req.user.updateOne({ $inc: { 'usage.brandsCreated': 1 } });
-        res.status(201).json({ success: true, brand });
+        const signedBrand = await signBrandAssets(brandData);
+        res.status(201).json({ success: true, brand: signedBrand });
     } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
@@ -183,7 +230,8 @@ router.put('/:id', protect, async (req, res) => {
             });
         }
 
-        res.json({ success: true, brand });
+        const signedBrand = await signBrandAssets(brand);
+        res.json({ success: true, brand: signedBrand });
         // Invalidate cache after response — non-blocking
         invalidateBrandCache(req.params.id);
 
@@ -243,7 +291,8 @@ router.put('/:id/dna', protect, async (req, res) => {
             changes: changeDetails,
         });
 
-        res.json({ success: true, brand });
+        const signedBrand = await signBrandAssets(brand);
+        res.json({ success: true, brand: signedBrand });
         invalidateBrandCache(req.params.id);
     } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
@@ -304,7 +353,8 @@ router.put('/:id/knowledge', protect, async (req, res) => {
             changes: { from: currentBrand.dna?.[section], to: data },
         });
 
-        res.json({ success: true, brand });
+        const signedBrand = await signBrandAssets(brand);
+        res.json({ success: true, brand: signedBrand });
         invalidateBrandCache(req.params.id);
     } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
@@ -505,9 +555,10 @@ router.post('/:id/rescan', protect, async (req, res) => {
         const updatedBrand = await Brand.findById(brand._id);
         console.log(`✅ Re-scan complete for "${brand.name}" — ${updateCount} fields updated`);
 
+        const signedBrand = await signBrandAssets(updatedBrand);
         res.json({
             success: true,
-            brand: updatedBrand,
+            brand: signedBrand,
             updates: updateCount,
             message: `Re-scan complete! ${updateCount} fields refreshed.`,
         });
@@ -583,7 +634,8 @@ router.put('/:id/status', protect, requireBrandOwner, async (req, res) => {
             summary: `Brand ${status === 'archived' ? 'archived' : 'restored to active'}`,
         });
 
-        res.json({ success: true, brand });
+        const signedBrand = await signBrandAssets(brand);
+        res.json({ success: true, brand: signedBrand });
         invalidateBrandCache(req.params.id);
     } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
