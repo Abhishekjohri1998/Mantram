@@ -2247,6 +2247,7 @@ function StepBlogWizard({ activeBrand, blogType, onGenerate, onBack, generating 
     const [audience, setAudience] = useState('')
     const defaultLang = activeBrand?.dna?.defaultLanguage?.toLowerCase() || 'english'
     const [language, setLanguage] = useState(defaultLang)
+    const [tone, setTone] = useState('professional')
 
     const TONES = ['professional', 'conversational', 'authoritative', 'friendly', 'witty', 'inspirational']
     const WORD_MARKS = [800, 1200, 1500, 2000, 2500, 3000]
