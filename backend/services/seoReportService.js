@@ -65,6 +65,7 @@ export async function buildSeoHealthReport(website, options = {}) {
     status: audit.reportMode, // 'FULL' or 'PARTIAL'
     audit,
     pages,
+    siteResearch, // Export the full original object so seo-studio route can format it
     siteStats: siteResearch.siteIntelligence || {}, // Inherit from web-research output
     findingsMode: audit.reportMode === 'PARTIAL' ? 'ESTIMATED' : 'MEASURED',
     warnings: audit.warnings,
