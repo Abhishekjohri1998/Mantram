@@ -715,7 +715,7 @@ function CanvasShellInner() {
             // ── PHASE 2: Execute tool sequence ──
             let toolResults = []
             if (result.toolCalls?.length > 0 && fc) {
-                const deps = { brand: activeBrand, canvasAssets, addImageUrlToCanvas, setBoardScenes, setStoryBrief, setCanvasView, setFidatoMessages }
+                const deps = { brand: activeBrand, canvasAssets, addImageUrlToCanvas, setBoardScenes, setStoryBrief, setCanvasView, setFidatoMessages, referenceImages: result.referenceImages || [] }
                 
                 const addLog = (text) => {
                     const time = new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })

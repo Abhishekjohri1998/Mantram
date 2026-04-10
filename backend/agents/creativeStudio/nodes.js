@@ -424,8 +424,8 @@ export async function artDirectorNode(state) {
     console.log('🎨 Creative Agent: Art Director — defining vision...');
     const startMs = Date.now();
 
-    // Use pre-loaded brandContext from pipeline runner (avoids redundant DB query)
-    const brandContext = state.brandContext || (await loadBrandContext(state.brandId)).brandContext;
+    // Use pre-loaded brandContext from pipeline runner (pre-loaded ONCE in runCreativePipeline)
+    const brandContext = state.brandContext || '<brand_bible>No brand data.</brand_bible>';
     const intel = state.brandIntel || {};
 
     // ── Build product context for anti-hallucination ──
@@ -521,7 +521,7 @@ export async function fastCreativeDirectorNode(state) {
     console.log('⚡ Creative Agent: Fast Creative Director — combined vision + prompt...');
     const startMs = Date.now();
 
-    const brandContext = state.brandContext || (await loadBrandContext(state.brandId)).brandContext;
+    const brandContext = state.brandContext || '<brand_bible>No brand data.</brand_bible>';
     const intel = state.brandIntel || {};
 
     // Build product context (same as artDirectorNode)
@@ -607,8 +607,8 @@ export async function promptEngineerNode(state) {
     console.log('🔧 Creative Agent: Prompt Engineer — crafting prompt...');
     const startMs = Date.now();
 
-    // Use pre-loaded brandContext from pipeline runner (avoids redundant DB query)
-    const brandContext = state.brandContext || (await loadBrandContext(state.brandId)).brandContext;
+    // Use pre-loaded brandContext from pipeline runner (pre-loaded ONCE in runCreativePipeline)
+    const brandContext = state.brandContext || '<brand_bible>No brand data.</brand_bible>';
     const intel = state.brandIntel || {};
 
     // ── Build product grounding for prompt engineer ──
@@ -671,8 +671,8 @@ export async function styleCriticNode(state) {
     console.log('🔍 Creative Agent: Style Critic — analyzing prompt...');
     const startMs = Date.now();
 
-    // Use pre-loaded brandContext from pipeline runner (avoids redundant DB query)
-    const brandContext = state.brandContext || (await loadBrandContext(state.brandId)).brandContext;
+    // Use pre-loaded brandContext from pipeline runner (pre-loaded ONCE in runCreativePipeline)
+    const brandContext = state.brandContext || '<brand_bible>No brand data.</brand_bible>';
 
     const userPrompt = [
         `ANALYZE THIS IMAGE GENERATION PROMPT:`,
@@ -710,8 +710,8 @@ export async function variationGeneratorNode(state) {
     console.log('🔀 Creative Agent: Variation Generator — creating alternatives...');
     const startMs = Date.now();
 
-    // Use pre-loaded brandContext from pipeline runner (avoids redundant DB query)
-    const brandContext = state.brandContext || (await loadBrandContext(state.brandId)).brandContext;
+    // Use pre-loaded brandContext from pipeline runner (pre-loaded ONCE in runCreativePipeline)
+    const brandContext = state.brandContext || '<brand_bible>No brand data.</brand_bible>';
 
     const userPrompt = [
         `CREATE 3 VARIATIONS OF THIS PROMPT:`,
@@ -742,22 +742,13 @@ export async function copywriterNode(state) {
     console.log('✍️  Creative Agent: Copywriter — writing brand copy...');
     const startMs = Date.now();
 
-    // Load brand context — also fetch brand object for language inference
-    let resolvedBrandContext = state.brandContext;
-    let brandObj = null;
-    if (!resolvedBrandContext && state.brandId) {
-        const { brandContext: ctx, brand } = await loadBrandContext(state.brandId);
-        resolvedBrandContext = ctx;
-        brandObj = brand;
-    }
-    // Use brandIntel (already loaded by brandIntelligenceNode) before doing a raw DB call
-    if (!brandObj && state.brandIntel) {
-        brandObj = { name: state.brandIntel.name, dna: { targetAudience: state.brandIntel.targetAudience, voice: { personality: state.brandIntel.personality }, defaultLanguage: state.brandIntel.defaultLanguage } };
-    }
-    if (!brandObj && state.brandId) {
-        // Last resort — only reached if pipeline skipped brandIntelligenceNode entirely
-        brandObj = await Brand.findById(state.brandId).select('name dna').lean();
-    }
+    // ⚡ Use pre-loaded brandContext + brandIntel — NO redundant DB/Redis calls
+    const resolvedBrandContext = state.brandContext || '<brand_bible>No brand data.</brand_bible>';
+    // Build brandObj from state.brandIntel (already loaded by brandIntelligenceNode)
+    // This eliminates the redundant loadBrandContext() + Brand.findById() calls
+    const brandObj = state.brandIntel
+        ? { name: state.brandIntel.name, dna: { targetAudience: state.brandIntel.targetAudience, voice: { personality: state.brandIntel.personality }, defaultLanguage: state.brandIntel.defaultLanguage } }
+        : null;
 
     // Language inference — generate copy in the brand's audience language
     const langInfo = inferBrandLanguage(brandObj);

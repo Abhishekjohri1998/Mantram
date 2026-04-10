@@ -9,8 +9,11 @@ import authRoutes from './routes/auth.js';
 import integrationsRoutes from './routes/integrations.js';
 import brandRoutes from './routes/brands.js';
 import contentRoutes from './routes/content.js';
-import creativeRoutes, { internalGenerateCreative } from './routes/creatives.js';
-import { initCreativeWorker } from './utils/creativeQueue.js';
+import creativeRoutes from './routes/creatives.js';
+// ⚡ Bull Queue REMOVED — it was burning ~500K Redis requests/month on Upstash
+// while idle (3 ioredis TCP connections spam BRPOP/PING/SUBSCRIBE continuously).
+// Creative generation already uses setImmediate() in creatives.js (line 88).
+// import { initCreativeWorker } from './utils/creativeQueue.js';
 import adminRoutes from './routes/admin.js';
 import agentRoutes from './routes/agents.js';
 import shopifyRoutes from './routes/shopify.js';
@@ -154,17 +157,16 @@ const server = app.listen(config.port, '0.0.0.0', () => {
 
 // ── DEFERRED INITIALIZATION (WAIT FOR DB) ─────────────────────
 connectDB().then(() => {
-    // Initialize Image Generation Worker (Bull + Redis)
-    initCreativeWorker(internalGenerateCreative);
+    // ⚡ Bull Queue worker REMOVED — was burning Upstash quota with idle TCP connections.
+    // Creative generation runs via setImmediate() in creatives.js (line 88).
 
-    // Warm up MCP Registry — connects mcpBridge to internal tool server (non-blocking)
-    import('./mcp/registry.js').then(({ callMcpTool }) => {
-        // Trigger lazy connection by calling a no-op probe
+    // Warm up MCP Registry — just connect, don't fire a real API call
+    import('./mcp/registry.js').then(({ getMcpToolSchemas }) => {
         setTimeout(() => {
-            callMcpTool('web_search', { query: 'mantram ai platform startup ping', mode: 'quick' })
-                .then(() => console.log('✅ MCP Registry: warm-up complete'))
+            getMcpToolSchemas()
+                .then((schemas) => console.log(`✅ MCP Registry: warm-up complete (${schemas.length} tools)`))
                 .catch(() => console.log('⚠️ MCP Registry: warm-up skipped (will retry on first real call)'));
-        }, 8000); // Wait 8s for server to be fully ready
+        }, 8000);
     }).catch(() => {});
 
     // Start follow-up scheduler (every 4 hours — Meta Compliance)
