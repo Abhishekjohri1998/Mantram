@@ -2351,7 +2351,199 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
 
 
                     {/* ═══════════ GALLERY (full-width — settings moved to floating bar) ═══════════ */}
-                    <div className="creative-gallery">
+                    <div className="creative-gallery relative">
+
+                        {/* ═══ NATIVE ANIMATE WORKSPACE (MAIN UI) ═══ */}
+                        {showAnimatePanel && (
+                            <div className="mb-6 studio-card border-[#FF4D00]/30 shadow-lg shadow-[#FF4D00]/5 bg-[var(--sys-surface)] overflow-hidden animate-fade-in relative">
+                                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#FF4D00] to-violet-500" />
+                                <div className="p-5 sm:p-6 xl:p-8">
+                                    <div className="flex flex-col xl:flex-row gap-6 xl:gap-8">
+                                        
+                                        {/* Left: Original Image Preview */}
+                                        <div className="w-full xl:w-[40%] flex flex-col gap-3 shrink-0">
+                                            <div className="flex items-center justify-between xl:hidden">
+                                                <h3 className="text-sm font-bold text-[var(--sys-text)] flex items-center gap-2">
+                                                    <span className="material-symbols-outlined text-[#FF4D00]">animation</span> Cinematic Animation
+                                                </h3>
+                                                <button onClick={() => { if (!animateGenerating) { setShowAnimatePanel(false); setAnimateModalOpen(false); } }}
+                                                    className="w-8 h-8 rounded-full bg-[var(--sys-surface-hover)] flex items-center justify-center text-[var(--sys-text-muted)] hover:text-[#FF4D00] transition-colors cursor-pointer border border-transparent">
+                                                    <span className="material-symbols-outlined text-sm">close</span>
+                                                </button>
+                                            </div>
+                                            
+                                            <div className="rounded-2xl overflow-hidden bg-[var(--sys-surface-hover)] border border-[var(--sys-border)] relative group shadow-inner">
+                                                {animateImageRef.current || (result && result.imageUrl) ? (
+                                                    <img src={animateImageRef.current || result.imageUrl} alt="Source for animation" className="w-full h-auto object-contain bg-black/40 xl:max-h-[420px]" />
+                                                ) : (
+                                                    <div className="w-full aspect-video flex flex-col items-center justify-center text-[var(--sys-text-muted)]">
+                                                        <span className="material-symbols-outlined text-3xl mb-2">image_not_supported</span>
+                                                        <span className="text-xs">No image selected</span>
+                                                    </div>
+                                                )}
+                                                <div className="absolute top-3 left-3 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded text-[10px] font-bold text-white tracking-widest uppercase border border-white/10 flex items-center gap-1.5"><span className="material-symbols-outlined text-[12px] text-[#FF4D00]">photo_library</span> Source Image</div>
+                                            </div>
+                                        </div>
+
+                                        {/* Right: Settings & Results */}
+                                        <div className="flex-1 flex flex-col min-w-0">
+                                            <div className="hidden xl:flex items-center justify-between mb-6 pb-4 border-b border-[var(--sys-border)]">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-10 h-10 rounded-xl bg-[#FF4D00]/10 flex items-center justify-center border border-[#FF4D00]/20">
+                                                        <span className="material-symbols-outlined text-[#FF4D00]">animation</span>
+                                                    </div>
+                                                    <div>
+                                                        <h3 className="text-base font-bold text-[var(--sys-text)] leading-tight">Animation Workspace</h3>
+                                                        <p className="text-[11px] text-[var(--sys-text-muted)] leading-tight mt-0.5">Bring your creative assets to life with motion</p>
+                                                    </div>
+                                                </div>
+                                                <button onClick={() => { if (!animateGenerating) { setShowAnimatePanel(false); setAnimateModalOpen(false); } }}
+                                                    className="w-10 h-10 rounded-full bg-[var(--sys-surface-hover)] flex items-center justify-center text-[var(--sys-text-muted)] hover:text-[#FF4D00] transition-colors cursor-pointer border border-transparent hover:border-[#FF4D00]/30 hover:bg-[#FF4D00]/10">
+                                                    <span className="material-symbols-outlined text-sm">close</span>
+                                                </button>
+                                            </div>
+
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-6 flex-1 content-start">
+                                                
+                                                {/* Prompt */}
+                                                <div className="sm:col-span-2">
+                                                    <label className="text-[11px] font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-2 flex justify-between">
+                                                        <span>Motion Visual Script</span>
+                                                        <span className="text-[#FF4D00] flex items-center gap-1"><span className="material-symbols-outlined text-[12px]">auto_awesome</span> Grounded</span>
+                                                    </label>
+                                                    {animateAnalyzing ? (
+                                                        <div className="w-full py-4 px-4 rounded-xl border border-[var(--sys-border)] bg-[var(--sys-surface)] flex items-center gap-3 text-sm font-medium text-[var(--sys-text)] shadow-inner">
+                                                            <div className="w-5 h-5 border-2 border-[#FF4D00] border-t-transparent rounded-full animate-spin" />
+                                                            Analyzing scene & writing motion instructions...
+                                                        </div>
+                                                    ) : (
+                                                        <textarea value={animatePrompt} onChange={e => setAnimatePrompt(e.target.value)}
+                                                            placeholder="Describe the cinematic motion you want..."
+                                                            className="input-glass w-full py-3.5 px-4 text-[13px] resize-none focus:border-[#FF4D00] min-h-[100px] shadow-inner font-medium text-[var(--sys-text)] bg-[var(--sys-bg)]" rows={3} />
+                                                    )}
+                                                </div>
+
+                                                {/* Model Selector */}
+                                                <div className="sm:col-span-2">
+                                                    <label className="text-[11px] font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-2 block">AI Video Engine</label>
+                                                    <div className="relative">
+                                                        <select value={animateModel} onChange={e => setAnimateModel(e.target.value)}
+                                                            className="input-glass w-full py-3 px-4 pl-11 text-sm font-bold text-[var(--sys-text)] bg-[var(--sys-surface)] border border-[var(--sys-border)] focus:border-[#FF4D00] transition-colors rounded-xl outline-none appearance-none shadow-sm cursor-pointer hover:bg-[var(--sys-surface-hover)]">
+                                                            {Object.entries(ANIMATE_MODELS).map(([id, m]) => (
+                                                                <option key={id} value={id}>
+                                                                    {m.name} — {m.desc}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                        <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-[var(--sys-text-muted)] pointer-events-none text-[18px]">{ANIMATE_MODELS[animateModel]?.icon || 'memory'}</span>
+                                                        <span className="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-[var(--sys-text-muted)] pointer-events-none">expand_more</span>
+                                                    </div>
+                                                </div>
+
+                                                {/* Parameters */}
+                                                <div className="grid grid-cols-2 gap-4 sm:col-span-2">
+                                                    <div>
+                                                        <label className="text-[11px] font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-2 block flex items-center gap-1.5"><span className="material-symbols-outlined text-[14px]">timer</span> Duration (s)</label>
+                                                        <input type="number" value={animateDuration}
+                                                            onChange={e => setAnimateDuration(Math.max(ANIMATE_MODELS[animateModel]?.dur?.[0] || 1, Math.min(ANIMATE_MODELS[animateModel]?.dur?.[1] || 15, Number(e.target.value))))}
+                                                            className="input-glass w-full py-3 text-[13px] font-bold text-[var(--sys-text)] text-center bg-[var(--sys-bg)] border border-[var(--sys-border)] shadow-inner rounded-xl"
+                                                            min={ANIMATE_MODELS[animateModel]?.dur?.[0] || 1}
+                                                            max={ANIMATE_MODELS[animateModel]?.dur?.[1] || 15} />
+                                                    </div>
+                                                    <div>
+                                                    <label className="text-[11px] font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-2 block flex items-center gap-1.5"><span className="material-symbols-outlined text-[14px]">crop</span> Format</label>
+                                                        <div className="relative">
+                                                            <select value={animateAspectRatio} onChange={e => setAnimateAspectRatio(e.target.value)}
+                                                                className="input-glass w-full py-3 text-[13px] font-bold text-[var(--sys-text)] bg-[var(--sys-bg)] border border-[var(--sys-border)] shadow-inner rounded-xl outline-none appearance-none cursor-pointer pl-4 pr-10 hover:bg-[var(--sys-surface-hover)] transition-colors">
+                                                                {(ANIMATE_MODELS[animateModel]?.ratios || ['1:1', '16:9', '9:16']).map(r => (
+                                                                    <option key={r} value={r}>{r}</option>
+                                                                ))}
+                                                            </select>
+                                                            <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-[var(--sys-text-muted)] pointer-events-none">unfold_more</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                            </div>
+
+                                            {/* Gen Actions / Results */}
+                                            <div className="mt-auto pt-6 border-t border-[var(--sys-border)] relative">
+                                                
+                                                {/* Error */}
+                                                {animateError && (
+                                                    <div className="mb-4 p-4 rounded-xl border bg-rose-500/10 border-rose-500/20 text-rose-500 flex items-start gap-3 shadow-[0_0_15px_rgba(244,63,94,0.1)]">
+                                                        <span className="material-symbols-outlined text-lg mt-0.5">{animateError.isProviderError ? 'cloud_off' : 'error'}</span>
+                                                        <div className="flex-1 text-[13px] leading-relaxed">
+                                                            <span className="font-bold mr-1 block mb-0.5">{animateError.isProviderError ? 'Engine Error:' : 'App Error:'}</span>
+                                                            {animateError.message}
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {/* Progress */}
+                                                {animateGenerating && (
+                                                    <div className="space-y-3 mb-5 bg-[var(--sys-surface-hover)] p-4 rounded-xl border border-[var(--sys-border)]">
+                                                        <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider">
+                                                            <span className="text-[#FF4D00] flex items-center gap-2">
+                                                                <span className="material-symbols-outlined text-[14px] animate-pulse">movie</span> Rendering Output
+                                                            </span>
+                                                            <span className="text-[var(--sys-text)]">{animateProgress}%</span>
+                                                        </div>
+                                                        <div className="w-full h-1.5 bg-[var(--sys-border)] rounded-full overflow-hidden">
+                                                            <div className="h-full bg-gradient-to-r from-[#FF4D00] to-orange-400 rounded-full transition-all duration-300" style={{ width: `${animateProgress}%` }} />
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {/* Final Action / Video */}
+                                                {!animateVideoUrl ? (
+                                                    <div className="flex gap-3">
+                                                        <button onClick={handleAnimateGenerate}
+                                                            disabled={animateGenerating || animateAnalyzing || !animatePrompt.trim() || !animateImageRef.current}
+                                                            className={`flex-1 py-3.5 rounded-xl text-[13px] font-bold flex items-center justify-center gap-2 cursor-pointer transition-all uppercase tracking-wider ${
+                                                                animateGenerating || animateAnalyzing || !animatePrompt.trim() || !animateImageRef.current
+                                                                    ? 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] border border-[var(--sys-border)] opacity-60 cursor-not-allowed'
+                                                                    : 'bg-[#FF4D00] text-white hover:bg-[#FF6A00] shadow-[0_0_20px_rgba(255,77,0,0.3)] hover:shadow-[0_0_25px_rgba(255,77,0,0.4)] hover:-translate-y-0.5'
+                                                            }`}>
+                                                            {animateGenerating ? (
+                                                                <><div className="w-4 h-4 border-2 border-white/80 border-t-transparent rounded-full animate-spin" /> Rendering Sequence...</>
+                                                            ) : (
+                                                                <><span className="material-symbols-outlined text-[18px]">play_circle</span> Initialize Render</>
+                                                            )}
+                                                        </button>
+                                                        <button onClick={() => { if (!animateGenerating) { setShowAnimatePanel(false); setAnimateModalOpen(false); } }}
+                                                                disabled={animateGenerating}
+                                                                className={`px-4 py-3.5 rounded-xl border border-[var(--sys-border)] bg-[var(--sys-surface)] hover:bg-[var(--sys-surface-hover)] text-[var(--sys-text)] transition-colors ${animateGenerating ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`} title="Cancel">
+                                                                Cancel
+                                                        </button>
+                                                    </div>
+                                                ): (
+                                                    <div className="rounded-2xl overflow-hidden border border-emerald-500/30 bg-emerald-500/5 cursor-pointer hover:border-emerald-500/50 transition-colors shadow-[0_0_20px_rgba(16,185,129,0.1)] group/video">
+                                                        {/* Full video element preview */}
+                                                        <div className="relative">
+                                                            <video src={animateVideoUrl} controls autoPlay loop muted playsInline
+                                                                className="w-full max-h-[300px] xl:max-h-[380px] bg-black/50" />
+                                                            <div className="absolute top-3 left-3 bg-emerald-500/90 backdrop-blur-md px-2.5 py-1 rounded text-[10px] font-bold text-white tracking-widest uppercase border border-white/20 flex items-center gap-1.5 shadow-lg"><span className="material-symbols-outlined text-[12px]">check_circle</span> Render Complete</div>
+                                                        </div>
+                                                        <div className="p-4 bg-[var(--sys-surface)] border-t border-[var(--sys-border)] flex items-center justify-between gap-3">
+                                                            <a href={animateVideoUrl} download="animated-creative.mp4"
+                                                                className="flex-1 block py-2.5 rounded-xl bg-emerald-500 text-white text-[13px] font-bold text-center hover:bg-emerald-600 transition-colors uppercase tracking-wider flex items-center justify-center gap-2">
+                                                                <span className="material-symbols-outlined text-[18px]">cloud_download</span>
+                                                                Save High-Res Video
+                                                            </a>
+                                                            <button onClick={() => { setAnimateVideoUrl(null); setAnimateProgress(0); setAnimateGenerating(false); }} className="w-10 h-10 flex items-center justify-center rounded-xl bg-[var(--sys-surface-hover)] border border-[var(--sys-border)] text-[var(--sys-text)] hover:text-primary transition-colors cursor-pointer" title="Discard & try again">
+                                                                <span className="material-symbols-outlined text-sm">refresh</span>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
 
 
 
@@ -2649,7 +2841,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                             });
 
                                             return groups.map((group, gIdx) => (
-                                                <div key={gIdx} className={`rounded-xl border ${gIdx === 0 ? 'border-[var(--sys-text)] bg-[var(--sys-text-muted)]' : 'border-[var(--sys-border)] bg-[var(--sys-surface)]'} overflow-hidden transition-all hover:border-[var(--sys-text-muted)] p-4`}>
+                                                <div key={gIdx} className={`rounded-xl border ${gIdx === 0 ? 'border-primary/20 bg-primary/[0.04]' : 'border-[var(--sys-border)] bg-[var(--sys-surface)]'} overflow-hidden transition-all hover:border-[var(--sys-border-hover)] p-4`}>
                                                     
                                                     {/* Top Row: Prompt + metadata */}
                                                     <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3 mb-4 pb-4 border-b border-[var(--sys-border)]">
@@ -2684,16 +2876,16 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                                 {item._idx === 0 && <span className="absolute top-2 left-2 w-5 h-5 rounded-full bg-[var(--sys-bg)] shadow flex items-center justify-center pointer-events-none"></span>}
                                                                 
                                                                 {/* Hover Ribbon Actions inside Image */}
-                                                                <div className="absolute inset-0 bg-[var(--sys-bg)]/20 backdrop-blur-[2px] transition-all opacity-0 group-hover/img:opacity-100 flex flex-col items-center justify-center">
-                                                                    <div className="flex bg-[var(--sys-bg)]/90 backdrop-blur-md rounded-xl shadow-lg border border-[var(--sys-border)] overflow-hidden scale-95 group-hover/img:scale-100 transition-transform">
-                                                                        <button onClick={(e) => { e.stopPropagation(); setZoomImage(item.imageUrl); }} className="px-4 py-2 hover:bg-[var(--sys-surface)] text-[var(--sys-text)] font-semibold text-xs border-r border-[var(--sys-border)] transition-colors">
+                                                                <div className="absolute inset-0 bg-black/40 backdrop-blur-md transition-all opacity-0 group-hover/img:opacity-100 flex flex-col items-center justify-center pointer-events-none group-hover/img:pointer-events-auto">
+                                                                    <div className="flex bg-[var(--sys-surface)]/95 backdrop-blur-xl rounded-xl shadow-2xl border border-[var(--sys-border)] overflow-hidden scale-95 group-hover/img:scale-100 transition-transform">
+                                                                        <button onClick={(e) => { e.stopPropagation(); setZoomImage(item.imageUrl); }} className="px-4 py-2 hover:bg-[var(--sys-surface-hover)] text-[var(--sys-text)] font-semibold text-xs border-r border-[var(--sys-border)] transition-colors">
                                                                             View
                                                                         </button>
-                                                                        <button onClick={(e) => { e.stopPropagation(); handleOpenEditPanel(item.imageUrl, 'Creative'); }} className="px-4 py-2 hover:bg-[var(--sys-surface)] text-[var(--sys-text)] font-semibold text-xs border-r border-[var(--sys-border)] transition-colors">
+                                                                        <button onClick={(e) => { e.stopPropagation(); handleOpenEditPanel(item.imageUrl, 'Creative'); }} className="px-4 py-2 hover:bg-[var(--sys-surface-hover)] text-[var(--sys-text)] font-semibold text-xs border-r border-[var(--sys-border)] transition-colors">
                                                                             Edit
                                                                         </button>
-                                                                        <button onClick={(e) => { e.stopPropagation(); handleAnimateClick(item); }} className="px-4 py-2 hover:bg-[var(--sys-surface)] text-[var(--sys-text)] font-semibold text-xs transition-colors">
-                                                                            Use
+                                                                        <button onClick={(e) => { e.stopPropagation(); handleAnimateClick(item); }} className="px-4 py-2 hover:bg-[var(--sys-surface-hover)] text-[var(--sys-text)] font-semibold text-xs transition-colors">
+                                                                            Animate
                                                                         </button>
                                                                     </div>
                                                                 </div>
@@ -3166,9 +3358,8 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                             if (chip.template && chip.template.fields?.length > 0) { setActiveQuickTemplate(chip.template); setTemplateFields({}); }
                                             else if (chip.prompt) setPrompt(chip.prompt);
                                         }}
-                                            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer hover:scale-[1.03] border border-[var(--sys-border)] hover:border-[var(--sys-border)]"
-                                            style={{ background: `var(--sys-primary)` }}>
-                                            <span className="material-symbols-outlined text-sm" style={{ color: chip.color }}>{chip.icon}</span>
+                                            className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-[13px] font-semibold transition-all cursor-pointer border border-[var(--sys-border)] bg-[var(--sys-surface)] hover:bg-[var(--sys-surface-hover)] hover:border-[var(--sys-border-hover)] hover:-translate-y-0.5 shadow-sm">
+                                            <span className="material-symbols-outlined text-[16px]" style={{ color: chip.color }}>{chip.icon}</span>
                                             <span className="text-[var(--sys-text)]">{chip.label}</span>
                                         </button>
                                     ))}
@@ -7605,22 +7796,22 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                         <img src={zoomImage} alt="Zoomed" className="max-w-full max-h-[85vh] rounded-2xl shadow-2xl object-contain relative z-10" />
                         
                         {/* Bottom Actions Dock */}
-                        <div className="absolute -bottom-16 left-1/2 -translate-x-1/2 flex items-center gap-2 p-1.5 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] shadow-2xl z-20 animate-in slide-in-from-bottom-4 duration-300">
+                        <div className="absolute -bottom-16 left-1/2 -translate-x-1/2 flex items-center gap-1.5 p-1.5 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] shadow-2xl z-20 animate-in slide-in-from-bottom-4 duration-300">
                             <button onClick={(e) => { e.stopPropagation(); handleOpenEditPanel(zoomImage, 'Creative'); setZoomImage(null); }}
-                                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold text-violet-300 hover:text-[var(--sys-text)] hover:bg-violet-500/20 cursor-pointer transition-all whitespace-nowrap">
-                                <span className="material-symbols-outlined text-base">auto_fix_high</span>
+                                className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-[var(--sys-text)] hover:bg-[var(--sys-surface-hover)] cursor-pointer transition-all whitespace-nowrap">
+                                <span className="material-symbols-outlined text-[18px] text-violet-500">auto_fix_high</span>
                                 Edit in AI Canvas
                             </button>
-                            <div className="w-px h-6 bg-[var(--sys-surface)]" />
+                            <div className="w-px h-6 bg-[var(--sys-border)]" />
                             <button onClick={(e) => { e.stopPropagation(); handleAnimateClick({ imageUrl: zoomImage }); setZoomImage(null); }}
-                                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold text-[var(--sys-bg)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-text)] cursor-pointer transition-all whitespace-nowrap">
-                                <span className="material-symbols-outlined text-base">movie</span>
+                                className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-[var(--sys-text)] hover:bg-[var(--sys-surface-hover)] cursor-pointer transition-all whitespace-nowrap">
+                                <span className="material-symbols-outlined text-[18px] text-[#FF4D00]">animation</span>
                                 Animate
                             </button>
-                            <div className="w-px h-6 bg-[var(--sys-surface)]" />
+                            <div className="w-px h-6 bg-[var(--sys-border)]" />
                             <button onClick={(e) => { e.stopPropagation(); setPublishData({ image: zoomImage, text: '' }); setZoomImage(null); }}
-                                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold text-[#1877F2] hover:text-[var(--sys-text)] hover:bg-[#1877F2]/20 cursor-pointer transition-all whitespace-nowrap">
-                                <span className="material-symbols-outlined text-base">send</span>
+                                className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-[var(--sys-text)] hover:bg-[var(--sys-surface-hover)] cursor-pointer transition-all whitespace-nowrap">
+                                <span className="material-symbols-outlined text-[18px] text-[#1877F2]">send</span>
                                 Publish to Content Studio
                             </button>
                         </div>
@@ -7686,157 +7877,6 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                 </div>
             )}
 
-            {/* ═══ ANIMATE MODAL ═══ */}
-            {animateModalOpen && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center animate-fade-in"
-                    onClick={() => { if (!animateGenerating) setAnimateModalOpen(false) }}>
-                    <div className="absolute inset-0 bg-black/60 " />
-                    <div className="relative w-full max-w-[calc(100%-2rem)] sm:max-w-lg mx-auto mx-4 bg-[#12121f] rounded-2xl border border-[var(--sys-border)] shadow-2xl overflow-hidden animate-scale-in"
-                        onClick={e => e.stopPropagation()}>
-
-                        {/* Header */}
-                        <div className="flex items-center justify-between p-4 sm:p-5 border-b border-[var(--sys-border)]">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-xl bg-[var(--sys-text)] flex items-center justify-center">
-                                    <span className="material-symbols-outlined text-[var(--sys-text)]">animation</span>
-                                </div>
-                                <div>
-                                    <h3 className="text-sm font-bold text-[var(--sys-text)]">Animate Image</h3>
-                                    <p className="text-[11px] text-[var(--sys-text-muted)]">Turn your still image into video</p>
-                                </div>
-                            </div>
-                            <button onClick={() => { if (!animateGenerating) setAnimateModalOpen(false) }}
-                                className="p-2 rounded-lg text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)] cursor-pointer transition-all">
-                                <span className="material-symbols-outlined text-lg">close</span>
-                            </button>
-                        </div>
-
-                        {/* Content */}
-                        <div className="p-4 sm:p-5 space-y-4 max-h-[65vh] overflow-y-auto">
-
-                            {/* Preview */}
-                            {result?.imageUrl && (
-                                <div className="rounded-xl overflow-hidden border border-[var(--sys-border)] mb-3">
-                                    <img src={result.imageUrl} alt="Source" className="w-full h-32 object-cover" />
-                                </div>
-                            )}
-
-                            {/* Prompt */}
-                            <div>
-                                <label className="text-xs font-bold text-[var(--sys-text-muted)] mb-1.5 block">Animation Prompt</label>
-                                {animateAnalyzing ? (
-                                    <div className="flex items-center gap-2 p-3 rounded-xl bg-[var(--sys-text)] border border-[var(--sys-text)]">
-                                        <div className="w-4 h-4 border border-[#FF4D00] border-t-transparent rounded-full" style={{ animation: 'spin 0.8s linear infinite' }} />
-                                        <span className="text-xs text-[var(--sys-text)]">AI analyzing image for motion...</span>
-                                    </div>
-                                ) : (
-                                    <textarea value={animatePrompt} onChange={e => setAnimatePrompt(e.target.value)}
-                                        placeholder="Describe the motion you want..."
-                                        className="input-glass w-full py-2.5 text-sm resize-none" rows={3} />
-                                )}
-                            </div>
-
-                            {/* Model Selector */}
-                            <div>
-                                <label className="text-xs font-bold text-[var(--sys-text-muted)] mb-1.5 block">Model</label>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                    {Object.entries(ANIMATE_MODELS).map(([id, m]) => (
-                                        <button key={id} onClick={() => setAnimateModel(id)}
-                                            className={`p-2.5 rounded-xl text-left text-xs transition-all cursor-pointer border ${
-                                                animateModel === id
-                                                    ? 'bg-[var(--sys-text)] border-[var(--sys-text)] text-[var(--sys-text)]'
-                                                    : 'bg-[var(--sys-surface)] border-[var(--sys-border)] text-[var(--sys-text-muted)] hover:border-[var(--sys-border)]'
-                                            }`}>
-                                            <span className="material-symbols-outlined text-sm mr-1 align-middle">{m.icon}</span>
-                                            <span className="font-bold">{m.name}</span>
-                                            <p className="text-[10px] text-[var(--sys-text-muted)] mt-0.5">{m.desc}</p>
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* Duration + Aspect Ratio */}
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                <div>
-                                    <label className="text-xs font-bold text-[var(--sys-text-muted)] mb-1.5 block">Duration (sec)</label>
-                                    <input type="number" value={animateDuration}
-                                        onChange={e => setAnimateDuration(Math.max(ANIMATE_MODELS[animateModel]?.dur?.[0] || 1, Math.min(ANIMATE_MODELS[animateModel]?.dur?.[1] || 15, Number(e.target.value))))}
-                                        className="input-glass w-full py-2 text-sm text-center"
-                                        min={ANIMATE_MODELS[animateModel]?.dur?.[0] || 1}
-                                        max={ANIMATE_MODELS[animateModel]?.dur?.[1] || 15} />
-                                </div>
-                                <div>
-                                    <label className="text-xs font-bold text-[var(--sys-text-muted)] mb-1.5 block">Aspect Ratio</label>
-                                    <select value={animateAspectRatio} onChange={e => setAnimateAspectRatio(e.target.value)}
-                                        className="input-glass w-full py-2 text-sm">
-                                        {(ANIMATE_MODELS[animateModel]?.ratios || ['1:1', '16:9', '9:16']).map(r => (
-                                            <option key={r} value={r}>{r}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                            </div>
-
-                            {/* Error */}
-                            {animateError && (
-                                <div className={`p-3 rounded-xl border flex items-center gap-2 ${animateError.isProviderError ? 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary' : 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary'}`}>
-                                    <span className="material-symbols-outlined text-sm">{animateError.isProviderError ? 'warning' : 'error'}</span>
-                                    <div className="flex-1 text-xs">
-                                        <span className="font-bold mr-1">{animateError.isProviderError ? `${animateError.provider || 'AI Provider'} Notice:` : 'Error:'}</span>
-                                        {animateError.message}
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Progress */}
-                            {animateGenerating && (
-                                <div className="space-y-2">
-                                    <div className="flex items-center justify-between text-xs">
-                                        <span className="text-[var(--sys-text)] font-bold">Generating animation...</span>
-                                        <span className="text-[var(--sys-text-muted)]">{animateProgress}%</span>
-                                    </div>
-                                    <div className="progress-bar">
-                                        <div className="progress-bar-fill" style={{ width: `${animateProgress}%`, background: 'var(--sys-primary)' }} />
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Result Video */}
-                            {animateVideoUrl && (
-                                <div className="rounded-xl overflow-hidden border border-[var(--sys-border)] bg-[var(--sys-primary-dim)]">
-                                    <video src={animateVideoUrl} controls autoPlay loop muted playsInline
-                                        className="w-full rounded-xl" />
-                                    <div className="p-3 flex gap-2">
-                                        <a href={animateVideoUrl} download="animated-creative.mp4"
-                                            className="flex-1 py-2 rounded-lg bg-[var(--sys-primary-dim)] text-primary text-xs font-bold text-center hover:bg-[var(--sys-primary-dim)] transition-colors">
-                                            <span className="material-symbols-outlined text-sm mr-1" style={{ verticalAlign: 'middle' }}>download</span>
-                                            Download Video
-                                        </a>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Footer */}
-                        {!animateVideoUrl && (
-                            <div className="p-4 sm:p-5 border-t border-[var(--sys-border)]">
-                                <button onClick={handleAnimateGenerate}
-                                    disabled={animateGenerating || animateAnalyzing || !animatePrompt.trim()}
-                                    className={`w-full py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 cursor-pointer transition-all ${
-                                        animateGenerating || animateAnalyzing || !animatePrompt.trim()
-                                            ? 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] cursor-not-allowed'
-                                            : 'bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] hover:from-[#FF4D00] hover:to-[#FF7A00] shadow-none'
-                                    }`}>
-                                    {animateGenerating ? (
-                                        <><div className="w-4 h-4 border border-[var(--sys-border)] border-t-transparent rounded-full" style={{ animation: 'spin 0.8s linear infinite' }} /> Generating...</>
-                                    ) : (
-                                        <><span className="material-symbols-outlined text-lg">play_arrow</span> Generate Animation</>
-                                    )}
-                                </button>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            )}
 
 
             {/* ── Media Picker Modal ── */}

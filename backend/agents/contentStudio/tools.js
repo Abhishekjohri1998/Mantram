@@ -857,8 +857,8 @@ export async function gatherIntelligence(state) {
             : fetchGA4ContentPerformance(state.userId, state.brandId),
     ];
 
-    // ⚡ Adaptive timeout: 5s cap for social fast-path, 9s for deep research
-    const GATHER_TIMEOUT_MS = isSocialQuick ? 5000 : 9000;
+    // ⚡ Adaptive timeout: 3s cap for social fast-path, 5s for deep research
+    const GATHER_TIMEOUT_MS = isSocialQuick ? 3000 : 5000;
     const withTimeout = (p, idx) => Promise.race([
         p,
         new Promise(resolve =>

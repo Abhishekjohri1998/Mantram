@@ -52,11 +52,34 @@ export function findElement(name, index, fc) {
  * @returns {string|Object} — result text or { text, thumbnail?, thumbnails? }
  */
 export async function executeToolCall(toolCall, fc, ctx = {}, deps = {}) {
-    const { name, args } = toolCall
+    const { name: rawName, args } = toolCall
+
+    // ── Tool Name Aliasing ──────────────────────────────────────────────
+    // Gemini fallback sometimes hallucinates tool names (e.g. "update_layer").
+    // Map common hallucinated names to their real equivalents.
+    const TOOL_ALIASES = {
+        'modify_element': 'change_element_property',
+        'resize_element': 'change_element_property',
+        'scale_element': 'change_element_property',
+        'position_element': 'move_element',
+        'move_layer': 'move_element',
+        'rearrange_layer': 'reorder_layer',
+        'delete_element': 'remove_element',
+        'create_text': 'add_text',
+        'create_shape': 'add_shape',
+        'create_image': 'generate_image',
+        'replace_image': 'generate_image',
+        'swap_image': 'generate_image',
+        'edit_image': 'generate_image',
+        'add_image': 'generate_image',
+    }
+    const name = TOOL_ALIASES[rawName] || rawName
+
     const { brand, canvasAssets, addImageUrlToCanvas, setBoardScenes, setStoryBrief, setCanvasView, setFidatoMessages } = deps
     const brandFont = brand?.dna?.fonts?.[0] || 'Inter'
     const brandColor = brand?.dna?.colors?.[0]?.hex || '#ffffff'
     const brandColor2 = brand?.dna?.colors?.[1]?.hex || brand?.dna?.colors?.[0]?.hex || '#6366f1'
+
 
     switch (name) {
         case 'add_text': {
@@ -182,9 +205,16 @@ export async function executeToolCall(toolCall, fc, ctx = {}, deps = {}) {
                 setFidatoMessages(prev => [...prev, { role: 'assistant', content: `🎨 Generating: "${args.prompt?.substring(0, 50)}..."` }])
             }
             try {
+                // Auto-inject brand colors into prompt for visual consistency
+                let enhancedPrompt = args.prompt || ''
+                const brandColors = brand?.dna?.colors?.slice(0, 2).map(c => c.hex).filter(Boolean) || []
+                if (brandColors.length > 0 && !enhancedPrompt.includes('#')) {
+                    enhancedPrompt += `. Brand color accents: ${brandColors.join(' and ')} as ambient glow, lighting tones, or background elements. Professional 4K quality.`
+                }
+
                 const refUrls = (ctx.referenceImages || []).slice(0, 3).map(r => r.url).filter(Boolean)
                 const data = await canvasAssets.aiGenerate({
-                    prompt: args.prompt,
+                    prompt: enhancedPrompt,
                     size: args.size || '1024x1024',
                     brandId: brand?._id || undefined,
                     referenceImages: refUrls.length > 0 ? refUrls : undefined,
@@ -203,7 +233,7 @@ export async function executeToolCall(toolCall, fc, ctx = {}, deps = {}) {
         }
 
         case 'merge_images': {
-            let activeObjs = fc.getActiveObjects().filter(o => o.type === 'image')
+            let activeObjs = fc.getActiveObjects?.()?.filter(o => o.type === 'image') || []
             
             // If not enough images selected, try to find them by passed names
             if (activeObjs.length < 2 && args.imageNames && args.imageNames.length > 0) {
@@ -216,27 +246,44 @@ export async function executeToolCall(toolCall, fc, ctx = {}, deps = {}) {
                 )
                 if (namedImages.length >= 2) activeObjs = namedImages
                 else if (namedImages.length > 0 && activeObjs.length > 0) {
-                    // Combine selected and named
                     activeObjs = [...new Set([...activeObjs, ...namedImages])]
+                }
+            }
+
+            // Last resort: if still <2 and there are exactly 2 images on canvas, use them
+            if (activeObjs.length < 2) {
+                const allImages = fc.getObjects().filter(o => o.type === 'image' && o.id !== 'artboard')
+                if (allImages.length >= 2) {
+                    activeObjs = allImages.slice(0, 5) // Take up to 5 images
                 }
             }
             
             if (activeObjs.length < 2) {
-                return 'Need at least 2 images to merge (either selected on the canvas, or clearly specified by name).'
+                const allImages = fc.getObjects().filter(o => o.type === 'image' && o.id !== 'artboard')
+                return `Need at least 2 images to merge. Currently ${allImages.length} image(s) on canvas: ${allImages.map(i => `"${i.customName || i.id || i.type}"`).join(', ') || 'none'}. Ask the user to add more images.`
             }
             
             if (setFidatoMessages) {
                 setFidatoMessages(prev => [...prev, { role: 'assistant', content: `🎨 Merging ${activeObjs.length} images: "${args.prompt?.substring(0, 50)}..."` }])
             }
             try {
-                const imageBase64s = activeObjs.map(obj => obj._element?.src || obj.getSrc?.()).filter(Boolean)
-                if (imageBase64s.length < 2) return 'Could not read image data from selected elements.'
+                // Extract image source URLs — prefer S3/HTTP URLs, fall back to toDataURL
+                const imageSources = activeObjs.map(obj => {
+                    // Try to get the original source URL (S3 or HTTP)
+                    const src = obj._element?.src || obj.getSrc?.() || ''
+                    if (src && (src.startsWith('http://') || src.startsWith('https://'))) return src
+                    if (src && src.startsWith('data:')) return src
+                    // Fallback: render the object to a data URL
+                    try { return obj.toDataURL({ format: 'png', quality: 0.9 }) } catch { return '' }
+                }).filter(Boolean)
+
+                if (imageSources.length < 2) return 'Could not read image data from canvas elements. Try re-uploading the images.'
                 
-                const mainImage = imageBase64s[0]
-                const additionalImages = imageBase64s.slice(1)
+                const mainImage = imageSources[0]
+                const additionalImages = imageSources.slice(1)
                 
                 const data = await canvasAssets.aiEdit({
-                    prompt: args.prompt,
+                    prompt: args.prompt || 'Combine these images into a single cohesive composition',
                     imageBase64: mainImage,
                     additionalImages: additionalImages
                 })
@@ -327,11 +374,24 @@ export async function executeToolCall(toolCall, fc, ctx = {}, deps = {}) {
             if (shouldGenerate && canvasAssets) {
                 const generatedThumbs = new Array(numFrames).fill(null)
                 ctx.scenes = new Array(numFrames).fill({})
+
+                // Build brand color + consistency anchor for all frames
+                const brandColors = brand?.dna?.colors?.slice(0, 2).map(c => c.hex).filter(Boolean) || []
+                const colorAnchor = brandColors.length > 0
+                    ? `. Color palette: ${brandColors.join(' and ')} as ambient accents. Consistent color grading across all frames.`
+                    : '. Professional 4K quality.'
+
                 await Promise.all(newScenes.map(async (scene, i) => {
                     try {
+                        // Inject brand colors into storyboard prompt if not already present
+                        let framePrompt = frames[i].imagePrompt || ''
+                        if (!framePrompt.includes('#') && brandColors.length > 0) {
+                            framePrompt += colorAnchor
+                        }
+
                         const refUrls = (ctx.referenceImages || []).slice(0, 3).map(r => r.url).filter(Boolean)
                         const data = await canvasAssets.aiGenerate({
-                            prompt: frames[i].imagePrompt,
+                            prompt: framePrompt,
                             size: '512x512',
                             referenceImages: refUrls.length > 0 ? refUrls : undefined,
                         })
@@ -726,7 +786,257 @@ export async function executeToolCall(toolCall, fc, ctx = {}, deps = {}) {
             } catch (e) { return `FFmpeg compilation failed: ${e.message}` }
         }
 
+        // ═══════════════════════════════════════════════════════════════
+        // CAMPAIGN GENERATION — Multi-size batch generation across platforms
+        // ═══════════════════════════════════════════════════════════════
+        case 'generate_campaign': {
+            const { prompt, presets, headline, ctaText } = args
+            if (!presets?.length) return 'No platform presets specified for campaign'
+
+            const PRESET_MAP = {
+                'ig-post':   { w: 1080, h: 1350, label: 'Instagram Post',  aspectRatio: '4:5' },
+                'ig-story':  { w: 1080, h: 1920, label: 'Instagram Story', aspectRatio: '9:16' },
+                'ig-reel':   { w: 1080, h: 1920, label: 'Instagram Reel',  aspectRatio: '9:16' },
+                'fb-post':   { w: 1080, h: 1350, label: 'Facebook Post',   aspectRatio: '4:5' },
+                'linkedin':  { w: 1200, h: 1200, label: 'LinkedIn Post',   aspectRatio: '1:1' },
+                'yt-thumb':  { w: 1280, h: 720,  label: 'YouTube Thumb',   aspectRatio: '16:9' },
+                'twitter':   { w: 1200, h: 675,  label: 'Twitter/X Post',  aspectRatio: '16:9' },
+                'carousel':  { w: 1080, h: 1080, label: 'Carousel Slide',  aspectRatio: '1:1' },
+                'banner':    { w: 1920, h: 600,  label: 'Web Banner',      aspectRatio: '16:5' },
+            }
+
+            if (setFidatoMessages) {
+                setFidatoMessages(prev => [...prev, {
+                    role: 'assistant',
+                    content: `🎯 Generating campaign across ${presets.length} platforms: ${presets.map(p => PRESET_MAP[p]?.label || p).join(', ')}...`
+                }])
+            }
+
+            const generatedVariants = []
+            const thumbnails = []
+
+            // Generate images for each preset in parallel
+            await Promise.all(presets.map(async (preset, idx) => {
+                const spec = PRESET_MAP[preset] || PRESET_MAP['ig-post']
+                let adaptedPrompt = prompt
+
+                // Inject brand colors into every image prompt for visual consistency
+                const brandColors = brand?.dna?.colors?.slice(0, 3).map(c => c.hex).filter(Boolean) || []
+                if (brandColors.length > 0) {
+                    adaptedPrompt += `. Brand color palette: ${brandColors.join(', ')} used as accent lighting, background tones, and ambient glow.`
+                }
+
+                // Platform-specific composition guidance (not just aspect ratio)
+                const platformGuide = {
+                    '9:16': 'Vertical composition, subject centered in upper third, negative space at bottom for text overlay. Mobile-first — bold and intimate.',
+                    '16:9': 'Wide cinematic composition, subject positioned using rule of thirds. Horizontal panoramic feel — dramatic and expansive.',
+                    '16:5': 'Ultra-wide panoramic banner, subject left-aligned with generous text space on right. Clean, minimal, high-impact.',
+                    '4:5': 'Near-square portrait composition, subject centered with breathing room on all sides. Balanced and focused.',
+                    '1:1': 'Square composition, centered subject with symmetric balance. Clean and bold — every corner matters.',
+                }
+                const guide = platformGuide[spec.aspectRatio] || platformGuide['1:1']
+                adaptedPrompt += `. ${guide}`
+
+                if (headline) {
+                    adaptedPrompt += ` Bold text reading "${headline}" in clean, high-contrast typography${brand?.dna?.fonts?.[0] ? ` (${brand.dna.fonts[0]} style)` : ''}.`
+                }
+                if (ctaText) {
+                    adaptedPrompt += ` Include a CTA button/badge with "${ctaText}" in ${brandColors[1] || 'accent'} color.`
+                }
+
+                try {
+                    const refUrls = (ctx.referenceImages || []).slice(0, 3).map(r => r.url).filter(Boolean)
+                    const data = await canvasAssets.aiGenerate({
+                        prompt: adaptedPrompt,
+                        size: '1024x1024',
+                        brandId: brand?._id || undefined,
+                        referenceImages: refUrls.length > 0 ? refUrls : undefined,
+                    })
+
+                    if (data.imageUrl) {
+                        generatedVariants.push({
+                            preset,
+                            label: spec.label,
+                            width: spec.w,
+                            height: spec.h,
+                            imageUrl: data.imageUrl,
+                        })
+                        thumbnails.push(data.imageUrl)
+
+                        // Add each image to canvas with label
+                        if (addImageUrlToCanvas) {
+                            const img = await addImageUrlToCanvas(data.imageUrl, `Campaign — ${spec.label}`)
+                            if (img) {
+                                // Position in a grid layout
+                                const col = idx % 3
+                                const row = Math.floor(idx / 3)
+                                const gapPx = 30
+                                const cardW = 300
+                                img.set({
+                                    left: 60 + col * (cardW + gapPx),
+                                    top: 80 + row * (cardW + gapPx + 50),
+                                    scaleX: cardW / (img.width || 1024),
+                                    scaleY: cardW / (img.height || 1024),
+                                })
+                                img.setCoords()
+                            }
+                        }
+
+                        if (setFidatoMessages) {
+                            setFidatoMessages(prev => [...prev, {
+                                role: 'assistant',
+                                content: `✅ ${spec.label} variant generated`
+                            }])
+                        }
+                    }
+                } catch (e) {
+                    console.warn(`Campaign variant ${preset} failed:`, e.message)
+                }
+            }))
+
+            // Add platform labels below each image
+            generatedVariants.forEach((variant, idx) => {
+                const col = idx % 3
+                const row = Math.floor(idx / 3)
+                const gapPx = 30
+                const cardW = 300
+                const labelY = 80 + row * (cardW + gapPx + 50) + cardW + 8
+
+                fc.add(new fabric.Textbox(`📱 ${variant.label}`, {
+                    left: 60 + col * (cardW + gapPx),
+                    top: labelY,
+                    width: cardW,
+                    fontSize: 12,
+                    fontWeight: '700',
+                    fontFamily: 'Inter',
+                    fill: '#a78bfa',
+                    textAlign: 'center',
+                    selectable: false,
+                    evented: false,
+                    id: `campaign-label-${idx}-${Date.now()}`,
+                    _nodeType: 'campaign',
+                }))
+            })
+
+            fc.requestRenderAll()
+
+            return {
+                text: `🎯 Campaign generated: ${generatedVariants.length}/${presets.length} platform variants created successfully!`,
+                thumbnails,
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // MCoT POST-GENERATION CRITIC — Quality check after image gen
+        // ═══════════════════════════════════════════════════════════════
+        case 'critique_image': {
+            const { imageUrl, originalPrompt, brief, productName } = args
+            if (!imageUrl) return 'No image URL provided for critique'
+
+            if (setFidatoMessages) {
+                setFidatoMessages(prev => [...prev, {
+                    role: 'assistant',
+                    content: `🔎 Running MCoT quality analysis on generated image...`
+                }])
+            }
+
+            try {
+                const data = await canvasAssets.critiqueImage({
+                    imageUrl,
+                    originalPrompt: originalPrompt || '',
+                    brief: brief || '',
+                    productName: productName || '',
+                })
+
+                if (data.success && data.critique) {
+                    const c = data.critique
+                    const scoreEmoji = c.overallScore >= 75 ? '✅' : c.overallScore >= 50 ? '⚠️' : '❌'
+                    const verdictText = c.verdict === 'approved'
+                        ? 'Image approved — ready for use!'
+                        : c.verdict === 'improve'
+                        ? 'Image needs improvement'
+                        : 'Image rejected — regeneration recommended'
+
+                    const critiqueReport = [
+                        `${scoreEmoji} **Quality Score: ${c.overallScore}/100** — ${verdictText}`,
+                        '',
+                        `📊 Breakdown:`,
+                        `  • Brief Alignment: ${c.briefAlignmentScore || '?'}/100`,
+                        `  • Product Accuracy: ${c.productAccuracyScore || '?'}/100`,
+                        `  • Visual Quality: ${c.visualQualityScore || '?'}/100`,
+                        `  • Brand Consistency: ${c.brandConsistencyScore || '?'}/100`,
+                        '',
+                        c.strengths?.length ? `💪 Strengths: ${c.strengths.join('; ')}` : '',
+                        c.issues?.length ? `⚠️ Issues: ${c.issues.join('; ')}` : '',
+                        c.critiqueNotes ? `📝 Notes: ${c.critiqueNotes}` : '',
+                        c.improvedPrompt ? `\n🔄 Improved prompt available for regeneration.` : '',
+                    ].filter(Boolean).join('\n')
+
+                    return {
+                        text: critiqueReport,
+                        critique: data.critique,
+                    }
+                }
+                return 'Critique analysis returned no results'
+            } catch (e) {
+                return `Critique failed: ${e.message}`
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // BULK UPDATE — Handles hallucinated tool names like update_layer,
+        // update_element where Gemini/fallback sends multiple properties
+        // in a single call: { elementName, left, top, opacity, fill, ... }
+        // ═══════════════════════════════════════════════════════════════
+        case 'update_layer':
+        case 'update_element': {
+            const el = findElement(args.elementName || args.name, args.elementIndex || args.index, fc)
+            if (!el) return `Element "${args.elementName || args.name || 'unknown'}" not found on canvas`
+
+            // Apply each recognized property from the args
+            const UPDATABLE_PROPS = ['left', 'top', 'scaleX', 'scaleY', 'angle', 'opacity', 'fill', 'stroke', 'fontSize', 'fontFamily', 'fontWeight', 'text', 'width', 'height']
+            const changes = []
+            for (const prop of UPDATABLE_PROPS) {
+                if (args[prop] !== undefined && args[prop] !== null) {
+                    let val = args[prop]
+                    if (['left', 'top', 'scaleX', 'scaleY', 'angle', 'opacity', 'fontSize', 'width', 'height'].includes(prop)) {
+                        val = parseFloat(val)
+                        if (isNaN(val)) continue
+                    }
+                    el.set(prop, val)
+                    changes.push(`${prop}=${val}`)
+                }
+            }
+
+            // Handle "position" shorthand if provided (same as move_element)
+            if (args.position) {
+                const artboard = fc.getObjects().find(o => o.id === 'artboard')
+                const cw = artboard?.width || fc.width
+                const ch = artboard?.height || fc.height
+                const ew = (el.width || 0) * (el.scaleX || 1)
+                const eh = (el.height || 0) * (el.scaleY || 1)
+                const positions = {
+                    'center':       { left: (cw - ew) / 2, top: (ch - eh) / 2 },
+                    'top-center':   { left: (cw - ew) / 2, top: 40 },
+                    'bottom-center':{ left: (cw - ew) / 2, top: ch - eh - 40 },
+                    'top-left':     { left: 40, top: 40 },
+                    'top-right':    { left: cw - ew - 40, top: 40 },
+                    'bottom-left':  { left: 40, top: ch - eh - 40 },
+                    'bottom-right': { left: cw - ew - 40, top: ch - eh - 40 },
+                }
+                const pos = positions[args.position] || positions['center']
+                el.set(pos)
+                changes.push(`position=${args.position}`)
+            }
+
+            if (changes.length === 0) return `No valid properties to update for "${el.customName || el.type}"`
+
+            el.setCoords()
+            fc.requestRenderAll()
+            return `Updated "${el.customName || el.type}": ${changes.join(', ')}`
+        }
+
         default:
-            return `Unknown tool: ${name}`
+            throw new Error(`Unknown tool: ${name}`)
     }
 }

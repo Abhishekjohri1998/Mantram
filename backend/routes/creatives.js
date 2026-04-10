@@ -24,7 +24,6 @@ import { startProgress, addStep, getProgress, endProgress } from '../utils/progr
 import { laozhangImageGenerate, laozhangMultimodalImageGenerate, isLaozhangAvailable } from '../agents/videoStudio/laozhangClient.js';
 import { getActiveProvider } from '../ai/providerRouting.js';
 
-import { creativeQueue } from '../utils/creativeQueue.js';
 
 const router = Router();
 
@@ -187,7 +186,8 @@ export async function internalGenerateCreative({ body, user, creditsDeducted, jo
                 runCreativePipeline({
                     brandId,
                     brief: prompt,
-                    type: type || 'instagram-post',
+                    format: type || 'instagram-post', // Changed to format to match node signature
+                    mode: 'fast', // Enforce fast-path to bypass sequential LLM criticism delays
                     options: options || {},
                     emit: async (agent, message, status, detail) => {
                         if (progressId) {

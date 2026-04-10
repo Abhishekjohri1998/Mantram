@@ -272,57 +272,41 @@ export default function Header({ title, subtitle, onMenuToggle }) {
                         </button>
                     )}
                     {creditBalance?.unlimited && (
-                        <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--sys-primary-dim)] border border-[var(--sys-border)]">
+                        <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary/10 border border-primary/20">
                             <span className="material-symbols-outlined text-lg text-primary">all_inclusive</span>
                             <span className="text-xs font-bold text-primary hidden md:inline">Unlimited</span>
                         </div>
                     )}
 
                     {/* Notifications */}
-                    <button className="p-2 transition-colors relative rounded-xl cursor-pointer" style={{ color: 'rgba(255,255,255,0.35)' }}
-                        onMouseEnter={e => { e.currentTarget.style.color = '#FF4D00'; e.currentTarget.style.background = 'rgba(255,77,0,0.06)' }}
-                        onMouseLeave={e => { e.currentTarget.style.color = 'rgba(255,255,255,0.35)'; e.currentTarget.style.background = 'transparent' }}>
+                    <button className="p-2 transition-colors relative rounded-xl cursor-pointer text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)]">
                         <span className="material-symbols-outlined text-xl">notifications</span>
-                        <span className="absolute top-2 right-2 w-2 h-2 rounded-full border" style={{ background: '#FF4D00', borderColor: '#08080C' }}></span>
+                        <span className="absolute top-2 right-2 w-2 h-2 rounded-full border-2 border-[var(--sys-bg)] bg-primary"></span>
                     </button>
 
-                    {/* Agent Fidato INTEL — Antigravity orange */}
+                    {/* Agent Fidato INTEL */}
                     <button
                         onClick={toggleFidato}
                         className="relative cursor-pointer group"
                         title="Agent Fidato — Competitive Intelligence"
                         style={{ padding: 0, background: 'none', border: 'none' }}
                     >
-                        <div className="absolute -inset-1 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"
-                            style={{ background: 'radial-gradient(circle, rgba(255,77,0,0.2) 0%, transparent 70%)', filter: 'blur(8px)' }} />
-                        <div className="relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl transition-all duration-300 group-hover:scale-[1.03]"
-                            style={{
-                                background: 'var(--sys-primary) 0%, rgba(255,112,67,0.06) 100%)',
-                                border: '1px solid rgba(255,77,0,0.3)',
-                                borderTopColor: 'rgba(255,77,0,0.45)',
-                                boxShadow: '0 0 12px rgba(255,77,0,0.12), inset 0 1px 0 rgba(255,77,0,0.08)',
-                            }}>
+                        <div className="absolute -inset-1 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-primary/20 blur-md" />
+                        <div className="relative flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all duration-300 group-hover:scale-[1.03] bg-[var(--sys-surface)] border border-[var(--sys-border)]">
                             <div className="relative">
-                                <span className="material-symbols-outlined text-lg group-hover:scale-110 transition-transform duration-300"
-                                    style={{ color: '#FF7043', filter: 'drop-shadow(0 0 4px rgba(255,77,0,0.5))' }}>shield</span>
+                                <span className="material-symbols-outlined text-lg group-hover:scale-110 transition-transform duration-300 text-primary">shield</span>
                                 {intelMissionCount > 0 && (
                                     <span className="absolute -top-0.5 -right-0.5 flex h-2 w-2">
-                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--sys-surface)] opacity-75" />
-                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-[var(--sys-surface)] border border-[var(--sys-border)]" />
+                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
+                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-primary border border-[var(--sys-bg)]" />
                                     </span>
                                 )}
                             </div>
-                            <span className="text-[10px] font-extrabold tracking-[0.15em] hidden sm:inline"
-                                style={{ color: '#FF7043', textShadow: '0 0 8px rgba(255,77,0,0.4)' }}>
+                            <span className="text-[10px] font-extrabold tracking-[0.15em] hidden sm:inline text-[var(--sys-text)]">
                                 INTEL
                             </span>
                             {intelMissionCount > 0 && (
-                                <span className="text-[9px] font-black rounded-full min-w-[16px] h-[16px] flex items-center justify-center"
-                                    style={{
-                                        background: 'var(--sys-primary)',
-                                        color: 'white',
-                                        boxShadow: '0 0 8px rgba(255,77,0,0.5)',
-                                    }}>
+                                <span className="text-[9px] font-black rounded-full min-w-[16px] h-[16px] flex items-center justify-center bg-primary text-white shadow-sm">
                                     {intelMissionCount}
                                 </span>
                             )}
@@ -341,18 +325,12 @@ export default function Header({ title, subtitle, onMenuToggle }) {
                             className="flex items-center gap-2 sm:gap-3 sm:pl-3 sm:border-l border-[var(--sys-border)] cursor-pointer hover:bg-[var(--sys-surface)] rounded-xl pr-1 sm:pr-2 py-1 transition-all"
                         >
                             <div className="text-right hidden md:block">
-                                <p className="text-base font-semibold text-[var(--sys-text)]">{user?.name || 'User'}</p>
-                                <p className="text-sm text-[var(--sys-text-muted)] uppercase tracking-wider font-medium">
+                                <p className="text-[13px] font-bold text-[var(--sys-text)] leading-tight">{user?.name || 'User'}</p>
+                                <p className="text-[10px] uppercase tracking-widest font-bold text-[var(--sys-text-muted)] mt-0.5">
                                     {user?.role === 'superadmin' ? 'Super Admin' : user?.role === 'admin' ? 'Admin' : user?.plan || 'Starter'}
                                 </p>
                             </div>
-                            <div className="size-9 sm:size-10 rounded-full flex items-center justify-center text-[var(--sys-text)] font-bold text-sm flex-shrink-0"
-                                style={{
-                                    background: 'var(--sys-primary)',
-                                    border: '2px solid rgba(255,77,0,0.4)',
-                                    boxShadow: '0 0 15px rgba(255,77,0,0.3)',
-                                    fontFamily: "'Space Grotesk', sans-serif"
-                                }}>
+                            <div className="size-9 sm:size-10 rounded-full flex items-center justify-center text-[var(--sys-text)] bg-[var(--sys-surface-hover)] font-bold text-sm flex-shrink-0 transition-all hover:-translate-y-0.5 border border-[var(--sys-border)]">
                                 {initials}
                             </div>
                             <span className="material-symbols-outlined text-[var(--sys-text-muted)] text-sm hidden sm:block">expand_more</span>
