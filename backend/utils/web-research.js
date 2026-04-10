@@ -66,7 +66,7 @@ let _cfSession = null; // { cookies: string, userAgent: string, solved: boolean 
  * Launches Chromium ONCE, navigates to the site, waits for challenge to pass,
  * then extracts cookies + UA for all subsequent HTTP requests.
  */
-async function solveCloudflare(url) {
+async function solveCloudflare(url, customUA = null) {
   if (_cfSession?.solved) return _cfSession;
 
   let pw;
@@ -86,7 +86,7 @@ async function solveCloudflare(url) {
       args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu', '--disable-dev-shm-usage']
     });
     const context = await browser.newContext({
-      userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+      userAgent: customUA || 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
       viewport: { width: 1280, height: 800 },
       ignoreHTTPSErrors: true,
     });
@@ -106,7 +106,13 @@ async function solveCloudflare(url) {
                   document.title.includes('Just a moment') ||
                   document.title.includes('Verifying'));
       });
-      if (!hasCfChallenge && !title.includes('Verifying') && !title.includes('Just a moment')) {
+      // Check if we are still on a challenge or block page
+      const currentTitle = title.toLowerCase();
+      const isStillBlocked = currentTitle.includes('access denied') || 
+                             currentTitle.includes('attention required') ||
+                             currentTitle.includes('one more step');
+
+      if (!hasCfChallenge && !title.includes('Verifying') && !title.includes('Just a moment') && !isStillBlocked) {
         solved = true;
         console.log(`🛡️  Cloudflare solved in ${((Date.now() - solveStart) / 1000).toFixed(1)}s — title: "${title.substring(0, 60)}"`);
         break;
@@ -130,10 +136,12 @@ async function solveCloudflare(url) {
       return Array.from(h1s).map(h => h.textContent?.trim()).filter(Boolean);
     });
 
+    const solvedHtml = await page.content();
+
     console.log(`🛡️  Extracted ${cookies.length} cookies, UA: ${ua.substring(0, 50)}...`);
     console.log(`🛡️  Homepage H1 (JS rendered): ${h1Data.length > 0 ? h1Data.join(', ').substring(0, 80) : 'NONE'}`);
 
-    _cfSession = { cookies: cookieStr, userAgent: ua, solved: true, homepageH1: h1Data };
+    _cfSession = { cookies: cookieStr, userAgent: ua, solved: true, homepageH1: h1Data, initialHtml: solvedHtml };
     await browser.close();
     return _cfSession;
   } catch (e) {
@@ -1148,37 +1156,58 @@ export async function researchDomain(baseUrl, options = {}) {
     const cleanBase = normalizedUrl.replace(/\/+$/, '');
 
     // Configurable crawl limits — callers can reduce for speed
-    const MAX_PAGES = options.maxPages || 800;
-    const CRAWL_TIMEOUT_MS = options.timeout || 3600000; // 1 hour budget
+    const MAX_PAGES = options.maxPages || 1000;
+    const CRAWL_TIMEOUT_MS = options.timeout || 600000; // 10 minute default budget for 'exhaustive' requests
     const skipCfSolve = options.skipCfSolve || false;
+    const customUA = options.userAgent;
 
     console.log(`🕷️  Deep crawl starting: ${cleanBase} (max ${MAX_PAGES} pages, timeout ${CRAWL_TIMEOUT_MS / 1000}s)`);
 
     // PHASE 0: Conditional Cloudflare challenge detection
     // Try a quick fetch first — only launch the expensive Playwright solver if CF is detected
     resetCfSession(); // Fresh session for each domain
+    
+    // If a custom UA is provided (e.g. for stealth), prime the session with it
+    if (customUA) {
+        _cfSession = { userAgent: customUA, cookies: '', solved: false };
+    }
+
     let _cfNeeded = false;
     if (!skipCfSolve) {
-      try {
-        const probeCtrl = new AbortController();
-        const probeTimer = setTimeout(() => probeCtrl.abort(), 8000);
-        const probeResp = await fetch(cleanBase, {
-            signal: probeCtrl.signal,
-            headers: { 'User-Agent': USER_AGENT, 'Accept': 'text/html,*/*;q=0.8' },
-            redirect: 'follow',
-        });
-        clearTimeout(probeTimer);
-        const probeHtml = await probeResp.text();
-        _cfNeeded = isBotChallengePage(probeHtml);
-        if (_cfNeeded) {
-            console.log(`🛡️  Cloudflare challenge DETECTED — launching solver...`);
-            await solveCloudflare(cleanBase);
-        } else {
-            console.log(`🛡️  No Cloudflare challenge — skipping solver (saved 15-30s)`);
+      if (options.stealth) {
+        console.log(`🛡️  Stealth mode enabled — forcing Playwright solver to bypass TLS fingerprinting`);
+        _cfNeeded = true;
+        await solveCloudflare(cleanBase, customUA);
+      } else {
+        try {
+          const probeCtrl = new AbortController();
+          const probeTimer = setTimeout(() => probeCtrl.abort(), 8000);
+          const probeResp = await fetch(cleanBase, {
+              signal: probeCtrl.signal,
+              headers: { 'User-Agent': customUA || USER_AGENT, 'Accept': 'text/html,*/*;q=0.8' },
+              redirect: 'follow',
+          });
+          clearTimeout(probeTimer);
+          
+          if (probeResp.status === 403 || probeResp.status === 401) {
+              console.log(`🛡️  Homepage probe rejected with HTTP ${probeResp.status} — assuming WAF/TLS block. Forcing solver.`);
+              _cfNeeded = true;
+              await solveCloudflare(cleanBase, customUA);
+          } else {
+              const probeHtml = await probeResp.text();
+              _cfNeeded = isBotChallengePage(probeHtml);
+              if (_cfNeeded) {
+                  console.log(`🛡️  Cloudflare challenge DETECTED — launching solver...`);
+                  await solveCloudflare(cleanBase, customUA);
+              } else {
+                  console.log(`🛡️  No Cloudflare challenge — skipping solver (saved 15-30s)`);
+              }
+          }
+        } catch (probeErr) {
+          console.log(`🛡️  Homepage probe failed (${probeErr.message}) — trying solver as fallback`);
+          _cfNeeded = true;
+          await solveCloudflare(cleanBase, customUA);
         }
-      } catch (probeErr) {
-        console.log(`🛡️  Homepage probe failed (${probeErr.message}) — trying solver as fallback`);
-        await solveCloudflare(cleanBase);
       }
     } else {
       console.log(`🛡️  CF solve skipped (fast mode)`);
@@ -1190,11 +1219,23 @@ export async function researchDomain(baseUrl, options = {}) {
     let homepageResult, robotsTxt, sitemap, llmsTxt;
 
     const _homepageFetchFn = async () => {
-            const { html, redirectChain, finalUrl } = await safeFetchWithRedirects(cleanBase);
-            if (!html) return { success: false, error: 'Empty response', redirectChain };
+        try {
+            let html, redirectChain, finalUrl, metaFetch;
 
-            // Also fetch metadata (status, timing, headers) via enhanced fetch
-            const metaFetch = await safeFetchWithMeta(finalUrl);
+            if (_cfSession?.initialHtml) {
+                console.log("🛡️  Using HTML extracted directly from Playwright CF solver to bypass TLS fingerprinting.");
+                html = _cfSession.initialHtml;
+                redirectChain = [];
+                finalUrl = cleanBase;
+                metaFetch = { status: 200, responseTimeMs: 1500, pageSizeBytes: html.length, headers: {} };
+            } else {
+                const fetchRes = await safeFetchWithRedirects(cleanBase);
+                html = fetchRes.html;
+                redirectChain = fetchRes.redirectChain;
+                finalUrl = fetchRes.finalUrl;
+                if (!html) return { success: false, error: 'Empty response', redirectChain };
+                metaFetch = await safeFetchWithMeta(finalUrl);
+            }
 
             const meta = extractMeta(html);
             const headings = extractHeadings(html);
@@ -1272,6 +1313,9 @@ export async function researchDomain(baseUrl, options = {}) {
                 externalUrls: links.externalUrls || [],
                 hasCacheControl: !!(metaFetch.headers?.cacheControl),
             };
+        } catch (e) {
+            return { url: cleanBase, success: false, error: e.message, redirectChain: [] };
+        }
     };
 
     if (_cfNeeded) {
@@ -1944,6 +1988,8 @@ export async function researchDomain(baseUrl, options = {}) {
         url: normalizedUrl,
         pages: allPages.map(p => ({
             url: p.url,
+            success: p.success,
+            isSoft404: p.isSoft404,
             title: p.title,
             metaDescription: p.metaDescription,
             h1: p.h1,

@@ -363,7 +363,14 @@ async function extractPricingFromWeb(url, modelsList, providerName) {
         });
 
         const result = await response.response;
-        const textResponse = result.text();
+        if (!result) return null;
+
+        const textResponse = result.text ? result.text() : null;
+        if (!textResponse) {
+            console.warn(`📊 [Pricing Monitor] Empty response from Gemini for ${providerName}`);
+            return null;
+        }
+
         let cleanJson = textResponse.trim();
         
         // Remove Markdown wrapping if present
@@ -381,7 +388,11 @@ async function extractPricingFromWeb(url, modelsList, providerName) {
         const resultJson = JSON.parse(cleanJson);
         return resultJson.models;
     } catch (e) {
-        console.warn(`⚠️ Failed to extract live pricing for ${providerName}:`, e.message);
+        if (e.message?.includes('503') || e.message?.includes('overloaded')) {
+             console.warn(`📊 [Pricing Monitor] Gemini overloaded (503) for ${providerName}. Skipping extraction.`);
+        } else {
+             console.warn(`⚠️ Failed to extract live pricing for ${providerName}:`, e.message);
+        }
         return null;
     }
 }

@@ -38,7 +38,9 @@ import { scoreSiteContent, formatContentScoresForPrompt } from '../utils/content
 import CompetitorSnapshot from '../models/CompetitorSnapshot.js';
 import { getRouter } from '../ai/router.js';
 import { extractJSON } from '../utils/ai-parser.js';
+import { buildSeoHealthReport } from '../services/seoReportService.js';
 import { buildBrandContext } from '../agents/shared/agentUtils.js';
+
 
 const router = Router();
 
@@ -112,6 +114,16 @@ router.post('/health-check', protect, requireStudio('seoStudio'), requireCredits
 
     const brandContext = buildBrandContext(brand || brandPayload);
 
+    // ── INITIALIZE JOB TRACKING ──
+    const auditRecord = await SeoAudit.create({
+      user: req.user._id,
+      brand: brand?._id || brandPayload?._id,
+      type: 'health-check',
+      url: website,
+      status: 'running'
+    });
+    const jobId = auditRecord._id;
+
     // STEP 1: FAST parallel data gathering — replaces 800-page crawl with APIs
     // researchDomainLight: homepage-only crawl (3-5s) for basic site structure
     // getInstantSiteIntelligence: DataForSEO APIs in parallel (5-10s) for ranked keywords, SERP competitors, instant page analysis
@@ -123,10 +135,14 @@ router.post('/health-check', protect, requireStudio('seoStudio'), requireCredits
     const dna = brandObj.dna || {};
     const country = dna.targetMarket || dna.country || 'India';
     
-    let [siteResearch, siteIntel, pageSpeedData, backlinkData, mozData] = await Promise.all([
-      researchDomain(website, { maxPages: 200, timeout: 60000 }).catch(e => {
-        console.error(`❌ Crawl failed: ${e.message}`);
-        return { url: website, pages: [], homepage: {}, siteIntelligence: { totalPages: 0 }, error: e.message };
+    // STEP 1: Orchestrated Crawling with Quality Guarding & Self-Healing Retries
+    // This replaces researchDomain + manual fallback with a deterministic validation layer.
+    let [reportData, siteIntel, pageSpeedData, backlinkData, mozData] = await Promise.all([
+      buildSeoHealthReport(website, { 
+        jobId, // PASS JOB ID for diagnostics
+        maxPages: 500, // Increased from 200 for user request
+        timeout: 300000, // 5 minutes (user requested exhaustive)
+        brandContext 
       }),
       isOnPageConfigured() ? getInstantSiteIntelligence(brandDomain, { country }).catch(e => {
         console.warn(`⚠️ Instant intelligence failed: ${e.message}`);
@@ -137,84 +153,54 @@ router.post('/health-check', protect, requireStudio('seoStudio'), requireCredits
       isMozConfigured() ? getMozDomainAuthority(brandDomain).catch(e => ({ available: false, error: e.message })) : Promise.resolve({ available: false }),
     ]);
 
-    // ── 429 FALLBACK: If crawl failed, use previous successful audit data ──
-    let crawlFailed = false;
-    if (siteResearch.error || !siteResearch.pages?.length) {
-      console.log('⚠️  Crawl returned 0 pages — checking for previous successful audit...');
-      try {
-        // Try a broad query first — look for any completed audit with real data
-        let prevAudit = await SeoAudit.findOne({
-          user: req.user?._id,
-          type: 'health-check',
-          'results.siteStats.pagesCrawled': { $gt: 0 }
-        }).sort({ createdAt: -1 }).lean();
+    // ── HALT ON CRAWL_PIPELINE_FAILURE: Complete Pipeline Diagnosis ──
+    if (reportData.status === 'CRAWL_PIPELINE_FAILURE') {
+      console.error(`🚨 SEO Pipeline Failure: ${website} | Stage: ${reportData.diagnosis?.stage}`);
+      
+      // Update job to failed
+      await SeoAudit.findByIdAndUpdate(jobId, {
+        status: 'failed',
+        error: reportData.userMessage || reportData.reason
+      });
 
-        // If no match with pagesCrawled > 0, try looking for totalPages > 0 or any siteStats
-        if (!prevAudit) {
-          prevAudit = await SeoAudit.findOne({
-            user: req.user?._id,
-            type: 'health-check',
-            'results.siteStats': { $exists: true }
-          }).sort({ createdAt: -1 }).lean();
-          console.log(`🔍 Fallback broad search: found=${!!prevAudit}, pagesCrawled=${prevAudit?.results?.siteStats?.pagesCrawled || 'N/A'}`);
-        }
-
-        if (prevAudit?.results?.siteStats) {
-          console.log(`✅ Found previous audit with ${prevAudit.results.siteStats.pagesCrawled} pages — using as fallback`);
-          crawlFailed = true;
-          // Reconstruct siteResearch from stored data
-          const ps = prevAudit.results.siteStats;
-          siteResearch = {
-            url: website,
-            pages: prevAudit.results.researchSources?.map(u => ({ url: u, title: '', h1: [] })) || [],
-            homepage: { title: ps.title || '', metaDescription: ps.metaDescription || '', h1: [], h2: [] },
-            siteIntelligence: {
-              totalPages: ps.totalPages || 0,
-              totalWordCount: ps.totalWordCount || 0,
-              avgWordCount: ps.avgWordCount || 0,
-              totalImages: ps.totalImages || 0,
-              imagesWithoutAlt: ps.imagesWithoutAlt || 0,
-              schemaTypes: ps.schemaTypes || [],
-              hasSchemaOrg: ps.hasSchemaOrg || false,
-              techStack: ps.techStack || [],
-              hasCanonical: ps.hasCanonical || false,
-              hasViewport: ps.hasViewport || false,
-              hasSitemap: ps.hasSitemap || false,
-              hasRobotsTxt: ps.hasRobotsTxt || false,
-              thinPageCount: ps.thinPageCount || 0,
-              duplicateContentCount: ps.duplicateContentCount || 0,
-              titleDuplicateCount: ps.titleDuplicateCount || 0,
-              metaDuplicateCount: ps.metaDuplicateCount || 0,
-              redirectChainCount: ps.redirectChainCount || 0,
-              missingH1Count: ps.missingH1Count || 0,
-              multipleH1Count: ps.multipleH1Count || 0,
-              missingH1Tags: ps.missingH1Tags || [],
-              multipleH1Pages: ps.multipleH1Pages || [],
-              missingMetaDescriptions: ps.missingMetaDescriptions || [],
-              brokenInternalCount: ps.brokenInternalCount || 0,
-              brokenInternalLinks: ps.brokenInternalLinks || [],
-              brokenExternalCount: ps.brokenExternalCount || 0,
-              permanentRedirectCount: ps.permanentRedirectCount || 0,
-              blockedByRobotsTxt: ps.blockedByRobotsTxt || { internalCount: 0 },
-              resourceScanning: ps.resourceScanning || { blockedResourceCount: 0, uncachedResourceCount: 0, unminifiedResourceCount: 0 },
-              emptyAnchorCount: ps.emptyAnchorCount || 0,
-              nofollowInternalCount: ps.nofollowInternalCount || 0,
-              headingIssues: { skippedCount: ps.skippedHeadingCount || 0, multipleH1Count: ps.multipleH1Count || 0 },
-              singleIncomingCount: ps.singleIncomingCount || 0,
-              orphanPages: ps.orphanPages || [],
-              lowTextRatioCount: ps.lowTextRatioCount || 0,
-              avgTextToHtmlRatio: ps.avgTextToHtmlRatio || 0,
-              metaRobotsIssues: { noindexCount: ps.noindexCount || 0 },
-            },
-            _fallbackFromPrevious: true,
-          };
-        }
-      } catch (fallbackErr) {
-        console.error('⚠️  Fallback lookup failed:', fallbackErr.message);
-      }
+      return res.status(200).json({
+        success: false,
+        status: 'CRAWL_PIPELINE_FAILURE',
+        error: reportData.userMessage,
+        diagnosis: reportData.diagnosis, // Full pipeline trace
+        strategyUsed: reportData.strategyUsed,
+        attemptsMade: reportData.attemptsMade
+      });
     }
 
-    const siteData = formatSiteResearch(siteResearch);
+    // ── HALT ON CRAWL_INVALID: Block Hallucination Risk ──
+    if (reportData.status === 'CRAWL_INVALID') {
+      console.error(`🛑 SEO Audit Guard: Blocking hallucination risk for ${website}. Reason: ${reportData.reason}`);
+      
+      // Update job to failed
+      await SeoAudit.findByIdAndUpdate(jobId, {
+        status: 'failed',
+        error: reportData.reason
+      });
+
+      return res.status(200).json({
+        success: false,
+        error: reportData.message, // "Recrawl Required: High Hallucination Risk"
+        diagnosis: reportData.diagnosis, // Tiered failure feedback
+        metrics: reportData.metrics,
+        strategyUsed: reportData.strategyUsed,
+        attemptsMade: reportData.attemptsMade
+      });
+    }
+
+    // Extract core research result (either FULL or PARTIAL)
+    const siteResearch = reportData.siteResearch;
+    const pages = reportData.pages;
+    const audit = reportData.audit;
+    const reportMode = reportData.status; // 'FULL' or 'PARTIAL'
+
+
+    const siteData = formatSiteResearch(siteResearch?.siteIntelligence || {});
     const pageSpeedText = formatPageSpeedForPrompt(pageSpeedData);
     const backlinkText = formatBacklinkDataForPrompt(backlinkData);
     const mozText = formatMozDataForPrompt(mozData);
@@ -266,7 +252,9 @@ Average text-to-HTML ratio: ${siMetrics.avgTextToHtmlRatio || 0}%
 
     const systemPrompt = `You are a SENIOR SEO STRATEGIST (not just an auditor). You think like a CMO + technical SEO expert combined. You have REAL CRAWL DATA — use it as ground truth. Never guess or contradict the crawl.
 
-CRITICAL RULE: The "DETERMINISTIC CRAWL METRICS" section below contains EXACT counts from the real crawl. You MUST use these exact numbers in your issues. DO NOT make up your own H1, broken link, redirect, or other counts — use ONLY the numbers given. For example, if the data says "Missing H1 tags: N pages", you must report exactly N, not "homepage + 2 pages".
+CRITICAL RULE: The "DETERMINISTIC CRAWL METRICS" section below contains EXACT counts from the real crawl. You MUST use these exact numbers in your issues. DO NOT make up your own H1, broken link, redirect, or other counts — use ONLY the numbers given.
+
+${reportMode === 'PARTIAL' ? 'REPORTING MODE: PARTIAL CRAWL DETECTED. The data for this site is sparse/partial. DO NOT generate complex strategic narratives or authority claims. Mark all findings as "ESTIMATED" and focus ONLY on the immediate technical blocking issues discovered.' : ''}
 
 IMPORTANT: Do NOT generate issues for ANY of these deterministic metrics — they are ALREADY displayed as separate checks in the report:
 - Missing H1 tags, multiple H1 tags
@@ -375,11 +363,15 @@ Generate 8-15 critical, high-impact issues. Be STRATEGIC — every issue must ha
             _aiTimedOut: true,
         };
     }
-    parsed.researchSources = siteResearch.pages?.map(p => p.url) || [website];
+    parsed.researchSources = pages?.map(p => p.url) || [website];
+    parsed.auditQuality = audit;
+    parsed.findingsMode = reportData.findingsMode; // ESTIMATED vs MEASURED
+    parsed.attemptsMade = reportData.attemptsMade;
+    parsed.strategyUsed = reportData.strategyUsed;
+
 
     // ── Inject REAL crawl data into AI results (AI only generates scores/strategy) ──
-    const si = siteResearch?.siteIntelligence || {};
-    const pages = siteResearch?.pages || [];
+    const si = siMetrics;
     parsed.siteStats = {
       pagesCrawled: si.totalPages || 0,
       totalWordCount: si.totalWordCount || 0,
@@ -791,11 +783,7 @@ Generate 8-15 critical, high-impact issues. Be STRATEGIC — every issue must ha
     // Save audit
     if (req.user) {
       try {
-        await SeoAudit.create({
-          user: req.user._id,
-          brand: brand?._id || brandPayload?._id,
-          type: 'health-check',
-          url: website,
+        await SeoAudit.findByIdAndUpdate(jobId, {
           scores: {
             seoHealth: parsed.seoHealthScore || 0,
             aiVisibility: parsed.aiVisibilityScore || 0,

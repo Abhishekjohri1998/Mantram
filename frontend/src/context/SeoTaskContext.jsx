@@ -163,7 +163,11 @@ export function SeoTaskProvider({ children, onNavigate }) {
                             error: { 
                                 message: e.message, 
                                 isProviderError: e.isProviderError, 
-                                provider: e.provider 
+                                provider: e.provider,
+                                diagnosis: e.diagnosis,
+                                metrics: e.metrics,
+                                strategyUsed: e.strategyUsed,
+                                attemptsMade: e.attemptsMade
                             }, 
                             stage: '' 
                         }
