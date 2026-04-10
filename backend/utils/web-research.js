@@ -406,16 +406,49 @@ function detectTechSignals(html) {
 }
 
 function getBodyText(html) {
-    // Remove script, style, nav, header, footer
-    let clean = html.replace(/<(script|style|nav|header|footer|noscript)[^>]*>[\s\S]*?<\/\1>/gi, '');
+    // ── Aggressive Semantic Filtering ──
+    // Remove script, style, nav, header, footer, aside, and hidden elements
+    let clean = html.replace(/<(script|style|nav|header|footer|aside|noscript|form|svg|iframe)[^>]*>[\s\S]*?<\/\1>/gi, '');
+    
+    // Remove comments
+    clean = clean.replace(/<!--[\s\S]*?-->/g, '');
+    
+    // Strip tags but keep spacing
     clean = stripTags(clean);
+    
+    // Normalize whitespace
     clean = clean.replace(/\s+/g, ' ').trim();
+    
     return clean;
 }
 
 function getWordCount(text) {
-    return text.split(/\s+/).filter(w => w.length > 1).length;
+    if (!text) return 0;
+    // Semrush logic: exclude very short words (<=2 chars) that are usually noise like 'a', 'the', 'of' 
+    // when calculating MEANINGFUL word count for thin content detection
+    return text.split(/\s+/).filter(w => w.length > 2).length;
 }
+
+/** Detect breadcrumbs for site hierarchy accuracy */
+function extractBreadcrumbs(html) {
+    const breadcrumbs = [];
+    const selectors = [
+        /class=["'][^"']*breadcrumb[^"']*["']/i,
+        /aria-label=["']breadcrumb["']/i,
+        /itemtype=["']http:\/\/schema\.org\/BreadcrumbList["']/i
+    ];
+    
+    const hasBreadcrumb = selectors.some(s => s.test(html));
+    return { hasBreadcrumb, count: hasBreadcrumb ? 1 : 0 };
+}
+
+/** Validate social preview tags (Open Graph & Twitter) */
+function validateSocialTags(meta) {
+    const og = !!(meta['og:title'] && meta['og:image']);
+    const twitter = !!(meta['twitter:title'] && meta['twitter:image']);
+    return { og, twitter, complete: og && twitter };
+}
+
 
 // ============================================================================
 // ADVANCED EXTRACTION — Beats Semrush/Ahrefs
@@ -615,6 +648,9 @@ export async function crawlPage(url) {
         const bodyText = getBodyText(html);
         const wordCount = getWordCount(bodyText);
 
+        const breadcrumbs = extractBreadcrumbs(html);
+        const socialTags = validateSocialTags(meta);
+
         // ── Soft-404 detection (SPA sites return 200 with a 404 page body) ──
         const titleLower = (meta.title || '').toLowerCase().trim();
         const h1Texts = headings.filter(h => h.level === 1).map(h => h.text.trim());
@@ -665,6 +701,8 @@ export async function crawlPage(url) {
             h2: headings.filter(h => h.level === 2).map(h => h.text),
             h3: headings.filter(h => h.level === 3).map(h => h.text),
             jsonLd,
+            breadcrumbs: breadcrumbs.hasBreadcrumb,
+            socialTags,
             hasSchemaOrg: jsonLd.length > 0,
             schemaTypes: jsonLd.map(s => s['@type']).filter(Boolean),
             links,
@@ -941,30 +979,38 @@ function computeDuplicates(pages) {
             const stripped = stripBoilerplate(p.bodyTextFull || p.contentSnippet || '');
             return { url: p.url, fp: stripped ? contentFingerprint(stripped) : new Set(), wordCount: p.wordCount || 0 };
         })
-        .filter(p => p.fp.size > 0); // Exclude pages with empty fingerprints
+        .filter(p => p.fp.size > 0);
 
-    // Content duplicates — 99%+ similarity ONLY (Semrush reports near-0 for most sites)
-    // 95% was catching templated pages (same layout, different products) as duplicates
     const contentDuplicates = [];
+    const nearDuplicates = []; // 85% to 98% similarity
+    
     for (let i = 0; i < fingerprints.length; i++) {
         for (let j = i + 1; j < fingerprints.length; j++) {
             const sim = jaccardSimilarity(fingerprints[i].fp, fingerprints[j].fp);
+            const simPercent = Math.round(sim * 100);
+            
             if (sim > 0.99) {
                 contentDuplicates.push({
                     page1: fingerprints[i].url,
                     page2: fingerprints[j].url,
-                    similarity: Math.round(sim * 100),
+                    similarity: simPercent,
                     level: 'exact-duplicate',
+                });
+            } else if (sim >= 0.85) {
+                nearDuplicates.push({
+                    page1: fingerprints[i].url,
+                    page2: fingerprints[j].url,
+                    similarity: simPercent,
+                    level: 'near-duplicate',
                 });
             }
         }
     }
 
-    // Duplicate titles (exact match, non-empty) — Semrush reports these separately
     const titleMap = new Map();
     for (const p of pages) {
         const t = (p.title || '').trim().toLowerCase();
-        if (t.length < 5) continue; // skip empty/too-short
+        if (t.length < 5) continue;
         if (!titleMap.has(t)) titleMap.set(t, []);
         titleMap.get(t).push(p.url);
     }
@@ -972,7 +1018,6 @@ function computeDuplicates(pages) {
         .filter(([, urls]) => urls.length > 1)
         .map(([title, urls]) => ({ title, count: urls.length, urls: urls.slice(0, 5) }));
 
-    // Duplicate meta descriptions (exact match, non-empty) — Semrush reports these separately
     const metaMap = new Map();
     for (const p of pages) {
         const d = (p.metaDescription || '').trim().toLowerCase();
@@ -984,21 +1029,19 @@ function computeDuplicates(pages) {
         .filter(([, urls]) => urls.length > 1)
         .map(([desc, urls]) => ({ description: desc.substring(0, 80) + '...', count: urls.length, urls: urls.slice(0, 5) }));
 
-    // Total duplicate count: Semrush-style (separate categories)
-    const titleDuplicateCount = duplicateTitles.reduce((s, d) => s + d.count, 0);
-    const metaDuplicateCount = duplicateMetaDescriptions.reduce((s, d) => s + d.count, 0);
-
     return {
         contentDuplicates,
+        nearDuplicates,
         duplicateTitles,
         duplicateMetaDescriptions,
         contentDuplicateCount: contentDuplicates.length,
-        titleDuplicateCount,
-        metaDuplicateCount,
-        // Semrush-parity: combined count reported as "X duplicate content issues"
-        totalDuplicateIssues: contentDuplicates.length + titleDuplicateCount + metaDuplicateCount,
+        nearDuplicateCount: nearDuplicates.length,
+        titleDuplicateCount: duplicateTitles.reduce((s, d) => s + d.count, 0),
+        metaDuplicateCount: duplicateMetaDescriptions.reduce((s, d) => s + d.count, 0),
+        totalDuplicateIssues: contentDuplicates.length + nearDuplicates.length + duplicateTitles.length + duplicateMetaDescriptions.length,
     };
 }
+
 
 
 // ============================================================================
@@ -1255,6 +1298,8 @@ export async function researchDomain(baseUrl, options = {}) {
             const headingHierarchy = validateHeadingHierarchy(headings);
             const metaRobots = extractMetaRobots(meta);
             const securityHeaders = analyzeSecurityHeaders(metaFetch.headers);
+            const breadcrumbs = extractBreadcrumbs(html);
+            const socialTags = validateSocialTags(meta);
 
             return {
                 url: finalUrl,
@@ -1262,8 +1307,8 @@ export async function researchDomain(baseUrl, options = {}) {
                 // Response metadata
                 statusCode: metaFetch.status || 200,
                 responseTimeMs: metaFetch.responseTimeMs || 0,
-                pageSizeBytes: metaFetch.pageSizeBytes || new Blob([html]).size,
-                pageSizeKB: Math.round((metaFetch.pageSizeBytes || new Blob([html]).size) / 1024),
+                pageSizeBytes: metaFetch.pageSizeBytes || (typeof Blob !== 'undefined' ? new Blob([html]).size : html.length),
+                pageSizeKB: Math.round((metaFetch.pageSizeBytes || (typeof Blob !== 'undefined' ? new Blob([html]).size : html.length)) / 1024),
                 // Existing fields
                 title: meta.title || '',
                 metaDescription: meta.description || '',
@@ -1276,6 +1321,8 @@ export async function researchDomain(baseUrl, options = {}) {
                 h2: headings.filter(h => h.level === 2).map(h => h.text),
                 h3: headings.filter(h => h.level === 3).map(h => h.text),
                 jsonLd,
+                breadcrumbs: breadcrumbs.hasBreadcrumb,
+                socialTags,
                 hasSchemaOrg: jsonLd.length > 0,
                 schemaTypes: jsonLd.map(s => s['@type']).filter(Boolean),
                 links,
@@ -1592,7 +1639,7 @@ export async function researchDomain(baseUrl, options = {}) {
                                 return null; // CF challenge page — skip
                             }
 
-                            const pageData = await tab.evaluate(() => {
+                            const pageData = await tab.evaluate(async () => {
                                 const title = document.title || '';
                                 const meta = {};
                                 document.querySelectorAll('meta').forEach(m => {
@@ -1600,6 +1647,19 @@ export async function researchDomain(baseUrl, options = {}) {
                                     const content = m.getAttribute('content');
                                     if (name && content) meta[name.toLowerCase()] = content;
                                 });
+
+                                // Capture Performance Metrics
+                                const getPerfMetrics = () => {
+                                    const paint = performance.getEntriesByType('paint');
+                                    const fcp = paint.find(p => p.name === 'first-contentful-paint')?.startTime || 0;
+                                    const navigation = performance.getEntriesByType('navigation')[0];
+                                    const ttfb = navigation ? navigation.responseStart - navigation.requestStart : 0;
+                                    const lcpEntry = performance.getEntriesByType('largest-contentful-paint');
+                                    const lcp = lcpEntry.length > 0 ? lcpEntry[lcpEntry.length - 1].startTime : 0;
+                                    return { fcp, ttfb, lcp };
+                                };
+
+                                const perf = getPerfMetrics();
 
                                 const headings = [];
                                 [1,2,3,4,5,6].forEach(level => {
@@ -1613,8 +1673,11 @@ export async function researchDomain(baseUrl, options = {}) {
                                     try { jsonLd.push(JSON.parse(s.textContent)); } catch {}
                                 });
 
-                                const bodyText = document.body?.innerText || '';
-                                const wordCount = bodyText.split(/\s+/).filter(w => w.length > 1).length;
+                                // Semantic Word Count (excluding boilerplate children)
+                                const bodyClone = document.body.cloneNode(true);
+                                bodyClone.querySelectorAll('header, nav, footer, aside, script, style, noscript, form, svg, iframe').forEach(el => el.remove());
+                                const bodyText = bodyClone.innerText || '';
+                                const wordCount = bodyText.split(/\s+/).filter(w => w.length > 2).length;
                                 
                                 const imgs = document.querySelectorAll('img');
                                 let imgTotal = 0, imgNoAlt = 0;
@@ -1623,7 +1686,7 @@ export async function researchDomain(baseUrl, options = {}) {
                                     const src = img.src || img.getAttribute('src') || '';
                                     if (!src || src.startsWith('data:') || src === '#') return;
                                     const rect = img.getBoundingClientRect();
-                                    if (rect.width < 3 || rect.height < 3) return;
+                                    if (rect.width < 5 || rect.height < 5) return; // ignore tracking pixels
                                     imgTotal++;
                                     if (!(img.alt || '').trim()) { imgNoAlt++; srcsMissingAlt.push(src); }
                                 });
@@ -1640,11 +1703,7 @@ export async function researchDomain(baseUrl, options = {}) {
                                 });
 
                                 const canonical = document.querySelector('link[rel="canonical"]')?.href || '';
-                                
-                                const hreflang = [];
-                                document.querySelectorAll('link[rel="alternate"][hreflang]').forEach(l => {
-                                    hreflang.push({ lang: l.getAttribute('hreflang'), url: l.href });
-                                });
+                                const hreflang = Array.from(document.querySelectorAll('link[rel="alternate"][hreflang]')).map(l => ({ lang: l.getAttribute('hreflang'), url: l.href }));
 
                                 const mixedContent = [];
                                 if (location.protocol === 'https:') {
@@ -1653,16 +1712,22 @@ export async function researchDomain(baseUrl, options = {}) {
                                     });
                                 }
 
-                                const cssTotal = document.querySelectorAll('link[rel="stylesheet"]').length;
-                                const jsTotal = document.querySelectorAll('script[src]').length;
+                                const breadcrumbs = !!(document.querySelector('.breadcrumb') || document.querySelector('[aria-label="breadcrumb"]') || document.querySelector('[itemtype*="BreadcrumbList"]'));
+                                const socialTags = {
+                                    og: !!(document.querySelector('meta[property="og:title"]') && document.querySelector('meta[property="og:image"]')),
+                                    twitter: !!(document.querySelector('meta[name="twitter:title"]') && document.querySelector('meta[name="twitter:image"]'))
+                                };
 
                                 return { 
                                     title, meta, headings, jsonLd, wordCount, 
                                     imgTotal, imgNoAlt, srcsMissingAlt, links, canonical, 
-                                    bodyText: bodyText.substring(0, 10000), // Larger snippet for duplicate detection
-                                    hreflang, mixedContent,
+                                    bodyText: bodyText.substring(0, 5000), // refined for duplicate detection
+                                    hreflang, mixedContent, perf, breadcrumbs, socialTags,
                                     langAttr: document.documentElement.lang || '',
-                                    resources: { cssTotal, jsTotal },
+                                    resources: { 
+                                        cssTotal: document.querySelectorAll('link[rel="stylesheet"]').length, 
+                                        jsTotal: document.querySelectorAll('script[src]').length 
+                                    },
                                     viewport: meta['viewport'] || '',
                                     htmlLength: document.documentElement.outerHTML.length
                                 };
@@ -1672,10 +1737,10 @@ export async function researchDomain(baseUrl, options = {}) {
                             const h1Lower = (pageData.headings.find(h => h.level === 1)?.text || '').toLowerCase();
                             if (h1Lower.includes('verify') || h1Lower.includes('checking') ||
                                 h1Lower.includes('just a moment') || h1Lower.includes('please wait')) {
-                                return null; // CF challenge in body
+                                return null; 
                             }
 
-                            // Skip empty/broken pages (didn't render properly)
+                            // Skip empty/broken pages
                             if (pageData.wordCount < 5 && !pageData.title) return null;
 
                             const titleLwr = (pageData.title || '').toLowerCase();
@@ -1683,7 +1748,6 @@ export async function researchDomain(baseUrl, options = {}) {
                                 titleLwr === 'page not found' || titleLwr === 'not found' ||
                                 (pageData.headings.filter(h => h.level === 1).some(h => /^(404|page not found|not found)$/i.test(h.text)));
 
-                            // Process robots
                             const robotsStr = (pageData.meta['robots'] || '').toLowerCase();
                             const metaRobots = {
                                 raw: robotsStr,
@@ -1692,7 +1756,6 @@ export async function researchDomain(baseUrl, options = {}) {
                                 hasDirectives: robotsStr.length > 0
                             };
 
-                            // Validate hierarchy
                             let lastLevel = 0;
                             const skippedLevels = [];
                             for (const h of pageData.headings) {
@@ -1703,6 +1766,7 @@ export async function researchDomain(baseUrl, options = {}) {
                             return {
                                 url, success: true, isSoft404, jsRendered: true,
                                 statusCode, responseTimeMs, 
+                                perf: pageData.perf, // NEW: FCP, TTFB, LCP
                                 pageSizeBytes: pageData.htmlLength, 
                                 pageSizeKB: Math.round(pageData.htmlLength / 1024),
                                 title: pageData.title, 
@@ -1713,6 +1777,8 @@ export async function researchDomain(baseUrl, options = {}) {
                                 h2: pageData.headings.filter(h => h.level === 2).map(h => h.text),
                                 h3: pageData.headings.filter(h => h.level === 3).map(h => h.text),
                                 jsonLd: pageData.jsonLd,
+                                breadcrumbs: pageData.breadcrumbs,
+                                socialTags: pageData.socialTags,
                                 hasSchemaOrg: pageData.jsonLd.length > 0,
                                 schemaTypes: pageData.jsonLd.map(s => s['@type']).filter(Boolean),
                                 images: { total: pageData.imgTotal, withAlt: pageData.imgTotal - pageData.imgNoAlt, withoutAlt: pageData.imgNoAlt, srcsMissingAlt: pageData.srcsMissingAlt },
@@ -1737,6 +1803,7 @@ export async function researchDomain(baseUrl, options = {}) {
                                 urlLength: url.length,
                                 urlTooLong: url.length > 75,
                             };
+
                         } catch (e) {
                             console.error(`🖥️  Playwright re-crawl fail for ${url}: ${e.message}`);
                             return null;
@@ -2280,6 +2347,28 @@ export async function researchDomain(baseUrl, options = {}) {
                 skippedCount: allPages.filter(p => !p.headingHierarchy?.valid).length,
                 multipleH1Count: allPages.filter(p => (p.h1?.length || 0) > 1).length,
             },
+
+            // ── Performance Metrics (NEW: FCP, TTFB, LCP) ──
+            perf: {
+                avgFcp: Math.round(allPages.filter(p => p.jsRendered).reduce((s, p) => s + (p.perf?.fcp || 0), 0) / Math.max(1, allPages.filter(p => p.jsRendered && p.perf?.fcp).length)) || 0,
+                avgTtfb: Math.round(allPages.reduce((s, p) => s + (p.perf?.ttfb || p.responseTimeMs || 0), 0) / allPages.length),
+                avgLcp: Math.round(allPages.filter(p => p.jsRendered).reduce((s, p) => s + (p.perf?.lcp || 0), 0) / Math.max(1, allPages.filter(p => p.jsRendered && p.perf?.lcp).length)) || 0,
+            },
+
+            // ── Near Duplicates (NEW: Cannibalization Check) ──
+            nearDuplicates: duplicateContent.nearDuplicates || [],
+            nearDuplicateCount: duplicateContent.nearDuplicateCount || 0,
+
+            // ── Breadcrumbs & Social Tags (NEW) ──
+            missingBreadcrumbsCount: allPages.filter(p => !p.isSoft404 && !p.breadcrumbs).length,
+            missingSocialTagsCount: allPages.filter(p => !p.isSoft404 && (!p.socialTags?.og || !p.socialTags?.twitter)).length,
+            
+            // Meta Robots & Redirects
+            metaRobotsIssues: {
+                noindexCount: allPages.filter(p => p.metaRobots?.noindex).length,
+                nofollowCount: allPages.filter(p => p.metaRobots?.nofollow).length,
+            },
+
 
             // Title quality
             titleQuality: {

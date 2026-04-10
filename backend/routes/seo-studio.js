@@ -225,6 +225,7 @@ Thin pages (<300 words): ${siMetrics.thinPageCount || 0}
 Duplicate titles: ${siMetrics.titleDuplicateCount || 0}
 Duplicate meta descriptions: ${siMetrics.metaDuplicateCount || 0}
 Missing meta descriptions: ${siMetrics.missingMetaDescriptions?.length || 0}
+Duplicate content: ${siMetrics.contentDuplicateCount || 0} exact, ${siMetrics.nearDuplicateCount || 0} near-duplicates
 Missing alt text: ${siMetrics.imagesWithoutAlt || 0} images
 Blocked by robots.txt: ${siMetrics.blockedByRobotsTxt?.internalCount || 0} internal pages
 Blocked JS/CSS resources: ${siMetrics.resourceScanning?.blockedResourceCount || 0}
@@ -234,6 +235,8 @@ Noindex pages: ${siMetrics.metaRobotsIssues?.noindexCount || 0}
 Nofollow internal links: ${siMetrics.nofollowInternalCount || 0}
 Empty anchor text links: ${siMetrics.emptyAnchorCount || 0}
 Pages with skipped heading levels: ${siMetrics.headingIssues?.skippedCount || 0}
+Pages without breadcrumbs: ${siMetrics.missingBreadcrumbsCount || 0}
+Pages without social preview (OG/Twitter): ${siMetrics.missingSocialTagsCount || 0}
 Single incoming internal link: ${siMetrics.singleIncomingCount || 0}
 Orphan pages: ${siMetrics.orphanPages?.length || 0}
 Schema types found: ${(siMetrics.schemaTypes || []).join(', ') || 'NONE'}
@@ -241,6 +244,9 @@ Sitemap found: ${siMetrics.hasSitemap ? 'Yes' : 'No'}
 Robots.txt found: ${siMetrics.hasRobotsTxt ? 'Yes' : 'No'}
 Low text-to-HTML ratio pages: ${siMetrics.lowTextRatioCount || 0}
 Average text-to-HTML ratio: ${siMetrics.avgTextToHtmlRatio || 0}%
+Average Response Time: ${siMetrics.responseTime?.avg || 0}ms
+Average FCP: ${siMetrics.perf?.avgFcp || 0}ms
+Average TTFB: ${siMetrics.perf?.avgTtfb || 0}ms
 `;
 
     // AI timeout: Phase 1 now completes in 5-10s (APIs), so AI gets max budget
@@ -427,10 +433,17 @@ Generate 8-15 critical, high-impact issues. Be STRATEGIC — every issue must ha
       metaDuplicateCount: si.metaDuplicateCount || 0,
       multipleH1Count: si.multipleH1Count || 0,
       missingH1Count: si.missingH1Count || 0,
+      nearDuplicateCount: si.nearDuplicateCount || 0,
+      missingBreadcrumbsCount: si.missingBreadcrumbsCount || 0,
+      missingSocialTagsCount: si.missingSocialTagsCount || 0,
       lowTextRatioCount: si.lowTextRatioCount || 0,
       avgTextToHtmlRatio: si.avgTextToHtmlRatio || 0,
       oversizedPageCount: si.oversizedPageCount || 0,
       singleIncomingCount: si.singleIncomingCount || 0,
+      // Performance metrics context
+      avgFcp: si.perf?.avgFcp || 0,
+      avgTtfb: si.perf?.avgTtfb || 0,
+      avgLcp: si.perf?.avgLcp || 0,
       // Resource scanning (Semrush parity: blocked/uncached/unminified JS/CSS)
       blockedResourceCount: si.resourceScanning?.blockedResourceCount || 0,
       uncachedResourceCount: si.resourceScanning?.uncachedResourceCount || 0,
@@ -469,6 +482,10 @@ Generate 8-15 critical, high-impact issues. Be STRATEGIC — every issue must ha
       title: p.title || 'Untitled',
       statusCode: p.statusCode || 200,
       responseTimeMs: p.responseTimeMs || 0,
+      // ── NEW: Performance Metrics ──
+      fcpMs: p.perf?.fcp || 0,
+      ttfbMs: p.perf?.ttfb || p.responseTimeMs || 0,
+      lcpMs: p.perf?.lcp || 0,
       pageSizeKB: p.pageSizeKB || 0,
       wordCount: p.wordCount || 0,
       titleLength: p.titleLength || 0,
@@ -478,11 +495,14 @@ Generate 8-15 critical, high-impact issues. Be STRATEGIC — every issue must ha
       imagesWithoutAlt: p.images?.withoutAlt || 0,
       headingHierarchyValid: p.headingHierarchy?.valid ?? true,
       hasSchema: p.hasSchemaOrg || false,
+      breadcrumbs: p.breadcrumbs || false,
+      socialTags: p.socialTags || { og: false, twitter: false, complete: false },
       hasCanonical: !!p.canonical,
       urlTooLong: p.urlTooLong || false,
       textToHtmlRatio: p.textToHtmlRatio || 0,
       metaRobots: p.metaRobots || {},
     }));
+
 
     // ── BUILD DETERMINISTIC GROUPED ISSUES FROM CRAWL DATA (Semrush parity) ──
     // Each issue has: check, value, issueType, aboutThisIssue, howToFix, affectedUrls
@@ -618,7 +638,30 @@ Generate 8-15 critical, high-impact issues. Be STRATEGIC — every issue must ha
       howToFix: 'Optimize server response time with caching, CDN, and efficient database queries. Target under 200ms server response. Learn more: https://web.dev/articles/ttfb',
       affectedUrls: [],
     });
+
+    if (st.nearDuplicateCount > 0) deterministicChecks.push({
+      check: `${st.nearDuplicateCount} near-duplicate content issues`, value: st.nearDuplicateCount, issueType: 'warning',
+      aboutThisIssue: 'Near-duplicate pages (85-98% similar) cause "keyword cannibalization." Google may struggle to decide which page is the authority, often diluting the ranking power of both.',
+      howToFix: 'Consolidate highly similar pages using 301 redirects, or differentiate the content by adding unique value to each page. Ensure each page targets a unique user intent.',
+      affectedUrls: (si.nearDuplicates || []).slice(0, 5).map(d => d.page1),
+    });
+
+    if (st.missingBreadcrumbsCount > 0) deterministicChecks.push({
+      check: `${st.missingBreadcrumbsCount} pages without breadcrumbs`, value: st.missingBreadcrumbsCount, issueType: 'notice',
+      aboutThisIssue: 'Breadcrumbs help users and search engines understand the structural hierarchy of a site. They contribute to a better UX and can appear as rich snippets in Google search results.',
+      howToFix: 'Implement BreadcrumbList schema and visible breadcrumb navigation on all deep pages to improve navigation and crawlability.',
+      affectedUrls: [],
+    });
+
+    if (st.missingSocialTagsCount > 0) deterministicChecks.push({
+      check: `${st.missingSocialTagsCount} pages with incomplete social previews`, value: st.missingSocialTagsCount, issueType: 'notice',
+      aboutThisIssue: 'Open Graph (OG) and Twitter card tags control how your content looks when shared on social media. Incomplete tags can lead to low click-through rates from social platforms.',
+      howToFix: 'Add og:title, og:image, twitter:title, and twitter:image meta tags to all pages. Use high-quality, relevant preview images to maximize engagement.',
+      affectedUrls: [],
+    });
+
     if ((st.oversizedPageCount || 0) > 0) deterministicChecks.push({
+
       check: `${st.oversizedPageCount} oversized pages (>3MB)`, value: st.oversizedPageCount, issueType: 'warning',
       aboutThisIssue: 'Pages over 3MB take significantly longer to load, especially on mobile networks. Large pages are penalized by Core Web Vitals metrics and increase bounce rate.',
       howToFix: 'Compress images, minify CSS/JS, lazy-load below-fold resources, remove unused code. Target total page size under 1.5MB.',
@@ -670,7 +713,9 @@ Generate 8-15 critical, high-impact issues. Be STRATEGIC — every issue must ha
       /\bduplicate.*title\b/i, /\btitle.*duplicate\b/i,
       /\bbroken.*link\b/i, /\b(4[0-9]{2}).*link\b/i, /\blink.*broken\b/i,
       /\bredirect.*chain\b/i, /\bmeta.*description\b/i, /\bthin.*page\b/i, /\bthin.*content\b/i,
+      /\bbreadcrumb\b/i, /\bsocial.*tag\b/i, /\bog:title\b/i, /\btwitter.*card\b/i, /\bnear.*duplicate\b/i,
     ];
+
     const aiIssues = (parsed.issues || []).map(i => ({
       check: i.title, value: i.description || '', issueType: i.severity === 'critical' ? 'error' : i.severity === 'high' ? 'error' : i.severity === 'medium' ? 'warning' : 'notice',
       aboutThisIssue: i.whyItMatters || i.description || '', howToFix: i.fix || '', affectedUrls: [],

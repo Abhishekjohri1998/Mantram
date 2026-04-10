@@ -1547,10 +1547,12 @@ function HealthCheckResults({ results }) {
             <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
                 {[
                     { label: 'Pages Crawled', value: stats.pagesCrawled || 0, icon: 'description', color: '#6366f1' },
-                    { label: 'Avg Response', value: `${stats.responseTimeAvg || 0}ms`, icon: 'speed', color: (stats.responseTimeAvg || 0) > 2000 ? '#f43f5e' : '#10b981' },
+                    { label: 'Avg Resp. Time', value: `${stats.responseTimeAvg || 0}ms`, icon: 'speed', color: (stats.responseTimeAvg || 0) > 2000 ? '#f43f5e' : '#10b981' },
+                    { label: 'Avg FCP (Speed)', value: stats.avgFcp ? `${Math.round(stats.avgFcp)}ms` : 'Slow', icon: 'bolt', color: (stats.avgFcp || 0) > 2500 ? '#f43f5e' : '#10b981' },
+                    { label: 'Avg TTFB', value: stats.avgTtfb ? `${Math.round(stats.avgTtfb)}ms` : 'N/A', icon: 'timer', color: (stats.avgTtfb || 0) > 800 ? '#f59e0b' : '#10b981' },
                     { label: 'Avg Page Size', value: `${stats.pageSizeAvg || 0}KB`, icon: 'data_usage', color: (stats.pageSizeAvg || 0) > 2000 ? '#f59e0b' : '#10b981' },
-                    { label: 'Thin Pages', value: stats.thinPageCount || 0, icon: 'short_text', color: (stats.thinPageCount || 0) > 0 ? '#f59e0b' : '#10b981' },
-                    { label: 'Orphan Pages', value: stats.orphanPageCount || 0, icon: 'link_off', color: (stats.orphanPageCount || 0) > 0 ? '#f43f5e' : '#10b981' },
+                    { label: 'Thin Content', value: stats.thinPageCount || 0, icon: 'short_text', color: (stats.thinPageCount || 0) > 0 ? '#f59e0b' : '#10b981' },
+                    { label: 'Near Duplicates', value: stats.nearDuplicateCount || 0, icon: 'layers', color: (stats.nearDuplicateCount || 0) > 0 ? '#f59e0b' : '#10b981' },
                     { label: 'Security', value: stats.securityHeaderScore || '0/7', icon: 'shield', color: '#6366f1' },
                     { label: 'Broken External', value: stats.brokenExternalCount || 0, icon: 'broken_image', color: (stats.brokenExternalCount || 0) > 0 ? '#f43f5e' : '#10b981' },
                     { label: 'Broken Internal', value: stats.brokenInternalCount || 0, icon: 'link_off', color: (stats.brokenInternalCount || 0) > 0 ? '#f43f5e' : '#10b981' },
@@ -1559,7 +1561,6 @@ function HealthCheckResults({ results }) {
                     { label: 'Canon. Conflicts', value: stats.conflictingCanonicalCount || 0, icon: 'content_copy', color: (stats.conflictingCanonicalCount || 0) > 0 ? '#f43f5e' : '#10b981' },
                     { label: 'Browser Cache', value: stats.cacheControlPresent ? 'Yes' : 'No', icon: 'cached', color: stats.cacheControlPresent ? '#10b981' : '#f59e0b' },
                     { label: 'AI Crawl (llms.txt)', value: stats.llmsTxtFound ? 'Found' : 'Missing', icon: 'smart_toy', color: stats.llmsTxtFound ? '#10b981' : '#f59e0b' },
-                    // ── Semrush parity: Missing metrics ──
                     { label: 'Missing H1', value: stats.missingH1Count || 0, icon: 'title', color: (stats.missingH1Count || 0) > 0 ? '#f43f5e' : '#10b981' },
                     { label: 'Multiple H1', value: stats.multipleH1Count || 0, icon: 'format_h1', color: (stats.multipleH1Count || 0) > 0 ? '#f59e0b' : '#10b981' },
                     { label: 'Perm. Redirects', value: stats.permanentRedirectCount || 0, icon: 'alt_route', color: (stats.permanentRedirectCount || 0) > 0 ? '#f59e0b' : '#10b981' },
@@ -1571,21 +1572,21 @@ function HealthCheckResults({ results }) {
                     { label: 'Schema Types', value: (stats.schemaTypes || []).length > 0 ? (stats.schemaTypes || []).length : '✗', icon: 'data_object', color: (stats.schemaTypes || []).length > 0 ? '#10b981' : '#f43f5e' },
                     { label: 'Slow Pages (>3s)', value: stats.slowPageCount || 0, icon: 'hourglass_top', color: (stats.slowPageCount || 0) > 0 ? '#f43f5e' : '#10b981' },
                     { label: 'Noindex Pages', value: stats.noindexPageCount || 0, icon: 'visibility_off', color: (stats.noindexPageCount || 0) > 0 ? '#f59e0b' : '#10b981' },
-                    // ── Backlink Intelligence (DataForSEO) ──
+                    { label: 'No Breadcrumbs', value: stats.missingBreadcrumbsCount || 0, icon: 'flat_collaboration', color: (stats.missingBreadcrumbsCount || 0) > 0 ? '#6366f1' : '#10b981' },
+                    { label: 'Social Tags', value: stats.missingSocialTagsCount || 0, icon: 'share', color: (stats.missingSocialTagsCount || 0) > 0 ? '#6366f1' : '#10b981' },
                     ...(stats.backlinkDataAvailable ? [
                       { label: 'Referring Domains', value: (stats.referringDomains || 0).toLocaleString(), icon: 'hub', color: '#8b5cf6' },
                       { label: 'Domain Rank', value: stats.domainRank || 0, icon: 'military_tech', color: '#8b5cf6' },
                     ] : []),
-                    // ── Moz Domain Authority ──
                     ...(stats.mozAvailable ? [
                       { label: 'Domain Auth. (DA)', value: stats.domainAuthority || 0, icon: 'verified', color: '#f59e0b' },
                       { label: 'Page Auth. (PA)', value: stats.pageAuthority || 0, icon: 'description', color: '#f59e0b' },
                       { label: 'Spam Score', value: `${stats.spamScore || 0}%`, icon: 'shield', color: (stats.spamScore || 0) > 30 ? '#f43f5e' : '#10b981' },
                     ] : []),
-                    // ── Resource Scanning (Semrush parity) ──
                     { label: 'Blocked Resources', value: stats.blockedResourceCount || 0, icon: 'block', color: (stats.blockedResourceCount || 0) > 0 ? '#f43f5e' : '#10b981' },
                     { label: 'Uncached JS/CSS', value: stats.uncachedResourceCount || 0, icon: 'cloud_off', color: (stats.uncachedResourceCount || 0) > 0 ? '#f59e0b' : '#10b981' },
                     { label: 'Unminified JS/CSS', value: stats.unminifiedResourceCount || 0, icon: 'compress', color: (stats.unminifiedResourceCount || 0) > 0 ? '#f59e0b' : '#10b981' },
+
                 ].map(s => (
                     <div key={s.label} className="flex items-center gap-2.5 p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
                         <span className="material-symbols-outlined text-lg" style={{ color: s.color }}>{s.icon}</span>
@@ -1759,35 +1760,52 @@ function HealthCheckResults({ results }) {
                             if (page.urlTooLong) pageIssueTags.push('URL >75 chars')
                             if (page.metaRobots?.noindex) pageIssueTags.push('noindex')
                             if (page.wordCount < 300 && page.wordCount > 0) pageIssueTags.push('Thin')
-                            if (page.responseTimeMs > 3000) pageIssueTags.push('Slow')
+                            if (page.nearDuplicate) pageIssueTags.push('Near Dup')
+                            if (!page.breadcrumbs) pageIssueTags.push('No Breds')
+                            if (!page.socialTags?.og || !page.socialTags?.twitter) pageIssueTags.push('No Social')
+                            if (page.perf?.fcp > 2500) pageIssueTags.push('Slow (FCP)')
+                            else if (page.responseTimeMs > 3000) pageIssueTags.push('Slow')
 
                             return (
-                                <div key={i} className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/[0.04] hover:bg-white/[0.04] transition-all">
+                                <div key={i} className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/[0.04] hover:bg-white/[0.04] transition-all group">
                                     {/* Status dot */}
                                     <span className={`w-2 h-2 rounded-full flex-shrink-0 ${pageIssueTags.length === 0 ? 'bg-emerald-400' : pageIssueTags.length <= 2 ? 'bg-amber-400' : 'bg-rose-400'}`} />
                                     {/* URL + title */}
                                     <div className="flex-1 min-w-0">
-                                        <p className="text-[11px] font-bold text-white truncate">{page.title || page.url}</p>
+                                        <div className="flex items-center gap-2">
+                                            <p className="text-[11px] font-bold text-white truncate">{page.title || page.url}</p>
+                                            {page.nearDuplicate && <span className="text-[8px] bg-amber-500/10 text-amber-400 px-1 py-0.5 rounded uppercase font-black tracking-tighter">Near Duplicate</span>}
+                                        </div>
                                         <p className="text-[9px] text-slate-600 truncate">{page.url}</p>
                                     </div>
                                     {/* Stats */}
-                                    <div className="flex items-center gap-3 flex-shrink-0">
-                                        <span className="text-[9px] text-slate-500">{page.responseTimeMs}ms</span>
-                                        <span className="text-[9px] text-slate-500">{page.pageSizeKB}KB</span>
-                                        <span className="text-[9px] text-slate-500">{page.wordCount}w</span>
+                                    <div className="flex items-center gap-3 flex-shrink-0 opacity-60 group-hover:opacity-100 transition-opacity">
+                                        <div className="flex flex-col items-end">
+                                            <span className="text-[10px] text-white font-bold">{page.perf?.fcp ? `${Math.round(page.perf.fcp)}ms` : `${page.responseTimeMs}ms`}</span>
+                                            <span className="text-[8px] text-slate-600 uppercase font-bold">{page.perf?.fcp ? 'FCP' : 'TTFB'}</span>
+                                        </div>
+                                        <div className="flex flex-col items-end">
+                                            <span className="text-[10px] text-white font-bold">{page.pageSizeKB}KB</span>
+                                            <span className="text-[8px] text-slate-600 uppercase font-bold">Size</span>
+                                        </div>
+                                        <div className="flex flex-col items-end">
+                                            <span className="text-[10px] text-white font-bold">{page.wordCount}</span>
+                                            <span className="text-[8px] text-slate-600 uppercase font-bold">Words</span>
+                                        </div>
                                     </div>
                                     {/* Issue tags */}
                                     {pageIssueTags.length > 0 && (
-                                        <div className="flex gap-1 flex-shrink-0">
-                                            {pageIssueTags.slice(0, 3).map((tag, ti) => (
-                                                <span key={ti} className="text-[8px] font-bold px-1.5 py-0.5 rounded-full bg-rose-500/10 text-rose-400">{tag}</span>
+                                        <div className="flex gap-1 flex-shrink-0 max-w-[120px] overflow-hidden">
+                                            {pageIssueTags.slice(0, 2).map((tag, ti) => (
+                                                <span key={ti} className="text-[8px] font-bold px-1.5 py-1 rounded-md bg-rose-500/10 text-rose-400 whitespace-nowrap">{tag}</span>
                                             ))}
-                                            {pageIssueTags.length > 3 && <span className="text-[8px] text-slate-600">+{pageIssueTags.length - 3}</span>}
+                                            {pageIssueTags.length > 2 && <span className="text-[9px] text-slate-500 font-black self-center">+{pageIssueTags.length - 2}</span>}
                                         </div>
                                     )}
                                 </div>
                             )
                         })}
+
                     </div>
                 )}
             </div>
