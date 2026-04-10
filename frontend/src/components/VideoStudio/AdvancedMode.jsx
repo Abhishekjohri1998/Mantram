@@ -29,7 +29,12 @@ const MODELS = {
 /* ── Minimal CSS ── */
 const css = `
 /* Layout */
-.vm-studio-root { position: relative; width: 100%; min-height: calc(100vh - 80px); display: flex; flex-direction: column; background: transparent; }
+.vm-studio-root { 
+  --sys-surface-glass: color-mix(in srgb, var(--sys-surface) 85%, transparent);
+  --sys-surface-raised: color-mix(in srgb, var(--sys-text) 4%, var(--sys-surface));
+  --sys-surface-hover: color-mix(in srgb, var(--sys-text) 8%, var(--sys-surface));
+  position: relative; width: 100%; min-height: calc(100vh - 80px); display: flex; flex-direction: column; background: transparent; 
+}
 .vm-layout { position: fixed; bottom: 0; left: 0; width: 100%; z-index: 50; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; padding: 0 16px 24px 16px; pointer-events: none; transition: transform 0.4s ease; }
 .vm-layout.layout-scrolled { transform: translateY(120px); }
 .vm-layout:hover { transform: translateY(0); }
@@ -44,16 +49,16 @@ const css = `
 .vm-bg-item:hover { opacity: 0.8; transform: scale(1.02); z-index: 2; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
 
 /* Director Panel (Floating Card) */
-.vm-card { margin-top: auto; margin-bottom: 0; width: 100%; max-width: 860px; background: var(--sys-surface-glass); border: 1px solid var(--sys-border); border-radius: 24px; padding: 0; backdrop-filter: blur(36px); box-shadow: 0 30px 60px rgba(0,0,0,0.4); z-index: 10; display: flex; flex-direction: column; color: var(--sys-text); font-family: 'Inter', sans-serif; position: relative; transition: all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.vm-card { margin-top: auto; margin-bottom: 0; width: 100%; max-width: 860px; background: var(--sys-surface-glass); border: 1px solid var(--sys-border); border-radius: 24px; padding: 0; backdrop-filter: blur(36px); box-shadow: 0 15px 40px rgba(0,0,0,0.15); z-index: 10; display: flex; flex-direction: column; color: var(--sys-text); font-family: 'Inter', sans-serif; position: relative; transition: all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1); }
 .vm-card.collapsed { transform: translateY(30%); opacity: 0.8; }
 .vm-card.collapsed:hover { transform: translateY(0); opacity: 1; }
 .vm-card.collapsed .vm-upper-controls, .vm-card.collapsed .vm-bottom { display: none; }
 
 /* Panel Header */
-.vm-card-header { padding: 12px 24px; border-bottom: 1px solid var(--sys-border); display: flex; align-items: center; justify-content: space-between; font-weight: 700; font-size: 13px; color: var(--sys-text); background: rgba(0,0,0,0.15); }
+.vm-card-header { padding: 12px 24px; border-bottom: 1px solid var(--sys-border); display: flex; align-items: center; justify-content: space-between; font-weight: 700; font-size: 13px; color: var(--sys-text); background: transparent; }
 
 /* Upper Controls (Thumbnails & Quality) */
-.vm-upper-controls { padding: 16px 24px; display: flex; gap: 16px; border-bottom: 1px solid var(--sys-border); align-items: center; flex-wrap: wrap; background: rgba(0,0,0,0.05); }
+.vm-upper-controls { padding: 16px 24px; display: flex; gap: 16px; border-bottom: 1px solid var(--sys-border); align-items: center; flex-wrap: wrap; background: transparent; }
 
 .vm-thumb-group { display: flex; align-items: center; gap: 8px; }
 .vm-thumb-box { width: 48px; height: 48px; border-radius: 12px; border: 1px dashed var(--sys-border); background: var(--sys-surface); display: flex; align-items: center; justify-content: center; cursor: pointer; position: relative; overflow: hidden; transition: all .2s; }
@@ -61,13 +66,13 @@ const css = `
 .vm-thumb-box img { width: 100%; height: 100%; object-fit: cover; }
 .vm-thumb-label { font-size: 11px; font-weight: 600; color: var(--sys-text-muted); text-align: center; margin-top: 4px; }
 
-.vm-quality-group { display: flex; align-items: center; gap: 6px; margin-left: auto; background: rgba(0,0,0,0.2); padding: 4px; border-radius: 12px; border: 1px solid var(--sys-border); }
+.vm-quality-group { display: flex; align-items: center; gap: 6px; margin-left: auto; background: var(--sys-surface-raised); padding: 4px; border-radius: 12px; border: 1px solid var(--sys-border); }
 .vm-quality-pill { padding: 8px 16px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; border: none; background: transparent; color: var(--sys-text-muted); transition: all .2s; display: flex; align-items: center; gap: 6px; }
 .vm-quality-pill:hover { color: var(--sys-text); }
 .vm-quality-pill.active { background: var(--sys-surface-glass); color: var(--sys-text); box-shadow: 0 4px 12px rgba(0,0,0,0.2); border: 1px solid var(--sys-border); }
 
 /* Prompt area */
-.vm-prompt { padding: 16px 20px; position: relative; flex: 1; min-height: 120px; background: rgba(0,0,0,0.15); border-radius: 12px; margin: 16px 24px; border: 1px solid rgba(255,255,255,0.05); }
+.vm-prompt { padding: 16px 20px; position: relative; flex: 1; min-height: 120px; background: var(--sys-surface-raised); border-radius: 12px; margin: 16px 24px; border: 1px solid var(--sys-border); }
 .vm-card.collapsed .vm-prompt { min-height: 50px; margin: 12px 24px; padding: 12px 20px; }
 .vm-card.collapsed .vm-textarea { min-height: 24px; max-height: 50px; overflow: hidden; }
 .vm-textarea { width: 100%; background: transparent; border: none; outline: none; resize: none; color: var(--sys-text); font-size: 15px; line-height: 1.6; font-family: inherit; min-height: 80px; font-weight: 500; margin: 0; padding: 0; letter-spacing: 0.3px; }
@@ -82,7 +87,7 @@ const css = `
 .vm-config-opt:hover { background: var(--sys-surface-hover); color: var(--sys-text); }
 
 /* Bottom Bar */
-.vm-bottom { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 24px; border-top: 1px solid var(--sys-border); background: rgba(0,0,0,0.15); }
+.vm-bottom { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 24px; border-top: 1px solid var(--sys-border); background: transparent; }
 .vm-bottom-left { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; flex: 1; }
 .vm-btn-icon-label { display: flex; align-items: center; gap: 4px; padding: 6px 12px; background: transparent; border: 1px solid transparent; color: var(--sys-text); cursor: pointer; font-size: 12px; font-weight: 600; border-radius: 10px; transition: 0.2s; }
 .vm-btn-icon-label:hover { background: rgba(255,255,255,0.05); border-color: var(--sys-border); }
