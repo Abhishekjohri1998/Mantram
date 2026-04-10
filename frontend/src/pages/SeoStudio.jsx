@@ -1586,6 +1586,9 @@ function HealthCheckResults({ results }) {
                     { label: 'Blocked Resources', value: stats.blockedResourceCount || 0, icon: 'block', color: (stats.blockedResourceCount || 0) > 0 ? '#f43f5e' : '#10b981' },
                     { label: 'Uncached JS/CSS', value: stats.uncachedResourceCount || 0, icon: 'cloud_off', color: (stats.uncachedResourceCount || 0) > 0 ? '#f59e0b' : '#10b981' },
                     { label: 'Unminified JS/CSS', value: stats.unminifiedResourceCount || 0, icon: 'compress', color: (stats.unminifiedResourceCount || 0) > 0 ? '#f59e0b' : '#10b981' },
+                    { label: 'Avg Readability', value: stats.avgReadabilityScore ? `${stats.avgReadabilityScore}/100` : 'N/A', icon: 'auto_stories', color: (stats.avgReadabilityScore || 100) < 50 ? '#f59e0b' : '#10b981' },
+                    { label: 'CLS Risk (Imgs)', value: stats.missingImageDimensionsCount || 0, icon: 'view_quilt', color: (stats.missingImageDimensionsCount || 0) > 0 ? '#f43f5e' : '#10b981' },
+
 
                 ].map(s => (
                     <div key={s.label} className="flex items-center gap-2.5 p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
@@ -1763,8 +1766,11 @@ function HealthCheckResults({ results }) {
                             if (page.nearDuplicate) pageIssueTags.push('Near Dup')
                             if (!page.breadcrumbs) pageIssueTags.push('No Breds')
                             if (!page.socialTags?.og || !page.socialTags?.twitter) pageIssueTags.push('No Social')
+                            if (page.readability?.score < 40 && page.readability?.score > 0) pageIssueTags.push(`Complex Text (${page.readability.score})`)
+                            if (page.imageStability?.missingDimensions > 0) pageIssueTags.push('CLS Risk (Imgs)')
                             if (page.perf?.fcp > 2500) pageIssueTags.push('Slow (FCP)')
                             else if (page.responseTimeMs > 3000) pageIssueTags.push('Slow')
+
 
                             return (
                                 <div key={i} className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/[0.04] hover:bg-white/[0.04] transition-all group">
@@ -1774,8 +1780,12 @@ function HealthCheckResults({ results }) {
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2">
                                             <p className="text-[11px] font-bold text-white truncate">{page.title || page.url}</p>
-                                            {page.nearDuplicate && <span className="text-[8px] bg-amber-500/10 text-amber-400 px-1 py-0.5 rounded uppercase font-black tracking-tighter">Near Duplicate</span>}
+                                            <div className="flex items-center gap-1">
+                                                {page.nearDuplicate && <span className="text-[7px] bg-amber-500/10 text-amber-400 px-1 py-0.5 rounded-sm uppercase font-black tracking-tighter border border-amber-500/20">Near Duplicate</span>}
+                                                {page.readability?.grade && <span className="text-[7px] bg-indigo-500/10 text-indigo-400 px-1 py-0.5 rounded-sm uppercase font-black tracking-tighter border border-indigo-500/20">{page.readability.grade}</span>}
+                                            </div>
                                         </div>
+
                                         <p className="text-[9px] text-slate-600 truncate">{page.url}</p>
                                     </div>
                                     {/* Stats */}

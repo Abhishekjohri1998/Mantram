@@ -475,7 +475,12 @@ Generate 8-15 critical, high-impact issues. Be STRATEGIC — every issue must ha
       mozLinkingDomains: mozData?.rootDomainsToRootDomain || 0,
       // Missing meta descriptions
       missingMetaDescCount: si.missingMetaDescriptions?.length || 0,
+      // Accuracy Tier: Advanced stats
+      avgReadabilityScore: si.readability?.avgScore || 0,
+      missingImageDimensionsCount: si.missingImageDimensionsCount || 0,
+      incompleteSchemaCount: si.incompleteSchemaCount || 0,
     };
+
     parsed.crawledUrls = pages.map(p => p.url);
     parsed.pageReports = pages.map(p => ({
       url: p.url,
@@ -501,7 +506,16 @@ Generate 8-15 critical, high-impact issues. Be STRATEGIC — every issue must ha
       urlTooLong: p.urlTooLong || false,
       textToHtmlRatio: p.textToHtmlRatio || 0,
       metaRobots: p.metaRobots || {},
+      // Accuracy Tier: Advanced page level data
+      readability: p.readability || { score: 0, grade: 'N/A' },
+      imageStability: {
+        missingDimensions: p.missingDimensions || 0,
+        missingLazy: p.missingLazy || 0,
+      },
+      schemaValidation: p.schemaValidation || [],
+      nearDuplicate: p.nearDuplicate || false,
     }));
+
 
 
     // ── BUILD DETERMINISTIC GROUPED ISSUES FROM CRAWL DATA (Semrush parity) ──
@@ -584,11 +598,37 @@ Generate 8-15 critical, high-impact issues. Be STRATEGIC — every issue must ha
       affectedUrls: (st.brokenExternalLinks || []).slice(0, 10).map(l => l.url || l),
     });
     if (st.redirectChainCount > 0) deterministicChecks.push({
-      check: `${st.redirectChainCount} pages with redirect chains`, value: st.redirectChainCount, issueType: 'notice',
-      aboutThisIssue: 'Redirect chains (A→B→C) add multiple round-trips, increasing page load time. Each redirect loses a small amount of link equity. Google may stop following chains after 5+ hops.',
-      howToFix: 'Eliminate redirect chains by pointing directly to the final destination URL. Update both internal links and server redirect rules.',
+      check: `${st.redirectChainCount} pages with redirect chains`, value: st.redirectChainCount, issueType: 'warning',
+      aboutThisIssue: 'Redirect chains involve multiple redirects between the source and destination URL. This slows down the page load and makes it harder for search engines to crawl.',
+      howToFix: 'Shorten redirect chains by making the initial URL point directly to the final destination.',
       affectedUrls: [],
     });
+    if (st.avgReadabilityScore < 45 && st.avgReadabilityScore > 0) deterministicChecks.push({
+      check: `Low Readability Score (${st.avgReadabilityScore}/100)`, value: st.avgReadabilityScore, issueType: 'warning',
+      aboutThisIssue: 'A low Flesch Reading Ease score indicates content that is too complex for the average reader. Google prioritizes content that is clear, concise, and easy for its users to understand.',
+      howToFix: 'Simplify the language, use shorter sentences, and break up long paragraphs. Aim for a score of 60 or higher for general audiences.',
+      affectedUrls: pages.filter(p => (p.readability?.score || 100) < 45).map(p => p.url).slice(0, 10),
+    });
+    if (st.missingImageDimensionsCount > 0) deterministicChecks.push({
+      check: `${st.missingImageDimensionsCount} images missing width/height attributes`, value: st.missingImageDimensionsCount, issueType: 'warning',
+      aboutThisIssue: 'Images without dimensions cause layout shifts (CLS) when they load, leading to a poor user experience. CLS is a critical Core Web Vital ranking factor.',
+      howToFix: 'Always specify "width" and "height" attributes for image tags in pixels. This allows the browser to reserve space before the image is downloaded.',
+      affectedUrls: pages.filter(p => p.missingDimensions > 0).map(p => p.url).slice(0, 5),
+    });
+    if (st.incompleteSchemaCount > 0) deterministicChecks.push({
+      check: `${st.incompleteSchemaCount} pages with incomplete schema properties`, value: st.incompleteSchemaCount, issueType: 'notice',
+      aboutThisIssue: 'While schema is technically valid, missing recommended properties (like price for Products or authors for Articles) can prevent your rich snippets from showing in SERP.',
+      howToFix: 'Check the specific page Schema and add all recommended fields for the primary entity type (Product, Review, etc.).',
+      affectedUrls: pages.filter(p => (p.schemaValidation || []).some(v => !v.valid)).map(p => p.url).slice(0, 10),
+    });
+    if (st.nearDuplicateCount > 0) deterministicChecks.push({
+      check: `${st.nearDuplicateCount} near-duplicate pages detected`, value: st.nearDuplicateCount, issueType: 'warning',
+      aboutThisIssue: 'Near-duplicate pages (over 85% similarity) cause keyword cannibalization. Google may struggle to decide which page to rank, resulting in lower positions for both.',
+      howToFix: 'Consolidate near-duplicate pages using canonical tags or 301 redirects to a single authoritative version. Ensure each page has a unique value proposition.',
+      affectedUrls: [],
+    });
+
+
     // ── 15 NEW checks (total: 28) ──
     if (st.headingSkippedCount > 0) deterministicChecks.push({
       check: `${st.headingSkippedCount} pages with skipped heading levels`, value: st.headingSkippedCount, issueType: 'warning',

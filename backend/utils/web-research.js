@@ -374,12 +374,22 @@ function extractImages(html) {
         if (/display\s*:\s*none|visibility\s*:\s*hidden/i.test(getAttr(tag, 'style') || '')) continue;
         if (!src || src === '#') continue;
 
-        imgs.push({ src, hasAlt: alt.trim().length > 0 });
+        imgs.push({ src, hasAlt: alt.trim().length > 0, width, height });
     }
     // Return src URLs of images missing alt for cross-page dedup
     const srcsMissingAlt = imgs.filter(i => !i.hasAlt).map(i => i.src);
-    return { total: imgs.length, withAlt: imgs.filter(i => i.hasAlt).length, withoutAlt: srcsMissingAlt.length, srcsMissingAlt };
+    const stability = extractImageStability(html);
+    
+    return { 
+        total: imgs.length, 
+        withAlt: imgs.filter(i => i.hasAlt).length, 
+        withoutAlt: srcsMissingAlt.length, 
+        srcsMissingAlt,
+        missingDimensions: stability.missingDimensions,
+        missingLazy: stability.missingLazy
+    };
 }
+
 
 function extractCanonical(html) {
     const m = html.match(/<link\s+[^>]*rel\s*=\s*["']canonical["'][^>]*href\s*=\s*["']([^"']+)["'][^>]*>/i)
@@ -445,9 +455,63 @@ function extractBreadcrumbs(html) {
 /** Validate social preview tags (Open Graph & Twitter) */
 function validateSocialTags(meta) {
     const og = !!(meta['og:title'] && meta['og:image']);
-    const twitter = !!(meta['twitter:title'] && meta['twitter:image']);
+    const twitter = !!(meta['twitter:title'] && meta['twitter:image'] || meta['twitter:card']);
     return { og, twitter, complete: og && twitter };
 }
+
+/** Calculate Readability (Flesch Reading Ease)
+ * 206.835 - 1.015 * (total_words / total_sentences) - 84.6 * (total_syllables / total_words)
+ */
+function calculateReadability(text) {
+    if (!text || text.length < 100) return { score: 100, grade: 'Easy', detail: 'Too short for analysis' };
+    
+    const words = text.split(/\s+/).filter(w => w.length > 0);
+    const sentences = text.split(/[.!?](\s|$)/).filter(s => s.trim().length > 0);
+    
+    let syllables = 0;
+    words.forEach(word => {
+        let w = word.toLowerCase().replace(/[^a-z]/g, '');
+        if (w.length <= 3) { syllables += 1; return; }
+        w = w.replace(/(?:[^laeiouy]es|ed|[^laeiouy]e)$/, '');
+        w = w.replace(/^y/, '');
+        const m = w.match(/[aeiouy]{1,2}/g);
+        syllables += m ? m.length : 1;
+    });
+
+    const wordCount = words.length;
+    const sentenceCount = sentences.length || 1;
+    
+    const score = 206.835 - 1.015 * (wordCount / sentenceCount) - 84.6 * (syllables / wordCount);
+    const clampedScore = Math.max(0, Math.min(100, Math.round(score)));
+    
+    let grade = 'College';
+    if (clampedScore > 90) grade = '5th Grade';
+    else if (clampedScore > 80) grade = '6th Grade';
+    else if (clampedScore > 70) grade = '7th Grade';
+    else if (clampedScore > 60) grade = '8th-9th Grade';
+    else if (clampedScore > 50) grade = '10th-12th Grade';
+    else if (clampedScore > 30) grade = 'College';
+    else grade = 'Professional/Academic';
+
+    return { score: clampedScore, grade, wordCount, sentenceCount };
+}
+
+/** Image stability detection (missing width/height causes CLS) */
+function extractImageStability(html) {
+    const rawImgs = (html.match(/<img\s+[^>]*>/gi) || []);
+    let missingDimensions = 0;
+    let missingLazy = 0;
+    
+    rawImgs.forEach(tag => {
+        const hasWidth = /width\s*=\s*["']?\d+/i.test(tag);
+        const hasHeight = /height\s*=\s*["']?\d+/i.test(tag);
+        if (!hasWidth || !hasHeight) missingDimensions++;
+        if (!/loading\s*=\s*["']lazy["']/i.test(tag)) missingLazy++;
+    });
+
+    return { missingDimensions, missingLazy, total: rawImgs.length };
+}
+
 
 
 // ============================================================================
@@ -705,6 +769,15 @@ export async function crawlPage(url) {
             socialTags,
             hasSchemaOrg: jsonLd.length > 0,
             schemaTypes: jsonLd.map(s => s['@type']).filter(Boolean),
+            schemaValidation: jsonLd.map(s => {
+                const type = s['@type'];
+                const props = Object.keys(s);
+                if (type === 'Product') return { type, valid: props.includes('offers') || props.includes('review'), missing: props.includes('offers') ? [] : ['offers/price'] };
+                if (type === 'Organization') return { type, valid: props.includes('logo') || props.includes('contactPoint'), missing: props.includes('logo') ? [] : ['logo'] };
+                return { type, valid: true };
+            }),
+            readability: calculateReadability(bodyTextFull),
+
             links,
             internalLinkCount: links.internal.length,
             externalLinkCount: links.external.length,
@@ -2336,6 +2409,21 @@ export async function researchDomain(baseUrl, options = {}) {
                 heavyPages: allPages.filter(p => (p.pageSizeKB || 0) > 3000).map(p => ({ url: p.url, sizeKB: p.pageSizeKB })),
                 heavyPageCount: allPages.filter(p => (p.pageSizeKB || 0) > 3000).length,
             },
+
+            // Performance Paint Metrics (Average)
+            perf: {
+                avgFcp: Math.round(allPages.reduce((s, p) => s + (p.perf?.fcp || 0), 0) / allPages.length),
+                avgTtfb: Math.round(allPages.reduce((s, p) => s + (p.perf?.ttfb || p.responseTimeMs || 0), 0) / allPages.length),
+                avgLcp: Math.round(allPages.reduce((s, p) => s + (p.perf?.lcp || 0), 0) / allPages.length),
+            },
+
+            // Accuracy Tier Aggregation
+            readability: {
+                avgScore: Math.round(allPages.reduce((s, p) => s + (p.readability?.score || 0), 0) / allPages.length),
+                grades: allPages.map(p => p.readability?.grade).filter(Boolean),
+            },
+            missingImageDimensionsCount: allPages.reduce((s, p) => s + (p.missingDimensions || 0), 0),
+            incompleteSchemaCount: allPages.filter(p => (p.schemaValidation || []).some(v => !v.valid)).length,
 
             // Heading hierarchy issues
             headingIssues: {
