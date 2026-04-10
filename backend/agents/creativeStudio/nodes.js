@@ -78,7 +78,14 @@ export async function brandIntelligenceNode(state) {
     console.log('🧠 Creative Agent: Brand Intelligence — gathering context...');
     const startMs = Date.now();
 
-    const brand = await Brand.findById(state.brandId).lean();
+    // ⚡ PERF: Reuse pre-loaded brand from state if available (loadBrandContext already ran in runCreativePipeline).
+    // Only fall back to a fresh DB query when called standalone (e.g. creative-agentic.js routes).
+    let brand = state.loadedBrand || null;
+    let products = state.loadedProducts || null;
+
+    if (!brand) {
+        brand = await Brand.findById(state.brandId).lean();
+    }
     if (!brand) {
         return { ...state, brandIntel: { error: 'Brand not found' }, status: 'brand-intel' };
     }
@@ -86,10 +93,13 @@ export async function brandIntelligenceNode(state) {
     const dna = brand.dna || {};
 
     // ── Fetch REAL products from catalog (anti-hallucination) ──
-    const products = await Product.find(
-        { brand: state.brandId, status: 'active' },
-        { title: 1, shortDescription: 1, description: 1, features: 1, category: 1, subCategory: 1, images: 1, tags: 1, type: 1, productType: 1 }
-    ).lean().limit(20);
+    // Skip if products were already loaded by loadBrandContext (passed via state.loadedProducts)
+    if (!products) {
+        products = await Product.find(
+            { brand: state.brandId, status: 'active' },
+            { title: 1, shortDescription: 1, description: 1, features: 1, category: 1, subCategory: 1, images: 1, tags: 1, type: 1, productType: 1 }
+        ).lean().limit(20);
+    }
 
     const hasProducts = products.length > 0;
     const brandType = hasProducts ? 'product' : 'service';
@@ -503,7 +513,8 @@ export async function artDirectorNode(state) {
         state.marketIntel?.calendarHooks ? `UPCOMING CALENDAR HOOKS: ${state.marketIntel.calendarHooks}` : '',
     ].filter(Boolean).join('\n');
 
-    const result = await callAgent(ART_DIRECTOR_PROMPT(brandContext), userPrompt, 0.7);
+    // ⚡ preferFast — Art Director output is structured JSON: Gemini 2.5 Flash handles well
+    const result = await callAgent(ART_DIRECTOR_PROMPT(brandContext), userPrompt, 0.7, 4096, { preferFast: true });
     console.log(`🎨 Art direction defined in ${Date.now() - startMs}ms`);
 
     return {
@@ -577,7 +588,8 @@ export async function fastCreativeDirectorNode(state) {
         !mp && intel.productCandidates?.length > 0 ? `\nCATALOG (pick ONLY if relevant):\n${intel.productCandidates.map(c => `• ${c.title}${c.category ? ` [${c.category}]` : ''}${c.images?.length > 0 ? ' 📸' : ''}`).join('\n')}` : '',
     ].filter(Boolean).join('\n');
 
-    const result = await callAgent(FAST_CREATIVE_DIRECTOR_PROMPT(brandContext), userPrompt, 0.6, 2048);
+    // ⚡ preferFast — Fast mode already implies speed priority: Gemini 2.5 Flash is ideal
+    const result = await callAgent(FAST_CREATIVE_DIRECTOR_PROMPT(brandContext), userPrompt, 0.6, 2048, { preferFast: true });
     console.log(`⚡ Fast Creative Director done in ${Date.now() - startMs}ms`);
 
     return {
@@ -654,7 +666,8 @@ export async function promptEngineerNode(state) {
         productGrounding,
     ].filter(Boolean).join('\n');
 
-    const result = await callAgent(PROMPT_ENGINEER_PROMPT(brandContext), userPrompt, 0.5);
+    // ⚡ preferFast — Prompt engineering is technical transformation: Gemini sufficient
+    const result = await callAgent(PROMPT_ENGINEER_PROMPT(brandContext), userPrompt, 0.5, 4096, { preferFast: true });
     console.log(`🔧 Prompt engineered in ${Date.now() - startMs}ms`);
 
     return {
@@ -684,7 +697,8 @@ export async function styleCriticNode(state) {
         `Original Brief: ${state.brief}`,
     ].join('\n');
 
-    const result = await callAgent(STYLE_CRITIC_PROMPT(brandContext), userPrompt, 0.3);
+    // ⚡ preferFast — Style critic is evaluation/scoring: Gemini sufficient
+    const result = await callAgent(STYLE_CRITIC_PROMPT(brandContext), userPrompt, 0.3, 4096, { preferFast: true });
     console.log(`🔍 Critique complete in ${Date.now() - startMs}ms — verdict: ${result.verdict}`);
 
     // If critic says improve-first, use the improved prompt (immutable — create new object)
@@ -723,7 +737,8 @@ export async function variationGeneratorNode(state) {
         `Original Brief: ${state.brief}`,
     ].join('\n');
 
-    const result = await callAgent(VARIATION_PROMPT(brandContext), userPrompt, 0.8);
+    // ⚡ preferFast — Variation is JSON structure generation: Gemini sufficient
+    const result = await callAgent(VARIATION_PROMPT(brandContext), userPrompt, 0.8, 4096, { preferFast: true });
     console.log(`🔀 ${(result.variations || []).length} variations generated in ${Date.now() - startMs}ms`);
 
     return {
@@ -858,7 +873,8 @@ export async function copywriterNode(state) {
         ? `${languageDirective}\n\n${COPYWRITER_PROMPT(resolvedBrandContext)}`
         : COPYWRITER_PROMPT(resolvedBrandContext);
 
-    const result = await callAgent(systemPrompt, userPrompt, 0.75, 8192);
+    // ⚡ preferFast — Copywriter produces structured JSON copy: Gemini 2.5 Flash handles well
+    const result = await callAgent(systemPrompt, userPrompt, 0.75, 8192, { preferFast: true });
     console.log(`✍️  Copywriter result keys: ${Object.keys(result || {}).join(', ')}`);
     console.log(`✍️  Copywriter done in ${Date.now() - startMs}ms — headline: "${result.headline || '?'}" | subtext: "${result.subtext || 'none'}" | cta: "${result.ctaText || 'none'}"${result.error ? ` [PARSE ERROR: ${result.error}] RAW: ${result.raw?.substring(0, 200)}` : ''}`);
     if (result.ctaText) console.log(`✍️  Copywriter CTA: "${result.ctaText}"`);
@@ -988,7 +1004,7 @@ export async function postGenerationCriticNode(state) {
         POST_GENERATION_CRITIC_PROMPT,
         userPrompt,
         [imageUrl], // Send the generated image for visual analysis
-        { temperature: 0.2, maxTokens: 4096 }
+        { temperature: 0.2, maxTokens: 1024 } // Reduced: critic returns short JSON score/verdict, not essays
     );
 
     // Handle failure gracefully
@@ -1041,11 +1057,15 @@ export async function runCreativePipeline(params) {
 
     // ── Pre-load brandContext ONCE to avoid redundant DB queries in each node ──
     emit('brand-intel', 'Gathering brand intelligence...', 'working');
-    const { brandContext } = await loadBrandContext(brandId);
+    // ⚡ PERF: loadBrandContext returns brand + products from Redis cache (5min TTL).
+    // We pass them directly into state so brandIntelligenceNode skips redundant DB queries.
+    const { brandContext, brand: loadedBrand, products: loadedProducts } = await loadBrandContext(brandId);
 
     let state = {
         brandId,
         brandContext,
+        loadedBrand,    // ⚡ Pre-loaded — reused by brandIntelligenceNode to skip Brand.findById
+        loadedProducts, // ⚡ Pre-loaded — reused by brandIntelligenceNode to skip Product.find
         brief,
         format: format || 'instagram-post',
         aspectRatio: aspectRatio || '1:1',
@@ -1053,7 +1073,7 @@ export async function runCreativePipeline(params) {
         imageModel: imageModel || 'nanobanana-2',
     };
 
-    // Node 0: Brand Intelligence (DB-only, ~50ms)
+    // Node 0: Brand Intelligence (DB-only, ~50ms — now ~0ms on cache hit)
     state = await brandIntelligenceNode(state);
     const productName = state.matchedProduct?.title || '';
     emit('brand-intel', productName ? `Matched product: ${productName}` : 'Brand context loaded', 'done', productName ? `Using "${productName}" as hero product` : '');

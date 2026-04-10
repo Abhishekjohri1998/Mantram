@@ -490,29 +490,12 @@ router.get('/jobs/:jobId', protect, async (req, res) => {
               creativeId: 1, result: 1, warnings: 1, createdAt: 1, startedAt: 1, completedAt: 1, steps: 1 }
         ).lean();
         if (!job) return res.status(404).json({ success: false, error: 'Job not found' });
-        // Sign S3 URLs before returning to frontend
+
+        // Sign S3 URLs before returning to frontend (do each URL once)
         job.imageUrl = await getSignedUrlIfNeeded(job.imageUrl);
         if (job.result?.creative) {
             job.result.creative.imageUrl = await getSignedUrlIfNeeded(job.result.creative.imageUrl);
             job.result.creative.thumbnailUrl = await getSignedUrlIfNeeded(job.result.creative.thumbnailUrl);
-        }
-
-        // Sign URL if it's an S3 URL
-        if (job && job.imageUrl) {
-            job.imageUrl = await getSignedUrlIfNeeded(job.imageUrl);
-        }
-        if (job && job.result?.creative) {
-            if (job.result.creative.imageUrl) job.result.creative.imageUrl = await getSignedUrlIfNeeded(job.result.creative.imageUrl);
-            if (job.result.creative.thumbnailUrl) job.result.creative.thumbnailUrl = await getSignedUrlIfNeeded(job.result.creative.thumbnailUrl);
-        }
-
-        // Sign URL if it's an S3 URL
-        if (job && job.imageUrl) {
-            job.imageUrl = await getSignedUrlIfNeeded(job.imageUrl);
-        }
-        if (job && job.result?.creative) {
-            if (job.result.creative.imageUrl) job.result.creative.imageUrl = await getSignedUrlIfNeeded(job.result.creative.imageUrl);
-            if (job.result.creative.thumbnailUrl) job.result.creative.thumbnailUrl = await getSignedUrlIfNeeded(job.result.creative.thumbnailUrl);
         }
 
         res.json({ success: true, job });
@@ -948,6 +931,7 @@ async function geminiImageGenerate(promptText, imageParts = [], temperature = 0.
 
         const data = await resp.json();
         if (data.error) {
+            const errMsg = data.error?.message || JSON.stringify(data.error);
             const lowerMsg = String(errMsg).toLowerCase();
 
             // Check for busy/overload — return modelBusy flag for frontend notification

@@ -25,7 +25,7 @@ const BRAND_CACHE_TTL = 300;
  * @param {number}  [temperature=0.7]
  * @param {number}  [maxTokens=4096]
  * @param {object}  [options={}]          - Optional overrides
- * @param {string}  [options.provider]    - Force a specific provider ('google', 'anthropic', etc.)
+ * @param {boolean} [options.preferFast]  - Use Gemini 2.5 Flash for speed instead of default provider
  */
 export async function callAgent(systemPrompt, userPrompt, temperature = 0.7, maxTokens = 4096, options = {}) {
     const router = getRouter();
@@ -34,59 +34,70 @@ export async function callAgent(systemPrompt, userPrompt, temperature = 0.7, max
     const safeSystem = systemPrompt.length > MAX_INPUT_CHARS ? systemPrompt.substring(0, MAX_INPUT_CHARS) + '... [truncated]' : systemPrompt;
     const safeUser = userPrompt.length > MAX_INPUT_CHARS ? userPrompt.substring(0, MAX_INPUT_CHARS) + '... [truncated]' : userPrompt;
 
-    const result = await router.generateText({
-        systemPrompt: safeSystem,
-        userPrompt: safeUser,
-        temperature,
-        maxTokens,
-    }, options.provider ? { provider: options.provider } : undefined); // Router auto-selects unless overridden
+    // Per-agent hard timeout (30s default) — prevents one slow LLM response from blocking the pipeline
+    const AGENT_TIMEOUT_MS = options.timeoutMs || 30_000;
+    let timeoutHandle;
+    const timeoutPromise = new Promise((_, reject) => {
+        timeoutHandle = setTimeout(() => reject(new Error(`callAgent timeout after ${AGENT_TIMEOUT_MS}ms`)), AGENT_TIMEOUT_MS);
+    });
+
+    // ⚡ preferFast: route to Gemini instead of default provider (Claude) for speed-sensitive tasks.
+    // Gemini 2.5 Flash: ~3-8s per call vs Claude 3.5 Sonnet: ~15-25s per call.
+    // Use in agentic pipeline nodes where volume > quality, keeping Claude for premium tasks.
+    const routingPrefs = options.provider
+        ? { provider: options.provider }
+        : options.preferFast
+            ? { provider: 'gemini' }
+            : undefined;
+
+    let result;
+    try {
+        result = await Promise.race([
+            router.generateText({
+                systemPrompt: safeSystem,
+                userPrompt: safeUser,
+                temperature,
+                maxTokens,
+            }, routingPrefs),
+            timeoutPromise,
+        ]);
+    } finally {
+        clearTimeout(timeoutHandle);
+    }
 
     const text = result.text || '';
     try {
         let cleaned = text;
-        
-        // Debug: log raw response length
-        console.log(`🔍 callAgent raw response: ${text.length} chars, starts with: "${text.substring(0, 50)}..."`);
         
         // Strip <think>...</think> tags (Gemini 2.5 Flash reasoning)
         // MUST strip closed tags first, then handle unclosed at end
         cleaned = cleaned.replace(/<think>[\s\S]*?<\/think>/gi, '');
         
         // Only strip unclosed <think> if it appears AFTER any JSON content
-        // Check if there's still an unclosed <think> tag
         const lastThinkIdx = cleaned.lastIndexOf('<think>');
         if (lastThinkIdx !== -1) {
-            // Only strip from <think> onward if there's no JSON before it
             const beforeThink = cleaned.substring(0, lastThinkIdx).trim();
             if (beforeThink.length > 0) {
-                cleaned = beforeThink; // Keep content before <think>
+                cleaned = beforeThink;
             } else {
-                cleaned = cleaned.substring(lastThinkIdx); // <think> is at start, strip everything
+                cleaned = cleaned.substring(lastThinkIdx);
                 cleaned = cleaned.replace(/<think>[\s\S]*/gi, '');
             }
         }
         
         // Strip markdown code fences: ```json ... ``` or ``` ... ```
         cleaned = cleaned.replace(/```(?:json)?\s*\n?/gi, '');
-        
         cleaned = cleaned.trim();
-        
-        console.log(`🔍 callAgent cleaned: ${cleaned.length} chars, starts with: "${cleaned.substring(0, 80)}..."`);
         
         // Strategy 1: Full text as JSON
         if (cleaned.startsWith('{')) {
-            try { return JSON.parse(cleaned); } catch (e) { 
-                console.log(`🔍 Strategy 1 failed: ${e.message.substring(0, 100)}`);
-            }
+            try { return JSON.parse(cleaned); } catch (_) { /* fall through */ }
         }
         
         // Strategy 2: Extract JSON with regex
         const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
-            console.log(`🔍 Strategy 2 match: ${jsonMatch[0].length} chars`);
-            try { return JSON.parse(jsonMatch[0]); } catch (e) { 
-                console.log(`🔍 Strategy 2 failed: ${e.message.substring(0, 100)}`);
-            }
+            try { return JSON.parse(jsonMatch[0]); } catch (_) { /* fall through */ }
         }
         
         // Strategy 3: Fix trailing commas + unquoted keys
@@ -94,61 +105,38 @@ export async function callAgent(systemPrompt, userPrompt, temperature = 0.7, max
             const fixedJson = jsonMatch[0]
                 .replace(/,\s*([\]}])/g, '$1')
                 .replace(/([{,]\s*)(\w+)\s*:/g, '$1"$2":');
-            try { return JSON.parse(fixedJson); } catch (e) { 
-                console.log(`🔍 Strategy 3 failed: ${e.message.substring(0, 100)}`);
-                console.log(`🔍 Raw text sample (first 300): ${text.substring(0, 300)}`);
-            }
-        } else {
-            console.log(`🔍 No JSON object found in cleaned text. Cleaned sample: ${cleaned.substring(0, 300)}`);
+            try { return JSON.parse(fixedJson); } catch (_) { /* fall through */ }
         }
 
-        // Strategy 4: Field-by-field regex extraction (last resort for copywriter / long JSON with unescaped chars)
-        // Handles cases where string values contain apostrophes, quotes, or newlines that break JSON.parse
+        // Strategy 4: Field-by-field regex extraction (last resort for long JSON with unescaped chars)
         const fieldExtract = (jsonMatch?.[0] || cleaned);
         if (fieldExtract) {
             try {
                 const obj = {};
-                // Extract string fields: "key": "value" — handles values with embedded quotes
                 const stringPairs = fieldExtract.matchAll(/"(\w+)"\s*:\s*"([\s\S]*?)(?<!\\)"(?=\s*[,}\n])/g);
                 for (const [, key, val] of stringPairs) {
                     if (!obj[key]) obj[key] = val.replace(/\\n/g, '\n').replace(/\\"/g, '"');
                 }
 
-                // --- NEW: Truncation Recovery ---
-                // If certain expected keys are missing, they might be truncated at the end of the string
+                // Truncation recovery for known important keys
                 const expectedKeys = ['primaryPrompt', 'engineeringNotes', 'creativeDirection', 'suggestedHeadline', 'analysis', 'headline'];
-                const missingKeys = expectedKeys.filter(k => !obj[k]);
-                
-                if (missingKeys.length > 0) {
-                    for (const key of missingKeys) {
-                        // Look for "key": " (open quote but no closing quote at end of string)
-                        const truncatedRegex = new RegExp(`"${key}"\\s*:\\s*"([\\s\\S]*)$`, 'i');
-                        const truncatedMatch = fieldExtract.match(truncatedRegex);
-                        if (truncatedMatch) {
-                            console.log(`🔍 Recovery: Found truncated field "${key}"`);
-                            let val = truncatedMatch[1].trim();
-                            // Strip any trailing garbage that isn't part of the string (like a trailing comma or partial brace if they somehow got there)
-                            val = val.replace(/["\s,}]*$/, ''); 
-                            obj[key] = val.replace(/\\n/g, '\n').replace(/\\"/g, '"');
-                        }
+                for (const key of expectedKeys.filter(k => !obj[k])) {
+                    const truncatedMatch = fieldExtract.match(new RegExp(`"${key}"\\s*:\\s*"([\\s\\S]*)$`, 'i'));
+                    if (truncatedMatch) {
+                        let val = truncatedMatch[1].trim().replace(/["\s,}]*$/, '');
+                        obj[key] = val.replace(/\\n/g, '\n').replace(/\\"/g, '"');
                     }
                 }
 
-                // Extract array fields: "key": [...]
+                // Extract array fields
                 const arrayPairs = fieldExtract.matchAll(/"(\w+)"\s*:\s*\[([\s\S]*?)\]/g);
                 for (const [, key, val] of arrayPairs) {
                     if (!obj[key]) {
-                        const items = val.match(/"([^"]+)"/g)?.map(s => s.replace(/"/g, '')) || [];
-                        obj[key] = items;
+                        obj[key] = val.match(/"([^"]+)"/g)?.map(s => s.replace(/"/g, '')) || [];
                     }
                 }
-                if (Object.keys(obj).length > 0) {
-                    console.log(`🔍 Strategy 4 success: extracted keys: ${Object.keys(obj).join(', ')}`);
-                    return obj;
-                }
-            } catch (e4) {
-                console.log(`🔍 Strategy 4 failed: ${e4.message.substring(0, 100)}`);
-            }
+                if (Object.keys(obj).length > 0) return obj;
+            } catch (_) { /* fall through */ }
         }
 
     } catch (e) {

@@ -556,16 +556,18 @@ export function simulateImpact(modelId, newCostMultiplier = 1.0) {
  * Start the background price monitor (24h interval)
  */
 export function startPricingMonitor() {
-    // Run initial check after 30s (let DB connect first)
+    // ⚡ PERF: Delay initial run to 5min (was 30s) — prevents competing with first user requests
+    // The pricing data is updated at most every 24h, so a 5min startup delay has zero business impact.
+    const INITIAL_DELAY_MS = 5 * 60 * 1000; // 5 minutes
     setTimeout(() => {
         checkPricingChanges().catch(err => console.error('❌ Pricing Monitor initial check failed:', err));
-    }, 30_000);
+    }, INITIAL_DELAY_MS);
 
     // Schedule recurring checks
     setInterval(() => {
         checkPricingChanges().catch(err => console.error('❌ Pricing Monitor check failed:', err));
     }, INTERVAL_MS);
 
-    console.log('📊 Pricing Monitor active — checking every 24h');
+    console.log('📊 Pricing Monitor active — checking every 24h (first run in 5min)');
 }
 

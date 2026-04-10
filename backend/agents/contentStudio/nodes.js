@@ -54,7 +54,15 @@ async function getLangDirective(state) {
 export async function researchNode(state) {
     console.log('🔍 Content Agent: Research — gathering real intelligence...');
 
-    const { brandContext, brand } = await loadBrandContext(state.brandId);
+    // ⚡ PERF: loadBrandContext + gatherIntelligence are independent — run in parallel.
+    // Previously sequential: ~2-3s wait for intelligence THEN LLM call.
+    // Now: both resolve together, saving 2-3s on every content request.
+    const [brandResult, intelligence] = await Promise.all([
+        loadBrandContext(state.brandId),
+        gatherIntelligence(state),
+    ]);
+    const { brandContext, brand } = brandResult;
+    state.intelligence = intelligence;
 
     // ── Language: User-selected language ALWAYS wins over brand DNA inference ──
     // If state.language is explicitly set (e.g. 'english'), skip regional inference entirely.
@@ -88,10 +96,6 @@ export async function researchNode(state) {
     state.langInfo = langInfo;
     state.languageDirective = languageDirective;
 
-    // ── NEW: Gather real data from tools ──
-    const intelligence = await gatherIntelligence(state);
-    state.intelligence = intelligence;
-
     // Build enriched research prompt with real data
     const intelligenceContext = buildIntelligenceContext(intelligence);
 
@@ -110,10 +114,12 @@ export async function researchNode(state) {
         ? `${languageDirective}\n\n${RESEARCH_PROMPT(brandContext)}`
         : RESEARCH_PROMPT(brandContext);
 
-    const result = await callAgent(systemPrompt, userPrompt, 0.6);
+    // ⚡ preferFast — Research is analytical, not creative: Gemini 2.5 Flash is fast enough
+    const result = await callAgent(systemPrompt, userPrompt, 0.6, 4096, { preferFast: true });
 
     return {
         ...state,
+        brandContext,   // ⚡ Pass forward so writerNode, seoNode, etc. skip loadBrandContext()
         research: result,
         detectedLanguage: langInfo,
         status: 'research',
@@ -130,7 +136,9 @@ export async function writerNode(state) {
 
     console.log(`✍️ Content Agent: Writer — ${state.rewriteCount > 0 ? `rewriting (attempt ${state.rewriteCount + 1})...` : 'creating content...'}`);
 
-    const { brandContext } = await loadBrandContext(state.brandId);
+    const { brandContext } = state.brandContext
+        ? { brandContext: state.brandContext }                // ⚡ Reuse from state (set by researchNode)
+        : await loadBrandContext(state.brandId);              // Fallback for standalone calls
     // Reuse language directive from researchNode (already on state)
     const languageDirective = state.languageDirective || '';
     const langInfo = state.langInfo || { isRegional: false, displayName: 'English' };
@@ -225,7 +233,9 @@ Top Pages: ${(state.intelligence.ga4.data?.pages || []).slice(0, 3).map(p => `${
 export async function seoNode(state) {
     console.log('🔎 Content Agent: SEO — optimizing...');
 
-    const { brandContext } = await loadBrandContext(state.brandId);
+    const { brandContext } = state.brandContext
+        ? { brandContext: state.brandContext }                // ⚡ Reuse from state
+        : await loadBrandContext(state.brandId);
     const languageDirective = state.languageDirective || '';
 
     // Include real SEO audit data if available
@@ -246,7 +256,8 @@ export async function seoNode(state) {
         ? `${languageDirective}\n\n${SEO_PROMPT(brandContext)}`
         : SEO_PROMPT(brandContext);
 
-    const result = await callAgent(systemPrompt, userPrompt, 0.3);
+    // ⚡ preferFast — SEO optimization is analytical: Gemini 2.5 Flash is sufficient
+    const result = await callAgent(systemPrompt, userPrompt, 0.3, 4096, { preferFast: true });
 
     return {
         ...state,
@@ -261,7 +272,9 @@ export async function seoNode(state) {
 export async function toneMatcherNode(state) {
     console.log('🎭 Content Agent: Tone Matcher — aligning voice...');
 
-    const { brandContext } = await loadBrandContext(state.brandId);
+    const { brandContext } = state.brandContext
+        ? { brandContext: state.brandContext }                // ⚡ Reuse from state
+        : await loadBrandContext(state.brandId);
     const languageDirective = state.languageDirective || '';
     const langInfo = state.langInfo || { isRegional: false, displayName: 'English' };
 
@@ -279,7 +292,8 @@ export async function toneMatcherNode(state) {
         ? `${languageDirective}\n\n${TONE_MATCHER_PROMPT(brandContext)}`
         : TONE_MATCHER_PROMPT(brandContext);
 
-    const result = await callAgent(systemPrompt, userPrompt, 0.4);
+    // ⚡ preferFast — Tone matching is pattern-based: fast model sufficient
+    const result = await callAgent(systemPrompt, userPrompt, 0.4, 4096, { preferFast: true });
 
     return {
         ...state,
@@ -294,7 +308,9 @@ export async function toneMatcherNode(state) {
 export async function contentStrategistNode(state) {
     console.log('🎯 Content Agent: Strategist — creating content strategy...');
 
-    const { brandContext } = await loadBrandContext(state.brandId);
+    const { brandContext } = state.brandContext
+        ? { brandContext: state.brandContext }                // ⚡ Reuse from state
+        : await loadBrandContext(state.brandId);
     const languageDirective = state.languageDirective || '';
 
     // Competitor context if available
@@ -330,7 +346,8 @@ export async function contentStrategistNode(state) {
         ? `${languageDirective}\n\n${CONTENT_STRATEGIST_PROMPT(brandContext)}`
         : CONTENT_STRATEGIST_PROMPT(brandContext);
 
-    const result = await callAgent(systemPrompt, userPrompt, 0.5);
+    // ⚡ preferFast — Strategy planning is structured analysis: Gemini 2.5 Flash sufficient
+    const result = await callAgent(systemPrompt, userPrompt, 0.5, 4096, { preferFast: true });
 
     return {
         ...state,
@@ -345,7 +362,9 @@ export async function contentStrategistNode(state) {
 export async function platformOptimizerNode(state) {
     console.log(`📱 Content Agent: Platform Optimizer — optimizing for ${state.platform || 'general'}...`);
 
-    const { brandContext } = await loadBrandContext(state.brandId);
+    const { brandContext } = state.brandContext
+        ? { brandContext: state.brandContext }                // ⚡ Reuse from state
+        : await loadBrandContext(state.brandId);
     const { langInfo, languageDirective } = await getLangDirective(state);
 
     const userPrompt = [
@@ -364,7 +383,8 @@ export async function platformOptimizerNode(state) {
         ? `${languageDirective}\n\n${PLATFORM_OPTIMIZER_PROMPT(brandContext)}`
         : PLATFORM_OPTIMIZER_PROMPT(brandContext);
 
-    const result = await callAgent(systemPrompt, userPrompt, 0.4);
+    // ⚡ preferFast — Platform optimization is rule-based: Gemini 2.5 Flash sufficient
+    const result = await callAgent(systemPrompt, userPrompt, 0.4, 4096, { preferFast: true });
 
     return {
         ...state,
@@ -379,7 +399,9 @@ export async function platformOptimizerNode(state) {
 export async function qualityCriticNode(state) {
     console.log(`⭐ Content Agent: Quality Critic — scoring... (attempt ${(state.rewriteCount || 0) + 1})`);
 
-    const { brandContext } = await loadBrandContext(state.brandId);
+    const { brandContext } = state.brandContext
+        ? { brandContext: state.brandContext }                // ⚡ Reuse from state
+        : await loadBrandContext(state.brandId);
     const { langInfo, languageDirective } = await getLangDirective(state);
 
     const userPrompt = [
@@ -397,14 +419,18 @@ export async function qualityCriticNode(state) {
         ? `${languageDirective}\n\n${QUALITY_CRITIC_PROMPT(brandContext)}`
         : QUALITY_CRITIC_PROMPT(brandContext);
 
-    const result = await callAgent(systemPrompt, userPrompt, 0.3);
+    // ⚡ preferFast — Quality critic scoring is evaluation, not generation: Gemini sufficient
+    const result = await callAgent(systemPrompt, userPrompt, 0.3, 4096, { preferFast: true });
 
     const overallScore = result?.scores?.overall || result?.overallScore || 10;
     const rewriteCount = state.rewriteCount || 0;
 
-    // ── AUTO-LOOP: If score < 8 and we haven't rewritten twice, send back to Writer ──
-    if (overallScore < 8 && rewriteCount < 2) {
-        console.log(`   ⚠️ Score ${overallScore}/10 — below threshold. Sending back to Writer (loop ${rewriteCount + 1}/2)...`);
+    // ── AUTO-LOOP: If score < 8 and we haven't hit the rewrite cap, send back to Writer ──
+    // maxRewriteLoops defaults to 2 (full quality mode), but callers can set it to 1 for
+    // fast-path social content to prevent double-rewrite latency spikes.
+    const maxLoops = state.maxRewriteLoops ?? 2;
+    if (overallScore < 8 && rewriteCount < maxLoops) {
+        console.log(`   ⚠️ Score ${overallScore}/10 — below threshold. Sending back to Writer (loop ${rewriteCount + 1}/${maxLoops})...`);
 
         const fixInstructions = [
             result?.improvements?.[0] || '',

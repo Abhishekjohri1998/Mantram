@@ -297,14 +297,22 @@ router.post('/start', protect, requireCredits('content'), async (req, res) => {
 // ══════════════════════════════════════════════════════════════════════════════
 router.post('/:id/refine', protect, requireCredits('contentRefine'), async (req, res) => {
     try {
+        const t0 = Date.now();
         const content = await Content.findOne({ _id: req.params.id, user: req.user._id });
         if (!content) return res.status(404).json({ success: false, error: 'Content not found' });
+
+        const contentType = content.type || 'social';
+        const researchDepth = content.aiMeta?.researchDepth || 'quick';
+
+        // Determine if this is a social fast-path — skip re-gathering intelligence for speed
+        const DEEP_CONTENT = ['blog', 'seo_blog', 'long_form', 'listicle', 'case_study', 'comparison', 'pillar_content', 'youtube_content', 'youtube_seo', 'press_release'];
+        const isSocialFastPath = !DEEP_CONTENT.includes(contentType) && researchDepth !== 'deep';
 
         let state = {
             userId: req.user._id.toString(),
             brandId: content.brand?.toString(),
             brief: content.prompt,
-            contentType: content.type,
+            contentType,
             platform: content.platform,
             draft: {
                 title: content.title,
@@ -313,23 +321,30 @@ router.post('/:id/refine', protect, requireCredits('contentRefine'), async (req,
             research: content.aiMeta?.research || {},
             tone: req.body.tone || '',
             language: req.body.language || '',
-            researchDepth: content.aiMeta?.researchDepth || 'quick',
+            researchDepth,
         };
 
-        // Gather intelligence so SEO + Tone agents have real data
-        const { gatherIntelligence } = await import('../agents/contentStudio/tools.js');
-        state.intelligence = await gatherIntelligence(state);
+        // Only re-gather intelligence for deep content types (blog, YouTube, etc.)
+        // Social posts skip this to save 2–5s on the refine call
+        if (!isSocialFastPath) {
+            const { gatherIntelligence } = await import('../agents/contentStudio/tools.js');
+            state.intelligence = await gatherIntelligence(state);
+        }
 
-        // Step 4: SEO Optimization (now with real SEO data)
-        state = await seoNode(state);
+        // ⚡ Step 4+5: SEO + Tone run in PARALLEL — they are independent of each other
+        const [seoResult, toneResult] = await Promise.allSettled([
+            seoNode(state),
+            toneMatcherNode(state),
+        ]);
+        const seoState  = seoResult.status === 'fulfilled'  ? seoResult.value  : state;
+        const toneState = toneResult.status === 'fulfilled' ? toneResult.value : state;
+        state = { ...state, ...seoState, ...toneState };
 
-        // Step 5: Tone Matching
-        state = await toneMatcherNode(state);
-
-        // Step 6: Platform Optimizer (adapts for target platform algorithm)
+        // Step 6: Platform Optimizer
         state = await platformOptimizerNode(state);
 
-        // Step 7: Quality Critic (with auto-loop to Writer)
+        // Step 7: Quality Critic — cap auto-rewrite to 1 iteration for social fast-path
+        if (isSocialFastPath) state.maxRewriteLoops = 1;
         state = await qualityCriticNode(state);
 
         // Update content with final optimized version
@@ -346,6 +361,7 @@ router.post('/:id/refine', protect, requireCredits('contentRefine'), async (req,
             brandAlignmentScore: state.critique?.scores?.brandAlignment || 85,
         };
         await content.save();
+        console.log(`✅ [Content Refine] ${isSocialFastPath ? 'Fast-path' : 'Deep'} completed in ${Date.now() - t0}ms`);
 
         res.json({
             success: true,
@@ -368,6 +384,7 @@ router.post('/:id/refine', protect, requireCredits('contentRefine'), async (req,
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
+
 
 // ══════════════════════════════════════════════════════════════════════════════
 // POST /api/content/agentic/:id/edit — Edit and re-critique

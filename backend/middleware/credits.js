@@ -439,6 +439,43 @@ export async function syncLiveModelPricing() {
 // Try initializing once at boot
 syncLiveModelPricing().catch(() => {});
 
+// ⚡ PERF: In-memory accumulator for provider budget tracking.
+// Instead of reading+writing DB on every AI call (getSetting+setSetting ~2 round-trips each),
+// we accumulate costs in memory and flush to DB every 60 seconds.
+// This trades sub-minute budget accuracy for a massive reduction in DB write load.
+const _providerBudgetAccumulator = {};
+let _budgetFlushTimer = null;
+async function _flushProviderBudgets() {
+    const snapshot = { ..._providerBudgetAccumulator };
+    // Clear accumulator BEFORE async write to avoid double-counting on concurrent flushes
+    for (const p of Object.keys(_providerBudgetAccumulator)) delete _providerBudgetAccumulator[p];
+    if (Object.keys(snapshot).length === 0) return;
+    try {
+        const budgets = await getSetting('provider_budgets', {});
+        for (const [p, cost] of Object.entries(snapshot)) {
+            if (budgets[p]) {
+                budgets[p].consumed = (budgets[p].consumed || 0) + cost;
+                budgets[p].lastUpdate = new Date();
+            } else {
+                const knownProviders = ['gemini', 'openai', 'anthropic', 'grok', 'piapi', 'fal', 'heygen', 'sarvam', 'laozhang'];
+                if (knownProviders.includes(p)) {
+                    budgets[p] = { budget: 1000, consumed: cost, lastUpdate: new Date() };
+                }
+            }
+        }
+        await setSetting('provider_budgets', budgets);
+    } catch (err) {
+        console.warn('[Budget Flush] DB write failed:', err.message);
+    }
+}
+function _scheduleBudgetFlush() {
+    if (_budgetFlushTimer) return; // Already scheduled
+    _budgetFlushTimer = setTimeout(async () => {
+        _budgetFlushTimer = null;
+        await _flushProviderBudgets();
+    }, 60_000); // Flush every 60s
+}
+
 export { MODEL_COSTS };
 
 /**
@@ -522,21 +559,14 @@ export const logTokenUsage = async (userId, tokenData, meta = {}) => {
             });
         }
 
-        // 3. Increment Platform Provider Budget (Admin Monitoring)
+        // 3. Increment Platform Provider Budget (Admin Monitoring) — batched, not per-call
         if (estimatedCost > 0) {
-            const budgets = await getSetting('provider_budgets', {});
             const p = (provider || '').toLowerCase();
-            if (p && budgets[p]) {
-                budgets[p].consumed = (budgets[p].consumed || 0) + estimatedCost;
-                budgets[p].lastUpdate = new Date();
-                await setSetting('provider_budgets', budgets);
-            } else if (p) {
-                // Initialize if missing but provider is known
-                const knownProviders = ['gemini', 'openai', 'anthropic', 'grok', 'piapi', 'fal', 'heygen', 'sarvam', 'laozhang'];
-                if (knownProviders.includes(p)) {
-                    budgets[p] = { budget: 1000, consumed: estimatedCost, lastUpdate: new Date() }; // Default $10 budget
-                    await setSetting('provider_budgets', budgets);
-                }
+            const knownProviders = ['gemini', 'openai', 'anthropic', 'grok', 'piapi', 'fal', 'heygen', 'sarvam', 'laozhang'];
+            if (p && knownProviders.includes(p)) {
+                // ⚡ Accumulate in memory — flushed to DB every 60s (not on every AI call)
+                _providerBudgetAccumulator[p] = (_providerBudgetAccumulator[p] || 0) + estimatedCost;
+                _scheduleBudgetFlush();
             }
         }
     } catch (err) {
