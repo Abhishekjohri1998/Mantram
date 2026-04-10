@@ -809,7 +809,7 @@ export default function VideoStudio() {
 
                 {/* ── ADVANCED MODE ── */}
                 {studioMode === 'advanced' && (
-                    <AdvancedMode activeBrand={activeBrand} initialData={advancedRefillData} />
+                    <AdvancedMode activeBrand={activeBrand} initialData={advancedRefillData} projects={projects} />
                 )}
 
                 {/* ── UGC CREATOR MODE (HeyGen) ── */}

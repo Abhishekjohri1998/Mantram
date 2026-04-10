@@ -838,6 +838,7 @@ export async function advancedGenerateNode(state) {
         generateAudio: state.generateAudio !== false,
         aspectRatio: state.aspectRatio || '16:9',
         referenceImages: state.referenceImages || [],
+        shots: state.shots || [],
     });
 
     return {
