@@ -305,46 +305,63 @@ router.post('/ai-generate', protect, requireCredits('canvasGenerate'), async (re
             console.log(`🧠 MCoT Canvas: Multi-subject reference detected. Synthesizing ${refCount} images...`)
             try {
                 const synthesis = await callMultimodalAgent(
-                    `You are an elite creative analyst. The user has provided ${refCount} reference images and asked for: "${prompt}".`,
-                    `Critically analyze each of the attached images. Identify the specific subject (person, object, animal) in EACH image. Then, write a master visual description that clearly features ALL distinct subjects interacting in the same scene as requested by the user's instruction. Be extremely descriptive.`,
+                    `You are an elite creative analyst. The user has provided ${refCount} reference images and wants: "${prompt}".`,
+                    `For EACH attached image, output a labeled block like this:
+IMAGE 1 SUBJECT: [Describe the exact person/object — age, gender, skin tone, hair color/style, clothing, build, expression, distinguishing features]
+IMAGE 2 SUBJECT: [Same level of detail for the second image]
+...and so on for all images.
+
+Then write:
+COMBINED SCENE: [A single paragraph describing ALL subjects together in the scene the user wants: "${prompt}". Every subject must appear with their exact appearance preserved.]
+
+Be forensically detailed about each subject's appearance so the image generator cannot hallucinate or swap them.`,
                     referenceImages.slice(0, 4),
-                    { temperature: 0.2, maxTokens: 1024, returnRaw: true }
+                    { temperature: 0.1, maxTokens: 1024, returnRaw: true }
                 )
                 if (synthesis && typeof synthesis === 'string') {
                     dynamicSynthesisPrompt = synthesis.trim()
-                    
-                    // CRITICAL: Drop raw image parts when fusing multiple subjects. 
-                    // Most diffusion APIs fail to composite 2+ separate raw subjects and will collapse them into one.
-                    // Relying strictly on the MCoT textual synthesis guarantees both subjects appear.
-                    console.log(`🧠 MCoT Canvas: Dropping raw image payloads for pure text-driven MCoT multi-subject fusion.`)
-                    parts.splice(0, refCount)
+                    console.log(`🧠 MCoT Canvas: Subject synthesis complete (${dynamicSynthesisPrompt.length} chars)`)
                 }
             } catch (e) {
                 console.warn('MCoT Synthesis failed for multiple ref images:', e.message)
             }
         }
 
-        const textPrompt = refCount > 0
-            ? `You are an elite creative director and visual artist with 20+ years of experience at top agencies. You have extraordinary creative intelligence.
+        const textPrompt = refCount > 1 && dynamicSynthesisPrompt
+            ? `CRITICAL INSTRUCTION — MULTI-SUBJECT IMAGE GENERATION:
 
-CREATIVE ANALYSIS PROCESS:
-1. ANALYZE each reference image: Identify dominant colors, mood, composition style, lighting quality, texture patterns, typography styles, and visual weight distribution
-2. EXTRACT creative DNA: Pull the artistic essence — what makes each reference visually powerful
-3. SYNTHESIZE: Merge the best creative elements into a cohesive new vision
+You have been given ${refCount} reference images. Each image contains a DIFFERENT subject.
+DO NOT merge them into one person. DO NOT hallucinate or replace any subject's appearance.
+You MUST faithfully reproduce the EXACT appearance of EVERY person/subject from the reference images.
 
-I have provided ${refCount} reference image(s). Study them deeply. Now create a NEW masterpiece based on this instruction: ${prompt}
+SUBJECT ANALYSIS FROM REFERENCES:
+${dynamicSynthesisPrompt}
+
+USER'S CREATIVE BRIEF: ${prompt}
 ${brandVisualInjection ? `\nBRAND VISUAL DIRECTION: ${brandVisualInjection}` : ''}
-${dynamicSynthesisPrompt ? `\nSUBJECT SYNTHESIS:\n${dynamicSynthesisPrompt}\n` : ''}
 
-CREATIVE PRINCIPLES TO APPLY:
-- Color Harmony: Use complementary/analogous color schemes from the references
-- Visual Hierarchy: Guide the eye through focal points, contrast, and spacing
-- Composition: Apply rule of thirds, golden ratio, or dynamic symmetry
-- Lighting: Professional lighting that creates depth and dimension  
-- Mood: Ensure emotional consistency throughout the image
-- Detail: Crisp, high-resolution output with rich textures
+ABSOLUTE RULES:
+1. Image 1's subject MUST appear exactly as shown in Image 1 — same face, hair, skin tone, build, clothing style
+2. Image 2's subject MUST appear exactly as shown in Image 2 — same face, hair, skin tone, build, clothing style
+${refCount > 2 ? `3. Image 3's subject MUST appear exactly as shown in Image 3\n` : ''}
+- Compose ALL subjects together in a single scene following the user's brief
+- Professional lighting, cinematic composition, 4K quality
+- DO NOT drop any subject. ALL ${refCount} subjects must be clearly visible and recognizable.
 
-The output must be a stunning, gallery-quality image that feels like it was crafted by a top creative agency.`
+Generate ONE stunning image with ALL subjects faithfully preserved.`
+            : refCount > 0
+            ? `You are an elite creative director. I have provided ${refCount} reference image(s).
+Study the reference carefully — reproduce the EXACT subject appearance (face, body, clothing, features).
+
+INSTRUCTION: ${prompt}
+${brandVisualInjection ? `\nBRAND VISUAL DIRECTION: ${brandVisualInjection}` : ''}
+
+RULES:
+- Faithfully preserve the subject's appearance from the reference image
+- Professional composition, cinematic lighting, 4K quality
+- Do NOT hallucinate or change the subject's face, hair, or body
+
+Generate a stunning, gallery-quality image.`
             : `You are an elite creative director and visual artist. Generate a stunning, gallery-quality image with these principles:
 
 INSTRUCTION: ${prompt}
@@ -457,33 +474,57 @@ router.post('/ai-edit', protect, requireCredits('canvasGenerate'), async (req, r
             console.log(`🧠 MCoT Canvas: Multi-subject edit detected. Synthesizing ${imgCount} images...`)
             try {
                 const synthesis = await callMultimodalAgent(
-                    `You are an elite creative analyst. The user has provided ${imgCount} reference images and asked for: "${prompt}".`,
-                    `Critically analyze each of the attached images. Identify the specific subject (person, object, animal) in EACH image. Then, write a master visual description that clearly features ALL distinct subjects interacting in the same scene as requested by the user's instruction. Be extremely descriptive.`,
+                    `You are an elite creative analyst. The user has provided ${imgCount} reference images and wants: "${prompt}".`,
+                    `For EACH attached image, output a labeled block like this:
+IMAGE 1 SUBJECT: [Describe the exact person/object — age, gender, skin tone, hair color/style, clothing, build, expression, distinguishing features]
+IMAGE 2 SUBJECT: [Same level of detail for the second image]
+...and so on for all images.
+
+Then write:
+COMBINED SCENE: [A single paragraph describing ALL subjects together in the scene the user wants: "${prompt}". Every subject must appear with their exact appearance preserved.]
+
+Be forensically detailed about each subject's appearance so the image generator cannot hallucinate or swap them.`,
                     [imageBase64, ...additionalImages].slice(0, 4),
-                    { temperature: 0.2, maxTokens: 1024, returnRaw: true }
+                    { temperature: 0.1, maxTokens: 1024, returnRaw: true }
                 )
                 if (synthesis && typeof synthesis === 'string') {
                     dynamicSynthesisPrompt = synthesis.trim()
-                    
-                    // CRITICAL: Drop raw image parts when fusing multiple subjects.
-                    // Prevent diffusion collapse by executing pure text-driven MCoT.
-                    console.log(`🧠 MCoT Canvas: Dropping raw image payloads for pure text-driven MCoT multi-subject edit fusion.`)
-                    parts.splice(0, imgCount)
+                    console.log(`🧠 MCoT Canvas: Edit subject synthesis complete (${dynamicSynthesisPrompt.length} chars)`)
                 }
             } catch (e) {
                 console.warn('MCoT Synthesis failed for edit payload:', e.message)
             }
         }
 
-        const editText = imgCount > 1
+        const editText = imgCount > 1 && dynamicSynthesisPrompt
+            ? `CRITICAL INSTRUCTION — MULTI-SUBJECT IMAGE EDIT:
+
+You have been given ${imgCount} reference images. Each image contains a DIFFERENT subject.
+DO NOT merge them into one person. DO NOT hallucinate or replace any subject's appearance.
+You MUST faithfully reproduce the EXACT appearance of EVERY person/subject from the reference images.
+
+SUBJECT ANALYSIS FROM REFERENCES:
+${dynamicSynthesisPrompt}
+
+USER'S CREATIVE BRIEF: "${prompt}"
+
+ABSOLUTE RULES:
+1. Image 1's subject MUST appear exactly as shown in Image 1 — same face, hair, skin tone, build, clothing style
+2. Image 2's subject MUST appear exactly as shown in Image 2 — same face, hair, skin tone, build, clothing style
+${imgCount > 2 ? `3. Image 3's subject MUST appear exactly as shown in Image 3\n` : ''}
+- Compose ALL subjects together in a single scene following the user's brief
+- Professional lighting, cinematic composition, 4K quality
+- DO NOT drop any subject. ALL ${imgCount} subjects must be clearly visible and recognizable.
+
+Generate ONE stunning image with ALL subjects faithfully preserved.`
+            : imgCount > 1
             ? `You are Fidato, an elite AI creative director. Your task is to generate a new image using the provided images strictly as VISUAL REFERENCES.
 
 INSTRUCTION: "${prompt}"
-${dynamicSynthesisPrompt ? `\nSUBJECT SYNTHESIS:\n${dynamicSynthesisPrompt}\n` : ''}
 
 CREATIVE RULES:
 1. The provided images are your REFERENCE IMAGES (subject and/or style references).
-2. You MUST generate a new image that prominently features the exact subjects (e.g. BOTH people, if multiple people are in the synthesis), products, or styles shown in these reference images.
+2. You MUST generate a new image that prominently features the exact subjects from ALL reference images.
 3. Intelligently compose them together into a single cohesive masterpiece based on the instruction.
 4. Ensure lighting and shadows are globally consistent.
 5. Do NOT hallucinate new products or subjects that conflict with the reference images.
