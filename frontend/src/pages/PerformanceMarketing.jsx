@@ -23,15 +23,15 @@ const TABS = [
 // ── Metric card ──
 function MetricCard({ icon, label, value, sub, color = 'emerald' }) {
     return (
-        <div className="glass-panel rounded-2xl p-5 border border-white/[0.06] hover:border-white/[0.12] transition-all group">
+        <div className="glass-panel rounded-2xl p-5 border border-[var(--sys-border)] hover:border-[var(--sys-border)] transition-all group">
             <div className="flex items-start justify-between mb-3">
                 <div className={`w-10 h-10 rounded-xl bg-${color}-500/10 flex items-center justify-center`}>
                     <span className={`material-symbols-outlined text-${color}-400`}>{icon}</span>
                 </div>
-                {sub && <span className="text-xs text-slate-500">{sub}</span>}
+                {sub && <span className="text-xs text-[var(--sys-text-muted)]">{sub}</span>}
             </div>
-            <p className="text-2xl font-bold text-white mb-1">{value}</p>
-            <p className="text-sm text-slate-400">{label}</p>
+            <p className="text-2xl font-bold text-[var(--sys-text)] mb-1">{value}</p>
+            <p className="text-sm text-[var(--sys-text-muted)]">{label}</p>
         </div>
     )
 }
@@ -370,8 +370,8 @@ export default function PerformanceMarketing() {
                     <div className="w-20 h-20 rounded-full bg-[#FF4D00]/10 flex items-center justify-center mb-4">
                         <span className="material-symbols-outlined text-4xl text-[#FF4D00]">brand_awareness</span>
                     </div>
-                    <h2 className="text-2xl font-bold text-white">Select a Brand to Continue</h2>
-                    <p className="text-slate-400 max-w-md mx-auto">
+                    <h2 className="text-2xl font-bold text-[var(--sys-text)]">Select a Brand to Continue</h2>
+                    <p className="text-[var(--sys-text-muted)] max-w-md mx-auto">
                         Performance marketing insights and strategies are brand-specific. Please select or create a brand to access the Performance Studio.
                     </p>
                     <button onClick={() => navigate('/dashboard')} className="px-6 py-3 rounded-xl bg-primary text-white font-bold hover:shadow-lg transition-all cursor-pointer">
@@ -395,7 +395,7 @@ export default function PerformanceMarketing() {
             <div className="max-w-7xl mx-auto space-y-6">
                 {/* ── Error display ── */}
                 {error && (
-                    <div className={`p-4 rounded-2xl border ${error.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-300'} text-sm flex items-center gap-2`}>
+                    <div className={`p-4 rounded-2xl border ${error.isProviderError ? 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary' : 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-[var(--sys-primary)]'} text-sm flex items-center gap-2`}>
                         <span className="material-symbols-outlined text-base">
                             {error.isProviderError ? 'warning' : 'error'}
                         </span>
@@ -417,14 +417,14 @@ export default function PerformanceMarketing() {
                 {/* ════════════════════════════════════════════════════════════ */}
                 {/* TAB NAVIGATION                                             */}
                 {/* ════════════════════════════════════════════════════════════ */}
-                <div className="flex gap-1 p-1.5 rounded-2xl bg-white/[0.03] border border-white/[0.06] overflow-x-auto">
+                <div className="flex gap-1 p-1.5 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] overflow-x-auto">
                     {TABS.map(t => (
                         <button
                             key={t.id}
                             onClick={() => setTab(t.id)}
                             className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all cursor-pointer ${tab === t.id
-                                ? 'bg-gradient-to-r from-[#FF4D00]/20 to-cyan-500/20 text-white border border-[#FF4D00]/30'
-                                : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.04]'
+                                ? 'bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] border border-[#FF4D00]/30'
+                                : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)]'
                                 }`}
                         >
                             <span className="material-symbols-outlined text-lg">{t.icon}</span>
@@ -432,7 +432,7 @@ export default function PerformanceMarketing() {
                         </button>
                     ))}
                     <button onClick={() => setTab('help')}
-                        className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all cursor-pointer ${tab === 'help' ? 'bg-gradient-to-r from-[#FF4D00]/20 to-cyan-500/20 text-white border border-[#FF4D00]/30' : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.04]'}`}>
+                        className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all cursor-pointer ${tab === 'help' ? 'bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] border border-[#FF4D00]/30' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)]'}`}>
                         <span className="material-symbols-outlined text-lg">menu_book</span>
                         How It Works
                     </button>
@@ -462,8 +462,8 @@ export default function PerformanceMarketing() {
 
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                             {/* Quick Actions */}
-                            <div className="glass-panel rounded-2xl p-6 border border-white/[0.06]">
-                                <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                            <div className="glass-panel rounded-2xl p-6 border border-[var(--sys-border)]">
+                                <h3 className="text-lg font-bold text-[var(--sys-text)] mb-4 flex items-center gap-2">
                                     <span className="material-symbols-outlined text-[#FF4D00]">bolt</span>
                                     Quick Actions
                                 </h3>
@@ -480,17 +480,17 @@ export default function PerformanceMarketing() {
                                             className={`p-4 rounded-xl bg-${qa.color}-500/5 border border-${qa.color}-500/10 hover:border-${qa.color}-500/30 hover:bg-${qa.color}-500/10 transition-all cursor-pointer text-left group`}
                                         >
                                             <span className={`material-symbols-outlined text-${qa.color}-400 text-2xl mb-2 block`}>{qa.icon}</span>
-                                            <p className="text-sm font-medium text-slate-300 group-hover:text-white transition-colors">{qa.label}</p>
+                                            <p className="text-sm font-medium text-[var(--sys-text-muted)] group-hover:text-[var(--sys-text)] transition-colors">{qa.label}</p>
                                         </button>
                                     ))}
                                 </div>
                             </div>
 
                             {/* Connected Platforms — Read-Only Status */}
-                            <div className="glass-panel rounded-2xl p-6 border border-white/[0.06]">
+                            <div className="glass-panel rounded-2xl p-6 border border-[var(--sys-border)]">
                                 <div className="flex items-center justify-between mb-4">
-                                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                                        <span className="material-symbols-outlined text-emerald-400">electrical_services</span>
+                                    <h3 className="text-lg font-bold text-[var(--sys-text)] flex items-center gap-2">
+                                        <span className="material-symbols-outlined text-primary">electrical_services</span>
                                         Ad Platforms
                                     </h3>
                                     <button onClick={() => navigate('/integrations')} className="text-xs text-primary hover:text-white cursor-pointer flex items-center gap-1 px-3 py-1.5 rounded-lg hover:bg-primary/10 transition-all">
@@ -506,40 +506,40 @@ export default function PerformanceMarketing() {
                                         const isConnected = conn.status === 'connected'
                                         return (
                                             <div key={p.key} className={`p-4 rounded-xl border transition-all ${isConnected
-                                                ? 'bg-emerald-500/5 border-emerald-500/20'
-                                                : 'bg-white/[0.02] border-white/[0.04]'
+                                                ? 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)]'
+                                                : 'bg-[var(--sys-surface)] border-[var(--sys-border)]'
                                                 }`}>
                                                 <div className="flex items-center justify-between">
                                                     <div className="flex items-center gap-3">
                                                         <span className="text-2xl">{p.icon}</span>
                                                         <div>
-                                                            <p className="text-sm font-medium text-white">{p.name}</p>
+                                                            <p className="text-sm font-medium text-[var(--sys-text)]">{p.name}</p>
                                                             {isConnected ? (
-                                                                <p className="text-xs text-emerald-400">✓ {conn.displayName || conn.email || 'Connected'}</p>
+                                                                <p className="text-xs text-primary">✓ {conn.displayName || conn.email || 'Connected'}</p>
                                                             ) : (
-                                                                <p className="text-xs text-slate-500">Not connected</p>
+                                                                <p className="text-xs text-[var(--sys-text-muted)]">Not connected</p>
                                                             )}
                                                         </div>
                                                     </div>
-                                                    <span className={`w-2.5 h-2.5 rounded-full ${isConnected ? 'bg-emerald-400 shadow-lg shadow-emerald-400/50' : 'bg-slate-600'}`} />
+                                                    <span className={`w-2.5 h-2.5 rounded-full ${isConnected ? 'bg-[var(--sys-surface)] shadow-none' : 'bg-[var(--sys-border)]'}`} />
                                                 </div>
 
                                                 {/* Account details when connected */}
                                                 {isConnected && conn.adAccounts?.length > 0 && (
-                                                    <div className="mt-2 pt-2 border-t border-white/[0.04]">
-                                                        <p className="text-xs text-slate-500 mb-1">Ad Accounts:</p>
+                                                    <div className="mt-2 pt-2 border-t border-[var(--sys-border)]">
+                                                        <p className="text-xs text-[var(--sys-text-muted)] mb-1">Ad Accounts:</p>
                                                         {conn.adAccounts.slice(0, 3).map(a => (
-                                                            <p key={a.id} className="text-xs text-slate-400">
-                                                                {a.name} <span className="text-slate-600">({a.id})</span>
+                                                            <p key={a.id} className="text-xs text-[var(--sys-text-muted)]">
+                                                                {a.name} <span className="text-[var(--sys-text-muted)]">({a.id})</span>
                                                             </p>
                                                         ))}
                                                     </div>
                                                 )}
                                                 {isConnected && conn.customerIds?.length > 0 && (
-                                                    <div className="mt-2 pt-2 border-t border-white/[0.04]">
-                                                        <p className="text-xs text-slate-500 mb-1">Customer IDs:</p>
+                                                    <div className="mt-2 pt-2 border-t border-[var(--sys-border)]">
+                                                        <p className="text-xs text-[var(--sys-text-muted)] mb-1">Customer IDs:</p>
                                                         {conn.customerIds.slice(0, 3).map(id => (
-                                                            <p key={id} className="text-xs text-slate-400">{id}</p>
+                                                            <p key={id} className="text-xs text-[var(--sys-text-muted)]">{id}</p>
                                                         ))}
                                                     </div>
                                                 )}
@@ -548,7 +548,7 @@ export default function PerformanceMarketing() {
                                                 {!isConnected && (
                                                     <div className="mt-3">
                                                         <button onClick={() => navigate('/integrations')}
-                                                            className="w-full py-2.5 rounded-lg bg-gradient-to-r from-[#FF4D00]/20 to-cyan-600/20 text-white/80 text-sm font-medium hover:from-[#FF4D00]/30 hover:to-cyan-600/30 transition-all cursor-pointer flex items-center justify-center gap-2 border border-[#FF4D00]/20">
+                                                            className="w-full py-2.5 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)]/80 text-sm font-medium hover:from-[#FF4D00]/30 hover:to-cyan-600/30 transition-all cursor-pointer flex items-center justify-center gap-2 border border-[#FF4D00]/20">
                                                             <span className="material-symbols-outlined text-sm">link</span>Connect in Integrations
                                                         </button>
                                                     </div>
@@ -556,7 +556,7 @@ export default function PerformanceMarketing() {
                                             </div>
                                         )
                                     })}
-                                    <p className="text-sm text-slate-500 mt-2">
+                                    <p className="text-sm text-[var(--sys-text-muted)] mt-2">
                                         💡 Research & Strategy work without connections. Connect for live campaign management.
                                     </p>
                                 </div>
@@ -565,10 +565,10 @@ export default function PerformanceMarketing() {
 
                         {/* ── 🔥 ADSENSE REVENUE (Conditionally rendered if connected) ── */}
                         {connections.google?.status === 'connected' && (adsenseLoading || adsenseReport || adsenseError) && (
-                            <div className="glass-panel rounded-2xl p-6 border border-emerald-500/20">
+                            <div className="glass-panel rounded-2xl p-6 border border-[var(--sys-border)]">
                                 <div className="flex items-center justify-between mb-4">
-                                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                                        <span className="material-symbols-outlined text-emerald-400">monetization_on</span>
+                                    <h3 className="text-lg font-bold text-[var(--sys-text)] flex items-center gap-2">
+                                        <span className="material-symbols-outlined text-primary">monetization_on</span>
                                         Google AdSense Revenue
                                     </h3>
                                     {adsenseAccounts.length > 1 && (
@@ -581,7 +581,7 @@ export default function PerformanceMarketing() {
                                                     .then(res => setAdsenseReport(res.report))
                                                     .finally(() => setAdsenseLoading(false));
                                             }}
-                                            className="bg-[#121217]/50 border border-slate-700 text-white text-xs rounded-lg px-3 py-1.5 focus:outline-none focus:border-emerald-500 transition-colors"
+                                            className="bg-[var(--sys-surface)]/50 border border-[var(--sys-border)] text-[var(--sys-text)] text-xs rounded-lg px-3 py-1.5 focus:outline-none focus:border-[var(--sys-border)] transition-colors"
                                         >
                                             {adsenseAccounts.map(a => <option key={a.id} value={a.id}>{a.displayName}</option>)}
                                         </select>
@@ -590,10 +590,10 @@ export default function PerformanceMarketing() {
                                 
                                 {adsenseLoading ? (
                                     <div className="flex items-center justify-center p-8">
-                                        <span className="material-symbols-outlined animate-spin text-emerald-400 text-3xl">progress_activity</span>
+                                        <span className="material-symbols-outlined animate-spin text-primary text-3xl">progress_activity</span>
                                     </div>
                                 ) : adsenseError ? (
-                                    <div className="p-4 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-400 text-sm">
+                                    <div className="p-4 bg-[var(--sys-primary-dim)] border border-[var(--sys-border)] rounded-xl text-primary text-sm">
                                         {adsenseError}
                                     </div>
                                 ) : adsenseReport ? (
@@ -608,18 +608,18 @@ export default function PerformanceMarketing() {
                                             ].map((s, i) => (
                                                 <div key={i} className={`p-4 rounded-xl border border-${s.color}-500/20 bg-${s.color}-500/5 text-center`}>
                                                     <span className={`material-symbols-outlined text-2xl text-${s.color}-400 mb-2 block`}>{s.icon}</span>
-                                                    <p className="text-xl font-black text-white">{s.value}</p>
-                                                    <p className="text-[10px] uppercase font-bold text-slate-400 mt-1">{s.label}</p>
+                                                    <p className="text-xl font-black text-[var(--sys-text)]">{s.value}</p>
+                                                    <p className="text-[10px] uppercase font-bold text-[var(--sys-text-muted)] mt-1">{s.label}</p>
                                                 </div>
                                             ))}
                                         </div>
                                         {/* AdSense Trend Sparkline */}
-                                        <div className="p-4 bg-white/[0.02] border border-white/[0.05] rounded-xl">
-                                            <p className="text-xs text-slate-400 font-bold uppercase mb-4">Daily Revenue (Last 30 Days)</p>
+                                        <div className="p-4 bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl">
+                                            <p className="text-xs text-[var(--sys-text-muted)] font-bold uppercase mb-4">Daily Revenue (Last 30 Days)</p>
                                             <div className="h-24 w-full relative">
                                                 {(() => {
                                                     const rows = adsenseReport.rows || [];
-                                                    if (rows.length < 2) return <p className="text-slate-500 text-xs text-center pt-8">Not enough data to trend</p>;
+                                                    if (rows.length < 2) return <p className="text-[var(--sys-text-muted)] text-xs text-center pt-8">Not enough data to trend</p>;
                                                     const maxV = Math.max(...rows.map(r => parseFloat(r.cells[5].value)), 1);
                                                     const minV = Math.min(...rows.map(r => parseFloat(r.cells[5].value)));
                                                     const w = 100, h = 100;
@@ -660,9 +660,9 @@ export default function PerformanceMarketing() {
                                                             Ad Blindness Risk
                                                         </h4>
                                                         {(ctr < 1.0 && impressions > 1000) ? (
-                                                            <p className="text-xs text-slate-300 mb-2">Your ad CTR is low (<span className="font-bold text-[#FF4D00]">{ctr.toFixed(2)}%</span>). Visitors might be experiencing ad blindness. Consider testing new ad placements.</p>
+                                                            <p className="text-xs text-[var(--sys-text-muted)] mb-2">Your ad CTR is low (<span className="font-bold text-[#FF4D00]">{ctr.toFixed(2)}%</span>). Visitors might be experiencing ad blindness. Consider testing new ad placements.</p>
                                                         ) : (
-                                                            <p className="text-xs text-emerald-400 mb-2">Ad engagement is healthy. CTR is stable relative to your page views.</p>
+                                                            <p className="text-xs text-primary mb-2">Ad engagement is healthy. CTR is stable relative to your page views.</p>
                                                         )}
                                                     </div>
                                                 );
@@ -674,13 +674,13 @@ export default function PerformanceMarketing() {
 
                                                 
                                                 return (
-                                                    <div className="p-4 bg-cyan-500/5 border border-cyan-500/10 rounded-xl relative overflow-hidden group">
-                                                        <div className="absolute top-0 right-0 w-24 h-24 bg-cyan-500/10 blur-2xl rounded-full -mr-10 -mt-10 transition-transform group-hover:scale-150" />
-                                                        <h4 className="text-sm font-bold text-cyan-400 flex items-center gap-2 mb-2">
+                                                    <div className="p-4 bg-[var(--sys-primary-dim)] border border-[var(--sys-border)] rounded-xl relative overflow-hidden group">
+                                                        <div className="absolute top-0 right-0 w-24 h-24 bg-[var(--sys-primary-dim)] blur-2xl rounded-full -mr-10 -mt-10 transition-transform group-hover:scale-150" />
+                                                        <h4 className="text-sm font-bold text-primary flex items-center gap-2 mb-2">
                                                             <span className="material-symbols-outlined text-base">trending_up</span>
                                                             Revenue Potential (RPM)
                                                         </h4>
-                                                        <p className="text-xs text-slate-300 mb-2">You are earning <span className="font-bold text-cyan-400">₹{rpm.toFixed(2)}</span> per 1,000 page views. Focus on driving organic traffic to high-RPM pages to scale earnings.</p>
+                                                        <p className="text-xs text-[var(--sys-text-muted)] mb-2">You are earning <span className="font-bold text-primary">₹{rpm.toFixed(2)}</span> per 1,000 page views. Focus on driving organic traffic to high-RPM pages to scale earnings.</p>
                                                     </div>
                                                 );
                                             })()}
@@ -691,17 +691,17 @@ export default function PerformanceMarketing() {
                         )}
 
                         {/* ── 🔥 GROK TRENDING NOW ── */}
-                        <div className="glass-panel rounded-2xl p-6 border border-orange-500/20">
+                        <div className="glass-panel rounded-2xl p-6 border border-[var(--sys-border)]">
                             <div className="flex items-center justify-between mb-4">
-                                <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-orange-400">whatshot</span>
+                                <h3 className="text-lg font-bold text-[var(--sys-text)] flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-[var(--sys-primary)]">whatshot</span>
                                     Trending Now
-                                    <span className="px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-400 text-xs font-bold">LIVE via Grok</span>
+                                    <span className="px-2 py-0.5 rounded-full bg-[var(--sys-surface)] text-[var(--sys-primary)] text-xs font-bold">LIVE via Grok</span>
                                 </h3>
                                 <button
                                     onClick={loadGrokTrends}
                                     disabled={loadingGrok}
-                                    className="px-3 py-1.5 rounded-lg bg-white/[0.04] text-slate-400 text-sm hover:bg-white/[0.08] transition-all cursor-pointer flex items-center gap-1"
+                                    className="px-3 py-1.5 rounded-lg bg-[var(--sys-surface)] text-[var(--sys-text-muted)] text-sm hover:bg-[var(--sys-surface)] transition-all cursor-pointer flex items-center gap-1"
                                 >
                                     <span className={`material-symbols-outlined text-sm ${loadingGrok ? 'animate-spin' : ''}`}>refresh</span>
                                     Refresh
@@ -710,37 +710,37 @@ export default function PerformanceMarketing() {
 
                             {loadingGrok && grokTopics.length === 0 ? (
                                 <div className="flex items-center justify-center py-8 gap-3">
-                                    <span className="material-symbols-outlined animate-spin text-orange-400">progress_activity</span>
-                                    <span className="text-base text-slate-400">Fetching live trends from Grok AI...</span>
+                                    <span className="material-symbols-outlined animate-spin text-[var(--sys-primary)]">progress_activity</span>
+                                    <span className="text-base text-[var(--sys-text-muted)]">Fetching live trends from Grok AI...</span>
                                 </div>
                             ) : grokTopics.length > 0 ? (
                                 <div className="space-y-4">
                                     {/* Trending Topics */}
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                                         {grokTopics.slice(0, 6).map((t, i) => (
-                                            <div key={i} className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.04] hover:border-orange-500/20 transition-all">
+                                            <div key={i} className="p-4 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:border-[var(--sys-border)] transition-all">
                                                 <div className="flex items-start justify-between mb-2">
-                                                    <h4 className="text-base font-bold text-white leading-tight">{t.topic}</h4>
-                                                    <span className={`px-2 py-0.5 rounded-full text-xs font-bold shrink-0 ml-2 ${t.urgency === 'now' ? 'bg-rose-500/10 text-rose-400'
-                                                        : t.urgency === 'today' ? 'bg-amber-500/10 text-amber-400'
-                                                            : 'bg-slate-500/10 text-slate-400'
+                                                    <h4 className="text-base font-bold text-[var(--sys-text)] leading-tight">{t.topic}</h4>
+                                                    <span className={`px-2 py-0.5 rounded-full text-xs font-bold shrink-0 ml-2 ${t.urgency === 'now' ? 'bg-[var(--sys-primary-dim)] text-primary'
+                                                        : t.urgency === 'today' ? 'bg-[var(--sys-primary-dim)] text-primary'
+                                                            : 'bg-[var(--sys-border)]/10 text-[var(--sys-text-muted)]'
                                                         }`}>
                                                         {t.urgency === 'now' ? '🔴 NOW' : t.urgency === 'today' ? '🟡 Today' : '📅 This week'}
                                                     </span>
                                                 </div>
-                                                <p className="text-sm text-slate-400 mb-2 line-clamp-2">{t.description}</p>
+                                                <p className="text-sm text-[var(--sys-text-muted)] mb-2 line-clamp-2">{t.description}</p>
                                                 <div className="flex items-center gap-2 mb-2">
                                                     <span className={`px-2 py-0.5 rounded-full text-xs ${t.category === 'entertainment' ? 'bg-[#FF4D00]/10 text-[#FF7A00]'
-                                                        : t.category === 'tech' ? 'bg-cyan-500/10 text-cyan-400'
+                                                        : t.category === 'tech' ? 'bg-[var(--sys-primary-dim)] text-primary'
                                                             : t.category === 'sports' ? 'bg-green-500/10 text-green-400'
-                                                                : t.category === 'viral' ? 'bg-orange-500/10 text-orange-400'
+                                                                : t.category === 'viral' ? 'bg-[var(--sys-surface)] text-[var(--sys-primary)]'
                                                                     : t.category === 'lifestyle' ? 'bg-[#FF4D00]/10 text-[#FF4D00]'
-                                                                        : 'bg-slate-500/10 text-slate-400'
+                                                                        : 'bg-[var(--sys-border)]/10 text-[var(--sys-text-muted)]'
                                                         }`}>{t.category}</span>
-                                                    {t.format && <span className="text-sm text-slate-500"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">smartphone</span> {t.format}</span>}
+                                                    {t.format && <span className="text-sm text-[var(--sys-text-muted)]"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">smartphone</span> {t.format}</span>}
                                                 </div>
                                                 {t.marketingAngle && (
-                                                    <p className="text-sm text-emerald-400 mb-2">💡 {t.marketingAngle}</p>
+                                                    <p className="text-sm text-primary mb-2">💡 {t.marketingAngle}</p>
                                                 )}
                                                 {t.hashtags?.length > 0 && (
                                                     <div className="flex flex-wrap gap-1">
@@ -755,35 +755,35 @@ export default function PerformanceMarketing() {
                                 </div>
                             ) : (
                                 <div className="text-center py-6">
-                                    <p className="text-base text-slate-500">No trending data available. Click Refresh to fetch.</p>
+                                    <p className="text-base text-[var(--sys-text-muted)]">No trending data available. Click Refresh to fetch.</p>
                                 </div>
                             )}
                         </div>
 
                         {/* ── 💡 GROK CONTENT IDEAS ── */}
                         {grokContent.length > 0 && (
-                            <div className="glass-panel rounded-2xl p-6 border border-cyan-500/20">
-                                <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-cyan-400">tips_and_updates</span>
+                            <div className="glass-panel rounded-2xl p-6 border border-[var(--sys-border)]">
+                                <h3 className="text-lg font-bold text-[var(--sys-text)] mb-4 flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-primary">tips_and_updates</span>
                                     AI Content Suggestions
-                                    <span className="px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 text-xs font-bold">Grok</span>
+                                    <span className="px-2 py-0.5 rounded-full bg-[var(--sys-primary-dim)] text-primary text-xs font-bold">Grok</span>
                                 </h3>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                     {grokContent.slice(0, 4).map((s, i) => (
-                                        <div key={i} className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.04] hover:border-cyan-500/20 transition-all">
+                                        <div key={i} className="p-4 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:border-[var(--sys-border)] transition-all">
                                             <div className="flex items-center gap-2 mb-2">
                                                 <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${s.platform === 'instagram' ? 'bg-[#FF4D00]/10 text-[#FF7A00]'
                                                     : s.platform === 'twitter' ? 'bg-sky-500/10 text-sky-400'
                                                         : s.platform === 'linkedin' ? 'bg-[#FF4D00]/10 text-[#FF4D00]'
-                                                            : 'bg-slate-500/10 text-slate-400'
+                                                            : 'bg-[var(--sys-border)]/10 text-[var(--sys-text-muted)]'
                                                     }`}>{s.platform}</span>
-                                                <span className="text-sm text-slate-500">{s.format}</span>
-                                                {s.viralPotential === 'high' && <span className="text-sm text-orange-400"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">local_fire_department</span> High viral</span>}
+                                                <span className="text-sm text-[var(--sys-text-muted)]">{s.format}</span>
+                                                {s.viralPotential === 'high' && <span className="text-sm text-[var(--sys-primary)]"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">local_fire_department</span> High viral</span>}
                                             </div>
-                                            <h4 className="text-base font-bold text-white mb-1">{s.title}</h4>
-                                            <p className="text-sm text-slate-400 mb-2">{s.hook}</p>
+                                            <h4 className="text-base font-bold text-[var(--sys-text)] mb-1">{s.title}</h4>
+                                            <p className="text-sm text-[var(--sys-text-muted)] mb-2">{s.hook}</p>
                                             {s.trendConnection && (
-                                                <p className="text-sm text-emerald-400 mb-2"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">trending_up</span> Trend: {s.trendConnection}</p>
+                                                <p className="text-sm text-primary mb-2"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">trending_up</span> Trend: {s.trendConnection}</p>
                                             )}
                                             {s.hashtags?.length > 0 && (
                                                 <div className="flex flex-wrap gap-1">
@@ -800,9 +800,9 @@ export default function PerformanceMarketing() {
 
                         {/* Recent Reports */}
                         {(dashboard?.recentReports?.length > 0) && (
-                            <div className="glass-panel rounded-2xl p-6 border border-white/[0.06]">
-                                <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-cyan-400">history</span>
+                            <div className="glass-panel rounded-2xl p-6 border border-[var(--sys-border)]">
+                                <h3 className="text-lg font-bold text-[var(--sys-text)] mb-4 flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-primary">history</span>
                                     Recent Reports
                                 </h3>
                                 <div className="space-y-2">
@@ -810,13 +810,13 @@ export default function PerformanceMarketing() {
                                         <button
                                             key={r._id}
                                             onClick={() => { setSelectedReport(r); setTab('reports') }}
-                                            className="w-full flex items-center justify-between p-3 rounded-xl bg-white/[0.02] border border-white/[0.04] hover:bg-white/[0.04] transition-all cursor-pointer text-left"
+                                            className="w-full flex items-center justify-between p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:bg-[var(--sys-surface)] transition-all cursor-pointer text-left"
                                         >
                                             <div>
-                                                <p className="text-sm font-medium text-white">{r.title}</p>
-                                                <p className="text-xs text-slate-500">{r.type} · {new Date(r.createdAt).toLocaleDateString()}</p>
+                                                <p className="text-sm font-medium text-[var(--sys-text)]">{r.title}</p>
+                                                <p className="text-xs text-[var(--sys-text-muted)]">{r.type} · {new Date(r.createdAt).toLocaleDateString()}</p>
                                             </div>
-                                            <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${r.status === 'complete' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'}`}>
+                                            <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${r.status === 'complete' ? 'bg-[var(--sys-primary-dim)] text-primary' : 'bg-[var(--sys-primary-dim)] text-primary'}`}>
                                                 {r.status}
                                             </span>
                                         </button>
@@ -845,43 +845,43 @@ export default function PerformanceMarketing() {
 
                         {/* ── 🔍 GROK TRENDING SEO KEYWORDS ── */}
                         {grokSeoKeywords?.risingKeywords?.length > 0 && (
-                            <div className="glass-panel rounded-2xl p-6 border border-amber-500/20">
-                                <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-amber-400">trending_up</span>
+                            <div className="glass-panel rounded-2xl p-6 border border-[var(--sys-border)]">
+                                <h3 className="text-lg font-bold text-[var(--sys-text)] mb-4 flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-primary">trending_up</span>
                                     Trending SEO Keywords
-                                    <span className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 text-xs font-bold">LIVE via Grok</span>
+                                    <span className="px-2 py-0.5 rounded-full bg-[var(--sys-primary-dim)] text-primary text-xs font-bold">LIVE via Grok</span>
                                 </h3>
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
                                     {grokSeoKeywords.risingKeywords.slice(0, 6).map((k, i) => (
-                                        <div key={i} className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
+                                        <div key={i} className="p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
                                             <div className="flex items-center justify-between mb-1">
-                                                <p className="text-sm font-medium text-white">"{k.keyword}"</p>
-                                                <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${k.trend === 'breakout' ? 'bg-rose-500/10 text-rose-400'
-                                                    : k.trend === 'rising' ? 'bg-emerald-500/10 text-emerald-400'
-                                                        : k.trend === 'seasonal' ? 'bg-amber-500/10 text-amber-400'
-                                                            : 'bg-cyan-500/10 text-cyan-400'
+                                                <p className="text-sm font-medium text-[var(--sys-text)]">"{k.keyword}"</p>
+                                                <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${k.trend === 'breakout' ? 'bg-[var(--sys-primary-dim)] text-primary'
+                                                    : k.trend === 'rising' ? 'bg-[var(--sys-primary-dim)] text-primary'
+                                                        : k.trend === 'seasonal' ? 'bg-[var(--sys-primary-dim)] text-primary'
+                                                            : 'bg-[var(--sys-primary-dim)] text-primary'
                                                     }`}>
                                                     {k.trend === 'breakout' ? 'rocket_launch' : k.trend === 'rising' ? 'trending_up' : 'calendar_month'} {k.trend}
                                                 </span>
                                             </div>
-                                            <p className="text-sm text-slate-500 mb-1">{k.growthRate} · {k.intent} intent · {k.difficulty} difficulty</p>
-                                            <p className="text-sm text-slate-400">{k.whyTrending}</p>
-                                            {k.semOpportunity && <p className="text-sm text-cyan-400 mt-1">💰 {k.semOpportunity}</p>}
+                                            <p className="text-sm text-[var(--sys-text-muted)] mb-1">{k.growthRate} · {k.intent} intent · {k.difficulty} difficulty</p>
+                                            <p className="text-sm text-[var(--sys-text-muted)]">{k.whyTrending}</p>
+                                            {k.semOpportunity && <p className="text-sm text-primary mt-1">💰 {k.semOpportunity}</p>}
                                         </div>
                                     ))}
                                 </div>
 
                                 {/* Question Queries */}
                                 {grokSeoKeywords.questionQueries?.length > 0 && (
-                                    <div className="mt-4 pt-4 border-t border-white/[0.04]">
+                                    <div className="mt-4 pt-4 border-t border-[var(--sys-border)]">
                                         <p className="text-sm font-bold text-[#FF4D00] mb-3">❓ People Are Asking</p>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                                             {grokSeoKeywords.questionQueries.slice(0, 6).map((q, i) => (
-                                                <div key={i} className="flex items-start gap-2 p-2 rounded-lg bg-white/[0.01]">
+                                                <div key={i} className="flex items-start gap-2 p-2 rounded-lg bg-[var(--sys-surface)]">
                                                     <span className="text-[#FF4D00] mt-0.5 text-sm">Q:</span>
                                                     <div>
-                                                        <p className="text-sm font-medium text-white">{q.question}</p>
-                                                        <p className="text-sm text-slate-500">{q.searchVolume} volume · {q.answerAngle}</p>
+                                                        <p className="text-sm font-medium text-[var(--sys-text)]">{q.question}</p>
+                                                        <p className="text-sm text-[var(--sys-text-muted)]">{q.searchVolume} volume · {q.answerAngle}</p>
                                                     </div>
                                                 </div>
                                             ))}
@@ -891,13 +891,13 @@ export default function PerformanceMarketing() {
 
                                 {/* Seasonal Keywords */}
                                 {grokSeoKeywords.seasonalUpcoming?.length > 0 && (
-                                    <div className="mt-4 pt-4 border-t border-white/[0.04]">
-                                        <p className="text-sm font-bold text-amber-400 mb-3"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">calendar_month</span> Upcoming Seasonal Peaks</p>
+                                    <div className="mt-4 pt-4 border-t border-[var(--sys-border)]">
+                                        <p className="text-sm font-bold text-primary mb-3"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">calendar_month</span> Upcoming Seasonal Peaks</p>
                                         <div className="flex flex-wrap gap-2">
                                             {grokSeoKeywords.seasonalUpcoming.slice(0, 6).map((s, i) => (
-                                                <div key={i} className="px-3 py-2 rounded-xl bg-amber-500/5 border border-amber-500/10">
-                                                    <p className="text-sm font-bold text-white">{s.keyword}</p>
-                                                    <p className="text-sm text-amber-400">Peak: {s.peakMonth} · {s.event}</p>
+                                                <div key={i} className="px-3 py-2 rounded-xl bg-[var(--sys-primary-dim)] border border-[var(--sys-border)]">
+                                                    <p className="text-sm font-bold text-[var(--sys-text)]">{s.keyword}</p>
+                                                    <p className="text-sm text-primary">Peak: {s.peakMonth} · {s.event}</p>
                                                 </div>
                                             ))}
                                         </div>
@@ -906,35 +906,35 @@ export default function PerformanceMarketing() {
                             </div>
                         )}
                         <div className="glass-panel rounded-2xl p-6 border border-[#FF4D00]/20">
-                            <h2 className="text-lg font-bold text-white mb-1 flex items-center gap-2">
+                            <h2 className="text-lg font-bold text-[var(--sys-text)] mb-1 flex items-center gap-2">
                                 <span className="material-symbols-outlined text-[#FF4D00]">search_insights</span>
                                 Competitor Research
                             </h2>
-                            <p className="text-sm text-slate-400 mb-6">AI-powered analysis of competitor ad strategies across Meta & Google</p>
+                            <p className="text-sm text-[var(--sys-text-muted)] mb-6">AI-powered analysis of competitor ad strategies across Meta & Google</p>
 
                             <div className="space-y-4">
                                 <div>
-                                    <label className="text-sm text-slate-300 font-medium mb-2 block">What do you want to research?</label>
+                                    <label className="text-sm text-[var(--sys-text-muted)] font-medium mb-2 block">What do you want to research?</label>
                                     <textarea
                                         value={researchQuery}
                                         onChange={e => setResearchQuery(e.target.value)}
                                         placeholder="e.g., Analyze performance marketing strategies of D2C skincare brands in India targeting Gen Z..."
-                                        className="w-full h-24 px-4 py-3 rounded-xl bg-black/30 border border-[#FF4D00]/20 text-white placeholder-slate-600 text-sm outline-none focus:border-[#FF4D00]/50 resize-y"
+                                        className="w-full h-24 px-4 py-3 rounded-xl bg-[var(--sys-surface)] border border-[#FF4D00]/20 text-[var(--sys-text)] placeholder-slate-600 text-sm outline-none focus:border-[#FF4D00]/50 resize-y"
                                     />
                                 </div>
                                 <div>
-                                    <label className="text-sm text-slate-300 font-medium mb-2 block">Competitors (comma-separated)</label>
+                                    <label className="text-sm text-[var(--sys-text-muted)] font-medium mb-2 block">Competitors (comma-separated)</label>
                                     <input
                                         value={competitors}
                                         onChange={e => setCompetitors(e.target.value)}
                                         placeholder="e.g., Minimalist, mCaffeine, Plum Goodness"
-                                        className="w-full px-4 py-3 rounded-xl bg-black/30 border border-[#FF4D00]/20 text-white placeholder-slate-600 text-sm outline-none focus:border-[#FF4D00]/50"
+                                        className="w-full px-4 py-3 rounded-xl bg-[var(--sys-surface)] border border-[#FF4D00]/20 text-[var(--sys-text)] placeholder-slate-600 text-sm outline-none focus:border-[#FF4D00]/50"
                                     />
                                 </div>
                                 <button
                                     onClick={handleResearch}
                                     disabled={loading || (!researchQuery.trim() && !competitors.trim())}
-                                    className="w-full py-4 rounded-2xl bg-gradient-to-r from-[#FF4D00] to-[#FF7A00] text-white font-bold text-sm hover:shadow-xl hover:shadow-[#FF4D00]/20 transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
+                                    className="w-full py-4 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] font-bold text-sm hover:shadow-xl hover:shadow-none transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
                                 >
                                     {loading ? (
                                         <><span className="material-symbols-outlined animate-spin">progress_activity</span>Analyzing competitors with AI...</>
@@ -948,20 +948,20 @@ export default function PerformanceMarketing() {
                         {/* Research Results */}
                         {researchResult && (
                             <div className="space-y-4">
-                                <div className="glass-panel rounded-2xl p-6 border border-white/[0.06]">
-                                    <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2">
-                                        <span className="material-symbols-outlined text-emerald-400">analytics</span>
+                                <div className="glass-panel rounded-2xl p-6 border border-[var(--sys-border)]">
+                                    <h3 className="text-base font-bold text-[var(--sys-text)] mb-4 flex items-center gap-2">
+                                        <span className="material-symbols-outlined text-primary">analytics</span>
                                         Research Findings
                                     </h3>
 
                                     {/* Key Findings */}
                                     {researchResult.aiAnalysis?.keyFindings?.length > 0 && (
                                         <div className="mb-6">
-                                            <p className="text-sm font-bold text-cyan-400 mb-2">🔍 Key Findings</p>
+                                            <p className="text-sm font-bold text-primary mb-2">🔍 Key Findings</p>
                                             <div className="space-y-2">
                                                 {researchResult.aiAnalysis.keyFindings.map((f, i) => (
-                                                    <div key={i} className="flex items-start gap-2 text-sm text-slate-300">
-                                                        <span className="text-cyan-400 mt-0.5">▸</span>
+                                                    <div key={i} className="flex items-start gap-2 text-sm text-[var(--sys-text-muted)]">
+                                                        <span className="text-primary mt-0.5">▸</span>
                                                         <span>{typeof f === 'string' ? f : f.title || JSON.stringify(f)}</span>
                                                     </div>
                                                 ))}
@@ -972,13 +972,13 @@ export default function PerformanceMarketing() {
                                     {/* Recommendations */}
                                     {researchResult.aiAnalysis?.recommendations?.length > 0 && (
                                         <div>
-                                            <p className="text-sm font-bold text-amber-400 mb-2">💡 Recommendations</p>
+                                            <p className="text-sm font-bold text-primary mb-2">💡 Recommendations</p>
                                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                                 {researchResult.aiAnalysis.recommendations.map((r, i) => (
-                                                    <div key={i} className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
-                                                        <p className="text-sm font-medium text-white mb-1">{r.title}</p>
-                                                        <p className="text-xs text-slate-400">{r.description}</p>
-                                                        <span className={`inline-block mt-2 px-2 py-0.5 rounded-full text-xs font-bold ${r.priority === 'high' ? 'bg-rose-500/10 text-rose-400' : r.priority === 'medium' ? 'bg-amber-500/10 text-amber-400' : 'bg-slate-500/10 text-slate-400'}`}>
+                                                    <div key={i} className="p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                                                        <p className="text-sm font-medium text-[var(--sys-text)] mb-1">{r.title}</p>
+                                                        <p className="text-xs text-[var(--sys-text-muted)]">{r.description}</p>
+                                                        <span className={`inline-block mt-2 px-2 py-0.5 rounded-full text-xs font-bold ${r.priority === 'high' ? 'bg-[var(--sys-primary-dim)] text-primary' : r.priority === 'medium' ? 'bg-[var(--sys-primary-dim)] text-primary' : 'bg-[var(--sys-border)]/10 text-[var(--sys-text-muted)]'}`}>
                                                             {r.priority} priority
                                                         </span>
                                                     </div>
@@ -990,33 +990,33 @@ export default function PerformanceMarketing() {
 
                                 {/* ── LIVE TREND DATA (Enhancement 1) ── */}
                                 {trendData?.length > 0 && (
-                                    <div className="glass-panel rounded-2xl p-6 border border-emerald-500/20">
-                                        <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2">
-                                            <span className="material-symbols-outlined text-emerald-400">trending_up</span>
+                                    <div className="glass-panel rounded-2xl p-6 border border-[var(--sys-border)]">
+                                        <h3 className="text-base font-bold text-[var(--sys-text)] mb-4 flex items-center gap-2">
+                                            <span className="material-symbols-outlined text-primary">trending_up</span>
                                             Live Google Trends
                                         </h3>
                                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                                             {trendData.map((t, i) => (
-                                                <div key={i} className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.04]">
-                                                    <p className="text-sm font-medium text-white mb-2">"{t.keyword}"</p>
+                                                <div key={i} className="p-4 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                                                    <p className="text-sm font-medium text-[var(--sys-text)] mb-2">"{t.keyword}"</p>
                                                     <div className="flex items-center gap-2 mb-2">
-                                                        <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${t.trend === 'rising' ? 'bg-emerald-500/10 text-emerald-400'
-                                                            : t.trend === 'declining' ? 'bg-rose-500/10 text-rose-400'
-                                                                : 'bg-slate-500/10 text-slate-400'
+                                                        <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${t.trend === 'rising' ? 'bg-[var(--sys-primary-dim)] text-primary'
+                                                            : t.trend === 'declining' ? 'bg-[var(--sys-primary-dim)] text-primary'
+                                                                : 'bg-[var(--sys-border)]/10 text-[var(--sys-text-muted)]'
                                                             }`}>
                                                             {t.trend === 'rising' ? 'trending_up' : t.trend === 'declining' ? '📉' : '➡️'} {t.trend}
                                                         </span>
-                                                        <span className="text-xs text-slate-500">
+                                                        <span className="text-xs text-[var(--sys-text-muted)]">
                                                             {t.trendStrength > 0 ? '+' : ''}{t.trendStrength}%
                                                         </span>
                                                     </div>
-                                                    <div className="flex items-center justify-between text-xs text-slate-500">
+                                                    <div className="flex items-center justify-between text-xs text-[var(--sys-text-muted)]">
                                                         <span>Interest: {t.currentInterest}/100</span>
                                                         <span>Peak: {t.peakInterest}</span>
                                                     </div>
                                                     {/* Mini bar */}
-                                                    <div className="w-full h-1.5 rounded-full bg-white/[0.06] mt-2 overflow-hidden">
-                                                        <div className={`h-full rounded-full ${t.trend === 'rising' ? 'bg-emerald-500' : t.trend === 'declining' ? 'bg-rose-500' : 'bg-slate-500'
+                                                    <div className="w-full h-1.5 rounded-full bg-[var(--sys-surface)] mt-2 overflow-hidden">
+                                                        <div className={`h-full rounded-full ${t.trend === 'rising' ? 'bg-[var(--sys-surface)]' : t.trend === 'declining' ? 'bg-[var(--sys-surface)]' : 'bg-[var(--sys-border)]'
                                                             }`} style={{ width: `${t.currentInterest}%` }} />
                                                     </div>
                                                 </div>
@@ -1027,7 +1027,7 @@ export default function PerformanceMarketing() {
 
                                 <button
                                     onClick={() => setTab('strategy')}
-                                    className="w-full py-3 rounded-xl bg-emerald-500/10 text-emerald-400 font-bold text-sm border border-emerald-500/20 hover:bg-emerald-500/20 transition-all cursor-pointer flex items-center justify-center gap-2"
+                                    className="w-full py-3 rounded-xl bg-[var(--sys-primary-dim)] text-primary font-bold text-sm border border-[var(--sys-border)] hover:bg-[var(--sys-primary-dim)] transition-all cursor-pointer flex items-center justify-center gap-2"
                                 >
                                     <span className="material-symbols-outlined">arrow_forward</span>
                                     Build Strategy from Research →
@@ -1055,37 +1055,37 @@ export default function PerformanceMarketing() {
                         {/* Strategy Health Banner */}
                         {strategyHealth && strategyHealth.health !== null && (
                             <div className={`glass-panel rounded-2xl p-5 border ${
-                                strategyHealth.alertLevel === 'excellent' ? 'border-emerald-500/30 bg-emerald-500/[0.04]' :
-                                strategyHealth.alertLevel === 'critical' ? 'border-rose-500/30 bg-rose-500/[0.04]' :
-                                strategyHealth.alertLevel === 'warning' ? 'border-amber-500/30 bg-amber-500/[0.04]' :
-                                'border-cyan-500/20'
+                                strategyHealth.alertLevel === 'excellent' ? 'border-[var(--sys-border)] bg-[var(--sys-surface)]/[0.04]' :
+                                strategyHealth.alertLevel === 'critical' ? 'border-[var(--sys-border)] bg-[var(--sys-surface)]/[0.04]' :
+                                strategyHealth.alertLevel === 'warning' ? 'border-[var(--sys-border)] bg-[var(--sys-surface)]/[0.04]' :
+                                'border-[var(--sys-border)]'
                             }`}>
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-3">
                                         <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-2xl font-black ${
-                                            strategyHealth.health >= 80 ? 'bg-emerald-500/15 text-emerald-400' :
-                                            strategyHealth.health >= 50 ? 'bg-amber-500/15 text-amber-400' :
-                                            'bg-rose-500/15 text-rose-400'
+                                            strategyHealth.health >= 80 ? 'bg-[var(--sys-primary-dim)] text-primary' :
+                                            strategyHealth.health >= 50 ? 'bg-[var(--sys-primary-dim)] text-primary' :
+                                            'bg-[var(--sys-primary-dim)] text-primary'
                                         }`}>
                                             {strategyHealth.health}
                                         </div>
                                         <div>
-                                            <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                                            <h3 className="text-sm font-bold text-[var(--sys-text)] flex items-center gap-2">
                                                 Strategy Health
                                                 <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
-                                                    strategyHealth.alertLevel === 'excellent' ? 'bg-emerald-500/15 text-emerald-400' :
-                                                    strategyHealth.alertLevel === 'healthy' ? 'bg-cyan-500/15 text-cyan-400' :
-                                                    strategyHealth.alertLevel === 'warning' ? 'bg-amber-500/15 text-amber-400' :
-                                                    'bg-rose-500/15 text-rose-400'
+                                                    strategyHealth.alertLevel === 'excellent' ? 'bg-[var(--sys-primary-dim)] text-primary' :
+                                                    strategyHealth.alertLevel === 'healthy' ? 'bg-[var(--sys-primary-dim)] text-primary' :
+                                                    strategyHealth.alertLevel === 'warning' ? 'bg-[var(--sys-primary-dim)] text-primary' :
+                                                    'bg-[var(--sys-primary-dim)] text-primary'
                                                 }`}>
                                                     {strategyHealth.alertLevel?.toUpperCase()}
                                                 </span>
                                             </h3>
-                                            <p className="text-xs text-slate-400">{strategyHealth.strategyTitle} • Running {strategyHealth.strategyAge} days • {strategyHealth.campaignsAnalyzed} campaigns</p>
+                                            <p className="text-xs text-[var(--sys-text-muted)]">{strategyHealth.strategyTitle} • Running {strategyHealth.strategyAge} days • {strategyHealth.campaignsAnalyzed} campaigns</p>
                                         </div>
                                     </div>
                                     {strategyHealth.message && (
-                                        <p className="text-xs text-slate-400 max-w-md text-right">{strategyHealth.message}</p>
+                                        <p className="text-xs text-[var(--sys-text-muted)] max-w-md text-right">{strategyHealth.message}</p>
                                     )}
                                 </div>
                                 {/* KPI Results */}
@@ -1093,13 +1093,13 @@ export default function PerformanceMarketing() {
                                     <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-4">
                                         {strategyHealth.kpiResults.map((kpi, i) => (
                                             <div key={i} className={`p-2.5 rounded-xl text-center border ${
-                                                kpi.status === 'on-track' ? 'border-emerald-500/15 bg-emerald-500/[0.03]' :
-                                                kpi.status === 'warning' ? 'border-amber-500/15 bg-amber-500/[0.03]' :
-                                                'border-rose-500/15 bg-rose-500/[0.03]'
+                                                kpi.status === 'on-track' ? 'border-[var(--sys-border)] bg-[var(--sys-surface)]/[0.03]' :
+                                                kpi.status === 'warning' ? 'border-[var(--sys-border)] bg-[var(--sys-surface)]/[0.03]' :
+                                                'border-[var(--sys-border)] bg-[var(--sys-surface)]/[0.03]'
                                             }`}>
-                                                <p className="text-[10px] text-slate-500 uppercase">{kpi.metric}</p>
-                                                <p className="text-sm font-bold text-white">{kpi.actual}</p>
-                                                <p className="text-[10px] text-slate-500">Target: {kpi.target}</p>
+                                                <p className="text-[10px] text-[var(--sys-text-muted)] uppercase">{kpi.metric}</p>
+                                                <p className="text-sm font-bold text-[var(--sys-text)]">{kpi.actual}</p>
+                                                <p className="text-[10px] text-[var(--sys-text-muted)]">Target: {kpi.target}</p>
                                             </div>
                                         ))}
                                     </div>
@@ -1107,16 +1107,16 @@ export default function PerformanceMarketing() {
                             </div>
                         )}
 
-                        <div className="glass-panel rounded-2xl p-6 border border-cyan-500/20">
-                            <h2 className="text-lg font-bold text-white mb-1 flex items-center gap-2">
-                                <span className="material-symbols-outlined text-cyan-400">strategy</span>
+                        <div className="glass-panel rounded-2xl p-6 border border-[var(--sys-border)]">
+                            <h2 className="text-lg font-bold text-[var(--sys-text)] mb-1 flex items-center gap-2">
+                                <span className="material-symbols-outlined text-primary">strategy</span>
                                 AI Strategy Builder
                             </h2>
-                            <p className="text-sm text-slate-400 mb-6">Generate a data-driven performance marketing strategy with Meta vs Google breakout</p>
+                            <p className="text-sm text-[var(--sys-text-muted)] mb-6">Generate a data-driven performance marketing strategy with Meta vs Google breakout</p>
 
                             {/* Multi-Goal Selection */}
                             <div className="mb-5">
-                                <label className="text-sm text-slate-300 font-medium mb-2 block">Campaign Goals (select multiple)</label>
+                                <label className="text-sm text-[var(--sys-text-muted)] font-medium mb-2 block">Campaign Goals (select multiple)</label>
                                 <div className="flex flex-wrap gap-2">
                                     {[
                                         { id: 'awareness', label: 'Brand Awareness', icon: 'visibility' },
@@ -1141,37 +1141,37 @@ export default function PerformanceMarketing() {
                                                 }}
                                                 className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-all cursor-pointer border ${
                                                     isSelected
-                                                        ? 'bg-cyan-500/15 border-cyan-500/40 text-cyan-300'
-                                                        : 'bg-white/[0.02] border-white/[0.06] text-slate-400 hover:border-white/[0.12] hover:text-slate-300'
+                                                        ? 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-[var(--sys-primary)]'
+                                                        : 'bg-[var(--sys-surface)] border-[var(--sys-border)] text-[var(--sys-text-muted)] hover:border-[var(--sys-border)] hover:text-[var(--sys-text-muted)]'
                                                 }`}
                                             >
                                                 <span className="material-symbols-outlined text-sm">{goal.icon}</span>
                                                 {goal.label}
-                                                {isSelected && <span className="material-symbols-outlined text-sm text-cyan-400">check_circle</span>}
+                                                {isSelected && <span className="material-symbols-outlined text-sm text-primary">check_circle</span>}
                                             </button>
                                         )
                                     })}
                                 </div>
-                                {strategyGoals.length === 0 && <p className="text-xs text-rose-400 mt-1">Select at least one goal</p>}
+                                {strategyGoals.length === 0 && <p className="text-xs text-primary mt-1">Select at least one goal</p>}
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-5">
                                 <div>
-                                    <label className="text-sm text-slate-300 font-medium mb-2 block">Total Budget</label>
+                                    <label className="text-sm text-[var(--sys-text-muted)] font-medium mb-2 block">Total Budget</label>
                                     <input
                                         type="number"
                                         value={strategyBudget}
                                         onChange={e => setStrategyBudget(e.target.value)}
                                         placeholder="50000"
-                                        className="w-full px-4 py-3 rounded-xl bg-black/30 border border-cyan-500/20 text-white placeholder-slate-600 text-sm outline-none focus:border-cyan-400/50"
+                                        className="w-full px-4 py-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] placeholder-slate-600 text-sm outline-none focus:border-[var(--sys-border)]"
                                     />
                                 </div>
                                 <div>
-                                    <label className="text-sm text-slate-300 font-medium mb-2 block">Currency</label>
+                                    <label className="text-sm text-[var(--sys-text-muted)] font-medium mb-2 block">Currency</label>
                                     <select
                                         value={strategyCurrency}
                                         onChange={e => setStrategyCurrency(e.target.value)}
-                                        className="w-full px-4 py-3 rounded-xl bg-black/30 border border-cyan-500/20 text-white text-sm outline-none focus:border-cyan-400/50 cursor-pointer"
+                                        className="w-full px-4 py-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm outline-none focus:border-[var(--sys-border)] cursor-pointer"
                                     >
                                         <option value="INR">₹ INR (India)</option>
                                         <option value="AED">د.إ AED (UAE)</option>
@@ -1184,11 +1184,11 @@ export default function PerformanceMarketing() {
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="text-sm text-slate-300 font-medium mb-2 block">Duration</label>
+                                    <label className="text-sm text-[var(--sys-text-muted)] font-medium mb-2 block">Duration</label>
                                     <select
                                         value={strategyDuration}
                                         onChange={e => setStrategyDuration(e.target.value)}
-                                        className="w-full px-4 py-3 rounded-xl bg-black/30 border border-cyan-500/20 text-white text-sm outline-none focus:border-cyan-400/50 cursor-pointer"
+                                        className="w-full px-4 py-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm outline-none focus:border-[var(--sys-border)] cursor-pointer"
                                     >
                                         <option value="7 days">7 Days</option>
                                         <option value="14 days">14 Days</option>
@@ -1198,38 +1198,38 @@ export default function PerformanceMarketing() {
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="text-sm text-slate-300 font-medium mb-2 block">Target Location</label>
+                                    <label className="text-sm text-[var(--sys-text-muted)] font-medium mb-2 block">Target Location</label>
                                     <input
                                         value={strategyTargetGeo}
                                         onChange={e => setStrategyTargetGeo(e.target.value)}
                                         placeholder="e.g. Dubai, Abu Dhabi"
-                                        className="w-full px-4 py-3 rounded-xl bg-black/30 border border-cyan-500/20 text-white placeholder-slate-600 text-sm outline-none focus:border-cyan-400/50"
+                                        className="w-full px-4 py-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] placeholder-slate-600 text-sm outline-none focus:border-[var(--sys-border)]"
                                     />
                                 </div>
                             </div>
 
                             {/* Custom Keywords */}
                             <div className="mb-4">
-                                <label className="text-sm text-slate-300 font-medium mb-2 block flex items-center gap-1.5">
-                                    <span className="material-symbols-outlined text-sm text-amber-400">key</span>
+                                <label className="text-sm text-[var(--sys-text-muted)] font-medium mb-2 block flex items-center gap-1.5">
+                                    <span className="material-symbols-outlined text-sm text-primary">key</span>
                                     Keywords to Research (optional)
                                 </label>
                                 <input
                                     value={strategyCustomKeywords}
                                     onChange={e => setStrategyCustomKeywords(e.target.value)}
                                     placeholder="e.g. bluetooth speakers, wireless earbuds, premium headphones, noise cancelling, audio equipment"
-                                    className="w-full px-4 py-3 rounded-xl bg-black/30 border border-amber-500/20 text-white placeholder-slate-600 text-sm outline-none focus:border-amber-400/50"
+                                    className="w-full px-4 py-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] placeholder-slate-600 text-sm outline-none focus:border-[var(--sys-border)]"
                                 />
-                                <p className="text-[10px] text-slate-500 mt-1">Comma-separated keywords you want included in the strategy. AI will also discover additional keywords.</p>
+                                <p className="text-[10px] text-[var(--sys-text-muted)] mt-1">Comma-separated keywords you want included in the strategy. AI will also discover additional keywords.</p>
                             </div>
 
                             <div className="mb-6">
-                                <label className="text-sm text-slate-300 font-medium mb-2 block">Target Audience (optional)</label>
+                                <label className="text-sm text-[var(--sys-text-muted)] font-medium mb-2 block">Target Audience (optional)</label>
                                 <input
                                     value={strategyTargetAudience}
                                     onChange={e => setStrategyTargetAudience(e.target.value)}
                                     placeholder="e.g. Men 25-35, tech enthusiasts, metro cities, HNI"
-                                    className="w-full px-4 py-3 rounded-xl bg-black/30 border border-cyan-500/20 text-white placeholder-slate-600 text-sm outline-none focus:border-cyan-400/50"
+                                    className="w-full px-4 py-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] placeholder-slate-600 text-sm outline-none focus:border-[var(--sys-border)]"
                                 />
                             </div>
 
@@ -1237,7 +1237,7 @@ export default function PerformanceMarketing() {
                                 <button
                                     onClick={handleStrategy}
                                     disabled={loading || strategyGoals.length === 0}
-                                    className="flex-1 py-4 rounded-2xl bg-gradient-to-r from-cyan-600 to-[#FF7A00] text-white font-bold text-sm hover:shadow-xl hover:shadow-cyan-500/20 transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
+                                    className="flex-1 py-4 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] font-bold text-sm hover:shadow-xl hover:shadow-none transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
                                 >
                                     {loading ? (
                                         <><span className="material-symbols-outlined animate-spin">progress_activity</span>AI is building expert strategy...</>
@@ -1248,7 +1248,7 @@ export default function PerformanceMarketing() {
                                 <button
                                     onClick={handleBudget}
                                     disabled={loading || !strategyResult}
-                                    className="px-6 py-4 rounded-2xl bg-amber-500/10 text-amber-400 font-bold text-sm border border-amber-500/20 hover:bg-amber-500/20 transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
+                                    className="px-6 py-4 rounded-2xl bg-[var(--sys-primary-dim)] text-primary font-bold text-sm border border-[var(--sys-border)] hover:bg-[var(--sys-primary-dim)] transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
                                 >
                                     <span className="material-symbols-outlined">payments</span>
                                     Budget Plan
@@ -1261,8 +1261,8 @@ export default function PerformanceMarketing() {
                             <div className="space-y-4">
                                 {/* Strategy Action Bar */}
                                 <div className="flex items-center justify-between">
-                                    <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                                        <span className="material-symbols-outlined text-cyan-400">strategy</span>
+                                    <h2 className="text-lg font-bold text-[var(--sys-text)] flex items-center gap-2">
+                                        <span className="material-symbols-outlined text-primary">strategy</span>
                                         Your Strategy Blueprint
                                     </h2>
                                     <div className="flex gap-2">
@@ -1368,14 +1368,14 @@ export default function PerformanceMarketing() {
                                                 printWindow.document.write(html)
                                                 printWindow.document.close()
                                             }}
-                                            className="px-4 py-2 rounded-xl bg-white/[0.06] border border-white/[0.08] text-slate-300 text-xs font-medium hover:bg-white/[0.1] transition-all flex items-center gap-1.5 cursor-pointer"
+                                            className="px-4 py-2 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text-muted)] text-xs font-medium hover:bg-[var(--sys-surface)] transition-all flex items-center gap-1.5 cursor-pointer"
                                         >
                                             <span className="material-symbols-outlined text-sm">picture_as_pdf</span>
                                             Download PDF
                                         </button>
                                         <button
                                             onClick={() => setShowStrategyPresentation(true)}
-                                            className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#FF4D00]/80 to-[#FF7A00]/80 text-white text-xs font-medium hover:shadow-lg hover:shadow-[#FF4D00]/20 transition-all flex items-center gap-1.5 cursor-pointer"
+                                            className="px-4 py-2 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-xs font-medium hover:shadow-lg hover:shadow-none transition-all flex items-center gap-1.5 cursor-pointer"
                                         >
                                             <span className="material-symbols-outlined text-sm">slideshow</span>
                                             Present Strategy
@@ -1384,9 +1384,9 @@ export default function PerformanceMarketing() {
                                 </div>
                                 {/* Goals with Confidence Scores */}
                                 {strategyResult.strategyPlan.goals?.length > 0 && (
-                                    <div className="glass-panel rounded-2xl p-6 border border-white/[0.06]">
-                                        <h3 className="text-base font-bold text-white mb-3 flex items-center gap-2">
-                                            <span className="material-symbols-outlined text-emerald-400">flag</span>
+                                    <div className="glass-panel rounded-2xl p-6 border border-[var(--sys-border)]">
+                                        <h3 className="text-base font-bold text-[var(--sys-text)] mb-3 flex items-center gap-2">
+                                            <span className="material-symbols-outlined text-primary">flag</span>
                                             Campaign Goals
                                         </h3>
                                         <div className="space-y-3">
@@ -1394,49 +1394,49 @@ export default function PerformanceMarketing() {
                                                 const goal = typeof g === 'string' ? { goal: g } : g
                                                 const conf = goal.confidenceScore || 5
                                                 return (
-                                                    <div key={i} className="p-4 rounded-xl bg-emerald-500/[0.03] border border-emerald-500/10">
+                                                    <div key={i} className="p-4 rounded-xl bg-[var(--sys-surface)]/[0.03] border border-[var(--sys-border)]">
                                                         <div className="flex items-start justify-between gap-3">
                                                             <div className="flex-1">
                                                                 <div className="flex items-center gap-2 mb-1">
-                                                                    <span className="text-emerald-400 font-bold text-sm">{i + 1}</span>
-                                                                    <p className="text-sm font-medium text-white">{goal.goal}</p>
+                                                                    <span className="text-primary font-bold text-sm">{i + 1}</span>
+                                                                    <p className="text-sm font-medium text-[var(--sys-text)]">{goal.goal}</p>
                                                                 </div>
                                                                 {(goal.currentBaseline || goal.target) && (
-                                                                    <p className="text-xs text-slate-400 ml-6">
+                                                                    <p className="text-xs text-[var(--sys-text-muted)] ml-6">
                                                                         {goal.currentBaseline && <span>Baseline: {goal.currentBaseline}</span>}
-                                                                        {goal.target && <span> → Target: <span className="text-emerald-300 font-medium">{goal.target}</span></span>}
-                                                                        {goal.timeframe && <span className="text-slate-500"> ({goal.timeframe})</span>}
+                                                                        {goal.target && <span> → Target: <span className="text-[var(--sys-primary)] font-medium">{goal.target}</span></span>}
+                                                                        {goal.timeframe && <span className="text-[var(--sys-text-muted)]"> ({goal.timeframe})</span>}
                                                                     </p>
                                                                 )}
                                                             </div>
                                                             {/* Confidence Score */}
                                                             <div className="text-center min-w-[50px]">
                                                                 <div className={`text-lg font-black ${
-                                                                    conf >= 7 ? 'text-emerald-400' : conf >= 5 ? 'text-amber-400' : 'text-rose-400'
+                                                                    conf >= 7 ? 'text-primary' : conf >= 5 ? 'text-primary' : 'text-primary'
                                                                 }`}>{conf}/10</div>
-                                                                <p className="text-[9px] text-slate-500 uppercase">Confidence</p>
+                                                                <p className="text-[9px] text-[var(--sys-text-muted)] uppercase">Confidence</p>
                                                             </div>
                                                         </div>
                                                         {/* Confidence Bar */}
                                                         <div className="mt-2 ml-6">
-                                                            <div className="w-full h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
+                                                            <div className="w-full h-1.5 rounded-full bg-[var(--sys-surface)] overflow-hidden">
                                                                 <div className={`h-full rounded-full transition-all ${
-                                                                    conf >= 7 ? 'bg-emerald-500' : conf >= 5 ? 'bg-amber-500' : 'bg-rose-500'
+                                                                    conf >= 7 ? 'bg-[var(--sys-surface)]' : conf >= 5 ? 'bg-[var(--sys-surface)]' : 'bg-[var(--sys-surface)]'
                                                                 }`} style={{ width: `${conf * 10}%` }} />
                                                             </div>
                                                         </div>
-                                                        {goal.confidenceReason && <p className="text-[11px] text-slate-500 mt-1.5 ml-6">{goal.confidenceReason}</p>}
+                                                        {goal.confidenceReason && <p className="text-[11px] text-[var(--sys-text-muted)] mt-1.5 ml-6">{goal.confidenceReason}</p>}
                                                         {goal.riskFactors?.length > 0 && (
                                                             <div className="mt-2 ml-6 flex flex-wrap gap-1.5">
                                                                 {goal.riskFactors.map((r, j) => (
-                                                                    <span key={j} className="text-[10px] px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/15">⚠ {r}</span>
+                                                                    <span key={j} className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--sys-primary-dim)] text-primary border border-[var(--sys-border)]">⚠ {r}</span>
                                                                 ))}
                                                             </div>
                                                         )}
                                                         {goal.planB && (
-                                                            <div className="mt-2 ml-6 p-2 rounded-lg bg-amber-500/5 border border-amber-500/10">
-                                                                <p className="text-[10px] text-amber-500 uppercase font-medium">Plan B</p>
-                                                                <p className="text-xs text-slate-400">{goal.planB}</p>
+                                                            <div className="mt-2 ml-6 p-2 rounded-lg bg-[var(--sys-primary-dim)] border border-[var(--sys-border)]">
+                                                                <p className="text-[10px] text-primary uppercase font-medium">Plan B</p>
+                                                                <p className="text-xs text-[var(--sys-text-muted)]">{goal.planB}</p>
                                                             </div>
                                                         )}
                                                     </div>
@@ -1448,8 +1448,8 @@ export default function PerformanceMarketing() {
 
                                 {/* Channel Allocation */}
                                 {strategyResult.strategyPlan.channelAllocation?.length > 0 && (
-                                    <div className="glass-panel rounded-2xl p-6 border border-white/[0.06]">
-                                        <h3 className="text-base font-bold text-white mb-3 flex items-center gap-2">
+                                    <div className="glass-panel rounded-2xl p-6 border border-[var(--sys-border)]">
+                                        <h3 className="text-base font-bold text-[var(--sys-text)] mb-3 flex items-center gap-2">
                                             <span className="material-symbols-outlined text-[#FF4D00]">donut_large</span>
                                             Channel Allocation
                                         </h3>
@@ -1458,13 +1458,13 @@ export default function PerformanceMarketing() {
                                                 <div key={i} className="flex items-center gap-4">
                                                     <div className="flex-1">
                                                         <div className="flex items-center justify-between mb-1">
-                                                            <p className="text-sm font-medium text-white">{ch.channel}</p>
+                                                            <p className="text-sm font-medium text-[var(--sys-text)]">{ch.channel}</p>
                                                             <p className="text-sm font-bold text-[#FF4D00]">{ch.budgetPercent}%</p>
                                                         </div>
-                                                        <div className="w-full h-2 rounded-full bg-white/[0.06] overflow-hidden">
-                                                            <div className="h-full rounded-full bg-gradient-to-r from-[#FF4D00] to-cyan-500 transition-all" style={{ width: `${ch.budgetPercent}%` }} />
+                                                        <div className="w-full h-2 rounded-full bg-[var(--sys-surface)] overflow-hidden">
+                                                            <div className="h-full rounded-full bg-[var(--sys-surface)] border border-[var(--sys-border)] transition-all" style={{ width: `${ch.budgetPercent}%` }} />
                                                         </div>
-                                                        <p className="text-xs text-slate-500 mt-1">{ch.rationale}</p>
+                                                        <p className="text-xs text-[var(--sys-text-muted)] mt-1">{ch.rationale}</p>
                                                     </div>
                                                 </div>
                                             ))}
@@ -1474,9 +1474,9 @@ export default function PerformanceMarketing() {
 
                                 {/* ═══ PLATFORM BREAKOUT: Meta vs Google ═══ */}
                                 {strategyResult.strategyPlan.platformBreakout && (strategyResult.strategyPlan.platformBreakout.meta || strategyResult.strategyPlan.platformBreakout.google) && (
-                                    <div className="glass-panel rounded-2xl p-6 border border-white/[0.06]">
-                                        <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2">
-                                            <span className="material-symbols-outlined text-orange-400">compare</span>
+                                    <div className="glass-panel rounded-2xl p-6 border border-[var(--sys-border)]">
+                                        <h3 className="text-base font-bold text-[var(--sys-text)] mb-4 flex items-center gap-2">
+                                            <span className="material-symbols-outlined text-[var(--sys-primary)]">compare</span>
                                             Platform Spend Breakout — Meta vs Google
                                         </h3>
                                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -1490,7 +1490,7 @@ export default function PerformanceMarketing() {
                                                                 <span className="material-symbols-outlined text-[#FF4D00] text-lg">campaign</span>
                                                             </div>
                                                             <div>
-                                                                <h4 className="text-sm font-bold text-white">Meta Ads</h4>
+                                                                <h4 className="text-sm font-bold text-[var(--sys-text)]">Meta Ads</h4>
                                                                 <p className="text-xs text-[#FF4D00]">{meta.budgetPercent}% of budget • {meta.budgetAmount || ''}</p>
                                                             </div>
                                                         </div>
@@ -1499,9 +1499,9 @@ export default function PerformanceMarketing() {
                                                         {meta.expectedMetrics && (
                                                             <div className="grid grid-cols-2 gap-2 mb-3">
                                                                 {Object.entries(meta.expectedMetrics).map(([key, val]) => (
-                                                                    <div key={key} className="p-2 rounded-lg bg-black/20 text-center">
-                                                                        <p className="text-[10px] text-slate-500 uppercase">{key}</p>
-                                                                        <p className="text-sm font-bold text-white">{typeof val === 'object' ? JSON.stringify(val) : val}</p>
+                                                                    <div key={key} className="p-2 rounded-lg bg-[var(--sys-surface)] text-center">
+                                                                        <p className="text-[10px] text-[var(--sys-text-muted)] uppercase">{key}</p>
+                                                                        <p className="text-sm font-bold text-[var(--sys-text)]">{typeof val === 'object' ? JSON.stringify(val) : val}</p>
                                                                     </div>
                                                                 ))}
                                                             </div>
@@ -1510,11 +1510,11 @@ export default function PerformanceMarketing() {
                                                         {/* Projections */}
                                                         {meta.projections && Object.keys(meta.projections).length > 0 && (
                                                             <div className="mb-3">
-                                                                <p className="text-xs text-slate-400 font-medium mb-1.5"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">bar_chart</span> Projections (math-backed)</p>
+                                                                <p className="text-xs text-[var(--sys-text-muted)] font-medium mb-1.5"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">bar_chart</span> Projections (math-backed)</p>
                                                                 <div className="grid grid-cols-2 gap-1.5">
                                                                     {Object.entries(meta.projections).map(([key, val]) => (
-                                                                        <div key={key} className="flex justify-between text-xs p-1.5 rounded bg-black/10">
-                                                                            <span className="text-slate-500">{key}</span>
+                                                                        <div key={key} className="flex justify-between text-xs p-1.5 rounded bg-[var(--sys-surface)]">
+                                                                            <span className="text-[var(--sys-text-muted)]">{key}</span>
                                                                             <span className="text-[#FF7A00] font-medium">{typeof val === 'object' ? JSON.stringify(val) : val}</span>
                                                                         </div>
                                                                     ))}
@@ -1525,11 +1525,11 @@ export default function PerformanceMarketing() {
                                                         {/* Campaigns */}
                                                         {meta.campaigns?.length > 0 && (
                                                             <div className="mb-3">
-                                                                <p className="text-xs text-slate-400 font-medium mb-1.5">📋 Campaigns</p>
+                                                                <p className="text-xs text-[var(--sys-text-muted)] font-medium mb-1.5">📋 Campaigns</p>
                                                                 {meta.campaigns.map((c, i) => (
-                                                                    <div key={i} className="flex justify-between text-xs py-1.5 border-b border-white/[0.04] last:border-0">
-                                                                        <span className="text-white font-medium">{c.name}</span>
-                                                                        <span className="text-slate-400">{c.dailyBudget || c.format || ''}</span>
+                                                                    <div key={i} className="flex justify-between text-xs py-1.5 border-b border-[var(--sys-border)] last:border-0">
+                                                                        <span className="text-[var(--sys-text)] font-medium">{c.name}</span>
+                                                                        <span className="text-[var(--sys-text-muted)]">{c.dailyBudget || c.format || ''}</span>
                                                                     </div>
                                                                 ))}
                                                             </div>
@@ -1544,7 +1544,7 @@ export default function PerformanceMarketing() {
                                                             </div>
                                                         )}
 
-                                                        {meta.rationale && <p className="text-xs text-slate-500 italic">{meta.rationale}</p>}
+                                                        {meta.rationale && <p className="text-xs text-[var(--sys-text-muted)] italic">{meta.rationale}</p>}
                                                     </div>
                                                 )
                                             })()}
@@ -1553,14 +1553,14 @@ export default function PerformanceMarketing() {
                                             {strategyResult.strategyPlan.platformBreakout.google && (() => {
                                                 const google = strategyResult.strategyPlan.platformBreakout.google
                                                 return (
-                                                    <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/[0.04] p-5">
+                                                    <div className="rounded-xl border border-[var(--sys-border)] bg-[var(--sys-surface)]/[0.04] p-5">
                                                         <div className="flex items-center gap-2 mb-3">
-                                                            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
-                                                                <span className="material-symbols-outlined text-emerald-400 text-lg">search</span>
+                                                            <div className="w-8 h-8 rounded-lg bg-[var(--sys-primary-dim)] flex items-center justify-center">
+                                                                <span className="material-symbols-outlined text-primary text-lg">search</span>
                                                             </div>
                                                             <div>
-                                                                <h4 className="text-sm font-bold text-white">Google Ads</h4>
-                                                                <p className="text-xs text-emerald-400">{google.budgetPercent}% of budget • {google.budgetAmount || ''}</p>
+                                                                <h4 className="text-sm font-bold text-[var(--sys-text)]">Google Ads</h4>
+                                                                <p className="text-xs text-primary">{google.budgetPercent}% of budget • {google.budgetAmount || ''}</p>
                                                             </div>
                                                         </div>
 
@@ -1568,9 +1568,9 @@ export default function PerformanceMarketing() {
                                                         {google.expectedMetrics && (
                                                             <div className="grid grid-cols-2 gap-2 mb-3">
                                                                 {Object.entries(google.expectedMetrics).map(([key, val]) => (
-                                                                    <div key={key} className="p-2 rounded-lg bg-black/20 text-center">
-                                                                        <p className="text-[10px] text-slate-500 uppercase">{key}</p>
-                                                                        <p className="text-sm font-bold text-white">{typeof val === 'object' ? JSON.stringify(val) : val}</p>
+                                                                    <div key={key} className="p-2 rounded-lg bg-[var(--sys-surface)] text-center">
+                                                                        <p className="text-[10px] text-[var(--sys-text-muted)] uppercase">{key}</p>
+                                                                        <p className="text-sm font-bold text-[var(--sys-text)]">{typeof val === 'object' ? JSON.stringify(val) : val}</p>
                                                                     </div>
                                                                 ))}
                                                             </div>
@@ -1579,12 +1579,12 @@ export default function PerformanceMarketing() {
                                                         {/* Projections */}
                                                         {google.projections && Object.keys(google.projections).length > 0 && (
                                                             <div className="mb-3">
-                                                                <p className="text-xs text-slate-400 font-medium mb-1.5"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">bar_chart</span> Projections (math-backed)</p>
+                                                                <p className="text-xs text-[var(--sys-text-muted)] font-medium mb-1.5"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">bar_chart</span> Projections (math-backed)</p>
                                                                 <div className="grid grid-cols-2 gap-1.5">
                                                                     {Object.entries(google.projections).map(([key, val]) => (
-                                                                        <div key={key} className="flex justify-between text-xs p-1.5 rounded bg-black/10">
-                                                                            <span className="text-slate-500">{key}</span>
-                                                                            <span className="text-emerald-300 font-medium">{typeof val === 'object' ? JSON.stringify(val) : val}</span>
+                                                                        <div key={key} className="flex justify-between text-xs p-1.5 rounded bg-[var(--sys-surface)]">
+                                                                            <span className="text-[var(--sys-text-muted)]">{key}</span>
+                                                                            <span className="text-[var(--sys-primary)] font-medium">{typeof val === 'object' ? JSON.stringify(val) : val}</span>
                                                                         </div>
                                                                     ))}
                                                                 </div>
@@ -1594,11 +1594,11 @@ export default function PerformanceMarketing() {
                                                         {/* Campaigns */}
                                                         {google.campaigns?.length > 0 && (
                                                             <div className="mb-3">
-                                                                <p className="text-xs text-slate-400 font-medium mb-1.5">📋 Campaigns</p>
+                                                                <p className="text-xs text-[var(--sys-text-muted)] font-medium mb-1.5">📋 Campaigns</p>
                                                                 {google.campaigns.map((c, i) => (
-                                                                    <div key={i} className="flex justify-between text-xs py-1.5 border-b border-white/[0.04] last:border-0">
-                                                                        <span className="text-white font-medium">{c.name}</span>
-                                                                        <span className="text-slate-400">{c.dailyBudget || c.campaignType || ''}</span>
+                                                                    <div key={i} className="flex justify-between text-xs py-1.5 border-b border-[var(--sys-border)] last:border-0">
+                                                                        <span className="text-[var(--sys-text)] font-medium">{c.name}</span>
+                                                                        <span className="text-[var(--sys-text-muted)]">{c.dailyBudget || c.campaignType || ''}</span>
                                                                     </div>
                                                                 ))}
                                                             </div>
@@ -1607,13 +1607,13 @@ export default function PerformanceMarketing() {
                                                         {/* Keyword Plan */}
                                                         {google.keywordPlan?.length > 0 && (
                                                             <div className="mb-3">
-                                                                <p className="text-xs text-slate-400 font-medium mb-1.5">🔑 Keyword Plan</p>
+                                                                <p className="text-xs text-[var(--sys-text-muted)] font-medium mb-1.5">🔑 Keyword Plan</p>
                                                                 <div className="space-y-1">
                                                                     {google.keywordPlan.slice(0, 6).map((kw, i) => (
-                                                                        <div key={i} className="flex items-center justify-between text-xs py-1.5 border-b border-white/[0.04] last:border-0">
-                                                                            <span className="text-white font-medium flex-1 truncate">{kw.keyword}</span>
-                                                                            <span className="text-emerald-300 ml-2">CPC: {kw.estimatedCpc || kw.cpc || 'N/A'}</span>
-                                                                            <span className="text-slate-400 ml-2">{kw.monthlyVolume || kw.volume || ''}/mo</span>
+                                                                        <div key={i} className="flex items-center justify-between text-xs py-1.5 border-b border-[var(--sys-border)] last:border-0">
+                                                                            <span className="text-[var(--sys-text)] font-medium flex-1 truncate">{kw.keyword}</span>
+                                                                            <span className="text-[var(--sys-primary)] ml-2">CPC: {kw.estimatedCpc || kw.cpc || 'N/A'}</span>
+                                                                            <span className="text-[var(--sys-text-muted)] ml-2">{kw.monthlyVolume || kw.volume || ''}/mo</span>
                                                                         </div>
                                                                     ))}
                                                                 </div>
@@ -1621,13 +1621,13 @@ export default function PerformanceMarketing() {
                                                         )}
 
                                                         {google.biddingStrategy && (
-                                                            <div className="p-2 rounded-lg bg-emerald-500/5 border border-emerald-500/10 mb-2">
-                                                                <p className="text-[10px] text-slate-500 uppercase mb-0.5">Bidding Strategy</p>
-                                                                <p className="text-xs text-emerald-300">{google.biddingStrategy}</p>
+                                                            <div className="p-2 rounded-lg bg-[var(--sys-primary-dim)] border border-[var(--sys-border)] mb-2">
+                                                                <p className="text-[10px] text-[var(--sys-text-muted)] uppercase mb-0.5">Bidding Strategy</p>
+                                                                <p className="text-xs text-[var(--sys-primary)]">{google.biddingStrategy}</p>
                                                             </div>
                                                         )}
 
-                                                        {google.rationale && <p className="text-xs text-slate-500 italic">{google.rationale}</p>}
+                                                        {google.rationale && <p className="text-xs text-[var(--sys-text-muted)] italic">{google.rationale}</p>}
                                                     </div>
                                                 )
                                             })()}
@@ -1637,9 +1637,9 @@ export default function PerformanceMarketing() {
 
                                 {/* ═══ KEYWORD STRATEGY (Detailed Table) ═══ */}
                                 {strategyResult.strategyPlan.keywordStrategy && (
-                                    <div className="glass-panel rounded-2xl p-6 border border-white/[0.06]">
-                                        <h3 className="text-base font-bold text-white mb-3 flex items-center gap-2">
-                                            <span className="material-symbols-outlined text-amber-400">key</span>
+                                    <div className="glass-panel rounded-2xl p-6 border border-[var(--sys-border)]">
+                                        <h3 className="text-base font-bold text-[var(--sys-text)] mb-3 flex items-center gap-2">
+                                            <span className="material-symbols-outlined text-primary">key</span>
                                             Keyword Strategy
                                         </h3>
 
@@ -1648,41 +1648,41 @@ export default function PerformanceMarketing() {
                                             <div className="overflow-x-auto mb-4">
                                                 <table className="w-full text-xs">
                                                     <thead>
-                                                        <tr className="border-b border-white/[0.08]">
-                                                            <th className="text-left py-2 pr-3 text-slate-400 font-medium">Keyword</th>
-                                                            <th className="text-left py-2 px-2 text-slate-400 font-medium">Category</th>
-                                                            <th className="text-right py-2 px-2 text-slate-400 font-medium">CPC</th>
-                                                            <th className="text-right py-2 px-2 text-slate-400 font-medium">Volume</th>
-                                                            <th className="text-center py-2 px-2 text-slate-400 font-medium">Intent</th>
-                                                            <th className="text-center py-2 px-2 text-slate-400 font-medium">Match</th>
-                                                            <th className="text-left py-2 px-2 text-slate-400 font-medium">Geo</th>
-                                                            <th className="text-center py-2 pl-2 text-slate-400 font-medium">Priority</th>
+                                                        <tr className="border-b border-[var(--sys-border)]">
+                                                            <th className="text-left py-2 pr-3 text-[var(--sys-text-muted)] font-medium">Keyword</th>
+                                                            <th className="text-left py-2 px-2 text-[var(--sys-text-muted)] font-medium">Category</th>
+                                                            <th className="text-right py-2 px-2 text-[var(--sys-text-muted)] font-medium">CPC</th>
+                                                            <th className="text-right py-2 px-2 text-[var(--sys-text-muted)] font-medium">Volume</th>
+                                                            <th className="text-center py-2 px-2 text-[var(--sys-text-muted)] font-medium">Intent</th>
+                                                            <th className="text-center py-2 px-2 text-[var(--sys-text-muted)] font-medium">Match</th>
+                                                            <th className="text-left py-2 px-2 text-[var(--sys-text-muted)] font-medium">Geo</th>
+                                                            <th className="text-center py-2 pl-2 text-[var(--sys-text-muted)] font-medium">Priority</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody>
                                                         {strategyResult.strategyPlan.keywordStrategy.keywordTable.map((kw, i) => {
                                                             const catColor = {
                                                                 'Branded': 'bg-[#FF4D00]/15 text-[#FF4D00]',
-                                                                'Generic-High Intent': 'bg-cyan-500/15 text-cyan-400',
-                                                                'Long-tail': 'bg-teal-500/15 text-teal-400',
-                                                                'Competitor': 'bg-rose-500/15 text-rose-400',
-                                                                'Vernacular': 'bg-amber-500/15 text-amber-400',
-                                                            }[kw.category] || 'bg-white/[0.06] text-slate-400'
+                                                                'Generic-High Intent': 'bg-[var(--sys-primary-dim)] text-primary',
+                                                                'Long-tail': 'bg-[var(--sys-primary-dim)] text-primary',
+                                                                'Competitor': 'bg-[var(--sys-primary-dim)] text-primary',
+                                                                'Vernacular': 'bg-[var(--sys-primary-dim)] text-primary',
+                                                            }[kw.category] || 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)]'
                                                             const priColor = {
-                                                                'Critical': 'text-rose-400',
-                                                                'High': 'text-amber-400',
-                                                                'Medium': 'text-cyan-400',
-                                                                'Test': 'text-slate-500',
-                                                            }[kw.priority] || 'text-slate-400'
+                                                                'Critical': 'text-primary',
+                                                                'High': 'text-primary',
+                                                                'Medium': 'text-primary',
+                                                                'Test': 'text-[var(--sys-text-muted)]',
+                                                            }[kw.priority] || 'text-[var(--sys-text-muted)]'
                                                             return (
-                                                                <tr key={i} className="border-b border-white/[0.03] hover:bg-white/[0.02]">
-                                                                    <td className="py-2 pr-3 text-white font-medium">{kw.keyword}</td>
+                                                                <tr key={i} className="border-b border-[var(--sys-border)] hover:bg-[var(--sys-surface)]">
+                                                                    <td className="py-2 pr-3 text-[var(--sys-text)] font-medium">{kw.keyword}</td>
                                                                     <td className="py-2 px-2"><span className={`px-1.5 py-0.5 rounded-full text-[10px] ${catColor}`}>{kw.category}</span></td>
-                                                                    <td className="py-2 px-2 text-right text-emerald-300 font-mono">{kw.cpc || 'N/A'}</td>
-                                                                    <td className="py-2 px-2 text-right text-slate-300 font-mono">{kw.volume || 'N/A'}</td>
-                                                                    <td className="py-2 px-2 text-center"><span className="text-[10px] text-slate-400">{kw.intent || '-'}</span></td>
-                                                                    <td className="py-2 px-2 text-center"><span className="text-[10px] px-1.5 py-0.5 rounded bg-white/[0.04] text-slate-300">{kw.matchType || '-'}</span></td>
-                                                                    <td className="py-2 px-2 text-slate-400 text-[10px]">{kw.geoRelevance || '-'}</td>
+                                                                    <td className="py-2 px-2 text-right text-[var(--sys-primary)] font-mono">{kw.cpc || 'N/A'}</td>
+                                                                    <td className="py-2 px-2 text-right text-[var(--sys-text-muted)] font-mono">{kw.volume || 'N/A'}</td>
+                                                                    <td className="py-2 px-2 text-center"><span className="text-[10px] text-[var(--sys-text-muted)]">{kw.intent || '-'}</span></td>
+                                                                    <td className="py-2 px-2 text-center"><span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--sys-surface)] text-[var(--sys-text-muted)]">{kw.matchType || '-'}</span></td>
+                                                                    <td className="py-2 px-2 text-[var(--sys-text-muted)] text-[10px]">{kw.geoRelevance || '-'}</td>
                                                                     <td className={`py-2 pl-2 text-center font-medium ${priColor}`}>{kw.priority || '-'}</td>
                                                                 </tr>
                                                             )
@@ -1696,11 +1696,11 @@ export default function PerformanceMarketing() {
                                         {strategyResult.strategyPlan.keywordStrategy.categoryBreakdown && (
                                             <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
                                                 {Object.entries(strategyResult.strategyPlan.keywordStrategy.categoryBreakdown).map(([cat, data]) => (
-                                                    <div key={cat} className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.05]">
-                                                        <p className="text-[10px] text-slate-500 uppercase mb-1">{cat.replace(/([A-Z])/g, ' $1')}</p>
-                                                        <p className="text-sm font-bold text-white">{typeof data === 'object' ? data.totalBudget || data.count : data}</p>
-                                                        {data.expectedClicks && <p className="text-[10px] text-slate-400">{data.expectedClicks} expected clicks</p>}
-                                                        {data.strategy && <p className="text-[10px] text-cyan-400/60 mt-1">{data.strategy}</p>}
+                                                    <div key={cat} className="p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                                                        <p className="text-[10px] text-[var(--sys-text-muted)] uppercase mb-1">{cat.replace(/([A-Z])/g, ' $1')}</p>
+                                                        <p className="text-sm font-bold text-[var(--sys-text)]">{typeof data === 'object' ? data.totalBudget || data.count : data}</p>
+                                                        {data.expectedClicks && <p className="text-[10px] text-[var(--sys-text-muted)]">{data.expectedClicks} expected clicks</p>}
+                                                        {data.strategy && <p className="text-[10px] text-primary/60 mt-1">{data.strategy}</p>}
                                                     </div>
                                                 ))}
                                             </div>
@@ -1711,15 +1711,15 @@ export default function PerformanceMarketing() {
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                 {strategyResult.strategyPlan.keywordStrategy.mustTarget?.length > 0 && (
                                                     <div>
-                                                        <p className="text-xs font-medium text-emerald-400 mb-2">Must Target</p>
+                                                        <p className="text-xs font-medium text-primary mb-2">Must Target</p>
                                                         <div className="space-y-1.5">
                                                             {strategyResult.strategyPlan.keywordStrategy.mustTarget.map((kw, i) => (
-                                                                <div key={i} className="p-2 rounded-lg bg-emerald-500/5 border border-emerald-500/10">
+                                                                <div key={i} className="p-2 rounded-lg bg-[var(--sys-primary-dim)] border border-[var(--sys-border)]">
                                                                     <div className="flex justify-between">
-                                                                        <span className="text-xs text-white font-medium">{kw.keyword}</span>
-                                                                        <span className="text-xs text-emerald-300">CPC: {kw.cpc || 'N/A'}</span>
+                                                                        <span className="text-xs text-[var(--sys-text)] font-medium">{kw.keyword}</span>
+                                                                        <span className="text-xs text-[var(--sys-primary)]">CPC: {kw.cpc || 'N/A'}</span>
                                                                     </div>
-                                                                    {kw.reason && <p className="text-[10px] text-slate-500 mt-0.5">{kw.reason}</p>}
+                                                                    {kw.reason && <p className="text-[10px] text-[var(--sys-text-muted)] mt-0.5">{kw.reason}</p>}
                                                                 </div>
                                                             ))}
                                                         </div>
@@ -1727,12 +1727,12 @@ export default function PerformanceMarketing() {
                                                 )}
                                                 {strategyResult.strategyPlan.keywordStrategy.avoid?.length > 0 && (
                                                     <div>
-                                                        <p className="text-xs font-medium text-rose-400 mb-2">Avoid</p>
+                                                        <p className="text-xs font-medium text-primary mb-2">Avoid</p>
                                                         <div className="space-y-1.5">
                                                             {strategyResult.strategyPlan.keywordStrategy.avoid.map((kw, i) => (
-                                                                <div key={i} className="p-2 rounded-lg bg-rose-500/5 border border-rose-500/10">
-                                                                    <span className="text-xs text-white font-medium">{kw.keyword}</span>
-                                                                    {kw.reason && <p className="text-[10px] text-slate-500 mt-0.5">{kw.reason}</p>}
+                                                                <div key={i} className="p-2 rounded-lg bg-[var(--sys-primary-dim)] border border-[var(--sys-border)]">
+                                                                    <span className="text-xs text-[var(--sys-text)] font-medium">{kw.keyword}</span>
+                                                                    {kw.reason && <p className="text-[10px] text-[var(--sys-text-muted)] mt-0.5">{kw.reason}</p>}
                                                                 </div>
                                                             ))}
                                                         </div>
@@ -1744,44 +1744,44 @@ export default function PerformanceMarketing() {
                                         {/* Negative Keywords */}
                                         {strategyResult.strategyPlan.keywordStrategy.negativeKeywords?.length > 0 && (
                                             <div className="mt-3">
-                                                <p className="text-xs font-medium text-slate-400 mb-1.5">Negative Keywords</p>
+                                                <p className="text-xs font-medium text-[var(--sys-text-muted)] mb-1.5">Negative Keywords</p>
                                                 <div className="flex flex-wrap gap-1.5">
                                                     {strategyResult.strategyPlan.keywordStrategy.negativeKeywords.map((kw, i) => (
-                                                        <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-white/[0.04] text-slate-400 border border-white/[0.06]">-{kw}</span>
+                                                        <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--sys-surface)] text-[var(--sys-text-muted)] border border-[var(--sys-border)]">-{kw}</span>
                                                     ))}
                                                 </div>
                                             </div>
                                         )}
                                         {(strategyResult.strategyPlan.keywordStrategy.matchTypes || strategyResult.strategyPlan.keywordStrategy.matchTypeStrategy) && (
-                                            <p className="text-xs text-slate-500 mt-3 italic">{strategyResult.strategyPlan.keywordStrategy.matchTypeStrategy || strategyResult.strategyPlan.keywordStrategy.matchTypes}</p>
+                                            <p className="text-xs text-[var(--sys-text-muted)] mt-3 italic">{strategyResult.strategyPlan.keywordStrategy.matchTypeStrategy || strategyResult.strategyPlan.keywordStrategy.matchTypes}</p>
                                         )}
                                     </div>
                                 )}
 
                                 {/* ═══ COMPETITIVE EDGE ═══ */}
                                 {strategyResult.strategyPlan.competitiveEdge && (
-                                    <div className="glass-panel rounded-2xl p-6 border border-rose-500/15">
-                                        <h3 className="text-base font-bold text-white mb-3 flex items-center gap-2">
-                                            <span className="material-symbols-outlined text-rose-400">swords</span>
+                                    <div className="glass-panel rounded-2xl p-6 border border-[var(--sys-border)]">
+                                        <h3 className="text-base font-bold text-[var(--sys-text)] mb-3 flex items-center gap-2">
+                                            <span className="material-symbols-outlined text-primary">swords</span>
                                             Competitive Edge Analysis
                                         </h3>
                                         {/* Competitor Cards */}
                                         {strategyResult.strategyPlan.competitiveEdge.competitorAnalysis?.length > 0 && (
                                             <div className="space-y-3 mb-4">
                                                 {strategyResult.strategyPlan.competitiveEdge.competitorAnalysis.map((comp, i) => (
-                                                    <div key={i} className="grid grid-cols-1 md:grid-cols-3 gap-3 p-4 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+                                                    <div key={i} className="grid grid-cols-1 md:grid-cols-3 gap-3 p-4 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
                                                         <div>
-                                                            <p className="text-[10px] text-slate-500 uppercase mb-1">🏢 {comp.competitor}</p>
-                                                            <p className="text-xs text-slate-300">{comp.whatTheyDo}</p>
+                                                            <p className="text-[10px] text-[var(--sys-text-muted)] uppercase mb-1">🏢 {comp.competitor}</p>
+                                                            <p className="text-xs text-[var(--sys-text-muted)]">{comp.whatTheyDo}</p>
                                                         </div>
                                                         <div>
-                                                            <p className="text-[10px] text-rose-400 uppercase mb-1">Their Weakness</p>
-                                                            <p className="text-xs text-slate-300">{comp.theirWeakness}</p>
+                                                            <p className="text-[10px] text-primary uppercase mb-1">Their Weakness</p>
+                                                            <p className="text-xs text-[var(--sys-text-muted)]">{comp.theirWeakness}</p>
                                                         </div>
                                                         <div>
-                                                            <p className="text-[10px] text-emerald-400 uppercase mb-1">Our Advantage</p>
-                                                            <p className="text-xs text-white font-medium">{comp.ourAdvantage}</p>
-                                                            {comp.actionItem && <p className="text-[10px] text-cyan-400 mt-1">→ {comp.actionItem}</p>}
+                                                            <p className="text-[10px] text-primary uppercase mb-1">Our Advantage</p>
+                                                            <p className="text-xs text-[var(--sys-text)] font-medium">{comp.ourAdvantage}</p>
+                                                            {comp.actionItem && <p className="text-[10px] text-primary mt-1">→ {comp.actionItem}</p>}
                                                         </div>
                                                     </div>
                                                 ))}
@@ -1790,18 +1790,18 @@ export default function PerformanceMarketing() {
                                         {/* Market Gaps & Differentiators */}
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                             {strategyResult.strategyPlan.competitiveEdge.uniqueAngles?.length > 0 && (
-                                                <div className="p-3 rounded-xl bg-white/[0.02]">
+                                                <div className="p-3 rounded-xl bg-[var(--sys-surface)]">
                                                     <p className="text-[10px] text-[#FF4D00] uppercase mb-1.5">Unique Angles</p>
                                                     {strategyResult.strategyPlan.competitiveEdge.uniqueAngles.map((a, i) => (
-                                                        <p key={i} className="text-xs text-slate-300 mb-1">• {a}</p>
+                                                        <p key={i} className="text-xs text-[var(--sys-text-muted)] mb-1">• {a}</p>
                                                     ))}
                                                 </div>
                                             )}
                                             {strategyResult.strategyPlan.competitiveEdge.marketGaps?.length > 0 && (
-                                                <div className="p-3 rounded-xl bg-white/[0.02]">
-                                                    <p className="text-[10px] text-amber-400 uppercase mb-1.5">Market Gaps</p>
+                                                <div className="p-3 rounded-xl bg-[var(--sys-surface)]">
+                                                    <p className="text-[10px] text-primary uppercase mb-1.5">Market Gaps</p>
                                                     {strategyResult.strategyPlan.competitiveEdge.marketGaps.map((g, i) => (
-                                                        <p key={i} className="text-xs text-slate-300 mb-1">• {g}</p>
+                                                        <p key={i} className="text-xs text-[var(--sys-text-muted)] mb-1">• {g}</p>
                                                     ))}
                                                 </div>
                                             )}
@@ -1811,26 +1811,26 @@ export default function PerformanceMarketing() {
 
                                 {/* ═══ LOCATION STRATEGY ═══ */}
                                 {strategyResult.strategyPlan.locationStrategy && (
-                                    <div className="glass-panel rounded-2xl p-6 border border-white/[0.06]">
-                                        <h3 className="text-base font-bold text-white mb-3 flex items-center gap-2">
-                                            <span className="material-symbols-outlined text-teal-400">location_on</span>
+                                    <div className="glass-panel rounded-2xl p-6 border border-[var(--sys-border)]">
+                                        <h3 className="text-base font-bold text-[var(--sys-text)] mb-3 flex items-center gap-2">
+                                            <span className="material-symbols-outlined text-primary">location_on</span>
                                             Location Strategy
                                         </h3>
                                         {strategyResult.strategyPlan.locationStrategy.locationBreakdown?.length > 0 && (
                                             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
                                                 {strategyResult.strategyPlan.locationStrategy.locationBreakdown.map((loc, i) => (
-                                                    <div key={i} className="p-4 rounded-xl bg-white/[0.02] border border-teal-500/10">
+                                                    <div key={i} className="p-4 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
                                                         <div className="flex items-center justify-between mb-2">
-                                                            <span className="text-sm font-bold text-white">{loc.location}</span>
-                                                            <span className="text-sm font-bold text-teal-400">{loc.budgetPercent}%</span>
+                                                            <span className="text-sm font-bold text-[var(--sys-text)]">{loc.location}</span>
+                                                            <span className="text-sm font-bold text-primary">{loc.budgetPercent}%</span>
                                                         </div>
-                                                        <p className="text-xs text-emerald-300 font-mono mb-1">{loc.budgetAmount}</p>
-                                                        {loc.cpcAdjustment && <p className="text-[10px] text-amber-400 mb-1">{loc.cpcAdjustment}</p>}
-                                                        <p className="text-[10px] text-slate-500">{loc.rationale}</p>
+                                                        <p className="text-xs text-[var(--sys-primary)] font-mono mb-1">{loc.budgetAmount}</p>
+                                                        {loc.cpcAdjustment && <p className="text-[10px] text-primary mb-1">{loc.cpcAdjustment}</p>}
+                                                        <p className="text-[10px] text-[var(--sys-text-muted)]">{loc.rationale}</p>
                                                         {loc.keywordsForLocation?.length > 0 && (
                                                             <div className="flex flex-wrap gap-1 mt-2">
                                                                 {loc.keywordsForLocation.map((kw, j) => (
-                                                                    <span key={j} className="text-[9px] px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-400">{kw}</span>
+                                                                    <span key={j} className="text-[9px] px-1.5 py-0.5 rounded bg-[var(--sys-primary-dim)] text-primary">{kw}</span>
                                                                 ))}
                                                             </div>
                                                         )}
@@ -1839,13 +1839,13 @@ export default function PerformanceMarketing() {
                                             </div>
                                         )}
                                         {strategyResult.strategyPlan.locationStrategy.geoTargetingStrategy && (
-                                            <p className="text-xs text-slate-400 italic">{strategyResult.strategyPlan.locationStrategy.geoTargetingStrategy}</p>
+                                            <p className="text-xs text-[var(--sys-text-muted)] italic">{strategyResult.strategyPlan.locationStrategy.geoTargetingStrategy}</p>
                                         )}
                                         {strategyResult.strategyPlan.locationStrategy.exclusions?.length > 0 && (
                                             <div className="mt-2 flex flex-wrap gap-1.5">
-                                                <span className="text-[10px] text-rose-400 mr-1">Exclude:</span>
+                                                <span className="text-[10px] text-primary mr-1">Exclude:</span>
                                                 {strategyResult.strategyPlan.locationStrategy.exclusions.map((e, i) => (
-                                                    <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400">{e}</span>
+                                                    <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--sys-primary-dim)] text-primary">{e}</span>
                                                 ))}
                                             </div>
                                         )}
@@ -1855,37 +1855,37 @@ export default function PerformanceMarketing() {
                                 {/* ═══ ACHIEVABILITY AUDIT ═══ */}
                                 {strategyResult.strategyPlan.achievabilityAudit && (
                                     <div className="glass-panel rounded-2xl p-6 border border-[#FF4D00]/15">
-                                        <h3 className="text-base font-bold text-white mb-3 flex items-center gap-2">
+                                        <h3 className="text-base font-bold text-[var(--sys-text)] mb-3 flex items-center gap-2">
                                             <span className="material-symbols-outlined text-[#FF4D00]">verified</span>
                                             Achievability Audit
                                         </h3>
                                         {/* Overall Score */}
                                         <div className="flex items-center gap-4 mb-4">
                                             <div className={`w-16 h-16 rounded-2xl flex items-center justify-center text-2xl font-black ${
-                                                strategyResult.strategyPlan.achievabilityAudit.overallScore >= 7 ? 'bg-emerald-500/15 text-emerald-400' :
-                                                strategyResult.strategyPlan.achievabilityAudit.overallScore >= 5 ? 'bg-amber-500/15 text-amber-400' :
-                                                'bg-rose-500/15 text-rose-400'
+                                                strategyResult.strategyPlan.achievabilityAudit.overallScore >= 7 ? 'bg-[var(--sys-primary-dim)] text-primary' :
+                                                strategyResult.strategyPlan.achievabilityAudit.overallScore >= 5 ? 'bg-[var(--sys-primary-dim)] text-primary' :
+                                                'bg-[var(--sys-primary-dim)] text-primary'
                                             }`}>
                                                 {strategyResult.strategyPlan.achievabilityAudit.overallScore}/10
                                             </div>
                                             <div className="flex-1">
-                                                <p className="text-sm font-medium text-white">Implementation Confidence</p>
-                                                <p className="text-xs text-slate-400">{strategyResult.strategyPlan.achievabilityAudit.overallAssessment}</p>
+                                                <p className="text-sm font-medium text-[var(--sys-text)]">Implementation Confidence</p>
+                                                <p className="text-xs text-[var(--sys-text-muted)]">{strategyResult.strategyPlan.achievabilityAudit.overallAssessment}</p>
                                             </div>
                                         </div>
                                         {/* Per-Goal Confidence */}
                                         {strategyResult.strategyPlan.achievabilityAudit.perGoalConfidence?.length > 0 && (
                                             <div className="space-y-2 mb-4">
                                                 {strategyResult.strategyPlan.achievabilityAudit.perGoalConfidence.map((pgc, i) => (
-                                                    <div key={i} className="flex items-center gap-3 p-2.5 rounded-lg bg-white/[0.02]">
+                                                    <div key={i} className="flex items-center gap-3 p-2.5 rounded-lg bg-[var(--sys-surface)]">
                                                         <div className={`text-sm font-bold min-w-[35px] text-center ${
-                                                            pgc.score >= 7 ? 'text-emerald-400' : pgc.score >= 5 ? 'text-amber-400' : 'text-rose-400'
+                                                            pgc.score >= 7 ? 'text-primary' : pgc.score >= 5 ? 'text-primary' : 'text-primary'
                                                         }`}>{pgc.score}/10</div>
                                                         <div className="flex-1">
-                                                            <p className="text-xs text-white">{pgc.goal}</p>
-                                                            <p className="text-[10px] text-slate-500">{pgc.reasoning}</p>
+                                                            <p className="text-xs text-[var(--sys-text)]">{pgc.goal}</p>
+                                                            <p className="text-[10px] text-[var(--sys-text-muted)]">{pgc.reasoning}</p>
                                                         </div>
-                                                        {pgc.risk && <span className="text-[9px] px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-400 whitespace-nowrap">⚠ {pgc.risk}</span>}
+                                                        {pgc.risk && <span className="text-[9px] px-1.5 py-0.5 rounded bg-[var(--sys-primary-dim)] text-primary whitespace-nowrap">⚠ {pgc.risk}</span>}
                                                     </div>
                                                 ))}
                                             </div>
@@ -1893,18 +1893,18 @@ export default function PerformanceMarketing() {
                                         {/* Assumptions & Prerequisites */}
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                             {strategyResult.strategyPlan.achievabilityAudit.assumptions?.length > 0 && (
-                                                <div className="p-3 rounded-xl bg-white/[0.02]">
-                                                    <p className="text-[10px] text-amber-400 uppercase mb-1.5">Key Assumptions</p>
+                                                <div className="p-3 rounded-xl bg-[var(--sys-surface)]">
+                                                    <p className="text-[10px] text-primary uppercase mb-1.5">Key Assumptions</p>
                                                     {strategyResult.strategyPlan.achievabilityAudit.assumptions.map((a, i) => (
-                                                        <p key={i} className="text-xs text-slate-300 mb-1">• {a}</p>
+                                                        <p key={i} className="text-xs text-[var(--sys-text-muted)] mb-1">• {a}</p>
                                                     ))}
                                                 </div>
                                             )}
                                             {strategyResult.strategyPlan.achievabilityAudit.prerequisites?.length > 0 && (
-                                                <div className="p-3 rounded-xl bg-white/[0.02]">
+                                                <div className="p-3 rounded-xl bg-[var(--sys-surface)]">
                                                     <p className="text-[10px] text-[#FF4D00] uppercase mb-1.5">Prerequisites</p>
                                                     {strategyResult.strategyPlan.achievabilityAudit.prerequisites.map((p, i) => (
-                                                        <p key={i} className="text-xs text-slate-300 mb-1">• {p}</p>
+                                                        <p key={i} className="text-xs text-[var(--sys-text-muted)] mb-1">• {p}</p>
                                                     ))}
                                                 </div>
                                             )}
@@ -1914,21 +1914,21 @@ export default function PerformanceMarketing() {
 
                                 {/* Timeline */}
                                 {strategyResult.strategyPlan.timeline?.length > 0 && (
-                                    <div className="glass-panel rounded-2xl p-6 border border-white/[0.06]">
-                                        <h3 className="text-base font-bold text-white mb-3 flex items-center gap-2">
-                                            <span className="material-symbols-outlined text-amber-400">timeline</span>
+                                    <div className="glass-panel rounded-2xl p-6 border border-[var(--sys-border)]">
+                                        <h3 className="text-base font-bold text-[var(--sys-text)] mb-3 flex items-center gap-2">
+                                            <span className="material-symbols-outlined text-primary">timeline</span>
                                             Launch Timeline
                                         </h3>
                                         <div className="space-y-4">
                                             {strategyResult.strategyPlan.timeline.map((phase, i) => (
-                                                <div key={i} className="relative pl-8 pb-4 border-l-2 border-white/[0.08] last:border-l-0">
-                                                    <div className="absolute left-0 top-0 -translate-x-1/2 w-4 h-4 rounded-full bg-amber-500/20 border-2 border-amber-500" />
-                                                    <h4 className="text-sm font-bold text-white">{phase.phase}</h4>
-                                                    <p className="text-xs text-amber-400 mb-2">{phase.duration}</p>
+                                                <div key={i} className="relative pl-8 pb-4 border-l-2 border-[var(--sys-border)] last:border-l-0">
+                                                    <div className="absolute left-0 top-0 -translate-x-1/2 w-4 h-4 rounded-full bg-[var(--sys-primary-dim)] border border-[var(--sys-border)]" />
+                                                    <h4 className="text-sm font-bold text-[var(--sys-text)]">{phase.phase}</h4>
+                                                    <p className="text-xs text-primary mb-2">{phase.duration}</p>
                                                     <ul className="space-y-1">
                                                         {(phase.activities || []).map((a, j) => (
-                                                            <li key={j} className="text-xs text-slate-400 flex items-start gap-1.5">
-                                                                <span className="text-slate-600 mt-0.5">•</span>{a}
+                                                            <li key={j} className="text-xs text-[var(--sys-text-muted)] flex items-start gap-1.5">
+                                                                <span className="text-[var(--sys-text-muted)] mt-0.5">•</span>{a}
                                                             </li>
                                                         ))}
                                                     </ul>
@@ -1940,16 +1940,16 @@ export default function PerformanceMarketing() {
 
                                 {/* KPIs */}
                                 {strategyResult.strategyPlan.kpis?.length > 0 && (
-                                    <div className="glass-panel rounded-2xl p-6 border border-white/[0.06]">
-                                        <h3 className="text-base font-bold text-white mb-3 flex items-center gap-2">
-                                            <span className="material-symbols-outlined text-cyan-400">speed</span>
+                                    <div className="glass-panel rounded-2xl p-6 border border-[var(--sys-border)]">
+                                        <h3 className="text-base font-bold text-[var(--sys-text)] mb-3 flex items-center gap-2">
+                                            <span className="material-symbols-outlined text-primary">speed</span>
                                             Key Performance Indicators
                                         </h3>
                                         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                                             {strategyResult.strategyPlan.kpis.map((kpi, i) => (
-                                                <div key={i} className="p-3 rounded-xl bg-cyan-500/5 border border-cyan-500/10 text-center">
-                                                    <p className="text-xs text-slate-500 uppercase tracking-wide">{kpi.metric}</p>
-                                                    <p className="text-lg font-bold text-white mt-1">{kpi.target}</p>
+                                                <div key={i} className="p-3 rounded-xl bg-[var(--sys-primary-dim)] border border-[var(--sys-border)] text-center">
+                                                    <p className="text-xs text-[var(--sys-text-muted)] uppercase tracking-wide">{kpi.metric}</p>
+                                                    <p className="text-lg font-bold text-[var(--sys-text)] mt-1">{kpi.target}</p>
                                                 </div>
                                             ))}
                                         </div>
@@ -1958,28 +1958,28 @@ export default function PerformanceMarketing() {
 
                                 {/* Budget Plan */}
                                 {strategyResult.budgetPlan?.allocation?.length > 0 && (
-                                    <div className="glass-panel rounded-2xl p-6 border border-amber-500/20">
-                                        <h3 className="text-base font-bold text-white mb-3 flex items-center gap-2">
-                                            <span className="material-symbols-outlined text-amber-400">account_balance</span>
+                                    <div className="glass-panel rounded-2xl p-6 border border-[var(--sys-border)]">
+                                        <h3 className="text-base font-bold text-[var(--sys-text)] mb-3 flex items-center gap-2">
+                                            <span className="material-symbols-outlined text-primary">account_balance</span>
                                             Budget Allocation — ₹{(strategyResult.budgetPlan.totalBudget || 0).toLocaleString()} for {strategyResult.budgetPlan.duration}
                                         </h3>
                                         <div className="overflow-x-auto">
                                             <table className="w-full text-sm">
                                                 <thead>
-                                                    <tr className="border-b border-white/[0.06]">
-                                                        <th className="text-left py-2 text-slate-500 font-medium">Platform</th>
-                                                        <th className="text-left py-2 text-slate-500 font-medium">Campaign</th>
-                                                        <th className="text-right py-2 text-slate-500 font-medium">Daily Budget</th>
-                                                        <th className="text-right py-2 text-slate-500 font-medium">Expected ROAS</th>
+                                                    <tr className="border-b border-[var(--sys-border)]">
+                                                        <th className="text-left py-2 text-[var(--sys-text-muted)] font-medium">Platform</th>
+                                                        <th className="text-left py-2 text-[var(--sys-text-muted)] font-medium">Campaign</th>
+                                                        <th className="text-right py-2 text-[var(--sys-text-muted)] font-medium">Daily Budget</th>
+                                                        <th className="text-right py-2 text-[var(--sys-text-muted)] font-medium">Expected ROAS</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
                                                     {strategyResult.budgetPlan.allocation.map((a, i) => (
-                                                        <tr key={i} className="border-b border-white/[0.04]">
-                                                            <td className="py-2 text-slate-300">{a.platform}</td>
-                                                            <td className="py-2 text-white font-medium">{a.campaign}</td>
-                                                            <td className="py-2 text-right text-amber-400">₹{(a.amount || 0).toLocaleString()}</td>
-                                                            <td className="py-2 text-right text-emerald-400">{a.expectedRoas || '–'}x</td>
+                                                        <tr key={i} className="border-b border-[var(--sys-border)]">
+                                                            <td className="py-2 text-[var(--sys-text-muted)]">{a.platform}</td>
+                                                            <td className="py-2 text-[var(--sys-text)] font-medium">{a.campaign}</td>
+                                                            <td className="py-2 text-right text-primary">₹{(a.amount || 0).toLocaleString()}</td>
+                                                            <td className="py-2 text-right text-primary">{a.expectedRoas || '–'}x</td>
                                                         </tr>
                                                     ))}
                                                 </tbody>
@@ -1992,7 +1992,7 @@ export default function PerformanceMarketing() {
                                 <button
                                     onClick={handleGenerateCreatives}
                                     disabled={loading}
-                                    className="w-full py-4 rounded-2xl bg-gradient-to-r from-emerald-600 to-cyan-600 text-white font-bold text-sm hover:shadow-xl hover:shadow-emerald-500/20 transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
+                                    className="w-full py-4 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] font-bold text-sm hover:shadow-xl hover:shadow-none transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
                                 >
                                     <span className="material-symbols-outlined">auto_fix_high</span>
                                     Generate Ad Creatives from Strategy
@@ -2008,13 +2008,13 @@ export default function PerformanceMarketing() {
                 {tab === 'campaigns' && (
                     <div className="space-y-6">
                         <div className="flex items-center justify-between">
-                            <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                                <span className="material-symbols-outlined text-emerald-400">campaign</span>
+                            <h2 className="text-lg font-bold text-[var(--sys-text)] flex items-center gap-2">
+                                <span className="material-symbols-outlined text-primary">campaign</span>
                                 Campaigns
                             </h2>
                             <button
                                 onClick={() => setTab('strategy')}
-                                className="px-4 py-2 rounded-xl bg-emerald-500/10 text-emerald-400 text-sm font-medium border border-emerald-500/20 hover:bg-emerald-500/20 transition-all cursor-pointer flex items-center gap-2"
+                                className="px-4 py-2 rounded-xl bg-[var(--sys-primary-dim)] text-primary text-sm font-medium border border-[var(--sys-border)] hover:bg-[var(--sys-primary-dim)] transition-all cursor-pointer flex items-center gap-2"
                             >
                                 <span className="material-symbols-outlined text-sm">add</span>
                                 New Campaign
@@ -2022,10 +2022,10 @@ export default function PerformanceMarketing() {
                         </div>
 
                         {campaigns.length === 0 ? (
-                            <div className="glass-panel rounded-2xl p-12 border border-white/[0.06] text-center">
-                                <span className="material-symbols-outlined text-5xl text-slate-600 mb-4 block">campaign</span>
-                                <h3 className="text-lg font-bold text-white mb-2">No Campaigns Yet</h3>
-                                <p className="text-sm text-slate-400 mb-6">Start by researching competitors and building a strategy, then create your first campaign.</p>
+                            <div className="glass-panel rounded-2xl p-12 border border-[var(--sys-border)] text-center">
+                                <span className="material-symbols-outlined text-5xl text-[var(--sys-text-muted)] mb-4 block">campaign</span>
+                                <h3 className="text-lg font-bold text-[var(--sys-text)] mb-2">No Campaigns Yet</h3>
+                                <p className="text-sm text-[var(--sys-text-muted)] mb-6">Start by researching competitors and building a strategy, then create your first campaign.</p>
                                 <button
                                     onClick={() => setTab('research')}
                                     className="px-6 py-3 rounded-xl bg-[#FF4D00]/10 text-[#FF4D00] font-medium text-sm border border-[#FF4D00]/20 hover:bg-[#FF4D00]/20 transition-all cursor-pointer"
@@ -2036,29 +2036,29 @@ export default function PerformanceMarketing() {
                         ) : (
                             <div className="space-y-3">
                                 {campaigns.map(c => (
-                                    <div key={c._id} className="glass-panel rounded-2xl p-5 border border-white/[0.06] hover:border-white/[0.12] transition-all">
+                                    <div key={c._id} className="glass-panel rounded-2xl p-5 border border-[var(--sys-border)] hover:border-[var(--sys-border)] transition-all">
                                         <div className="flex items-start justify-between mb-3">
                                             <div>
-                                                <h4 className="text-base font-bold text-white">{c.title}</h4>
+                                                <h4 className="text-base font-bold text-[var(--sys-text)]">{c.title}</h4>
                                                 <div className="flex items-center gap-3 mt-1">
-                                                    <span className="text-xs text-slate-500">{c.platform === 'meta' ? '📘 Meta' : c.platform === 'google' ? '🔍 Google' : '📢 Both'}</span>
-                                                    <span className="text-xs text-slate-500">·</span>
-                                                    <span className="text-xs text-slate-500">{c.objective}</span>
+                                                    <span className="text-xs text-[var(--sys-text-muted)]">{c.platform === 'meta' ? '📘 Meta' : c.platform === 'google' ? '🔍 Google' : '📢 Both'}</span>
+                                                    <span className="text-xs text-[var(--sys-text-muted)]">·</span>
+                                                    <span className="text-xs text-[var(--sys-text-muted)]">{c.objective}</span>
                                                 </div>
                                             </div>
-                                            <span className={`px-3 py-1 rounded-full text-xs font-bold ${c.status === 'active' ? 'bg-emerald-500/10 text-emerald-400'
-                                                : c.status === 'draft' ? 'bg-slate-500/10 text-slate-400'
-                                                    : c.status === 'paused' ? 'bg-amber-500/10 text-amber-400'
+                                            <span className={`px-3 py-1 rounded-full text-xs font-bold ${c.status === 'active' ? 'bg-[var(--sys-primary-dim)] text-primary'
+                                                : c.status === 'draft' ? 'bg-[var(--sys-border)]/10 text-[var(--sys-text-muted)]'
+                                                    : c.status === 'paused' ? 'bg-[var(--sys-primary-dim)] text-primary'
                                                         : 'bg-[#FF4D00]/10 text-[#FF4D00]'
                                                 }`}>
                                                 {c.status}
                                             </span>
                                         </div>
                                         <div className="grid grid-cols-4 gap-4">
-                                            <div><p className="text-xs text-slate-500">Spend</p><p className="text-sm font-bold text-white">₹{(c.performance?.spend || 0).toLocaleString()}</p></div>
-                                            <div><p className="text-xs text-slate-500">Impressions</p><p className="text-sm font-bold text-white">{(c.performance?.impressions || 0).toLocaleString()}</p></div>
-                                            <div><p className="text-xs text-slate-500">Clicks</p><p className="text-sm font-bold text-white">{(c.performance?.clicks || 0).toLocaleString()}</p></div>
-                                            <div><p className="text-xs text-slate-500">ROAS</p><p className="text-sm font-bold text-emerald-400">{c.performance?.roas || '–'}x</p></div>
+                                            <div><p className="text-xs text-[var(--sys-text-muted)]">Spend</p><p className="text-sm font-bold text-[var(--sys-text)]">₹{(c.performance?.spend || 0).toLocaleString()}</p></div>
+                                            <div><p className="text-xs text-[var(--sys-text-muted)]">Impressions</p><p className="text-sm font-bold text-[var(--sys-text)]">{(c.performance?.impressions || 0).toLocaleString()}</p></div>
+                                            <div><p className="text-xs text-[var(--sys-text-muted)]">Clicks</p><p className="text-sm font-bold text-[var(--sys-text)]">{(c.performance?.clicks || 0).toLocaleString()}</p></div>
+                                            <div><p className="text-xs text-[var(--sys-text-muted)]">ROAS</p><p className="text-sm font-bold text-primary">{c.performance?.roas || '–'}x</p></div>
                                         </div>
                                     </div>
                                 ))}
@@ -2066,23 +2066,23 @@ export default function PerformanceMarketing() {
                         )}
 
                         {/* ── AD IMAGE GENERATOR (Enhancement 3) ── */}
-                        <div className="glass-panel rounded-2xl p-6 border border-cyan-500/20">
-                            <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2">
-                                <span className="material-symbols-outlined text-cyan-400">auto_awesome</span>
+                        <div className="glass-panel rounded-2xl p-6 border border-[var(--sys-border)]">
+                            <h3 className="text-base font-bold text-[var(--sys-text)] mb-4 flex items-center gap-2">
+                                <span className="material-symbols-outlined text-primary">auto_awesome</span>
                                 AI Ad Image Generator
                             </h3>
-                            <p className="text-sm text-slate-400 mb-4">Generate scroll-stopping ad visuals using your brand style</p>
+                            <p className="text-sm text-[var(--sys-text-muted)] mb-4">Generate scroll-stopping ad visuals using your brand style</p>
                             <div className="flex gap-3 mb-4">
                                 <input
                                     value={adImagePrompt}
                                     onChange={e => setAdImagePrompt(e.target.value)}
                                     placeholder="e.g., Summer sale banner with vibrant product showcase..."
-                                    className="flex-1 px-4 py-3 rounded-xl bg-black/30 border border-cyan-500/20 text-white placeholder-slate-600 text-sm outline-none focus:border-cyan-400/50"
+                                    className="flex-1 px-4 py-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] placeholder-slate-600 text-sm outline-none focus:border-[var(--sys-border)]"
                                 />
                                 <button
                                     onClick={handleGenerateAdImage}
                                     disabled={generatingImage || !adImagePrompt.trim()}
-                                    className="px-6 py-3 rounded-xl bg-gradient-to-r from-cyan-600 to-[#FF7A00] text-white font-bold text-sm hover:shadow-xl hover:shadow-cyan-500/20 transition-all disabled:opacity-50 cursor-pointer flex items-center gap-2"
+                                    className="px-6 py-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] font-bold text-sm hover:shadow-xl hover:shadow-none transition-all disabled:opacity-50 cursor-pointer flex items-center gap-2"
                                 >
                                     {generatingImage ? (
                                         <><span className="material-symbols-outlined animate-spin text-sm">progress_activity</span>Generating...</>
@@ -2092,8 +2092,8 @@ export default function PerformanceMarketing() {
                                 </button>
                             </div>
                             {adImageUrl && (
-                                <div className="rounded-xl overflow-hidden border border-white/[0.06]">
-                                    <img src={adImageUrl} alt="Generated ad" className="w-full max-h-96 object-contain bg-black/40" />
+                                <div className="rounded-xl overflow-hidden border border-[var(--sys-border)]">
+                                    <img src={adImageUrl} alt="Generated ad" className="w-full max-h-96 object-contain bg-[var(--sys-surface)]" />
                                 </div>
                             )}
                         </div>
@@ -2105,16 +2105,16 @@ export default function PerformanceMarketing() {
                 {/* ════════════════════════════════════════════════════════════ */}
                 {tab === 'ab-tests' && (
                     <div className="space-y-6">
-                        <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                        <h2 className="text-lg font-bold text-[var(--sys-text)] flex items-center gap-2">
                             <span className="material-symbols-outlined text-[#FF4D00]">science</span>
                             A/B Testing
                         </h2>
 
                         {campaigns.filter(c => c.abTest?.enabled).length === 0 ? (
-                            <div className="glass-panel rounded-2xl p-12 border border-white/[0.06] text-center">
-                                <span className="material-symbols-outlined text-5xl text-slate-600 mb-4 block">science</span>
-                                <h3 className="text-lg font-bold text-white mb-2">No A/B Tests Running</h3>
-                                <p className="text-sm text-slate-400 mb-6">Create a campaign first, then design an A/B test to optimize your ad performance.</p>
+                            <div className="glass-panel rounded-2xl p-12 border border-[var(--sys-border)] text-center">
+                                <span className="material-symbols-outlined text-5xl text-[var(--sys-text-muted)] mb-4 block">science</span>
+                                <h3 className="text-lg font-bold text-[var(--sys-text)] mb-2">No A/B Tests Running</h3>
+                                <p className="text-sm text-[var(--sys-text-muted)] mb-6">Create a campaign first, then design an A/B test to optimize your ad performance.</p>
                                 <button
                                     onClick={() => setTab('campaigns')}
                                     className="px-6 py-3 rounded-xl bg-[#FF4D00]/10 text-[#FF4D00] font-medium text-sm border border-[#FF4D00]/20 hover:bg-[#FF4D00]/20 transition-all cursor-pointer"
@@ -2126,24 +2126,24 @@ export default function PerformanceMarketing() {
                             <div className="space-y-4">
                                 {campaigns.filter(c => c.abTest?.enabled).map(c => (
                                     <div key={c._id} className="glass-panel rounded-2xl p-6 border border-[#FF4D00]/20">
-                                        <h3 className="text-base font-bold text-white mb-4">{c.title} — A/B Test</h3>
+                                        <h3 className="text-base font-bold text-[var(--sys-text)] mb-4">{c.title} — A/B Test</h3>
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                             {(c.abTest.variants || []).map((v, i) => (
-                                                <div key={i} className={`p-4 rounded-xl border ${c.abTest.winnerVariant === v.name ? 'border-emerald-500/40 bg-emerald-500/5' : 'border-white/[0.06] bg-white/[0.02]'}`}>
-                                                    <p className="text-sm font-bold text-white mb-2">
+                                                <div key={i} className={`p-4 rounded-xl border ${c.abTest.winnerVariant === v.name ? 'border-[var(--sys-border)] bg-[var(--sys-primary-dim)]' : 'border-[var(--sys-border)] bg-[var(--sys-surface)]'}`}>
+                                                    <p className="text-sm font-bold text-[var(--sys-text)] mb-2">
                                                         {v.name}
-                                                        {c.abTest.winnerVariant === v.name && <span className="ml-2 text-emerald-400"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">emoji_events</span> Winner</span>}
+                                                        {c.abTest.winnerVariant === v.name && <span className="ml-2 text-primary"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">emoji_events</span> Winner</span>}
                                                     </p>
                                                     <div className="grid grid-cols-2 gap-2 text-xs">
-                                                        <div><span className="text-slate-500">Clicks</span><p className="text-white font-bold">{v.performance?.clicks || 0}</p></div>
-                                                        <div><span className="text-slate-500">CTR</span><p className="text-white font-bold">{v.performance?.ctr || 0}%</p></div>
-                                                        <div><span className="text-slate-500">Spend</span><p className="text-white font-bold">₹{v.performance?.spend || 0}</p></div>
-                                                        <div><span className="text-slate-500">Conversions</span><p className="text-white font-bold">{v.performance?.conversions || 0}</p></div>
+                                                        <div><span className="text-[var(--sys-text-muted)]">Clicks</span><p className="text-[var(--sys-text)] font-bold">{v.performance?.clicks || 0}</p></div>
+                                                        <div><span className="text-[var(--sys-text-muted)]">CTR</span><p className="text-[var(--sys-text)] font-bold">{v.performance?.ctr || 0}%</p></div>
+                                                        <div><span className="text-[var(--sys-text-muted)]">Spend</span><p className="text-[var(--sys-text)] font-bold">₹{v.performance?.spend || 0}</p></div>
+                                                        <div><span className="text-[var(--sys-text-muted)]">Conversions</span><p className="text-[var(--sys-text)] font-bold">{v.performance?.conversions || 0}</p></div>
                                                     </div>
                                                 </div>
                                             ))}
                                         </div>
-                                        <p className="text-xs text-slate-500 mt-3">Primary metric: <span className="text-[#FF4D00] font-bold">{c.abTest.metric?.toUpperCase()}</span></p>
+                                        <p className="text-xs text-[var(--sys-text-muted)] mt-3">Primary metric: <span className="text-[#FF4D00] font-bold">{c.abTest.metric?.toUpperCase()}</span></p>
                                     </div>
                                 ))}
                             </div>
@@ -2157,18 +2157,18 @@ export default function PerformanceMarketing() {
                 {tab === 'learnings' && (
                     <div className="space-y-6">
                         <div className="flex items-center justify-between">
-                            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                            <h2 className="text-lg font-bold text-[var(--sys-text)] flex items-center gap-2">
                                 <span className="material-symbols-outlined text-[#FF4D00]">psychology</span>
                                 AI Learnings
                             </h2>
-                            <p className="text-xs text-slate-500">{learnings.length} insights stored</p>
+                            <p className="text-xs text-[var(--sys-text-muted)]">{learnings.length} insights stored</p>
                         </div>
 
                         {learnings.length === 0 ? (
-                            <div className="glass-panel rounded-2xl p-12 border border-white/[0.06] text-center">
-                                <span className="material-symbols-outlined text-5xl text-slate-600 mb-4 block">psychology</span>
-                                <h3 className="text-lg font-bold text-white mb-2">No Learnings Yet</h3>
-                                <p className="text-sm text-slate-400 mb-6">Run competitor research or create campaigns — the AI will automatically extract insights and get smarter over time.</p>
+                            <div className="glass-panel rounded-2xl p-12 border border-[var(--sys-border)] text-center">
+                                <span className="material-symbols-outlined text-5xl text-[var(--sys-text-muted)] mb-4 block">psychology</span>
+                                <h3 className="text-lg font-bold text-[var(--sys-text)] mb-2">No Learnings Yet</h3>
+                                <p className="text-sm text-[var(--sys-text-muted)] mb-6">Run competitor research or create campaigns — the AI will automatically extract insights and get smarter over time.</p>
                                 <button
                                     onClick={() => setTab('research')}
                                     className="px-6 py-3 rounded-xl bg-[#FF4D00]/10 text-[#FF4D00] font-medium text-sm border border-[#FF4D00]/20 hover:bg-[#FF4D00]/20 transition-all cursor-pointer"
@@ -2179,31 +2179,31 @@ export default function PerformanceMarketing() {
                         ) : (
                             <div className="space-y-3">
                                 {learnings.map(l => (
-                                    <div key={l._id} className="glass-panel rounded-2xl p-5 border border-white/[0.06] hover:border-[#FF4D00]/20 transition-all">
+                                    <div key={l._id} className="glass-panel rounded-2xl p-5 border border-[var(--sys-border)] hover:border-[#FF4D00]/20 transition-all">
                                         <div className="flex items-start justify-between mb-2">
                                             <div className="flex items-center gap-2">
-                                                <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${l.type === 'campaign-result' ? 'bg-emerald-500/10 text-emerald-400'
-                                                    : l.type === 'audience-insight' ? 'bg-cyan-500/10 text-cyan-400'
+                                                <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${l.type === 'campaign-result' ? 'bg-[var(--sys-primary-dim)] text-primary'
+                                                    : l.type === 'audience-insight' ? 'bg-[var(--sys-primary-dim)] text-primary'
                                                         : l.type === 'creative-insight' ? 'bg-[#FF4D00]/10 text-[#FF4D00]'
-                                                            : l.type === 'competitor-pattern' ? 'bg-rose-500/10 text-rose-400'
-                                                                : 'bg-amber-500/10 text-amber-400'
+                                                            : l.type === 'competitor-pattern' ? 'bg-[var(--sys-primary-dim)] text-primary'
+                                                                : 'bg-[var(--sys-primary-dim)] text-primary'
                                                     }`}>
                                                     {l.type.replace(/-/g, ' ')}
                                                 </span>
-                                                <span className={`w-1.5 h-1.5 rounded-full ${l.insight?.confidence === 'high' ? 'bg-emerald-400' : l.insight?.confidence === 'medium' ? 'bg-amber-400' : 'bg-slate-500'}`} />
+                                                <span className={`w-1.5 h-1.5 rounded-full ${l.insight?.confidence === 'high' ? 'bg-[var(--sys-surface)]' : l.insight?.confidence === 'medium' ? 'bg-[var(--sys-surface)]' : 'bg-[var(--sys-border)]'}`} />
                                             </div>
-                                            <span className="text-xs text-slate-600">{new Date(l.createdAt).toLocaleDateString()}</span>
+                                            <span className="text-xs text-[var(--sys-text-muted)]">{new Date(l.createdAt).toLocaleDateString()}</span>
                                         </div>
-                                        <h4 className="text-sm font-bold text-white mb-1">{l.title}</h4>
-                                        <p className="text-xs text-slate-400 mb-2">{l.insight?.summary}</p>
+                                        <h4 className="text-sm font-bold text-[var(--sys-text)] mb-1">{l.title}</h4>
+                                        <p className="text-xs text-[var(--sys-text-muted)] mb-2">{l.insight?.summary}</p>
                                         {l.insight?.actionable && (
                                             <p className="text-xs text-[#FF4D00]">💡 {l.insight.actionable}</p>
                                         )}
                                         {l.metrics?.roas && (
-                                            <div className="flex gap-4 mt-2 text-xs text-slate-500">
-                                                <span>ROAS: <span className="text-emerald-400 font-bold">{l.metrics.roas.toFixed(1)}x</span></span>
-                                                {l.metrics.ctr && <span>CTR: <span className="text-white font-bold">{l.metrics.ctr.toFixed(2)}%</span></span>}
-                                                {l.metrics.spend && <span>Spend: <span className="text-white font-bold">₹{l.metrics.spend.toLocaleString()}</span></span>}
+                                            <div className="flex gap-4 mt-2 text-xs text-[var(--sys-text-muted)]">
+                                                <span>ROAS: <span className="text-primary font-bold">{l.metrics.roas.toFixed(1)}x</span></span>
+                                                {l.metrics.ctr && <span>CTR: <span className="text-[var(--sys-text)] font-bold">{l.metrics.ctr.toFixed(2)}%</span></span>}
+                                                {l.metrics.spend && <span>Spend: <span className="text-[var(--sys-text)] font-bold">₹{l.metrics.spend.toLocaleString()}</span></span>}
                                             </div>
                                         )}
                                     </div>
@@ -2219,8 +2219,8 @@ export default function PerformanceMarketing() {
                 {tab === 'reports' && (
                     <div className="space-y-6">
                         <div className="flex items-center justify-between">
-                            <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                                <span className="material-symbols-outlined text-amber-400">summarize</span>
+                            <h2 className="text-lg font-bold text-[var(--sys-text)] flex items-center gap-2">
+                                <span className="material-symbols-outlined text-primary">summarize</span>
                                 Reports
                             </h2>
                             <button
@@ -2236,7 +2236,7 @@ export default function PerformanceMarketing() {
                                     finally { setLoading(false) }
                                 }}
                                 disabled={loading}
-                                className="px-4 py-2 rounded-xl bg-amber-500/10 text-amber-400 text-sm font-medium border border-amber-500/20 hover:bg-amber-500/20 transition-all cursor-pointer flex items-center gap-2 disabled:opacity-50"
+                                className="px-4 py-2 rounded-xl bg-[var(--sys-primary-dim)] text-primary text-sm font-medium border border-[var(--sys-border)] hover:bg-[var(--sys-primary-dim)] transition-all cursor-pointer flex items-center gap-2 disabled:opacity-50"
                             >
                                 <span className="material-symbols-outlined text-sm">auto_awesome</span>
                                 Generate Report
@@ -2245,20 +2245,20 @@ export default function PerformanceMarketing() {
 
                         {/* Selected Report Detail View */}
                         {selectedReport && (
-                            <div className="glass-panel rounded-2xl p-6 border border-amber-500/20">
+                            <div className="glass-panel rounded-2xl p-6 border border-[var(--sys-border)]">
                                 <div className="flex items-center justify-between mb-4">
-                                    <h3 className="text-base font-bold text-white">{selectedReport.title}</h3>
-                                    <button onClick={() => setSelectedReport(null)} className="text-slate-400 hover:text-white cursor-pointer">
+                                    <h3 className="text-base font-bold text-[var(--sys-text)]">{selectedReport.title}</h3>
+                                    <button onClick={() => setSelectedReport(null)} className="text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer">
                                         <span className="material-symbols-outlined">close</span>
                                     </button>
                                 </div>
-                                <div className="text-sm text-slate-300 space-y-3">
+                                <div className="text-sm text-[var(--sys-text-muted)] space-y-3">
                                     {selectedReport.aiAnalysis?.summary && (
-                                        <p className="text-white font-medium">{selectedReport.aiAnalysis.summary}</p>
+                                        <p className="text-[var(--sys-text)] font-medium">{selectedReport.aiAnalysis.summary}</p>
                                     )}
                                     {selectedReport.aiAnalysis?.keyFindings?.map((f, i) => (
                                         <div key={i} className="flex items-start gap-2">
-                                            <span className="text-amber-400 mt-0.5">▸</span>
+                                            <span className="text-primary mt-0.5">▸</span>
                                             <span>{typeof f === 'string' ? f : f.title || JSON.stringify(f)}</span>
                                         </div>
                                     ))}
@@ -2268,10 +2268,10 @@ export default function PerformanceMarketing() {
 
                         {/* Reports List */}
                         {reports.length === 0 ? (
-                            <div className="glass-panel rounded-2xl p-12 border border-white/[0.06] text-center">
-                                <span className="material-symbols-outlined text-5xl text-slate-600 mb-4 block">summarize</span>
-                                <h3 className="text-lg font-bold text-white mb-2">No Reports Yet</h3>
-                                <p className="text-sm text-slate-400">Reports are generated automatically from research and campaign data.</p>
+                            <div className="glass-panel rounded-2xl p-12 border border-[var(--sys-border)] text-center">
+                                <span className="material-symbols-outlined text-5xl text-[var(--sys-text-muted)] mb-4 block">summarize</span>
+                                <h3 className="text-lg font-bold text-[var(--sys-text)] mb-2">No Reports Yet</h3>
+                                <p className="text-sm text-[var(--sys-text-muted)]">Reports are generated automatically from research and campaign data.</p>
                             </div>
                         ) : (
                             <div className="space-y-3">
@@ -2279,22 +2279,22 @@ export default function PerformanceMarketing() {
                                     <button
                                         key={r._id}
                                         onClick={() => setSelectedReport(r)}
-                                        className="w-full glass-panel rounded-2xl p-5 border border-white/[0.06] hover:border-white/[0.12] transition-all cursor-pointer text-left flex items-center justify-between"
+                                        className="w-full glass-panel rounded-2xl p-5 border border-[var(--sys-border)] hover:border-[var(--sys-border)] transition-all cursor-pointer text-left flex items-center justify-between"
                                     >
                                         <div>
-                                            <h4 className="text-sm font-bold text-white">{r.title}</h4>
+                                            <h4 className="text-sm font-bold text-[var(--sys-text)]">{r.title}</h4>
                                             <div className="flex items-center gap-3 mt-1">
                                                 <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${r.type === 'competitor-research' ? 'bg-[#FF4D00]/10 text-[#FF4D00]'
-                                                    : r.type === 'strategy' ? 'bg-cyan-500/10 text-cyan-400'
-                                                        : r.type === 'budget-plan' ? 'bg-amber-500/10 text-amber-400'
-                                                            : 'bg-emerald-500/10 text-emerald-400'
+                                                    : r.type === 'strategy' ? 'bg-[var(--sys-primary-dim)] text-primary'
+                                                        : r.type === 'budget-plan' ? 'bg-[var(--sys-primary-dim)] text-primary'
+                                                            : 'bg-[var(--sys-primary-dim)] text-primary'
                                                     }`}>
                                                     {r.type}
                                                 </span>
-                                                <span className="text-xs text-slate-500">{new Date(r.createdAt).toLocaleDateString()}</span>
+                                                <span className="text-xs text-[var(--sys-text-muted)]">{new Date(r.createdAt).toLocaleDateString()}</span>
                                             </div>
                                         </div>
-                                        <span className="material-symbols-outlined text-slate-600">chevron_right</span>
+                                        <span className="material-symbols-outlined text-[var(--sys-text-muted)]">chevron_right</span>
                                     </button>
                                 ))}
                             </div>
@@ -2416,37 +2416,37 @@ function PMHelpView({ onBack }) {
         <div>
             <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
-                    <button onClick={onBack} className="size-10 rounded-xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center hover:bg-white/[0.08] transition-all cursor-pointer">
-                        <span className="material-symbols-outlined text-slate-400">arrow_back</span>
+                    <button onClick={onBack} className="size-10 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] flex items-center justify-center hover:bg-[var(--sys-surface)] transition-all cursor-pointer">
+                        <span className="material-symbols-outlined text-[var(--sys-text-muted)]">arrow_back</span>
                     </button>
                     <div>
-                        <h2 className="text-white font-bold text-lg flex items-center gap-2">
+                        <h2 className="text-[var(--sys-text)] font-bold text-lg flex items-center gap-2">
                             <span className="material-symbols-outlined text-primary">menu_book</span> Performance Marketing Guide
                         </h2>
-                        <p className="text-sm text-slate-500">Master AI-powered ad strategies, campaigns, and optimization</p>
+                        <p className="text-sm text-[var(--sys-text-muted)]">Master AI-powered ad strategies, campaigns, and optimization</p>
                     </div>
                 </div>
             </div>
 
-            <div className="glass-panel rounded-2xl p-6 mb-6" style={{ background: 'linear-gradient(135deg, #8b5cf608, #3b82f608, #10b98108)' }}>
-                <h3 className="text-white font-bold mb-3 flex items-center gap-2"><span className="material-symbols-outlined text-primary">info</span> What is Performance Marketing Studio?</h3>
-                <p className="text-slate-400 text-sm leading-relaxed mb-4">
-                    Performance Marketing Studio is your <strong className="text-white">AI advertising command center</strong>.
-                    Run <strong className="text-white">competitor research</strong>, generate <strong className="text-white">AI strategies</strong>,
-                    create and manage <strong className="text-white">campaigns on Meta & Google</strong>,
-                    <strong className="text-white"> A/B test</strong> variations, and track <strong className="text-white">learnings</strong> —
-                    all powered by AI with your brand context. Plus <strong className="text-white">Grok-powered real-time trends</strong>.
+            <div className="glass-panel rounded-2xl p-6 mb-6" style={{ background: 'var(--sys-primary)' }}>
+                <h3 className="text-[var(--sys-text)] font-bold mb-3 flex items-center gap-2"><span className="material-symbols-outlined text-primary">info</span> What is Performance Marketing Studio?</h3>
+                <p className="text-[var(--sys-text-muted)] text-sm leading-relaxed mb-4">
+                    Performance Marketing Studio is your <strong className="text-[var(--sys-text)]">AI advertising command center</strong>.
+                    Run <strong className="text-[var(--sys-text)]">competitor research</strong>, generate <strong className="text-[var(--sys-text)]">AI strategies</strong>,
+                    create and manage <strong className="text-[var(--sys-text)]">campaigns on Meta & Google</strong>,
+                    <strong className="text-[var(--sys-text)]"> A/B test</strong> variations, and track <strong className="text-[var(--sys-text)]">learnings</strong> —
+                    all powered by AI with your brand context. Plus <strong className="text-[var(--sys-text)]">Grok-powered real-time trends</strong>.
                 </p>
                 <div className="flex flex-wrap gap-2">
                     {['Research', 'Strategy', 'Campaigns', 'A/B Tests', 'Learnings', 'Reports', 'Ad Creative', 'Grok Trends'].map(t => (
-                        <span key={t} className="px-3 py-1 rounded-full text-xs font-bold bg-white/[0.04] border border-white/[0.06] text-slate-400">{t}</span>
+                        <span key={t} className="px-3 py-1 rounded-full text-xs font-bold bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text-muted)]">{t}</span>
                     ))}
                 </div>
             </div>
 
             <div className="glass-panel rounded-2xl p-5 mb-6">
-                <h3 className="text-white font-bold mb-4 text-sm flex items-center gap-2">
-                    <span className="material-symbols-outlined text-amber-400 text-lg">account_tree</span> Typical Workflow
+                <h3 className="text-[var(--sys-text)] font-bold mb-4 text-sm flex items-center gap-2">
+                    <span className="material-symbols-outlined text-primary text-lg">account_tree</span> Typical Workflow
                 </h3>
                 <div className="flex items-center gap-0 overflow-x-auto pb-2">
                     {[
@@ -2462,7 +2462,7 @@ function PMHelpView({ onBack }) {
                                 <div className="size-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${step.color}15` }}>
                                     <span className="material-symbols-outlined text-lg" style={{ color: step.color }}>{step.icon}</span>
                                 </div>
-                                <p className="text-xs text-slate-400 text-center leading-tight font-medium">{step.label}</p>
+                                <p className="text-xs text-[var(--sys-text-muted)] text-center leading-tight font-medium">{step.label}</p>
                             </div>
                             {idx < arr.length - 1 && <span className="material-symbols-outlined text-slate-700 text-sm mx-1 shrink-0">chevron_right</span>}
                         </div>
@@ -2474,19 +2474,19 @@ function PMHelpView({ onBack }) {
                 {PM_HELP_SECTIONS.map(section => (
                     <div key={section.id} className="glass-panel rounded-2xl overflow-hidden">
                         <button onClick={() => setExpanded(expanded === section.id ? null : section.id)}
-                            className="w-full flex items-center gap-3 p-5 text-left hover:bg-white/[0.02] transition-all cursor-pointer">
+                            className="w-full flex items-center gap-3 p-5 text-left hover:bg-[var(--sys-surface)] transition-all cursor-pointer">
                             <div className="size-10 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: `${section.color}15` }}>
                                 <span className="material-symbols-outlined" style={{ color: section.color }}>{section.icon}</span>
                             </div>
                             <div className="flex-1 min-w-0">
-                                <p className="text-white font-bold text-sm">{section.title}</p>
-                                <p className="text-slate-500 text-xs">{section.subtitle}</p>
+                                <p className="text-[var(--sys-text)] font-bold text-sm">{section.title}</p>
+                                <p className="text-[var(--sys-text-muted)] text-xs">{section.subtitle}</p>
                             </div>
-                            <span className="text-xs text-slate-600 font-bold mr-1">{section.steps.length} topics</span>
-                            <span className={`material-symbols-outlined text-slate-500 transition-transform ${expanded === section.id ? 'rotate-180' : ''}`}>expand_more</span>
+                            <span className="text-xs text-[var(--sys-text-muted)] font-bold mr-1">{section.steps.length} topics</span>
+                            <span className={`material-symbols-outlined text-[var(--sys-text-muted)] transition-transform ${expanded === section.id ? 'rotate-180' : ''}`}>expand_more</span>
                         </button>
                         {expanded === section.id && (
-                            <div className="px-5 pb-5 space-y-3 border-t border-white/[0.04] pt-4">
+                            <div className="px-5 pb-5 space-y-3 border-t border-[var(--sys-border)] pt-4">
                                 {section.steps.map((step, idx) => (
                                     <div key={idx} className="flex gap-3">
                                         <div className="flex flex-col items-center">
@@ -2496,8 +2496,8 @@ function PMHelpView({ onBack }) {
                                             {idx < section.steps.length - 1 && <div className="w-px flex-1 mt-1" style={{ backgroundColor: `${section.color}20` }} />}
                                         </div>
                                         <div className="pb-3">
-                                            <p className="text-white font-bold text-sm mb-0.5">{step.title}</p>
-                                            <p className="text-slate-400 text-xs leading-relaxed">{step.description}</p>
+                                            <p className="text-[var(--sys-text)] font-bold text-sm mb-0.5">{step.title}</p>
+                                            <p className="text-[var(--sys-text-muted)] text-xs leading-relaxed">{step.description}</p>
                                         </div>
                                     </div>
                                 ))}
@@ -2507,23 +2507,23 @@ function PMHelpView({ onBack }) {
                 ))}
             </div>
 
-            <div className="glass-panel rounded-2xl p-6" style={{ background: 'linear-gradient(135deg, #f59e0b08, #ef444408)' }}>
-                <h3 className="text-white font-bold mb-4 flex items-center gap-2">
-                    <span className="material-symbols-outlined text-amber-400">emoji_objects</span> Pro Tips
+            <div className="glass-panel rounded-2xl p-6" style={{ background: 'var(--sys-primary)' }}>
+                <h3 className="text-[var(--sys-text)] font-bold mb-4 flex items-center gap-2">
+                    <span className="material-symbols-outlined text-primary">emoji_objects</span> Pro Tips
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {PM_PRO_TIPS.map((tip, idx) => (
-                        <div key={idx} className="flex gap-2.5 p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
+                        <div key={idx} className="flex gap-2.5 p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
                             <span className="text-lg shrink-0 mt-0.5">{tip.icon}</span>
-                            <p className="text-xs text-slate-400 leading-relaxed">{tip.tip}</p>
+                            <p className="text-xs text-[var(--sys-text-muted)] leading-relaxed">{tip.tip}</p>
                         </div>
                     ))}
                 </div>
             </div>
 
             <div className="text-center mt-6 py-6">
-                <p className="text-slate-500 text-sm mb-3">Ready to advertise?</p>
-                <button onClick={onBack} className="px-6 py-3 rounded-xl text-sm font-bold bg-gradient-to-r from-primary to-[#FF7A00] text-white cursor-pointer hover:shadow-lg hover:shadow-primary/20 transition-all flex items-center gap-2 mx-auto">
+                <p className="text-[var(--sys-text-muted)] text-sm mb-3">Ready to advertise?</p>
+                <button onClick={onBack} className="px-6 py-3 rounded-xl text-sm font-bold bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] cursor-pointer hover:shadow-lg hover:shadow-none transition-all flex items-center gap-2 mx-auto">
                     <span className="material-symbols-outlined text-sm">space_dashboard</span> Go to Dashboard
                 </button>
             </div>

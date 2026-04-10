@@ -9,6 +9,8 @@ import path from 'path';
 import { execSync } from 'child_process';
 import { searchWeb, searchBrandImages } from '../utils/searchManager.js';
 import Product from '../models/Product.js';
+import { callMultimodalAgent } from '../agents/shared/agentUtils.js';
+import { VISUAL_GROUNDING_PROMPT, POST_GENERATION_CRITIC_PROMPT } from '../agents/creativeStudio/prompts.js';
 
 const router = express.Router();
 
@@ -176,6 +178,23 @@ const CANVAS_TOOLS = [
             required: ['prompt'],
         },
     },
+    {
+        name: 'merge_images',
+        description: 'Merge two or more images on the canvas into a new AI-generated image. Use this when the user asks to blend, merge, or combine images.',
+        input_schema: {
+            type: 'object',
+            properties: {
+                prompt: { type: 'string', description: 'Detailed prompt describing how the images should be combined or what the final output should look like' },
+                imageNames: {
+                    type: 'array',
+                    items: { type: 'string' },
+                    description: 'Optional names of the images to merge if they are not specifically selected.'
+                },
+                position: { type: 'string', enum: ['center', 'top-center', 'bottom-center', 'top-left', 'top-right', 'bottom-left', 'bottom-right'], description: 'Where to place the merged image' },
+            },
+            required: ['prompt'],
+        },
+    },
 
     // ═══════════════════════════════════════════════════════════════
     // ── AGENTIC CANVAS TOOLS — Scripting, Storyboarding, Layout ──
@@ -339,7 +358,46 @@ const CANVAS_TOOLS = [
             },
             required: ['title', 'campaignType']
         }
-    }
+    },
+
+    // ═══════════════════════════════════════════════════════════════
+    // ── CAMPAIGN GENERATION — Multi-size batch generation ──
+    // ═══════════════════════════════════════════════════════════════
+    {
+        name: 'generate_campaign',
+        description: 'Generate the SAME creative across MULTIPLE platform sizes simultaneously. Use this when the user asks for a "campaign", wants creatives for "all platforms", or mentions multiple formats. This tool generates one AI image and then intelligently adapts it across all requested platform presets. Each variant is placed as a separate artboard on the canvas.',
+        input_schema: {
+            type: 'object',
+            properties: {
+                prompt: { type: 'string', description: 'The primary image generation prompt (will be adapted per format)' },
+                presets: {
+                    type: 'array',
+                    description: 'Array of platform presets to generate for',
+                    items: {
+                        type: 'string',
+                        enum: ['ig-post', 'ig-story', 'ig-reel', 'fb-post', 'linkedin', 'yt-thumb', 'twitter', 'carousel', 'banner'],
+                    },
+                },
+                headline: { type: 'string', description: 'Optional headline text to overlay on each variant' },
+                ctaText: { type: 'string', description: 'Optional CTA button text (e.g. "Shop Now")' },
+            },
+            required: ['prompt', 'presets'],
+        },
+    },
+    {
+        name: 'critique_image',
+        description: 'Run MCoT Post-Generation Critic on a generated image. Use this AFTER generate_image to verify quality and brand alignment. The backend analyzes the generated image using visual AI and returns a quality score, issues, and an improved prompt if needed. Use this when a user asks to "check quality", "review", or when you want to self-verify before presenting the result.',
+        input_schema: {
+            type: 'object',
+            properties: {
+                imageUrl: { type: 'string', description: 'URL of the generated image to critique' },
+                originalPrompt: { type: 'string', description: 'The prompt that was used to generate this image' },
+                brief: { type: 'string', description: 'The original user brief/request' },
+                productName: { type: 'string', description: 'Expected product name (if applicable)' },
+            },
+            required: ['imageUrl'],
+        },
+    },
 ];
 
 // ── POST /api/fidato/canvas-direct ──
@@ -363,29 +421,142 @@ router.post('/canvas-direct', protect, requireCredits('fidatoCanvas'), async (re
             brand.dna?.industry ? `Industry: ${brand.dna.industry}` : '',
             brand.dna?.country || brand.country ? `Market: ${brand.dna?.country || brand.country}` : 'Market: India',
             brand.dna?.targetMarkets?.length ? `Target Markets: ${brand.dna.targetMarkets.join(', ')}` : '',
-            brand.dna?.colors?.length ? `Brand Colors: ${brand.dna.colors.map(c => c.hex || c).join(', ')}` : '',
+            brand.dna?.colors?.length ? `Brand Colors: ${brand.dna.colors.map(c => `${c.name || c.usage || ''}:${c.hex || c}`).join(', ')}` : '',
             brand.dna?.fonts?.length ? `Brand Fonts: ${brand.dna.fonts.join(', ')}` : '',
             brand.dna?.logo?.url ? 'Brand logo: Available (use add_logo tool)' : 'Brand logo: Not uploaded',
+            brand.dna?.voice?.personality ? `Brand Voice: ${brand.dna.voice.personality}` : '',
+            brand.dna?.targetAudience ? `Target Audience: ${brand.dna.targetAudience}` : '',
         ].filter(Boolean).join('\n');
 
-        const systemPrompt = `You are Fidato, an autonomous AI creative director. You create professional ad films and campaigns with a clear, structured pipeline.
+        // ⚡ Detect edit type BEFORE building system prompt — simple edits get a leaner prompt
+        // to save ~1,500 tokens per request ($0.02-0.05 savings on Claude)
+        const needsResearch = /\b(ad|creative|campaign|video|film|promo|poster|post|storyboard|script)\b/i.test(message)
+            && !/\b(change|move|resize|delete|color|font|undo|redo)\b/i.test(message);
+
+        // ── CREATIVE MASTERY SECTIONS (only included for creative generation requests) ──
+        const creativeMasterySections = needsResearch ? `
+## YOUR 3 CREATIVE ROLES
+
+### 🎯 CREATIVE DIRECTOR — Strategic Vision
+You decode user briefs into crystal-clear creative strategies. Before touching any tool, you ALWAYS think:
+- **What's the ONE message?** Every great ad says ONE thing. Identify the single most powerful benefit/emotion.
+- **Who's the audience?** Speak to their desires, fears, or aspirations. NOT generic — specific.
+- **What's the hook?** The first 0.5 seconds must arrest attention. Lead with intrigue, not information.
+- **What's the emotional journey?** Great ads make you FEEL something: aspiration, belonging, urgency, delight.
+- **Campaign coherence**: Every element (image, text, color, font) must serve the same story.
+
+### 🎨 ART DIRECTOR — Visual Mastery
+You compose visuals with intention. Every pixel serves the story.
+
+**Composition Rules (ALWAYS apply):**
+- **Rule of Thirds**: Place the hero element at a power point (1/3 from edges), never dead center unless symmetry is the concept
+- **Visual Hierarchy**: Eye flows: Hero Image → Headline → Subtext → CTA. Size, contrast, and position guide this naturally
+- **Negative Space**: Don't fill every pixel. Premium = breathing room. Let the design BREATHE.
+- **Focal Point**: ONE dominant element per canvas. Everything else supports it.
+- **Z-Pattern / F-Pattern**: For text-heavy layouts, arrange elements along natural reading paths
+
+**Color Theory (apply using brand colors):**
+- **Primary brand color** → Hero backgrounds, brand elements, key visuals, large color blocks
+- **Secondary brand color** → CTA buttons, accent highlights, dividers, badges, underlines
+- **Dark/Neutral color** → Body text, subtle borders, section backgrounds
+- **High Contrast**: Headlines MUST contrast sharply against their background (light on dark or dark on light). Minimum contrast ratio: 4.5:1
+- **Color Harmony**: Use the brand palette intentionally — complementary for energy, analogous for sophistication, monochromatic for elegance
+- **70-20-10 Rule**: 70% dominant color, 20% secondary, 10% accent
+
+**Typography Hierarchy (when adding text):**
+- **Display/Hero**: 64-96px, weight 800-900, tight tracking (-2 to -1), brand primary font
+- **Heading**: 36-48px, weight 700, standard tracking
+- **Subheading**: 20-28px, weight 600, slightly wider tracking
+- **Body Copy**: 14-18px, weight 400, generous line height (1.5-1.6×)
+- **Caption/CTA**: 12-16px, weight 700, uppercase with wide tracking (+2 to +4) for CTAs
+- Font pairing: Use brand font for headlines + clean sans-serif (Inter, DM Sans) for body
+
+**Photography/Visual Style (for image prompts):**
+- **Product Hero**: Clean, floating product on gradient/solid background, dramatic lighting, shallow DOF. Best for: fashion, tech, beauty
+- **Lifestyle**: Product in real-world context with aspirational setting. Natural light, warm tones. Best for: D2C, food, wellness
+- **Flat Lay**: Top-down arrangement of product + complementary props on textured surface. Best for: beauty, food, accessories
+- **Cinematic**: Wide-angle, moody lighting, dramatic shadows, film grain. Best for: premium, luxury, automotive
+- **UGC-Style**: Candid, slightly imperfect, authentic feel. Warm filter, casual composition. Best for: Gen-Z, social media, D2C
+- **Editorial**: High-fashion, high-contrast, bold poses, striking colors. Best for: fashion, beauty, premium
+- ALWAYS inject brand colors and product features into image prompts. NEVER generate generic stock imagery.
+
+### ✍️ COPYWRITER — Words That Convert
+
+**Headline Formulas (choose based on objective):**
+- **Benefit-Led**: "[Product] that [transforms/delivers] [specific benefit]" → "Earbuds that silence the world"
+- **Curiosity**: "The [adjective] secret to [desirable outcome]" → "The quiet secret to 40-hour battery life"
+- **Social Proof**: "[Number] [people] already [action]" → "50,000 audiophiles already switched"
+- **Urgency**: "[Action] before [consequence/deadline]" → "Grab yours before midnight"
+- **Question**: "Still [pain point]?" → "Still tangled in wires?"
+- **Command**: "[Action verb] + [emotional benefit]" → "Unleash your sound"
+- Max headline length: 6-10 words. Every word must earn its place.
+
+**Copy Frameworks:**
+- **AIDA** (Attention → Interest → Desire → Action): Hook them, intrigue them, make them want it, tell them what to do
+- **PAS** (Problem → Agitate → Solution): Name the pain, twist the knife, present the product as relief
+- **BAB** (Before → After → Bridge): Paint the frustrating "before", the glorious "after", and position the product as the bridge
+
+**CTA Psychology:**
+- Use action verbs: "Shop", "Discover", "Grab", "Get", "Try", "Start"
+- Add urgency or scarcity: "Limited Drop", "Only 50 Left", "Ends Tonight"
+- Make it benefit-oriented: "Get 40hrs of Music" beats "Buy Now"
+- Keep CTAs 2-4 words max
+
+**Platform Voice Adaptation:**
+- **Instagram**: Punchy, visual-first, emoji-friendly, hashtag-ready. Short captions. Aspirational tone.
+- **LinkedIn**: Professional yet human, insight-driven, thought leadership angle. No emoji overload.
+- **YouTube**: Curiosity-driven thumbnails, bold text, expressive faces. Titles that promise value.
+- **Twitter/X**: Witty, concise, conversation-starting. Hot takes welcome. Max impact in min words.
+- **Facebook**: Community-oriented, slightly longer copy, benefit-focused. Works for older demographics.
+
+## STORYBOARD PROMPT MASTERY
+When calling create_storyboard_frames, compose imagePrompt like an elite art director:
+- ❌ Bad: "Product shot of earbuds"
+- ❌ Medium: "Black earbuds on a dark surface"
+- ✅ Great: "Cinematic close-up of matte black ACWO DwOTS wireless earbuds with metallic accents on a dark reflective surface, dramatic side lighting creating rim highlights, shallow depth of field, brand colors #1A1A2E and #6366F1 as ambient glow accents, premium product photography, 4K quality, studio lighting"
+- ALWAYS inject: brand colors, product material/finish from research, specific lighting direction, camera angle, mood keyword, and "4K quality, professional photography"
+- For scenes with PEOPLE: describe ethnicity, age, expression, wardrobe, pose, and setting specifically
+- For CONSISTENCY across scenes: repeat key visual elements (same color grading, same lighting style, same product positioning)
+
+## RESPONSE FORMAT FOR CREATIVE REQUESTS
+Start your reply with a <thinking> block:
+<thinking>
+CREATIVE STRATEGY:
+- Single message: [the ONE thing this ad communicates]
+- Emotional hook: [what feeling we're creating]
+- Visual direction: [composition style + lighting + color approach]
+- Copy angle: [which headline formula + copy framework + CTA approach]
+- Brand alignment: [how we're using brand colors, fonts, voice]
+</thinking>
+
+Then announce your plan briefly:
+"Here's my creative direction for the [Brand] [Product] ad:
+🎯 **Concept**: [one-line creative concept]
+1. ✅ Research completed (product details found)
+2. 📝 Writing ad script with [N] scenes
+3. 🎬 Generating [N] keyframe images ([composition style])
+4. 🎙️ Creating voiceover narration
+5. 🎵 Generating background music
+⏸️ Will pause for your review before video generation"
+
+Then call the tools for Phase 1 in order. After Phase 1 completes, STOP and ask user to confirm.
+` : ''; // ⚡ Simple edits skip all creative mastery sections (~1,500 tokens saved)
+
+        const systemPrompt = `You are Fidato — a world-class Creative Director, Art Director, and Senior Copywriter rolled into one AI. You think like the best minds at Ogilvy, Wieden+Kennedy, and Droga5. You don't just execute — you craft, you compose, you create work that stops scrolls and wins awards.
 
 BRAND CONTEXT:
 ${brandContext}
 ${canvasContext}
-
-## YOUR ROLE
-You are a creative director who receives a brief + brand data from the database (Brand DNA + Product catalog), then executes the full creative pipeline using your tools. Brand DNA data (description, USPs, product info, images) is ALREADY PROVIDED in this prompt — you do NOT need to search. Use what's given.
-
+${creativeMasterySections}
 ## PIPELINE — EXECUTE IN THIS EXACT ORDER
 
 ### For VIDEO ADS (any request mentioning "ad", "video", "film", "reel", "sec", "second"):
 
 **PHASE 1 — Creative Assets (execute immediately):**
-1. **create_script_block** — Write a professional ad script
-2. **create_storyboard_frames** — Generate keyframe images for each shot
+1. **create_script_block** — Write a professional ad script. Apply AIDA framework. Each scene needs a clear visual + emotional beat.
+2. **create_storyboard_frames** — Generate keyframe images. EVERY imagePrompt must include: brand colors, product details from research, specific lighting/composition style, camera angle, and mood.
 3. **generate_voiceover** — Create TTS narration (speaker: anushka for female, abhilash for male)
-4. **generate_music** — Create background music matching the ad's mood
+4. **generate_music** — Create background music matching the ad's mood and energy arc
 
 **⚠️ STOP HERE — After Phase 1, you MUST pause and ask the user:**
 "✅ Script, storyboard images, voiceover, and music are ready!
@@ -400,11 +571,42 @@ You are a creative director who receives a brief + brand data from the database 
 6. **compile_workspace_assets** — Stitch everything into the final ad film
 
 ### For IMAGE ADS (posters, social posts, creatives):
-1. **create_script_block** — Write ad copy with headline, body, CTA
-2. **create_storyboard_frames** — Generate the visual(s) with generateImages: true
+1. **create_script_block** — Write ad copy: a killer headline (6-10 words, benefit-led or curiosity-led), a sharp subline, and a CTA
+2. **create_storyboard_frames** — Generate the visual(s). Apply art direction: composition, focal point, brand colors in the prompt, product features from research. generateImages: true
+
+### For MULTI-PLATFORM CAMPAIGNS (user says "campaign", "all platforms", "multi-size", mentions multiple formats):
+1. **generate_campaign** — Generate the creative across ALL requested platform sizes in parallel
+   - Choose the appropriate presets from: ig-post, ig-story, fb-post, linkedin, yt-thumb, twitter, carousel, banner
+   - Each variant is auto-adapted for its platform's aspect ratio and composition rules
+   - Write platform-appropriate headline and ctaText (punchy for IG, professional for LinkedIn, curiosity for YT)
+
+### For QUALITY REVIEW (after image generation):
+- Use **critique_image** to run MCoT quality analysis on any generated image
+- This returns a quality score (0-100) with breakdown by brief alignment, product accuracy, visual quality, and brand consistency
+- If score < 75, consider regenerating with the improved prompt provided
 
 ### For SIMPLE EDITS (move, resize, color, font changes):
-Use add_text, add_shape, change_element_property, set_background directly.
+- **Repositioning**: Use **move_element** with position presets (center, top-left, top-right, bottom-left, bottom-right, top-center, bottom-center)
+- **Property changes**: Use **change_element_property** for left, top, scaleX, scaleY, fill, opacity, fontSize, fontFamily, fontWeight, text, angle
+- **Z-order**: Use **reorder_layer** to bring elements forward/backward
+- **Removing**: Use **remove_element** to delete an element
+- Use add_text, add_shape, set_background for adding new elements
+- ⚠️ NEVER use tool names like "update_layer" or "update_element" — these do NOT exist. Use the exact names listed above.
+
+### For IMAGE EDITING & MERGING (combine, blend, merge, edit images):
+- **Merging/Combining**: Use **merge_images** — it will automatically find and merge images on the canvas. You do NOT need the user to select images manually.
+  - If the canvas state shows 2+ image elements, merge_images will combine them automatically
+  - Pass specific image names via \`imageNames\` array if the user references specific images
+  - Always include a detailed \`prompt\` describing how the images should be combined
+- **Generating new images**: Use **generate_image** with a detailed prompt
+- **Editing existing images**: If user says "change the background", "add X to this image", etc. — first note which images are on canvas from the canvas state, then use generate_image with a prompt that describes the edit
+- ⚠️ NEVER use tool names like "edit_image", "swap_image", "replace_image" — these do NOT exist. Use merge_images or generate_image.
+
+## MCoT VISUAL GROUNDING
+If the research data below includes a "🧠 MCoT VISUAL GROUNDING" section, this means our AI has ALREADY analyzed the brand's actual product images. You MUST reference these observations in your prompts:
+- Use the exact colors, materials, and features described
+- Follow the "CRITICAL GENERATION GUIDANCE" instructions
+- Do NOT contradict the visual observations with invented features
 
 ## SCRIPT FORMAT
 When calling create_script_block, use this structure:
@@ -420,33 +622,13 @@ When calling create_script_block, use this structure:
   }
 }
 
-## STORYBOARD FORMAT  
-When calling create_storyboard_frames, make imagePrompt VERY detailed:
-- ❌ Bad: "Product shot of earbuds"
-- ✅ Good: "Cinematic close-up of matte black ACWO DwOTS wireless earbuds with metallic accents on a dark reflective surface, dramatic side lighting, shallow depth of field, premium product photography, 4K quality"
-
-## RESPONSE FORMAT
-Start your reply with a <thinking> block:
-<thinking>
-Brief creative strategy: what you learned from the research, your creative direction, and the pipeline you'll follow.
-</thinking>
-
-Then announce your plan briefly:
-"Here's my plan for the [Brand] [Product] ad:
-1. ✅ Research completed (product details found)
-2. 📝 Writing ad script with [N] scenes
-3. 🎬 Generating [N] keyframe images
-4. 🎙️ Creating voiceover narration
-5. 🎵 Generating background music
-⏸️ Will pause for your review before video generation"
-
-Then call the tools for Phase 1 in order. After Phase 1 completes, STOP and ask user to confirm.
-
 ## CRITICAL RULES
 - ALWAYS use research data provided — never make up product features
 - ALWAYS call create_script_block BEFORE create_storyboard_frames
-- Use brand colors when available
-- Be extremely detailed in storyboard image prompts
+- ALWAYS inject brand colors into image generation prompts (specify exact hex codes)
+- ALWAYS apply typography hierarchy when adding text elements (display → heading → body → caption sizing)
+- ALWAYS apply composition rules (rule of thirds, visual hierarchy, focal point)
+- Be extremely detailed in storyboard image prompts — follow the "STORYBOARD PROMPT MASTERY" format
 - For video ads: script scenes must include voiceover text and duration per scene
 - For voiceover: ONLY use speaker 'anushka' (female) or 'abhilash' (male). No other speakers.
 - NEVER just add plain text elements for ad requests — use the full pipeline
@@ -461,9 +643,7 @@ Then call the tools for Phase 1 in order. After Phase 1 completes, STOP and ask 
         let preFlightResearch = '';
         let referenceImages = [];
 
-        // Detect if the message mentions a brand/product that needs creative generation
-        const needsResearch = /\b(ad|creative|campaign|video|film|promo|poster|post|storyboard|script)\b/i.test(message)
-            && !/\b(change|move|resize|delete|color|font|undo|redo)\b/i.test(message);
+        // needsResearch already computed above (line ~431) for system prompt optimization
 
         // If user confirmed pre-flight data from a previous request, use it directly
         if (preflightResearchData) {
@@ -515,6 +695,75 @@ Then call the tools for Phase 1 in order. After Phase 1 completes, STOP and ask 
                 if (vdParts.length) preFlightResearch += `Visual DNA: ${vdParts.join(' | ')}\n`;
                 if (vd.designRules?.length) preFlightResearch += `Design Rules: ${vd.designRules.join('; ')}\n`;
                 if (vd.designAvoid?.length) preFlightResearch += `Avoid: ${vd.designAvoid.join('; ')}\n`;
+            }
+
+            // ── Creative Direction Hints (Art Director + Copywriter briefing pack) ──
+
+            // Brand Color Application Guide
+            if (dna.colors?.length >= 2) {
+                const primary = dna.colors[0];
+                const secondary = dna.colors[1];
+                const tertiary = dna.colors[2];
+                preFlightResearch += `\n## 🎨 COLOR APPLICATION GUIDE\n`;
+                preFlightResearch += `- PRIMARY (${primary.hex}): Use for hero backgrounds, large color blocks, brand text, key visuals\n`;
+                preFlightResearch += `- SECONDARY (${secondary.hex}): Use for CTA buttons, accent highlights, badges, underlines\n`;
+                if (tertiary) preFlightResearch += `- TERTIARY (${tertiary.hex}): Use for body text, subtle borders, section dividers\n`;
+                preFlightResearch += `- Apply 70-20-10 rule: 70% ${primary.hex}, 20% ${secondary.hex}, 10% accent\n`;
+                preFlightResearch += `- For IMAGE PROMPTS: always mention "${primary.hex} and ${secondary.hex} as ambient color accents" to ensure brand-consistent visuals\n`;
+            }
+
+            // Brand Voice Examples (derived from existing brand data)
+            if (dna.tagline || dna.uniqueSellingPoints?.length || dna.voice?.personality) {
+                preFlightResearch += `\n## ✍️ BRAND VOICE GUIDE\n`;
+                if (dna.voice?.personality) {
+                    preFlightResearch += `Tone: ${dna.voice.personality}\n`;
+                    preFlightResearch += `When writing copy, channel this tone. Example approaches:\n`;
+                    const tone = (dna.voice.personality || '').toLowerCase();
+                    if (tone.includes('professional') || tone.includes('corporate') || tone.includes('formal')) {
+                        preFlightResearch += `  - Use refined, authoritative language. Avoid slang. Lead with expertise and trust.\n`;
+                        preFlightResearch += `  - Headlines: Benefit-Led or Social Proof formulas work best\n`;
+                    } else if (tone.includes('playful') || tone.includes('fun') || tone.includes('casual') || tone.includes('friendly')) {
+                        preFlightResearch += `  - Use conversational, approachable language. Light humor welcome. Emojis OK for social.\n`;
+                        preFlightResearch += `  - Headlines: Question or Command formulas work best\n`;
+                    } else if (tone.includes('luxury') || tone.includes('premium') || tone.includes('sophisticated')) {
+                        preFlightResearch += `  - Use elegant, minimal language. Less is more. Evoke aspiration and exclusivity.\n`;
+                        preFlightResearch += `  - Headlines: Curiosity or Benefit-Led formulas work best\n`;
+                    } else if (tone.includes('bold') || tone.includes('edgy') || tone.includes('youthful') || tone.includes('gen-z')) {
+                        preFlightResearch += `  - Use punchy, direct language. Break conventions. Speak like a peer, not a brand.\n`;
+                        preFlightResearch += `  - Headlines: Command or Urgency formulas work best\n`;
+                    } else {
+                        preFlightResearch += `  - Match the "${dna.voice.personality}" tone in all copy. Be authentic to the brand's character.\n`;
+                    }
+                }
+                if (dna.tagline) {
+                    preFlightResearch += `Reference tagline for style: "${dna.tagline}"\n`;
+                }
+                if (dna.uniqueSellingPoints?.length) {
+                    preFlightResearch += `Key selling points to weave into copy: ${dna.uniqueSellingPoints.slice(0, 3).join(' | ')}\n`;
+                }
+            }
+
+            // Recommended Visual Style based on industry
+            if (dna.industry) {
+                preFlightResearch += `\n## 📸 RECOMMENDED VISUAL DIRECTION\n`;
+                const ind = (dna.industry || '').toLowerCase();
+                if (ind.includes('tech') || ind.includes('electronics') || ind.includes('software') || ind.includes('saas')) {
+                    preFlightResearch += `Industry "${dna.industry}" → Recommended: Product Hero or Cinematic style. Dark backgrounds, dramatic lighting, neon/tech accents. Clean, futuristic compositions.\n`;
+                } else if (ind.includes('fashion') || ind.includes('apparel') || ind.includes('clothing')) {
+                    preFlightResearch += `Industry "${dna.industry}" → Recommended: Editorial or Lifestyle style. Bold poses, striking colors, high-fashion lighting. Aspirational settings.\n`;
+                } else if (ind.includes('beauty') || ind.includes('cosmetic') || ind.includes('skincare')) {
+                    preFlightResearch += `Industry "${dna.industry}" → Recommended: Flat Lay or Product Hero style. Soft, diffused lighting. Dewy textures. Clean, minimal compositions with complementary props.\n`;
+                } else if (ind.includes('food') || ind.includes('beverage') || ind.includes('restaurant') || ind.includes('fmcg')) {
+                    preFlightResearch += `Industry "${dna.industry}" → Recommended: Lifestyle or Flat Lay style. Warm tones, natural light, appetizing compositions. Close-up textures.\n`;
+                } else if (ind.includes('health') || ind.includes('wellness') || ind.includes('fitness')) {
+                    preFlightResearch += `Industry "${dna.industry}" → Recommended: Lifestyle style. Natural light, warm tones, aspirational settings. Active, energetic compositions.\n`;
+                } else if (ind.includes('luxury') || ind.includes('jewelry') || ind.includes('premium')) {
+                    preFlightResearch += `Industry "${dna.industry}" → Recommended: Cinematic or Product Hero style. Rich textures, dramatic shadows, selective focus. Elegant, minimal compositions.\n`;
+                } else if (ind.includes('education') || ind.includes('edtech')) {
+                    preFlightResearch += `Industry "${dna.industry}" → Recommended: Lifestyle or UGC style. Bright, clean, approachable imagery. Diverse, relatable people in learning settings.\n`;
+                } else {
+                    preFlightResearch += `Industry "${dna.industry}" → Choose the visual style that best matches the brand's personality and target audience.\n`;
+                }
             }
 
             // ── Step 2: Search Product catalog for matching products ──
@@ -587,6 +836,57 @@ Then call the tools for Phase 1 in order. After Phase 1 completes, STOP and ask 
                 preFlightResearch += `\nUse these REAL product/brand images as visual references. These are pre-uploaded to S3 and ready to use.\n`;
             }
 
+            // ═══════════════════════════════════════════════════════════════
+            // MCoT Stage 1: VISUAL GROUNDING — Analyze product/brand images
+            // Runs in parallel with research compilation (~2-3s with Gemini Flash)
+            // Prevents product hallucination by giving Claude real visual facts
+            // ═══════════════════════════════════════════════════════════════
+            let visualGroundingResult = null;
+            const imageUrlsForGrounding = referenceImages
+                .filter(img => img.source === 'product-catalog' || img.source === 'brand-onboarding')
+                .map(img => img.url)
+                .slice(0, 4);
+
+            if (imageUrlsForGrounding.length > 0) {
+                console.log(`🧠 MCoT Canvas: Running visual grounding on ${imageUrlsForGrounding.length} images...`);
+                try {
+                    const groundingStart = Date.now();
+                    visualGroundingResult = await callMultimodalAgent(
+                        VISUAL_GROUNDING_PROMPT,
+                        [
+                            `CREATIVE BRIEF: ${message}`,
+                            `BRAND: ${brand.name || 'Unknown'}`,
+                            brand.dna?.industry ? `INDUSTRY: ${brand.dna.industry}` : '',
+                            `\nAnalyze the ${imageUrlsForGrounding.length} provided image(s) and produce your visual rationale.`,
+                        ].filter(Boolean).join('\n'),
+                        imageUrlsForGrounding,
+                        { temperature: 0.2, maxTokens: 1024 }
+                    );
+
+                    if (visualGroundingResult && !visualGroundingResult.error) {
+                        console.log(`🧠 MCoT Canvas: Visual grounding complete in ${Date.now() - groundingStart}ms — confidence: ${visualGroundingResult.confidence || 'unknown'}`);
+                        
+                        // Inject visual grounding into pre-flight research
+                        preFlightResearch += `\n## 🧠 MCoT VISUAL GROUNDING (AI analyzed your actual product/brand images)\n`;
+                        if (visualGroundingResult.productAnalysis) preFlightResearch += `Product Analysis: ${visualGroundingResult.productAnalysis}\n`;
+                        if (visualGroundingResult.keyVisualFeatures?.length) preFlightResearch += `Key Visual Features: ${visualGroundingResult.keyVisualFeatures.join(', ')}\n`;
+                        if (visualGroundingResult.colorPalette?.length) preFlightResearch += `Accurate Colors: ${visualGroundingResult.colorPalette.join(', ')}\n`;
+                        if (visualGroundingResult.materialFinish) preFlightResearch += `Material & Finish: ${visualGroundingResult.materialFinish}\n`;
+                        if (visualGroundingResult.brandAesthetic) preFlightResearch += `Brand Aesthetic: ${visualGroundingResult.brandAesthetic}\n`;
+                        if (visualGroundingResult.generationGuidance) preFlightResearch += `⚠️ CRITICAL GENERATION GUIDANCE: ${visualGroundingResult.generationGuidance}\n`;
+                        if (visualGroundingResult.avoidList?.length) preFlightResearch += `DO NOT: ${visualGroundingResult.avoidList.join('; ')}\n`;
+                        preFlightResearch += `\n⚠️ USE THIS VISUAL INTELLIGENCE: When generating images, Claude MUST reference these real visual observations. Do NOT invent product features, colors, or materials that contradict this analysis.\n`;
+                    } else {
+                        console.warn(`🧠 MCoT Canvas: Visual grounding skipped (${visualGroundingResult?.error || 'no result'})`);
+                    }
+                } catch (groundingErr) {
+                    console.warn(`🧠 MCoT Canvas: Visual grounding failed (non-blocking): ${groundingErr.message}`);
+                    // Non-blocking — pipeline continues without grounding
+                }
+            } else {
+                console.log(`🧠 MCoT Canvas: No product images for visual grounding — skipping`);
+            }
+
             console.log(`   ✅ Brand DNA research: ${preFlightResearch.length} chars, ${referenceImages.length} images`);
 
             // ── Return pre-flight results for user confirmation ──
@@ -596,6 +896,7 @@ Then call the tools for Phase 1 in order. After Phase 1 completes, STOP and ask 
                 reply: '',
                 research: preFlightResearch || '(No brand data found)',
                 referenceImages: referenceImages,
+                visualGrounding: visualGroundingResult || null,
                 productName: productKeywords,
                 toolCalls: [],
                 tokensUsed: 0,
@@ -607,6 +908,10 @@ Then call the tools for Phase 1 in order. After Phase 1 completes, STOP and ask 
         const enrichedSystemPrompt = preFlightResearch
             ? systemPrompt + preFlightResearch
             : systemPrompt;
+
+        // Filter out server-side tools — Claude doesn't need search_web anymore
+        // Declared outside try/catch so it's accessible in the Gemini fallback catch block
+        const clientTools = CANVAS_TOOLS.filter(t => t.name !== 'search_web' && t.name !== 'download_brand_assets');
 
         try {
             const anthropic = aiRouter.getProvider('anthropic');
@@ -622,17 +927,14 @@ Then call the tools for Phase 1 in order. After Phase 1 completes, STOP and ask 
                 userPrompt = `Previous conversation:\n${historyContext}\n\nUser's latest request: ${message}`;
             }
 
-            // Filter out server-side tools — Claude doesn't need search_web anymore
-            const clientTools = CANVAS_TOOLS.filter(t => t.name !== 'search_web' && t.name !== 'download_brand_assets');
-
             result = await anthropic.generateWithTools({
                 systemPrompt: enrichedSystemPrompt,
                 userPrompt,
                 tools: clientTools,
                 toolHandlers: {}, // No server-side tools needed — research done pre-flight
                 temperature: 0.5,
-                maxTokens: 8192,
-                model: 'claude-3-opus-20240229',
+                maxTokens: 4096,
+                model: 'claude-3-5-sonnet-20240620',
             });
 
             // Attach reference images to response
@@ -643,12 +945,19 @@ Then call the tools for Phase 1 in order. After Phase 1 completes, STOP and ask 
             console.warn(`   ⚠️ Claude tool-use failed: ${claudeErr.message?.substring(0, 100)}`);
 
             // Fallback: use regular text generation to suggest what to do
+            // IMPORTANT: List EXACT tool names to prevent hallucinated tool names like "update_layer"
+            const validToolNames = clientTools.map(t => t.name).join(', ');
             const fallbackResult = await aiRouter.generateText({
                 systemPrompt: `You are Fidato, an AI creative director. The user wants to modify their canvas. Since tool-use is unavailable, respond with a JSON object containing "actions" — an array of canvas actions the frontend should execute.
 ${brandContext}
 ${canvasContext}
 
-Respond ONLY with valid JSON: { "reply": "friendly message", "actions": [{ "tool": "add_text|add_shape|add_logo|set_background|...", "args": {...} }] }`,
+VALID TOOLS (you MUST only use these exact names — NO other tool names):
+${validToolNames}
+
+For repositioning elements, use "move_element" with { position: "center" | "top-left" | etc. } or "change_element_property" with { property: "left" | "top", value: "number" }.
+
+Respond ONLY with valid JSON: { "reply": "friendly message", "actions": [{ "tool": "EXACT_TOOL_NAME_FROM_LIST", "args": {...} }] }`,
                 userPrompt: message,
                 maxTokens: 2048,
                 temperature: 0.5,
@@ -667,10 +976,18 @@ Respond ONLY with valid JSON: { "reply": "friendly message", "actions": [{ "tool
                     provider: fallbackResult.provider,
                     generationTime: Date.now() - startTime,
                 });
-            } catch {
+            } catch (parseErr) {
+                console.warn('⚠️ Fallback JSON parsing failed:', parseErr.message);
+                
+                // If text contains a JSON block, don't show it to the user. Provide a clean apology.
+                let cleanReply = fallbackResult.text || 'I can help with your canvas design. Could you be more specific?';
+                if (cleanReply.includes('```json') || cleanReply.includes('"actions":')) {
+                   cleanReply = "I planned some updates for your canvas, but encountered an unexpected error formatting them. Could you try asking me to make that change again?";
+                }
+
                 return res.json({
                     success: true,
-                    reply: fallbackResult.text || 'I can help with your canvas design. Could you be more specific?',
+                    reply: cleanReply,
                     toolCalls: [],
                     fallback: true,
                     provider: fallbackResult.provider,
@@ -703,6 +1020,7 @@ Respond ONLY with valid JSON: { "reply": "friendly message", "actions": [{ "tool
             toolCalls: result.toolCalls,
             referenceImages: referenceImages || [],
             research: preFlightResearch || '',
+            visualGrounding: req._visualGrounding || null,
             tokensUsed: result.tokensUsed,
             provider: 'anthropic',
             generationTime: Date.now() - startTime,
@@ -1067,6 +1385,129 @@ router.post('/canvas-compile', protect, async (req, res) => {
     } catch (err) {
         console.error('Canvas compile error:', err.message);
         res.status(500).json({ error: err.message || 'Video compilation failed' });
+    }
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// POST /api/fidato/canvas-critique — MCoT Post-Generation Critic
+// Analyzes a generated image for quality, brand alignment, and accuracy
+// ═══════════════════════════════════════════════════════════════════════
+router.post('/canvas-critique', protect, requireCredits('creativeCritique'), async (req, res) => {
+    try {
+        const { imageUrl, originalPrompt, brief, productName, brandContext: clientBrandContext } = req.body;
+        if (!imageUrl) return res.status(400).json({ error: 'imageUrl is required' });
+
+        console.log(`🔎 MCoT Canvas Critic: Analyzing generated image...`);
+        const startTime = Date.now();
+
+        const brand = req.brand || {};
+        const brandName = brand.name || 'Unknown';
+
+        const userPrompt = [
+            brief ? `ORIGINAL CREATIVE BRIEF: ${brief}` : '',
+            originalPrompt ? `GENERATED WITH PROMPT: ${originalPrompt.substring(0, 500)}` : '',
+            `BRAND: ${brandName}${brand.dna?.industry ? ` (${brand.dna.industry})` : ''}`,
+            productName ? `EXPECTED PRODUCT: "${productName}"` : 'No specific product expected',
+            `\nAnalyze the generated image (provided) against these requirements. Score it honestly.`,
+        ].filter(Boolean).join('\n');
+
+        const result = await callMultimodalAgent(
+            POST_GENERATION_CRITIC_PROMPT,
+            userPrompt,
+            [imageUrl],
+            { temperature: 0.2, maxTokens: 2048 }
+        );
+
+        if (result.error || result.skipped) {
+            console.warn(`🔎 MCoT Canvas Critic: Failed (${result.error})`);
+            return res.json({ success: true, critique: null, error: result.error });
+        }
+
+        console.log(`🔎 MCoT Canvas Critic: Score ${result.overallScore}/100, verdict: ${result.verdict} (${Date.now() - startTime}ms)`);
+
+        res.json({
+            success: true,
+            critique: result,
+            generationTime: Date.now() - startTime,
+        });
+    } catch (err) {
+        console.error('Canvas critique error:', err.message);
+        res.status(500).json({ error: err.message || 'Critique failed' });
+    }
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// POST /api/fidato/canvas-campaign — Multi-size campaign generation
+// Generates images across multiple platform presets in parallel
+// ═══════════════════════════════════════════════════════════════════════
+router.post('/canvas-campaign', protect, requireCredits('creativeCampaign'), async (req, res) => {
+    try {
+        const { prompt, presets, headline, ctaText, brandId } = req.body;
+        if (!prompt?.trim()) return res.status(400).json({ error: 'Prompt is required' });
+        if (!presets?.length) return res.status(400).json({ error: 'At least one preset is required' });
+
+        console.log(`🎯 Canvas Campaign: Generating ${presets.length} variants — "${prompt.substring(0, 60)}..."`);
+        const startTime = Date.now();
+
+        // Preset dimensions map
+        const PRESET_MAP = {
+            'ig-post':   { w: 1080, h: 1350, label: 'Instagram Post',  aspectRatio: '4:5' },
+            'ig-story':  { w: 1080, h: 1920, label: 'Instagram Story', aspectRatio: '9:16' },
+            'ig-reel':   { w: 1080, h: 1920, label: 'Instagram Reel',  aspectRatio: '9:16' },
+            'fb-post':   { w: 1080, h: 1350, label: 'Facebook Post',   aspectRatio: '4:5' },
+            'linkedin':  { w: 1200, h: 1200, label: 'LinkedIn Post',   aspectRatio: '1:1' },
+            'yt-thumb':  { w: 1280, h: 720,  label: 'YouTube Thumb',   aspectRatio: '16:9' },
+            'twitter':   { w: 1200, h: 675,  label: 'Twitter/X Post',  aspectRatio: '16:9' },
+            'carousel':  { w: 1080, h: 1080, label: 'Carousel Slide',  aspectRatio: '1:1' },
+            'banner':    { w: 1920, h: 600,  label: 'Web Banner',      aspectRatio: '16:5' },
+        };
+
+        // Build campaign variants with adapted prompts
+        const variants = presets.map(preset => {
+            const spec = PRESET_MAP[preset] || PRESET_MAP['ig-post'];
+            let adaptedPrompt = prompt;
+            
+            // Adapt prompt for aspect ratio
+            if (spec.aspectRatio === '9:16') {
+                adaptedPrompt += '. Vertical composition, subject centered with room above and below.';
+            } else if (spec.aspectRatio === '16:9') {
+                adaptedPrompt += '. Wide cinematic composition, subject positioned using rule of thirds.';
+            } else if (spec.aspectRatio === '16:5') {
+                adaptedPrompt += '. Ultra-wide panoramic banner composition, subject left-aligned with text space right.';
+            }
+            
+            // Inject text overlay instructions
+            if (headline) {
+                adaptedPrompt += ` Bold text reading "${headline}" in clean, high-contrast typography.`;
+            }
+            if (ctaText) {
+                adaptedPrompt += ` Include a CTA button/badge with "${ctaText}" in accent color at bottom.`;
+            }
+
+            return {
+                preset,
+                label: spec.label,
+                width: spec.w,
+                height: spec.h,
+                aspectRatio: spec.aspectRatio,
+                prompt: adaptedPrompt,
+            };
+        });
+
+        res.json({
+            success: true,
+            campaign: {
+                variants,
+                totalFormats: variants.length,
+                headline: headline || null,
+                ctaText: ctaText || null,
+            },
+            generationTime: Date.now() - startTime,
+            message: `Campaign plan ready with ${variants.length} platform variants. The frontend will generate images for each.`,
+        });
+    } catch (err) {
+        console.error('Canvas campaign error:', err.message);
+        res.status(500).json({ error: err.message || 'Campaign generation failed' });
     }
 });
 

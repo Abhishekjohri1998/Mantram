@@ -22,7 +22,7 @@ import {
     fetchPostAnalytics
 } from '../services/socialService.js';
 import config from '../config/env.js';
-import { uploadToS3, mirrorUrlToS3 } from '../utils/s3.js';
+import { uploadToS3, mirrorUrlToS3, getSignedUrlIfNeeded } from '../utils/s3.js';
 import { safeErrorMessage } from '../utils/safeError.js';
 
 const router = express.Router();
@@ -608,6 +608,11 @@ router.post('/publish', protect, async (req, res) => {
             }
         }
 
+        const resultsWithSignedIndices = results.map(r => ({
+            ...r,
+            // (The published postId is returned, but the UI might want the signed URL)
+        }));
+
         res.json({ success: true, results });
 
     } catch (error) {
@@ -732,7 +737,17 @@ router.get('/posts/history', protect, async (req, res) => {
             .sort({ createdAt: -1 })
             .limit(parseInt(req.query.limit) || 100);
 
-        res.json({ success: true, posts });
+        // Sign S3 URLs in history results
+        const signedPosts = await Promise.all(posts.map(async (pt) => {
+            const p = pt.toObject();
+            if (p.imageUrl) p.imageUrl = await getSignedUrlIfNeeded(p.imageUrl);
+            if (p.imageUrls) {
+                p.imageUrls = await Promise.all(p.imageUrls.map(u => getSignedUrlIfNeeded(u)));
+            }
+            return p;
+        }));
+
+        res.json({ success: true, posts: signedPosts });
     } catch (error) {
         console.error('Post history error:', error);
         res.status(500).json({ success: false, error: 'Server error fetching post history' });

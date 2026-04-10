@@ -107,6 +107,12 @@ export default function SuperAdminDashboard() {
     const [switchingImageProvider, setSwitchingImageProvider] = useState(null)
     const [addImageProviderForm, setAddImageProviderForm] = useState(null)
     const [editImageProviderData, setEditImageProviderData] = useState(null)
+    // LLM Provider Switching state
+    const [llmProviders, setLlmProviders] = useState(null)
+    const [llmCategories, setLlmCategories] = useState({})
+    const [switchingLlmProvider, setSwitchingLlmProvider] = useState(null)
+    const [addLlmProviderForm, setAddLlmProviderForm] = useState(null)
+    const [editLlmProviderData, setEditLlmProviderData] = useState(null)
     // Credit Packs management
     const [creditPacksList, setCreditPacksList] = useState([])
     const [showPackForm, setShowPackForm] = useState(false)
@@ -120,7 +126,7 @@ export default function SuperAdminDashboard() {
     const [userStudioModal, setUserStudioModal] = useState(null)
 
     if (user?.role !== 'superadmin') {
-        return <DashboardLayout><div className="flex items-center justify-center h-screen"><div className="text-center"><span className="material-symbols-outlined text-6xl text-rose-500 mb-4">shield</span><h2 className="text-2xl font-bold text-white mb-2">Access Denied</h2><p className="text-slate-500">Super Admin access required</p></div></div></DashboardLayout>
+        return <DashboardLayout><div className="flex items-center justify-center h-screen"><div className="text-center"><span className="material-symbols-outlined text-6xl text-primary mb-4">shield</span><h2 className="text-2xl font-bold text-[var(--sys-text)] mb-2">Access Denied</h2><p className="text-[var(--sys-text-muted)]">Super Admin access required</p></div></div></DashboardLayout>
     }
 
     const showToast = (msg, type = 'success') => { setToast({ msg, type }); setTimeout(() => setToast(null), 3000) }
@@ -251,6 +257,14 @@ export default function SuperAdminDashboard() {
     const handleAddImageProvider = async () => { if (!addImageProviderForm?.modelId || !addImageProviderForm?.providerId || !addImageProviderForm?.providerName) return showToast('Fill all required fields', 'error'); try { const d = await API.addImageProvider(addImageProviderForm); showToast(d.message || 'Provider added'); setAddImageProviderForm(null); loadImageProviders() } catch (e) { showToast(e.error || e.message || 'Failed', 'error') } }
     const handleRemoveImageProvider = async (modelId, providerId) => { if (!confirm(`Remove provider "${providerId}" from this model?`)) return; try { const d = await API.removeImageProvider({ modelId, providerId }); showToast(d.message || 'Provider removed'); loadImageProviders() } catch (e) { showToast(e.error || e.message || 'Failed', 'error') } }
     const handleEditImageProvider = async () => { if (!editImageProviderData) return; try { const { modelId, providerId, ...updates } = editImageProviderData; const d = await API.modifyImageProvider({ modelId, providerId, updates }); showToast(d.message || 'Provider updated'); setEditImageProviderData(null); loadImageProviders() } catch (e) { showToast(e.error || e.message || 'Failed', 'error') } }
+    
+    // LLM Provider Management
+    const loadLlmProviders = async () => { try { const d = await API.getLlmProviders(); setLlmProviders(d.models || []); setLlmCategories(d.categories || {}) } catch (e) { console.error('Failed to load LLM providers:', e) } }
+    const handleSwitchLlmProvider = async (modelId, provider) => { setSwitchingLlmProvider(`${modelId}-${provider}`); try { const d = await API.updateLlmProvider({ modelId, provider }); showToast(d.message || 'Provider switched'); loadLlmProviders() } catch (e) { showToast(e.error || e.message || 'Failed to switch provider', 'error') } finally { setSwitchingLlmProvider(null) } }
+    const handleAddLlmProvider = async () => { if (!addLlmProviderForm?.modelId || !addLlmProviderForm?.providerId || !addLlmProviderForm?.providerName) return showToast('Fill all required fields', 'error'); try { const d = await API.addLlmProvider(addLlmProviderForm); showToast(d.message || 'Provider added'); setAddLlmProviderForm(null); loadLlmProviders() } catch (e) { showToast(e.error || e.message || 'Failed', 'error') } }
+    const handleRemoveLlmProvider = async (modelId, providerId) => { if (!confirm(`Remove provider "${providerId}" from this model?`)) return; try { const d = await API.removeLlmProvider({ modelId, providerId }); showToast(d.message || 'Provider removed'); loadLlmProviders() } catch (e) { showToast(e.error || e.message || 'Failed', 'error') } }
+    const handleEditLlmProvider = async () => { if (!editLlmProviderData) return; try { const { modelId, providerId, ...updates } = editLlmProviderData; const d = await API.modifyLlmProvider({ modelId, providerId, updates }); showToast(d.message || 'Provider updated'); setEditLlmProviderData(null); loadLlmProviders() } catch (e) { showToast(e.error || e.message || 'Failed', 'error') } }
+
     // Watermark functions
     const handleWatermarkLogoUpload = async (e) => { const file = e.target.files?.[0]; if (!file) return; const reader = new FileReader(); reader.onload = async (ev) => { const dataUrl = ev.target.result; setWatermarkLogoPreview(dataUrl); try { const d = await API.uploadWatermarkLogo(dataUrl); showToast('Watermark logo uploaded'); loadSettings() } catch (err) { showToast(err.error || 'Upload failed', 'error') } }; reader.readAsDataURL(file) }
     const handleWatermarkSettingsUpdate = async (updates) => { try { await API.updateWatermarkSettings(updates); showToast('Watermark settings updated'); loadSettings() } catch (e) { showToast(e.error || 'Failed', 'error') } }
@@ -434,8 +448,8 @@ export default function SuperAdminDashboard() {
     const Card = ({ icon, color, value, label }) => (
         <div className="glass-panel rounded-2xl p-5">
             <span className={`material-symbols-outlined text-2xl mb-3 block ${color}`}>{icon}</span>
-            <p className="text-3xl font-extrabold text-white">{typeof value === 'number' ? value.toLocaleString() : value}</p>
-            <p className="text-sm text-slate-500 mt-1">{label}</p>
+            <p className="text-3xl font-extrabold text-[var(--sys-text)]">{typeof value === 'number' ? value.toLocaleString() : value}</p>
+            <p className="text-sm text-[var(--sys-text-muted)] mt-1">{label}</p>
         </div>
     )
 
@@ -443,18 +457,18 @@ export default function SuperAdminDashboard() {
         <DashboardLayout>
             <SEOHead title="Super Admin — Mantram AI" noIndex={true} />
             <div>
-                {toast && <div className={`fixed top-6 right-6 z-50 px-4 py-3 rounded-xl text-sm font-bold shadow-xl ${toast.type === 'error' ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'}`}>{toast.msg}</div>}
+                {toast && <div className={`fixed top-6 right-6 z-50 px-4 py-3 rounded-xl text-sm font-bold shadow-xl ${toast.type === 'error' ? 'bg-[var(--sys-primary-dim)] text-primary border border-[var(--sys-border)]' : 'bg-[var(--sys-primary-dim)] text-primary border border-[var(--sys-border)]'}`}>{toast.msg}</div>}
 
                 {/* Per-User Studio Access Modal */}
                 {userStudioModal && (
-                    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setUserStudioModal(null)}>
-                        <div className="w-full max-w-lg bg-[#0e1025] border border-white/[0.08] rounded-2xl shadow-2xl p-6 max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+                    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[var(--sys-surface)] " onClick={() => setUserStudioModal(null)}>
+                        <div className="w-full max-w-lg bg-[#0e1025] border border-[var(--sys-border)] rounded-2xl shadow-2xl p-6 max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
                             <div className="flex items-center justify-between mb-6">
                                 <div>
-                                    <h3 className="text-lg font-bold text-white flex items-center gap-2"><span className="material-symbols-outlined text-[#FF4D00]">shield_person</span>Studio Access</h3>
-                                    <p className="text-sm text-slate-500 mt-1">{userStudioModal.userName} ({userStudioModal.userEmail}) — {userStudioModal.userPlan} plan</p>
+                                    <h3 className="text-lg font-bold text-[var(--sys-text)] flex items-center gap-2"><span className="material-symbols-outlined text-[#FF4D00]">shield_person</span>Studio Access</h3>
+                                    <p className="text-sm text-[var(--sys-text-muted)] mt-1">{userStudioModal.userName} ({userStudioModal.userEmail}) — {userStudioModal.userPlan} plan</p>
                                 </div>
-                                <button onClick={() => setUserStudioModal(null)} className="p-2 rounded-lg hover:bg-white/[0.08] text-slate-500 cursor-pointer"><span className="material-symbols-outlined">close</span></button>
+                                <button onClick={() => setUserStudioModal(null)} className="p-2 rounded-lg hover:bg-[var(--sys-surface)] text-[var(--sys-text-muted)] cursor-pointer"><span className="material-symbols-outlined">close</span></button>
                             </div>
                             <div className="space-y-2">
                                 {(userStudioModal.studioKeys || studioKeys).map(key => {
@@ -466,16 +480,16 @@ export default function SuperAdminDashboard() {
                                     const isHidden = portalStatus === 'hidden';
 
                                     let statusBadge, statusColor, statusIcon;
-                                    if (isHidden) { statusBadge = 'Hidden (global)'; statusColor = 'text-rose-400'; statusIcon = 'lock'; }
-                                    else if (hasOverride && overrideVal === true) { statusBadge = 'Granted'; statusColor = 'text-emerald-400'; statusIcon = 'check_circle'; }
-                                    else if (hasOverride && overrideVal === false) { statusBadge = 'Revoked'; statusColor = 'text-rose-400'; statusIcon = 'cancel'; }
-                                    else if (portalStatus === 'private') { statusBadge = 'Private (no access)'; statusColor = 'text-amber-400'; statusIcon = 'lock_person'; }
-                                    else { statusBadge = 'Plan (public)'; statusColor = 'text-emerald-400'; statusIcon = 'public'; }
+                                    if (isHidden) { statusBadge = 'Hidden (global)'; statusColor = 'text-primary'; statusIcon = 'lock'; }
+                                    else if (hasOverride && overrideVal === true) { statusBadge = 'Granted'; statusColor = 'text-primary'; statusIcon = 'check_circle'; }
+                                    else if (hasOverride && overrideVal === false) { statusBadge = 'Revoked'; statusColor = 'text-primary'; statusIcon = 'cancel'; }
+                                    else if (portalStatus === 'private') { statusBadge = 'Private (no access)'; statusColor = 'text-primary'; statusIcon = 'lock_person'; }
+                                    else { statusBadge = 'Plan (public)'; statusColor = 'text-primary'; statusIcon = 'public'; }
 
                                     return (
-                                        <div key={key} className={`flex items-center justify-between px-4 py-3 rounded-xl ${resolved ? 'bg-white/[0.02]' : 'bg-rose-500/5'} border border-white/[0.06]`}>
+                                        <div key={key} className={`flex items-center justify-between px-4 py-3 rounded-xl ${resolved ? 'bg-[var(--sys-surface)]' : 'bg-[var(--sys-primary-dim)]'} border border-[var(--sys-border)]`}>
                                             <div>
-                                                <p className="text-sm font-bold text-white">{label}</p>
+                                                <p className="text-sm font-bold text-[var(--sys-text)]">{label}</p>
                                                 <p className={`text-xs flex items-center gap-1 ${statusColor}`}>
                                                     <span className="material-symbols-outlined text-[11px]">{statusIcon}</span>
                                                     {statusBadge}
@@ -484,14 +498,14 @@ export default function SuperAdminDashboard() {
                                             {!isHidden && (
                                                 <div className="flex gap-1">
                                                     <button onClick={() => handleUserStudioOverride(key, true)}
-                                                        className={`px-2.5 py-1 rounded-lg text-xs font-bold cursor-pointer transition-all ${hasOverride && overrideVal === true ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' : 'text-slate-600 hover:text-emerald-400 border border-transparent'}`}
+                                                        className={`px-2.5 py-1 rounded-lg text-xs font-bold cursor-pointer transition-all ${hasOverride && overrideVal === true ? 'bg-[var(--sys-primary-dim)] text-primary border border-[var(--sys-border)]' : 'text-[var(--sys-text-muted)] hover:text-primary border border-transparent'}`}
                                                     >Grant</button>
                                                     <button onClick={() => handleUserStudioOverride(key, false)}
-                                                        className={`px-2.5 py-1 rounded-lg text-xs font-bold cursor-pointer transition-all ${hasOverride && overrideVal === false ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40' : 'text-slate-600 hover:text-rose-400 border border-transparent'}`}
+                                                        className={`px-2.5 py-1 rounded-lg text-xs font-bold cursor-pointer transition-all ${hasOverride && overrideVal === false ? 'bg-[var(--sys-primary-dim)] text-primary border border-[var(--sys-border)]' : 'text-[var(--sys-text-muted)] hover:text-primary border border-transparent'}`}
                                                     >Revoke</button>
                                                     {hasOverride && (
                                                         <button onClick={() => handleUserStudioOverride(key, null)}
-                                                            className="px-2.5 py-1 rounded-lg text-xs font-bold cursor-pointer text-slate-600 hover:text-amber-400 border border-transparent"
+                                                            className="px-2.5 py-1 rounded-lg text-xs font-bold cursor-pointer text-[var(--sys-text-muted)] hover:text-primary border border-transparent"
                                                         >Reset</button>
                                                     )}
                                                 </div>
@@ -510,13 +524,13 @@ export default function SuperAdminDashboard() {
                     {/* Sidebar Navigation */}
                     <div className={`${sidebarCollapsed ? 'w-14' : 'w-56'} flex-shrink-0 transition-all duration-300`}>
                         <div className="sticky top-4">
-                            <button onClick={() => setSidebarCollapsed(!sidebarCollapsed)} className="w-full flex items-center justify-center mb-3 p-1.5 rounded-lg bg-white/[0.03] hover:bg-white/[0.06] text-slate-500 cursor-pointer transition-all">
+                            <button onClick={() => setSidebarCollapsed(!sidebarCollapsed)} className="w-full flex items-center justify-center mb-3 p-1.5 rounded-lg bg-[var(--sys-surface)] hover:bg-[var(--sys-surface)] text-[var(--sys-text-muted)] cursor-pointer transition-all">
                                 <span className="material-symbols-outlined text-sm">{sidebarCollapsed ? 'chevron_right' : 'chevron_left'}</span>
                             </button>
                             {navGroups.map(group => (
                                 <div key={group.label} className="mb-4">
                                     {!sidebarCollapsed && (
-                                        <p className="text-[9px] font-black uppercase tracking-widest text-slate-600 px-3 mb-1.5">
+                                        <p className="text-[9px] font-black uppercase tracking-widest text-[var(--sys-text-muted)] px-3 mb-1.5">
                                             {group.label}
                                         </p>
                                     )}
@@ -527,14 +541,14 @@ export default function SuperAdminDashboard() {
                                             title={sidebarCollapsed ? item.label : ''}
                                             className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all mb-0.5 cursor-pointer ${
                                                 tab === item.id
-                                                    ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/20'
-                                                    : 'text-slate-500 hover:text-white hover:bg-white/[0.04]'
+                                                    ? 'bg-[var(--sys-surface)] text-black shadow-none'
+                                                    : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)]'
                                             }`}
                                         >
                                             <span className="material-symbols-outlined text-sm">{item.icon}</span>
                                             {!sidebarCollapsed && <span className="flex-1 text-left truncate">{item.label}</span>}
                                             {item.badge > 0 && (
-                                                <span className="min-w-[16px] h-[16px] flex items-center justify-center rounded-full bg-rose-500 text-white text-[9px] font-black px-1">
+                                                <span className="min-w-[16px] h-[16px] flex items-center justify-center rounded-full bg-[var(--sys-surface)] text-[var(--sys-text)] text-[9px] font-black px-1">
                                                     {item.badge > 99 ? '99+' : item.badge}
                                                 </span>
                                             )}
@@ -552,48 +566,48 @@ export default function SuperAdminDashboard() {
                     <div className="mb-6">
                         <div className="flex items-center justify-between mb-4">
                             <div>
-                                <h1 className="text-2xl font-extrabold text-white tracking-tight flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-amber-400 text-2xl">shield_person</span>
+                                <h1 className="text-2xl font-extrabold text-[var(--sys-text)] tracking-tight flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-primary text-2xl">shield_person</span>
                                     Super Admin
                                 </h1>
-                                <p className="text-slate-500 text-xs mt-0.5">Platform management & operations</p>
+                                <p className="text-[var(--sys-text-muted)] text-xs mt-0.5">Platform management & operations</p>
                             </div>
                         </div>
 
                         {/* ─── VIEW AS USER — Command Bar ─── */}
                         <div className="relative">
-                            <div className="flex items-center gap-3 bg-white/[0.03] rounded-xl border border-white/[0.06] px-4 py-2.5 focus-within:border-amber-500/30 transition-all">
-                                <span className="material-symbols-outlined text-amber-400 text-lg">person_search</span>
+                            <div className="flex items-center gap-3 bg-[var(--sys-surface)] rounded-xl border border-[var(--sys-border)] px-4 py-2.5 focus-within:border-[var(--sys-border)] transition-all">
+                                <span className="material-symbols-outlined text-primary text-lg">person_search</span>
                                 <input
                                     type="text"
                                     placeholder="Search user by name or email → View as User..."
                                     value={impersonateSearch}
                                     onChange={e => setImpersonateSearch(e.target.value)}
-                                    className="flex-1 bg-transparent text-sm text-white placeholder-slate-500 outline-none"
+                                    className="flex-1 bg-transparent text-sm text-[var(--sys-text)] placeholder-slate-500 outline-none"
                                 />
-                                {impersonateLoading && <span className="material-symbols-outlined text-sm animate-spin text-slate-500">progress_activity</span>}
-                                <span className="text-[9px] text-slate-600 bg-white/[0.04] px-2 py-1 rounded font-mono">⌘K</span>
+                                {impersonateLoading && <span className="material-symbols-outlined text-sm animate-spin text-[var(--sys-text-muted)]">progress_activity</span>}
+                                <span className="text-[9px] text-[var(--sys-text-muted)] bg-[var(--sys-surface)] px-2 py-1 rounded font-mono">⌘K</span>
                             </div>
                             {/* Results Dropdown */}
                             {impersonateResults.length > 0 && impersonateSearch.length >= 2 && (
-                                <div className="absolute top-full left-0 right-0 mt-1 bg-[#08080C]/95 border border-white/[0.08] rounded-xl shadow-2xl shadow-black/40 overflow-hidden z-40 backdrop-blur-xl">
+                                <div className="absolute top-full left-0 right-0 mt-1 bg-[#08080C]/95 border border-[var(--sys-border)] rounded-xl shadow-none overflow-hidden z-40 ">
                                     {impersonateResults.map(u => (
-                                        <div key={u._id} className="flex items-center gap-3 px-4 py-3 hover:bg-white/[0.04] transition-all cursor-pointer group" onClick={() => { handleImpersonate(u._id, u.name); setImpersonateSearch(''); setImpersonateResults([]) }}>
-                                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-500 to-rose-500 flex items-center justify-center text-white text-xs font-black">
+                                        <div key={u._id} className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--sys-surface)] transition-all cursor-pointer group" onClick={() => { handleImpersonate(u._id, u.name); setImpersonateSearch(''); setImpersonateResults([]) }}>
+                                            <div className="w-8 h-8 rounded-full bg-[var(--sys-surface)] border border-[var(--sys-border)] flex items-center justify-center text-[var(--sys-text)] text-xs font-black">
                                                 {u.name?.charAt(0)?.toUpperCase() || '?'}
                                             </div>
                                             <div className="flex-1 min-w-0">
-                                                <p className="text-sm font-bold text-white truncate">{u.name}</p>
-                                                <p className="text-[10px] text-slate-500 truncate">{u.email}</p>
+                                                <p className="text-sm font-bold text-[var(--sys-text)] truncate">{u.name}</p>
+                                                <p className="text-[10px] text-[var(--sys-text-muted)] truncate">{u.email}</p>
                                             </div>
                                             <div className="flex items-center gap-2">
-                                                <span className="text-[9px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 font-bold">{u.plan || 'free'}</span>
-                                                <span className="text-[10px] text-slate-500">{u.credits?.balance || 0} cr</span>
-                                                <span className="material-symbols-outlined text-base text-amber-400 opacity-0 group-hover:opacity-100 transition-all">login</span>
+                                                <span className="text-[9px] px-2 py-0.5 rounded-full bg-[var(--sys-primary-dim)] text-primary font-bold">{u.plan || 'free'}</span>
+                                                <span className="text-[10px] text-[var(--sys-text-muted)]">{u.credits?.balance || 0} cr</span>
+                                                <span className="material-symbols-outlined text-base text-primary opacity-0 group-hover:opacity-100 transition-all">login</span>
                                             </div>
                                         </div>
                                     ))}
-                                    <div className="px-4 py-2 border-t border-white/[0.06] text-[9px] text-slate-600">
+                                    <div className="px-4 py-2 border-t border-[var(--sys-border)] text-[9px] text-[var(--sys-text-muted)]">
                                         Click user to impersonate • See exactly what they see
                                     </div>
                                 </div>
@@ -603,15 +617,15 @@ export default function SuperAdminDashboard() {
 
                     {/* Impersonation Warning Banner */}
                     {user?.isImpersonated && (
-                        <div className="mb-6 p-4 rounded-2xl bg-gradient-to-r from-amber-500 to-rose-500 shadow-lg shadow-amber-500/20 flex items-center justify-between">
+                        <div className="mb-6 p-4 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] shadow-none flex items-center justify-between">
                             <div className="flex items-center gap-3">
-                                <span className="material-symbols-outlined text-white text-2xl">error</span>
+                                <span className="material-symbols-outlined text-[var(--sys-text)] text-2xl">error</span>
                                 <div>
-                                    <p className="text-white font-black text-sm uppercase tracking-wider">Active Impersonation Session</p>
-                                    <p className="text-white/80 text-xs">You are currently viewing the platform as <strong>{user.name}</strong>. All actions are logged.</p>
+                                    <p className="text-[var(--sys-text)] font-black text-sm uppercase tracking-wider">Active Impersonation Session</p>
+                                    <p className="text-[var(--sys-text)]/80 text-xs">You are currently viewing the platform as <strong>{user.name}</strong>. All actions are logged.</p>
                                 </div>
                             </div>
-                            <button onClick={handleExitImpersonation} className="px-4 py-2 bg-white text-rose-500 rounded-xl text-xs font-black uppercase hover:bg-slate-100 transition-all cursor-pointer flex items-center gap-2">
+                            <button onClick={handleExitImpersonation} className="px-4 py-2 bg-white text-primary rounded-xl text-xs font-black uppercase hover:bg-slate-100 transition-all cursor-pointer flex items-center gap-2">
                                 <span className="material-symbols-outlined text-sm">arrow_back</span>
                                 Back to SuperAdmin
                             </button>
@@ -621,25 +635,25 @@ export default function SuperAdminDashboard() {
                 {/* ════════════ OVERVIEW ════════════ */}
                 {tab === 'overview' && (
                     <div>
-                        {loading ? <div className="flex items-center justify-center py-20 text-slate-500"><span className="material-symbols-outlined animate-spin mr-2">progress_activity</span>Loading...</div> : stats && (
+                        {loading ? <div className="flex items-center justify-center py-20 text-[var(--sys-text-muted)]"><span className="material-symbols-outlined animate-spin mr-2">progress_activity</span>Loading...</div> : stats && (
                             <>
                                 <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-5">
                                     <Card icon="group" color="text-[#FF4D00]" value={stats.totalUsers} label="Users" />
                                     <Card icon="branding_watermark" color="text-[#FF4D00]" value={stats.totalBrands} label="Brands" />
-                                    <Card icon="article" color="text-emerald-400" value={stats.totalContent} label="Content" />
+                                    <Card icon="article" color="text-primary" value={stats.totalContent} label="Content" />
                                     <Card icon="image" color="text-[#FF7A00]" value={stats.totalCreatives} label="Creatives" />
-                                    <Card icon="inventory_2" color="text-cyan-400" value={stats.totalProducts} label="Products" />
+                                    <Card icon="inventory_2" color="text-primary" value={stats.totalProducts} label="Products" />
                                 </div>
 
                                 {/* API Wallet / Provider Health Summary (Promoted to Overview) */}
                                 {tokenData?.providerWallets && (
                                     <div className="mb-6">
                                         <div className="flex items-center justify-between mb-4">
-                                            <h4 className="text-sm font-black text-white flex items-center gap-2 uppercase tracking-tighter">
-                                                <span className="material-symbols-outlined text-amber-400 text-lg">account_balance_wallet</span>
+                                            <h4 className="text-sm font-black text-[var(--sys-text)] flex items-center gap-2 uppercase tracking-tighter">
+                                                <span className="material-symbols-outlined text-primary text-lg">account_balance_wallet</span>
                                                 API Provider Wallet (Real-time)
                                             </h4>
-                                            <button onClick={() => setTab('tokenUsage')} className="text-[10px] font-bold text-amber-500 hover:text-amber-400 transition-all flex items-center gap-1 cursor-pointer">
+                                            <button onClick={() => setTab('tokenUsage')} className="text-[10px] font-bold text-primary hover:text-primary transition-all flex items-center gap-1 cursor-pointer">
                                                 Full Analytics <span className="material-symbols-outlined text-sm">arrow_forward</span>
                                             </button>
                                         </div>
@@ -648,18 +662,18 @@ export default function SuperAdminDashboard() {
                                                 if (w.budget === 0 && w.consumed === 0) return null;
                                                 const remaining = Math.max(0, w.budget - w.consumed);
                                                 const isLow = w.budget > 0 && (remaining / w.budget) < 0.15;
-                                                const colors = { anthropic: 'text-orange-400', openai: 'text-emerald-400', gemini: 'text-[#FF4D00]', xai: 'text-slate-200', grok: 'text-slate-200', sarvam: 'text-rose-400' };
-                                                const bgHighlights = { anthropic: 'border-orange-500/10', openai: 'border-emerald-500/10', gemini: 'border-[#FF4D00]/10', xai: 'border-slate-500/10', grok: 'border-slate-500/10', sarvam: 'border-rose-500/10' };
+                                                const colors = { anthropic: 'text-[var(--sys-primary)]', openai: 'text-primary', gemini: 'text-[#FF4D00]', xai: 'text-[var(--sys-text)]', grok: 'text-[var(--sys-text)]', sarvam: 'text-primary' };
+                                                const bgHighlights = { anthropic: 'border-[var(--sys-border)]', openai: 'border-[var(--sys-border)]', gemini: 'border-[#FF4D00]/10', xai: 'border-[var(--sys-border)]', grok: 'border-[var(--sys-border)]', sarvam: 'border-[var(--sys-border)]' };
                                                 
                                                 return (
-                                                    <div key={w.provider} className={`glass-panel border-white/[0.04] rounded-xl p-3 flex flex-col justify-between transition-all ${isLow ? 'bg-amber-500/10 border-amber-500/30' : 'bg-white/[0.01]'}`}>
+                                                    <div key={w.provider} className={`glass-panel border-[var(--sys-border)] rounded-xl p-3 flex flex-col justify-between transition-all ${isLow ? 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)]' : 'bg-[var(--sys-surface)]'}`}>
                                                         <div className="flex items-center justify-between gap-2 mb-2">
-                                                            <p className={`text-[10px] font-black uppercase tracking-widest truncate ${colors[w.provider] || 'text-slate-400'}`}>{w.provider === 'xai' ? 'Grok (xAI)' : w.provider}</p>
-                                                            {isLow && <span className="material-symbols-outlined text-amber-500 text-xs animate-pulse">warning</span>}
+                                                            <p className={`text-[10px] font-black uppercase tracking-widest truncate ${colors[w.provider] || 'text-[var(--sys-text-muted)]'}`}>{w.provider === 'xai' ? 'Grok (xAI)' : w.provider}</p>
+                                                            {isLow && <span className="material-symbols-outlined text-primary text-xs animate-pulse">warning</span>}
                                                         </div>
                                                         <div>
-                                                            <p className="text-lg font-black text-white tracking-tighter">${remaining.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</p>
-                                                            <p className="text-[9px] text-slate-500 font-bold uppercase tracking-tighter">Remaining</p>
+                                                            <p className="text-lg font-black text-[var(--sys-text)] tracking-tighter">${remaining.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</p>
+                                                            <p className="text-[9px] text-[var(--sys-text-muted)] font-bold uppercase tracking-tighter">Remaining</p>
                                                         </div>
                                                     </div>
                                                 );
@@ -669,83 +683,83 @@ export default function SuperAdminDashboard() {
                                 )}
                                 <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
                                     <div className="glass-panel rounded-2xl p-5">
-                                        <div className="flex items-center gap-2 mb-2"><span className="material-symbols-outlined text-amber-400">payments</span><span className="text-sm font-bold text-white">Revenue</span></div>
-                                        <p className="text-2xl font-extrabold text-amber-400">₹{(stats.totalRevenue || 0).toLocaleString()}</p>
-                                        <p className="text-xs text-slate-600 mt-1">{stats.totalSubscriptions} active subs</p>
+                                        <div className="flex items-center gap-2 mb-2"><span className="material-symbols-outlined text-primary">payments</span><span className="text-sm font-bold text-[var(--sys-text)]">Revenue</span></div>
+                                        <p className="text-2xl font-extrabold text-primary">₹{(stats.totalRevenue || 0).toLocaleString()}</p>
+                                        <p className="text-xs text-[var(--sys-text-muted)] mt-1">{stats.totalSubscriptions} active subs</p>
                                     </div>
                                     <div className="glass-panel rounded-2xl p-5">
-                                        <div className="flex items-center gap-2 mb-2"><span className="material-symbols-outlined text-cyan-400">token</span><span className="text-sm font-bold text-white">Credits Used</span></div>
-                                        <p className="text-2xl font-extrabold text-cyan-400">{(stats.totalCreditsUsed || 0).toLocaleString()}</p>
+                                        <div className="flex items-center gap-2 mb-2"><span className="material-symbols-outlined text-primary">token</span><span className="text-sm font-bold text-[var(--sys-text)]">Credits Used</span></div>
+                                        <p className="text-2xl font-extrabold text-primary">{(stats.totalCreditsUsed || 0).toLocaleString()}</p>
                                     </div>
                                     <div className="glass-panel rounded-2xl p-5">
-                                        <div className="flex items-center gap-2 mb-2"><span className="material-symbols-outlined text-emerald-400">hub</span><span className="text-sm font-bold text-white">Integrations</span></div>
-                                        <p className="text-2xl font-extrabold text-emerald-400">{stats.totalIntegrations}</p>
+                                        <div className="flex items-center gap-2 mb-2"><span className="material-symbols-outlined text-primary">hub</span><span className="text-sm font-bold text-[var(--sys-text)]">Integrations</span></div>
+                                        <p className="text-2xl font-extrabold text-primary">{stats.totalIntegrations}</p>
                                     </div>
                                     <div className="glass-panel rounded-2xl p-5">
-                                        <div className="flex items-center gap-2 mb-2"><span className="material-symbols-outlined text-rose-400">rate_review</span><span className="text-sm font-bold text-white">AI Feedback</span></div>
-                                        <p className="text-2xl font-extrabold text-rose-400">{stats.totalFeedback}</p>
+                                        <div className="flex items-center gap-2 mb-2"><span className="material-symbols-outlined text-primary">rate_review</span><span className="text-sm font-bold text-[var(--sys-text)]">AI Feedback</span></div>
+                                        <p className="text-2xl font-extrabold text-primary">{stats.totalFeedback}</p>
                                     </div>
                                     <div className="glass-panel rounded-2xl p-5 border border-[#FF4D00]/10">
-                                        <div className="flex items-center gap-2 mb-2"><span className="material-symbols-outlined text-[#FF4D00]">trending_up</span><span className="text-sm font-bold text-white">Retention Rate</span></div>
+                                        <div className="flex items-center gap-2 mb-2"><span className="material-symbols-outlined text-[#FF4D00]">trending_up</span><span className="text-sm font-bold text-[var(--sys-text)]">Retention Rate</span></div>
                                         <p className="text-2xl font-extrabold text-[#FF4D00]">{stats.usageAnalytics?.retentionRate || '0%'}</p>
-                                        <p className="text-xs text-slate-600 mt-1">{stats.usageAnalytics?.churnedUsersCount || 0} churned (20d+)</p>
+                                        <p className="text-xs text-[var(--sys-text-muted)] mt-1">{stats.usageAnalytics?.churnedUsersCount || 0} churned (20d+)</p>
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
                                     <div className="glass-panel rounded-2xl p-5">
-                                        <h3 className="font-bold text-white text-sm mb-3 flex items-center gap-2"><span className="material-symbols-outlined text-primary text-lg">pie_chart</span>Plan Distribution</h3>
+                                        <h3 className="font-bold text-[var(--sys-text)] text-sm mb-3 flex items-center gap-2"><span className="material-symbols-outlined text-primary text-lg">pie_chart</span>Plan Distribution</h3>
                                         <div className="flex gap-3">{(stats.planDistribution || []).map(p => (
                                             <div key={p._id || 'none'} className="flex-1 glass-panel rounded-xl p-3 text-center">
-                                                <p className="text-xl font-extrabold text-white">{p.count}</p>
-                                                <p className="text-xs font-bold mt-1 capitalize text-slate-400">{p._id || 'None'}</p>
+                                                <p className="text-xl font-extrabold text-[var(--sys-text)]">{p.count}</p>
+                                                <p className="text-xs font-bold mt-1 capitalize text-[var(--sys-text-muted)]">{p._id || 'None'}</p>
                                             </div>
                                         ))}</div>
                                     </div>
                                     <div className="glass-panel rounded-2xl p-5">
-                                        <h3 className="font-bold text-white text-sm mb-3 flex items-center gap-2"><span className="material-symbols-outlined text-emerald-400 text-lg">bar_chart</span>Content by Type</h3>
+                                        <h3 className="font-bold text-[var(--sys-text)] text-sm mb-3 flex items-center gap-2"><span className="material-symbols-outlined text-primary text-lg">bar_chart</span>Content by Type</h3>
                                         <div className="space-y-2">{(stats.contentByType || []).map(c => (
                                             <div key={c._id} className="flex items-center justify-between">
-                                                <span className="text-sm text-slate-400 capitalize">{c._id}</span>
+                                                <span className="text-sm text-[var(--sys-text-muted)] capitalize">{c._id}</span>
                                                 <div className="flex items-center gap-2">
-                                                    <div className="w-24 h-1.5 rounded-full bg-white/[0.06]"><div className="h-full rounded-full bg-primary" style={{ width: `${Math.min(100, (c.count / Math.max(1, stats.totalContent)) * 100)}%` }} /></div>
-                                                    <span className="text-sm font-bold text-white w-6 text-right">{c.count}</span>
+                                                    <div className="w-24 h-1.5 rounded-full bg-[var(--sys-surface)]"><div className="h-full rounded-full bg-primary" style={{ width: `${Math.min(100, (c.count / Math.max(1, stats.totalContent)) * 100)}%` }} /></div>
+                                                    <span className="text-sm font-bold text-[var(--sys-text)] w-6 text-right">{c.count}</span>
                                                 </div>
                                             </div>
                                         ))}</div>
                                     </div>
                                 </div>
                                 <div className="glass-panel rounded-2xl p-5">
-                                    <h3 className="font-bold text-white text-sm mb-3 flex items-center gap-2"><span className="material-symbols-outlined text-[#FF4D00] text-lg">group</span>Recent Users</h3>
+                                    <h3 className="font-bold text-[var(--sys-text)] text-sm mb-3 flex items-center gap-2"><span className="material-symbols-outlined text-[#FF4D00] text-lg">group</span>Recent Users</h3>
                                     <div className="space-y-1">{(stats.recentUsers || []).map(u => (
-                                        <div key={u._id} className="flex items-center justify-between p-2.5 rounded-xl hover:bg-white/[0.03] transition-all">
+                                        <div key={u._id} className="flex items-center justify-between p-2.5 rounded-xl hover:bg-[var(--sys-surface)] transition-all">
                                             <div className="flex items-center gap-3">
                                                 <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center text-primary text-xs font-bold">{u.name?.[0]?.toUpperCase()}</div>
-                                                <div><p className="text-sm font-bold text-white">{u.name}</p><p className="text-xs text-slate-600">{u.email}</p></div>
+                                                <div><p className="text-sm font-bold text-[var(--sys-text)]">{u.name}</p><p className="text-xs text-[var(--sys-text-muted)]">{u.email}</p></div>
                                             </div>
                                             <div className="flex items-center gap-4">
                                                 <div className="text-right">
-                                                    <p className="text-xs font-bold text-white mb-1">{u.credits?.used || 0} / {u.credits?.total + (u.credits?.bonus || 0)} used</p>
-                                                    <div className="w-24 h-1 rounded-full bg-white/[0.06]">
+                                                    <p className="text-xs font-bold text-[var(--sys-text)] mb-1">{u.credits?.used || 0} / {u.credits?.total + (u.credits?.bonus || 0)} used</p>
+                                                    <div className="w-24 h-1 rounded-full bg-[var(--sys-surface)]">
                                                         <div
-                                                            className={`h-full rounded-full ${((u.credits?.used || 0) / (u.credits?.total + (u.credits?.bonus || 0))) > 0.9 ? 'bg-rose-500' : 'bg-primary'}`}
+                                                            className={`h-full rounded-full ${((u.credits?.used || 0) / (u.credits?.total + (u.credits?.bonus || 0))) > 0.9 ? 'bg-[var(--sys-surface)]' : 'bg-primary'}`}
                                                             style={{ width: `${Math.min(100, ((u.credits?.used || 0) / (u.credits?.total + (u.credits?.bonus || 0))) * 100)}%` }}
                                                         />
                                                     </div>
                                                 </div>
                                                 <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${
-                                                    (u.approvalStatus === 'approved') ? 'bg-emerald-500/10 text-emerald-500' :
-                                                    (u.approvalStatus === 'rejected') ? 'bg-rose-500/10 text-rose-500' :
-                                                    'bg-amber-500/10 text-amber-500'
+                                                    (u.approvalStatus === 'approved') ? 'bg-[var(--sys-primary-dim)] text-primary' :
+                                                    (u.approvalStatus === 'rejected') ? 'bg-[var(--sys-primary-dim)] text-primary' :
+                                                    'bg-[var(--sys-primary-dim)] text-primary'
                                                 }`}>
                                                     {u.approvalStatus || 'pending'}
                                                 </span>
                                                 <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${
-                                                    u.plan === 'enterprise' ? 'bg-amber-500/15 text-amber-400' : 
+                                                    u.plan === 'enterprise' ? 'bg-[var(--sys-primary-dim)] text-primary' : 
                                                     u.plan === 'professional' ? 'bg-[#FF4D00]/15 text-[#FF4D00]' : 
-                                                    u.plan === 'test' ? 'bg-rose-500/15 text-rose-400' :
-                                                    'bg-slate-500/15 text-slate-400'
+                                                    u.plan === 'test' ? 'bg-[var(--sys-primary-dim)] text-primary' :
+                                                    'bg-[var(--sys-border)]/15 text-[var(--sys-text-muted)]'
                                                 }`}>Plan: {u.plan}</span>
-                                                <span className="text-xs text-slate-600">{new Date(u.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' })}</span>
+                                                <span className="text-xs text-[var(--sys-text-muted)]">{new Date(u.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' })}</span>
                                             </div>
                                         </div>
                                     ))}</div>
@@ -754,38 +768,38 @@ export default function SuperAdminDashboard() {
                                 {/* AI Usage Insights */}
                                 {stats.usageAnalytics && (
                                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 mt-5">
-                                        <div className="lg:col-span-1 glass-panel rounded-2xl p-5 border border-rose-500/10">
-                                            <h3 className="font-bold text-white text-sm mb-4 flex items-center gap-2">
-                                                <span className="material-symbols-outlined text-rose-500 text-lg">error</span>
+                                        <div className="lg:col-span-1 glass-panel rounded-2xl p-5 border border-[var(--sys-border)]">
+                                            <h3 className="font-bold text-[var(--sys-text)] text-sm mb-4 flex items-center gap-2">
+                                                <span className="material-symbols-outlined text-primary text-lg">error</span>
                                                 Quota Alerts
                                             </h3>
                                             <div className="space-y-3">
-                                                <div className="flex items-center justify-between p-3 rounded-xl bg-rose-500/5 border border-rose-500/10">
+                                                <div className="flex items-center justify-between p-3 rounded-xl bg-[var(--sys-primary-dim)] border border-[var(--sys-border)]">
                                                     <div className="flex items-center gap-2">
-                                                        <span className="material-symbols-outlined text-rose-500">block</span>
-                                                        <span className="text-sm font-bold text-white">Full Exhaustion</span>
+                                                        <span className="material-symbols-outlined text-primary">block</span>
+                                                        <span className="text-sm font-bold text-[var(--sys-text)]">Full Exhaustion</span>
                                                     </div>
-                                                    <span className="text-lg font-black text-rose-500">{stats.usageAnalytics.exhaustedCount}</span>
+                                                    <span className="text-lg font-black text-primary">{stats.usageAnalytics.exhaustedCount}</span>
                                                 </div>
-                                                <div className="flex items-center justify-between p-3 rounded-xl bg-amber-500/5 border border-amber-500/10">
+                                                <div className="flex items-center justify-between p-3 rounded-xl bg-[var(--sys-primary-dim)] border border-[var(--sys-border)]">
                                                     <div className="flex items-center gap-2">
-                                                        <span className="material-symbols-outlined text-amber-500">warning</span>
-                                                        <span className="text-sm font-bold text-white">Near Exhaustion (&gt;90%)</span>
+                                                        <span className="material-symbols-outlined text-primary">warning</span>
+                                                        <span className="text-sm font-bold text-[var(--sys-text)]">Near Exhaustion (&gt;90%)</span>
                                                     </div>
-                                                    <span className="text-lg font-black text-amber-500">{stats.usageAnalytics.nearEmptyCount}</span>
+                                                    <span className="text-lg font-black text-primary">{stats.usageAnalytics.nearEmptyCount}</span>
                                                 </div>
                                             </div>
                                         </div>
 
                                         <div className="lg:col-span-2 glass-panel rounded-2xl p-5 border border-primary/10">
-                                            <h3 className="font-bold text-white text-sm mb-4 flex items-center gap-2">
+                                            <h3 className="font-bold text-[var(--sys-text)] text-sm mb-4 flex items-center gap-2">
                                                 <span className="material-symbols-outlined text-primary text-lg">leaderboard</span>
                                                 Top AI Consumers (Leaderboard)
                                             </h3>
                                             <div className="overflow-x-auto">
                                                 <table className="w-full text-left min-w-[500px]">
                                                     <thead>
-                                                        <tr className="text-[10px] text-slate-500 font-bold uppercase tracking-wider border-b border-white/[0.04]">
+                                                        <tr className="text-[10px] text-[var(--sys-text-muted)] font-bold uppercase tracking-wider border-b border-[var(--sys-border)]">
                                                             <th className="pb-2">User</th>
                                                             <th className="pb-2">Plan</th>
                                                             <th className="pb-2 text-right">Credits Used</th>
@@ -794,16 +808,16 @@ export default function SuperAdminDashboard() {
                                                     </thead>
                                                     <tbody className="divide-y divide-white/[0.04]">
                                                         {(stats.usageAnalytics.topUsers || []).map(u => (
-                                                            <tr key={u._id} className="text-sm group hover:bg-white/[0.02] transition-all">
+                                                            <tr key={u._id} className="text-sm group hover:bg-[var(--sys-surface)] transition-all">
                                                                 <td className="py-2.5">
                                                                     <div className="flex items-center gap-2">
                                                                         <div className="w-6 h-6 rounded bg-primary/10 flex items-center justify-center text-[10px] font-bold text-primary">{u.name?.[0]}</div>
-                                                                        <div><p className="font-bold text-white text-xs">{u.name}</p><p className="text-[10px] text-slate-600">{u.email}</p></div>
+                                                                        <div><p className="font-bold text-[var(--sys-text)] text-xs">{u.name}</p><p className="text-[10px] text-[var(--sys-text-muted)]">{u.email}</p></div>
                                                                     </div>
                                                                 </td>
-                                                                <td className="py-2.5"><span className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-white/[0.05] text-slate-400 capitalize">{u.plan}</span></td>
-                                                                <td className="py-2.5 text-right font-bold text-white">{u.credits?.used?.toLocaleString()}</td>
-                                                                <td className="py-2.5 text-right font-bold text-emerald-400">
+                                                                <td className="py-2.5"><span className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-[var(--sys-surface)] text-[var(--sys-text-muted)] capitalize">{u.plan}</span></td>
+                                                                <td className="py-2.5 text-right font-bold text-[var(--sys-text)]">{u.credits?.used?.toLocaleString()}</td>
+                                                                <td className="py-2.5 text-right font-bold text-primary">
                                                                     {u.creditBalance?.unlimited ? '∞' : u.creditBalance?.remaining?.toLocaleString()}
                                                                 </td>
                                                             </tr>
@@ -824,44 +838,44 @@ export default function SuperAdminDashboard() {
                     <div>
                         <div className="flex items-center justify-between mb-6">
                             <div>
-                                <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-amber-400">how_to_reg</span>
+                                <h3 className="text-lg font-bold text-[var(--sys-text)] flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-primary">how_to_reg</span>
                                     Pending Approvals ({pendingUsers.length})
                                 </h3>
-                                <p className="text-sm text-slate-500 mt-1">Review and approve new user registrations to grant platform access</p>
+                                <p className="text-sm text-[var(--sys-text-muted)] mt-1">Review and approve new user registrations to grant platform access</p>
                             </div>
-                            <button onClick={loadPendingUsers} className="p-2 rounded-lg bg-white/[0.04] text-slate-400 hover:text-white cursor-pointer"><span className="material-symbols-outlined text-sm">refresh</span></button>
+                            <button onClick={loadPendingUsers} className="p-2 rounded-lg bg-[var(--sys-surface)] text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer"><span className="material-symbols-outlined text-sm">refresh</span></button>
                         </div>
 
                         {pendingUsers.length > 0 ? (
                             <div className="space-y-3">
                                 {pendingUsers.map(u => (
-                                    <div key={u._id} className="glass-panel rounded-2xl p-5 border border-amber-500/10 hover:border-amber-500/30 transition-all bg-gradient-to-r from-amber-500/[0.02] to-transparent">
+                                    <div key={u._id} className="glass-panel rounded-2xl p-5 border border-[var(--sys-border)] hover:border-[var(--sys-border)] transition-all bg-[var(--sys-surface)] border border-[var(--sys-border)]">
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center gap-4 flex-1">
-                                                <div className="w-12 h-12 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-400 font-bold text-lg">{u.name?.[0]?.toUpperCase()}</div>
+                                                <div className="w-12 h-12 rounded-xl bg-[var(--sys-primary-dim)] flex items-center justify-center text-primary font-bold text-lg">{u.name?.[0]?.toUpperCase()}</div>
                                                 <div>
                                                     <div className="flex items-center gap-2 mb-0.5">
-                                                        <p className="text-base font-bold text-white">{u.name}</p>
-                                                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 font-bold tracking-wider uppercase">Position #{u.queueNumber}</span>
+                                                        <p className="text-base font-bold text-[var(--sys-text)]">{u.name}</p>
+                                                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--sys-primary-dim)] text-primary font-bold tracking-wider uppercase">Position #{u.queueNumber}</span>
                                                     </div>
-                                                     <p className="text-sm text-slate-400">
+                                                     <p className="text-sm text-[var(--sys-text-muted)]">
                                                         {u.email} • {u.company || 'Individual'} 
                                                         <span className={`ml-2 text-[10px] px-1.5 py-0.5 rounded font-bold uppercase ${
-                                                            u.plan === 'enterprise' ? 'bg-amber-500/15 text-amber-400' : 
+                                                            u.plan === 'enterprise' ? 'bg-[var(--sys-primary-dim)] text-primary' : 
                                                             u.plan === 'professional' ? 'bg-[#FF4D00]/15 text-[#FF4D00]' : 
-                                                            u.plan === 'test' ? 'bg-rose-500/15 text-rose-400' :
-                                                            'bg-slate-500/15 text-slate-400'
+                                                            u.plan === 'test' ? 'bg-[var(--sys-primary-dim)] text-primary' :
+                                                            'bg-[var(--sys-border)]/15 text-[var(--sys-text-muted)]'
                                                         }`}>Plan: {u.plan}</span>
                                                      </p>
-                                                    <p className="text-[10px] text-slate-600 mt-1 uppercase tracking-widest">Registered {new Date(u.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+                                                    <p className="text-[10px] text-[var(--sys-text-muted)] mt-1 uppercase tracking-widest">Registered {new Date(u.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
                                                 </div>
                                             </div>
                                             <div className="flex items-center gap-3">
-                                                <button onClick={() => handleRejectUser(u._id)} className="px-4 py-2 rounded-xl bg-rose-500/10 text-rose-500 text-xs font-bold hover:bg-rose-500/20 transition-all flex items-center gap-1.5 cursor-pointer">
+                                                <button onClick={() => handleRejectUser(u._id)} className="px-4 py-2 rounded-xl bg-[var(--sys-primary-dim)] text-primary text-xs font-bold hover:bg-[var(--sys-primary-dim)] transition-all flex items-center gap-1.5 cursor-pointer">
                                                     <span className="material-symbols-outlined text-sm">close</span>Reject
                                                 </button>
-                                                <button onClick={() => handleApproveUser(u._id)} className="px-6 py-2 rounded-xl bg-emerald-500 text-white text-xs font-bold hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20 flex items-center gap-1.5 cursor-pointer">
+                                                <button onClick={() => handleApproveUser(u._id)} className="px-6 py-2 rounded-xl bg-[var(--sys-surface)] text-[var(--sys-text)] text-xs font-bold hover:bg-[var(--sys-surface)] transition-all shadow-none flex items-center gap-1.5 cursor-pointer">
                                                     <span className="material-symbols-outlined text-sm font-bold">check</span>Approve User
                                                 </button>
                                             </div>
@@ -870,10 +884,10 @@ export default function SuperAdminDashboard() {
                                 ))}
                             </div>
                         ) : (
-                            <div className="text-center py-20 glass-panel rounded-2xl border border-dashed border-white/[0.06]">
+                            <div className="text-center py-20 glass-panel rounded-2xl border border-dashed border-[var(--sys-border)]">
                                 <span className="material-symbols-outlined text-5xl text-slate-700 mb-3">verified_user</span>
-                                <h3 className="text-lg font-bold text-white mb-1">Queue is Empty</h3>
-                                <p className="text-sm text-slate-500">All users have been processed. Great job!</p>
+                                <h3 className="text-lg font-bold text-[var(--sys-text)] mb-1">Queue is Empty</h3>
+                                <p className="text-sm text-[var(--sys-text-muted)]">All users have been processed. Great job!</p>
                             </div>
                         )}
                     </div>
@@ -884,21 +898,21 @@ export default function SuperAdminDashboard() {
                     <div>
                         <div className="flex items-center justify-between mb-6">
                             <div>
-                                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                                <h3 className="text-lg font-bold text-[var(--sys-text)] flex items-center gap-2">
                                     <span className="material-symbols-outlined text-[#FF4D00]">list_alt</span>
                                     Waitlist Submissions ({waitlist.length})
                                 </h3>
-                                <p className="text-sm text-slate-500 mt-1">Direct early access requests from the landing page waitlist</p>
+                                <p className="text-sm text-[var(--sys-text-muted)] mt-1">Direct early access requests from the landing page waitlist</p>
                             </div>
-                            <button onClick={loadWaitlist} className="p-2 rounded-lg bg-white/[0.04] text-slate-400 hover:text-white cursor-pointer"><span className="material-symbols-outlined text-sm">refresh</span></button>
+                            <button onClick={loadWaitlist} className="p-2 rounded-lg bg-[var(--sys-surface)] text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer"><span className="material-symbols-outlined text-sm">refresh</span></button>
                         </div>
 
                         {waitlist.length > 0 ? (
-                            <div className="glass-panel rounded-2xl overflow-hidden border border-white/[0.06] shadow-2xl">
+                            <div className="glass-panel rounded-2xl overflow-hidden border border-[var(--sys-border)] shadow-2xl">
                                 <div className="overflow-x-auto">
                                     <table className="w-full text-left min-w-[800px]">
                                         <thead>
-                                            <tr className="text-[10px] text-slate-500 font-black uppercase tracking-[0.1em] border-b border-white/[0.06] bg-white/[0.02]">
+                                            <tr className="text-[10px] text-[var(--sys-text-muted)] font-black uppercase tracking-[0.1em] border-b border-[var(--sys-border)] bg-[var(--sys-surface)]">
                                                 <th className="px-6 py-4">Name & Email</th>
                                                 <th className="px-6 py-4">Company</th>
                                                 <th className="px-6 py-4">Message / Note</th>
@@ -909,31 +923,31 @@ export default function SuperAdminDashboard() {
                                         </thead>
                                         <tbody className="divide-y divide-white/[0.04]">
                                             {waitlist.map(entry => (
-                                                <tr key={entry._id} className="text-sm group hover:bg-white/[0.01] transition-all">
+                                                <tr key={entry._id} className="text-sm group hover:bg-[var(--sys-surface)] transition-all">
                                                     <td className="px-6 py-4">
                                                         <div className="flex items-center gap-3">
                                                             <div className="w-9 h-9 rounded-xl bg-[#FF4D00]/10 flex items-center justify-center text-[#FF4D00] font-black shadow-lg">
                                                                 {entry.name?.[0]?.toUpperCase()}
                                                             </div>
                                                             <div className="min-w-0">
-                                                                <p className="font-bold text-white truncate">{entry.name}</p>
-                                                                <p className="text-[10px] text-slate-600 truncate">{entry.email}</p>
+                                                                <p className="font-bold text-[var(--sys-text)] truncate">{entry.name}</p>
+                                                                <p className="text-[10px] text-[var(--sys-text-muted)] truncate">{entry.email}</p>
                                                             </div>
                                                         </div>
                                                     </td>
                                                     <td className="px-6 py-4">
-                                                        <span className="text-slate-400">{entry.company || '—'}</span>
+                                                        <span className="text-[var(--sys-text-muted)]">{entry.company || '—'}</span>
                                                     </td>
                                                     <td className="px-6 py-4 max-w-xs">
-                                                        <p className="text-slate-500 truncate" title={entry.message}>{entry.message || '—'}</p>
+                                                        <p className="text-[var(--sys-text-muted)] truncate" title={entry.message}>{entry.message || '—'}</p>
                                                     </td>
-                                                    <td className="px-6 py-4 text-[11px] text-slate-600">
+                                                    <td className="px-6 py-4 text-[11px] text-[var(--sys-text-muted)]">
                                                         {new Date(entry.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                                                     </td>
                                                     <td className="px-6 py-4 text-center">
                                                         {entry.status === 'registered' ? (
                                                             <div className="inline-flex flex-col items-center">
-                                                                <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 text-[10px] font-black uppercase tracking-wider border border-emerald-500/20">Registered</span>
+                                                                <span className="px-2 py-0.5 rounded-full bg-[var(--sys-primary-dim)] text-primary text-[10px] font-black uppercase tracking-wider border border-[var(--sys-border)]">Registered</span>
                                                             </div>
                                                         ) : entry.status === 'invited' ? (
                                                             <div className="inline-flex flex-col items-center gap-1">
@@ -941,7 +955,7 @@ export default function SuperAdminDashboard() {
                                                                 {entry.invitedAt && <span className="text-[9px] text-slate-700">{new Date(entry.invitedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span>}
                                                             </div>
                                                         ) : (
-                                                            <span className="px-2 py-0.5 rounded-full bg-slate-500/10 text-slate-500 text-[10px] font-black uppercase tracking-wider border border-slate-500/20">Pending</span>
+                                                            <span className="px-2 py-0.5 rounded-full bg-[var(--sys-border)]/10 text-[var(--sys-text-muted)] text-[10px] font-black uppercase tracking-wider border border-[var(--sys-border)]">Pending</span>
                                                         )}
                                                     </td>
                                                     <td className="px-6 py-4 text-right">
@@ -951,8 +965,8 @@ export default function SuperAdminDashboard() {
                                                                     onClick={() => handleApproveWaitlist(entry._id)}
                                                                     className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all border cursor-pointer ${
                                                                         entry.status === 'invited' 
-                                                                        ? 'bg-[#FF4D00]/10 hover:bg-[#FF4D00] text-[#FF4D00] hover:text-white border-[#FF4D00]/20' 
-                                                                        : 'bg-emerald-500/10 hover:bg-emerald-500 text-emerald-500 hover:text-white border-emerald-500/20'
+                                                                        ? 'bg-[#FF4D00]/10 hover:bg-[#FF4D00] text-[#FF4D00] hover:text-[var(--sys-text)] border-[#FF4D00]/20' 
+                                                                        : 'bg-[var(--sys-primary-dim)] hover:bg-[var(--sys-surface)] text-primary hover:text-[var(--sys-text)] border-[var(--sys-border)]'
                                                                     }`}
                                                                     title={entry.status === 'invited' ? 'Resend Invitation' : 'Send Invitation'}
                                                                 >
@@ -961,7 +975,7 @@ export default function SuperAdminDashboard() {
                                                             )}
                                                             <button 
                                                                 onClick={() => handleDeleteWaitlist(entry._id)}
-                                                                className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500 text-rose-500 hover:text-white transition-all border border-rose-500/20 cursor-pointer"
+                                                                className="p-1.5 rounded-lg bg-[var(--sys-primary-dim)] hover:bg-[var(--sys-surface)] text-primary hover:text-[var(--sys-text)] transition-all border border-[var(--sys-border)] cursor-pointer"
                                                                 title="Remove Entry"
                                                             >
                                                                 <span className="material-symbols-outlined text-sm">delete</span>
@@ -975,10 +989,10 @@ export default function SuperAdminDashboard() {
                                 </div>
                             </div>
                         ) : (
-                            <div className="text-center py-20 glass-panel rounded-2xl border border-dashed border-white/[0.06]">
+                            <div className="text-center py-20 glass-panel rounded-2xl border border-dashed border-[var(--sys-border)]">
                                 <span className="material-symbols-outlined text-5xl text-slate-700 mb-3">inbox</span>
-                                <h3 className="text-lg font-bold text-white mb-1">Waitlist is Empty</h3>
-                                <p className="text-sm text-slate-500">No new early access requests found.</p>
+                                <h3 className="text-lg font-bold text-[var(--sys-text)] mb-1">Waitlist is Empty</h3>
+                                <p className="text-sm text-[var(--sys-text-muted)]">No new early access requests found.</p>
                             </div>
                         )}
                     </div>
@@ -989,91 +1003,91 @@ export default function SuperAdminDashboard() {
                     <div>
                         <div className="flex gap-3 mb-5">
                             <div className="flex-1 relative">
-                                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-600 text-lg">search</span>
-                                <input type="text" value={search} onChange={e => { setSearch(e.target.value); setUserPage(1) }} placeholder="Search name, email, company..." className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none focus:border-primary/50" />
+                                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[var(--sys-text-muted)] text-lg">search</span>
+                                <input type="text" value={search} onChange={e => { setSearch(e.target.value); setUserPage(1) }} placeholder="Search name, email, company..." className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm outline-none focus:border-primary/50" />
                             </div>
-                            <button onClick={loadUsers} className="p-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-slate-400 hover:text-white transition-all cursor-pointer" title="Refresh Users"><span className="material-symbols-outlined text-sm">refresh</span></button>
-                            <select value={planFilter} onChange={e => { setPlanFilter(e.target.value); setUserPage(1) }} className="px-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none cursor-pointer">
+                            <button onClick={loadUsers} className="p-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] transition-all cursor-pointer" title="Refresh Users"><span className="material-symbols-outlined text-sm">refresh</span></button>
+                            <select value={planFilter} onChange={e => { setPlanFilter(e.target.value); setUserPage(1) }} className="px-4 py-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm outline-none cursor-pointer">
                                 <option value="">All Plans</option>
                                 {packages.map(p => (
                                     <option key={p._id} value={p.slug}>{p.name}</option>
                                 ))}
                             </select>
                         </div>
-                        <p className="text-xs text-slate-600 mb-3">{totalUsers} users</p>
+                        <p className="text-xs text-[var(--sys-text-muted)] mb-3">{totalUsers} users</p>
                         <div className="space-y-2">{users.map(u => (
-                            <div key={u._id} className="glass-panel rounded-2xl p-4 hover:bg-white/[0.03] transition-all">
+                            <div key={u._id} className="glass-panel rounded-2xl p-4 hover:bg-[var(--sys-surface)] transition-all">
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-3 flex-1 min-w-0">
                                         <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center text-primary font-bold shrink-0">{u.name?.[0]?.toUpperCase()}</div>
                                         <div className="min-w-0">
                                             <div className="flex items-center gap-2">
-                                                <p className="text-base font-bold text-white truncate">{u.name}</p>
+                                                <p className="text-base font-bold text-[var(--sys-text)] truncate">{u.name}</p>
                                                 <span className={`text-xs px-1.5 py-0.5 rounded font-bold capitalize ${
-                                                    u.plan === 'enterprise' ? 'bg-amber-500/15 text-amber-400' : 
+                                                    u.plan === 'enterprise' ? 'bg-[var(--sys-primary-dim)] text-primary' : 
                                                     u.plan === 'professional' ? 'bg-[#FF4D00]/15 text-[#FF4D00]' : 
-                                                    u.plan === 'test' ? 'bg-rose-500/15 text-rose-400' :
-                                                    'bg-slate-500/15 text-slate-400'
+                                                    u.plan === 'test' ? 'bg-[var(--sys-primary-dim)] text-primary' :
+                                                    'bg-[var(--sys-border)]/15 text-[var(--sys-text-muted)]'
                                                 }`}>Plan: {u.plan}</span>
-                                                <span className="text-xs px-1.5 py-0.5 rounded font-bold border border-white/10 text-slate-500 uppercase tracking-tighter text-[9px]">{u.role}</span>
-                                                {(!u.approvalStatus || u.approvalStatus === 'pending') && <span className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-amber-500/20 text-amber-400">PENDING</span>}
-                                                {u.approvalStatus === 'rejected' && <span className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-rose-500/20 text-rose-400">REJECTED</span>}
+                                                <span className="text-xs px-1.5 py-0.5 rounded font-bold border border-[var(--sys-border)] text-[var(--sys-text-muted)] uppercase tracking-tighter text-[9px]">{u.role}</span>
+                                                {(!u.approvalStatus || u.approvalStatus === 'pending') && <span className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-[var(--sys-primary-dim)] text-primary">PENDING</span>}
+                                                {u.approvalStatus === 'rejected' && <span className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-[var(--sys-primary-dim)] text-primary">REJECTED</span>}
                                             </div>
-                                            <p className="text-[11px] text-slate-600 truncate">{u.email} {u.company ? `• ${u.company}` : ''}</p>
+                                            <p className="text-[11px] text-[var(--sys-text-muted)] truncate">{u.email} {u.company ? `• ${u.company}` : ''}</p>
                                         </div>
                                     </div>
                                     <div className="text-center mx-4 shrink-0 flex items-center gap-4">
                                         <div className="text-right">
-                                            <p className="text-xs font-bold text-white mb-1">{u.credits?.used || 0} / {u.credits?.total + (u.credits?.bonus || 0)} used</p>
-                                            <div className="w-24 h-1.5 rounded-full bg-white/[0.06]">
+                                            <p className="text-xs font-bold text-[var(--sys-text)] mb-1">{u.credits?.used || 0} / {u.credits?.total + (u.credits?.bonus || 0)} used</p>
+                                            <div className="w-24 h-1.5 rounded-full bg-[var(--sys-surface)]">
                                                 <div
-                                                    className={`h-full rounded-full ${u.creditBalance?.remaining <= 5 ? 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.4)]' : 'bg-primary'}`}
+                                                    className={`h-full rounded-full ${u.creditBalance?.remaining <= 5 ? 'bg-[var(--sys-surface)] shadow-[0_0_8px_rgba(244,63,94,0.4)]' : 'bg-primary'}`}
                                                     style={{ width: `${Math.min(100, ((u.credits?.used || 0) / (u.credits?.total + (u.credits?.bonus || 0))) * 100)}%` }}
                                                 />
                                             </div>
                                         </div>
                                         <div className="w-16">
-                                            <p className="text-base font-bold text-white">{u.creditBalance?.unlimited ? '∞' : `${u.creditBalance?.remaining || 0}`}</p>
-                                            <p className="text-[10px] text-slate-600 uppercase tracking-tighter">remaining</p>
+                                            <p className="text-base font-bold text-[var(--sys-text)]">{u.creditBalance?.unlimited ? '∞' : `${u.creditBalance?.remaining || 0}`}</p>
+                                            <p className="text-[10px] text-[var(--sys-text-muted)] uppercase tracking-tighter">remaining</p>
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-1 shrink-0">
-                                         <button onClick={() => setCreditModal(u)} title="Add Credits" className="p-2 rounded-lg hover:bg-emerald-500/10 text-slate-500 hover:text-emerald-400 transition-all cursor-pointer"><span className="material-symbols-outlined text-base">add_circle</span></button>
-                                        <button onClick={() => handleResetCredits(u._id)} title="Reset Credits" className="p-2 rounded-lg hover:bg-cyan-500/10 text-slate-500 hover:text-cyan-400 transition-all cursor-pointer"><span className="material-symbols-outlined text-base">restart_alt</span></button>
-                                        <button onClick={() => setPlanModal(u)} title="Change Plan" className="p-2 rounded-lg hover:bg-[#FF4D00]/10 text-slate-500 hover:text-[#FF4D00] transition-all cursor-pointer"><span className="material-symbols-outlined text-base">upgrade</span></button>
+                                         <button onClick={() => setCreditModal(u)} title="Add Credits" className="p-2 rounded-lg hover:bg-[var(--sys-primary-dim)] text-[var(--sys-text-muted)] hover:text-primary transition-all cursor-pointer"><span className="material-symbols-outlined text-base">add_circle</span></button>
+                                        <button onClick={() => handleResetCredits(u._id)} title="Reset Credits" className="p-2 rounded-lg hover:bg-[var(--sys-primary-dim)] text-[var(--sys-text-muted)] hover:text-primary transition-all cursor-pointer"><span className="material-symbols-outlined text-base">restart_alt</span></button>
+                                        <button onClick={() => setPlanModal(u)} title="Change Plan" className="p-2 rounded-lg hover:bg-[#FF4D00]/10 text-[var(--sys-text-muted)] hover:text-[#FF4D00] transition-all cursor-pointer"><span className="material-symbols-outlined text-base">upgrade</span></button>
                                         
                                         {(!u.approvalStatus || u.approvalStatus === 'pending') ? (
-                                            <div className="flex gap-1 border-x border-white/[0.04] px-1 mx-1">
-                                                <button onClick={() => handleApproveUser(u._id)} title="Approve User" className="p-2 rounded-lg hover:bg-emerald-500/10 text-emerald-500 transition-all cursor-pointer shadow-sm"><span className="material-symbols-outlined text-base font-bold">check_circle</span></button>
-                                                <button onClick={() => handleRejectUser(u._id)} title="Reject User" className="p-2 rounded-lg hover:bg-rose-500/10 text-rose-500 transition-all cursor-pointer shadow-sm"><span className="material-symbols-outlined text-base font-bold">cancel</span></button>
+                                            <div className="flex gap-1 border-x border-[var(--sys-border)] px-1 mx-1">
+                                                <button onClick={() => handleApproveUser(u._id)} title="Approve User" className="p-2 rounded-lg hover:bg-[var(--sys-primary-dim)] text-primary transition-all cursor-pointer shadow-sm"><span className="material-symbols-outlined text-base font-bold">check_circle</span></button>
+                                                <button onClick={() => handleRejectUser(u._id)} title="Reject User" className="p-2 rounded-lg hover:bg-[var(--sys-primary-dim)] text-primary transition-all cursor-pointer shadow-sm"><span className="material-symbols-outlined text-base font-bold">cancel</span></button>
                                             </div>
                                         ) : u.approvalStatus === 'approved' ? (
-                                            <div className="px-2 border-x border-white/[0.04] mx-1">
-                                                <span className="text-[9px] font-black text-emerald-500/50 bg-emerald-500/5 px-2 py-1 rounded-md border border-emerald-500/10 flex items-center gap-1">
+                                            <div className="px-2 border-x border-[var(--sys-border)] mx-1">
+                                                <span className="text-[9px] font-black text-primary/50 bg-[var(--sys-primary-dim)] px-2 py-1 rounded-md border border-[var(--sys-border)] flex items-center gap-1">
                                                     <span className="material-symbols-outlined text-[10px]">verified</span>
                                                     APPROVED
                                                 </span>
                                             </div>
                                         ) : (
-                                            <div className="px-2 border-x border-white/[0.04] mx-1">
-                                                <span className="text-[9px] font-black text-rose-500/50 bg-rose-500/5 px-2 py-1 rounded-md border border-rose-500/10 flex items-center gap-1">
+                                            <div className="px-2 border-x border-[var(--sys-border)] mx-1">
+                                                <span className="text-[9px] font-black text-primary/50 bg-[var(--sys-primary-dim)] px-2 py-1 rounded-md border border-[var(--sys-border)] flex items-center gap-1">
                                                     <span className="material-symbols-outlined text-[10px]">block</span>
                                                     REJECTED
                                                 </span>
                                             </div>
                                         )}
 
-                                        <button onClick={() => handleImpersonate(u._id, u.name)} title="Login as User" className="p-2 rounded-lg hover:bg-amber-500/10 text-slate-500 hover:text-amber-400 transition-all cursor-pointer"><span className="material-symbols-outlined text-base">login</span></button>
-                                        <button onClick={() => openUserStudioModal(u._id)} title="Studio Access" className="p-2 rounded-lg hover:bg-[#FF4D00]/10 text-slate-500 hover:text-[#FF4D00] transition-all cursor-pointer"><span className="material-symbols-outlined text-base">shield_person</span></button>
-                                        <button onClick={() => handleDeleteUser(u._id, u.name)} title="Delete" className="p-2 rounded-lg hover:bg-rose-500/10 text-slate-500 hover:text-rose-400 transition-all cursor-pointer"><span className="material-symbols-outlined text-base">delete</span></button>
+                                        <button onClick={() => handleImpersonate(u._id, u.name)} title="Login as User" className="p-2 rounded-lg hover:bg-[var(--sys-primary-dim)] text-[var(--sys-text-muted)] hover:text-primary transition-all cursor-pointer"><span className="material-symbols-outlined text-base">login</span></button>
+                                        <button onClick={() => openUserStudioModal(u._id)} title="Studio Access" className="p-2 rounded-lg hover:bg-[#FF4D00]/10 text-[var(--sys-text-muted)] hover:text-[#FF4D00] transition-all cursor-pointer"><span className="material-symbols-outlined text-base">shield_person</span></button>
+                                        <button onClick={() => handleDeleteUser(u._id, u.name)} title="Delete" className="p-2 rounded-lg hover:bg-[var(--sys-primary-dim)] text-[var(--sys-text-muted)] hover:text-primary transition-all cursor-pointer"><span className="material-symbols-outlined text-base">delete</span></button>
                                     </div>
                                 </div>
                             </div>
                         ))}</div>
                         {totalUsers > 20 && <div className="flex justify-center gap-2 mt-6">
-                            <button disabled={userPage <= 1} onClick={() => setUserPage(p => p - 1)} className="px-4 py-2 rounded-lg bg-white/[0.04] text-sm text-slate-400 disabled:opacity-30 cursor-pointer">← Prev</button>
-                            <span className="px-4 py-2 text-sm text-slate-500">Page {userPage}</span>
-                            <button disabled={users.length < 20} onClick={() => setUserPage(p => p + 1)} className="px-4 py-2 rounded-lg bg-white/[0.04] text-sm text-slate-400 disabled:opacity-30 cursor-pointer">Next →</button>
+                            <button disabled={userPage <= 1} onClick={() => setUserPage(p => p - 1)} className="px-4 py-2 rounded-lg bg-[var(--sys-surface)] text-sm text-[var(--sys-text-muted)] disabled:opacity-30 cursor-pointer">← Prev</button>
+                            <span className="px-4 py-2 text-sm text-[var(--sys-text-muted)]">Page {userPage}</span>
+                            <button disabled={users.length < 20} onClick={() => setUserPage(p => p + 1)} className="px-4 py-2 rounded-lg bg-[var(--sys-surface)] text-sm text-[var(--sys-text-muted)] disabled:opacity-30 cursor-pointer">Next →</button>
                         </div>}
                     </div>
                 )}
@@ -1089,93 +1103,93 @@ export default function SuperAdminDashboard() {
                                         <span className="material-symbols-outlined text-primary">token</span>
                                     </div>
                                     <div>
-                                        <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">System Credits Used</p>
-                                        <h4 className="text-2xl font-black text-white">
+                                        <p className="text-xs text-[var(--sys-text-muted)] font-bold uppercase tracking-wider">System Credits Used</p>
+                                        <h4 className="text-2xl font-black text-[var(--sys-text)]">
                                             {stats?.totalCreditsUsed?.toLocaleString() || '—'}
                                         </h4>
                                     </div>
                                 </div>
-                                <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
+                                <div className="h-1 w-full bg-[var(--sys-surface)] rounded-full overflow-hidden">
                                      <div className="h-full bg-primary" style={{ width: '65%' }} />
                                 </div>
                             </div>
 
-                            <div className="glass-panel rounded-2xl p-5 border border-rose-500/10">
+                            <div className="glass-panel rounded-2xl p-5 border border-[var(--sys-border)]">
                                 <div className="flex items-center gap-3 mb-2">
-                                    <div className="w-10 h-10 rounded-xl bg-rose-500/10 flex items-center justify-center">
-                                        <span className="material-symbols-outlined text-rose-400">battery_alert</span>
+                                    <div className="w-10 h-10 rounded-xl bg-[var(--sys-primary-dim)] flex items-center justify-center">
+                                        <span className="material-symbols-outlined text-primary">battery_alert</span>
                                     </div>
                                     <div>
-                                        <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Exhausted Accounts</p>
-                                        <h4 className="text-2xl font-black text-white">
+                                        <p className="text-xs text-[var(--sys-text-muted)] font-bold uppercase tracking-wider">Exhausted Accounts</p>
+                                        <h4 className="text-2xl font-black text-[var(--sys-text)]">
                                             {stats?.usageAnalytics?.exhaustedCount || 0}
                                         </h4>
                                     </div>
                                 </div>
-                                <p className="text-[10px] text-rose-400/60 font-medium">Require immediate recharge or plan upgrade</p>
+                                <p className="text-[10px] text-primary/60 font-medium">Require immediate recharge or plan upgrade</p>
                             </div>
 
-                            <div className="glass-panel rounded-2xl p-5 border border-amber-500/10">
+                            <div className="glass-panel rounded-2xl p-5 border border-[var(--sys-border)]">
                                 <div className="flex items-center gap-3 mb-2">
-                                    <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center">
-                                        <span className="material-symbols-outlined text-amber-400">warning</span>
+                                    <div className="w-10 h-10 rounded-xl bg-[var(--sys-primary-dim)] flex items-center justify-center">
+                                        <span className="material-symbols-outlined text-primary">warning</span>
                                     </div>
                                     <div>
-                                        <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Low Balance (&lt;10%)</p>
-                                        <h4 className="text-2xl font-black text-white">
+                                        <p className="text-xs text-[var(--sys-text-muted)] font-bold uppercase tracking-wider">Low Balance (&lt;10%)</p>
+                                        <h4 className="text-2xl font-black text-[var(--sys-text)]">
                                             {stats?.usageAnalytics?.nearEmptyCount || 0}
                                         </h4>
                                     </div>
                                 </div>
-                                <p className="text-[10px] text-amber-400/60 font-medium">Approaching credit limits</p>
+                                <p className="text-[10px] text-primary/60 font-medium">Approaching credit limits</p>
                             </div>
 
-                            <div className="glass-panel rounded-2xl p-5 border border-emerald-500/10">
+                            <div className="glass-panel rounded-2xl p-5 border border-[var(--sys-border)]">
                                 <div className="flex items-center gap-3 mb-2">
-                                    <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
-                                        <span className="material-symbols-outlined text-emerald-400">trending_up</span>
+                                    <div className="w-10 h-10 rounded-xl bg-[var(--sys-primary-dim)] flex items-center justify-center">
+                                        <span className="material-symbols-outlined text-primary">trending_up</span>
                                     </div>
                                     <div>
-                                        <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Top Consumers</p>
-                                        <h4 className="text-2xl font-black text-white">
+                                        <p className="text-xs text-[var(--sys-text-muted)] font-bold uppercase tracking-wider">Top Consumers</p>
+                                        <h4 className="text-2xl font-black text-[var(--sys-text)]">
                                             {stats?.usageAnalytics?.topUsers?.length || 0}
                                         </h4>
                                     </div>
                                 </div>
-                                <p className="text-[10px] text-emerald-400/60 font-medium">Power users with high generation volume</p>
+                                <p className="text-[10px] text-primary/60 font-medium">Power users with high generation volume</p>
                             </div>
                         </div>
 
                         {/* Search & Utility Bar */}
                         <div className="flex flex-col sm:flex-row gap-4 mb-6">
                             <div className="flex-1 relative">
-                                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-lg">search</span>
+                                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[var(--sys-text-muted)] text-lg">search</span>
                                 <input 
                                     type="text" 
                                     value={search} 
                                     onChange={e => { setSearch(e.target.value); setUserPage(1) }} 
                                     placeholder="Search users to manage credits..." 
-                                    className="w-full pl-10 pr-4 py-3 rounded-2xl bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none focus:border-primary/50 transition-all shadow-inner" 
+                                    className="w-full pl-10 pr-4 py-3 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm outline-none focus:border-primary/50 transition-all shadow-inner" 
                                 />
                             </div>
                             <div className="flex gap-2">
                                 <button 
                                     onClick={() => { setPlanFilter('exhausted'); setUserPage(1) }}
-                                    className={`px-4 py-3 rounded-2xl text-xs font-bold border transition-all flex items-center gap-2 ${planFilter === 'exhausted' ? 'bg-rose-500/15 border-rose-500/30 text-rose-400' : 'bg-white/[0.04] border-white/[0.08] text-slate-400 hover:bg-white/[0.08]'}`}
+                                    className={`px-4 py-3 rounded-2xl text-xs font-bold border transition-all flex items-center gap-2 ${planFilter === 'exhausted' ? 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary' : 'bg-[var(--sys-surface)] border-[var(--sys-border)] text-[var(--sys-text-muted)] hover:bg-[var(--sys-surface)]'}`}
                                 >
                                     <span className="material-symbols-outlined text-sm">error</span>
                                     Exhausted
                                 </button>
                                 <button 
                                     onClick={() => { setPlanFilter('low'); setUserPage(1) }}
-                                    className={`px-4 py-3 rounded-2xl text-xs font-bold border transition-all flex items-center gap-2 ${planFilter === 'low' ? 'bg-amber-500/15 border-amber-500/30 text-amber-400' : 'bg-white/[0.04] border-white/[0.08] text-slate-400 hover:bg-white/[0.08]'}`}
+                                    className={`px-4 py-3 rounded-2xl text-xs font-bold border transition-all flex items-center gap-2 ${planFilter === 'low' ? 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary' : 'bg-[var(--sys-surface)] border-[var(--sys-border)] text-[var(--sys-text-muted)] hover:bg-[var(--sys-surface)]'}`}
                                 >
                                     <span className="material-symbols-outlined text-sm">warning</span>
                                     Low Balance
                                 </button>
                                 <button 
                                     onClick={() => { setPlanFilter(''); setSearch(''); setUserPage(1) }}
-                                    className="px-4 py-3 rounded-2xl text-xs font-bold bg-white/[0.04] border border-white/[0.08] text-slate-400 hover:bg-white/[0.08] transition-all"
+                                    className="px-4 py-3 rounded-2xl text-xs font-bold bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text-muted)] hover:bg-[var(--sys-surface)] transition-all"
                                 >
                                     Reset
                                 </button>
@@ -1183,11 +1197,11 @@ export default function SuperAdminDashboard() {
                         </div>
 
                         {/* Detailed Usage Table */}
-                        <div className="glass-panel rounded-2xl overflow-hidden border border-white/[0.06] shadow-2xl">
+                        <div className="glass-panel rounded-2xl overflow-hidden border border-[var(--sys-border)] shadow-2xl">
                             <div className="overflow-x-auto">
                                 <table className="w-full text-left min-w-[900px]">
                                     <thead>
-                                        <tr className="text-[10px] text-slate-500 font-black uppercase tracking-[0.1em] border-b border-white/[0.06] bg-white/[0.02]">
+                                        <tr className="text-[10px] text-[var(--sys-text-muted)] font-black uppercase tracking-[0.1em] border-b border-[var(--sys-border)] bg-[var(--sys-surface)]">
                                             <th className="px-6 py-4">User Identity</th>
                                             <th className="px-6 py-4">Subscription Plan</th>
                                             <th className="px-6 py-4">AI Usage (Used/Total)</th>
@@ -1206,24 +1220,24 @@ export default function SuperAdminDashboard() {
                                             const isExhausted = remaining <= 0;
 
                                             return (
-                                                <tr key={u._id} className="text-sm group hover:bg-white/[0.01] transition-all">
+                                                <tr key={u._id} className="text-sm group hover:bg-[var(--sys-surface)] transition-all">
                                                     <td className="px-6 py-4">
                                                         <div className="flex items-center gap-3">
-                                                            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary/20 to-[#FF7A00]/10 flex items-center justify-center text-primary font-black shadow-lg">
+                                                            <div className="w-9 h-9 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] flex items-center justify-center text-primary font-black shadow-lg">
                                                                 {u.name?.[0]?.toUpperCase()}
                                                             </div>
                                                             <div className="min-w-0">
-                                                                <p className="font-bold text-white truncate">{u.name}</p>
-                                                                <p className="text-[10px] text-slate-600 truncate">{u.email}</p>
+                                                                <p className="font-bold text-[var(--sys-text)] truncate">{u.name}</p>
+                                                                <p className="text-[10px] text-[var(--sys-text-muted)] truncate">{u.email}</p>
                                                             </div>
                                                         </div>
                                                     </td>
                                                     <td className="px-6 py-4">
                                                         <span className={`text-[9px] px-2 py-1 rounded-lg font-black uppercase tracking-wider border ${
-                                                            u.plan === 'enterprise' ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 
+                                                            u.plan === 'enterprise' ? 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary' : 
                                                             u.plan === 'professional' ? 'bg-[#FF4D00]/10 border-[#FF4D00]/20 text-[#FF4D00]' : 
-                                                            u.plan === 'test' ? 'bg-rose-500/10 border-rose-500/20 text-rose-400' :
-                                                            'bg-slate-500/10 border-white/10 text-slate-400'
+                                                            u.plan === 'test' ? 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary' :
+                                                            'bg-[var(--sys-border)]/10 border-[var(--sys-border)] text-[var(--sys-text-muted)]'
                                                         }`}>
                                                             {u.plan}
                                                         </span>
@@ -1231,14 +1245,14 @@ export default function SuperAdminDashboard() {
                                                     <td className="px-6 py-4">
                                                         <div className="w-32">
                                                             <div className="flex justify-between items-center mb-1.5">
-                                                                <p className="text-[10px] font-bold text-white">{used} / {total}</p>
-                                                                <p className="text-[9px] text-slate-600 font-bold">{Math.round(percent)}%</p>
+                                                                <p className="text-[10px] font-bold text-[var(--sys-text)]">{used} / {total}</p>
+                                                                <p className="text-[9px] text-[var(--sys-text-muted)] font-bold">{Math.round(percent)}%</p>
                                                             </div>
-                                                            <div className="h-1.5 w-full bg-white/[0.06] rounded-full overflow-hidden">
+                                                            <div className="h-1.5 w-full bg-[var(--sys-surface)] rounded-full overflow-hidden">
                                                                 <div 
                                                                     className={`h-full rounded-full transition-all duration-700 ${
-                                                                        isExhausted ? 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.4)]' : 
-                                                                        isLow ? 'bg-amber-500' : 
+                                                                        isExhausted ? 'bg-[var(--sys-surface)] shadow-[0_0_8px_rgba(244,63,94,0.4)]' : 
+                                                                        isLow ? 'bg-[var(--sys-surface)]' : 
                                                                         'bg-primary'
                                                                     }`}
                                                                     style={{ width: `${percent}%` }}
@@ -1247,23 +1261,23 @@ export default function SuperAdminDashboard() {
                                                         </div>
                                                     </td>
                                                     <td className="px-6 py-4">
-                                                        <span className={`text-base font-black ${isExhausted ? 'text-rose-500' : isLow ? 'text-amber-500' : 'text-emerald-400'}`}>
+                                                        <span className={`text-base font-black ${isExhausted ? 'text-primary' : isLow ? 'text-primary' : 'text-primary'}`}>
                                                             {u.creditBalance?.unlimited ? '∞' : remaining}
                                                         </span>
                                                     </td>
                                                     <td className="px-6 py-4">
                                                         {isExhausted ? (
-                                                            <div className="flex items-center gap-1 text-rose-500">
+                                                            <div className="flex items-center gap-1 text-primary">
                                                                 <span className="material-symbols-outlined text-sm">cancel</span>
                                                                 <span className="text-[10px] font-black uppercase tracking-tighter">Expired</span>
                                                             </div>
                                                         ) : isLow ? (
-                                                            <div className="flex items-center gap-1 text-amber-500">
+                                                            <div className="flex items-center gap-1 text-primary">
                                                                 <span className="material-symbols-outlined text-sm">history_toggle_off</span>
                                                                 <span className="text-[10px] font-black uppercase tracking-tighter">Low Balance</span>
                                                             </div>
                                                         ) : (
-                                                            <div className="flex items-center gap-1 text-emerald-500">
+                                                            <div className="flex items-center gap-1 text-primary">
                                                                 <span className="material-symbols-outlined text-sm">check_circle</span>
                                                                 <span className="text-[10px] font-black uppercase tracking-tighter">Healthy</span>
                                                             </div>
@@ -1272,7 +1286,7 @@ export default function SuperAdminDashboard() {
                                                     <td className="px-6 py-4 text-right">
                                                         <button 
                                                             onClick={() => setCreditModal(u)}
-                                                            className="px-4 py-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500 text-emerald-400 hover:text-white text-xs font-black transition-all border border-emerald-500/20 flex items-center gap-2 ml-auto cursor-pointer"
+                                                            className="px-4 py-2 rounded-xl bg-[var(--sys-primary-dim)] hover:bg-[var(--sys-surface)] text-primary hover:text-[var(--sys-text)] text-xs font-black transition-all border border-[var(--sys-border)] flex items-center gap-2 ml-auto cursor-pointer"
                                                         >
                                                             <span className="material-symbols-outlined text-sm">add_card</span>
                                                             Recharge
@@ -1281,7 +1295,7 @@ export default function SuperAdminDashboard() {
                                                 </tr>
                                             );
                                         }) : (
-                                            <tr><td colSpan="6" className="py-20 text-center text-slate-600 font-medium tracking-wide">No users matching current filters</td></tr>
+                                            <tr><td colSpan="6" className="py-20 text-center text-[var(--sys-text-muted)] font-medium tracking-wide">No users matching current filters</td></tr>
                                         )}
                                     </tbody>
                                 </table>
@@ -1293,7 +1307,7 @@ export default function SuperAdminDashboard() {
                                 <button 
                                     disabled={userPage <= 1} 
                                     onClick={() => setUserPage(p => p - 1)} 
-                                    className="px-6 py-3 rounded-2xl bg-white/[0.04] text-xs font-bold text-slate-400 disabled:opacity-30 border border-white/[0.08] hover:border-white/[0.2] transition-all cursor-pointer"
+                                    className="px-6 py-3 rounded-2xl bg-[var(--sys-surface)] text-xs font-bold text-[var(--sys-text-muted)] disabled:opacity-30 border border-[var(--sys-border)] hover:border-[var(--sys-border)] transition-all cursor-pointer"
                                 >
                                     ← Previous Page
                                 </button>
@@ -1303,7 +1317,7 @@ export default function SuperAdminDashboard() {
                                 <button 
                                     disabled={users.length < 20} 
                                     onClick={() => setUserPage(p => p + 1)} 
-                                    className="px-6 py-3 rounded-2xl bg-white/[0.04] text-xs font-bold text-slate-400 disabled:opacity-30 border border-white/[0.08] hover:border-white/[0.2] transition-all cursor-pointer"
+                                    className="px-6 py-3 rounded-2xl bg-[var(--sys-surface)] text-xs font-bold text-[var(--sys-text-muted)] disabled:opacity-30 border border-[var(--sys-border)] hover:border-[var(--sys-border)] transition-all cursor-pointer"
                                 >
                                     Next Page →
                                 </button>
@@ -1318,16 +1332,16 @@ export default function SuperAdminDashboard() {
                     <div>
                         <div className="flex items-center justify-between mb-6">
                             <div>
-                                <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-cyan-400">monitoring</span>
+                                <h3 className="text-lg font-bold text-[var(--sys-text)] flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-primary">monitoring</span>
                                     AI Token Usage &amp; Cost Analytics
                                 </h3>
-                                <p className="text-sm text-slate-500 mt-1">Track actual AI API token consumption, costs, and profitability</p>
+                                <p className="text-sm text-[var(--sys-text-muted)] mt-1">Track actual AI API token consumption, costs, and profitability</p>
                             </div>
                             <div className="flex gap-2">
                                 {[7, 30, 90].map(d => (
                                     <button key={d} onClick={() => { setTokenDays(d); setTimeout(() => loadTokenUsage(), 50) }}
-                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-all ${tokenDays === d ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' : 'text-slate-500 bg-white/[0.03] border border-white/[0.06]'}`}>
+                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-all ${tokenDays === d ? 'bg-[var(--sys-primary-dim)] text-primary border border-[var(--sys-border)]' : 'text-[var(--sys-text-muted)] bg-[var(--sys-surface)] border border-[var(--sys-border)]'}`}>
                                         {d}d
                                     </button>
                                 ))}
@@ -1335,7 +1349,7 @@ export default function SuperAdminDashboard() {
                         </div>
 
                         {!tokenData ? (
-                            <div className="flex items-center justify-center py-20 text-slate-500">
+                            <div className="flex items-center justify-center py-20 text-[var(--sys-text-muted)]">
                                 <span className="material-symbols-outlined animate-spin mr-2">progress_activity</span>Loading token analytics...
                             </div>
                         ) : (
@@ -1343,45 +1357,45 @@ export default function SuperAdminDashboard() {
                                 {/* Summary Cards */}
                                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-5">
                                     <div className="glass-panel rounded-2xl p-4">
-                                        <span className="material-symbols-outlined text-cyan-400 text-lg mb-1 block">token</span>
-                                        <p className="text-xl font-extrabold text-white">{(tokenData.totals?.totalTokens || 0).toLocaleString()}</p>
-                                        <p className="text-[10px] text-slate-500">Total Tokens</p>
+                                        <span className="material-symbols-outlined text-primary text-lg mb-1 block">token</span>
+                                        <p className="text-xl font-extrabold text-[var(--sys-text)]">{(tokenData.totals?.totalTokens || 0).toLocaleString()}</p>
+                                        <p className="text-[10px] text-[var(--sys-text-muted)]">Total Tokens</p>
                                     </div>
                                     <div className="glass-panel rounded-2xl p-4">
                                         <span className="material-symbols-outlined text-[#FF4D00] text-lg mb-1 block">input</span>
-                                        <p className="text-xl font-extrabold text-white">{(tokenData.totals?.inputTokens || 0).toLocaleString()}</p>
-                                        <p className="text-[10px] text-slate-500">Input Tokens</p>
+                                        <p className="text-xl font-extrabold text-[var(--sys-text)]">{(tokenData.totals?.inputTokens || 0).toLocaleString()}</p>
+                                        <p className="text-[10px] text-[var(--sys-text-muted)]">Input Tokens</p>
                                     </div>
                                     <div className="glass-panel rounded-2xl p-4">
                                         <span className="material-symbols-outlined text-[#FF4D00] text-lg mb-1 block">output</span>
-                                        <p className="text-xl font-extrabold text-white">{(tokenData.totals?.outputTokens || 0).toLocaleString()}</p>
-                                        <p className="text-[10px] text-slate-500">Output Tokens</p>
+                                        <p className="text-xl font-extrabold text-[var(--sys-text)]">{(tokenData.totals?.outputTokens || 0).toLocaleString()}</p>
+                                        <p className="text-[10px] text-[var(--sys-text-muted)]">Output Tokens</p>
                                     </div>
                                     <div className="glass-panel rounded-2xl p-4">
-                                        <span className="material-symbols-outlined text-amber-400 text-lg mb-1 block">payments</span>
-                                        <p className="text-xl font-extrabold text-amber-400">${tokenData.totals?.estimatedCostUSD || 0}</p>
-                                        <p className="text-[10px] text-slate-500">Est. Cost (USD)</p>
+                                        <span className="material-symbols-outlined text-primary text-lg mb-1 block">payments</span>
+                                        <p className="text-xl font-extrabold text-primary">${tokenData.totals?.estimatedCostUSD || 0}</p>
+                                        <p className="text-[10px] text-[var(--sys-text-muted)]">Est. Cost (USD)</p>
                                     </div>
                                     <div className="glass-panel rounded-2xl p-4">
-                                        <span className="material-symbols-outlined text-emerald-400 text-lg mb-1 block">bolt</span>
-                                        <p className="text-xl font-extrabold text-white">{(tokenData.totals?.totalCalls || 0).toLocaleString()}</p>
-                                        <p className="text-[10px] text-slate-500">AI Calls</p>
+                                        <span className="material-symbols-outlined text-primary text-lg mb-1 block">bolt</span>
+                                        <p className="text-xl font-extrabold text-[var(--sys-text)]">{(tokenData.totals?.totalCalls || 0).toLocaleString()}</p>
+                                        <p className="text-[10px] text-[var(--sys-text-muted)]">AI Calls</p>
                                     </div>
                                     <div className="glass-panel rounded-2xl p-4">
                                         <span className="material-symbols-outlined text-lg mb-1 block" style={{ color: (tokenData.profitability?.margin || 0) > 50 ? '#34d399' : (tokenData.profitability?.margin || 0) > 0 ? '#fbbf24' : '#fb7185' }}>trending_up</span>
                                         <p className="text-xl font-extrabold" style={{ color: (tokenData.profitability?.margin || 0) > 50 ? '#34d399' : (tokenData.profitability?.margin || 0) > 0 ? '#fbbf24' : '#fb7185' }}>{tokenData.profitability?.margin || 0}%</p>
-                                        <p className="text-[10px] text-slate-500">Profit Margin</p>
+                                        <p className="text-[10px] text-[var(--sys-text-muted)]">Profit Margin</p>
                                     </div>
                                 </div>
 
                                 {/* Provider Portfolio Section */}
                                 <div className="mb-6">
                                     <div className="flex items-center justify-between mb-4">
-                                        <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                                            <span className="material-symbols-outlined text-amber-400 text-lg">account_balance_wallet</span>
+                                        <h4 className="text-sm font-bold text-[var(--sys-text)] flex items-center gap-2">
+                                            <span className="material-symbols-outlined text-primary text-lg">account_balance_wallet</span>
                                             Provider Portfolio (Prepaid Balances)
                                         </h4>
-                                        <button onClick={() => setShowBudgetModal(true)} className="px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-slate-400 text-[10px] font-bold hover:bg-white/[0.06] transition-all flex items-center gap-1.5 cursor-pointer">
+                                        <button onClick={() => setShowBudgetModal(true)} className="px-3 py-1.5 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text-muted)] text-[10px] font-bold hover:bg-[var(--sys-surface)] transition-all flex items-center gap-1.5 cursor-pointer">
                                             <span className="material-symbols-outlined text-sm">settings</span>
                                             Configure Budgets
                                         </button>
@@ -1391,31 +1405,31 @@ export default function SuperAdminDashboard() {
                                             const pct = w.budget > 0 ? Math.min(100, (w.consumed / w.budget) * 100) : 0;
                                             const remaining = Math.max(0, w.budget - w.consumed);
                                             const isLow = w.budget > 0 && (remaining / w.budget) < 0.15;
-                                            const colors = { anthropic: 'text-orange-400', openai: 'text-emerald-400', gemini: 'text-[#FF4D00]', xai: 'text-slate-200', grok: 'text-slate-200', sarvam: 'text-rose-400' };
-                                            const bgColors = { anthropic: 'bg-orange-500', openai: 'bg-emerald-500', gemini: 'bg-[#FF4D00]', xai: 'bg-slate-500', grok: 'bg-slate-500', sarvam: 'bg-rose-500' };
+                                            const colors = { anthropic: 'text-[var(--sys-primary)]', openai: 'text-primary', gemini: 'text-[#FF4D00]', xai: 'text-[var(--sys-text)]', grok: 'text-[var(--sys-text)]', sarvam: 'text-primary' };
+                                            const bgColors = { anthropic: 'bg-[var(--sys-surface)]', openai: 'bg-[var(--sys-surface)]', gemini: 'bg-[#FF4D00]', xai: 'bg-[var(--sys-border)]', grok: 'bg-[var(--sys-border)]', sarvam: 'bg-[var(--sys-surface)]' };
                                             
                                             return (
-                                                <div key={w.provider} className={`glass-panel rounded-2xl p-5 border transition-all ${isLow ? 'border-amber-500/30' : 'border-white/[0.06]'}`}>
+                                                <div key={w.provider} className={`glass-panel rounded-2xl p-5 border transition-all ${isLow ? 'border-[var(--sys-border)]' : 'border-[var(--sys-border)]'}`}>
                                                     <div className="flex items-center justify-between mb-3">
-                                                        <p className={`text-xs font-black uppercase tracking-widest ${colors[w.provider] || 'text-slate-400'}`}>{w.provider === 'xai' ? 'Grok (xAI)' : w.provider}</p>
-                                                        {isLow && <span className="material-symbols-outlined text-amber-500 text-sm animate-pulse">warning</span>}
+                                                        <p className={`text-xs font-black uppercase tracking-widest ${colors[w.provider] || 'text-[var(--sys-text-muted)]'}`}>{w.provider === 'xai' ? 'Grok (xAI)' : w.provider}</p>
+                                                        {isLow && <span className="material-symbols-outlined text-primary text-sm animate-pulse">warning</span>}
                                                     </div>
                                                     <div className="flex items-baseline gap-1 mb-1">
-                                                        <span className="text-2xl font-black text-white">${remaining.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                                        <span className="text-[10px] text-slate-500 font-bold tracking-tighter uppercase">Left</span>
+                                                        <span className="text-2xl font-black text-[var(--sys-text)]">${remaining.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                        <span className="text-[10px] text-[var(--sys-text-muted)] font-bold tracking-tighter uppercase">Left</span>
                                                     </div>
                                                     <div className="flex justify-between items-center mb-4">
-                                                        <p className="text-[10px] text-slate-600 font-medium">of ${w.budget?.toLocaleString()} purchased</p>
-                                                        <p className="text-[9px] font-bold text-slate-500 bg-white/[0.04] px-1.5 py-0.5 rounded uppercase tracking-tighter">{w.tokens?.toLocaleString() || 0} tokens</p>
+                                                        <p className="text-[10px] text-[var(--sys-text-muted)] font-medium">of ${w.budget?.toLocaleString()} purchased</p>
+                                                        <p className="text-[9px] font-bold text-[var(--sys-text-muted)] bg-[var(--sys-surface)] px-1.5 py-0.5 rounded uppercase tracking-tighter">{w.tokens?.toLocaleString() || 0} tokens</p>
                                                     </div>
                                                     <div className="space-y-1.5">
                                                         <div className="flex justify-between text-[9px] font-bold uppercase tracking-tighter">
-                                                            <span className="text-slate-600">Consumed: ${w.consumed?.toLocaleString()}</span>
-                                                            <span className={pct > 90 ? 'text-rose-400' : pct > 75 ? 'text-amber-400' : 'text-slate-600'}>{Math.round(pct)}%</span>
+                                                            <span className="text-[var(--sys-text-muted)]">Consumed: ${w.consumed?.toLocaleString()}</span>
+                                                            <span className={pct > 90 ? 'text-primary' : pct > 75 ? 'text-primary' : 'text-[var(--sys-text-muted)]'}>{Math.round(pct)}%</span>
                                                         </div>
-                                                        <div className="h-1.5 w-full bg-white/[0.04] rounded-full overflow-hidden">
+                                                        <div className="h-1.5 w-full bg-[var(--sys-surface)] rounded-full overflow-hidden">
                                                             <div 
-                                                                className={`h-full rounded-full transition-all duration-1000 ${pct > 90 ? 'bg-rose-500' : pct > 75 ? 'bg-amber-500' : bgColors[w.provider] || 'bg-primary'}`} 
+                                                                className={`h-full rounded-full transition-all duration-1000 ${pct > 90 ? 'bg-[var(--sys-surface)]' : pct > 75 ? 'bg-[var(--sys-surface)]' : bgColors[w.provider] || 'bg-primary'}`} 
                                                                 style={{ width: `${pct}%` }} 
                                                             />
                                                         </div>
@@ -1423,7 +1437,7 @@ export default function SuperAdminDashboard() {
                                                 </div>
                                             );
                                         }) : (
-                                            <div className="col-span-full py-8 text-center glass-panel rounded-2xl border border-white/[0.04] text-slate-600 text-xs">
+                                            <div className="col-span-full py-8 text-center glass-panel rounded-2xl border border-[var(--sys-border)] text-[var(--sys-text-muted)] text-xs">
                                                 No provider budgets configured yet. Click "Configure Budgets" to start tracking.
                                             </div>
                                         )}
@@ -1431,22 +1445,22 @@ export default function SuperAdminDashboard() {
                                 </div>
 
                                 {/* Profitability Banner */}
-                                <div className="glass-panel rounded-2xl p-5 mb-5 border border-emerald-500/10 bg-gradient-to-r from-emerald-500/[0.03] to-transparent">
-                                    <h4 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
-                                        <span className="material-symbols-outlined text-emerald-400 text-lg">account_balance</span>
+                                <div className="glass-panel rounded-2xl p-5 mb-5 border border-[var(--sys-border)] bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                                    <h4 className="text-sm font-bold text-[var(--sys-text)] mb-3 flex items-center gap-2">
+                                        <span className="material-symbols-outlined text-primary text-lg">account_balance</span>
                                         Profitability Analysis
                                     </h4>
                                     <div className="grid grid-cols-3 gap-4">
                                         <div>
-                                            <p className="text-xs text-slate-500 mb-1">Monthly Revenue</p>
-                                            <p className="text-lg font-extrabold text-emerald-400">₹{(tokenData.profitability?.monthlyRevenue || 0).toLocaleString()}</p>
+                                            <p className="text-xs text-[var(--sys-text-muted)] mb-1">Monthly Revenue</p>
+                                            <p className="text-lg font-extrabold text-primary">₹{(tokenData.profitability?.monthlyRevenue || 0).toLocaleString()}</p>
                                         </div>
                                         <div>
-                                            <p className="text-xs text-slate-500 mb-1">Est. AI Cost (INR)</p>
-                                            <p className="text-lg font-extrabold text-rose-400">₹{(tokenData.profitability?.estimatedCostINR || 0).toLocaleString()}</p>
+                                            <p className="text-xs text-[var(--sys-text-muted)] mb-1">Est. AI Cost (INR)</p>
+                                            <p className="text-lg font-extrabold text-primary">₹{(tokenData.profitability?.estimatedCostINR || 0).toLocaleString()}</p>
                                         </div>
                                         <div>
-                                            <p className="text-xs text-slate-500 mb-1">Net Profit</p>
+                                            <p className="text-xs text-[var(--sys-text-muted)] mb-1">Net Profit</p>
                                             <p className="text-lg font-extrabold" style={{ color: ((tokenData.profitability?.monthlyRevenue || 0) - (tokenData.profitability?.estimatedCostINR || 0)) > 0 ? '#34d399' : '#fb7185' }}>
                                                 ₹{((tokenData.profitability?.monthlyRevenue || 0) - (tokenData.profitability?.estimatedCostINR || 0)).toLocaleString()}
                                             </p>
@@ -1457,7 +1471,7 @@ export default function SuperAdminDashboard() {
                                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
                                     {/* Per-Studio Breakdown */}
                                     <div className="glass-panel rounded-2xl p-5">
-                                        <h4 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
+                                        <h4 className="text-sm font-bold text-[var(--sys-text)] mb-3 flex items-center gap-2">
                                             <span className="material-symbols-outlined text-[#FF4D00] text-lg">apps</span>
                                             Usage by Studio
                                         </h4>
@@ -1468,30 +1482,30 @@ export default function SuperAdminDashboard() {
                                                     const pct = maxTokens > 0 ? ((s.totalTokens || 0) / maxTokens) * 100 : 0;
                                                     const colors = { seo: '#6366f1', content: '#10b981', creative: '#f472b6', brainstorm: '#f59e0b', video: '#06b6d4', unknown: '#64748b' };
                                                     return (
-                                                        <div key={s._id || 'unknown'} className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
+                                                        <div key={s._id || 'unknown'} className="p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
                                                             <div className="flex items-center justify-between mb-1.5">
-                                                                <span className="text-sm font-bold text-white capitalize">{s._id || 'Other'}</span>
-                                                                <span className="text-xs text-slate-400">{(s.totalTokens || 0).toLocaleString()} tokens</span>
+                                                                <span className="text-sm font-bold text-[var(--sys-text)] capitalize">{s._id || 'Other'}</span>
+                                                                <span className="text-xs text-[var(--sys-text-muted)]">{(s.totalTokens || 0).toLocaleString()} tokens</span>
                                                             </div>
-                                                            <div className="w-full h-1.5 rounded-full bg-white/[0.06] mb-1">
+                                                            <div className="w-full h-1.5 rounded-full bg-[var(--sys-surface)] mb-1">
                                                                 <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: colors[s._id] || colors.unknown }} />
                                                             </div>
-                                                            <div className="flex items-center justify-between text-[10px] text-slate-600">
+                                                            <div className="flex items-center justify-between text-[10px] text-[var(--sys-text-muted)]">
                                                                 <span>{s.calls} calls • {s.credits} credits</span>
-                                                                <span className="text-amber-400">${(s.estimatedCost || 0).toFixed(2)}</span>
+                                                                <span className="text-primary">${(s.estimatedCost || 0).toFixed(2)}</span>
                                                             </div>
                                                         </div>
                                                     );
                                                 })}
                                             </div>
                                         ) : (
-                                            <p className="text-sm text-slate-600 text-center py-8">No token usage data yet. Generate some reports to see studio breakdown.</p>
+                                            <p className="text-sm text-[var(--sys-text-muted)] text-center py-8">No token usage data yet. Generate some reports to see studio breakdown.</p>
                                         )}
                                     </div>
 
                                     {/* Per-Model Breakdown */}
                                     <div className="glass-panel rounded-2xl p-5">
-                                        <h4 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
+                                        <h4 className="text-sm font-bold text-[var(--sys-text)] mb-3 flex items-center gap-2">
                                             <span className="material-symbols-outlined text-[#FF4D00] text-lg">smart_toy</span>
                                             Usage by Model
                                         </h4>
@@ -1500,16 +1514,16 @@ export default function SuperAdminDashboard() {
                                                 {tokenData.byModel.map((m, i) => {
                                                     const provColors = { openai: '#10b981', xai: '#3b82f6', gemini: '#f59e0b' };
                                                     return (
-                                                        <div key={i} className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
+                                                        <div key={i} className="p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
                                                             <div className="flex items-center justify-between mb-1">
                                                                 <div className="flex items-center gap-2">
                                                                     <span className="w-2 h-2 rounded-full" style={{ background: provColors[m._id?.provider] || '#64748b' }} />
-                                                                    <span className="text-sm font-bold text-white">{m._id?.model || 'Unknown'}</span>
-                                                                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-white/[0.06] text-slate-500 uppercase">{m._id?.provider}</span>
+                                                                    <span className="text-sm font-bold text-[var(--sys-text)]">{m._id?.model || 'Unknown'}</span>
+                                                                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-[var(--sys-surface)] text-[var(--sys-text-muted)] uppercase">{m._id?.provider}</span>
                                                                 </div>
-                                                                <span className="text-xs font-bold text-amber-400">${(m.estimatedCost || 0).toFixed(2)}</span>
+                                                                <span className="text-xs font-bold text-primary">${(m.estimatedCost || 0).toFixed(2)}</span>
                                                             </div>
-                                                            <div className="flex items-center gap-4 text-[10px] text-slate-500">
+                                                            <div className="flex items-center gap-4 text-[10px] text-[var(--sys-text-muted)]">
                                                                 <span>{(m.totalTokens || 0).toLocaleString()} total</span>
                                                                 <span>↓{(m.inputTokens || 0).toLocaleString()} in</span>
                                                                 <span>↑{(m.outputTokens || 0).toLocaleString()} out</span>
@@ -1520,22 +1534,22 @@ export default function SuperAdminDashboard() {
                                                 })}
                                             </div>
                                         ) : (
-                                            <p className="text-sm text-slate-600 text-center py-8">No model usage data yet.</p>
+                                            <p className="text-sm text-[var(--sys-text-muted)] text-center py-8">No model usage data yet.</p>
                                         )}
                                     </div>
                                 </div>
 
                                 {/* Top Token Consumers */}
                                 <div className="glass-panel rounded-2xl p-5">
-                                    <h4 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
-                                        <span className="material-symbols-outlined text-rose-400 text-lg">leaderboard</span>
+                                    <h4 className="text-sm font-bold text-[var(--sys-text)] mb-3 flex items-center gap-2">
+                                        <span className="material-symbols-outlined text-primary text-lg">leaderboard</span>
                                         Top Token Consumers
                                     </h4>
                                     {(tokenData.topUsers || []).length > 0 ? (
                                         <div className="overflow-x-auto">
                                             <table className="w-full text-left min-w-[700px]">
                                                 <thead>
-                                                    <tr className="text-[10px] text-slate-500 font-bold uppercase tracking-wider border-b border-white/[0.04]">
+                                                    <tr className="text-[10px] text-[var(--sys-text-muted)] font-bold uppercase tracking-wider border-b border-[var(--sys-border)]">
                                                         <th className="pb-2">User</th>
                                                         <th className="pb-2">Plan</th>
                                                         <th className="pb-2 text-right">Tokens Used</th>
@@ -1546,25 +1560,25 @@ export default function SuperAdminDashboard() {
                                                 </thead>
                                                 <tbody className="divide-y divide-white/[0.04]">
                                                     {tokenData.topUsers.map((u, i) => (
-                                                        <tr key={u._id || i} className="text-sm hover:bg-white/[0.02] transition-all">
+                                                        <tr key={u._id || i} className="text-sm hover:bg-[var(--sys-surface)] transition-all">
                                                             <td className="py-2.5">
                                                                 <div className="flex items-center gap-2">
-                                                                    <div className="w-6 h-6 rounded bg-cyan-500/10 flex items-center justify-center text-[10px] font-bold text-cyan-400">{u.name?.[0] || '?'}</div>
-                                                                    <div><p className="font-bold text-white text-xs">{u.name || 'Unknown'}</p><p className="text-[10px] text-slate-600">{u.email}</p></div>
+                                                                    <div className="w-6 h-6 rounded bg-[var(--sys-primary-dim)] flex items-center justify-center text-[10px] font-bold text-primary">{u.name?.[0] || '?'}</div>
+                                                                    <div><p className="font-bold text-[var(--sys-text)] text-xs">{u.name || 'Unknown'}</p><p className="text-[10px] text-[var(--sys-text-muted)]">{u.email}</p></div>
                                                                 </div>
                                                             </td>
-                                                            <td className="py-2.5"><span className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-white/[0.05] text-slate-400 capitalize">{u.plan}</span></td>
-                                                            <td className="py-2.5 text-right font-bold text-white">{(u.totalTokens || 0).toLocaleString()}</td>
-                                                            <td className="py-2.5 text-right text-slate-400">{u.calls}</td>
-                                                            <td className="py-2.5 text-right text-slate-400">{u.credits}</td>
-                                                            <td className="py-2.5 text-right font-bold text-amber-400">${(u.estimatedCost || 0).toFixed(2)}</td>
+                                                            <td className="py-2.5"><span className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-[var(--sys-surface)] text-[var(--sys-text-muted)] capitalize">{u.plan}</span></td>
+                                                            <td className="py-2.5 text-right font-bold text-[var(--sys-text)]">{(u.totalTokens || 0).toLocaleString()}</td>
+                                                            <td className="py-2.5 text-right text-[var(--sys-text-muted)]">{u.calls}</td>
+                                                            <td className="py-2.5 text-right text-[var(--sys-text-muted)]">{u.credits}</td>
+                                                            <td className="py-2.5 text-right font-bold text-primary">${(u.estimatedCost || 0).toFixed(2)}</td>
                                                         </tr>
                                                     ))}
                                                 </tbody>
                                             </table>
                                         </div>
                                     ) : (
-                                        <p className="text-sm text-slate-600 text-center py-8">No user token data yet. Users need to generate reports to see their consumption.</p>
+                                        <p className="text-sm text-[var(--sys-text-muted)] text-center py-8">No user token data yet. Users need to generate reports to see their consumption.</p>
                                     )}
                                 </div>
                             </>
@@ -1578,17 +1592,17 @@ export default function SuperAdminDashboard() {
                         {/* Header row */}
                         <div className="flex justify-between items-center mb-6">
                             <div>
-                                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                                <h3 className="text-lg font-bold text-[var(--sys-text)] flex items-center gap-2">
                                     <span className="material-symbols-outlined text-[#FF4D00]">inventory_2</span>
                                     Subscription Packages ({packages.length})
                                 </h3>
-                                <p className="text-sm text-slate-500 mt-1">AI-driven package builder — design, suggest, and manage subscription tiers</p>
+                                <p className="text-sm text-[var(--sys-text-muted)] mt-1">AI-driven package builder — design, suggest, and manage subscription tiers</p>
                             </div>
                             <div className="flex gap-2">
-                                <button onClick={handleSeedDefaults} className="px-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-slate-400 text-xs font-medium hover:bg-white/[0.06] flex items-center gap-1.5 cursor-pointer">
+                                <button onClick={handleSeedDefaults} className="px-4 py-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text-muted)] text-xs font-medium hover:bg-[var(--sys-surface)] flex items-center gap-1.5 cursor-pointer">
                                     <span className="material-symbols-outlined text-sm">database</span>Seed Defaults
                                 </button>
-                                <button onClick={handleAISuggest} disabled={suggestingAI} className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#FF4D00]/20 to-[#FF7A00]/20 border border-[#FF4D00]/30 text-[#FF7A00] text-xs font-bold hover:from-[#FF4D00]/30 hover:to-[#FF7A00]/30 flex items-center gap-1.5 cursor-pointer disabled:opacity-50">
+                                <button onClick={handleAISuggest} disabled={suggestingAI} className="px-4 py-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] border border-[#FF4D00]/30 text-[#FF7A00] text-xs font-bold hover:from-[#FF4D00]/30 hover:to-[#FF7A00]/30 flex items-center gap-1.5 cursor-pointer disabled:opacity-50">
                                     <span className={`material-symbols-outlined text-sm ${suggestingAI ? 'animate-spin' : ''}`}>{suggestingAI ? 'progress_activity' : 'auto_awesome'}</span>
                                     {suggestingAI ? 'Analyzing...' : 'AI Suggest Packages'}
                                 </button>
@@ -1601,51 +1615,51 @@ export default function SuperAdminDashboard() {
                         {/* AI Suggestions Panel */}
                         {aiSuggestions && aiSuggestions.length > 0 && (
                             <div className="mb-6">
-                                <div className="glass-panel rounded-2xl p-5 border border-[#FF4D00]/20 bg-gradient-to-br from-[#FF4D00]/5 to-[#FF7A00]/5">
+                                <div className="glass-panel rounded-2xl p-5 border border-[#FF4D00]/20 bg-[var(--sys-surface)] border border-[var(--sys-border)]">
                                     <div className="flex items-center gap-2 mb-4">
                                         <span className="material-symbols-outlined text-[#FF4D00]">auto_awesome</span>
-                                        <h4 className="font-bold text-white text-sm">AI-Recommended Packages</h4>
+                                        <h4 className="font-bold text-[var(--sys-text)] text-sm">AI-Recommended Packages</h4>
                                         <span className="text-xs px-2 py-0.5 rounded-full bg-[#FF4D00]/20 text-[#FF7A00] font-bold">Based on platform analytics</span>
-                                        <button onClick={() => setAiSuggestions(null)} className="ml-auto text-slate-600 hover:text-slate-400 cursor-pointer"><span className="material-symbols-outlined text-sm">close</span></button>
+                                        <button onClick={() => setAiSuggestions(null)} className="ml-auto text-[var(--sys-text-muted)] hover:text-[var(--sys-text-muted)] cursor-pointer"><span className="material-symbols-outlined text-sm">close</span></button>
                                     </div>
                                     {/* Analytics summary */}
                                     {aiAnalytics && (
                                         <div className="flex gap-3 mb-4">
-                                            {[{ l: 'Users', v: aiAnalytics.totalUsers, c: 'text-[#FF4D00]' }, { l: 'Content', v: aiAnalytics.totalContent, c: 'text-emerald-400' }, { l: 'Creatives', v: aiAnalytics.totalCreatives, c: 'text-[#FF7A00]' }, { l: 'SEO Audits', v: aiAnalytics.seoUsage, c: 'text-cyan-400' }].map(a => (
-                                                <div key={a.l} className="px-3 py-2 rounded-lg bg-white/[0.03] text-center">
+                                            {[{ l: 'Users', v: aiAnalytics.totalUsers, c: 'text-[#FF4D00]' }, { l: 'Content', v: aiAnalytics.totalContent, c: 'text-primary' }, { l: 'Creatives', v: aiAnalytics.totalCreatives, c: 'text-[#FF7A00]' }, { l: 'SEO Audits', v: aiAnalytics.seoUsage, c: 'text-primary' }].map(a => (
+                                                <div key={a.l} className="px-3 py-2 rounded-lg bg-[var(--sys-surface)] text-center">
                                                     <p className={`text-sm font-bold ${a.c}`}>{a.v}</p>
-                                                    <p className="text-xs text-slate-600">{a.l}</p>
+                                                    <p className="text-xs text-[var(--sys-text-muted)]">{a.l}</p>
                                                 </div>
                                             ))}
-                                            {aiAnalytics.contentHeavy && <span className="self-center text-xs px-2 py-1 rounded bg-emerald-500/10 text-emerald-400 font-bold">Content-Heavy</span>}
+                                            {aiAnalytics.contentHeavy && <span className="self-center text-xs px-2 py-1 rounded bg-[var(--sys-primary-dim)] text-primary font-bold">Content-Heavy</span>}
                                             {aiAnalytics.creativeHeavy && <span className="self-center text-xs px-2 py-1 rounded bg-[#FF4D00]/10 text-[#FF7A00] font-bold">Creative-Heavy</span>}
-                                            {aiAnalytics.seoActive && <span className="self-center text-xs px-2 py-1 rounded bg-cyan-500/10 text-cyan-400 font-bold">SEO Active</span>}
+                                            {aiAnalytics.seoActive && <span className="self-center text-xs px-2 py-1 rounded bg-[var(--sys-primary-dim)] text-primary font-bold">SEO Active</span>}
                                         </div>
                                     )}
                                     {/* Suggestion cards */}
                                     <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-3 gap-3">
                                         {aiSuggestions.map((s, i) => (
-                                            <div key={i} className="relative rounded-xl border border-white/[0.08] p-4 hover:border-[#FF4D00]/30 transition-all" style={{ background: `linear-gradient(135deg, ${s.color}08, transparent)` }}>
-                                                {s.badge && <span className="absolute -top-2 right-3 text-[8px] px-2 py-0.5 rounded-full font-bold text-white" style={{ background: s.color }}>{s.badge}</span>}
+                                            <div key={i} className="relative rounded-xl border border-[var(--sys-border)] p-4 hover:border-[#FF4D00]/30 transition-all" style={{ background: `var(--sys-primary)` }}>
+                                                {s.badge && <span className="absolute -top-2 right-3 text-[8px] px-2 py-0.5 rounded-full font-bold text-[var(--sys-text)]" style={{ background: s.color }}>{s.badge}</span>}
                                                 <div className="flex items-center gap-2 mb-2">
                                                     <span className="material-symbols-outlined text-lg" style={{ color: s.color }}>{s.icon || 'star'}</span>
-                                                    <h5 className="font-bold text-white text-sm">{s.name}</h5>
+                                                    <h5 className="font-bold text-[var(--sys-text)] text-sm">{s.name}</h5>
                                                 </div>
-                                                <p className="text-sm text-slate-500 mb-3 line-clamp-2">{s.description}</p>
+                                                <p className="text-sm text-[var(--sys-text-muted)] mb-3 line-clamp-2">{s.description}</p>
                                                 {/* Studios */}
                                                 <div className="flex gap-1 mb-2">
                                                     {Object.entries(s.studios || {}).map(([k, v]) => (
-                                                        <span key={k} className={`text-[8px] px-1.5 py-0.5 rounded font-bold ${v ? 'bg-emerald-500/15 text-emerald-400' : 'bg-white/[0.04] text-slate-700 line-through'}`}>{studioNames[k]?.split(' ')[0]}</span>
+                                                        <span key={k} className={`text-[8px] px-1.5 py-0.5 rounded font-bold ${v ? 'bg-[var(--sys-primary-dim)] text-primary' : 'bg-[var(--sys-surface)] text-slate-700 line-through'}`}>{studioNames[k]?.split(' ')[0]}</span>
                                                     ))}
                                                 </div>
                                                 <div className="flex items-baseline gap-2 mb-2">
-                                                    <span className="text-lg font-extrabold text-white">₹{s.pricing?.monthly?.toLocaleString()}</span>
-                                                    <span className="text-xs text-slate-600">/mo</span>
-                                                    <span className="text-sm text-slate-500 ml-auto">{s.credits?.monthly >= 999999 ? '∞' : s.credits?.monthly} credits</span>
+                                                    <span className="text-lg font-extrabold text-[var(--sys-text)]">₹{s.pricing?.monthly?.toLocaleString()}</span>
+                                                    <span className="text-xs text-[var(--sys-text-muted)]">/mo</span>
+                                                    <span className="text-sm text-[var(--sys-text-muted)] ml-auto">{s.credits?.monthly >= 999999 ? '∞' : s.credits?.monthly} credits</span>
                                                 </div>
                                                 {/* AI rationale */}
                                                 <p className="text-xs text-[#FF4D00]/70 italic mb-3 line-clamp-2"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">smart_toy</span> {s.aiRationale}</p>
-                                                <button onClick={() => handleAdoptSuggestion(s)} className="w-full py-2 rounded-lg text-sm font-bold text-white cursor-pointer hover:opacity-90 transition-all" style={{ background: `linear-gradient(135deg, ${s.color}, ${s.color}cc)` }}>
+                                                <button onClick={() => handleAdoptSuggestion(s)} className="w-full py-2 rounded-lg text-sm font-bold text-[var(--sys-text)] cursor-pointer hover:opacity-90 transition-all" style={{ background: `var(--sys-primary)` }}>
                                                     Adopt This Package
                                                 </button>
                                             </div>
@@ -1658,97 +1672,97 @@ export default function SuperAdminDashboard() {
                         {/* Package Creation / Edit Form */}
                         {showPkgForm && (
                             <form onSubmit={handleSavePkg} className="glass-panel rounded-2xl p-6 mb-6 border border-primary/20">
-                                <h4 className="font-bold text-white mb-4 flex items-center gap-2">
+                                <h4 className="font-bold text-[var(--sys-text)] mb-4 flex items-center gap-2">
                                     <span className="material-symbols-outlined text-primary text-lg">{editingPkg ? 'edit' : 'add_circle'}</span>
                                     {editingPkg ? `Edit: ${editingPkg.name}` : 'Create New Package'}
                                 </h4>
                                 {/* Row 1: Basic info */}
                                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-                                    <input type="text" placeholder="Package Name *" value={pkgForm.name} onChange={e => setPkgForm(f => ({ ...f, name: e.target.value }))} className="px-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none" required />
-                                    <input type="text" placeholder="Tagline" value={pkgForm.tagline} onChange={e => setPkgForm(f => ({ ...f, tagline: e.target.value }))} className="px-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none" />
-                                    <select value={pkgForm.tier} onChange={e => setPkgForm(f => ({ ...f, tier: Number(e.target.value) }))} className="px-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none cursor-pointer">
+                                    <input type="text" placeholder="Package Name *" value={pkgForm.name} onChange={e => setPkgForm(f => ({ ...f, name: e.target.value }))} className="px-4 py-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm outline-none" required />
+                                    <input type="text" placeholder="Tagline" value={pkgForm.tagline} onChange={e => setPkgForm(f => ({ ...f, tagline: e.target.value }))} className="px-4 py-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm outline-none" />
+                                    <select value={pkgForm.tier} onChange={e => setPkgForm(f => ({ ...f, tier: Number(e.target.value) }))} className="px-4 py-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm outline-none cursor-pointer">
                                         <option value={1}>Tier 1 — Basic</option><option value={2}>Tier 2 — Pro</option><option value={3}>Tier 3 — Enterprise</option>
                                     </select>
-                                    <input type="text" placeholder="Badge (POPULAR, etc)" value={pkgForm.badge} onChange={e => setPkgForm(f => ({ ...f, badge: e.target.value.toUpperCase() }))} className="px-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none" />
+                                    <input type="text" placeholder="Badge (POPULAR, etc)" value={pkgForm.badge} onChange={e => setPkgForm(f => ({ ...f, badge: e.target.value.toUpperCase() }))} className="px-4 py-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm outline-none" />
                                 </div>
-                                <textarea placeholder="Description" value={pkgForm.description} onChange={e => setPkgForm(f => ({ ...f, description: e.target.value }))} rows={2} className="w-full mb-4 px-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none resize-none" />
+                                <textarea placeholder="Description" value={pkgForm.description} onChange={e => setPkgForm(f => ({ ...f, description: e.target.value }))} rows={2} className="w-full mb-4 px-4 py-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm outline-none resize-none" />
 
                                 {/* Row 2: Studio Access */}
-                                <h5 className="text-xs font-bold text-slate-400 mb-2 flex items-center gap-1.5"><span className="material-symbols-outlined text-sm text-[#FF4D00]">apps</span>Studio Access</h5>
+                                <h5 className="text-xs font-bold text-[var(--sys-text-muted)] mb-2 flex items-center gap-1.5"><span className="material-symbols-outlined text-sm text-[#FF4D00]">apps</span>Studio Access</h5>
                                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
                                     {Object.entries(studioNames).map(([key, label]) => (
                                         <button key={key} type="button" onClick={() => setPkgForm(f => ({ ...f, studios: { ...f.studios, [key]: !f.studios[key] } }))}
-                                            className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${pkgForm.studios[key] ? 'border-emerald-500/30 bg-emerald-500/10' : 'border-white/[0.06] bg-white/[0.02]'}`}>
+                                            className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${pkgForm.studios[key] ? 'border-[var(--sys-border)] bg-[var(--sys-primary-dim)]' : 'border-[var(--sys-border)] bg-[var(--sys-surface)]'}`}>
                                             <div className="flex items-center justify-between">
-                                                <span className="text-sm font-bold text-white">{label}</span>
-                                                <span className={`material-symbols-outlined text-sm ${pkgForm.studios[key] ? 'text-emerald-400' : 'text-slate-700'}`}>{pkgForm.studios[key] ? 'check_circle' : 'cancel'}</span>
+                                                <span className="text-sm font-bold text-[var(--sys-text)]">{label}</span>
+                                                <span className={`material-symbols-outlined text-sm ${pkgForm.studios[key] ? 'text-primary' : 'text-slate-700'}`}>{pkgForm.studios[key] ? 'check_circle' : 'cancel'}</span>
                                             </div>
                                         </button>
                                     ))}
                                 </div>
 
                                 {/* Row 3: Credits */}
-                                <h5 className="text-xs font-bold text-slate-400 mb-2 flex items-center gap-1.5"><span className="material-symbols-outlined text-sm text-amber-400">token</span>Credits & Costs</h5>
+                                <h5 className="text-xs font-bold text-[var(--sys-text-muted)] mb-2 flex items-center gap-1.5"><span className="material-symbols-outlined text-sm text-primary">token</span>Credits & Costs</h5>
                                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-4">
                                     <div>
-                                        <label className="text-xs text-slate-600 block mb-1">Monthly Credits</label>
-                                        <input type="number" value={pkgForm.credits.monthly} onChange={e => setPkgForm(f => ({ ...f, credits: { ...f.credits, monthly: Number(e.target.value) } }))} className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none" />
+                                        <label className="text-xs text-[var(--sys-text-muted)] block mb-1">Monthly Credits</label>
+                                        <input type="number" value={pkgForm.credits.monthly} onChange={e => setPkgForm(f => ({ ...f, credits: { ...f.credits, monthly: Number(e.target.value) } }))} className="w-full px-3 py-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm outline-none" />
                                     </div>
                                     <div>
-                                        <label className="text-xs text-slate-600 block mb-1">Signup Bonus</label>
-                                        <input type="number" value={pkgForm.credits.bonusOnSignup} onChange={e => setPkgForm(f => ({ ...f, credits: { ...f.credits, bonusOnSignup: Number(e.target.value) } }))} className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none" />
+                                        <label className="text-xs text-[var(--sys-text-muted)] block mb-1">Signup Bonus</label>
+                                        <input type="number" value={pkgForm.credits.bonusOnSignup} onChange={e => setPkgForm(f => ({ ...f, credits: { ...f.credits, bonusOnSignup: Number(e.target.value) } }))} className="w-full px-3 py-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm outline-none" />
                                     </div>
                                     <div className="flex items-end">
                                         <button type="button" onClick={() => setPkgForm(f => ({ ...f, credits: { ...f.credits, rollover: !f.credits.rollover } }))}
-                                            className={`w-full py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1 cursor-pointer ${pkgForm.credits.rollover ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20' : 'bg-white/[0.04] text-slate-500 border border-white/[0.08]'}`}>
+                                            className={`w-full py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1 cursor-pointer ${pkgForm.credits.rollover ? 'bg-[var(--sys-primary-dim)] text-primary border border-[var(--sys-border)]' : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] border border-[var(--sys-border)]'}`}>
                                             <span className="material-symbols-outlined text-sm">{pkgForm.credits.rollover ? 'check' : 'close'}</span>Rollover
                                         </button>
                                     </div>
                                     <div>
-                                        <label className="text-xs text-slate-600 block mb-1">Content Cost</label>
-                                        <input type="number" value={pkgForm.creditCosts.content} onChange={e => setPkgForm(f => ({ ...f, creditCosts: { ...f.creditCosts, content: Number(e.target.value) } }))} className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none" />
+                                        <label className="text-xs text-[var(--sys-text-muted)] block mb-1">Content Cost</label>
+                                        <input type="number" value={pkgForm.creditCosts.content} onChange={e => setPkgForm(f => ({ ...f, creditCosts: { ...f.creditCosts, content: Number(e.target.value) } }))} className="w-full px-3 py-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm outline-none" />
                                     </div>
                                     <div>
-                                        <label className="text-xs text-slate-600 block mb-1">Creative Cost</label>
-                                        <input type="number" value={pkgForm.creditCosts.creative} onChange={e => setPkgForm(f => ({ ...f, creditCosts: { ...f.creditCosts, creative: Number(e.target.value) } }))} className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none" />
+                                        <label className="text-xs text-[var(--sys-text-muted)] block mb-1">Creative Cost</label>
+                                        <input type="number" value={pkgForm.creditCosts.creative} onChange={e => setPkgForm(f => ({ ...f, creditCosts: { ...f.creditCosts, creative: Number(e.target.value) } }))} className="w-full px-3 py-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm outline-none" />
                                     </div>
                                 </div>
 
                                 {/* Row 4: Limits + Pricing */}
-                                <h5 className="text-xs font-bold text-slate-400 mb-2 flex items-center gap-1.5"><span className="material-symbols-outlined text-sm text-[#FF4D00]">tune</span>Limits & Pricing</h5>
+                                <h5 className="text-xs font-bold text-[var(--sys-text-muted)] mb-2 flex items-center gap-1.5"><span className="material-symbols-outlined text-sm text-[#FF4D00]">tune</span>Limits & Pricing</h5>
                                 <div className="grid grid-cols-7 gap-3 mb-4">
-                                    <div><label className="text-xs text-slate-600 block mb-1">Max Brands</label><input type="number" value={pkgForm.limits.maxBrands} onChange={e => setPkgForm(f => ({ ...f, limits: { ...f.limits, maxBrands: Number(e.target.value) } }))} className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none" /></div>
-                                    <div><label className="text-xs text-slate-600 block mb-1">Team Seats</label><input type="number" value={pkgForm.limits.maxTeamMembers} onChange={e => setPkgForm(f => ({ ...f, limits: { ...f.limits, maxTeamMembers: Number(e.target.value) } }))} className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none" /></div>
-                                    <div><label className="text-xs text-slate-600 block mb-1">Products</label><input type="number" value={pkgForm.limits.maxProducts} onChange={e => setPkgForm(f => ({ ...f, limits: { ...f.limits, maxProducts: Number(e.target.value) } }))} className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none" /></div>
-                                    <div><label className="text-xs text-slate-600 block mb-1">Sched. Posts</label><input type="number" value={pkgForm.limits.maxScheduledPosts} onChange={e => setPkgForm(f => ({ ...f, limits: { ...f.limits, maxScheduledPosts: Number(e.target.value) } }))} className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none" /></div>
-                                    <div><label className="text-xs text-slate-600 block mb-1">Social Accs</label><input type="number" value={pkgForm.limits.socialIntegrations} onChange={e => setPkgForm(f => ({ ...f, limits: { ...f.limits, socialIntegrations: Number(e.target.value) } }))} className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none" /></div>
-                                    <div><label className="text-xs text-slate-600 block mb-1">₹ Monthly</label><input type="number" value={pkgForm.pricing.monthly} onChange={e => setPkgForm(f => ({ ...f, pricing: { ...f.pricing, monthly: Number(e.target.value) } }))} className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none" /></div>
-                                    <div><label className="text-xs text-slate-600 block mb-1">₹ Quarterly</label><input type="number" value={pkgForm.pricing.quarterly} onChange={e => setPkgForm(f => ({ ...f, pricing: { ...f.pricing, quarterly: Number(e.target.value) } }))} className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none" /></div>
-                                    <div><label className="text-xs text-slate-600 block mb-1">₹ Yearly</label><input type="number" value={pkgForm.pricing.yearly} onChange={e => setPkgForm(f => ({ ...f, pricing: { ...f.pricing, yearly: Number(e.target.value) } }))} className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none" /></div>
+                                    <div><label className="text-xs text-[var(--sys-text-muted)] block mb-1">Max Brands</label><input type="number" value={pkgForm.limits.maxBrands} onChange={e => setPkgForm(f => ({ ...f, limits: { ...f.limits, maxBrands: Number(e.target.value) } }))} className="w-full px-3 py-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm outline-none" /></div>
+                                    <div><label className="text-xs text-[var(--sys-text-muted)] block mb-1">Team Seats</label><input type="number" value={pkgForm.limits.maxTeamMembers} onChange={e => setPkgForm(f => ({ ...f, limits: { ...f.limits, maxTeamMembers: Number(e.target.value) } }))} className="w-full px-3 py-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm outline-none" /></div>
+                                    <div><label className="text-xs text-[var(--sys-text-muted)] block mb-1">Products</label><input type="number" value={pkgForm.limits.maxProducts} onChange={e => setPkgForm(f => ({ ...f, limits: { ...f.limits, maxProducts: Number(e.target.value) } }))} className="w-full px-3 py-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm outline-none" /></div>
+                                    <div><label className="text-xs text-[var(--sys-text-muted)] block mb-1">Sched. Posts</label><input type="number" value={pkgForm.limits.maxScheduledPosts} onChange={e => setPkgForm(f => ({ ...f, limits: { ...f.limits, maxScheduledPosts: Number(e.target.value) } }))} className="w-full px-3 py-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm outline-none" /></div>
+                                    <div><label className="text-xs text-[var(--sys-text-muted)] block mb-1">Social Accs</label><input type="number" value={pkgForm.limits.socialIntegrations} onChange={e => setPkgForm(f => ({ ...f, limits: { ...f.limits, socialIntegrations: Number(e.target.value) } }))} className="w-full px-3 py-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm outline-none" /></div>
+                                    <div><label className="text-xs text-[var(--sys-text-muted)] block mb-1">₹ Monthly</label><input type="number" value={pkgForm.pricing.monthly} onChange={e => setPkgForm(f => ({ ...f, pricing: { ...f.pricing, monthly: Number(e.target.value) } }))} className="w-full px-3 py-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm outline-none" /></div>
+                                    <div><label className="text-xs text-[var(--sys-text-muted)] block mb-1">₹ Quarterly</label><input type="number" value={pkgForm.pricing.quarterly} onChange={e => setPkgForm(f => ({ ...f, pricing: { ...f.pricing, quarterly: Number(e.target.value) } }))} className="w-full px-3 py-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm outline-none" /></div>
+                                    <div><label className="text-xs text-[var(--sys-text-muted)] block mb-1">₹ Yearly</label><input type="number" value={pkgForm.pricing.yearly} onChange={e => setPkgForm(f => ({ ...f, pricing: { ...f.pricing, yearly: Number(e.target.value) } }))} className="w-full px-3 py-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm outline-none" /></div>
                                 </div>
 
                                 {/* Row 5: Features */}
-                                <h5 className="text-xs font-bold text-slate-400 mb-2 flex items-center gap-1.5"><span className="material-symbols-outlined text-sm text-emerald-400">checklist</span>Features</h5>
+                                <h5 className="text-xs font-bold text-[var(--sys-text-muted)] mb-2 flex items-center gap-1.5"><span className="material-symbols-outlined text-sm text-primary">checklist</span>Features</h5>
                                 <div className="flex gap-2 mb-2">
-                                    <input type="text" value={newFeature} onChange={e => setNewFeature(e.target.value)} onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addFeature())} placeholder="Add feature (e.g. AI Photoshoot)" className="flex-1 px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none" />
-                                    <button type="button" onClick={addFeature} className="px-3 py-2 rounded-lg bg-emerald-500/10 text-emerald-400 text-xs font-bold cursor-pointer">+ Add</button>
+                                    <input type="text" value={newFeature} onChange={e => setNewFeature(e.target.value)} onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addFeature())} placeholder="Add feature (e.g. AI Photoshoot)" className="flex-1 px-3 py-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm outline-none" />
+                                    <button type="button" onClick={addFeature} className="px-3 py-2 rounded-lg bg-[var(--sys-primary-dim)] text-primary text-xs font-bold cursor-pointer">+ Add</button>
                                 </div>
                                 <div className="flex flex-wrap gap-1.5 mb-4">
                                     {pkgForm.features.map((f, i) => (
-                                        <span key={i} className="text-xs px-2 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center gap-1">
+                                        <span key={i} className="text-xs px-2 py-1 rounded-lg bg-[var(--sys-primary-dim)] text-primary flex items-center gap-1">
                                             {f.name}
-                                            <button type="button" onClick={() => removeFeature(i)} className="text-emerald-600 hover:text-rose-400 cursor-pointer">×</button>
+                                            <button type="button" onClick={() => removeFeature(i)} className="text-primary hover:text-primary cursor-pointer">×</button>
                                         </span>
                                     ))}
                                 </div>
 
                                 {/* Row 6: Color + actions */}
                                 <div className="flex items-center gap-3">
-                                    <label className="text-xs text-slate-600">Color</label>
+                                    <label className="text-xs text-[var(--sys-text-muted)]">Color</label>
                                     <input type="color" value={pkgForm.color} onChange={e => setPkgForm(f => ({ ...f, color: e.target.value }))} className="w-8 h-8 rounded cursor-pointer bg-transparent border-0" />
-                                    <input type="text" placeholder="Icon name" value={pkgForm.icon} onChange={e => setPkgForm(f => ({ ...f, icon: e.target.value }))} className="px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none w-32" />
+                                    <input type="text" placeholder="Icon name" value={pkgForm.icon} onChange={e => setPkgForm(f => ({ ...f, icon: e.target.value }))} className="px-3 py-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm outline-none w-32" />
                                     <div className="flex-1" />
-                                    <button type="button" onClick={() => { setShowPkgForm(false); setEditingPkg(null) }} className="px-4 py-2 rounded-lg text-sm text-slate-400 cursor-pointer">Cancel</button>
+                                    <button type="button" onClick={() => { setShowPkgForm(false); setEditingPkg(null) }} className="px-4 py-2 rounded-lg text-sm text-[var(--sys-text-muted)] cursor-pointer">Cancel</button>
                                     <button type="submit" className="btn-primary px-6 py-2 rounded-lg text-sm cursor-pointer">{editingPkg ? 'Update' : 'Create'} Package</button>
                                 </div>
                             </form>
@@ -1758,44 +1772,44 @@ export default function SuperAdminDashboard() {
                         {packages.length > 0 ? (
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                 {packages.map(pkg => (
-                                    <div key={pkg._id} className="relative glass-panel rounded-2xl overflow-hidden hover:border-white/[0.12] transition-all" style={{ borderTop: `3px solid ${pkg.color || '#6366f1'}` }}>
-                                        {pkg.badge && <span className="absolute top-3 right-3 text-[8px] px-2 py-0.5 rounded-full font-bold text-white" style={{ background: pkg.color }}>{pkg.badge}</span>}
+                                    <div key={pkg._id} className="relative glass-panel rounded-2xl overflow-hidden hover:border-[var(--sys-border)] transition-all" style={{ borderTop: `3px solid ${pkg.color || '#6366f1'}` }}>
+                                        {pkg.badge && <span className="absolute top-3 right-3 text-[8px] px-2 py-0.5 rounded-full font-bold text-[var(--sys-text)]" style={{ background: pkg.color }}>{pkg.badge}</span>}
                                         <div className="p-5">
                                             <div className="flex items-center gap-2 mb-1">
                                                 <span className="material-symbols-outlined" style={{ color: pkg.color }}>{pkg.icon || 'star'}</span>
-                                                <h4 className="text-base font-extrabold text-white">{pkg.name}</h4>
+                                                <h4 className="text-base font-extrabold text-[var(--sys-text)]">{pkg.name}</h4>
                                                 {pkg.generatedByAI && <span className="text-[8px] px-1.5 py-0.5 rounded bg-[#FF4D00]/15 text-[#FF4D00] font-bold">AI</span>}
                                             </div>
-                                            {pkg.tagline && <p className="text-sm text-slate-500 mb-3">{pkg.tagline}</p>}
+                                            {pkg.tagline && <p className="text-sm text-[var(--sys-text-muted)] mb-3">{pkg.tagline}</p>}
 
                                             {/* Price */}
                                             <div className="flex items-baseline gap-1 mb-3">
-                                                <span className="text-2xl font-extrabold text-white">₹{(pkg.pricing?.monthly || 0).toLocaleString()}</span>
-                                                <span className="text-xs text-slate-600">/mo</span>
-                                                {pkg.pricing?.quarterly > 0 && <span className="text-sm text-slate-500 ml-1">₹{(pkg.pricing?.quarterly || 0).toLocaleString()}/qtr</span>}
-                                                {pkg.pricing?.yearly > 0 && <span className="text-sm text-slate-500 ml-1">₹{(pkg.pricing?.yearly || 0).toLocaleString()}/yr</span>}
+                                                <span className="text-2xl font-extrabold text-[var(--sys-text)]">₹{(pkg.pricing?.monthly || 0).toLocaleString()}</span>
+                                                <span className="text-xs text-[var(--sys-text-muted)]">/mo</span>
+                                                {pkg.pricing?.quarterly > 0 && <span className="text-sm text-[var(--sys-text-muted)] ml-1">₹{(pkg.pricing?.quarterly || 0).toLocaleString()}/qtr</span>}
+                                                {pkg.pricing?.yearly > 0 && <span className="text-sm text-[var(--sys-text-muted)] ml-1">₹{(pkg.pricing?.yearly || 0).toLocaleString()}/yr</span>}
                                             </div>
 
                                             {/* Studios */}
                                             <div className="flex gap-1 mb-3">
                                                 {Object.entries(pkg.studios || {}).map(([k, v]) => (
-                                                    <span key={k} className={`text-xs px-2 py-0.5 rounded-full font-bold ${v ? 'bg-emerald-500/15 text-emerald-400' : 'bg-white/[0.04] text-slate-700 line-through'}`}>{studioNames[k]?.split(' ')[0]}</span>
+                                                    <span key={k} className={`text-xs px-2 py-0.5 rounded-full font-bold ${v ? 'bg-[var(--sys-primary-dim)] text-primary' : 'bg-[var(--sys-surface)] text-slate-700 line-through'}`}>{studioNames[k]?.split(' ')[0]}</span>
                                                 ))}
                                             </div>
 
                                             {/* Credits */}
                                             <div className="flex gap-3 mb-3 text-center">
-                                                <div className="flex-1 p-2 rounded-lg bg-white/[0.03]">
-                                                    <p className="text-sm font-bold text-amber-400">{pkg.credits?.monthly >= 999999 ? '∞' : pkg.credits?.monthly || 0}</p>
-                                                    <p className="text-[8px] text-slate-600">credits/mo</p>
+                                                <div className="flex-1 p-2 rounded-lg bg-[var(--sys-surface)]">
+                                                    <p className="text-sm font-bold text-primary">{pkg.credits?.monthly >= 999999 ? '∞' : pkg.credits?.monthly || 0}</p>
+                                                    <p className="text-[8px] text-[var(--sys-text-muted)]">credits/mo</p>
                                                 </div>
-                                                <div className="flex-1 p-2 rounded-lg bg-white/[0.03]">
-                                                    <p className="text-base font-bold text-white">{pkg.limits?.maxBrands >= 999 ? '∞' : pkg.limits?.maxBrands || 0}</p>
-                                                    <p className="text-[8px] text-slate-600">brands</p>
+                                                <div className="flex-1 p-2 rounded-lg bg-[var(--sys-surface)]">
+                                                    <p className="text-base font-bold text-[var(--sys-text)]">{pkg.limits?.maxBrands >= 999 ? '∞' : pkg.limits?.maxBrands || 0}</p>
+                                                    <p className="text-[8px] text-[var(--sys-text-muted)]">brands</p>
                                                 </div>
-                                                <div className="flex-1 p-2 rounded-lg bg-white/[0.03]">
-                                                    <p className="text-base font-bold text-white">{pkg.limits?.maxTeamMembers || 0}</p>
-                                                    <p className="text-[8px] text-slate-600">seats</p>
+                                                <div className="flex-1 p-2 rounded-lg bg-[var(--sys-surface)]">
+                                                    <p className="text-base font-bold text-[var(--sys-text)]">{pkg.limits?.maxTeamMembers || 0}</p>
+                                                    <p className="text-[8px] text-[var(--sys-text-muted)]">seats</p>
                                                 </div>
                                             </div>
 
@@ -1804,27 +1818,27 @@ export default function SuperAdminDashboard() {
                                                 <div className="space-y-1 mb-3">
                                                     {pkg.features.slice(0, 5).map((f, i) => (
                                                         <div key={i} className="flex items-center gap-1.5">
-                                                            <span className={`material-symbols-outlined text-xs ${f.included ? 'text-emerald-400' : 'text-slate-700'}`}>{f.included ? 'check' : 'close'}</span>
-                                                            <span className={`text-xs ${f.included ? 'text-slate-400' : 'text-slate-700 line-through'}`}>{f.name}</span>
+                                                            <span className={`material-symbols-outlined text-xs ${f.included ? 'text-primary' : 'text-slate-700'}`}>{f.included ? 'check' : 'close'}</span>
+                                                            <span className={`text-xs ${f.included ? 'text-[var(--sys-text-muted)]' : 'text-slate-700 line-through'}`}>{f.name}</span>
                                                         </div>
                                                     ))}
-                                                    {pkg.features.length > 5 && <p className="text-xs text-slate-600 pl-5">+{pkg.features.length - 5} more</p>}
+                                                    {pkg.features.length > 5 && <p className="text-xs text-[var(--sys-text-muted)] pl-5">+{pkg.features.length - 5} more</p>}
                                                 </div>
                                             )}
 
                                             {/* Rollover + subscriber badge */}
                                             <div className="flex items-center gap-2 mb-3">
-                                                {pkg.credits?.rollover && <span className="text-[8px] px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 font-bold">Rollover</span>}
-                                                {pkg.isDefault && <span className="text-[8px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 font-bold">DEFAULT</span>}
-                                                <span className="text-xs text-slate-600 ml-auto">{pkg.subscriberCount || 0} users</span>
+                                                {pkg.credits?.rollover && <span className="text-[8px] px-1.5 py-0.5 rounded bg-[var(--sys-primary-dim)] text-primary font-bold">Rollover</span>}
+                                                {pkg.isDefault && <span className="text-[8px] px-1.5 py-0.5 rounded bg-[var(--sys-primary-dim)] text-primary font-bold">DEFAULT</span>}
+                                                <span className="text-xs text-[var(--sys-text-muted)] ml-auto">{pkg.subscriberCount || 0} users</span>
                                             </div>
 
                                             {/* Actions */}
-                                            <div className="flex gap-2 pt-3 border-t border-white/[0.06]">
-                                                <button onClick={() => handleEditPkg(pkg)} className="flex-1 py-2 rounded-lg bg-white/[0.04] text-xs font-bold text-slate-400 hover:text-white hover:bg-white/[0.06] flex items-center justify-center gap-1 cursor-pointer">
+                                            <div className="flex gap-2 pt-3 border-t border-[var(--sys-border)]">
+                                                <button onClick={() => handleEditPkg(pkg)} className="flex-1 py-2 rounded-lg bg-[var(--sys-surface)] text-xs font-bold text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)] flex items-center justify-center gap-1 cursor-pointer">
                                                     <span className="material-symbols-outlined text-sm">edit</span>Edit
                                                 </button>
-                                                <button onClick={() => handleDeletePkg(pkg._id, pkg.name)} className="py-2 px-3 rounded-lg hover:bg-rose-500/10 text-slate-600 hover:text-rose-400 cursor-pointer">
+                                                <button onClick={() => handleDeletePkg(pkg._id, pkg.name)} className="py-2 px-3 rounded-lg hover:bg-[var(--sys-primary-dim)] text-[var(--sys-text-muted)] hover:text-primary cursor-pointer">
                                                     <span className="material-symbols-outlined text-sm">delete</span>
                                                 </button>
                                             </div>
@@ -1835,9 +1849,9 @@ export default function SuperAdminDashboard() {
                         ) : (
                             <div className="text-center py-16 glass-panel rounded-2xl">
                                 <span className="material-symbols-outlined text-5xl text-slate-700 mb-3">inventory_2</span>
-                                <h3 className="text-lg font-bold text-white mb-1">No Packages Yet</h3>
-                                <p className="text-sm text-slate-500 mb-4">Use AI to suggest packages based on usage patterns, or create one manually</p>
-                                <button onClick={handleAISuggest} disabled={suggestingAI} className="px-6 py-3 rounded-xl bg-gradient-to-r from-[#FF4D00]/20 to-[#FF7A00]/20 border border-[#FF4D00]/30 text-[#FF7A00] text-sm font-bold cursor-pointer">
+                                <h3 className="text-lg font-bold text-[var(--sys-text)] mb-1">No Packages Yet</h3>
+                                <p className="text-sm text-[var(--sys-text-muted)] mb-4">Use AI to suggest packages based on usage patterns, or create one manually</p>
+                                <button onClick={handleAISuggest} disabled={suggestingAI} className="px-6 py-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] border border-[#FF4D00]/30 text-[#FF7A00] text-sm font-bold cursor-pointer">
                                     <span className="material-symbols-outlined text-sm align-middle mr-1">auto_awesome</span>Generate AI Suggestions
                                 </button>
                             </div>
@@ -1851,13 +1865,13 @@ export default function SuperAdminDashboard() {
                     <div>
                         <div className="flex justify-between items-center mb-6">
                             <div>
-                                <h3 className="text-xl font-black text-white flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-amber-500">confirmation_number</span>
+                                <h3 className="text-xl font-black text-[var(--sys-text)] flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-primary">confirmation_number</span>
                                     Coupon Management
                                 </h3>
-                                <p className="text-sm text-slate-500">Create and track promotional discounts</p>
+                                <p className="text-sm text-[var(--sys-text-muted)]">Create and track promotional discounts</p>
                             </div>
-                            <button onClick={() => setShowCouponForm(!showCouponForm)} className="px-5 py-2.5 rounded-xl bg-amber-500 text-black font-black text-sm flex items-center gap-2 hover:bg-amber-400 transition-all cursor-pointer">
+                            <button onClick={() => setShowCouponForm(!showCouponForm)} className="px-5 py-2.5 rounded-xl bg-[var(--sys-surface)] text-black font-black text-sm flex items-center gap-2 hover:bg-[var(--sys-surface)] transition-all cursor-pointer">
                                 <span className="material-symbols-outlined text-sm">add</span>
                                 New Coupon
                             </button>
@@ -1865,75 +1879,75 @@ export default function SuperAdminDashboard() {
 
                         {/* Quick Stats Summary */}
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-                            <div className="glass-panel p-4 rounded-2xl border-white/[0.04]">
-                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1">Total Coupons</p>
-                                <p className="text-2xl font-black text-white">{coupons.length}</p>
+                            <div className="glass-panel p-4 rounded-2xl border-[var(--sys-border)]">
+                                <p className="text-[10px] font-black uppercase tracking-widest text-[var(--sys-text-muted)] mb-1">Total Coupons</p>
+                                <p className="text-2xl font-black text-[var(--sys-text)]">{coupons.length}</p>
                             </div>
-                            <div className="glass-panel p-4 rounded-2xl border-emerald-500/10 bg-emerald-500/[0.02]">
-                                <p className="text-[10px] font-black uppercase tracking-widest text-emerald-500/60 mb-1">Active Now</p>
-                                <p className="text-2xl font-black text-emerald-400">{coupons.filter(c => c.isActive && c.isValid).length}</p>
+                            <div className="glass-panel p-4 rounded-2xl border-[var(--sys-border)] bg-[var(--sys-surface)]/[0.02]">
+                                <p className="text-[10px] font-black uppercase tracking-widest text-primary/60 mb-1">Active Now</p>
+                                <p className="text-2xl font-black text-primary">{coupons.filter(c => c.isActive && c.isValid).length}</p>
                             </div>
-                            <div className="glass-panel p-4 rounded-2xl border-amber-500/10 bg-amber-500/[0.02]">
-                                <p className="text-[10px] font-black uppercase tracking-widest text-amber-500/60 mb-1">Total Redemptions</p>
-                                <p className="text-2xl font-black text-amber-400">
+                            <div className="glass-panel p-4 rounded-2xl border-[var(--sys-border)] bg-[var(--sys-surface)]/[0.02]">
+                                <p className="text-[10px] font-black uppercase tracking-widest text-primary/60 mb-1">Total Redemptions</p>
+                                <p className="text-2xl font-black text-primary">
                                     {coupons.reduce((sum, c) => sum + (c.usedCount || 0), 0)}
                                 </p>
                             </div>
                         </div>
 
                         {showCouponForm && (
-                            <form onSubmit={handleCreateCoupon} className="glass-panel rounded-2xl p-6 mb-8 border border-amber-500/20 bg-amber-500/[0.02] shadow-2xl shadow-amber-500/5 anim-fade-in">
-                                <h4 className="font-black text-white mb-6 uppercase tracking-widest text-xs flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-amber-400 text-sm">edit_note</span>
+                            <form onSubmit={handleCreateCoupon} className="glass-panel rounded-2xl p-6 mb-8 border border-[var(--sys-border)] bg-[var(--sys-surface)]/[0.02] shadow-none anim-fade-in">
+                                <h4 className="font-black text-[var(--sys-text)] mb-6 uppercase tracking-widest text-xs flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-primary text-sm">edit_note</span>
                                     Configure New Coupon
                                 </h4>
                                 
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
                                     <div>
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 block ml-1">Unique Code</label>
-                                        <input type="text" placeholder="e.g. MANTRAM50" value={couponForm.code} onChange={e => setCouponForm(f => ({ ...f, code: e.target.value.toUpperCase() }))} className="w-full px-4 py-3 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none focus:border-amber-500/30 transition-all font-mono font-bold" required />
+                                        <label className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest mb-2 block ml-1">Unique Code</label>
+                                        <input type="text" placeholder="e.g. MANTRAM50" value={couponForm.code} onChange={e => setCouponForm(f => ({ ...f, code: e.target.value.toUpperCase() }))} className="w-full px-4 py-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm outline-none focus:border-[var(--sys-border)] transition-all font-mono font-bold" required />
                                     </div>
                                     <div>
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 block ml-1">Discount Type</label>
-                                        <select value={couponForm.discountType} onChange={e => setCouponForm(f => ({ ...f, discountType: e.target.value }))} className="w-full px-4 py-3 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none cursor-pointer focus:border-amber-500/30">
+                                        <label className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest mb-2 block ml-1">Discount Type</label>
+                                        <select value={couponForm.discountType} onChange={e => setCouponForm(f => ({ ...f, discountType: e.target.value }))} className="w-full px-4 py-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm outline-none cursor-pointer focus:border-[var(--sys-border)]">
                                             <option value="credits">Bonus Credits</option>
                                             <option value="percentage">% Percentage Discount</option>
                                             <option value="fixed">Fixed ₹ Amount Off</option>
                                         </select>
                                     </div>
                                     <div>
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 block ml-1">Value</label>
-                                        <input type="number" placeholder="Enter number..." value={couponForm.discountValue} onChange={e => setCouponForm(f => ({ ...f, discountValue: e.target.value }))} className="w-full px-4 py-3 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none focus:border-amber-500/30 transition-all font-bold" required />
+                                        <label className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest mb-2 block ml-1">Value</label>
+                                        <input type="number" placeholder="Enter number..." value={couponForm.discountValue} onChange={e => setCouponForm(f => ({ ...f, discountValue: e.target.value }))} className="w-full px-4 py-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm outline-none focus:border-[var(--sys-border)] transition-all font-bold" required />
                                     </div>
                                     <div>
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 block ml-1">Total Max Uses (0=∞)</label>
-                                        <input type="number" placeholder="Global limit" value={couponForm.maxUses} onChange={e => setCouponForm(f => ({ ...f, maxUses: e.target.value }))} className="w-full px-4 py-3 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none focus:border-amber-500/30 transition-all" />
+                                        <label className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest mb-2 block ml-1">Total Max Uses (0=∞)</label>
+                                        <input type="number" placeholder="Global limit" value={couponForm.maxUses} onChange={e => setCouponForm(f => ({ ...f, maxUses: e.target.value }))} className="w-full px-4 py-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm outline-none focus:border-[var(--sys-border)] transition-all" />
                                     </div>
                                     <div>
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 block ml-1">Max Uses Per User</label>
-                                        <input type="number" value={couponForm.maxUsesPerUser} onChange={e => setCouponForm(f => ({ ...f, maxUsesPerUser: e.target.value }))} className="w-full px-4 py-3 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none focus:border-amber-500/30 transition-all" />
+                                        <label className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest mb-2 block ml-1">Max Uses Per User</label>
+                                        <input type="number" value={couponForm.maxUsesPerUser} onChange={e => setCouponForm(f => ({ ...f, maxUsesPerUser: e.target.value }))} className="w-full px-4 py-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm outline-none focus:border-[var(--sys-border)] transition-all" />
                                     </div>
                                     <div>
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 block ml-1">Min Order Value (₹)</label>
-                                        <input type="number" value={couponForm.minPurchase} onChange={e => setCouponForm(f => ({ ...f, minPurchase: e.target.value }))} className="w-full px-4 py-3 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none focus:border-amber-500/30 transition-all" />
+                                        <label className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest mb-2 block ml-1">Min Order Value (₹)</label>
+                                        <input type="number" value={couponForm.minPurchase} onChange={e => setCouponForm(f => ({ ...f, minPurchase: e.target.value }))} className="w-full px-4 py-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm outline-none focus:border-[var(--sys-border)] transition-all" />
                                     </div>
                                     <div>
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 block ml-1">Expiry Date</label>
-                                        <input type="date" value={couponForm.validUntil} onChange={e => setCouponForm(f => ({ ...f, validUntil: e.target.value }))} className="w-full px-4 py-3 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none focus:border-amber-500/30 transition-all" />
+                                        <label className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest mb-2 block ml-1">Expiry Date</label>
+                                        <input type="date" value={couponForm.validUntil} onChange={e => setCouponForm(f => ({ ...f, validUntil: e.target.value }))} className="w-full px-4 py-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm outline-none focus:border-[var(--sys-border)] transition-all" />
                                     </div>
                                     <div className="md:col-span-2">
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 block ml-1">Internal Description</label>
-                                        <input type="text" placeholder="Why is this coupon being created?" value={couponForm.description} onChange={e => setCouponForm(f => ({ ...f, description: e.target.value }))} className="w-full px-4 py-3 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none focus:border-amber-500/30 transition-all" />
+                                        <label className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest mb-2 block ml-1">Internal Description</label>
+                                        <input type="text" placeholder="Why is this coupon being created?" value={couponForm.description} onChange={e => setCouponForm(f => ({ ...f, description: e.target.value }))} className="w-full px-4 py-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm outline-none focus:border-[var(--sys-border)] transition-all" />
                                     </div>
                                 </div>
 
                                 <div className="mb-6">
-                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3 block ml-1">Targeting: Applicable Plans & Packs (None = All)</label>
-                                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 max-h-48 overflow-y-auto p-4 bg-black/20 rounded-2xl border border-white/[0.04]">
+                                    <label className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest mb-3 block ml-1">Targeting: Applicable Plans & Packs (None = All)</label>
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 max-h-48 overflow-y-auto p-4 bg-[var(--sys-surface)] rounded-2xl border border-[var(--sys-border)]">
                                         {/* Packages */}
                                         {packages.map(p => (
                                             <div key={p.slug} onClick={() => setCouponForm(f => ({ ...f, applicablePlans: f.applicablePlans.includes(p.slug) ? f.applicablePlans.filter(x => x !== p.slug) : [...f.applicablePlans, p.slug] }))} 
-                                                className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-all border ${couponForm.applicablePlans.includes(p.slug) ? 'bg-amber-500/20 border-amber-500/40 text-amber-400' : 'bg-white/[0.02] border-transparent text-slate-500 hover:text-slate-300'}`}>
+                                                className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-all border ${couponForm.applicablePlans.includes(p.slug) ? 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary' : 'bg-[var(--sys-surface)] border-transparent text-[var(--sys-text-muted)] hover:text-[var(--sys-text-muted)]'}`}>
                                                 <span className="material-symbols-outlined text-xs">{couponForm.applicablePlans.includes(p.slug) ? 'check_box' : 'check_box_outline_blank'}</span>
                                                 <span className="text-[10px] font-bold uppercase truncate">{p.name} (Sub)</span>
                                             </div>
@@ -1941,7 +1955,7 @@ export default function SuperAdminDashboard() {
                                         {/* Credit Packs */}
                                         {creditPacksList.map(p => (
                                             <div key={p.slug} onClick={() => setCouponForm(f => ({ ...f, applicablePlans: f.applicablePlans.includes(p.slug) ? f.applicablePlans.filter(x => x !== p.slug) : [...f.applicablePlans, p.slug] }))} 
-                                                className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-all border ${couponForm.applicablePlans.includes(p.slug) ? 'bg-cyan-500/20 border-cyan-500/40 text-cyan-400' : 'bg-white/[0.02] border-transparent text-slate-500 hover:text-slate-300'}`}>
+                                                className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-all border ${couponForm.applicablePlans.includes(p.slug) ? 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary' : 'bg-[var(--sys-surface)] border-transparent text-[var(--sys-text-muted)] hover:text-[var(--sys-text-muted)]'}`}>
                                                 <span className="material-symbols-outlined text-xs">{couponForm.applicablePlans.includes(p.slug) ? 'check_box' : 'check_box_outline_blank'}</span>
                                                 <span className="text-[10px] font-bold uppercase truncate">{p.name} (Pack)</span>
                                             </div>
@@ -1949,37 +1963,37 @@ export default function SuperAdminDashboard() {
                                     </div>
                                 </div>
 
-                                <div className="flex justify-end gap-3 pt-6 border-t border-white/[0.06]">
-                                    <button type="button" onClick={() => setShowCouponForm(false)} className="px-6 py-2.5 rounded-xl text-xs font-black text-slate-500 hover:text-white transition-all cursor-pointer">Discard</button>
-                                    <button type="submit" className="px-8 py-2.5 rounded-xl bg-amber-500 text-black font-black text-xs hover:bg-amber-400 transition-all shadow-lg shadow-amber-500/20 cursor-pointer">Create Coupon</button>
+                                <div className="flex justify-end gap-3 pt-6 border-t border-[var(--sys-border)]">
+                                    <button type="button" onClick={() => setShowCouponForm(false)} className="px-6 py-2.5 rounded-xl text-xs font-black text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] transition-all cursor-pointer">Discard</button>
+                                    <button type="submit" className="px-8 py-2.5 rounded-xl bg-[var(--sys-surface)] text-black font-black text-xs hover:bg-[var(--sys-surface)] transition-all shadow-none cursor-pointer">Create Coupon</button>
                                 </div>
                             </form>
                         )}
 
                         <div className="space-y-3">
                             {coupons.length === 0 ? (
-                                <div className="text-center py-20 glass-panel rounded-3xl border border-dashed border-white/[0.08]">
+                                <div className="text-center py-20 glass-panel rounded-3xl border border-dashed border-[var(--sys-border)]">
                                     <span className="material-symbols-outlined text-6xl text-slate-800 mb-4 scale-125 block">confirmation_number</span>
-                                    <h3 className="text-xl font-black text-white mb-2">No Active Campaigns</h3>
-                                    <p className="text-slate-600 max-w-sm mx-auto text-sm">Create your first coupon code to start driving conversions and rewarding users.</p>
+                                    <h3 className="text-xl font-black text-[var(--sys-text)] mb-2">No Active Campaigns</h3>
+                                    <p className="text-[var(--sys-text-muted)] max-w-sm mx-auto text-sm">Create your first coupon code to start driving conversions and rewarding users.</p>
                                 </div>
                             ) : coupons.map(c => {
                                 const isExpired = c.validUntil && new Date(c.validUntil) < new Date();
                                 const usagePct = c.maxUses > 0 ? (c.usedCount / c.maxUses) * 100 : 0;
                                 
                                 return (
-                                    <div key={c._id} className={`glass-panel rounded-2xl p-5 border transition-all duration-500 hover:shadow-xl hover:shadow-black/20 ${!c.isActive ? 'opacity-40 grayscale-[0.5]' : isExpired ? 'border-rose-500/10' : 'border-white/[0.04]'}`}>
+                                    <div key={c._id} className={`glass-panel rounded-2xl p-5 border transition-all duration-500 hover:shadow-xl hover:shadow-none ${!c.isActive ? 'opacity-40 grayscale-[0.5]' : isExpired ? 'border-[var(--sys-border)]' : 'border-[var(--sys-border)]'}`}>
                                         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
                                             <div className="flex items-center gap-4 flex-1">
-                                                <div className={`w-14 h-14 rounded-2xl flex flex-col items-center justify-center border ${c.discountType === 'credits' ? 'bg-cyan-500/10 border-cyan-500/20 text-cyan-400' : 'bg-amber-500/10 border-amber-500/20 text-amber-400'}`}>
+                                                <div className={`w-14 h-14 rounded-2xl flex flex-col items-center justify-center border ${c.discountType === 'credits' ? 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary' : 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary'}`}>
                                                     <p className="text-xs font-black uppercase tracking-tighter leading-none mb-0.5">{c.discountType === 'credits' ? 'Cr' : c.discountType === 'percentage' ? '%' : '₹'}</p>
                                                     <p className="text-lg font-black leading-none">{c.discountValue}</p>
                                                 </div>
                                                 <div className="min-w-0 flex-1">
                                                     <div className="flex items-center gap-3 mb-1">
-                                                        <p className="text-xl font-black text-white font-mono tracking-wider">{c.code}</p>
+                                                        <p className="text-xl font-black text-[var(--sys-text)] font-mono tracking-wider">{c.code}</p>
                                                         <div className="flex gap-1.5">
-                                                            <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-widest ${!c.isActive ? 'bg-slate-500/20 text-slate-500' : isExpired ? 'bg-rose-500/20 text-rose-500' : 'bg-emerald-500/20 text-emerald-400'}`}>
+                                                            <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-widest ${!c.isActive ? 'bg-[var(--sys-border)]/20 text-[var(--sys-text-muted)]' : isExpired ? 'bg-[var(--sys-primary-dim)] text-primary' : 'bg-[var(--sys-primary-dim)] text-primary'}`}>
                                                                 {!c.isActive ? 'Paused' : isExpired ? 'Expired' : 'Active'}
                                                             </span>
                                                             {c.applicablePlans?.length > 0 && (
@@ -1989,10 +2003,10 @@ export default function SuperAdminDashboard() {
                                                             )}
                                                         </div>
                                                     </div>
-                                                    <p className="text-xs text-slate-500 flex items-center gap-1.5 line-clamp-1">
+                                                    <p className="text-xs text-[var(--sys-text-muted)] flex items-center gap-1.5 line-clamp-1">
                                                         <span className="material-symbols-outlined text-[14px]">info</span>
                                                         {c.description || 'No description provided'} 
-                                                        {c.validUntil && <span className="text-slate-600">• Expires {new Date(c.validUntil).toLocaleDateString()}</span>}
+                                                        {c.validUntil && <span className="text-[var(--sys-text-muted)]">• Expires {new Date(c.validUntil).toLocaleDateString()}</span>}
                                                     </p>
                                                 </div>
                                             </div>
@@ -2000,19 +2014,19 @@ export default function SuperAdminDashboard() {
                                             <div className="flex items-center gap-8 pl-18 lg:pl-0">
                                                 <div className="w-32">
                                                     <div className="flex items-center justify-between mb-1.5">
-                                                        <p className="text-[10px] font-black text-slate-600 uppercase tracking-tighter">Usage</p>
-                                                        <p className="text-[10px] font-black text-white uppercase tracking-tighter">{c.usedCount}{c.maxUses > 0 ? ` / ${c.maxUses}` : ''}</p>
+                                                        <p className="text-[10px] font-black text-[var(--sys-text-muted)] uppercase tracking-tighter">Usage</p>
+                                                        <p className="text-[10px] font-black text-[var(--sys-text)] uppercase tracking-tighter">{c.usedCount}{c.maxUses > 0 ? ` / ${c.maxUses}` : ''}</p>
                                                     </div>
-                                                    <div className="h-1.5 w-full bg-white/[0.04] rounded-full overflow-hidden">
-                                                        <div className={`h-full rounded-full transition-all duration-1000 ${usagePct > 90 ? 'bg-rose-500' : usagePct > 50 ? 'bg-amber-500' : 'bg-emerald-500'}`} style={{ width: `${c.maxUses > 0 ? Math.min(100, usagePct) : Math.min(100, (c.usedCount / 100) * 100)}%` }} />
+                                                    <div className="h-1.5 w-full bg-[var(--sys-surface)] rounded-full overflow-hidden">
+                                                        <div className={`h-full rounded-full transition-all duration-1000 ${usagePct > 90 ? 'bg-[var(--sys-surface)]' : usagePct > 50 ? 'bg-[var(--sys-surface)]' : 'bg-[var(--sys-surface)]'}`} style={{ width: `${c.maxUses > 0 ? Math.min(100, usagePct) : Math.min(100, (c.usedCount / 100) * 100)}%` }} />
                                                     </div>
                                                 </div>
 
                                                 <div className="flex gap-1.5">
-                                                    <button onClick={() => handleToggleCoupon(c._id, c.isActive)} className={`w-9 h-9 flex items-center justify-center rounded-xl transition-all cursor-pointer ${c.isActive ? 'bg-amber-500/10 text-amber-500 hover:bg-amber-500/20' : 'bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20'}`} title={c.isActive ? 'Pause' : 'Activate'}>
+                                                    <button onClick={() => handleToggleCoupon(c._id, c.isActive)} className={`w-9 h-9 flex items-center justify-center rounded-xl transition-all cursor-pointer ${c.isActive ? 'bg-[var(--sys-primary-dim)] text-primary hover:bg-[var(--sys-primary-dim)]' : 'bg-[var(--sys-primary-dim)] text-primary hover:bg-[var(--sys-primary-dim)]'}`} title={c.isActive ? 'Pause' : 'Activate'}>
                                                         <span className="material-symbols-outlined text-lg">{c.isActive ? 'pause' : 'play_arrow'}</span>
                                                     </button>
-                                                    <button onClick={() => handleDeleteCoupon(c._id)} className="w-9 h-9 flex items-center justify-center rounded-xl bg-rose-500/5 text-slate-600 hover:text-rose-500 hover:bg-rose-500/10 transition-all cursor-pointer" title="Delete">
+                                                    <button onClick={() => handleDeleteCoupon(c._id)} className="w-9 h-9 flex items-center justify-center rounded-xl bg-[var(--sys-primary-dim)] text-[var(--sys-text-muted)] hover:text-primary hover:bg-[var(--sys-primary-dim)] transition-all cursor-pointer" title="Delete">
                                                         <span className="material-symbols-outlined text-lg">delete</span>
                                                     </button>
                                                 </div>
@@ -2020,10 +2034,10 @@ export default function SuperAdminDashboard() {
                                         </div>
                                         {/* Targeting Tooltip-style info */}
                                         {c.applicablePlans?.length > 0 && (
-                                            <div className="mt-4 pt-4 border-t border-white/[0.03] flex flex-wrap gap-2">
+                                            <div className="mt-4 pt-4 border-t border-[var(--sys-border)] flex flex-wrap gap-2">
                                                 <span className="text-[9px] font-black text-slate-700 uppercase pt-0.5">Applies to:</span>
                                                 {c.applicablePlans.map(slug => (
-                                                    <span key={slug} className="text-[9px] font-bold px-2 py-0.5 rounded bg-white/[0.03] text-slate-500 border border-white/[0.05]">{slug}</span>
+                                                    <span key={slug} className="text-[9px] font-bold px-2 py-0.5 rounded bg-[var(--sys-surface)] text-[var(--sys-text-muted)] border border-[var(--sys-border)]">{slug}</span>
                                                 ))}
                                             </div>
                                         )}
@@ -2037,36 +2051,36 @@ export default function SuperAdminDashboard() {
                 {/* ════════════ CONTENT & BRANDS ════════════ */}
                 {tab === 'content' && (
                     <div>
-                        <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><span className="material-symbols-outlined text-[#FF4D00]">branding_watermark</span>{totalBrands} Brands</h3>
+                        <h3 className="text-lg font-bold text-[var(--sys-text)] mb-4 flex items-center gap-2"><span className="material-symbols-outlined text-[#FF4D00]">branding_watermark</span>{totalBrands} Brands</h3>
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-8">{brands.map(b => (
                             <div key={b._id} className="glass-panel rounded-2xl p-4">
                                 <div className="flex items-center justify-between mb-3">
                                     <div className="flex items-center gap-2">
                                         <div className="w-8 h-8 rounded-lg bg-[#FF4D00]/20 flex items-center justify-center text-[#FF4D00] text-xs font-bold">{b.name?.[0]?.toUpperCase()}</div>
-                                        <div><p className="text-base font-bold text-white">{b.name}</p><p className="text-xs text-slate-600">{b.user?.name} • {b.user?.email}</p></div>
+                                        <div><p className="text-base font-bold text-[var(--sys-text)]">{b.name}</p><p className="text-xs text-[var(--sys-text-muted)]">{b.user?.name} • {b.user?.email}</p></div>
                                     </div>
-                                    <button onClick={() => handleDeleteBrand(b, b.name)} className="p-1.5 rounded-lg hover:bg-rose-500/10 text-slate-600 hover:text-rose-400 cursor-pointer"><span className="material-symbols-outlined text-sm">delete</span></button>
+                                    <button onClick={() => handleDeleteBrand(b, b.name)} className="p-1.5 rounded-lg hover:bg-[var(--sys-primary-dim)] text-[var(--sys-text-muted)] hover:text-primary cursor-pointer"><span className="material-symbols-outlined text-sm">delete</span></button>
                                 </div>
                                 <div className="flex gap-3 text-center">
-                                    <div className="flex-1 p-2 rounded-lg bg-white/[0.02]"><p className="text-base font-bold text-white">{b.contentCount}</p><p className="text-xs text-slate-600">Content</p></div>
-                                    <div className="flex-1 p-2 rounded-lg bg-white/[0.02]"><p className="text-base font-bold text-white">{b.creativeCount}</p><p className="text-xs text-slate-600">Creatives</p></div>
-                                    <div className="flex-1 p-2 rounded-lg bg-white/[0.02]"><p className="text-base font-bold text-white">{b.productCount}</p><p className="text-xs text-slate-600">Products</p></div>
+                                    <div className="flex-1 p-2 rounded-lg bg-[var(--sys-surface)]"><p className="text-base font-bold text-[var(--sys-text)]">{b.contentCount}</p><p className="text-xs text-[var(--sys-text-muted)]">Content</p></div>
+                                    <div className="flex-1 p-2 rounded-lg bg-[var(--sys-surface)]"><p className="text-base font-bold text-[var(--sys-text)]">{b.creativeCount}</p><p className="text-xs text-[var(--sys-text-muted)]">Creatives</p></div>
+                                    <div className="flex-1 p-2 rounded-lg bg-[var(--sys-surface)]"><p className="text-base font-bold text-[var(--sys-text)]">{b.productCount}</p><p className="text-xs text-[var(--sys-text-muted)]">Products</p></div>
                                 </div>
                             </div>
                         ))}</div>
-                        <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><span className="material-symbols-outlined text-emerald-400">article</span>{totalContent} Content Pieces</h3>
+                        <h3 className="text-lg font-bold text-[var(--sys-text)] mb-4 flex items-center gap-2"><span className="material-symbols-outlined text-primary">article</span>{totalContent} Content Pieces</h3>
                         <div className="space-y-2">{content.map(c => (
                             <div key={c._id} className="glass-panel rounded-2xl p-3 flex items-center justify-between">
                                 <div className="flex items-center gap-3 flex-1 min-w-0">
-                                    <span className={`text-xs px-1.5 py-0.5 rounded font-bold capitalize ${c.status === 'published' ? 'bg-emerald-500/15 text-emerald-400' : c.status === 'approved' ? 'bg-[#FF4D00]/15 text-[#FF4D00]' : 'bg-slate-500/15 text-slate-400'}`}>{c.status}</span>
-                                    <p className="text-sm text-white truncate max-w-[300px]">{c.title || c.prompt?.slice(0, 60) || 'Untitled'}</p>
-                                    <span className="text-xs text-slate-600 capitalize">{c.type}</span>
+                                    <span className={`text-xs px-1.5 py-0.5 rounded font-bold capitalize ${c.status === 'published' ? 'bg-[var(--sys-primary-dim)] text-primary' : c.status === 'approved' ? 'bg-[#FF4D00]/15 text-[#FF4D00]' : 'bg-[var(--sys-border)]/15 text-[var(--sys-text-muted)]'}`}>{c.status}</span>
+                                    <p className="text-sm text-[var(--sys-text)] truncate max-w-[300px]">{c.title || c.prompt?.slice(0, 60) || 'Untitled'}</p>
+                                    <span className="text-xs text-[var(--sys-text-muted)] capitalize">{c.type}</span>
                                     <span className="text-xs text-slate-700">{c.brand?.name}</span>
                                 </div>
                                 <div className="flex items-center gap-2 shrink-0">
-                                    <span className="text-xs text-slate-600">{c.user?.name}</span>
+                                    <span className="text-xs text-[var(--sys-text-muted)]">{c.user?.name}</span>
                                     <span className="text-xs text-slate-700">{new Date(c.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span>
-                                    <button onClick={() => handleDeleteContent(c)} className="p-1.5 rounded-lg hover:bg-rose-500/10 text-slate-600 hover:text-rose-400 cursor-pointer"><span className="material-symbols-outlined text-sm">delete</span></button>
+                                    <button onClick={() => handleDeleteContent(c)} className="p-1.5 rounded-lg hover:bg-[var(--sys-primary-dim)] text-[var(--sys-text-muted)] hover:text-primary cursor-pointer"><span className="material-symbols-outlined text-sm">delete</span></button>
                                 </div>
                             </div>
                         ))}</div>
@@ -2077,17 +2091,17 @@ export default function SuperAdminDashboard() {
                 {tab === 'ai' && (
                     <div>
                         {/* AI Providers */}
-                        <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><span className="material-symbols-outlined text-cyan-400">smart_toy</span>AI Providers</h3>
+                        <h3 className="text-lg font-bold text-[var(--sys-text)] mb-4 flex items-center gap-2"><span className="material-symbols-outlined text-primary">smart_toy</span>AI Providers</h3>
                         {aiHealth && (
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-6">{Object.entries(aiHealth.providers || {}).map(([p, active]) => (
-                                <div key={p} className={`glass-panel rounded-2xl p-5 ${active ? 'border border-emerald-500/20' : 'border border-rose-500/20 opacity-60'}`}>
+                                <div key={p} className={`glass-panel rounded-2xl p-5 ${active ? 'border border-[var(--sys-border)]' : 'border border-[var(--sys-border)] opacity-60'}`}>
                                     <div className="flex items-center justify-between mb-2">
-                                        <p className="text-base font-bold text-white capitalize">{p}</p>
-                                        <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${active ? 'bg-emerald-500/15 text-emerald-400' : 'bg-rose-500/15 text-rose-400'}`}>{active ? 'ACTIVE' : 'NO KEY'}</span>
+                                        <p className="text-base font-bold text-[var(--sys-text)] capitalize">{p}</p>
+                                        <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${active ? 'bg-[var(--sys-primary-dim)] text-primary' : 'bg-[var(--sys-primary-dim)] text-primary'}`}>{active ? 'ACTIVE' : 'NO KEY'}</span>
                                     </div>
                                     {aiHealth.providerUsage?.find(u => u._id === p) && (
-                                        <div><p className="text-sm text-slate-500">{aiHealth.providerUsage.find(u => u._id === p).count} generations</p>
-                                            <p className="text-sm text-slate-500">Sentiment: {aiHealth.providerUsage.find(u => u._id === p).avgSentiment?.toFixed(2)}</p></div>
+                                        <div><p className="text-sm text-[var(--sys-text-muted)]">{aiHealth.providerUsage.find(u => u._id === p).count} generations</p>
+                                            <p className="text-sm text-[var(--sys-text-muted)]">Sentiment: {aiHealth.providerUsage.find(u => u._id === p).avgSentiment?.toFixed(2)}</p></div>
                                     )}
                                 </div>
                             ))}</div>
@@ -2096,24 +2110,112 @@ export default function SuperAdminDashboard() {
                         {/* Feedback Breakdown */}
                         {aiHealth?.recentFeedback?.length > 0 && (
                             <div className="glass-panel rounded-2xl p-5 mb-6">
-                                <h4 className="font-bold text-white text-sm mb-3">Feedback (Last 24h)</h4>
+                                <h4 className="font-bold text-[var(--sys-text)] text-sm mb-3">Feedback (Last 24h)</h4>
                                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">{aiHealth.recentFeedback.map(f => (
-                                    <div key={f._id} className="p-3 rounded-xl bg-white/[0.02] text-center">
-                                        <p className="text-lg font-bold text-white">{f.count}</p>
-                                        <p className="text-sm text-slate-500 capitalize">{f._id?.replace('_', ' ')}</p>
-                                        <p className={`text-xs font-bold ${f.avgSentiment > 0 ? 'text-emerald-400' : f.avgSentiment < 0 ? 'text-rose-400' : 'text-slate-500'}`}>{f.avgSentiment?.toFixed(2)}</p>
+                                    <div key={f._id} className="p-3 rounded-xl bg-[var(--sys-surface)] text-center">
+                                        <p className="text-lg font-bold text-[var(--sys-text)]">{f.count}</p>
+                                        <p className="text-sm text-[var(--sys-text-muted)] capitalize">{f._id?.replace('_', ' ')}</p>
+                                        <p className={`text-xs font-bold ${f.avgSentiment > 0 ? 'text-primary' : f.avgSentiment < 0 ? 'text-primary' : 'text-[var(--sys-text-muted)]'}`}>{f.avgSentiment?.toFixed(2)}</p>
                                     </div>
                                 ))}</div>
                             </div>
                         )}
 
+                        {/* ═══ LLM Provider Management — Global API Switcher ═══ */}
+                        <h3 className="text-lg font-bold text-[var(--sys-text)] mb-2 flex items-center gap-2">
+                            <span className="material-symbols-outlined text-primary">psychology</span>
+                            LLM & Text Provider Management
+                            <span className="text-[9px] font-black text-primary bg-[var(--sys-primary-dim)] px-2 py-0.5 rounded-full uppercase tracking-wider">Global API Switcher</span>
+                        </h3>
+                        <p className="text-[11px] text-[var(--sys-text-muted)] mb-5">Switch active text providers, manage LLM API keys for Grok, Gemini, OpenAI, Claude, and Sarvam. System respects this globally.</p>
+
+                        {llmProviders && llmProviders.length > 0 ? (() => {
+                            const catColors = { premium: 'amber', balanced: 'violet', fast: 'emerald', specialized: 'cyan', experimental: 'rose' };
+                            const grouped = {};
+                            llmProviders.forEach(m => { const cat = m.category || 'experimental'; if (!grouped[cat]) grouped[cat] = []; grouped[cat].push(m); });
+                            const catOrder = ['premium', 'balanced', 'fast', 'specialized', 'experimental'];
+                            return (
+                                <div className="space-y-6 mb-8">
+                                    {catOrder.filter(c => grouped[c]).map(cat => {
+                                        const catInfo = llmCategories[cat] || { label: cat, color: catColors[cat] || 'slate', icon: 'psychology' };
+                                        const color = catColors[cat] || 'slate';
+                                        return (
+                                            <div key={cat}>
+                                                <div className="flex items-center gap-2 mb-3">
+                                                    <span className={`material-symbols-outlined text-${color}-400 text-sm`}>{catInfo.icon}</span>
+                                                    <span className={`text-xs font-black uppercase tracking-wider text-${color}-400`}>{catInfo.label}</span>
+                                                    <div className={`flex-1 h-px bg-${color}-500/10`} />
+                                                </div>
+                                                <div className="space-y-3">
+                                                    {grouped[cat].map(model => (
+                                                        <div key={model.id} className="glass-panel rounded-2xl p-5 border border-[var(--sys-border)]">
+                                                            <div className="flex items-center gap-3 mb-3">
+                                                                <span className={`material-symbols-outlined text-${color}-400`}>{model.icon || 'psychology'}</span>
+                                                                <div className="flex-1 min-w-0">
+                                                                    <h4 className="text-sm font-bold text-[var(--sys-text)]">{model.name}</h4>
+                                                                    <p className="text-[10px] text-[var(--sys-text-muted)]">
+                                                                        Active: <span className={`text-${color}-400 font-bold`}>{model.providers.find(p => p.isActive)?.name || '—'}</span>
+                                                                        {model.lastSwitched && <span className="ml-2 text-[var(--sys-text-muted)]">· switched {new Date(model.lastSwitched).toLocaleDateString()}</span>}
+                                                                    </p>
+                                                                </div>
+                                                                <button onClick={() => setAddLlmProviderForm({ modelId: model.id, modelName: model.name, providerId: '', providerName: '', costPerSecond: 0, description: '' })} className="h-8 w-8 rounded-xl bg-[var(--sys-surface)] hover:bg-[var(--sys-surface)] flex items-center justify-center transition-colors">
+                                                                    <span className="material-symbols-outlined text-sm text-[var(--sys-text-muted)]">add</span>
+                                                                </button>
+                                                            </div>
+                                                            <div className="space-y-1.5 border-t border-[var(--sys-border)] pt-3">
+                                                                {model.providers.map(p => (
+                                                                    <div key={p.id} className={`group flex items-center p-2.5 rounded-xl border transition-all ${p.isActive ? `bg-${color}-500/5 border-${color}-500/20` : 'bg-transparent border-transparent hover:bg-[var(--sys-surface)]'}`}>
+                                                                        <label className="flex items-center gap-3 cursor-pointer flex-1 min-w-0 mb-0">
+                                                                            <input type="radio" name={`llm-${model.id}`} checked={p.isActive} onChange={() => handleSwitchLlmProvider(model.id, p.id)} disabled={switchingLlmProvider} className="hidden" />
+                                                                            <div className={`w-4 h-4 rounded-full border flex flex-shrink-0 items-center justify-center transition-colors ${p.isActive ? `bg-${color}-500 border-${color}-500` : 'border-[var(--sys-border)] bg-black'}`}>
+                                                                                {p.isActive && <div className="w-1.5 h-1.5 rounded-full bg-black shadow-sm" />}
+                                                                            </div>
+                                                                            <div className="flex-1 min-w-0">
+                                                                                <div className="flex items-center gap-2">
+                                                                                    <span className={`text-xs font-bold ${p.isActive ? 'text-[var(--sys-text)]' : 'text-[var(--sys-text-muted)]'}`}>{p.name}</span>
+                                                                                    {p.builtIn && <span className="text-[9px] bg-[var(--sys-surface)] text-[var(--sys-text-muted)] px-1.5 py-0.5 rounded uppercase font-bold tracking-wider">built-in</span>}
+                                                                                    {!p.hasKey && <span className="text-[9px] bg-[var(--sys-primary-dim)] text-primary px-1.5 py-0.5 rounded uppercase font-bold tracking-wider animate-pulse flex items-center gap-1"><span className="material-symbols-outlined text-[10px]">key_off</span> Missing Key</span>}
+                                                                                    {switchingLlmProvider === `${model.id}-${p.id}` && <span className="material-symbols-outlined text-xs animate-spin text-[var(--sys-text-muted)]">progress_activity</span>}
+                                                                                </div>
+                                                                                {p.description && <p className="text-[10px] text-[var(--sys-text-muted)] truncate mt-0.5" title={p.description}>{p.description}</p>}
+                                                                            </div>
+                                                                        </label>
+                                                                        
+                                                                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                            <button onClick={() => setEditLlmProviderData({ modelId: model.id, providerId: p.id, providerName: p.name, envKey: p.envKey, costPerSecond: p.costPerSecond, description: p.description })} className="h-7 w-7 flex items-center justify-center rounded-lg hover:bg-[var(--sys-surface)] text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]" title="Edit Provider">
+                                                                                <span className="material-symbols-outlined text-[14px]">edit</span>
+                                                                            </button>
+                                                                            {!p.builtIn && (
+                                                                                <button onClick={() => handleRemoveLlmProvider(model.id, p.id)} disabled={p.isActive} className="h-7 w-7 flex items-center justify-center rounded-lg hover:bg-[var(--sys-primary-dim)] text-[var(--sys-text-muted)] hover:text-primary disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-[var(--sys-text-muted)]" title={p.isActive ? "Cannot remove active provider" : "Remove Provider"}>
+                                                                                    <span className="material-symbols-outlined text-[14px]">delete</span>
+                                                                                </button>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            )
+                        })() : (
+                            <div className="animate-pulse space-y-4 mb-8">
+                                <div className="h-32 bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-2xl w-full" />
+                                <div className="h-32 bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-2xl w-full" />
+                            </div>
+                        )}
+
                         {/* ═══ Video Provider Management — Global API Switcher ═══ */}
-                        <h3 className="text-lg font-bold text-white mb-2 flex items-center gap-2">
+                        <h3 className="text-lg font-bold text-[var(--sys-text)] mb-2 flex items-center gap-2">
                             <span className="material-symbols-outlined text-[#FF4D00]">movie_filter</span>
                             Video Provider Management
                             <span className="text-[9px] font-black text-[#FF4D00] bg-[#FF4D00]/10 px-2 py-0.5 rounded-full uppercase tracking-wider">Global API Switcher</span>
                         </h3>
-                        <p className="text-[11px] text-slate-500 mb-5">Switch active providers, add new APIs, or remove unused ones for any video model. Changes take effect immediately.</p>
+                        <p className="text-[11px] text-[var(--sys-text-muted)] mb-5">Switch active providers, add new APIs, or remove unused ones for any video model. Changes take effect immediately.</p>
 
                         {videoProviders && videoProviders.length > 0 ? (() => {
                             // Group models by category
@@ -2135,20 +2237,20 @@ export default function SuperAdminDashboard() {
                                                 </div>
                                                 <div className="space-y-3">
                                                     {grouped[cat].map(model => (
-                                                        <div key={model.id} className="glass-panel rounded-2xl p-5 border border-white/[0.04]">
+                                                        <div key={model.id} className="glass-panel rounded-2xl p-5 border border-[var(--sys-border)]">
                                                             <div className="flex items-center gap-3 mb-3">
                                                                 <span className={`material-symbols-outlined text-${color}-400`}>{model.icon || 'movie'}</span>
                                                                 <div className="flex-1 min-w-0">
-                                                                    <h4 className="text-sm font-bold text-white">{model.name}</h4>
-                                                                    <p className="text-[10px] text-slate-500">
+                                                                    <h4 className="text-sm font-bold text-[var(--sys-text)]">{model.name}</h4>
+                                                                    <p className="text-[10px] text-[var(--sys-text-muted)]">
                                                                         Active: <span className={`text-${color}-400 font-bold`}>{model.providers.find(p => p.isActive)?.name || '—'}</span>
-                                                                        {model.lastSwitched && <span className="ml-2 text-slate-600">· switched {new Date(model.lastSwitched).toLocaleDateString()}</span>}
+                                                                        {model.lastSwitched && <span className="ml-2 text-[var(--sys-text-muted)]">· switched {new Date(model.lastSwitched).toLocaleDateString()}</span>}
                                                                     </p>
                                                                 </div>
-                                                                {model.multiProvider && <span className="text-[8px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-black uppercase">Multi-Provider</span>}
-                                                                {!model.multiProvider && <span className="text-[8px] px-1.5 py-0.5 rounded bg-slate-500/10 text-slate-500 font-black uppercase">Single</span>}
+                                                                {model.multiProvider && <span className="text-[8px] px-1.5 py-0.5 rounded bg-[var(--sys-primary-dim)] text-primary font-black uppercase">Multi-Provider</span>}
+                                                                {!model.multiProvider && <span className="text-[8px] px-1.5 py-0.5 rounded bg-[var(--sys-border)]/10 text-[var(--sys-text-muted)] font-black uppercase">Single</span>}
                                                                 <button onClick={() => setAddProviderForm({ modelId: model.id, providerId: '', providerName: '', envKey: '', costPerSecond: '', description: '' })}
-                                                                    className="text-[10px] px-2 py-1 rounded-lg bg-white/[0.04] text-slate-400 hover:text-[#FF4D00] hover:bg-[#FF4D00]/10 transition-all cursor-pointer flex items-center gap-1">
+                                                                    className="text-[10px] px-2 py-1 rounded-lg bg-[var(--sys-surface)] text-[var(--sys-text-muted)] hover:text-[#FF4D00] hover:bg-[#FF4D00]/10 transition-all cursor-pointer flex items-center gap-1">
                                                                     <span className="material-symbols-outlined text-[12px]">add</span>Add Provider
                                                                 </button>
                                                             </div>
@@ -2159,47 +2261,47 @@ export default function SuperAdminDashboard() {
                                                                     const isSwitching = switchingProvider === `${model.id}-${provider.id}`;
                                                                     return (
                                                                         <div key={provider.id}
-                                                                            className={`relative p-3 rounded-xl border-2 transition-all group ${
+                                                                            className={`relative p-3 rounded-xl border transition-all group ${
                                                                                 provider.isActive
                                                                                     ? `border-${color}-500/40 bg-${color}-500/5`
                                                                                     : provider.hasKey
-                                                                                        ? `border-white/[0.06] hover:border-${color}-500/20 cursor-pointer hover:bg-white/[0.02]`
-                                                                                        : 'border-white/[0.04] opacity-50'
+                                                                                        ? `border-[var(--sys-border)] hover:border-${color}-500/20 cursor-pointer hover:bg-[var(--sys-surface)]`
+                                                                                        : 'border-[var(--sys-border)] opacity-50'
                                                                             }`}
                                                                         >
                                                                             {/* Top row: radio + name + actions */}
                                                                             <div className="flex items-center gap-2 mb-1.5">
                                                                                 <div onClick={() => !provider.isActive && provider.hasKey && !isSwitching && handleSwitchVideoProvider(model.id, provider.id)}
-                                                                                    className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center transition-all cursor-pointer ${
-                                                                                        provider.isActive ? `border-${color}-500` : 'border-slate-600 hover:border-slate-400'
+                                                                                    className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center transition-all cursor-pointer ${
+                                                                                        provider.isActive ? `border-${color}-500` : 'border-[var(--sys-border)] hover:border-[var(--sys-border)]'
                                                                                     }`}>
                                                                                     {provider.isActive && <div className={`w-1.5 h-1.5 rounded-full bg-${color}-500`} />}
                                                                                     {isSwitching && <span className="material-symbols-outlined text-[8px] animate-spin text-[#FF4D00]">progress_activity</span>}
                                                                                 </div>
-                                                                                <span className="text-[11px] font-bold text-white flex-1">{provider.name}</span>
+                                                                                <span className="text-[11px] font-bold text-[var(--sys-text)] flex-1">{provider.name}</span>
                                                                                 {provider.isActive && <span className={`text-[7px] px-1 py-0.5 rounded bg-${color}-500/20 text-${color}-400 font-black uppercase`}>Active</span>}
                                                                                 {/* Action buttons (visible on hover) */}
                                                                                 <div className="hidden group-hover:flex items-center gap-1">
                                                                                     <button onClick={(e) => { e.stopPropagation(); setEditProviderData({ modelId: model.id, providerId: provider.id, name: provider.name, costPerSecond: provider.costPerSecond, description: provider.description }) }}
-                                                                                        className="text-[10px] text-slate-500 hover:text-cyan-400 cursor-pointer" title="Edit">
+                                                                                        className="text-[10px] text-[var(--sys-text-muted)] hover:text-primary cursor-pointer" title="Edit">
                                                                                         <span className="material-symbols-outlined text-[12px]">edit</span>
                                                                                     </button>
                                                                                     {!provider.isActive && (
                                                                                         <button onClick={(e) => { e.stopPropagation(); handleRemoveVideoProvider(model.id, provider.id) }}
-                                                                                            className="text-[10px] text-slate-500 hover:text-rose-400 cursor-pointer" title="Remove">
+                                                                                            className="text-[10px] text-[var(--sys-text-muted)] hover:text-primary cursor-pointer" title="Remove">
                                                                                             <span className="material-symbols-outlined text-[12px]">close</span>
                                                                                         </button>
                                                                                     )}
                                                                                 </div>
                                                                             </div>
                                                                             {/* Description + cost */}
-                                                                            <p className="text-[9px] text-slate-500 mb-1.5 leading-relaxed line-clamp-2">{provider.description}</p>
+                                                                            <p className="text-[9px] text-[var(--sys-text-muted)] mb-1.5 leading-relaxed line-clamp-2">{provider.description}</p>
                                                                             <div className="flex items-center gap-2 flex-wrap">
-                                                                                <span className="text-[9px] font-bold text-slate-400">${provider.costPerSecond}/s</span>
-                                                                                <span className={`text-[8px] px-1 py-0.5 rounded-full font-bold ${provider.hasKey ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
+                                                                                <span className="text-[9px] font-bold text-[var(--sys-text-muted)]">${provider.costPerSecond}/s</span>
+                                                                                <span className={`text-[8px] px-1 py-0.5 rounded-full font-bold ${provider.hasKey ? 'bg-[var(--sys-primary-dim)] text-primary' : 'bg-[var(--sys-primary-dim)] text-primary'}`}>
                                                                                     {provider.hasKey ? `✓ ${provider.keySource}` : '✗ No Key'}
                                                                                 </span>
-                                                                                {!provider.builtIn && <span className="text-[7px] px-1 py-0.5 rounded bg-amber-500/10 text-amber-400 font-black uppercase">Custom</span>}
+                                                                                {!provider.builtIn && <span className="text-[7px] px-1 py-0.5 rounded bg-[var(--sys-primary-dim)] text-primary font-black uppercase">Custom</span>}
                                                                             </div>
                                                                         </div>
                                                                     );
@@ -2215,27 +2317,27 @@ export default function SuperAdminDashboard() {
                                                                     <div className="grid grid-cols-2 gap-2 mb-3">
                                                                         <input placeholder="Provider ID (e.g., replicate)" value={addProviderForm.providerId}
                                                                             onChange={e => setAddProviderForm(f => ({ ...f, providerId: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') }))}
-                                                                            className="px-2 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-[11px] focus:border-[#FF4D00]/40 outline-none" />
+                                                                            className="px-2 py-1.5 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-[11px] focus:border-[#FF4D00]/40 outline-none" />
                                                                         <input placeholder="Provider Name (e.g., Replicate)" value={addProviderForm.providerName}
                                                                             onChange={e => setAddProviderForm(f => ({ ...f, providerName: e.target.value }))}
-                                                                            className="px-2 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-[11px] focus:border-[#FF4D00]/40 outline-none" />
+                                                                            className="px-2 py-1.5 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-[11px] focus:border-[#FF4D00]/40 outline-none" />
                                                                         <input placeholder="Env Key (e.g., REPLICATE_API_KEY)" value={addProviderForm.envKey}
                                                                             onChange={e => setAddProviderForm(f => ({ ...f, envKey: e.target.value }))}
-                                                                            className="px-2 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-[11px] focus:border-[#FF4D00]/40 outline-none" />
+                                                                            className="px-2 py-1.5 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-[11px] focus:border-[#FF4D00]/40 outline-none" />
                                                                         <input placeholder="Cost/sec (e.g., 0.10)" value={addProviderForm.costPerSecond} type="number" step="0.01"
                                                                             onChange={e => setAddProviderForm(f => ({ ...f, costPerSecond: e.target.value }))}
-                                                                            className="px-2 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-[11px] focus:border-[#FF4D00]/40 outline-none" />
+                                                                            className="px-2 py-1.5 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-[11px] focus:border-[#FF4D00]/40 outline-none" />
                                                                     </div>
                                                                     <input placeholder="Description (optional)" value={addProviderForm.description}
                                                                         onChange={e => setAddProviderForm(f => ({ ...f, description: e.target.value }))}
-                                                                        className="w-full px-2 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-[11px] focus:border-[#FF4D00]/40 outline-none mb-3" />
+                                                                        className="w-full px-2 py-1.5 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-[11px] focus:border-[#FF4D00]/40 outline-none mb-3" />
                                                                     <div className="flex gap-2">
                                                                         <button onClick={handleAddVideoProvider}
                                                                             className="px-3 py-1.5 rounded-lg bg-[#FF4D00]/20 text-[#FF4D00] text-[11px] font-bold hover:bg-[#FF4D00]/30 cursor-pointer transition-all">
                                                                             Add Provider
                                                                         </button>
                                                                         <button onClick={() => setAddProviderForm(null)}
-                                                                            className="px-3 py-1.5 rounded-lg bg-white/[0.04] text-slate-500 text-[11px] hover:text-white cursor-pointer transition-all">
+                                                                            className="px-3 py-1.5 rounded-lg bg-[var(--sys-surface)] text-[var(--sys-text-muted)] text-[11px] hover:text-[var(--sys-text)] cursor-pointer transition-all">
                                                                             Cancel
                                                                         </button>
                                                                     </div>
@@ -2247,49 +2349,49 @@ export default function SuperAdminDashboard() {
                                             </div>
                                         );
                                     })}
-                                    <p className="text-[10px] text-slate-600 italic">Click the radio button to switch providers. Hover over a provider card to edit or remove. Add custom providers with the + button.</p>
+                                    <p className="text-[10px] text-[var(--sys-text-muted)] italic">Click the radio button to switch providers. Hover over a provider card to edit or remove. Add custom providers with the + button.</p>
                                 </div>
                             );
                         })() : (
-                            <div className="glass-panel rounded-2xl p-6 mb-8 text-center text-slate-500 text-sm">
-                                <span className="material-symbols-outlined text-2xl mb-2 block text-slate-600">movie_filter</span>
+                            <div className="glass-panel rounded-2xl p-6 mb-8 text-center text-[var(--sys-text-muted)] text-sm">
+                                <span className="material-symbols-outlined text-2xl mb-2 block text-[var(--sys-text-muted)]">movie_filter</span>
                                 Loading video providers...
                             </div>
                         )}
 
                         {/* Edit Provider Modal */}
                         {editProviderData && (
-                            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center" onClick={() => setEditProviderData(null)}>
-                                <div className="glass-panel border border-white/[0.08] rounded-2xl p-6 w-full max-w-md" onClick={e => e.stopPropagation()}>
-                                    <h4 className="text-base font-bold text-white mb-4 flex items-center gap-2">
-                                        <span className="material-symbols-outlined text-cyan-400">edit</span>
+                            <div className="fixed inset-0 bg-[var(--sys-surface)] z-50 flex items-center justify-center" onClick={() => setEditProviderData(null)}>
+                                <div className="glass-panel border border-[var(--sys-border)] rounded-2xl p-6 w-full max-w-md" onClick={e => e.stopPropagation()}>
+                                    <h4 className="text-base font-bold text-[var(--sys-text)] mb-4 flex items-center gap-2">
+                                        <span className="material-symbols-outlined text-primary">edit</span>
                                         Edit Provider: {editProviderData.name}
                                     </h4>
                                     <div className="space-y-3 mb-5">
                                         <div>
-                                            <label className="text-[10px] text-slate-500 uppercase font-bold block mb-1">Display Name</label>
+                                            <label className="text-[10px] text-[var(--sys-text-muted)] uppercase font-bold block mb-1">Display Name</label>
                                             <input value={editProviderData.name || ''} onChange={e => setEditProviderData(d => ({ ...d, name: e.target.value }))}
-                                                className="w-full px-3 py-2 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm focus:border-cyan-500/40 outline-none" />
+                                                className="w-full px-3 py-2 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm focus:border-[var(--sys-border)] outline-none" />
                                         </div>
                                         <div>
-                                            <label className="text-[10px] text-slate-500 uppercase font-bold block mb-1">Cost Per Second ($)</label>
+                                            <label className="text-[10px] text-[var(--sys-text-muted)] uppercase font-bold block mb-1">Cost Per Second ($)</label>
                                             <input value={editProviderData.costPerSecond || ''} type="number" step="0.01"
                                                 onChange={e => setEditProviderData(d => ({ ...d, costPerSecond: parseFloat(e.target.value) || 0 }))}
-                                                className="w-full px-3 py-2 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm focus:border-cyan-500/40 outline-none" />
+                                                className="w-full px-3 py-2 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm focus:border-[var(--sys-border)] outline-none" />
                                         </div>
                                         <div>
-                                            <label className="text-[10px] text-slate-500 uppercase font-bold block mb-1">Description</label>
+                                            <label className="text-[10px] text-[var(--sys-text-muted)] uppercase font-bold block mb-1">Description</label>
                                             <input value={editProviderData.description || ''} onChange={e => setEditProviderData(d => ({ ...d, description: e.target.value }))}
-                                                className="w-full px-3 py-2 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm focus:border-cyan-500/40 outline-none" />
+                                                className="w-full px-3 py-2 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm focus:border-[var(--sys-border)] outline-none" />
                                         </div>
                                     </div>
                                     <div className="flex gap-2">
                                         <button onClick={handleEditVideoProvider}
-                                            className="px-4 py-2 rounded-xl bg-cyan-500/20 text-cyan-400 text-sm font-bold hover:bg-cyan-500/30 cursor-pointer transition-all flex-1">
+                                            className="px-4 py-2 rounded-xl bg-[var(--sys-primary-dim)] text-primary text-sm font-bold hover:bg-[var(--sys-primary-dim)] cursor-pointer transition-all flex-1">
                                             Save Changes
                                         </button>
                                         <button onClick={() => setEditProviderData(null)}
-                                            className="px-4 py-2 rounded-xl bg-white/[0.04] text-slate-500 text-sm hover:text-white cursor-pointer transition-all">
+                                            className="px-4 py-2 rounded-xl bg-[var(--sys-surface)] text-[var(--sys-text-muted)] text-sm hover:text-[var(--sys-text)] cursor-pointer transition-all">
                                             Cancel
                                         </button>
                                     </div>
@@ -2298,12 +2400,12 @@ export default function SuperAdminDashboard() {
                         )}
 
                         {/* ═══ Image Provider Management — Global API Switcher ═══ */}
-                        <h3 className="text-lg font-bold text-white mb-2 flex items-center gap-2 mt-8">
-                            <span className="material-symbols-outlined text-cyan-400">image</span>
+                        <h3 className="text-lg font-bold text-[var(--sys-text)] mb-2 flex items-center gap-2 mt-8">
+                            <span className="material-symbols-outlined text-primary">image</span>
                             Image Provider Management
-                            <span className="text-[9px] font-black text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded-full uppercase tracking-wider">Global API Switcher</span>
+                            <span className="text-[9px] font-black text-primary bg-[var(--sys-primary-dim)] px-2 py-0.5 rounded-full uppercase tracking-wider">Global API Switcher</span>
                         </h3>
-                        <p className="text-[11px] text-slate-500 mb-5">Switch active providers, add new APIs, or remove unused ones for any image model. Changes take effect immediately.</p>
+                        <p className="text-[11px] text-[var(--sys-text-muted)] mb-5">Switch active providers, add new APIs, or remove unused ones for any image model. Changes take effect immediately.</p>
 
                         {imageProviders && imageProviders.length > 0 ? (() => {
                             const imgCatColors = { multimodal: 'cyan', 'text-to-image': 'violet', premium: 'amber' };
@@ -2324,20 +2426,20 @@ export default function SuperAdminDashboard() {
                                                 </div>
                                                 <div className="space-y-3">
                                                     {imgGrouped[cat].map(model => (
-                                                        <div key={model.id} className="glass-panel rounded-2xl p-5 border border-white/[0.04]">
+                                                        <div key={model.id} className="glass-panel rounded-2xl p-5 border border-[var(--sys-border)]">
                                                             <div className="flex items-center gap-3 mb-3">
                                                                 <span className={`material-symbols-outlined text-${color}-400`}>{model.icon || 'image'}</span>
                                                                 <div className="flex-1 min-w-0">
-                                                                    <h4 className="text-sm font-bold text-white">{model.name}</h4>
-                                                                    <p className="text-[10px] text-slate-500">
+                                                                    <h4 className="text-sm font-bold text-[var(--sys-text)]">{model.name}</h4>
+                                                                    <p className="text-[10px] text-[var(--sys-text-muted)]">
                                                                         Active: <span className={`text-${color}-400 font-bold`}>{model.providers.find(p => p.isActive)?.name || '—'}</span>
-                                                                        {model.lastSwitched && <span className="ml-2 text-slate-600">· switched {new Date(model.lastSwitched).toLocaleDateString()}</span>}
+                                                                        {model.lastSwitched && <span className="ml-2 text-[var(--sys-text-muted)]">· switched {new Date(model.lastSwitched).toLocaleDateString()}</span>}
                                                                     </p>
                                                                 </div>
-                                                                {model.multiProvider && <span className="text-[8px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-black uppercase">Multi-Provider</span>}
-                                                                {!model.multiProvider && <span className="text-[8px] px-1.5 py-0.5 rounded bg-slate-500/10 text-slate-500 font-black uppercase">Single</span>}
+                                                                {model.multiProvider && <span className="text-[8px] px-1.5 py-0.5 rounded bg-[var(--sys-primary-dim)] text-primary font-black uppercase">Multi-Provider</span>}
+                                                                {!model.multiProvider && <span className="text-[8px] px-1.5 py-0.5 rounded bg-[var(--sys-border)]/10 text-[var(--sys-text-muted)] font-black uppercase">Single</span>}
                                                                 <button onClick={() => setAddImageProviderForm({ modelId: model.id, providerId: '', providerName: '', envKey: '', costPerImage: '', description: '' })}
-                                                                    className="text-[10px] px-2 py-1 rounded-lg bg-white/[0.04] text-slate-400 hover:text-cyan-400 hover:bg-cyan-500/10 transition-all cursor-pointer flex items-center gap-1">
+                                                                    className="text-[10px] px-2 py-1 rounded-lg bg-[var(--sys-surface)] text-[var(--sys-text-muted)] hover:text-primary hover:bg-[var(--sys-primary-dim)] transition-all cursor-pointer flex items-center gap-1">
                                                                     <span className="material-symbols-outlined text-[12px]">add</span>Add Provider
                                                                 </button>
                                                             </div>
@@ -2348,44 +2450,44 @@ export default function SuperAdminDashboard() {
                                                                     const isSwitching = switchingImageProvider === `${model.id}-${provider.id}`;
                                                                     return (
                                                                         <div key={provider.id}
-                                                                            className={`relative p-3 rounded-xl border-2 transition-all group ${
+                                                                            className={`relative p-3 rounded-xl border transition-all group ${
                                                                                 provider.isActive
                                                                                     ? `border-${color}-500/40 bg-${color}-500/5`
                                                                                     : provider.hasKey
-                                                                                        ? `border-white/[0.06] hover:border-${color}-500/20 cursor-pointer hover:bg-white/[0.02]`
-                                                                                        : 'border-white/[0.04] opacity-50'
+                                                                                        ? `border-[var(--sys-border)] hover:border-${color}-500/20 cursor-pointer hover:bg-[var(--sys-surface)]`
+                                                                                        : 'border-[var(--sys-border)] opacity-50'
                                                                             }`}
                                                                         >
                                                                             <div className="flex items-center gap-2 mb-1.5">
                                                                                 <div onClick={() => !provider.isActive && provider.hasKey && !isSwitching && handleSwitchImageProvider(model.id, provider.id)}
-                                                                                    className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center transition-all cursor-pointer ${
-                                                                                        provider.isActive ? `border-${color}-500` : 'border-slate-600 hover:border-slate-400'
+                                                                                    className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center transition-all cursor-pointer ${
+                                                                                        provider.isActive ? `border-${color}-500` : 'border-[var(--sys-border)] hover:border-[var(--sys-border)]'
                                                                                     }`}>
                                                                                     {provider.isActive && <div className={`w-1.5 h-1.5 rounded-full bg-${color}-500`} />}
-                                                                                    {isSwitching && <span className="material-symbols-outlined text-[8px] animate-spin text-cyan-400">progress_activity</span>}
+                                                                                    {isSwitching && <span className="material-symbols-outlined text-[8px] animate-spin text-primary">progress_activity</span>}
                                                                                 </div>
-                                                                                <span className="text-[11px] font-bold text-white flex-1">{provider.name}</span>
+                                                                                <span className="text-[11px] font-bold text-[var(--sys-text)] flex-1">{provider.name}</span>
                                                                                 {provider.isActive && <span className={`text-[7px] px-1 py-0.5 rounded bg-${color}-500/20 text-${color}-400 font-black uppercase`}>Active</span>}
                                                                                 <div className="hidden group-hover:flex items-center gap-1">
                                                                                     <button onClick={(e) => { e.stopPropagation(); setEditImageProviderData({ modelId: model.id, providerId: provider.id, name: provider.name, costPerImage: provider.costPerImage, description: provider.description }) }}
-                                                                                        className="text-[10px] text-slate-500 hover:text-cyan-400 cursor-pointer" title="Edit">
+                                                                                        className="text-[10px] text-[var(--sys-text-muted)] hover:text-primary cursor-pointer" title="Edit">
                                                                                         <span className="material-symbols-outlined text-[12px]">edit</span>
                                                                                     </button>
                                                                                     {!provider.isActive && (
                                                                                         <button onClick={(e) => { e.stopPropagation(); handleRemoveImageProvider(model.id, provider.id) }}
-                                                                                            className="text-[10px] text-slate-500 hover:text-rose-400 cursor-pointer" title="Remove">
+                                                                                            className="text-[10px] text-[var(--sys-text-muted)] hover:text-primary cursor-pointer" title="Remove">
                                                                                             <span className="material-symbols-outlined text-[12px]">close</span>
                                                                                         </button>
                                                                                     )}
                                                                                 </div>
                                                                             </div>
-                                                                            <p className="text-[9px] text-slate-500 mb-1.5 leading-relaxed line-clamp-2">{provider.description}</p>
+                                                                            <p className="text-[9px] text-[var(--sys-text-muted)] mb-1.5 leading-relaxed line-clamp-2">{provider.description}</p>
                                                                             <div className="flex items-center gap-2 flex-wrap">
-                                                                                <span className="text-[9px] font-bold text-slate-400">${provider.costPerImage}/img</span>
-                                                                                <span className={`text-[8px] px-1 py-0.5 rounded-full font-bold ${provider.hasKey ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
+                                                                                <span className="text-[9px] font-bold text-[var(--sys-text-muted)]">${provider.costPerImage}/img</span>
+                                                                                <span className={`text-[8px] px-1 py-0.5 rounded-full font-bold ${provider.hasKey ? 'bg-[var(--sys-primary-dim)] text-primary' : 'bg-[var(--sys-primary-dim)] text-primary'}`}>
                                                                                     {provider.hasKey ? `✓ ${provider.keySource}` : '✗ No Key'}
                                                                                 </span>
-                                                                                {!provider.builtIn && <span className="text-[7px] px-1 py-0.5 rounded bg-amber-500/10 text-amber-400 font-black uppercase">Custom</span>}
+                                                                                {!provider.builtIn && <span className="text-[7px] px-1 py-0.5 rounded bg-[var(--sys-primary-dim)] text-primary font-black uppercase">Custom</span>}
                                                                             </div>
                                                                         </div>
                                                                     );
@@ -2394,34 +2496,34 @@ export default function SuperAdminDashboard() {
 
                                                             {/* Add Provider inline form */}
                                                             {addImageProviderForm?.modelId === model.id && (
-                                                                <div className="mt-3 p-4 rounded-xl border border-cyan-500/20 bg-cyan-500/[0.03]">
-                                                                    <h5 className="text-[11px] font-bold text-cyan-400 mb-3 flex items-center gap-1">
+                                                                <div className="mt-3 p-4 rounded-xl border border-[var(--sys-border)] bg-[var(--sys-surface)]/[0.03]">
+                                                                    <h5 className="text-[11px] font-bold text-primary mb-3 flex items-center gap-1">
                                                                         <span className="material-symbols-outlined text-[13px]">add_circle</span>Add New Provider to {model.name}
                                                                     </h5>
                                                                     <div className="grid grid-cols-2 gap-2 mb-3">
                                                                         <input placeholder="Provider ID (e.g., replicate)" value={addImageProviderForm.providerId}
                                                                             onChange={e => setAddImageProviderForm(f => ({ ...f, providerId: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') }))}
-                                                                            className="px-2 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-[11px] focus:border-cyan-500/40 outline-none" />
+                                                                            className="px-2 py-1.5 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-[11px] focus:border-[var(--sys-border)] outline-none" />
                                                                         <input placeholder="Provider Name" value={addImageProviderForm.providerName}
                                                                             onChange={e => setAddImageProviderForm(f => ({ ...f, providerName: e.target.value }))}
-                                                                            className="px-2 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-[11px] focus:border-cyan-500/40 outline-none" />
+                                                                            className="px-2 py-1.5 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-[11px] focus:border-[var(--sys-border)] outline-none" />
                                                                         <input placeholder="Env Key (e.g., REPLICATE_API_KEY)" value={addImageProviderForm.envKey}
                                                                             onChange={e => setAddImageProviderForm(f => ({ ...f, envKey: e.target.value }))}
-                                                                            className="px-2 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-[11px] focus:border-cyan-500/40 outline-none" />
+                                                                            className="px-2 py-1.5 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-[11px] focus:border-[var(--sys-border)] outline-none" />
                                                                         <input placeholder="Cost/img (e.g., 0.04)" value={addImageProviderForm.costPerImage} type="number" step="0.01"
                                                                             onChange={e => setAddImageProviderForm(f => ({ ...f, costPerImage: e.target.value }))}
-                                                                            className="px-2 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-[11px] focus:border-cyan-500/40 outline-none" />
+                                                                            className="px-2 py-1.5 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-[11px] focus:border-[var(--sys-border)] outline-none" />
                                                                     </div>
                                                                     <input placeholder="Description (optional)" value={addImageProviderForm.description}
                                                                         onChange={e => setAddImageProviderForm(f => ({ ...f, description: e.target.value }))}
-                                                                        className="w-full px-2 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-[11px] focus:border-cyan-500/40 outline-none mb-3" />
+                                                                        className="w-full px-2 py-1.5 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-[11px] focus:border-[var(--sys-border)] outline-none mb-3" />
                                                                     <div className="flex gap-2">
                                                                         <button onClick={handleAddImageProvider}
-                                                                            className="px-3 py-1.5 rounded-lg bg-cyan-500/20 text-cyan-400 text-[11px] font-bold hover:bg-cyan-500/30 cursor-pointer transition-all">
+                                                                            className="px-3 py-1.5 rounded-lg bg-[var(--sys-primary-dim)] text-primary text-[11px] font-bold hover:bg-[var(--sys-primary-dim)] cursor-pointer transition-all">
                                                                             Add Provider
                                                                         </button>
                                                                         <button onClick={() => setAddImageProviderForm(null)}
-                                                                            className="px-3 py-1.5 rounded-lg bg-white/[0.04] text-slate-500 text-[11px] hover:text-white cursor-pointer transition-all">
+                                                                            className="px-3 py-1.5 rounded-lg bg-[var(--sys-surface)] text-[var(--sys-text-muted)] text-[11px] hover:text-[var(--sys-text)] cursor-pointer transition-all">
                                                                             Cancel
                                                                         </button>
                                                                     </div>
@@ -2433,49 +2535,49 @@ export default function SuperAdminDashboard() {
                                             </div>
                                         );
                                     })}
-                                    <p className="text-[10px] text-slate-600 italic">Click the radio button to switch providers. Hover over a provider card to edit or remove. Add custom providers with the + button.</p>
+                                    <p className="text-[10px] text-[var(--sys-text-muted)] italic">Click the radio button to switch providers. Hover over a provider card to edit or remove. Add custom providers with the + button.</p>
                                 </div>
                             );
                         })() : (
-                            <div className="glass-panel rounded-2xl p-6 mb-8 text-center text-slate-500 text-sm">
-                                <span className="material-symbols-outlined text-2xl mb-2 block text-slate-600">image</span>
+                            <div className="glass-panel rounded-2xl p-6 mb-8 text-center text-[var(--sys-text-muted)] text-sm">
+                                <span className="material-symbols-outlined text-2xl mb-2 block text-[var(--sys-text-muted)]">image</span>
                                 Loading image providers...
                             </div>
                         )}
 
                         {/* Edit Image Provider Modal */}
                         {editImageProviderData && (
-                            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center" onClick={() => setEditImageProviderData(null)}>
-                                <div className="glass-panel border border-white/[0.08] rounded-2xl p-6 w-full max-w-md" onClick={e => e.stopPropagation()}>
-                                    <h4 className="text-base font-bold text-white mb-4 flex items-center gap-2">
-                                        <span className="material-symbols-outlined text-cyan-400">edit</span>
+                            <div className="fixed inset-0 bg-[var(--sys-surface)] z-50 flex items-center justify-center" onClick={() => setEditImageProviderData(null)}>
+                                <div className="glass-panel border border-[var(--sys-border)] rounded-2xl p-6 w-full max-w-md" onClick={e => e.stopPropagation()}>
+                                    <h4 className="text-base font-bold text-[var(--sys-text)] mb-4 flex items-center gap-2">
+                                        <span className="material-symbols-outlined text-primary">edit</span>
                                         Edit Provider: {editImageProviderData.name}
                                     </h4>
                                     <div className="space-y-3 mb-5">
                                         <div>
-                                            <label className="text-[10px] text-slate-500 uppercase font-bold block mb-1">Display Name</label>
+                                            <label className="text-[10px] text-[var(--sys-text-muted)] uppercase font-bold block mb-1">Display Name</label>
                                             <input value={editImageProviderData.name || ''} onChange={e => setEditImageProviderData(d => ({ ...d, name: e.target.value }))}
-                                                className="w-full px-3 py-2 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm focus:border-cyan-500/40 outline-none" />
+                                                className="w-full px-3 py-2 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm focus:border-[var(--sys-border)] outline-none" />
                                         </div>
                                         <div>
-                                            <label className="text-[10px] text-slate-500 uppercase font-bold block mb-1">Cost Per Image ($)</label>
+                                            <label className="text-[10px] text-[var(--sys-text-muted)] uppercase font-bold block mb-1">Cost Per Image ($)</label>
                                             <input value={editImageProviderData.costPerImage || ''} type="number" step="0.001"
                                                 onChange={e => setEditImageProviderData(d => ({ ...d, costPerImage: parseFloat(e.target.value) || 0 }))}
-                                                className="w-full px-3 py-2 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm focus:border-cyan-500/40 outline-none" />
+                                                className="w-full px-3 py-2 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm focus:border-[var(--sys-border)] outline-none" />
                                         </div>
                                         <div>
-                                            <label className="text-[10px] text-slate-500 uppercase font-bold block mb-1">Description</label>
+                                            <label className="text-[10px] text-[var(--sys-text-muted)] uppercase font-bold block mb-1">Description</label>
                                             <input value={editImageProviderData.description || ''} onChange={e => setEditImageProviderData(d => ({ ...d, description: e.target.value }))}
-                                                className="w-full px-3 py-2 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm focus:border-cyan-500/40 outline-none" />
+                                                className="w-full px-3 py-2 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm focus:border-[var(--sys-border)] outline-none" />
                                         </div>
                                     </div>
                                     <div className="flex gap-2">
                                         <button onClick={handleEditImageProvider}
-                                            className="px-4 py-2 rounded-xl bg-cyan-500/20 text-cyan-400 text-sm font-bold hover:bg-cyan-500/30 cursor-pointer transition-all flex-1">
+                                            className="px-4 py-2 rounded-xl bg-[var(--sys-primary-dim)] text-primary text-sm font-bold hover:bg-[var(--sys-primary-dim)] cursor-pointer transition-all flex-1">
                                             Save Changes
                                         </button>
                                         <button onClick={() => setEditImageProviderData(null)}
-                                            className="px-4 py-2 rounded-xl bg-white/[0.04] text-slate-500 text-sm hover:text-white cursor-pointer transition-all">
+                                            className="px-4 py-2 rounded-xl bg-[var(--sys-surface)] text-[var(--sys-text-muted)] text-sm hover:text-[var(--sys-text)] cursor-pointer transition-all">
                                             Cancel
                                         </button>
                                     </div>
@@ -2484,37 +2586,37 @@ export default function SuperAdminDashboard() {
                         )}
 
                         {/* System Settings */}
-                        <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><span className="material-symbols-outlined text-amber-400">settings</span>System Settings</h3>
+                        <h3 className="text-lg font-bold text-[var(--sys-text)] mb-4 flex items-center gap-2"><span className="material-symbols-outlined text-primary">settings</span>System Settings</h3>
                         {systemSettings && (
                             <div className="glass-panel rounded-2xl p-5 space-y-4">
                                 <div className="flex items-center justify-between">
-                                    <div><p className="text-base font-bold text-white">Watermark on Creatives</p><p className="text-sm text-slate-500">Add brand watermark to generated images</p></div>
+                                    <div><p className="text-base font-bold text-[var(--sys-text)]">Watermark on Creatives</p><p className="text-sm text-[var(--sys-text-muted)]">Add brand watermark to generated images</p></div>
                                     <button onClick={() => handleToggleSetting('watermarkEnabled', !systemSettings.watermarkEnabled)}
-                                        className={`w-12 h-6 rounded-full transition-all cursor-pointer ${systemSettings.watermarkEnabled ? 'bg-emerald-500' : 'bg-slate-700'}`}>
+                                        className={`w-12 h-6 rounded-full transition-all cursor-pointer ${systemSettings.watermarkEnabled ? 'bg-[var(--sys-surface)]' : 'bg-[var(--sys-surface)]'}`}>
                                         <div className={`w-5 h-5 rounded-full bg-white shadow-md transform transition-all ${systemSettings.watermarkEnabled ? 'translate-x-6' : 'translate-x-0.5'}`} />
                                     </button>
                                 </div>
                                 <div className="flex items-center justify-between">
-                                    <div><p className="text-base font-bold text-white">Maintenance Mode</p><p className="text-sm text-slate-500">Block access for regular users</p></div>
+                                    <div><p className="text-base font-bold text-[var(--sys-text)]">Maintenance Mode</p><p className="text-sm text-[var(--sys-text-muted)]">Block access for regular users</p></div>
                                     <button onClick={() => handleToggleSetting('maintenanceMode', !systemSettings.maintenanceMode)}
-                                        className={`w-12 h-6 rounded-full transition-all cursor-pointer ${systemSettings.maintenanceMode ? 'bg-rose-500' : 'bg-slate-700'}`}>
+                                        className={`w-12 h-6 rounded-full transition-all cursor-pointer ${systemSettings.maintenanceMode ? 'bg-[var(--sys-surface)]' : 'bg-[var(--sys-surface)]'}`}>
                                         <div className={`w-5 h-5 rounded-full bg-white shadow-md transform transition-all ${systemSettings.maintenanceMode ? 'translate-x-6' : 'translate-x-0.5'}`} />
                                     </button>
                                 </div>
-                                <div className="pt-2 border-t border-white/[0.06]">
-                                    <p className="text-xs text-slate-600 uppercase font-bold tracking-wider mb-3">Store Visibility</p>
+                                <div className="pt-2 border-t border-[var(--sys-border)]">
+                                    <p className="text-xs text-[var(--sys-text-muted)] uppercase font-bold tracking-wider mb-3">Store Visibility</p>
                                     <div className="space-y-3">
                                         <div className="flex items-center justify-between">
-                                            <div><p className="text-base font-bold text-white">Show Subscription Plans</p><p className="text-sm text-slate-500">Users can see & purchase subscription packages</p></div>
+                                            <div><p className="text-base font-bold text-[var(--sys-text)]">Show Subscription Plans</p><p className="text-sm text-[var(--sys-text-muted)]">Users can see & purchase subscription packages</p></div>
                                             <button onClick={() => handleToggleSetting('showSubscriptionPlans', !systemSettings.showSubscriptionPlans)}
-                                                className={`w-12 h-6 rounded-full transition-all cursor-pointer ${systemSettings.showSubscriptionPlans ? 'bg-emerald-500' : 'bg-slate-700'}`}>
+                                                className={`w-12 h-6 rounded-full transition-all cursor-pointer ${systemSettings.showSubscriptionPlans ? 'bg-[var(--sys-surface)]' : 'bg-[var(--sys-surface)]'}`}>
                                                 <div className={`w-5 h-5 rounded-full bg-white shadow-md transform transition-all ${systemSettings.showSubscriptionPlans ? 'translate-x-6' : 'translate-x-0.5'}`} />
                                             </button>
                                         </div>
                                         <div className="flex items-center justify-between">
-                                            <div><p className="text-base font-bold text-white">Show Credit Packs (Top-up Store)</p><p className="text-sm text-slate-500">Users can buy additional credit packs</p></div>
+                                            <div><p className="text-base font-bold text-[var(--sys-text)]">Show Credit Packs (Top-up Store)</p><p className="text-sm text-[var(--sys-text-muted)]">Users can buy additional credit packs</p></div>
                                             <button onClick={() => handleToggleSetting('showCreditPacks', !systemSettings.showCreditPacks)}
-                                                className={`w-12 h-6 rounded-full transition-all cursor-pointer ${systemSettings.showCreditPacks !== false ? 'bg-emerald-500' : 'bg-slate-700'}`}>
+                                                className={`w-12 h-6 rounded-full transition-all cursor-pointer ${systemSettings.showCreditPacks !== false ? 'bg-[var(--sys-surface)]' : 'bg-[var(--sys-surface)]'}`}>
                                                 <div className={`w-5 h-5 rounded-full bg-white shadow-md transform transition-all ${systemSettings.showCreditPacks !== false ? 'translate-x-6' : 'translate-x-0.5'}`} />
                                             </button>
                                         </div>
@@ -2522,22 +2624,22 @@ export default function SuperAdminDashboard() {
                                 </div>
 
                                 <div className="flex items-center justify-between">
-                                    <div><p className="text-base font-bold text-white">Default AI Provider</p><p className="text-sm text-slate-500">Primary model for content generation</p></div>
+                                    <div><p className="text-base font-bold text-[var(--sys-text)]">Default AI Provider</p><p className="text-sm text-[var(--sys-text-muted)]">Primary model for content generation</p></div>
                                     <select value={systemSettings.defaultProvider || 'gemini'} onChange={e => handleToggleSetting('defaultProvider', e.target.value)}
-                                        className="px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none cursor-pointer">
+                                        className="px-3 py-1.5 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm outline-none cursor-pointer">
                                         <option value="gemini">Gemini</option><option value="openai">OpenAI</option><option value="anthropic">Anthropic</option>
                                     </select>
                                 </div>
-                                <div className="pt-2 border-t border-white/[0.06]">
+                                <div className="pt-2 border-t border-[var(--sys-border)]">
                                     <div className="flex items-center justify-between mb-3">
-                                        <div><p className="text-base font-bold text-white">Credit Costs</p><p className="text-sm text-slate-500">Credits deducted per AI operation</p></div>
+                                        <div><p className="text-base font-bold text-[var(--sys-text)]">Credit Costs</p><p className="text-sm text-[var(--sys-text-muted)]">Credits deducted per AI operation</p></div>
                                         <div className="flex gap-2">
                                             {!editingCosts ? (
-                                                <button onClick={() => setEditingCosts({ ...(creditCosts || {}) })} className="px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-sm text-slate-400 hover:text-white cursor-pointer flex items-center gap-1"><span className="material-symbols-outlined text-sm">edit</span>Edit</button>
+                                                <button onClick={() => setEditingCosts({ ...(creditCosts || {}) })} className="px-3 py-1.5 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-sm text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer flex items-center gap-1"><span className="material-symbols-outlined text-sm">edit</span>Edit</button>
                                             ) : (
                                                 <>
-                                                    <button onClick={handleResetCosts} className="px-3 py-1.5 rounded-lg text-sm text-slate-500 hover:text-rose-400 cursor-pointer">Reset Defaults</button>
-                                                    <button onClick={() => setEditingCosts(null)} className="px-3 py-1.5 rounded-lg text-sm text-slate-400 cursor-pointer">Cancel</button>
+                                                    <button onClick={handleResetCosts} className="px-3 py-1.5 rounded-lg text-sm text-[var(--sys-text-muted)] hover:text-primary cursor-pointer">Reset Defaults</button>
+                                                    <button onClick={() => setEditingCosts(null)} className="px-3 py-1.5 rounded-lg text-sm text-[var(--sys-text-muted)] cursor-pointer">Cancel</button>
                                                     <button onClick={handleSaveCosts} className="btn-primary px-4 py-1.5 rounded-lg text-xs cursor-pointer">Save</button>
                                                 </>
                                             )}
@@ -2545,12 +2647,12 @@ export default function SuperAdminDashboard() {
                                     </div>
                                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                                         {Object.entries(editingCosts || creditCosts || {}).map(([key, val]) => (
-                                            <div key={key} className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/[0.03] border border-white/[0.06]">
-                                                <span className="text-sm text-slate-400">{creditCostLabels[key] || key}</span>
+                                            <div key={key} className="flex items-center justify-between px-3 py-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                                                <span className="text-sm text-[var(--sys-text-muted)]">{creditCostLabels[key] || key}</span>
                                                 {editingCosts ? (
-                                                    <input type="number" min={0} value={editingCosts[key] ?? val} onChange={e => setEditingCosts(prev => ({ ...prev, [key]: Number(e.target.value) }))} className="w-12 text-right text-xs font-bold text-amber-400 bg-transparent outline-none border-b border-amber-500/30" />
+                                                    <input type="number" min={0} value={editingCosts[key] ?? val} onChange={e => setEditingCosts(prev => ({ ...prev, [key]: Number(e.target.value) }))} className="w-12 text-right text-xs font-bold text-primary bg-transparent outline-none border-b border-[var(--sys-border)]" />
                                                 ) : (
-                                                    <span className="text-xs font-bold text-amber-400">{val}</span>
+                                                    <span className="text-xs font-bold text-primary">{val}</span>
                                                 )}
                                             </div>
                                         ))}
@@ -2560,18 +2662,18 @@ export default function SuperAdminDashboard() {
                                 <div className="glass-panel rounded-2xl p-6 border border-primary/10">
                                     <div className="flex items-center justify-between mb-8">
                                         <div className="flex items-center gap-4">
-                                            <div className="w-12 h-12 rounded-xl bg-amber-500/10 flex items-center justify-center">
-                                                <span className="material-symbols-outlined text-amber-400">sync_problem</span>
+                                            <div className="w-12 h-12 rounded-xl bg-[var(--sys-primary-dim)] flex items-center justify-center">
+                                                <span className="material-symbols-outlined text-primary">sync_problem</span>
                                             </div>
                                             <div>
-                                                <p className="text-base font-bold text-white">Credit Integrity Sync</p>
-                                                <p className="text-sm text-slate-500">Repair and synchronize credit data system-wide</p>
+                                                <p className="text-base font-bold text-[var(--sys-text)]">Credit Integrity Sync</p>
+                                                <p className="text-sm text-[var(--sys-text-muted)]">Repair and synchronize credit data system-wide</p>
                                             </div>
                                         </div>
                                         <button 
                                             onClick={handleSyncCredits} 
                                             disabled={syncingCredits}
-                                            className="px-6 py-3 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 text-sm font-bold border border-amber-500/30 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                                            className="px-6 py-3 rounded-xl bg-[var(--sys-primary-dim)] hover:bg-[var(--sys-primary-dim)] text-primary text-sm font-bold border border-[var(--sys-border)] transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
                                         >
                                             <span className={`material-symbols-outlined text-base ${syncingCredits ? 'animate-spin' : ''}`}>
                                                 {syncingCredits ? 'progress_activity' : 'database_sync'}
@@ -2579,10 +2681,10 @@ export default function SuperAdminDashboard() {
                                             {syncingCredits ? 'Syncing...' : 'Start Integrity Sync'}
                                         </button>
                                     </div>
-                                    <div className="p-4 rounded-xl bg-amber-500/5 border border-amber-500/10">
+                                    <div className="p-4 rounded-xl bg-[var(--sys-primary-dim)] border border-[var(--sys-border)]">
                                         <div className="flex gap-2">
-                                            <span className="material-symbols-outlined text-amber-400 text-sm">info</span>
-                                            <p className="text-xs text-amber-400/80 leading-relaxed">
+                                            <span className="material-symbols-outlined text-primary text-sm">info</span>
+                                            <p className="text-xs text-primary/80 leading-relaxed">
                                                 This utility walks through all users, verifies their active subscription allocation, and matches their `used` credits against the `CreditUsage` logs for the current cycle. Use this if you notice discrepancies between plan limits and actual credit balances.
                                             </p>
                                         </div>
@@ -2595,15 +2697,15 @@ export default function SuperAdminDashboard() {
                         <div className="mt-8">
                             <div className="flex items-center justify-between mb-4">
                                 <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500/20 to-cyan-500/20 flex items-center justify-center">
-                                        <span className="material-symbols-outlined text-emerald-400">calculate</span>
+                                    <div className="w-10 h-10 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] flex items-center justify-center">
+                                        <span className="material-symbols-outlined text-primary">calculate</span>
                                     </div>
                                     <div>
-                                        <p className="text-base font-bold text-white">Pricing Calculator</p>
-                                        <p className="text-sm text-slate-500">API cost vs credit revenue — per action profitability</p>
+                                        <p className="text-base font-bold text-[var(--sys-text)]">Pricing Calculator</p>
+                                        <p className="text-sm text-[var(--sys-text-muted)]">API cost vs credit revenue — per action profitability</p>
                                     </div>
                                 </div>
-                                <button onClick={() => loadPricingData()} disabled={pricingLoading} className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500/10 to-cyan-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold hover:from-emerald-500/20 hover:to-cyan-500/20 cursor-pointer flex items-center gap-1.5 disabled:opacity-50">
+                                <button onClick={() => loadPricingData()} disabled={pricingLoading} className="px-4 py-2 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] border border-[var(--sys-border)] text-primary text-xs font-bold hover:from-emerald-500/20 hover:to-cyan-500/20 cursor-pointer flex items-center gap-1.5 disabled:opacity-50">
                                     <span className={`material-symbols-outlined text-sm ${pricingLoading ? 'animate-spin' : ''}`}>{pricingLoading ? 'progress_activity' : 'refresh'}</span>
                                     {pricingLoading ? 'Loading...' : pricingData ? 'Refresh' : 'Load Pricing Data'}
                                 </button>
@@ -2612,25 +2714,25 @@ export default function SuperAdminDashboard() {
                             {pricingData && (
                                 <div className="space-y-4">
                                     {/* Credit Price Slider */}
-                                    <div className="glass-panel rounded-2xl p-5 border border-emerald-500/10">
-                                        <label className="text-xs font-bold text-slate-400 mb-2 block">PRICE PER CREDIT (₹)</label>
+                                    <div className="glass-panel rounded-2xl p-5 border border-[var(--sys-border)]">
+                                        <label className="text-xs font-bold text-[var(--sys-text-muted)] mb-2 block">PRICE PER CREDIT (₹)</label>
                                         <div className="flex items-center gap-4">
                                             <input type="range" min="0.5" max="10" step="0.5" value={pricingPrice} onChange={e => { setPricingPrice(parseFloat(e.target.value)); loadPricingData(parseFloat(e.target.value)) }} className="flex-1 accent-emerald-500 cursor-pointer" />
-                                            <span className="text-2xl font-extrabold text-emerald-400 min-w-[60px] text-center">₹{pricingPrice}</span>
+                                            <span className="text-2xl font-extrabold text-primary min-w-[60px] text-center">₹{pricingPrice}</span>
                                         </div>
                                     </div>
 
                                     {/* Summary Cards */}
                                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                                        {[{ l: 'Profitable', v: pricingData.summary?.profitableActions, c: 'text-emerald-400', bg: 'from-emerald-500/10', i: 'trending_up' },
-                                          { l: 'Break-even', v: pricingData.summary?.breakevenActions, c: 'text-amber-400', bg: 'from-amber-500/10', i: 'trending_flat' },
-                                          { l: 'Loss', v: pricingData.summary?.lossActions, c: 'text-rose-400', bg: 'from-rose-500/10', i: 'trending_down' },
-                                          { l: 'Overall Margin', v: `${pricingData.summary?.overallMarginPct || 0}%`, c: (pricingData.summary?.overallMarginPct || 0) >= 50 ? 'text-emerald-400' : (pricingData.summary?.overallMarginPct || 0) >= 20 ? 'text-amber-400' : 'text-rose-400', bg: 'from-[#FF4D00]/10', i: 'donut_large' },
+                                        {[{ l: 'Profitable', v: pricingData.summary?.profitableActions, c: 'text-primary', bg: 'from-emerald-500/10', i: 'trending_up' },
+                                          { l: 'Break-even', v: pricingData.summary?.breakevenActions, c: 'text-primary', bg: 'from-amber-500/10', i: 'trending_flat' },
+                                          { l: 'Loss', v: pricingData.summary?.lossActions, c: 'text-primary', bg: 'from-rose-500/10', i: 'trending_down' },
+                                          { l: 'Overall Margin', v: `${pricingData.summary?.overallMarginPct || 0}%`, c: (pricingData.summary?.overallMarginPct || 0) >= 50 ? 'text-primary' : (pricingData.summary?.overallMarginPct || 0) >= 20 ? 'text-primary' : 'text-primary', bg: 'from-[#FF4D00]/10', i: 'donut_large' },
                                         ].map(s => (
                                             <div key={s.l} className={`glass-panel rounded-xl p-4 bg-gradient-to-br ${s.bg} to-transparent`}>
                                                 <div className="flex items-center gap-2 mb-1">
                                                     <span className={`material-symbols-outlined text-sm ${s.c}`}>{s.i}</span>
-                                                    <span className="text-xs text-slate-500 font-bold">{s.l}</span>
+                                                    <span className="text-xs text-[var(--sys-text-muted)] font-bold">{s.l}</span>
                                                 </div>
                                                 <p className={`text-2xl font-extrabold ${s.c}`}>{s.v}</p>
                                             </div>
@@ -2640,34 +2742,34 @@ export default function SuperAdminDashboard() {
                                     {/* Monthly Projection */}
                                     <div className="grid grid-cols-3 gap-3">
                                         <div className="glass-panel rounded-xl p-4 text-center">
-                                            <p className="text-xs text-slate-500 mb-1">Est. Monthly API Cost</p>
-                                            <p className="text-lg font-extrabold text-rose-400">₹{(pricingData.summary?.estimatedMonthlyAPICostINR || 0).toLocaleString()}</p>
+                                            <p className="text-xs text-[var(--sys-text-muted)] mb-1">Est. Monthly API Cost</p>
+                                            <p className="text-lg font-extrabold text-primary">₹{(pricingData.summary?.estimatedMonthlyAPICostINR || 0).toLocaleString()}</p>
                                         </div>
                                         <div className="glass-panel rounded-xl p-4 text-center">
-                                            <p className="text-xs text-slate-500 mb-1">Est. Monthly Revenue</p>
-                                            <p className="text-lg font-extrabold text-emerald-400">₹{(pricingData.summary?.estimatedMonthlyRevenueINR || 0).toLocaleString()}</p>
+                                            <p className="text-xs text-[var(--sys-text-muted)] mb-1">Est. Monthly Revenue</p>
+                                            <p className="text-lg font-extrabold text-primary">₹{(pricingData.summary?.estimatedMonthlyRevenueINR || 0).toLocaleString()}</p>
                                         </div>
                                         <div className="glass-panel rounded-xl p-4 text-center">
-                                            <p className="text-xs text-slate-500 mb-1">Est. Monthly Profit</p>
-                                            <p className={`text-lg font-extrabold ${((pricingData.summary?.estimatedMonthlyRevenueINR || 0) - (pricingData.summary?.estimatedMonthlyAPICostINR || 0)) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>₹{((pricingData.summary?.estimatedMonthlyRevenueINR || 0) - (pricingData.summary?.estimatedMonthlyAPICostINR || 0)).toLocaleString()}</p>
+                                            <p className="text-xs text-[var(--sys-text-muted)] mb-1">Est. Monthly Profit</p>
+                                            <p className={`text-lg font-extrabold ${((pricingData.summary?.estimatedMonthlyRevenueINR || 0) - (pricingData.summary?.estimatedMonthlyAPICostINR || 0)) >= 0 ? 'text-primary' : 'text-primary'}`}>₹{((pricingData.summary?.estimatedMonthlyRevenueINR || 0) - (pricingData.summary?.estimatedMonthlyAPICostINR || 0)).toLocaleString()}</p>
                                         </div>
                                     </div>
 
                                     {/* Studio Filter */}
                                     <div className="flex gap-2 flex-wrap">
                                         {['all', ...Object.keys(pricingData.studioSummary || {})].map(s => (
-                                            <button key={s} onClick={() => setPricingStudioFilter(s)} className={`px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-all ${pricingStudioFilter === s ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-white/[0.04] text-slate-500 border border-white/[0.08] hover:text-white'}`}>
+                                            <button key={s} onClick={() => setPricingStudioFilter(s)} className={`px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-all ${pricingStudioFilter === s ? 'bg-[var(--sys-primary-dim)] text-primary border border-[var(--sys-border)]' : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] border border-[var(--sys-border)] hover:text-[var(--sys-text)]'}`}>
                                                 {s === 'all' ? 'All Studios' : s}
                                             </button>
                                         ))}
                                     </div>
 
                                     {/* Per-Action Table */}
-                                    <div className="glass-panel rounded-2xl overflow-hidden border border-white/[0.06]">
+                                    <div className="glass-panel rounded-2xl overflow-hidden border border-[var(--sys-border)]">
                                         <div className="overflow-x-auto">
                                             <table className="w-full text-left min-w-[900px]">
                                                 <thead>
-                                                    <tr className="text-[10px] text-slate-500 font-bold uppercase tracking-wider border-b border-white/[0.06] bg-white/[0.02]">
+                                                    <tr className="text-[10px] text-[var(--sys-text-muted)] font-bold uppercase tracking-wider border-b border-[var(--sys-border)] bg-[var(--sys-surface)]">
                                                         <th className="px-4 py-3">Action</th>
                                                         <th className="px-3 py-3">Studio</th>
                                                         <th className="px-3 py-3 text-right">Credits</th>
@@ -2682,18 +2784,18 @@ export default function SuperAdminDashboard() {
                                                 </thead>
                                                 <tbody className="divide-y divide-white/[0.04]">
                                                     {(pricingData.actions || []).filter(a => pricingStudioFilter === 'all' || a.studio === pricingStudioFilter).map(a => (
-                                                        <tr key={a.action} className="text-sm hover:bg-white/[0.02] transition-all">
-                                                            <td className="px-4 py-2.5"><span className="font-bold text-white text-xs">{a.label}</span></td>
-                                                            <td className="px-3 py-2.5"><span className="text-[10px] px-1.5 py-0.5 rounded bg-white/[0.05] text-slate-400 font-bold">{a.studio}</span></td>
-                                                            <td className="px-3 py-2.5 text-right font-bold text-amber-400">{a.creditCost}</td>
-                                                            <td className="px-3 py-2.5 text-right text-slate-400 font-mono text-xs">${a.apiCostUSD}</td>
-                                                            <td className="px-3 py-2.5 text-right text-slate-400">₹{a.apiCostINR}</td>
-                                                            <td className="px-3 py-2.5 text-right text-white font-bold">₹{a.revenueINR}</td>
-                                                            <td className={`px-3 py-2.5 text-right font-bold ${a.profitINR >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>₹{a.profitINR}</td>
-                                                            <td className={`px-3 py-2.5 text-right font-extrabold ${a.marginPct >= 50 ? 'text-emerald-400' : a.marginPct >= 20 ? 'text-amber-400' : 'text-rose-400'}`}>{a.marginPct}%</td>
-                                                            <td className="px-3 py-2.5 text-center text-slate-500">{a.last30d?.count || 0}</td>
+                                                        <tr key={a.action} className="text-sm hover:bg-[var(--sys-surface)] transition-all">
+                                                            <td className="px-4 py-2.5"><span className="font-bold text-[var(--sys-text)] text-xs">{a.label}</span></td>
+                                                            <td className="px-3 py-2.5"><span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--sys-surface)] text-[var(--sys-text-muted)] font-bold">{a.studio}</span></td>
+                                                            <td className="px-3 py-2.5 text-right font-bold text-primary">{a.creditCost}</td>
+                                                            <td className="px-3 py-2.5 text-right text-[var(--sys-text-muted)] font-mono text-xs">${a.apiCostUSD}</td>
+                                                            <td className="px-3 py-2.5 text-right text-[var(--sys-text-muted)]">₹{a.apiCostINR}</td>
+                                                            <td className="px-3 py-2.5 text-right text-[var(--sys-text)] font-bold">₹{a.revenueINR}</td>
+                                                            <td className={`px-3 py-2.5 text-right font-bold ${a.profitINR >= 0 ? 'text-primary' : 'text-primary'}`}>₹{a.profitINR}</td>
+                                                            <td className={`px-3 py-2.5 text-right font-extrabold ${a.marginPct >= 50 ? 'text-primary' : a.marginPct >= 20 ? 'text-primary' : 'text-primary'}`}>{a.marginPct}%</td>
+                                                            <td className="px-3 py-2.5 text-center text-[var(--sys-text-muted)]">{a.last30d?.count || 0}</td>
                                                             <td className="px-3 py-2.5 text-center">
-                                                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${a.status === 'profitable' ? 'bg-emerald-500/15 text-emerald-400' : a.status === 'breakeven' ? 'bg-amber-500/15 text-amber-400' : 'bg-rose-500/15 text-rose-400'}`}>
+                                                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${a.status === 'profitable' ? 'bg-[var(--sys-primary-dim)] text-primary' : a.status === 'breakeven' ? 'bg-[var(--sys-primary-dim)] text-primary' : 'bg-[var(--sys-primary-dim)] text-primary'}`}>
                                                                     {a.status === 'profitable' ? '🟢' : a.status === 'breakeven' ? '🟡' : '🔴'} {a.status}
                                                                 </span>
                                                             </td>
@@ -2708,12 +2810,12 @@ export default function SuperAdminDashboard() {
                                     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
                                         {Object.entries(pricingData.studioSummary || {}).map(([studio, data]) => (
                                             <div key={studio} className="glass-panel rounded-xl p-3">
-                                                <p className="text-xs font-bold text-white mb-1">{studio}</p>
+                                                <p className="text-xs font-bold text-[var(--sys-text)] mb-1">{studio}</p>
                                                 <div className="flex items-baseline gap-2">
-                                                    <span className={`text-lg font-extrabold ${data.avgMargin >= 50 ? 'text-emerald-400' : data.avgMargin >= 20 ? 'text-amber-400' : 'text-rose-400'}`}>{data.avgMargin}%</span>
-                                                    <span className="text-[10px] text-slate-600">avg margin</span>
+                                                    <span className={`text-lg font-extrabold ${data.avgMargin >= 50 ? 'text-primary' : data.avgMargin >= 20 ? 'text-primary' : 'text-primary'}`}>{data.avgMargin}%</span>
+                                                    <span className="text-[10px] text-[var(--sys-text-muted)]">avg margin</span>
                                                 </div>
-                                                <p className="text-[10px] text-slate-600">{data.actions} actions{data.losses > 0 ? ` • ${data.losses} loss` : ''}</p>
+                                                <p className="text-[10px] text-[var(--sys-text-muted)]">{data.actions} actions{data.losses > 0 ? ` • ${data.losses} loss` : ''}</p>
                                             </div>
                                         ))}
                                     </div>
@@ -2725,12 +2827,12 @@ export default function SuperAdminDashboard() {
                         <div className="mt-8">
                             <div className="flex items-center justify-between mb-4">
                                 <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#FF4D00]/20 to-[#FF7A00]/20 flex items-center justify-center">
+                                    <div className="w-10 h-10 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] flex items-center justify-center">
                                         <span className="material-symbols-outlined text-[#FF4D00]">key</span>
                                     </div>
                                     <div>
-                                        <p className="text-base font-bold text-white">API Key Management</p>
-                                        <p className="text-sm text-slate-500">Manage external API keys — DB overrides env vars</p>
+                                        <p className="text-base font-bold text-[var(--sys-text)]">API Key Management</p>
+                                        <p className="text-sm text-[var(--sys-text-muted)]">Manage external API keys — DB overrides env vars</p>
                                     </div>
                                 </div>
                                 <button onClick={loadApiKeys} className="px-3 py-1.5 rounded-lg bg-[#FF4D00]/10 border border-[#FF4D00]/20 text-[#FF4D00] text-xs font-bold hover:bg-[#FF4D00]/20 cursor-pointer flex items-center gap-1">
@@ -2740,46 +2842,46 @@ export default function SuperAdminDashboard() {
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                                 {apiProviders.map(p => (
-                                    <div key={p.id} className="glass-panel rounded-xl p-4 border border-white/[0.06] hover:border-[#FF4D00]/20 transition-all">
+                                    <div key={p.id} className="glass-panel rounded-xl p-4 border border-[var(--sys-border)] hover:border-[#FF4D00]/20 transition-all">
                                         <div className="flex items-center justify-between mb-3">
                                             <div className="flex items-center gap-2">
                                                 <span className="material-symbols-outlined text-[#FF4D00] text-lg">{p.icon}</span>
-                                                <span className="text-sm font-bold text-white">{p.label}</span>
+                                                <span className="text-sm font-bold text-[var(--sys-text)]">{p.label}</span>
                                             </div>
                                             <div className="flex gap-1">
                                                 {p.canTest && (
-                                                    <button onClick={() => handleTestApiKey(p.id)} disabled={testingProvider === p.id} className="p-1 rounded hover:bg-white/[0.05] cursor-pointer" title="Test">
-                                                        <span className={`material-symbols-outlined text-sm ${testingProvider === p.id ? 'animate-spin text-amber-400' : 'text-slate-500'}`}>{testingProvider === p.id ? 'progress_activity' : 'speed'}</span>
+                                                    <button onClick={() => handleTestApiKey(p.id)} disabled={testingProvider === p.id} className="p-1 rounded hover:bg-[var(--sys-surface)] cursor-pointer" title="Test">
+                                                        <span className={`material-symbols-outlined text-sm ${testingProvider === p.id ? 'animate-spin text-primary' : 'text-[var(--sys-text-muted)]'}`}>{testingProvider === p.id ? 'progress_activity' : 'speed'}</span>
                                                     </button>
                                                 )}
-                                                <button onClick={() => { setEditingProvider(p.id); setEditProviderKeys({}) }} className="p-1 rounded hover:bg-white/[0.05] cursor-pointer" title="Edit">
-                                                    <span className="material-symbols-outlined text-sm text-slate-500">edit</span>
+                                                <button onClick={() => { setEditingProvider(p.id); setEditProviderKeys({}) }} className="p-1 rounded hover:bg-[var(--sys-surface)] cursor-pointer" title="Edit">
+                                                    <span className="material-symbols-outlined text-sm text-[var(--sys-text-muted)]">edit</span>
                                                 </button>
                                             </div>
                                         </div>
                                         {p.fields.map(f => (
-                                            <div key={f.key} className="flex items-center justify-between py-1.5 border-t border-white/[0.04]">
-                                                <span className="text-[10px] text-slate-500 font-bold">{f.label}</span>
+                                            <div key={f.key} className="flex items-center justify-between py-1.5 border-t border-[var(--sys-border)]">
+                                                <span className="text-[10px] text-[var(--sys-text-muted)] font-bold">{f.label}</span>
                                                 <div className="flex items-center gap-2">
-                                                    <span className="text-xs text-slate-400 font-mono">{f.masked || '—'}</span>
-                                                    <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${f.source === 'database' ? 'bg-[#FF4D00]/15 text-[#FF4D00]' : f.source === 'env' ? 'bg-emerald-500/15 text-emerald-400' : 'bg-rose-500/15 text-rose-400'}`}>{f.source}</span>
+                                                    <span className="text-xs text-[var(--sys-text-muted)] font-mono">{f.masked || '—'}</span>
+                                                    <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${f.source === 'database' ? 'bg-[#FF4D00]/15 text-[#FF4D00]' : f.source === 'env' ? 'bg-[var(--sys-primary-dim)] text-primary' : 'bg-[var(--sys-primary-dim)] text-primary'}`}>{f.source}</span>
                                                 </div>
                                             </div>
                                         ))}
                                         {testResults[p.id] && (
-                                            <div className={`mt-2 p-2 rounded-lg text-[10px] font-bold ${testResults[p.id].success ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
+                                            <div className={`mt-2 p-2 rounded-lg text-[10px] font-bold ${testResults[p.id].success ? 'bg-[var(--sys-primary-dim)] text-primary' : 'bg-[var(--sys-primary-dim)] text-primary'}`}>
                                                 {testResults[p.id].status === 'connected' ? '🟢' : testResults[p.id].status === 'no_key' ? '⚫' : '🔴'} {testResults[p.id].message}
                                             </div>
                                         )}
                                         {editingProvider === p.id && (
                                             <div className="mt-3 pt-3 border-t border-[#FF4D00]/20 space-y-2">
                                                 {p.fields.map(f => (
-                                                    <input key={f.key} type="password" placeholder={`New ${f.label}`} value={editProviderKeys[f.key] || ''} onChange={e => setEditProviderKeys(k => ({ ...k, [f.key]: e.target.value }))} className="w-full px-3 py-1.5 rounded-lg bg-white/[0.05] border border-white/[0.1] text-white text-xs focus:border-[#FF4D00]/50 outline-none" />
+                                                    <input key={f.key} type="password" placeholder={`New ${f.label}`} value={editProviderKeys[f.key] || ''} onChange={e => setEditProviderKeys(k => ({ ...k, [f.key]: e.target.value }))} className="w-full px-3 py-1.5 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-xs focus:border-[#FF4D00]/50 outline-none" />
                                                 ))}
                                                 <div className="flex gap-2">
                                                     <button onClick={() => handleSaveApiKey(p.id)} className="flex-1 px-3 py-1.5 rounded-lg bg-[#FF4D00]/20 text-[#FF4D00] text-xs font-bold hover:bg-[#FF4D00]/30 cursor-pointer">Save</button>
-                                                    <button onClick={() => handleDeleteApiKey(p.id)} className="px-3 py-1.5 rounded-lg bg-rose-500/10 text-rose-400 text-xs font-bold hover:bg-rose-500/20 cursor-pointer">Remove</button>
-                                                    <button onClick={() => setEditingProvider(null)} className="px-3 py-1.5 rounded-lg bg-white/[0.05] text-slate-500 text-xs font-bold hover:bg-white/[0.1] cursor-pointer">Cancel</button>
+                                                    <button onClick={() => handleDeleteApiKey(p.id)} className="px-3 py-1.5 rounded-lg bg-[var(--sys-primary-dim)] text-primary text-xs font-bold hover:bg-[var(--sys-primary-dim)] cursor-pointer">Remove</button>
+                                                    <button onClick={() => setEditingProvider(null)} className="px-3 py-1.5 rounded-lg bg-[var(--sys-surface)] text-[var(--sys-text-muted)] text-xs font-bold hover:bg-[var(--sys-surface)] cursor-pointer">Cancel</button>
                                                 </div>
                                             </div>
                                         )}
@@ -2792,58 +2894,58 @@ export default function SuperAdminDashboard() {
                         {systemSettings && (
                             <div className="mt-8">
                                 <div className="flex items-center gap-3 mb-4">
-                                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500/20 to-teal-500/20 flex items-center justify-center">
-                                        <span className="material-symbols-outlined text-cyan-400">branding_watermark</span>
+                                    <div className="w-10 h-10 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] flex items-center justify-center">
+                                        <span className="material-symbols-outlined text-primary">branding_watermark</span>
                                     </div>
                                     <div>
-                                        <p className="text-base font-bold text-white">Watermark Configuration</p>
-                                        <p className="text-sm text-slate-500">Logo, position, opacity — applied to images & videos</p>
+                                        <p className="text-base font-bold text-[var(--sys-text)]">Watermark Configuration</p>
+                                        <p className="text-sm text-[var(--sys-text-muted)]">Logo, position, opacity — applied to images & videos</p>
                                     </div>
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                    <div className="glass-panel rounded-xl p-4 border border-white/[0.06]">
-                                        <label className="text-xs font-bold text-slate-400 mb-2 block">WATERMARK LOGO</label>
+                                    <div className="glass-panel rounded-xl p-4 border border-[var(--sys-border)]">
+                                        <label className="text-xs font-bold text-[var(--sys-text-muted)] mb-2 block">WATERMARK LOGO</label>
                                         <div className="flex flex-col items-center gap-3">
                                             {(watermarkLogoPreview || systemSettings.watermarkLogoUrl) ? (
-                                                <div className="w-full h-24 rounded-lg bg-[#121217]/50 flex items-center justify-center overflow-hidden border border-white/[0.06]">
+                                                <div className="w-full h-24 rounded-lg bg-[var(--sys-surface)]/50 flex items-center justify-center overflow-hidden border border-[var(--sys-border)]">
                                                     <img src={watermarkLogoPreview || systemSettings.watermarkLogoUrl} alt="Watermark" className="max-h-20 max-w-full object-contain" />
                                                 </div>
                                             ) : (
-                                                <div className="w-full h-24 rounded-lg bg-[#121217]/50 flex items-center justify-center border border-dashed border-white/[0.1]">
-                                                    <span className="text-slate-600 text-xs">No logo — text watermark active</span>
+                                                <div className="w-full h-24 rounded-lg bg-[var(--sys-surface)]/50 flex items-center justify-center border border-dashed border-[var(--sys-border)]">
+                                                    <span className="text-[var(--sys-text-muted)] text-xs">No logo — text watermark active</span>
                                                 </div>
                                             )}
-                                            <label className="px-4 py-2 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-xs font-bold hover:bg-cyan-500/20 cursor-pointer flex items-center gap-1.5">
+                                            <label className="px-4 py-2 rounded-lg bg-[var(--sys-primary-dim)] border border-[var(--sys-border)] text-primary text-xs font-bold hover:bg-[var(--sys-primary-dim)] cursor-pointer flex items-center gap-1.5">
                                                 <span className="material-symbols-outlined text-sm">upload</span> Upload Logo
                                                 <input type="file" accept="image/*" onChange={handleWatermarkLogoUpload} className="hidden" />
                                             </label>
                                         </div>
                                     </div>
 
-                                    <div className="glass-panel rounded-xl p-4 border border-white/[0.06]">
-                                        <label className="text-xs font-bold text-slate-400 mb-2 block">POSITION</label>
-                                        <select value={systemSettings.watermarkPosition || 'bottom-right'} onChange={e => handleWatermarkSettingsUpdate({ position: e.target.value })} className="w-full px-3 py-2 rounded-lg bg-white/[0.05] border border-white/[0.1] text-white text-xs mb-4 cursor-pointer outline-none">
+                                    <div className="glass-panel rounded-xl p-4 border border-[var(--sys-border)]">
+                                        <label className="text-xs font-bold text-[var(--sys-text-muted)] mb-2 block">POSITION</label>
+                                        <select value={systemSettings.watermarkPosition || 'bottom-right'} onChange={e => handleWatermarkSettingsUpdate({ position: e.target.value })} className="w-full px-3 py-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-xs mb-4 cursor-pointer outline-none">
                                             {['top-left', 'top-right', 'center', 'bottom-left', 'bottom-right'].map(pos => (
                                                 <option key={pos} value={pos} className="bg-[#08080C]">{pos.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}</option>
                                             ))}
                                         </select>
-                                        <label className="text-xs font-bold text-slate-400 mb-2 block">OPACITY ({Math.round((systemSettings.watermarkOpacity || 0.4) * 100)}%)</label>
+                                        <label className="text-xs font-bold text-[var(--sys-text-muted)] mb-2 block">OPACITY ({Math.round((systemSettings.watermarkOpacity || 0.4) * 100)}%)</label>
                                         <input type="range" min="0.1" max="1" step="0.05" value={systemSettings.watermarkOpacity || 0.4} onChange={e => handleWatermarkSettingsUpdate({ opacity: parseFloat(e.target.value) })} className="w-full accent-cyan-500 cursor-pointer" />
                                     </div>
 
-                                    <div className="glass-panel rounded-xl p-4 border border-white/[0.06]">
-                                        <label className="text-xs font-bold text-slate-400 mb-3 block">WATERMARK STATUS</label>
+                                    <div className="glass-panel rounded-xl p-4 border border-[var(--sys-border)]">
+                                        <label className="text-xs font-bold text-[var(--sys-text-muted)] mb-3 block">WATERMARK STATUS</label>
                                         <div className="flex items-center gap-3 mb-4">
-                                            <button onClick={() => handleWatermarkSettingsUpdate({ enabled: !systemSettings.watermarkEnabled })} className={`relative inline-flex h-6 w-11 items-center rounded-full cursor-pointer transition-colors ${systemSettings.watermarkEnabled ? 'bg-cyan-500' : 'bg-slate-700'}`}>
+                                            <button onClick={() => handleWatermarkSettingsUpdate({ enabled: !systemSettings.watermarkEnabled })} className={`relative inline-flex h-6 w-11 items-center rounded-full cursor-pointer transition-colors ${systemSettings.watermarkEnabled ? 'bg-[var(--sys-surface)]' : 'bg-[var(--sys-surface)]'}`}>
                                                 <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${systemSettings.watermarkEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
                                             </button>
-                                            <span className={`text-sm font-bold ${systemSettings.watermarkEnabled ? 'text-cyan-400' : 'text-slate-500'}`}>{systemSettings.watermarkEnabled ? 'ON — All Outputs' : 'OFF — No Watermarks'}</span>
+                                            <span className={`text-sm font-bold ${systemSettings.watermarkEnabled ? 'text-primary' : 'text-[var(--sys-text-muted)]'}`}>{systemSettings.watermarkEnabled ? 'ON — All Outputs' : 'OFF — No Watermarks'}</span>
                                         </div>
                                         <div className="space-y-1.5">
-                                            <div className="flex items-center gap-2 text-[10px]"><span className="material-symbols-outlined text-xs text-cyan-400">image</span><span className="text-slate-400">Applied to generated images</span></div>
-                                            <div className="flex items-center gap-2 text-[10px]"><span className="material-symbols-outlined text-xs text-cyan-400">movie</span><span className="text-slate-400">Applied to generated videos</span></div>
-                                            <div className="flex items-center gap-2 text-[10px]"><span className="material-symbols-outlined text-xs text-amber-400">tune</span><span className="text-slate-400">Per-brand/user overrides available</span></div>
+                                            <div className="flex items-center gap-2 text-[10px]"><span className="material-symbols-outlined text-xs text-primary">image</span><span className="text-[var(--sys-text-muted)]">Applied to generated images</span></div>
+                                            <div className="flex items-center gap-2 text-[10px]"><span className="material-symbols-outlined text-xs text-primary">movie</span><span className="text-[var(--sys-text-muted)]">Applied to generated videos</span></div>
+                                            <div className="flex items-center gap-2 text-[10px]"><span className="material-symbols-outlined text-xs text-primary">tune</span><span className="text-[var(--sys-text-muted)]">Per-brand/user overrides available</span></div>
                                         </div>
                                     </div>
                                 </div>
@@ -2854,19 +2956,19 @@ export default function SuperAdminDashboard() {
                         <div className="mt-8">
                             <div className="flex items-center justify-between mb-4">
                                 <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500/20 to-amber-500/20 flex items-center justify-center">
-                                        <span className="material-symbols-outlined text-orange-400">monitoring</span>
+                                    <div className="w-10 h-10 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] flex items-center justify-center">
+                                        <span className="material-symbols-outlined text-[var(--sys-primary)]">monitoring</span>
                                     </div>
                                     <div>
-                                        <p className="text-base font-bold text-white">Provider Usage Intelligence</p>
-                                        <p className="text-sm text-slate-500">Real API usage data from providers + internal logs</p>
+                                        <p className="text-base font-bold text-[var(--sys-text)]">Provider Usage Intelligence</p>
+                                        <p className="text-sm text-[var(--sys-text-muted)]">Real API usage data from providers + internal logs</p>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <select value={providerUsageDays} onChange={e => { setProviderUsageDays(parseInt(e.target.value)); loadProviderUsage(parseInt(e.target.value)) }} className="px-2 py-1.5 rounded-lg bg-white/[0.05] border border-white/[0.1] text-white text-xs cursor-pointer outline-none">
+                                    <select value={providerUsageDays} onChange={e => { setProviderUsageDays(parseInt(e.target.value)); loadProviderUsage(parseInt(e.target.value)) }} className="px-2 py-1.5 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-xs cursor-pointer outline-none">
                                         {[7, 14, 30, 60, 90].map(d => <option key={d} value={d} className="bg-[#08080C]">{d} days</option>)}
                                     </select>
-                                    <button onClick={() => loadProviderUsage()} disabled={providerUsageLoading} className="px-3 py-1.5 rounded-lg bg-orange-500/10 border border-orange-500/20 text-orange-400 text-xs font-bold hover:bg-orange-500/20 cursor-pointer flex items-center gap-1 disabled:opacity-50">
+                                    <button onClick={() => loadProviderUsage()} disabled={providerUsageLoading} className="px-3 py-1.5 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-primary)] text-xs font-bold hover:bg-[var(--sys-surface)] cursor-pointer flex items-center gap-1 disabled:opacity-50">
                                         <span className={`material-symbols-outlined text-sm ${providerUsageLoading ? 'animate-spin' : ''}`}>{providerUsageLoading ? 'progress_activity' : 'refresh'}</span>
                                         {providerUsageLoading ? 'Loading...' : providerUsageData ? 'Refresh' : 'Load Usage'}
                                     </button>
@@ -2877,39 +2979,39 @@ export default function SuperAdminDashboard() {
                                 <div className="space-y-4">
                                     <div className="grid grid-cols-3 gap-3">
                                         <div className="glass-panel rounded-xl p-4 text-center">
-                                            <p className="text-xs text-slate-500 mb-1">Total API Cost (Est.)</p>
-                                            <p className="text-xl font-extrabold text-rose-400">${providerUsageData.totalEstimatedCostUSD}</p>
-                                            <p className="text-[10px] text-slate-600">≈ ₹{Math.round((providerUsageData.totalEstimatedCostUSD || 0) * 85).toLocaleString()}</p>
+                                            <p className="text-xs text-[var(--sys-text-muted)] mb-1">Total API Cost (Est.)</p>
+                                            <p className="text-xl font-extrabold text-primary">${providerUsageData.totalEstimatedCostUSD}</p>
+                                            <p className="text-[10px] text-[var(--sys-text-muted)]">≈ ₹{Math.round((providerUsageData.totalEstimatedCostUSD || 0) * 85).toLocaleString()}</p>
                                         </div>
                                         <div className="glass-panel rounded-xl p-4 text-center">
-                                            <p className="text-xs text-slate-500 mb-1">Total API Calls</p>
-                                            <p className="text-xl font-extrabold text-amber-400">{(providerUsageData.totalCalls || 0).toLocaleString()}</p>
+                                            <p className="text-xs text-[var(--sys-text-muted)] mb-1">Total API Calls</p>
+                                            <p className="text-xl font-extrabold text-primary">{(providerUsageData.totalCalls || 0).toLocaleString()}</p>
                                         </div>
                                         <div className="glass-panel rounded-xl p-4 text-center">
-                                            <p className="text-xs text-slate-500 mb-1">Credits Consumed</p>
+                                            <p className="text-xs text-[var(--sys-text-muted)] mb-1">Credits Consumed</p>
                                             <p className="text-xl font-extrabold text-[#FF4D00]">{(providerUsageData.totalCreditsUsed || 0).toLocaleString()}</p>
                                         </div>
                                     </div>
 
                                     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                                         {Object.entries(providerUsageData.providerUsage || {}).map(([prov, data]) => (
-                                            <div key={prov} className={`glass-panel rounded-xl p-4 border ${data.calls > 0 ? 'border-orange-500/10' : 'border-white/[0.04]'}`}>
+                                            <div key={prov} className={`glass-panel rounded-xl p-4 border ${data.calls > 0 ? 'border-[var(--sys-border)]' : 'border-[var(--sys-border)]'}`}>
                                                 <div className="flex items-center justify-between mb-2">
-                                                    <span className="text-xs font-bold text-white capitalize">{prov}</span>
-                                                    {data.calls > 0 && <span className="text-[9px] px-1.5 py-0.5 rounded bg-orange-500/15 text-orange-400 font-bold">ACTIVE</span>}
+                                                    <span className="text-xs font-bold text-[var(--sys-text)] capitalize">{prov}</span>
+                                                    {data.calls > 0 && <span className="text-[9px] px-1.5 py-0.5 rounded bg-[var(--sys-surface)] text-[var(--sys-primary)] font-bold">ACTIVE</span>}
                                                 </div>
                                                 <div className="space-y-1">
-                                                    <div className="flex justify-between text-[10px]"><span className="text-slate-500">Calls</span><span className="text-white font-bold">{data.calls.toLocaleString()}</span></div>
-                                                    <div className="flex justify-between text-[10px]"><span className="text-slate-500">Tokens</span><span className="text-white font-bold">{(data.totalTokens || 0).toLocaleString()}</span></div>
-                                                    <div className="flex justify-between text-[10px]"><span className="text-slate-500">Est. Cost</span><span className="text-rose-400 font-bold">${data.estimatedCostUSD}</span></div>
-                                                    <div className="flex justify-between text-[10px]"><span className="text-slate-500">Credits</span><span className="text-amber-400 font-bold">{data.creditsUsed}</span></div>
+                                                    <div className="flex justify-between text-[10px]"><span className="text-[var(--sys-text-muted)]">Calls</span><span className="text-[var(--sys-text)] font-bold">{data.calls.toLocaleString()}</span></div>
+                                                    <div className="flex justify-between text-[10px]"><span className="text-[var(--sys-text-muted)]">Tokens</span><span className="text-[var(--sys-text)] font-bold">{(data.totalTokens || 0).toLocaleString()}</span></div>
+                                                    <div className="flex justify-between text-[10px]"><span className="text-[var(--sys-text-muted)]">Est. Cost</span><span className="text-primary font-bold">${data.estimatedCostUSD}</span></div>
+                                                    <div className="flex justify-between text-[10px]"><span className="text-[var(--sys-text-muted)]">Credits</span><span className="text-primary font-bold">{data.creditsUsed}</span></div>
                                                 </div>
                                                 {data.models?.length > 0 && (
-                                                    <div className="mt-2 pt-2 border-t border-white/[0.04]">
+                                                    <div className="mt-2 pt-2 border-t border-[var(--sys-border)]">
                                                         {data.models.slice(0, 3).map(m => (
                                                             <div key={m.model} className="flex justify-between text-[9px] py-0.5">
-                                                                <span className="text-slate-600 truncate max-w-[60%]">{m.model}</span>
-                                                                <span className="text-slate-500">{m.calls} calls</span>
+                                                                <span className="text-[var(--sys-text-muted)] truncate max-w-[60%]">{m.model}</span>
+                                                                <span className="text-[var(--sys-text-muted)]">{m.calls} calls</span>
                                                             </div>
                                                         ))}
                                                     </div>
@@ -2919,12 +3021,12 @@ export default function SuperAdminDashboard() {
                                     </div>
 
                                     {providerUsageData.piapiBalance && (
-                                        <div className="glass-panel rounded-xl p-4 border border-orange-500/10">
+                                        <div className="glass-panel rounded-xl p-4 border border-[var(--sys-border)]">
                                             <div className="flex items-center gap-2 mb-2">
-                                                <span className="material-symbols-outlined text-orange-400 text-sm">account_balance_wallet</span>
-                                                <span className="text-xs font-bold text-white">PiAPI Account Balance</span>
+                                                <span className="material-symbols-outlined text-[var(--sys-primary)] text-sm">account_balance_wallet</span>
+                                                <span className="text-xs font-bold text-[var(--sys-text)]">PiAPI Account Balance</span>
                                             </div>
-                                            <pre className="text-[10px] text-slate-400 bg-white/[0.02] p-2 rounded overflow-auto max-h-24">{JSON.stringify(providerUsageData.piapiBalance, null, 2)}</pre>
+                                            <pre className="text-[10px] text-[var(--sys-text-muted)] bg-[var(--sys-surface)] p-2 rounded overflow-auto max-h-24">{JSON.stringify(providerUsageData.piapiBalance, null, 2)}</pre>
                                         </div>
                                     )}
                                 </div>
@@ -2937,20 +3039,20 @@ export default function SuperAdminDashboard() {
                     <div>
                         <div className="flex items-center justify-between mb-6">
                             <div>
-                                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                                <h3 className="text-lg font-bold text-[var(--sys-text)] flex items-center gap-2">
                                     <span className="material-symbols-outlined text-[#FF4D00]">rocket_launch</span>
                                     Studio Launch Control
                                 </h3>
-                                <p className="text-sm text-slate-500 mt-1">Control which studios are visible across the platform — globally or per user</p>
+                                <p className="text-sm text-[var(--sys-text-muted)] mt-1">Control which studios are visible across the platform — globally or per user</p>
                             </div>
-                            <button onClick={loadStudioVisibility} className="p-2 rounded-lg bg-white/[0.04] text-slate-400 hover:text-white cursor-pointer"><span className="material-symbols-outlined text-sm">refresh</span></button>
+                            <button onClick={loadStudioVisibility} className="p-2 rounded-lg bg-[var(--sys-surface)] text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer"><span className="material-symbols-outlined text-sm">refresh</span></button>
                         </div>
 
                         {/* Legend */}
-                        <div className="flex gap-6 mb-5 px-4 py-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
-                            <div className="flex items-center gap-2 text-xs"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500" /><span className="text-slate-400"><b className="text-emerald-400">Public</b> — visible to everyone (per plan)</span></div>
-                            <div className="flex items-center gap-2 text-xs"><span className="w-2.5 h-2.5 rounded-full bg-amber-500" /><span className="text-slate-400"><b className="text-amber-400">Private</b> — whitelisted users only</span></div>
-                            <div className="flex items-center gap-2 text-xs"><span className="w-2.5 h-2.5 rounded-full bg-rose-500" /><span className="text-slate-400"><b className="text-rose-400">Hidden</b> — off for everyone</span></div>
+                        <div className="flex gap-6 mb-5 px-4 py-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                            <div className="flex items-center gap-2 text-xs"><span className="w-2.5 h-2.5 rounded-full bg-[var(--sys-surface)]" /><span className="text-[var(--sys-text-muted)]"><b className="text-primary">Public</b> — visible to everyone (per plan)</span></div>
+                            <div className="flex items-center gap-2 text-xs"><span className="w-2.5 h-2.5 rounded-full bg-[var(--sys-surface)]" /><span className="text-[var(--sys-text-muted)]"><b className="text-primary">Private</b> — whitelisted users only</span></div>
+                            <div className="flex items-center gap-2 text-xs"><span className="w-2.5 h-2.5 rounded-full bg-[var(--sys-surface)]" /><span className="text-[var(--sys-text-muted)]"><b className="text-primary">Hidden</b> — off for everyone</span></div>
                         </div>
 
                         {/* Global Studio Visibility */}
@@ -2958,26 +3060,26 @@ export default function SuperAdminDashboard() {
                             <div className="space-y-2 mb-8">
                                 {studioKeys.map(key => {
                                     const status = studioVisibility[key] || 'public';
-                                    const rowBorder = { public: 'border-emerald-500/20', private: 'border-amber-500/20', hidden: 'border-rose-500/20' };
-                                    const dotColor = { public: 'bg-emerald-500', private: 'bg-amber-500', hidden: 'bg-rose-500' };
+                                    const rowBorder = { public: 'border-[var(--sys-border)]', private: 'border-[var(--sys-border)]', hidden: 'border-[var(--sys-border)]' };
+                                    const dotColor = { public: 'bg-[var(--sys-surface)]', private: 'bg-[var(--sys-surface)]', hidden: 'bg-[var(--sys-surface)]' };
                                     const activeClasses = {
-                                        public: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40',
-                                        private: 'bg-amber-500/20 text-amber-400 border border-amber-500/40',
-                                        hidden: 'bg-rose-500/20 text-rose-400 border border-rose-500/40',
+                                        public: 'bg-[var(--sys-primary-dim)] text-primary border border-[var(--sys-border)]',
+                                        private: 'bg-[var(--sys-primary-dim)] text-primary border border-[var(--sys-border)]',
+                                        hidden: 'bg-[var(--sys-primary-dim)] text-primary border border-[var(--sys-border)]',
                                     };
                                     return (
-                                        <div key={key} className={`flex items-center justify-between px-5 py-4 rounded-xl bg-white/[0.02] border ${rowBorder[status]} transition-all`}>
+                                        <div key={key} className={`flex items-center justify-between px-5 py-4 rounded-xl bg-[var(--sys-surface)] border ${rowBorder[status]} transition-all`}>
                                             <div className="flex items-center gap-3">
                                                 <span className={`w-3 h-3 rounded-full ${dotColor[status]}`} />
-                                                <span className="text-sm font-bold text-white">{studioLabels[key] || key}</span>
-                                                <span className="text-[10px] text-slate-600 font-mono bg-white/[0.04] px-2 py-0.5 rounded">{key}</span>
+                                                <span className="text-sm font-bold text-[var(--sys-text)]">{studioLabels[key] || key}</span>
+                                                <span className="text-[10px] text-[var(--sys-text-muted)] font-mono bg-[var(--sys-surface)] px-2 py-0.5 rounded">{key}</span>
                                             </div>
                                             <div className="flex gap-1.5">
                                                 {['public', 'private', 'hidden'].map(state => (
                                                     <button key={state} onClick={() => handleStudioVisibilityChange(key, state)}
                                                         className={`px-4 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-all ${status === state
                                                             ? activeClasses[state]
-                                                            : 'text-slate-600 hover:text-slate-400 border border-transparent'
+                                                            : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text-muted)] border border-transparent'
                                                         }`}
                                                     >
                                                         {state.charAt(0).toUpperCase() + state.slice(1)}
@@ -2989,7 +3091,7 @@ export default function SuperAdminDashboard() {
                                 })}
                             </div>
                         ) : (
-                            <div className="flex items-center justify-center py-12 text-slate-500 text-sm">
+                            <div className="flex items-center justify-center py-12 text-[var(--sys-text-muted)] text-sm">
                                 <span className="material-symbols-outlined animate-spin mr-2">progress_activity</span>
                                 Loading studio visibility...
                             </div>
@@ -2997,30 +3099,30 @@ export default function SuperAdminDashboard() {
 
                         {/* Per-User Studio Access Section */}
                         <div className="glass-panel rounded-2xl p-5 mt-6">
-                            <h4 className="text-sm font-bold text-white flex items-center gap-2 mb-3">
-                                <span className="material-symbols-outlined text-amber-400">shield_person</span>
+                            <h4 className="text-sm font-bold text-[var(--sys-text)] flex items-center gap-2 mb-3">
+                                <span className="material-symbols-outlined text-primary">shield_person</span>
                                 Per-User Studio Access
                             </h4>
-                            <p className="text-xs text-slate-500 mb-4">Search for a user to grant or revoke individual studio access. User overrides take priority over global settings (except Hidden).</p>
-                            <div className="flex items-center gap-3 bg-white/[0.03] rounded-xl border border-white/[0.06] px-4 py-2.5">
-                                <span className="material-symbols-outlined text-slate-500 text-lg">search</span>
+                            <p className="text-xs text-[var(--sys-text-muted)] mb-4">Search for a user to grant or revoke individual studio access. User overrides take priority over global settings (except Hidden).</p>
+                            <div className="flex items-center gap-3 bg-[var(--sys-surface)] rounded-xl border border-[var(--sys-border)] px-4 py-2.5">
+                                <span className="material-symbols-outlined text-[var(--sys-text-muted)] text-lg">search</span>
                                 <input
                                     type="text"
                                     placeholder="Search user to manage studio access..."
                                     value={impersonateSearch}
                                     onChange={e => setImpersonateSearch(e.target.value)}
-                                    className="flex-1 bg-transparent text-sm text-white placeholder-slate-500 outline-none"
+                                    className="flex-1 bg-transparent text-sm text-[var(--sys-text)] placeholder-slate-500 outline-none"
                                 />
                             </div>
                             {impersonateResults.length > 0 && impersonateSearch.length >= 2 && (
-                                <div className="mt-2 border border-white/[0.06] rounded-xl overflow-hidden">
+                                <div className="mt-2 border border-[var(--sys-border)] rounded-xl overflow-hidden">
                                     {impersonateResults.map(u => (
-                                        <div key={u._id} className="flex items-center justify-between px-4 py-3 hover:bg-white/[0.04] transition-all border-b border-white/[0.04] last:border-b-0">
+                                        <div key={u._id} className="flex items-center justify-between px-4 py-3 hover:bg-[var(--sys-surface)] transition-all border-b border-[var(--sys-border)] last:border-b-0">
                                             <div className="flex items-center gap-3">
-                                                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#FF4D00] to-[#FF7A00] flex items-center justify-center text-white text-xs font-black">{u.name?.charAt(0)?.toUpperCase() || '?'}</div>
+                                                <div className="w-8 h-8 rounded-full bg-[var(--sys-surface)] border border-[var(--sys-border)] flex items-center justify-center text-[var(--sys-text)] text-xs font-black">{u.name?.charAt(0)?.toUpperCase() || '?'}</div>
                                                 <div>
-                                                    <p className="text-sm font-bold text-white">{u.name}</p>
-                                                    <p className="text-[10px] text-slate-500">{u.email} · {u.plan || 'free'}</p>
+                                                    <p className="text-sm font-bold text-[var(--sys-text)]">{u.name}</p>
+                                                    <p className="text-[10px] text-[var(--sys-text-muted)]">{u.email} · {u.plan || 'free'}</p>
                                                 </div>
                                             </div>
                                             <button onClick={() => { openUserStudioModal(u._id); setImpersonateSearch(''); setImpersonateResults([]) }}
@@ -3043,19 +3145,19 @@ export default function SuperAdminDashboard() {
                                 <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3 mb-6">{Object.entries(integrations.summary?.byPlatform || {}).map(([p, count]) => (
                                     <div key={p} className="glass-panel rounded-2xl p-4 text-center">
                                         <p className="text-2xl mb-1">{platformIcons[p] || '🔌'}</p>
-                                        <p className="text-lg font-extrabold text-white">{count}</p>
-                                        <p className="text-sm text-slate-500 capitalize">{p.replace('-', ' ')}</p>
+                                        <p className="text-lg font-extrabold text-[var(--sys-text)]">{count}</p>
+                                        <p className="text-sm text-[var(--sys-text-muted)] capitalize">{p.replace('-', ' ')}</p>
                                     </div>
                                 ))}</div>
 
                                 {/* Search + Filter */}
                                 <div className="flex gap-3 mb-5">
                                     <div className="flex-1 relative">
-                                        <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-600 text-lg">search</span>
+                                        <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[var(--sys-text-muted)] text-lg">search</span>
                                         <input
                                             type="text"
                                             placeholder="Search by user, email, or brand..."
-                                            className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none focus:border-primary/50"
+                                            className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm outline-none focus:border-primary/50"
                                             id="integration-search"
                                             onChange={e => {
                                                 const q = e.target.value.toLowerCase()
@@ -3066,7 +3168,7 @@ export default function SuperAdminDashboard() {
                                         />
                                     </div>
                                     <select
-                                        className="px-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none cursor-pointer"
+                                        className="px-4 py-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm outline-none cursor-pointer"
                                         onChange={e => {
                                             const f = e.target.value
                                             document.querySelectorAll('[data-integration-row]').forEach(row => {
@@ -3084,7 +3186,7 @@ export default function SuperAdminDashboard() {
                                 {/* Table Header */}
                                 <div className="overflow-x-auto pb-2">
                                     <div className="min-w-[800px]">
-                                        <div className="grid grid-cols-[2fr_1.5fr_1fr_0.8fr_1.5fr_1fr] gap-3 px-4 py-2 text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-white/[0.06] mb-2">
+                                        <div className="grid grid-cols-[2fr_1.5fr_1fr_0.8fr_1.5fr_1fr] gap-3 px-4 py-2 text-xs font-bold text-[var(--sys-text-muted)] uppercase tracking-wider border-b border-[var(--sys-border)] mb-2">
                                             <span>User</span><span>Brand</span><span>Platform</span><span>Status</span><span>Account</span><span>Last Synced</span>
                                         </div>
 
@@ -3095,7 +3197,7 @@ export default function SuperAdminDashboard() {
                                                     key={i._id}
                                                     data-integration-row={`${i.user?.name || ''} ${i.user?.email || ''} ${i.brand?.name || ''} ${i.platform || ''}`.toLowerCase()}
                                                     data-platform={i.platform}
-                                                    className="grid grid-cols-[2fr_1.5fr_1fr_0.8fr_1.5fr_1fr] gap-3 items-center glass-panel rounded-xl px-4 py-3 hover:bg-white/[0.03] transition-all"
+                                                    className="grid grid-cols-[2fr_1.5fr_1fr_0.8fr_1.5fr_1fr] gap-3 items-center glass-panel rounded-xl px-4 py-3 hover:bg-[var(--sys-surface)] transition-all"
                                                 >
                                                     {/* User */}
                                                     <div className="flex items-center gap-2 min-w-0">
@@ -3103,25 +3205,25 @@ export default function SuperAdminDashboard() {
                                                             {i.user?.name?.[0]?.toUpperCase() || '?'}
                                                         </div>
                                                         <div className="min-w-0">
-                                                            <p className="text-sm font-medium text-white truncate">{i.user?.name || 'Unknown'}</p>
-                                                            <p className="text-[10px] text-slate-600 truncate">{i.user?.email}</p>
+                                                            <p className="text-sm font-medium text-[var(--sys-text)] truncate">{i.user?.name || 'Unknown'}</p>
+                                                            <p className="text-[10px] text-[var(--sys-text-muted)] truncate">{i.user?.email}</p>
                                                         </div>
                                                     </div>
                                                     {/* Brand */}
                                                     <div className="min-w-0">
-                                                        <p className="text-sm text-slate-300 truncate">{i.brand?.name || '—'}</p>
+                                                        <p className="text-sm text-[var(--sys-text-muted)] truncate">{i.brand?.name || '—'}</p>
                                                     </div>
                                                     {/* Platform */}
                                                     <div className="flex items-center gap-1.5">
                                                         <span className="text-lg">{platformIcons[i.platform] || '🔌'}</span>
-                                                        <span className="text-xs text-slate-400 capitalize">{(i.platform || '').replace('-', ' ')}</span>
+                                                        <span className="text-xs text-[var(--sys-text-muted)] capitalize">{(i.platform || '').replace('-', ' ')}</span>
                                                     </div>
                                                     {/* Status */}
-                                                    <span className={`text-xs px-2 py-0.5 rounded-full font-bold w-fit ${i.status === 'connected' ? 'bg-emerald-500/15 text-emerald-400' : i.status === 'expired' ? 'bg-amber-500/15 text-amber-400' : 'bg-slate-500/15 text-slate-400'}`}>{i.status}</span>
+                                                    <span className={`text-xs px-2 py-0.5 rounded-full font-bold w-fit ${i.status === 'connected' ? 'bg-[var(--sys-primary-dim)] text-primary' : i.status === 'expired' ? 'bg-[var(--sys-primary-dim)] text-primary' : 'bg-[var(--sys-border)]/15 text-[var(--sys-text-muted)]'}`}>{i.status}</span>
                                                     {/* Account */}
-                                                    <p className="text-xs text-slate-400 truncate">{i.displayName || i.email || '—'}</p>
+                                                    <p className="text-xs text-[var(--sys-text-muted)] truncate">{i.displayName || i.email || '—'}</p>
                                                     {/* Last Synced */}
-                                                    <span className="text-xs text-slate-600">{i.lastSyncAt ? new Date(i.lastSyncAt).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'Never'}</span>
+                                                    <span className="text-xs text-[var(--sys-text-muted)]">{i.lastSyncAt ? new Date(i.lastSyncAt).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'Never'}</span>
                                                 </div>
                                             ))}
                                         </div>
@@ -3131,8 +3233,8 @@ export default function SuperAdminDashboard() {
                                 {(integrations.integrations || []).length === 0 && (
                                     <div className="text-center py-16 glass-panel rounded-2xl mt-4">
                                         <span className="material-symbols-outlined text-5xl text-slate-700 mb-3">hub</span>
-                                        <h3 className="text-lg font-bold text-white mb-1">No Integrations</h3>
-                                        <p className="text-sm text-slate-500">Users haven't connected any platforms yet</p>
+                                        <h3 className="text-lg font-bold text-[var(--sys-text)] mb-1">No Integrations</h3>
+                                        <p className="text-sm text-[var(--sys-text-muted)]">Users haven't connected any platforms yet</p>
                                     </div>
                                 )}
                             </>
@@ -3145,20 +3247,20 @@ export default function SuperAdminDashboard() {
                     <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
                         <div className="flex items-center justify-between mb-6">
                             <div>
-                                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                                <h3 className="text-lg font-bold text-[var(--sys-text)] flex items-center gap-2">
                                     <span className="material-symbols-outlined text-[#FF4D00]">history</span>
                                     System Audit Logs
                                 </h3>
-                                <p className="text-sm text-slate-500 mt-1">Immutable record of all administrative actions performed on the platform</p>
+                                <p className="text-sm text-[var(--sys-text-muted)] mt-1">Immutable record of all administrative actions performed on the platform</p>
                             </div>
-                            <button onClick={loadLogs} className="p-2 rounded-lg bg-white/[0.04] text-slate-400 hover:text-white cursor-pointer transition-all"><span className={`${logsLoading ? 'animate-spin' : ''} material-symbols-outlined text-sm`}>refresh</span></button>
+                            <button onClick={loadLogs} className="p-2 rounded-lg bg-[var(--sys-surface)] text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer transition-all"><span className={`${logsLoading ? 'animate-spin' : ''} material-symbols-outlined text-sm`}>refresh</span></button>
                         </div>
 
-                        <div className="glass-panel rounded-2xl overflow-hidden border border-white/[0.06]">
+                        <div className="glass-panel rounded-2xl overflow-hidden border border-[var(--sys-border)]">
                             <div className="overflow-x-auto">
                                 <table className="w-full text-left min-w-[800px]">
                                     <thead>
-                                        <tr className="text-xs text-slate-500 font-bold uppercase tracking-wider border-b border-white/[0.06] bg-white/[0.02]">
+                                        <tr className="text-xs text-[var(--sys-text-muted)] font-bold uppercase tracking-wider border-b border-[var(--sys-border)] bg-[var(--sys-surface)]">
                                             <th className="px-5 py-4">Action & Target</th>
                                             <th className="px-5 py-4">Admin</th>
                                             <th className="px-5 py-4">Severity</th>
@@ -3168,31 +3270,31 @@ export default function SuperAdminDashboard() {
                                     </thead>
                                     <tbody className="divide-y divide-white/[0.04]">
                                         {logsLoading ? (
-                                            <tr><td colSpan="5" className="py-20 text-center text-slate-500 capitalize"><span className="material-symbols-outlined animate-spin mr-2">progress_activity</span>Loading Audit Trail...</td></tr>
+                                            <tr><td colSpan="5" className="py-20 text-center text-[var(--sys-text-muted)] capitalize"><span className="material-symbols-outlined animate-spin mr-2">progress_activity</span>Loading Audit Trail...</td></tr>
                                         ) : logs.length > 0 ? logs.map(log => (
-                                            <tr key={log._id} className="text-sm hover:bg-white/[0.01] transition-all group">
+                                            <tr key={log._id} className="text-sm hover:bg-[var(--sys-surface)] transition-all group">
                                                 <td className="px-5 py-4">
                                                     <div>
-                                                        <span className="font-bold text-white uppercase text-[10px] px-1.5 py-0.5 rounded bg-white/[0.08] mr-2">{log.action?.replace(/_/g, ' ')}</span>
-                                                        <span className="text-slate-400 text-xs">{log.targetModel} ({log.targetId?.slice(-6)})</span>
-                                                        {log.metadata?.reason && <p className="text-[10px] text-slate-600 mt-1 italic">"{log.metadata.reason}"</p>}
+                                                        <span className="font-bold text-[var(--sys-text)] uppercase text-[10px] px-1.5 py-0.5 rounded bg-[var(--sys-surface)] mr-2">{log.action?.replace(/_/g, ' ')}</span>
+                                                        <span className="text-[var(--sys-text-muted)] text-xs">{log.targetModel} ({log.targetId?.slice(-6)})</span>
+                                                        {log.metadata?.reason && <p className="text-[10px] text-[var(--sys-text-muted)] mt-1 italic">"{log.metadata.reason}"</p>}
                                                     </div>
                                                 </td>
                                                 <td className="px-5 py-4">
                                                     <div className="flex items-center gap-2">
                                                         <div className="w-6 h-6 rounded bg-[#FF4D00]/10 flex items-center justify-center text-[10px] font-bold text-[#FF4D00]">{log.admin?.name?.[0]}</div>
-                                                        <span className="text-slate-300 font-medium">{log.admin?.name || 'System'}</span>
+                                                        <span className="text-[var(--sys-text-muted)] font-medium">{log.admin?.name || 'System'}</span>
                                                     </div>
                                                 </td>
                                                 <td className="px-5 py-4">
                                                     <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
-                                                        log.severity === 'high' ? 'bg-rose-500/20 text-rose-400' :
-                                                        log.severity === 'medium' ? 'bg-amber-500/20 text-amber-400' :
-                                                        'bg-emerald-500/20 text-emerald-400'
+                                                        log.severity === 'high' ? 'bg-[var(--sys-primary-dim)] text-primary' :
+                                                        log.severity === 'medium' ? 'bg-[var(--sys-primary-dim)] text-primary' :
+                                                        'bg-[var(--sys-primary-dim)] text-primary'
                                                     }`}>{log.severity?.toUpperCase()}</span>
                                                 </td>
-                                                <td className="px-5 py-4 font-mono text-xs text-slate-600">{log.ipAddress || '—'}</td>
-                                                <td className="px-5 py-4 text-right text-slate-500 text-xs">
+                                                <td className="px-5 py-4 font-mono text-xs text-[var(--sys-text-muted)]">{log.ipAddress || '—'}</td>
+                                                <td className="px-5 py-4 text-right text-[var(--sys-text-muted)] text-xs">
                                                     {new Date(log.createdAt).toLocaleString('en-IN', { 
                                                         day: '2-digit', 
                                                         month: 'short', 
@@ -3205,7 +3307,7 @@ export default function SuperAdminDashboard() {
                                                 </td>
                                             </tr>
                                         )) : (
-                                            <tr><td colSpan="5" className="py-20 text-center text-slate-600">No audit logs found</td></tr>
+                                            <tr><td colSpan="5" className="py-20 text-center text-[var(--sys-text-muted)]">No audit logs found</td></tr>
                                         )}
                                     </tbody>
                                 </table>
@@ -3213,9 +3315,9 @@ export default function SuperAdminDashboard() {
                         </div>
                         {totalLogs > 50 && (
                             <div className="flex justify-center gap-2 mt-6">
-                                <button disabled={logsPage <= 1} onClick={() => setLogsPage(p => p - 1)} className="px-4 py-2 rounded-lg bg-white/[0.04] text-sm text-slate-400 disabled:opacity-30 cursor-pointer">← Prev</button>
-                                <span className="px-4 py-2 text-sm text-slate-500">Page {logsPage}</span>
-                                <button disabled={logs.length < 50} onClick={() => setLogsPage(p => p + 1)} className="px-4 py-2 rounded-lg bg-white/[0.04] text-sm text-slate-400 disabled:opacity-30 cursor-pointer">Next →</button>
+                                <button disabled={logsPage <= 1} onClick={() => setLogsPage(p => p - 1)} className="px-4 py-2 rounded-lg bg-[var(--sys-surface)] text-sm text-[var(--sys-text-muted)] disabled:opacity-30 cursor-pointer">← Prev</button>
+                                <span className="px-4 py-2 text-sm text-[var(--sys-text-muted)]">Page {logsPage}</span>
+                                <button disabled={logs.length < 50} onClick={() => setLogsPage(p => p + 1)} className="px-4 py-2 rounded-lg bg-[var(--sys-surface)] text-sm text-[var(--sys-text-muted)] disabled:opacity-30 cursor-pointer">Next →</button>
                             </div>
                         )}
                     </div>
@@ -3223,37 +3325,37 @@ export default function SuperAdminDashboard() {
 
                 {/* ════════════ MODALS ════════════ */}
                 {creditModal && (
-                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50" onClick={() => setCreditModal(null)}>
+                    <div className="fixed inset-0 bg-[var(--sys-surface)] flex items-center justify-center z-50" onClick={() => setCreditModal(null)}>
                         <div className="glass-panel rounded-2xl p-6 w-[90%] max-w-sm border border-primary/20" onClick={e => e.stopPropagation()}>
-                            <h3 className="font-bold text-white mb-4 flex items-center gap-2"><span className="material-symbols-outlined text-emerald-400">add_circle</span>Add Credits — {creditModal.name}</h3>
-                            <p className="text-sm text-slate-500 mb-4">Current: {creditModal.creditBalance?.remaining || 0} credits</p>
-                            <input type="number" value={creditAmount} onChange={e => setCreditAmount(e.target.value)} placeholder="Credits to add" className="w-full px-4 py-3 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none mb-4" />
+                            <h3 className="font-bold text-[var(--sys-text)] mb-4 flex items-center gap-2"><span className="material-symbols-outlined text-primary">add_circle</span>Add Credits — {creditModal.name}</h3>
+                            <p className="text-sm text-[var(--sys-text-muted)] mb-4">Current: {creditModal.creditBalance?.remaining || 0} credits</p>
+                            <input type="number" value={creditAmount} onChange={e => setCreditAmount(e.target.value)} placeholder="Credits to add" className="w-full px-4 py-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm outline-none mb-4" />
                             <div className="flex gap-3 mb-4">{[25, 50, 100, 500].map(n => (
-                                <button key={n} onClick={() => setCreditAmount(String(n))} className="flex-1 py-2 rounded-lg bg-white/[0.04] text-slate-400 text-xs font-bold hover:bg-primary/10 hover:text-primary cursor-pointer">+{n}</button>
+                                <button key={n} onClick={() => setCreditAmount(String(n))} className="flex-1 py-2 rounded-lg bg-[var(--sys-surface)] text-[var(--sys-text-muted)] text-xs font-bold hover:bg-primary/10 hover:text-primary cursor-pointer">+{n}</button>
                             ))}</div>
                             <div className="flex justify-end gap-3">
-                                <button onClick={() => setCreditModal(null)} className="px-4 py-2 rounded-lg text-sm text-slate-400 cursor-pointer">Cancel</button>
+                                <button onClick={() => setCreditModal(null)} className="px-4 py-2 rounded-lg text-sm text-[var(--sys-text-muted)] cursor-pointer">Cancel</button>
                                 <button onClick={handleAddCredits} disabled={!creditAmount} className="btn-primary px-6 py-2 rounded-lg text-sm cursor-pointer disabled:opacity-30">Add</button>
                             </div>
                         </div>
                     </div>
                 )}
                 {planModal && (
-                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50" onClick={() => setPlanModal(null)}>
+                    <div className="fixed inset-0 bg-[var(--sys-surface)] flex items-center justify-center z-50" onClick={() => setPlanModal(null)}>
                         <div className="glass-panel rounded-2xl p-6 w-[95%] max-w-md border border-primary/20" onClick={e => e.stopPropagation()}>
-                            <h3 className="font-bold text-white mb-4 flex items-center gap-2"><span className="material-symbols-outlined text-[#FF4D00]">upgrade</span>Change Plan — {planModal.name}</h3>
-                            <p className="text-sm text-slate-500 mb-4">Current: <strong className="text-white capitalize">{planModal.plan}</strong></p>
+                            <h3 className="font-bold text-[var(--sys-text)] mb-4 flex items-center gap-2"><span className="material-symbols-outlined text-[#FF4D00]">upgrade</span>Change Plan — {planModal.name}</h3>
+                            <p className="text-sm text-[var(--sys-text-muted)] mb-4">Current: <strong className="text-[var(--sys-text)] capitalize">{planModal.plan}</strong></p>
                             <div className="space-y-2">
                                 {packages.length > 0 ? packages.map((pkg) => (
                                     <button 
                                         key={pkg._id} 
                                         onClick={() => handleChangePlan(planModal._id, pkg.slug)} 
-                                        className={`w-full p-4 rounded-xl text-left transition-all cursor-pointer border ${planModal.plan === pkg.slug ? 'border-primary/40 bg-primary/10' : 'border-white/[0.06] hover:bg-white/[0.04]'}`}
+                                        className={`w-full p-4 rounded-xl text-left transition-all cursor-pointer border ${planModal.plan === pkg.slug ? 'border-primary/40 bg-primary/10' : 'border-[var(--sys-border)] hover:bg-[var(--sys-surface)]'}`}
                                     >
                                         <div className="flex justify-between items-center">
                                             <div>
-                                                <p className="text-base font-bold text-white capitalize">{pkg.name}</p>
-                                                <p className="text-[11px] text-slate-500">
+                                                <p className="text-base font-bold text-[var(--sys-text)] capitalize">{pkg.name}</p>
+                                                <p className="text-[11px] text-[var(--sys-text-muted)]">
                                                     {pkg.credits?.monthly} credits • {pkg.pricing?.monthly > 0 ? `₹${pkg.pricing.monthly}/mo` : 'Free'}
                                                 </p>
                                             </div>
@@ -3261,45 +3363,45 @@ export default function SuperAdminDashboard() {
                                         </div>
                                     </button>
                                 )) : (
-                                    <div className="text-center py-4 text-slate-500 text-sm">No packages found. Create one in the Packages tab.</div>
+                                    <div className="text-center py-4 text-[var(--sys-text-muted)] text-sm">No packages found. Create one in the Packages tab.</div>
                                 )}
                             </div>
-                            <div className="flex justify-end mt-4"><button onClick={() => setPlanModal(null)} className="px-4 py-2 rounded-lg text-sm text-slate-400 cursor-pointer">Close</button></div>
+                            <div className="flex justify-end mt-4"><button onClick={() => setPlanModal(null)} className="px-4 py-2 rounded-lg text-sm text-[var(--sys-text-muted)] cursor-pointer">Close</button></div>
                         </div>
                     </div>
                 )}
                 {/* Provider Budgets Modal */}
                 {showBudgetModal && (
-                    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-[#08080C]/80 backdrop-blur-sm animate-in fade-in duration-300">
-                        <div className="glass-panel rounded-3xl w-full max-w-md border border-white/10 shadow-2xl p-6">
+                    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-[#08080C]/80 animate-in fade-in duration-300">
+                        <div className="glass-panel rounded-3xl w-full max-w-md border border-[var(--sys-border)] shadow-2xl p-6">
                             <div className="flex items-center justify-between mb-6">
-                                <h3 className="text-xl font-black text-white flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-amber-400">account_balance_wallet</span>
+                                <h3 className="text-xl font-black text-[var(--sys-text)] flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-primary">account_balance_wallet</span>
                                     Configure Provider Budgets
                                 </h3>
-                                <button onClick={() => setShowBudgetModal(false)} className="text-slate-600 hover:text-white cursor-pointer transition-all"><span className="material-symbols-outlined">close</span></button>
+                                <button onClick={() => setShowBudgetModal(false)} className="text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer transition-all"><span className="material-symbols-outlined">close</span></button>
                             </div>
-                            <p className="text-xs text-slate-500 mb-6 font-medium leading-relaxed">Enter the total dollar amount you have recharged for each provider. We'll track your platform's consumption against these limits.</p>
+                            <p className="text-xs text-[var(--sys-text-muted)] mb-6 font-medium leading-relaxed">Enter the total dollar amount you have recharged for each provider. We'll track your platform's consumption against these limits.</p>
                             
                             <form onSubmit={handleSaveBudgets} className="space-y-4">
                                 {Object.keys(budgetForm).map(provider => (
                                     <div key={provider}>
-                                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">{provider}</label>
+                                        <label className="block text-[10px] font-black text-[var(--sys-text-muted)] uppercase tracking-widest mb-1.5 ml-1">{provider}</label>
                                         <div className="relative">
-                                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 text-sm font-bold">$</span>
+                                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--sys-text-muted)] text-sm font-bold">$</span>
                                             <input 
                                                 type="number" 
                                                 value={budgetForm[provider]} 
                                                 onChange={e => setBudgetForm(f => ({ ...f, [provider]: Number(e.target.value) }))}
-                                                className="w-full pl-8 pr-4 py-3 rounded-2xl bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none focus:border-amber-500/50 transition-all"
+                                                className="w-full pl-8 pr-4 py-3 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm outline-none focus:border-[var(--sys-border)] transition-all"
                                                 placeholder="0.00"
                                             />
                                         </div>
                                     </div>
                                 ))}
                                 <div className="pt-4 flex gap-3">
-                                    <button type="button" onClick={() => setShowBudgetModal(false)} className="flex-1 py-3 bg-white/[0.04] text-white text-xs font-black uppercase tracking-wider rounded-2xl hover:bg-white/[0.08] transition-all border border-white/[0.06] cursor-pointer">Cancel</button>
-                                    <button type="submit" className="flex-1 py-3 bg-amber-500 text-slate-950 text-xs font-black uppercase tracking-wider rounded-2xl hover:bg-amber-400 transition-all shadow-lg shadow-amber-500/20 cursor-pointer">Save Budgets</button>
+                                    <button type="button" onClick={() => setShowBudgetModal(false)} className="flex-1 py-3 bg-[var(--sys-surface)] text-[var(--sys-text)] text-xs font-black uppercase tracking-wider rounded-2xl hover:bg-[var(--sys-surface)] transition-all border border-[var(--sys-border)] cursor-pointer">Cancel</button>
+                                    <button type="submit" className="flex-1 py-3 bg-[var(--sys-surface)] text-slate-950 text-xs font-black uppercase tracking-wider rounded-2xl hover:bg-[var(--sys-surface)] transition-all shadow-none cursor-pointer">Save Budgets</button>
                                 </div>
                             </form>
                         </div>
@@ -3311,11 +3413,11 @@ export default function SuperAdminDashboard() {
                     <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
                         <div className="flex items-center justify-between mb-6">
                             <div>
-                                <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-amber-400">calculate</span>
+                                <h3 className="text-lg font-bold text-[var(--sys-text)] flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-primary">calculate</span>
                                     Pricing Strategy Command Center
                                 </h3>
-                                <p className="text-sm text-slate-500 mt-1">Policy, margin calculator, and LLM price monitoring</p>
+                                <p className="text-sm text-[var(--sys-text-muted)] mt-1">Policy, margin calculator, and LLM price monitoring</p>
                             </div>
                         </div>
 
@@ -3326,7 +3428,7 @@ export default function SuperAdminDashboard() {
                               { id: 'monitor', label: '🤖 Price Monitor', icon: 'monitoring' }].map(s => (
                                 <button key={s.id} onClick={() => setPolicySection(s.id)}
                                     className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                                        policySection === s.id ? 'bg-amber-500/20 text-amber-400' : 'bg-white/[0.04] text-slate-400 hover:text-white'}`}>
+                                        policySection === s.id ? 'bg-[var(--sys-primary-dim)] text-primary' : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]'}`}>
                                     {s.label}
                                 </button>
                             ))}
@@ -3336,41 +3438,41 @@ export default function SuperAdminDashboard() {
                         {policySection === 'calculator' && (
                             <div className="space-y-6">
                                 {/* Slider Controls */}
-                                <div className="glass-panel rounded-2xl p-6 border border-amber-500/10">
-                                    <h4 className="text-sm font-black text-white uppercase tracking-wider mb-4 flex items-center gap-2">
-                                        <span className="material-symbols-outlined text-amber-400">tune</span>
+                                <div className="glass-panel rounded-2xl p-6 border border-[var(--sys-border)]">
+                                    <h4 className="text-sm font-black text-[var(--sys-text)] uppercase tracking-wider mb-4 flex items-center gap-2">
+                                        <span className="material-symbols-outlined text-primary">tune</span>
                                         Adjust Parameters — See Real-Time Impact
                                     </h4>
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                         <div>
                                             <div className="flex items-center justify-between mb-2">
-                                                <label className="text-xs font-bold text-slate-400">₹ per Credit</label>
-                                                <span className="text-lg font-black text-amber-400">₹{calcCreditPrice}</span>
+                                                <label className="text-xs font-bold text-[var(--sys-text-muted)]">₹ per Credit</label>
+                                                <span className="text-lg font-black text-primary">₹{calcCreditPrice}</span>
                                             </div>
                                             <input type="range" min="1" max="10" step="0.5" value={calcCreditPrice}
                                                 onChange={e => { setCalcCreditPrice(parseFloat(e.target.value)); loadPricingData(parseFloat(e.target.value), calcMargin, calcExRate) }}
                                                 className="w-full accent-amber-500" />
-                                            <div className="flex justify-between text-[9px] text-slate-600 mt-1"><span>₹1</span><span>₹5 (floor)</span><span>₹10</span></div>
+                                            <div className="flex justify-between text-[9px] text-[var(--sys-text-muted)] mt-1"><span>₹1</span><span>₹5 (floor)</span><span>₹10</span></div>
                                         </div>
                                         <div>
                                             <div className="flex items-center justify-between mb-2">
-                                                <label className="text-xs font-bold text-slate-400">Target Margin %</label>
-                                                <span className="text-lg font-black text-emerald-400">{calcMargin}%</span>
+                                                <label className="text-xs font-bold text-[var(--sys-text-muted)]">Target Margin %</label>
+                                                <span className="text-lg font-black text-primary">{calcMargin}%</span>
                                             </div>
                                             <input type="range" min="20" max="80" step="5" value={calcMargin}
                                                 onChange={e => { setCalcMargin(parseInt(e.target.value)); loadPricingData(calcCreditPrice, parseInt(e.target.value), calcExRate) }}
                                                 className="w-full accent-emerald-500" />
-                                            <div className="flex justify-between text-[9px] text-slate-600 mt-1"><span>20%</span><span>50% (target)</span><span>80%</span></div>
+                                            <div className="flex justify-between text-[9px] text-[var(--sys-text-muted)] mt-1"><span>20%</span><span>50% (target)</span><span>80%</span></div>
                                         </div>
                                         <div>
                                             <div className="flex items-center justify-between mb-2">
-                                                <label className="text-xs font-bold text-slate-400">USD/INR Rate</label>
+                                                <label className="text-xs font-bold text-[var(--sys-text-muted)]">USD/INR Rate</label>
                                                 <span className="text-lg font-black text-[#FF4D00]">₹{calcExRate}</span>
                                             </div>
                                             <input type="range" min="80" max="95" step="1" value={calcExRate}
                                                 onChange={e => { setCalcExRate(parseInt(e.target.value)); loadPricingData(calcCreditPrice, calcMargin, parseInt(e.target.value)) }}
                                                 className="w-full accent-blue-500" />
-                                            <div className="flex justify-between text-[9px] text-slate-600 mt-1"><span>₹80</span><span>₹85 (default)</span><span>₹95</span></div>
+                                            <div className="flex justify-between text-[9px] text-[var(--sys-text-muted)] mt-1"><span>₹80</span><span>₹85 (default)</span><span>₹95</span></div>
                                         </div>
                                     </div>
                                 </div>
@@ -3378,25 +3480,25 @@ export default function SuperAdminDashboard() {
                                 {/* Summary Cards */}
                                 {pricingData?.summary && (
                                     <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                                        <div className="glass-panel rounded-xl p-4 border border-emerald-500/10">
-                                            <p className="text-[10px] text-slate-500 uppercase font-bold">Profitable</p>
-                                            <p className="text-2xl font-black text-emerald-400">{pricingData.summary.profitableActions}</p>
+                                        <div className="glass-panel rounded-xl p-4 border border-[var(--sys-border)]">
+                                            <p className="text-[10px] text-[var(--sys-text-muted)] uppercase font-bold">Profitable</p>
+                                            <p className="text-2xl font-black text-primary">{pricingData.summary.profitableActions}</p>
                                         </div>
-                                        <div className="glass-panel rounded-xl p-4 border border-amber-500/10">
-                                            <p className="text-[10px] text-slate-500 uppercase font-bold">Breakeven</p>
-                                            <p className="text-2xl font-black text-amber-400">{pricingData.summary.breakevenActions}</p>
+                                        <div className="glass-panel rounded-xl p-4 border border-[var(--sys-border)]">
+                                            <p className="text-[10px] text-[var(--sys-text-muted)] uppercase font-bold">Breakeven</p>
+                                            <p className="text-2xl font-black text-primary">{pricingData.summary.breakevenActions}</p>
                                         </div>
-                                        <div className="glass-panel rounded-xl p-4 border border-rose-500/10">
-                                            <p className="text-[10px] text-slate-500 uppercase font-bold">Loss</p>
-                                            <p className="text-2xl font-black text-rose-400">{pricingData.summary.lossActions}</p>
-                                        </div>
-                                        <div className="glass-panel rounded-xl p-4">
-                                            <p className="text-[10px] text-slate-500 uppercase font-bold">Est Monthly API Cost</p>
-                                            <p className="text-2xl font-black text-white">₹{(pricingData.summary.estimatedMonthlyAPICostINR || 0).toLocaleString()}</p>
+                                        <div className="glass-panel rounded-xl p-4 border border-[var(--sys-border)]">
+                                            <p className="text-[10px] text-[var(--sys-text-muted)] uppercase font-bold">Loss</p>
+                                            <p className="text-2xl font-black text-primary">{pricingData.summary.lossActions}</p>
                                         </div>
                                         <div className="glass-panel rounded-xl p-4">
-                                            <p className="text-[10px] text-slate-500 uppercase font-bold">Overall Margin</p>
-                                            <p className={`text-2xl font-black ${pricingData.summary.overallMarginPct >= 50 ? 'text-emerald-400' : pricingData.summary.overallMarginPct >= 20 ? 'text-amber-400' : 'text-rose-400'}`}>
+                                            <p className="text-[10px] text-[var(--sys-text-muted)] uppercase font-bold">Est Monthly API Cost</p>
+                                            <p className="text-2xl font-black text-[var(--sys-text)]">₹{(pricingData.summary.estimatedMonthlyAPICostINR || 0).toLocaleString()}</p>
+                                        </div>
+                                        <div className="glass-panel rounded-xl p-4">
+                                            <p className="text-[10px] text-[var(--sys-text-muted)] uppercase font-bold">Overall Margin</p>
+                                            <p className={`text-2xl font-black ${pricingData.summary.overallMarginPct >= 50 ? 'text-primary' : pricingData.summary.overallMarginPct >= 20 ? 'text-primary' : 'text-primary'}`}>
                                                 {pricingData.summary.overallMarginPct}%
                                             </p>
                                         </div>
@@ -3407,11 +3509,11 @@ export default function SuperAdminDashboard() {
                                 {pricingData?.studioSummary && (
                                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                                         {Object.entries(pricingData.studioSummary).map(([studio, s]) => (
-                                            <div key={studio} className={`glass-panel rounded-xl p-4 border ${s.avgMargin >= 50 ? 'border-emerald-500/10' : s.avgMargin >= 20 ? 'border-amber-500/10' : 'border-rose-500/10'}`}>
-                                                <p className="text-xs font-bold text-white truncate">{studio}</p>
+                                            <div key={studio} className={`glass-panel rounded-xl p-4 border ${s.avgMargin >= 50 ? 'border-[var(--sys-border)]' : s.avgMargin >= 20 ? 'border-[var(--sys-border)]' : 'border-[var(--sys-border)]'}`}>
+                                                <p className="text-xs font-bold text-[var(--sys-text)] truncate">{studio}</p>
                                                 <div className="flex items-center justify-between mt-2">
-                                                    <span className={`text-lg font-black ${s.avgMargin >= 50 ? 'text-emerald-400' : s.avgMargin >= 20 ? 'text-amber-400' : 'text-rose-400'}`}>{s.avgMargin}%</span>
-                                                    <span className="text-[10px] text-slate-500">{s.actions} actions{s.losses > 0 ? `, ${s.losses} loss` : ''}</span>
+                                                    <span className={`text-lg font-black ${s.avgMargin >= 50 ? 'text-primary' : s.avgMargin >= 20 ? 'text-primary' : 'text-primary'}`}>{s.avgMargin}%</span>
+                                                    <span className="text-[10px] text-[var(--sys-text-muted)]">{s.actions} actions{s.losses > 0 ? `, ${s.losses} loss` : ''}</span>
                                                 </div>
                                             </div>
                                         ))}
@@ -3420,14 +3522,14 @@ export default function SuperAdminDashboard() {
 
                                 {/* Per-Action Table */}
                                 {pricingData?.actions && (
-                                    <div className="glass-panel rounded-2xl overflow-hidden border border-white/[0.06]">
-                                        <div className="flex items-center justify-between p-4 border-b border-white/[0.04]">
-                                            <h4 className="text-sm font-black text-white flex items-center gap-2">
+                                    <div className="glass-panel rounded-2xl overflow-hidden border border-[var(--sys-border)]">
+                                        <div className="flex items-center justify-between p-4 border-b border-[var(--sys-border)]">
+                                            <h4 className="text-sm font-black text-[var(--sys-text)] flex items-center gap-2">
                                                 <span className="material-symbols-outlined text-primary text-lg">table_chart</span>
                                                 Per-Action Cost vs Revenue
                                             </h4>
                                             <select value={pricingStudioFilter} onChange={e => setPricingStudioFilter(e.target.value)}
-                                                className="px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-xs text-white cursor-pointer">
+                                                className="px-3 py-1.5 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-xs text-[var(--sys-text)] cursor-pointer">
                                                 <option value="all">All Studios</option>
                                                 {Object.keys(pricingData.studioSummary || {}).map(s => <option key={s} value={s}>{s}</option>)}
                                             </select>
@@ -3435,7 +3537,7 @@ export default function SuperAdminDashboard() {
                                         <div className="overflow-x-auto">
                                             <table className="w-full text-left min-w-[900px]">
                                                 <thead>
-                                                    <tr className="text-[10px] text-slate-500 font-black uppercase tracking-wider border-b border-white/[0.04] bg-white/[0.02]">
+                                                    <tr className="text-[10px] text-[var(--sys-text-muted)] font-black uppercase tracking-wider border-b border-[var(--sys-border)] bg-[var(--sys-surface)]">
                                                         <th className="px-4 py-3">Action</th>
                                                         <th className="px-4 py-3">Studio</th>
                                                         <th className="px-4 py-3 text-right">Credits</th>
@@ -3451,23 +3553,23 @@ export default function SuperAdminDashboard() {
                                                     {pricingData.actions
                                                         .filter(a => pricingStudioFilter === 'all' || a.studio === pricingStudioFilter)
                                                         .map(a => (
-                                                        <tr key={a.action} className="text-sm hover:bg-white/[0.02] transition-all">
-                                                            <td className="px-4 py-2.5 font-medium text-white text-xs">{a.label}</td>
-                                                            <td className="px-4 py-2.5 text-[10px] text-slate-500">{a.studio}</td>
-                                                            <td className="px-4 py-2.5 text-right font-bold text-white text-xs">{a.creditCost}</td>
-                                                            <td className="px-4 py-2.5 text-right text-xs text-slate-400">₹{a.apiCostINR}</td>
-                                                            <td className="px-4 py-2.5 text-right text-xs text-emerald-400">₹{a.revenueINR}</td>
+                                                        <tr key={a.action} className="text-sm hover:bg-[var(--sys-surface)] transition-all">
+                                                            <td className="px-4 py-2.5 font-medium text-[var(--sys-text)] text-xs">{a.label}</td>
+                                                            <td className="px-4 py-2.5 text-[10px] text-[var(--sys-text-muted)]">{a.studio}</td>
+                                                            <td className="px-4 py-2.5 text-right font-bold text-[var(--sys-text)] text-xs">{a.creditCost}</td>
+                                                            <td className="px-4 py-2.5 text-right text-xs text-[var(--sys-text-muted)]">₹{a.apiCostINR}</td>
+                                                            <td className="px-4 py-2.5 text-right text-xs text-primary">₹{a.revenueINR}</td>
                                                             <td className="px-4 py-2.5 text-right text-xs font-bold" style={{ color: a.profitINR >= 0 ? '#34d399' : '#f87171' }}>₹{a.profitINR}</td>
                                                             <td className="px-4 py-2.5 text-right text-xs font-bold" style={{ color: a.marginPct >= 50 ? '#34d399' : a.marginPct >= 20 ? '#fbbf24' : '#f87171' }}>{a.marginPct}%</td>
                                                             <td className="px-4 py-2.5 text-center">
                                                                 <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold ${
-                                                                    a.status === 'profitable' ? 'bg-emerald-500/15 text-emerald-400' :
-                                                                    a.status === 'breakeven' ? 'bg-amber-500/15 text-amber-400' :
-                                                                    'bg-rose-500/15 text-rose-400'}`}>
+                                                                    a.status === 'profitable' ? 'bg-[var(--sys-primary-dim)] text-primary' :
+                                                                    a.status === 'breakeven' ? 'bg-[var(--sys-primary-dim)] text-primary' :
+                                                                    'bg-[var(--sys-primary-dim)] text-primary'}`}>
                                                                     {a.status === 'profitable' ? '🟢' : a.status === 'breakeven' ? '🟡' : '🔴'} {a.status}
                                                                 </span>
                                                             </td>
-                                                            <td className="px-4 py-2.5 text-right text-[10px] text-slate-500">{a.last30d?.count || 0}</td>
+                                                            <td className="px-4 py-2.5 text-right text-[10px] text-[var(--sys-text-muted)]">{a.last30d?.count || 0}</td>
                                                         </tr>
                                                     ))}
                                                 </tbody>
@@ -3483,37 +3585,37 @@ export default function SuperAdminDashboard() {
                             <div className="space-y-6">
                                 {/* Formula */}
                                 <div className="glass-panel rounded-2xl p-6 border border-[#FF4D00]/10">
-                                    <h4 className="text-sm font-black text-white uppercase tracking-wider mb-4 flex items-center gap-2">
+                                    <h4 className="text-sm font-black text-[var(--sys-text)] uppercase tracking-wider mb-4 flex items-center gap-2">
                                         <span className="material-symbols-outlined text-[#FF4D00]">function</span>
                                         Pricing Formula & Guardrails
                                     </h4>
                                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                                         <div className="bg-[#FF4D00]/5 rounded-xl p-4 border border-[#FF4D00]/10">
-                                            <p className="text-[10px] text-slate-500 uppercase font-bold">Formula</p>
+                                            <p className="text-[10px] text-[var(--sys-text-muted)] uppercase font-bold">Formula</p>
                                             <p className="text-sm font-black text-[#FF4D00] mt-1">{policyData.formula?.text}</p>
                                         </div>
-                                        <div className="bg-emerald-500/5 rounded-xl p-4 border border-emerald-500/10">
-                                            <p className="text-[10px] text-slate-500 uppercase font-bold">Floor Price</p>
-                                            <p className="text-sm font-black text-emerald-400 mt-1">{policyData.formula?.floorPrice}</p>
+                                        <div className="bg-[var(--sys-primary-dim)] rounded-xl p-4 border border-[var(--sys-border)]">
+                                            <p className="text-[10px] text-[var(--sys-text-muted)] uppercase font-bold">Floor Price</p>
+                                            <p className="text-sm font-black text-primary mt-1">{policyData.formula?.floorPrice}</p>
                                         </div>
-                                        <div className="bg-amber-500/5 rounded-xl p-4 border border-amber-500/10">
-                                            <p className="text-[10px] text-slate-500 uppercase font-bold">Target Margin</p>
-                                            <p className="text-sm font-black text-amber-400 mt-1">{policyData.formula?.targetMargin}</p>
+                                        <div className="bg-[var(--sys-primary-dim)] rounded-xl p-4 border border-[var(--sys-border)]">
+                                            <p className="text-[10px] text-[var(--sys-text-muted)] uppercase font-bold">Target Margin</p>
+                                            <p className="text-sm font-black text-primary mt-1">{policyData.formula?.targetMargin}</p>
                                         </div>
                                         <div className="bg-[#FF4D00]/5 rounded-xl p-4 border border-[#FF4D00]/10">
-                                            <p className="text-[10px] text-slate-500 uppercase font-bold">Exchange Rate</p>
+                                            <p className="text-[10px] text-[var(--sys-text-muted)] uppercase font-bold">Exchange Rate</p>
                                             <p className="text-sm font-black text-[#FF4D00] mt-1">{policyData.formula?.exchangeRate}</p>
                                         </div>
                                     </div>
                                     {policyData.guardrails && (
                                         <div className="space-y-2">
                                             {policyData.guardrails.map((g, i) => (
-                                                <div key={i} className="flex items-center gap-3 bg-white/[0.02] rounded-lg p-3">
-                                                    <span className="material-symbols-outlined text-amber-400 text-base">shield</span>
+                                                <div key={i} className="flex items-center gap-3 bg-[var(--sys-surface)] rounded-lg p-3">
+                                                    <span className="material-symbols-outlined text-primary text-base">shield</span>
                                                     <div className="flex-1">
-                                                        <span className="text-xs font-bold text-white">{g.rule}: </span>
-                                                        <span className="text-xs text-amber-400 font-bold">{g.value}</span>
-                                                        <span className="text-xs text-slate-500"> — {g.reason}</span>
+                                                        <span className="text-xs font-bold text-[var(--sys-text)]">{g.rule}: </span>
+                                                        <span className="text-xs text-primary font-bold">{g.value}</span>
+                                                        <span className="text-xs text-[var(--sys-text-muted)]"> — {g.reason}</span>
                                                     </div>
                                                 </div>
                                             ))}
@@ -3524,19 +3626,19 @@ export default function SuperAdminDashboard() {
                                 {/* Credit Costs by Studio */}
                                 {policyData.creditCostsByStudio && (
                                     <div className="glass-panel rounded-2xl p-6">
-                                        <h4 className="text-sm font-black text-white uppercase tracking-wider mb-4 flex items-center gap-2">
-                                            <span className="material-symbols-outlined text-emerald-400">token</span>
+                                        <h4 className="text-sm font-black text-[var(--sys-text)] uppercase tracking-wider mb-4 flex items-center gap-2">
+                                            <span className="material-symbols-outlined text-primary">token</span>
                                             Credit Costs by Studio
                                         </h4>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                             {Object.entries(policyData.creditCostsByStudio).map(([studio, actions]) => (
-                                                <div key={studio} className="bg-white/[0.02] rounded-xl p-4 border border-white/[0.04]">
+                                                <div key={studio} className="bg-[var(--sys-surface)] rounded-xl p-4 border border-[var(--sys-border)]">
                                                     <h5 className="text-xs font-black text-primary uppercase mb-3">{studio}</h5>
                                                     <div className="space-y-1.5">
                                                         {actions.map(a => (
                                                             <div key={a.action} className="flex items-center justify-between">
-                                                                <span className="text-xs text-slate-400">{a.label}</span>
-                                                                <span className="text-xs font-bold text-white bg-white/[0.05] px-2 py-0.5 rounded">
+                                                                <span className="text-xs text-[var(--sys-text-muted)]">{a.label}</span>
+                                                                <span className="text-xs font-bold text-[var(--sys-text)] bg-[var(--sys-surface)] px-2 py-0.5 rounded">
                                                                     {typeof a.credits === 'string' ? a.credits : `${a.credits} cr`}
                                                                 </span>
                                                             </div>
@@ -3550,17 +3652,17 @@ export default function SuperAdminDashboard() {
 
                                 {/* Video Model Matrix */}
                                 {policyData.videoMatrix?.length > 0 && (
-                                    <div className="glass-panel rounded-2xl overflow-hidden border border-white/[0.06]">
-                                        <div className="p-4 border-b border-white/[0.04]">
-                                            <h4 className="text-sm font-black text-white flex items-center gap-2">
-                                                <span className="material-symbols-outlined text-rose-400">videocam</span>
+                                    <div className="glass-panel rounded-2xl overflow-hidden border border-[var(--sys-border)]">
+                                        <div className="p-4 border-b border-[var(--sys-border)]">
+                                            <h4 className="text-sm font-black text-[var(--sys-text)] flex items-center gap-2">
+                                                <span className="material-symbols-outlined text-primary">videocam</span>
                                                 Video Model Cost Matrix
                                             </h4>
                                         </div>
                                         <div className="overflow-x-auto">
                                             <table className="w-full text-left min-w-[800px]">
                                                 <thead>
-                                                    <tr className="text-[10px] text-slate-500 font-black uppercase tracking-wider border-b border-white/[0.04] bg-white/[0.02]">
+                                                    <tr className="text-[10px] text-[var(--sys-text-muted)] font-black uppercase tracking-wider border-b border-[var(--sys-border)] bg-[var(--sys-surface)]">
                                                         <th className="px-4 py-3">Model</th>
                                                         <th className="px-4 py-3 text-right">Fast $/sec</th>
                                                         <th className="px-4 py-3 text-right">Quality $/sec</th>
@@ -3571,14 +3673,14 @@ export default function SuperAdminDashboard() {
                                                 </thead>
                                                 <tbody className="divide-y divide-white/[0.03]">
                                                     {policyData.videoMatrix.map(v => (
-                                                        <tr key={v.model} className="text-sm hover:bg-white/[0.02] transition-all">
-                                                            <td className="px-4 py-2.5 font-bold text-white text-xs">{v.name}</td>
-                                                            <td className="px-4 py-2.5 text-right text-xs text-slate-400">${v.fastPerSec}</td>
-                                                            <td className="px-4 py-2.5 text-right text-xs text-slate-400">${v.qualityPerSec}</td>
+                                                        <tr key={v.model} className="text-sm hover:bg-[var(--sys-surface)] transition-all">
+                                                            <td className="px-4 py-2.5 font-bold text-[var(--sys-text)] text-xs">{v.name}</td>
+                                                            <td className="px-4 py-2.5 text-right text-xs text-[var(--sys-text-muted)]">${v.fastPerSec}</td>
+                                                            <td className="px-4 py-2.5 text-right text-xs text-[var(--sys-text-muted)]">${v.qualityPerSec}</td>
                                                             {v.examples.map(ex => (
                                                                 <td key={ex.duration} className="px-4 py-2.5 text-right text-xs">
-                                                                    <span className="text-white font-bold">{ex.fast1080?.credits || '—'} cr</span>
-                                                                    <span className="text-[9px] text-slate-600 ml-1">(${ex.fast1080?.usd || '—'})</span>
+                                                                    <span className="text-[var(--sys-text)] font-bold">{ex.fast1080?.credits || '—'} cr</span>
+                                                                    <span className="text-[9px] text-[var(--sys-text-muted)] ml-1">(${ex.fast1080?.usd || '—'})</span>
                                                                 </td>
                                                             ))}
                                                         </tr>
@@ -3591,17 +3693,17 @@ export default function SuperAdminDashboard() {
 
                                 {/* Top-Up Packs */}
                                 {policyData.creditPacks?.length > 0 && (
-                                    <div className="glass-panel rounded-2xl overflow-hidden border border-white/[0.06]">
-                                        <div className="p-4 border-b border-white/[0.04]">
-                                            <h4 className="text-sm font-black text-white flex items-center gap-2">
-                                                <span className="material-symbols-outlined text-amber-400">shopping_cart</span>
+                                    <div className="glass-panel rounded-2xl overflow-hidden border border-[var(--sys-border)]">
+                                        <div className="p-4 border-b border-[var(--sys-border)]">
+                                            <h4 className="text-sm font-black text-[var(--sys-text)] flex items-center gap-2">
+                                                <span className="material-symbols-outlined text-primary">shopping_cart</span>
                                                 Credit Top-Up Packs ({policyData.creditPacks.length} tiers)
                                             </h4>
                                         </div>
                                         <div className="overflow-x-auto">
                                             <table className="w-full text-left min-w-[600px]">
                                                 <thead>
-                                                    <tr className="text-[10px] text-slate-500 font-black uppercase tracking-wider border-b border-white/[0.04] bg-white/[0.02]">
+                                                    <tr className="text-[10px] text-[var(--sys-text-muted)] font-black uppercase tracking-wider border-b border-[var(--sys-border)] bg-[var(--sys-surface)]">
                                                         <th className="px-4 py-3">Pack</th>
                                                         <th className="px-4 py-3 text-right">Credits</th>
                                                         <th className="px-4 py-3 text-right">Bonus</th>
@@ -3614,15 +3716,15 @@ export default function SuperAdminDashboard() {
                                                 </thead>
                                                 <tbody className="divide-y divide-white/[0.03]">
                                                     {policyData.creditPacks.map(p => (
-                                                        <tr key={p.slug} className="text-sm hover:bg-white/[0.02] transition-all">
-                                                            <td className="px-4 py-2.5 font-bold text-white text-xs">{p.name}</td>
-                                                            <td className="px-4 py-2.5 text-right text-xs text-white">{p.credits?.toLocaleString()}</td>
-                                                            <td className="px-4 py-2.5 text-right text-xs text-amber-400 font-bold">{p.bonus > 0 ? `+${p.bonus?.toLocaleString()}` : '—'}</td>
-                                                            <td className="px-4 py-2.5 text-right text-xs text-emerald-400 font-bold">{p.total?.toLocaleString()}</td>
-                                                            <td className="px-4 py-2.5 text-right text-xs text-white font-bold">₹{p.price?.toLocaleString()}</td>
-                                                            <td className="px-4 py-2.5 text-right text-xs text-slate-400">₹{p.perCredit}</td>
-                                                            <td className="px-4 py-2.5 text-right text-xs text-slate-500">{p.validity}d</td>
-                                                            <td className="px-4 py-2.5 text-xs">{p.badge ? <span className="px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-400 text-[9px] font-bold">{p.badge}</span> : '—'}</td>
+                                                        <tr key={p.slug} className="text-sm hover:bg-[var(--sys-surface)] transition-all">
+                                                            <td className="px-4 py-2.5 font-bold text-[var(--sys-text)] text-xs">{p.name}</td>
+                                                            <td className="px-4 py-2.5 text-right text-xs text-[var(--sys-text)]">{p.credits?.toLocaleString()}</td>
+                                                            <td className="px-4 py-2.5 text-right text-xs text-primary font-bold">{p.bonus > 0 ? `+${p.bonus?.toLocaleString()}` : '—'}</td>
+                                                            <td className="px-4 py-2.5 text-right text-xs text-primary font-bold">{p.total?.toLocaleString()}</td>
+                                                            <td className="px-4 py-2.5 text-right text-xs text-[var(--sys-text)] font-bold">₹{p.price?.toLocaleString()}</td>
+                                                            <td className="px-4 py-2.5 text-right text-xs text-[var(--sys-text-muted)]">₹{p.perCredit}</td>
+                                                            <td className="px-4 py-2.5 text-right text-xs text-[var(--sys-text-muted)]">{p.validity}d</td>
+                                                            <td className="px-4 py-2.5 text-xs">{p.badge ? <span className="px-2 py-0.5 rounded-full bg-[var(--sys-primary-dim)] text-primary text-[9px] font-bold">{p.badge}</span> : '—'}</td>
                                                         </tr>
                                                     ))}
                                                 </tbody>
@@ -3639,46 +3741,46 @@ export default function SuperAdminDashboard() {
                                 {/* Controls */}
                                 <div className="flex items-center gap-3 flex-wrap">
                                     <button onClick={handlePricingCheck} disabled={monitorChecking}
-                                        className="px-5 py-2.5 rounded-xl bg-amber-500 text-slate-950 text-xs font-black uppercase tracking-wider hover:bg-amber-400 transition-all shadow-lg shadow-amber-500/20 disabled:opacity-50 cursor-pointer flex items-center gap-2">
+                                        className="px-5 py-2.5 rounded-xl bg-[var(--sys-surface)] text-slate-950 text-xs font-black uppercase tracking-wider hover:bg-[var(--sys-surface)] transition-all shadow-none disabled:opacity-50 cursor-pointer flex items-center gap-2">
                                         {monitorChecking ? <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span> : <span className="material-symbols-outlined text-sm">radar</span>}
                                         {monitorChecking ? 'Scraping Models...' : 'Check Now'}
                                     </button>
                                     {monitorData?.lastCheck && (
-                                        <span className="text-xs text-slate-500">
+                                        <span className="text-xs text-[var(--sys-text-muted)]">
                                             Last checked: {new Date(monitorData.lastCheck).toLocaleString('en-IN')}
                                         </span>
                                     )}
                                 </div>
 
                                 {/* Oracle Banner */}
-                                <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                <div className="bg-[var(--sys-primary-dim)] border border-[var(--sys-border)] rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
                                     <div className="flex items-start md:items-center gap-3">
-                                        <div className="p-2 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                                        <div className="p-2 rounded-lg bg-[var(--sys-primary-dim)] text-primary flex items-center justify-center">
                                             <span className="material-symbols-outlined text-xl">smart_toy</span>
                                         </div>
                                         <div>
-                                            <h4 className="text-sm font-black text-emerald-400 uppercase tracking-wider mb-0.5 flex items-center gap-2">
+                                            <h4 className="text-sm font-black text-primary uppercase tracking-wider mb-0.5 flex items-center gap-2">
                                                 Live AI Pricing Oracle Active
                                                 <span className="relative flex h-2 w-2">
-                                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--sys-surface)] opacity-75"></span>
+                                                  <span className="relative inline-flex rounded-full h-2 w-2 bg-[var(--sys-surface)]"></span>
                                                 </span>
                                             </h4>
-                                            <p className="text-xs text-slate-400">Scrapes provider docs via LLM to extract live generation costs across all APIs.</p>
+                                            <p className="text-xs text-[var(--sys-text-muted)]">Scrapes provider docs via LLM to extract live generation costs across all APIs.</p>
                                         </div>
                                     </div>
                                     <div className="flex gap-3">
-                                        <div className="flex flex-col items-center p-2.5 rounded-lg bg-white/[0.02] border border-white/[0.05] min-w-[80px]">
-                                            <p className="text-[9px] text-slate-500 uppercase font-black tracking-wider">Providers</p>
-                                            <p className="text-lg font-black text-white">{monitorData?.providers ? Object.keys(monitorData.providers).length : '—'}</p>
+                                        <div className="flex flex-col items-center p-2.5 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] min-w-[80px]">
+                                            <p className="text-[9px] text-[var(--sys-text-muted)] uppercase font-black tracking-wider">Providers</p>
+                                            <p className="text-lg font-black text-[var(--sys-text)]">{monitorData?.providers ? Object.keys(monitorData.providers).length : '—'}</p>
                                         </div>
-                                        <div className="flex flex-col items-center p-2.5 rounded-lg bg-white/[0.02] border border-white/[0.05] min-w-[80px]">
-                                            <p className="text-[9px] text-slate-500 uppercase font-black tracking-wider">Models</p>
-                                            <p className="text-lg font-black text-white">{monitorData?.providers ? Object.values(monitorData.providers).reduce((sum, p) => sum + Object.keys(p.models).length, 0) : '—'}</p>
+                                        <div className="flex flex-col items-center p-2.5 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] min-w-[80px]">
+                                            <p className="text-[9px] text-[var(--sys-text-muted)] uppercase font-black tracking-wider">Models</p>
+                                            <p className="text-lg font-black text-[var(--sys-text)]">{monitorData?.providers ? Object.values(monitorData.providers).reduce((sum, p) => sum + Object.keys(p.models).length, 0) : '—'}</p>
                                         </div>
-                                        <div className="flex flex-col items-center p-2.5 rounded-lg bg-white/[0.02] border border-white/[0.05] min-w-[80px]">
-                                            <p className="text-[9px] text-slate-500 uppercase font-black tracking-wider">Margin</p>
-                                            <p className="text-xs font-bold text-emerald-400 flex items-center gap-0.5"><span className="material-symbols-outlined text-[12px]">shield</span>≥50%</p>
+                                        <div className="flex flex-col items-center p-2.5 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] min-w-[80px]">
+                                            <p className="text-[9px] text-[var(--sys-text-muted)] uppercase font-black tracking-wider">Margin</p>
+                                            <p className="text-xs font-bold text-primary flex items-center gap-0.5"><span className="material-symbols-outlined text-[12px]">shield</span>≥50%</p>
                                         </div>
                                     </div>
                                 </div>
@@ -3690,7 +3792,7 @@ export default function SuperAdminDashboard() {
                                       { id: 'alerts', label: `Alerts ${monitorData?.alertCount > 0 ? `(${monitorData.alertCount})` : ''}`, icon: 'notifications' }].map(s => (
                                         <button key={s.id} onClick={() => setMonitorSubTab(s.id)}
                                             className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                                                (monitorSubTab || 'providers') === s.id ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : 'bg-white/[0.04] text-slate-500 border border-white/[0.08] hover:text-white'}`}>
+                                                (monitorSubTab || 'providers') === s.id ? 'bg-[var(--sys-primary-dim)] text-primary border border-[var(--sys-border)]' : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] border border-[var(--sys-border)] hover:text-[var(--sys-text)]'}`}>
                                             <span className="material-symbols-outlined text-sm">{s.icon}</span>
                                             {s.label}
                                         </button>
@@ -3703,7 +3805,7 @@ export default function SuperAdminDashboard() {
                                         <div className="flex gap-2 flex-wrap">
                                             {['all', 'text', 'image', 'video', 'voice'].map(t => (
                                                 <button key={t} onClick={() => setMonitorTypeFilter(t)} className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
-                                                    (monitorTypeFilter || 'all') === t ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : 'bg-white/[0.03] text-slate-500 border border-white/[0.06] hover:text-white'}`}>
+                                                    (monitorTypeFilter || 'all') === t ? 'bg-[var(--sys-primary-dim)] text-primary border border-[var(--sys-border)]' : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] border border-[var(--sys-border)] hover:text-[var(--sys-text)]'}`}>
                                                     {t === 'all' ? '📊 All' : t === 'text' ? '💬 Text' : t === 'image' ? '🖼️ Image' : t === 'video' ? '🎥 Video' : '🎙️ Voice'}
                                                 </button>
                                             ))}
@@ -3715,40 +3817,40 @@ export default function SuperAdminDashboard() {
                                                     return Object.values(provider.models).some(m => m.type === (monitorTypeFilter || 'all'));
                                                 })
                                                 .map(([providerId, provider]) => (
-                                                <div key={providerId} className="glass-panel rounded-2xl p-5 border border-white/[0.06] hover:border-amber-500/20 transition-all">
+                                                <div key={providerId} className="glass-panel rounded-2xl p-5 border border-[var(--sys-border)] hover:border-[var(--sys-border)] transition-all">
                                                     <div className="flex items-center justify-between mb-4">
                                                         <div className="flex items-center gap-2">
                                                             <span className="text-xl">{provider.icon}</span>
-                                                            <h5 className="text-sm font-black text-white">{provider.provider}</h5>
+                                                            <h5 className="text-sm font-black text-[var(--sys-text)]">{provider.provider}</h5>
                                                         </div>
-                                                        <span className="text-[9px] bg-white/[0.06] text-slate-400 px-2 py-0.5 rounded-full font-bold">{Object.keys(provider.models).length} models</span>
+                                                        <span className="text-[9px] bg-[var(--sys-surface)] text-[var(--sys-text-muted)] px-2 py-0.5 rounded-full font-bold">{Object.keys(provider.models).length} models</span>
                                                     </div>
                                                     <div className="space-y-2.5">
                                                         {Object.entries(provider.models)
                                                             .filter(([, model]) => (monitorTypeFilter || 'all') === 'all' || model.type === (monitorTypeFilter || 'all'))
                                                             .map(([modelId, model]) => (
-                                                            <div key={modelId} className="bg-white/[0.02] rounded-xl p-3 border border-white/[0.04] hover:border-white/[0.1] transition-all">
+                                                            <div key={modelId} className="bg-[var(--sys-surface)] rounded-xl p-3 border border-[var(--sys-border)] hover:border-[var(--sys-border)] transition-all">
                                                                 <div className="flex items-center justify-between mb-1.5">
-                                                                    <p className="text-xs font-bold text-white">{model.name}</p>
+                                                                    <p className="text-xs font-bold text-[var(--sys-text)]">{model.name}</p>
                                                                     <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${
                                                                         model.type === 'text' ? 'bg-[#FF4D00]/10 text-[#FF4D00]' :
-                                                                        model.type === 'image' ? 'bg-emerald-500/10 text-emerald-400' :
-                                                                        model.type === 'video' ? 'bg-amber-500/10 text-amber-400' :
+                                                                        model.type === 'image' ? 'bg-[var(--sys-primary-dim)] text-primary' :
+                                                                        model.type === 'video' ? 'bg-[var(--sys-primary-dim)] text-primary' :
                                                                         'bg-[#FF4D00]/10 text-[#FF7A00]'}`}>{model.type}</span>
                                                                 </div>
                                                                 <div className="flex flex-wrap gap-1.5 text-[10px]">
                                                                     {model.inputPer1M !== undefined && <span className="px-2 py-0.5 rounded bg-[#FF4D00]/10 text-[#FF4D00]">In: ${model.inputPer1M}/1M</span>}
                                                                     {model.outputPer1M !== undefined && <span className="px-2 py-0.5 rounded bg-[#FF4D00]/10 text-[#FF4D00]">Out: ${model.outputPer1M}/1M</span>}
-                                                                    {model.flatCostUSD !== undefined && <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400">${model.flatCostUSD}/{model.type === 'video' ? 'gen' : 'image'}</span>}
-                                                                    {model.costPerSecFast !== undefined && <span className="px-2 py-0.5 rounded bg-amber-500/10 text-amber-400">Fast: ${model.costPerSecFast}/s</span>}
-                                                                    {model.costPerSecQuality !== undefined && <span className="px-2 py-0.5 rounded bg-rose-500/10 text-rose-400">Quality: ${model.costPerSecQuality}/s</span>}
-                                                                    {model.costPerMinute !== undefined && <span className="px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-400">${model.costPerMinute}/min</span>}
+                                                                    {model.flatCostUSD !== undefined && <span className="px-2 py-0.5 rounded bg-[var(--sys-primary-dim)] text-primary">${model.flatCostUSD}/{model.type === 'video' ? 'gen' : 'image'}</span>}
+                                                                    {model.costPerSecFast !== undefined && <span className="px-2 py-0.5 rounded bg-[var(--sys-primary-dim)] text-primary">Fast: ${model.costPerSecFast}/s</span>}
+                                                                    {model.costPerSecQuality !== undefined && <span className="px-2 py-0.5 rounded bg-[var(--sys-primary-dim)] text-primary">Quality: ${model.costPerSecQuality}/s</span>}
+                                                                    {model.costPerMinute !== undefined && <span className="px-2 py-0.5 rounded bg-[var(--sys-primary-dim)] text-primary">${model.costPerMinute}/min</span>}
                                                                     {model.costPerSecond !== undefined && <span className="px-2 py-0.5 rounded bg-[#FF4D00]/10 text-[#FF7A00]">${model.costPerSecond}/sec</span>}
                                                                 </div>
-                                                                <p className="text-[9px] text-slate-600 mt-1.5 flex items-center gap-1">
+                                                                <p className="text-[9px] text-[var(--sys-text-muted)] mt-1.5 flex items-center gap-1">
                                                                     <span className="text-[8px] font-mono text-slate-700">{modelId}</span>
                                                                     <span className="text-slate-700">·</span>
-                                                                    <a href={model.pricingUrl} target="_blank" rel="noopener" className="hover:text-amber-400 transition-colors">Pricing →</a>
+                                                                    <a href={model.pricingUrl} target="_blank" rel="noopener" className="hover:text-primary transition-colors">Pricing →</a>
                                                                 </p>
                                                             </div>
                                                         ))}
@@ -3762,16 +3864,16 @@ export default function SuperAdminDashboard() {
                                 {/* ── TAB: COST COMPARISON ── */}
                                 {(monitorSubTab || 'providers') === 'comparison' && (
                                     <div className="space-y-6">
-                                        <div className="glass-panel rounded-2xl p-5 border border-amber-500/10">
-                                            <h4 className="text-sm font-black text-amber-400 uppercase tracking-wider mb-1 flex items-center gap-2">
-                                                <span className="material-symbols-outlined text-amber-400">compare_arrows</span>
+                                        <div className="glass-panel rounded-2xl p-5 border border-[var(--sys-border)]">
+                                            <h4 className="text-sm font-black text-primary uppercase tracking-wider mb-1 flex items-center gap-2">
+                                                <span className="material-symbols-outlined text-primary">compare_arrows</span>
                                                 Cross-Provider Cost Comparison
                                             </h4>
-                                            <p className="text-xs text-slate-500 mb-4">Models available on multiple providers are grouped together. The cheapest option is highlighted in green.</p>
+                                            <p className="text-xs text-[var(--sys-text-muted)] mb-4">Models available on multiple providers are grouped together. The cheapest option is highlighted in green.</p>
                                             <div className="flex gap-2 mb-5">
                                                 {['all', 'text', 'image', 'video', 'voice'].map(t => (
                                                     <button key={t} onClick={() => setMonitorTypeFilter(t)} className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
-                                                        (monitorTypeFilter || 'all') === t ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : 'bg-white/[0.03] text-slate-500 border border-white/[0.06] hover:text-white'}`}>
+                                                        (monitorTypeFilter || 'all') === t ? 'bg-[var(--sys-primary-dim)] text-primary border border-[var(--sys-border)]' : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] border border-[var(--sys-border)] hover:text-[var(--sys-text)]'}`}>
                                                         {t === 'all' ? '📊 All' : t === 'text' ? '💬 Text' : t === 'image' ? '🖼️ Image' : t === 'video' ? '🎥 Video' : '🎙️ Voice'}
                                                     </button>
                                                 ))}
@@ -3780,21 +3882,21 @@ export default function SuperAdminDashboard() {
                                                 {(monitorData?.comparison || [])
                                                     .filter(c => (monitorTypeFilter || 'all') === 'all' || c.type === (monitorTypeFilter || 'all'))
                                                     .map((comp, idx) => (
-                                                    <div key={idx} className={`rounded-xl border transition-all ${comp.providerCount > 1 ? 'border-amber-500/15 bg-amber-500/[0.02]' : 'border-white/[0.06] bg-white/[0.01]'}`}>
-                                                        <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.04]">
+                                                    <div key={idx} className={`rounded-xl border transition-all ${comp.providerCount > 1 ? 'border-[var(--sys-border)] bg-[var(--sys-surface)]/[0.02]' : 'border-[var(--sys-border)] bg-[var(--sys-surface)]'}`}>
+                                                        <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--sys-border)]">
                                                             <div className="flex items-center gap-2">
                                                                 <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${
                                                                     comp.type === 'text' ? 'bg-[#FF4D00]/10 text-[#FF4D00]' :
-                                                                    comp.type === 'image' ? 'bg-emerald-500/10 text-emerald-400' :
-                                                                    comp.type === 'video' ? 'bg-amber-500/10 text-amber-400' :
+                                                                    comp.type === 'image' ? 'bg-[var(--sys-primary-dim)] text-primary' :
+                                                                    comp.type === 'video' ? 'bg-[var(--sys-primary-dim)] text-primary' :
                                                                     'bg-[#FF4D00]/10 text-[#FF7A00]'}`}>{comp.type}</span>
-                                                                <p className="text-sm font-bold text-white">{comp.modelName}</p>
+                                                                <p className="text-sm font-bold text-[var(--sys-text)]">{comp.modelName}</p>
                                                                 {comp.providerCount > 1 && (
-                                                                    <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400 font-bold">{comp.providerCount} providers</span>
+                                                                    <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[var(--sys-primary-dim)] text-primary font-bold">{comp.providerCount} providers</span>
                                                                 )}
                                                             </div>
                                                             {comp.providerCount > 1 && (
-                                                                <span className="text-[10px] font-bold text-emerald-400 flex items-center gap-1">
+                                                                <span className="text-[10px] font-bold text-primary flex items-center gap-1">
                                                                     <span className="material-symbols-outlined text-[12px]">emoji_events</span>
                                                                     Best: {comp.cheapestProvider}
                                                                 </span>
@@ -3802,23 +3904,23 @@ export default function SuperAdminDashboard() {
                                                         </div>
                                                         <div className="divide-y divide-white/[0.03]">
                                                             {comp.providers.map((p, pi) => (
-                                                                <div key={pi} className={`flex items-center justify-between px-4 py-2.5 ${p.cheapest && comp.providerCount > 1 ? 'bg-emerald-500/[0.04]' : ''}`}>
+                                                                <div key={pi} className={`flex items-center justify-between px-4 py-2.5 ${p.cheapest && comp.providerCount > 1 ? 'bg-[var(--sys-surface)]/[0.04]' : ''}`}>
                                                                     <div className="flex items-center gap-2.5 min-w-[180px]">
                                                                         <span className="text-sm">{p.icon}</span>
                                                                         <div>
-                                                                            <p className={`text-xs font-bold ${p.cheapest && comp.providerCount > 1 ? 'text-emerald-400' : 'text-white'}`}>{p.providerName}</p>
-                                                                            <p className="text-[8px] font-mono text-slate-600">{p.modelId}</p>
+                                                                            <p className={`text-xs font-bold ${p.cheapest && comp.providerCount > 1 ? 'text-primary' : 'text-[var(--sys-text)]'}`}>{p.providerName}</p>
+                                                                            <p className="text-[8px] font-mono text-[var(--sys-text-muted)]">{p.modelId}</p>
                                                                         </div>
                                                                     </div>
                                                                     <div className="flex items-center gap-3">
-                                                                        <span className={`text-xs font-bold ${p.cheapest && comp.providerCount > 1 ? 'text-emerald-400' : p.rank === comp.providerCount && comp.providerCount > 1 ? 'text-rose-400' : 'text-slate-300'}`}>
+                                                                        <span className={`text-xs font-bold ${p.cheapest && comp.providerCount > 1 ? 'text-primary' : p.rank === comp.providerCount && comp.providerCount > 1 ? 'text-primary' : 'text-[var(--sys-text-muted)]'}`}>
                                                                             {p.costLabel}
                                                                         </span>
                                                                         {p.cheapest && comp.providerCount > 1 && (
-                                                                            <span className="text-[8px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-black uppercase">Cheapest</span>
+                                                                            <span className="text-[8px] px-1.5 py-0.5 rounded bg-[var(--sys-primary-dim)] text-primary font-black uppercase">Cheapest</span>
                                                                         )}
                                                                         {!p.cheapest && comp.providerCount > 1 && (
-                                                                            <span className="text-[8px] px-1.5 py-0.5 rounded bg-white/[0.04] text-slate-500 font-bold">
+                                                                            <span className="text-[8px] px-1.5 py-0.5 rounded bg-[var(--sys-surface)] text-[var(--sys-text-muted)] font-bold">
                                                                                 +{((p.costUSD / comp.providers[0].costUSD - 1) * 100).toFixed(0)}%
                                                                             </span>
                                                                         )}
@@ -3837,36 +3939,36 @@ export default function SuperAdminDashboard() {
                                 {(monitorSubTab || 'providers') === 'alerts' && (
                                     <div className="space-y-4">
                                         {monitorData?.alerts?.length > 0 ? (
-                                            <div className="bg-rose-500/5 border border-rose-500/20 rounded-2xl p-5">
+                                            <div className="bg-[var(--sys-primary-dim)] border border-[var(--sys-border)] rounded-2xl p-5">
                                                 <div className="flex items-center justify-between mb-3">
-                                                    <h4 className="text-sm font-black text-rose-400 uppercase tracking-wider flex items-center gap-2">
-                                                        <span className="material-symbols-outlined text-rose-400">emergency</span>
+                                                    <h4 className="text-sm font-black text-primary uppercase tracking-wider flex items-center gap-2">
+                                                        <span className="material-symbols-outlined text-primary">emergency</span>
                                                         Price Change Alerts ({monitorData.alerts.length})
                                                     </h4>
-                                                    <button onClick={handleDismissAlerts} className="px-3 py-1.5 rounded-lg bg-rose-500/10 text-rose-400 text-[10px] font-bold border border-rose-500/20 hover:bg-rose-500/20 transition-all cursor-pointer">
+                                                    <button onClick={handleDismissAlerts} className="px-3 py-1.5 rounded-lg bg-[var(--sys-primary-dim)] text-primary text-[10px] font-bold border border-[var(--sys-border)] hover:bg-[var(--sys-primary-dim)] transition-all cursor-pointer">
                                                         Dismiss All
                                                     </button>
                                                 </div>
                                                 <div className="space-y-2">
                                                     {monitorData.alerts.map((a, i) => (
-                                                        <div key={i} className="flex items-center gap-2 py-2 px-3 bg-white/[0.02] rounded-lg border border-white/[0.04]">
-                                                            <span className={`material-symbols-outlined text-sm ${a.direction === 'up' ? 'text-rose-400' : 'text-emerald-400'}`}>
+                                                        <div key={i} className="flex items-center gap-2 py-2 px-3 bg-[var(--sys-surface)] rounded-lg border border-[var(--sys-border)]">
+                                                            <span className={`material-symbols-outlined text-sm ${a.direction === 'up' ? 'text-primary' : 'text-primary'}`}>
                                                                 {a.direction === 'up' ? 'trending_up' : 'trending_down'}
                                                             </span>
                                                             <div className="flex-1">
-                                                                <span className="text-xs font-bold text-white">{a.model}: </span>
-                                                                <span className="text-xs text-slate-400">{a.details}</span>
+                                                                <span className="text-xs font-bold text-[var(--sys-text)]">{a.model}: </span>
+                                                                <span className="text-xs text-[var(--sys-text-muted)]">{a.details}</span>
                                                             </div>
-                                                            <span className="text-[9px] text-slate-600">{a.detectedAt ? new Date(a.detectedAt).toLocaleDateString('en-IN') : ''}</span>
+                                                            <span className="text-[9px] text-[var(--sys-text-muted)]">{a.detectedAt ? new Date(a.detectedAt).toLocaleDateString('en-IN') : ''}</span>
                                                         </div>
                                                     ))}
                                                 </div>
                                             </div>
                                         ) : (
-                                            <div className="glass-panel rounded-2xl p-8 border border-white/[0.06] text-center">
-                                                <span className="material-symbols-outlined text-4xl text-emerald-400 mb-2 block">check_circle</span>
-                                                <p className="text-sm font-bold text-white mb-1">No Price Alerts</p>
-                                                <p className="text-xs text-slate-500">All provider costs are stable. The oracle will alert you when prices change.</p>
+                                            <div className="glass-panel rounded-2xl p-8 border border-[var(--sys-border)] text-center">
+                                                <span className="material-symbols-outlined text-4xl text-primary mb-2 block">check_circle</span>
+                                                <p className="text-sm font-bold text-[var(--sys-text)] mb-1">No Price Alerts</p>
+                                                <p className="text-xs text-[var(--sys-text-muted)]">All provider costs are stable. The oracle will alert you when prices change.</p>
                                             </div>
                                         )}
                                     </div>
@@ -3881,18 +3983,18 @@ export default function SuperAdminDashboard() {
                     <div>
                         <div className="flex items-center justify-between mb-6">
                             <div>
-                                <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-amber-400">shopping_cart</span>
+                                <h3 className="text-lg font-bold text-[var(--sys-text)] flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-primary">shopping_cart</span>
                                     Credit Store Management
                                 </h3>
-                                <p className="text-sm text-slate-500 mt-1">Manage additional credit packs users can purchase</p>
+                                <p className="text-sm text-[var(--sys-text-muted)] mt-1">Manage additional credit packs users can purchase</p>
                             </div>
                             <div className="flex gap-2">
-                                <button onClick={handleSeedPacks} className="px-3 py-2 rounded-lg bg-white/[0.04] text-slate-400 text-xs font-bold hover:bg-white/[0.08] transition-all cursor-pointer border border-white/[0.06]">
+                                <button onClick={handleSeedPacks} className="px-3 py-2 rounded-lg bg-[var(--sys-surface)] text-[var(--sys-text-muted)] text-xs font-bold hover:bg-[var(--sys-surface)] transition-all cursor-pointer border border-[var(--sys-border)]">
                                     <span className="material-symbols-outlined text-sm mr-1 align-middle">database</span>Seed Defaults
                                 </button>
                                 <button onClick={() => { setEditingPack(null); setPackForm({ name: '', slug: '', credits: 100, bonusCredits: 0, price: 499, validityDays: 180, icon: 'bolt', badge: '', description: '', isPromo: false, promoDiscount: 0, promoOriginalPrice: 0, promoLabel: '', displayOrder: 0, isActive: true, isFirstPurchaseEligible: true }); setShowPackForm(true) }}
-                                    className="px-4 py-2 rounded-lg bg-amber-500 text-slate-950 text-xs font-black uppercase tracking-wider hover:bg-amber-400 transition-all shadow-lg shadow-amber-500/20 cursor-pointer">
+                                    className="px-4 py-2 rounded-lg bg-[var(--sys-surface)] text-slate-950 text-xs font-black uppercase tracking-wider hover:bg-[var(--sys-surface)] transition-all shadow-none cursor-pointer">
                                     + New Pack
                                 </button>
                             </div>
@@ -3902,50 +4004,50 @@ export default function SuperAdminDashboard() {
                         {creditPacksList.length > 0 && (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6">
                             {creditPacksList.map(p => (
-                                <div key={p._id} className={`glass-panel rounded-2xl overflow-hidden border transition-all ${p.isActive ? 'border-white/[0.06]' : 'border-rose-500/20 opacity-60'}`}>
+                                <div key={p._id} className={`glass-panel rounded-2xl overflow-hidden border transition-all ${p.isActive ? 'border-[var(--sys-border)]' : 'border-[var(--sys-border)] opacity-60'}`}>
                                     {/* Pack Header */}
-                                    <div className="p-4 border-b border-white/[0.04]" style={{ background: `linear-gradient(135deg, ${p.color || '#f59e0b'}15, transparent)` }}>
+                                    <div className="p-4 border-b border-[var(--sys-border)]" style={{ background: `var(--sys-primary)` }}>
                                         <div className="flex items-center justify-between mb-2">
                                             <div className="flex items-center gap-2">
                                                 <span className="material-symbols-outlined text-xl" style={{ color: p.color || '#f59e0b' }}>{p.icon || 'bolt'}</span>
-                                                <h4 className="text-sm font-black text-white">{p.name}</h4>
+                                                <h4 className="text-sm font-black text-[var(--sys-text)]">{p.name}</h4>
                                             </div>
                                             <div className="flex items-center gap-1">
                                                 {p.badge && <span className="text-[9px] px-2 py-0.5 rounded-full font-bold" style={{ background: `${p.badgeColor || '#f59e0b'}20`, color: p.badgeColor || '#f59e0b' }}>{p.badge}</span>}
-                                                {p.isPromo && <span className="text-[9px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 font-bold">PROMO</span>}
+                                                {p.isPromo && <span className="text-[9px] px-2 py-0.5 rounded-full bg-[var(--sys-primary-dim)] text-primary font-bold">PROMO</span>}
                                             </div>
                                         </div>
                                         <div className="flex items-baseline gap-1">
-                                            <span className="text-2xl font-black text-white">₹{p.price?.toLocaleString()}</span>
-                                            {p.isPromo && p.promoOriginalPrice > 0 && <span className="text-sm text-slate-500 line-through">₹{p.promoOriginalPrice}</span>}
+                                            <span className="text-2xl font-black text-[var(--sys-text)]">₹{p.price?.toLocaleString()}</span>
+                                            {p.isPromo && p.promoOriginalPrice > 0 && <span className="text-sm text-[var(--sys-text-muted)] line-through">₹{p.promoOriginalPrice}</span>}
                                         </div>
                                     </div>
                                     {/* Pack Details */}
                                     <div className="p-4 space-y-2">
                                         <div className="flex items-center justify-between">
-                                            <span className="text-[10px] text-slate-500 uppercase font-bold">Credits</span>
-                                            <span className="text-sm font-bold text-white">{p.credits?.toLocaleString()}{p.bonusCredits > 0 && <span className="text-amber-400"> +{p.bonusCredits}</span>}</span>
+                                            <span className="text-[10px] text-[var(--sys-text-muted)] uppercase font-bold">Credits</span>
+                                            <span className="text-sm font-bold text-[var(--sys-text)]">{p.credits?.toLocaleString()}{p.bonusCredits > 0 && <span className="text-primary"> +{p.bonusCredits}</span>}</span>
                                         </div>
                                         <div className="flex items-center justify-between">
-                                            <span className="text-[10px] text-slate-500 uppercase font-bold">₹/Credit</span>
-                                            <span className="text-xs text-slate-400">₹{(p.price / ((p.credits || 1) + (p.bonusCredits || 0))).toFixed(2)}</span>
+                                            <span className="text-[10px] text-[var(--sys-text-muted)] uppercase font-bold">₹/Credit</span>
+                                            <span className="text-xs text-[var(--sys-text-muted)]">₹{(p.price / ((p.credits || 1) + (p.bonusCredits || 0))).toFixed(2)}</span>
                                         </div>
                                         <div className="flex items-center justify-between">
-                                            <span className="text-[10px] text-slate-500 uppercase font-bold">Validity</span>
-                                            <span className="text-xs text-slate-400">{p.validityDays || 180} days</span>
+                                            <span className="text-[10px] text-[var(--sys-text-muted)] uppercase font-bold">Validity</span>
+                                            <span className="text-xs text-[var(--sys-text-muted)]">{p.validityDays || 180} days</span>
                                         </div>
                                         <div className="flex items-center justify-between">
-                                            <span className="text-[10px] text-slate-500 uppercase font-bold">Sales</span>
-                                            <span className="text-xs text-emerald-400 font-bold">{p.purchaseCount || 0} sold · ₹{(p.totalRevenue || 0).toLocaleString()}</span>
+                                            <span className="text-[10px] text-[var(--sys-text-muted)] uppercase font-bold">Sales</span>
+                                            <span className="text-xs text-primary font-bold">{p.purchaseCount || 0} sold · ₹{(p.totalRevenue || 0).toLocaleString()}</span>
                                         </div>
                                     </div>
                                     {/* Pack Actions */}
-                                    <div className="p-3 border-t border-white/[0.04] flex gap-2">
-                                        <button onClick={() => handleEditPack(p)} className="flex-1 py-1.5 rounded-lg bg-white/[0.04] text-xs text-slate-400 hover:text-white hover:bg-white/[0.08] transition-all cursor-pointer">Edit</button>
-                                        <button onClick={() => handleTogglePack(p._id)} className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${p.isActive ? 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20' : 'bg-rose-500/10 text-rose-400 hover:bg-rose-500/20'}`}>
+                                    <div className="p-3 border-t border-[var(--sys-border)] flex gap-2">
+                                        <button onClick={() => handleEditPack(p)} className="flex-1 py-1.5 rounded-lg bg-[var(--sys-surface)] text-xs text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)] transition-all cursor-pointer">Edit</button>
+                                        <button onClick={() => handleTogglePack(p._id)} className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${p.isActive ? 'bg-[var(--sys-primary-dim)] text-primary hover:bg-[var(--sys-primary-dim)]' : 'bg-[var(--sys-primary-dim)] text-primary hover:bg-[var(--sys-primary-dim)]'}`}>
                                             {p.isActive ? 'Active' : 'Inactive'}
                                         </button>
-                                        <button onClick={() => handleDeletePack(p._id, p.name)} className="py-1.5 px-3 rounded-lg bg-rose-500/10 text-rose-400 text-xs hover:bg-rose-500/20 transition-all cursor-pointer">
+                                        <button onClick={() => handleDeletePack(p._id, p.name)} className="py-1.5 px-3 rounded-lg bg-[var(--sys-primary-dim)] text-primary text-xs hover:bg-[var(--sys-primary-dim)] transition-all cursor-pointer">
                                             <span className="material-symbols-outlined text-sm">delete</span>
                                         </button>
                                     </div>
@@ -3956,10 +4058,10 @@ export default function SuperAdminDashboard() {
 
                         {creditPacksList.length === 0 && (
                             <div className="text-center py-16 glass-panel rounded-2xl">
-                                <span className="material-symbols-outlined text-5xl text-slate-600 mb-3 block">shopping_cart</span>
-                                <p className="text-slate-400 text-sm font-bold mb-1">No credit packs yet</p>
-                                <p className="text-slate-600 text-xs mb-4">Create packs or seed defaults to get started</p>
-                                <button onClick={handleSeedPacks} className="px-5 py-2.5 rounded-xl bg-amber-500 text-slate-950 text-xs font-black uppercase hover:bg-amber-400 transition-all shadow-lg shadow-amber-500/20 cursor-pointer">
+                                <span className="material-symbols-outlined text-5xl text-[var(--sys-text-muted)] mb-3 block">shopping_cart</span>
+                                <p className="text-[var(--sys-text-muted)] text-sm font-bold mb-1">No credit packs yet</p>
+                                <p className="text-[var(--sys-text-muted)] text-xs mb-4">Create packs or seed defaults to get started</p>
+                                <button onClick={handleSeedPacks} className="px-5 py-2.5 rounded-xl bg-[var(--sys-surface)] text-slate-950 text-xs font-black uppercase hover:bg-[var(--sys-surface)] transition-all shadow-none cursor-pointer">
                                     Seed Default Packs
                                 </button>
                             </div>
@@ -3967,80 +4069,80 @@ export default function SuperAdminDashboard() {
 
                         {/* Create/Edit Pack Modal */}
                         {showPackForm && (
-                            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={e => e.target === e.currentTarget && setShowPackForm(false)}>
-                                <div className="bg-[#08080C] border border-white/[0.08] rounded-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto shadow-2xl" style={{ scrollbarWidth: 'thin' }}>
-                                    <div className="p-5 border-b border-white/[0.06] flex items-center justify-between sticky top-0 bg-[#08080C] z-10">
-                                        <h4 className="text-sm font-black text-white uppercase tracking-wider">{editingPack ? 'Edit Pack' : 'New Credit Pack'}</h4>
-                                        <button onClick={() => setShowPackForm(false)} className="p-1 rounded-lg hover:bg-white/[0.06] text-slate-500 cursor-pointer"><span className="material-symbols-outlined">close</span></button>
+                            <div className="fixed inset-0 bg-[var(--sys-surface)] flex items-center justify-center z-50 p-4" onClick={e => e.target === e.currentTarget && setShowPackForm(false)}>
+                                <div className="bg-[#08080C] border border-[var(--sys-border)] rounded-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto shadow-2xl" style={{ scrollbarWidth: 'thin' }}>
+                                    <div className="p-5 border-b border-[var(--sys-border)] flex items-center justify-between sticky top-0 bg-[#08080C] z-10">
+                                        <h4 className="text-sm font-black text-[var(--sys-text)] uppercase tracking-wider">{editingPack ? 'Edit Pack' : 'New Credit Pack'}</h4>
+                                        <button onClick={() => setShowPackForm(false)} className="p-1 rounded-lg hover:bg-[var(--sys-surface)] text-[var(--sys-text-muted)] cursor-pointer"><span className="material-symbols-outlined">close</span></button>
                                     </div>
                                     <form onSubmit={handleSavePack} className="p-5 space-y-4">
                                         <div className="grid grid-cols-2 gap-3">
                                             <div>
-                                                <label className="text-[10px] text-slate-500 uppercase font-bold mb-1 block">Name *</label>
-                                                <input value={packForm.name} onChange={e => setPackForm(f => ({ ...f, name: e.target.value }))} required className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-sm text-white outline-none focus:border-amber-500/30" placeholder="⚡ Spark" />
+                                                <label className="text-[10px] text-[var(--sys-text-muted)] uppercase font-bold mb-1 block">Name *</label>
+                                                <input value={packForm.name} onChange={e => setPackForm(f => ({ ...f, name: e.target.value }))} required className="w-full px-3 py-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-sm text-[var(--sys-text)] outline-none focus:border-[var(--sys-border)]" placeholder="⚡ Spark" />
                                             </div>
                                             <div>
-                                                <label className="text-[10px] text-slate-500 uppercase font-bold mb-1 block">Slug *</label>
-                                                <input value={packForm.slug} onChange={e => setPackForm(f => ({ ...f, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-') }))} required className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-sm text-white outline-none focus:border-amber-500/30" placeholder="spark" />
-                                            </div>
-                                        </div>
-                                        <div className="grid grid-cols-3 gap-3">
-                                            <div>
-                                                <label className="text-[10px] text-slate-500 uppercase font-bold mb-1 block">Credits *</label>
-                                                <input type="number" value={packForm.credits} onChange={e => setPackForm(f => ({ ...f, credits: parseInt(e.target.value) || 0 }))} required className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-sm text-white outline-none" />
-                                            </div>
-                                            <div>
-                                                <label className="text-[10px] text-slate-500 uppercase font-bold mb-1 block">Bonus</label>
-                                                <input type="number" value={packForm.bonusCredits} onChange={e => setPackForm(f => ({ ...f, bonusCredits: parseInt(e.target.value) || 0 }))} className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-sm text-white outline-none" />
-                                            </div>
-                                            <div>
-                                                <label className="text-[10px] text-slate-500 uppercase font-bold mb-1 block">Price (₹) *</label>
-                                                <input type="number" value={packForm.price} onChange={e => setPackForm(f => ({ ...f, price: parseInt(e.target.value) || 0 }))} required className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-sm text-white outline-none" />
+                                                <label className="text-[10px] text-[var(--sys-text-muted)] uppercase font-bold mb-1 block">Slug *</label>
+                                                <input value={packForm.slug} onChange={e => setPackForm(f => ({ ...f, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-') }))} required className="w-full px-3 py-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-sm text-[var(--sys-text)] outline-none focus:border-[var(--sys-border)]" placeholder="spark" />
                                             </div>
                                         </div>
                                         <div className="grid grid-cols-3 gap-3">
                                             <div>
-                                                <label className="text-[10px] text-slate-500 uppercase font-bold mb-1 block">Validity (days)</label>
-                                                <input type="number" value={packForm.validityDays} onChange={e => setPackForm(f => ({ ...f, validityDays: parseInt(e.target.value) || 180 }))} className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-sm text-white outline-none" />
+                                                <label className="text-[10px] text-[var(--sys-text-muted)] uppercase font-bold mb-1 block">Credits *</label>
+                                                <input type="number" value={packForm.credits} onChange={e => setPackForm(f => ({ ...f, credits: parseInt(e.target.value) || 0 }))} required className="w-full px-3 py-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-sm text-[var(--sys-text)] outline-none" />
                                             </div>
                                             <div>
-                                                <label className="text-[10px] text-slate-500 uppercase font-bold mb-1 block">Icon</label>
-                                                <input value={packForm.icon} onChange={e => setPackForm(f => ({ ...f, icon: e.target.value }))} className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-sm text-white outline-none" placeholder="bolt" />
+                                                <label className="text-[10px] text-[var(--sys-text-muted)] uppercase font-bold mb-1 block">Bonus</label>
+                                                <input type="number" value={packForm.bonusCredits} onChange={e => setPackForm(f => ({ ...f, bonusCredits: parseInt(e.target.value) || 0 }))} className="w-full px-3 py-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-sm text-[var(--sys-text)] outline-none" />
                                             </div>
                                             <div>
-                                                <label className="text-[10px] text-slate-500 uppercase font-bold mb-1 block">Display Order</label>
-                                                <input type="number" value={packForm.displayOrder} onChange={e => setPackForm(f => ({ ...f, displayOrder: parseInt(e.target.value) || 0 }))} className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-sm text-white outline-none" />
+                                                <label className="text-[10px] text-[var(--sys-text-muted)] uppercase font-bold mb-1 block">Price (₹) *</label>
+                                                <input type="number" value={packForm.price} onChange={e => setPackForm(f => ({ ...f, price: parseInt(e.target.value) || 0 }))} required className="w-full px-3 py-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-sm text-[var(--sys-text)] outline-none" />
+                                            </div>
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-3">
+                                            <div>
+                                                <label className="text-[10px] text-[var(--sys-text-muted)] uppercase font-bold mb-1 block">Validity (days)</label>
+                                                <input type="number" value={packForm.validityDays} onChange={e => setPackForm(f => ({ ...f, validityDays: parseInt(e.target.value) || 180 }))} className="w-full px-3 py-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-sm text-[var(--sys-text)] outline-none" />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] text-[var(--sys-text-muted)] uppercase font-bold mb-1 block">Icon</label>
+                                                <input value={packForm.icon} onChange={e => setPackForm(f => ({ ...f, icon: e.target.value }))} className="w-full px-3 py-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-sm text-[var(--sys-text)] outline-none" placeholder="bolt" />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] text-[var(--sys-text-muted)] uppercase font-bold mb-1 block">Display Order</label>
+                                                <input type="number" value={packForm.displayOrder} onChange={e => setPackForm(f => ({ ...f, displayOrder: parseInt(e.target.value) || 0 }))} className="w-full px-3 py-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-sm text-[var(--sys-text)] outline-none" />
                                             </div>
                                         </div>
                                         <div className="grid grid-cols-2 gap-3">
                                             <div>
-                                                <label className="text-[10px] text-slate-500 uppercase font-bold mb-1 block">Badge</label>
-                                                <input value={packForm.badge} onChange={e => setPackForm(f => ({ ...f, badge: e.target.value }))} className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-sm text-white outline-none" placeholder="Best Value, Popular..." />
+                                                <label className="text-[10px] text-[var(--sys-text-muted)] uppercase font-bold mb-1 block">Badge</label>
+                                                <input value={packForm.badge} onChange={e => setPackForm(f => ({ ...f, badge: e.target.value }))} className="w-full px-3 py-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-sm text-[var(--sys-text)] outline-none" placeholder="Best Value, Popular..." />
                                             </div>
                                             <div>
-                                                <label className="text-[10px] text-slate-500 uppercase font-bold mb-1 block">Description</label>
-                                                <input value={packForm.description} onChange={e => setPackForm(f => ({ ...f, description: e.target.value }))} className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-sm text-white outline-none" placeholder="Great for casual creators" />
+                                                <label className="text-[10px] text-[var(--sys-text-muted)] uppercase font-bold mb-1 block">Description</label>
+                                                <input value={packForm.description} onChange={e => setPackForm(f => ({ ...f, description: e.target.value }))} className="w-full px-3 py-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-sm text-[var(--sys-text)] outline-none" placeholder="Great for casual creators" />
                                             </div>
                                         </div>
                                         {/* Promo Section */}
-                                        <div className="border border-white/[0.06] rounded-xl p-4">
+                                        <div className="border border-[var(--sys-border)] rounded-xl p-4">
                                             <label className="flex items-center gap-2 cursor-pointer mb-3">
                                                 <input type="checkbox" checked={packForm.isPromo} onChange={e => setPackForm(f => ({ ...f, isPromo: e.target.checked }))} className="accent-amber-500" />
-                                                <span className="text-xs font-bold text-white">Enable Promo Mode</span>
+                                                <span className="text-xs font-bold text-[var(--sys-text)]">Enable Promo Mode</span>
                                             </label>
                                             {packForm.isPromo && (
                                                 <div className="grid grid-cols-3 gap-3">
                                                     <div>
-                                                        <label className="text-[10px] text-slate-500 uppercase font-bold mb-1 block">Discount %</label>
-                                                        <input type="number" value={packForm.promoDiscount} onChange={e => setPackForm(f => ({ ...f, promoDiscount: parseInt(e.target.value) || 0 }))} className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-sm text-white outline-none" />
+                                                        <label className="text-[10px] text-[var(--sys-text-muted)] uppercase font-bold mb-1 block">Discount %</label>
+                                                        <input type="number" value={packForm.promoDiscount} onChange={e => setPackForm(f => ({ ...f, promoDiscount: parseInt(e.target.value) || 0 }))} className="w-full px-3 py-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-sm text-[var(--sys-text)] outline-none" />
                                                     </div>
                                                     <div>
-                                                        <label className="text-[10px] text-slate-500 uppercase font-bold mb-1 block">Original ₹</label>
-                                                        <input type="number" value={packForm.promoOriginalPrice} onChange={e => setPackForm(f => ({ ...f, promoOriginalPrice: parseInt(e.target.value) || 0 }))} className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-sm text-white outline-none" />
+                                                        <label className="text-[10px] text-[var(--sys-text-muted)] uppercase font-bold mb-1 block">Original ₹</label>
+                                                        <input type="number" value={packForm.promoOriginalPrice} onChange={e => setPackForm(f => ({ ...f, promoOriginalPrice: parseInt(e.target.value) || 0 }))} className="w-full px-3 py-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-sm text-[var(--sys-text)] outline-none" />
                                                     </div>
                                                     <div>
-                                                        <label className="text-[10px] text-slate-500 uppercase font-bold mb-1 block">Promo Label</label>
-                                                        <input value={packForm.promoLabel} onChange={e => setPackForm(f => ({ ...f, promoLabel: e.target.value }))} className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-sm text-white outline-none" placeholder="33% off!" />
+                                                        <label className="text-[10px] text-[var(--sys-text-muted)] uppercase font-bold mb-1 block">Promo Label</label>
+                                                        <input value={packForm.promoLabel} onChange={e => setPackForm(f => ({ ...f, promoLabel: e.target.value }))} className="w-full px-3 py-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-sm text-[var(--sys-text)] outline-none" placeholder="33% off!" />
                                                     </div>
                                                 </div>
                                             )}
@@ -4049,16 +4151,16 @@ export default function SuperAdminDashboard() {
                                         <div className="flex gap-4">
                                             <label className="flex items-center gap-2 cursor-pointer">
                                                 <input type="checkbox" checked={packForm.isActive} onChange={e => setPackForm(f => ({ ...f, isActive: e.target.checked }))} className="accent-emerald-500" />
-                                                <span className="text-xs text-slate-400">Active</span>
+                                                <span className="text-xs text-[var(--sys-text-muted)]">Active</span>
                                             </label>
                                             <label className="flex items-center gap-2 cursor-pointer">
                                                 <input type="checkbox" checked={packForm.isFirstPurchaseEligible} onChange={e => setPackForm(f => ({ ...f, isFirstPurchaseEligible: e.target.checked }))} className="accent-amber-500" />
-                                                <span className="text-xs text-slate-400">2× First Purchase</span>
+                                                <span className="text-xs text-[var(--sys-text-muted)]">2× First Purchase</span>
                                             </label>
                                         </div>
                                         <div className="flex gap-3 pt-2">
-                                            <button type="button" onClick={() => setShowPackForm(false)} className="flex-1 py-3 bg-white/[0.04] text-white text-xs font-black uppercase tracking-wider rounded-xl hover:bg-white/[0.08] transition-all border border-white/[0.06] cursor-pointer">Cancel</button>
-                                            <button type="submit" className="flex-1 py-3 bg-amber-500 text-slate-950 text-xs font-black uppercase tracking-wider rounded-xl hover:bg-amber-400 transition-all shadow-lg shadow-amber-500/20 cursor-pointer">{editingPack ? 'Update Pack' : 'Create Pack'}</button>
+                                            <button type="button" onClick={() => setShowPackForm(false)} className="flex-1 py-3 bg-[var(--sys-surface)] text-[var(--sys-text)] text-xs font-black uppercase tracking-wider rounded-xl hover:bg-[var(--sys-surface)] transition-all border border-[var(--sys-border)] cursor-pointer">Cancel</button>
+                                            <button type="submit" className="flex-1 py-3 bg-[var(--sys-surface)] text-slate-950 text-xs font-black uppercase tracking-wider rounded-xl hover:bg-[var(--sys-surface)] transition-all shadow-none cursor-pointer">{editingPack ? 'Update Pack' : 'Create Pack'}</button>
                                         </div>
                                     </form>
                                 </div>

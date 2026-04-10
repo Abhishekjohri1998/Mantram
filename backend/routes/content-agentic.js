@@ -674,7 +674,7 @@ router.post('/youtube-seo', protect, requireCredits('content'), async (req, res)
 // ══════════════════════════════════════════════════════════════════════════════
 router.post('/blog/generate', protect, requireCredits('content'), async (req, res) => {
     try {
-        const { brandId, topic, blogType, targetWordCount, keywords, targetAudience, tone } = req.body;
+        const { brandId, topic, blogType, targetWordCount, keywords, targetAudience, tone, language } = req.body;
         if (!topic) return res.status(400).json({ success: false, error: 'Topic is required' });
 
         // Step 1: Research (same intelligence gathering as /start)
@@ -688,6 +688,7 @@ router.post('/blog/generate', protect, requireCredits('content'), async (req, re
             keywords: keywords || [],
             targetAudience: targetAudience || 'general',
             tone: tone || 'professional',
+            language: language || 'english',
             contentType: 'blog',
             platform: 'website',
             researchDepth: 'quick',

@@ -11,20 +11,20 @@ import { automations as automationsAPI } from '../services/api'
 
 const NODE_STYLES = {
     send_message: { icon: 'chat_bubble', color: '#6366f1', bg: 'bg-[#FF4D00]/10', border: 'border-[#FF4D00]/30' },
-    quick_replies: { icon: 'touch_app', color: '#f59e0b', bg: 'bg-amber-500/10', border: 'border-amber-500/30' },
-    ask_question: { icon: 'help', color: '#10b981', bg: 'bg-emerald-500/10', border: 'border-emerald-500/30' },
+    quick_replies: { icon: 'touch_app', color: '#f59e0b', bg: 'bg-[var(--sys-primary-dim)]', border: 'border-[var(--sys-border)]' },
+    ask_question: { icon: 'help', color: '#10b981', bg: 'bg-[var(--sys-primary-dim)]', border: 'border-[var(--sys-border)]' },
     condition: { icon: 'call_split', color: '#8b5cf6', bg: 'bg-[#FF4D00]/10', border: 'border-[#FF4D00]/30' },
-    tag_user: { icon: 'label', color: '#06b6d4', bg: 'bg-cyan-500/10', border: 'border-cyan-500/30' },
-    delay: { icon: 'timer', color: '#64748b', bg: 'bg-slate-500/10', border: 'border-slate-500/30' },
-    action: { icon: 'webhook', color: '#f97316', bg: 'bg-orange-500/10', border: 'border-orange-500/30' },
+    tag_user: { icon: 'label', color: '#06b6d4', bg: 'bg-[var(--sys-primary-dim)]', border: 'border-[var(--sys-border)]' },
+    delay: { icon: 'timer', color: '#64748b', bg: 'bg-[var(--sys-border)]/10', border: 'border-[var(--sys-border)]' },
+    action: { icon: 'webhook', color: '#f97316', bg: 'bg-[var(--sys-surface)]', border: 'border-[var(--sys-border)]' },
     human_handoff: { icon: 'person', color: '#eab308', bg: 'bg-yellow-500/10', border: 'border-yellow-500/30' },
-    end: { icon: 'stop_circle', color: '#ef4444', bg: 'bg-rose-500/10', border: 'border-rose-500/30' },
+    end: { icon: 'stop_circle', color: '#ef4444', bg: 'bg-[var(--sys-primary-dim)]', border: 'border-[var(--sys-border)]' },
 }
 
 const RECIPE_ICONS = {
     faq_auto_reply: { icon: 'help_center', gradient: 'from-[#FF4D00] to-[#FF7A00]' },
-    lead_capture: { icon: 'person_add', gradient: 'from-emerald-500 to-teal-500' },
-    comment_to_dm: { icon: 'mode_comment', gradient: 'from-amber-500 to-orange-500' },
+    lead_capture: { icon: 'person_add', gradient: 'bg-[var(--sys-surface)] border border-[var(--sys-border)]' },
+    comment_to_dm: { icon: 'mode_comment', gradient: 'bg-[var(--sys-surface)] border border-[var(--sys-border)]' },
     product_recommendation: { icon: 'recommend', gradient: 'from-[#FF4D00] to-rose-500' },
 }
 
@@ -290,7 +290,7 @@ export default function Automations() {
         return (
             <DashboardLayout title="Flow Builder" subtitle={selectedAutomation.name}>
                 {error && (
-                    <div className={`mb-6 p-4 rounded-xl border ${error.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'} text-sm flex items-center gap-2`}>
+                    <div className={`mb-6 p-4 rounded-xl border ${error.isProviderError ? 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary' : 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary'} text-sm flex items-center gap-2`}>
                         <span className="material-symbols-outlined text-base">
                             {error.isProviderError ? 'warning' : 'error'}
                         </span>
@@ -307,21 +307,21 @@ export default function Automations() {
                 <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center gap-3">
                         <button onClick={() => { setView('list'); setSelectedAutomation(null) }}
-                            className="size-10 rounded-xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center hover:bg-white/[0.08] transition-all cursor-pointer">
-                            <span className="material-symbols-outlined text-slate-400">arrow_back</span>
+                            className="size-10 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] flex items-center justify-center hover:bg-[var(--sys-surface)] transition-all cursor-pointer">
+                            <span className="material-symbols-outlined text-[var(--sys-text-muted)]">arrow_back</span>
                         </button>
                         <div>
-                            <h2 className="text-white font-bold text-lg">{selectedAutomation.name}</h2>
-                            <p className="text-sm text-slate-500">{nodes.length} steps · {selectedAutomation.triggers?.length || 0} triggers</p>
+                            <h2 className="text-[var(--sys-text)] font-bold text-lg">{selectedAutomation.name}</h2>
+                            <p className="text-sm text-[var(--sys-text-muted)]">{nodes.length} steps · {selectedAutomation.triggers?.length || 0} triggers</p>
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
-                        <span className={`px-3 py-1.5 rounded-lg text-xs font-bold ${selectedAutomation.isActive ? 'bg-emerald-500/10 text-emerald-400' : 'bg-white/[0.04] text-slate-500'}`}>
+                        <span className={`px-3 py-1.5 rounded-lg text-xs font-bold ${selectedAutomation.isActive ? 'bg-[var(--sys-primary-dim)] text-primary' : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)]'}`}>
                             {selectedAutomation.isActive ? '● Active' : '○ Draft'}
                         </span>
                         <button onClick={activateAutomation}
                             className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all cursor-pointer ${selectedAutomation.isActive
-                                ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20 hover:bg-rose-500/20'
+                                ? 'bg-[var(--sys-primary-dim)] text-primary border border-[var(--sys-border)] hover:bg-[var(--sys-primary-dim)]'
                                 : 'btn-primary'}`}>
                             {selectedAutomation.isActive ? 'Deactivate' : '⚡ Activate Flow'}
                         </button>
@@ -331,7 +331,7 @@ export default function Automations() {
                 {/* Triggers Card — Editable */}
                 <div className="glass-panel rounded-xl p-4 mb-6">
                     <div className="flex items-center justify-between mb-3">
-                        <p className="text-sm text-slate-500 uppercase tracking-widest font-bold flex items-center gap-1.5">
+                        <p className="text-sm text-[var(--sys-text-muted)] uppercase tracking-widest font-bold flex items-center gap-1.5">
                             <span className="material-symbols-outlined text-primary text-xs">bolt</span> When triggered by
                         </p>
                         <div className="flex items-center gap-2">
@@ -348,28 +348,28 @@ export default function Automations() {
                                 <span className="material-symbols-outlined text-primary text-sm">
                                     {t.type === 'dm_received' ? 'mail' : t.type === 'keyword_match' ? 'key' : t.type === 'intent_detected' ? 'psychology' : t.type.includes('comment') ? 'comment' : 'auto_stories'}
                                 </span>
-                                <span className="text-sm text-white font-medium">{t.type.replace(/_/g, ' ')}</span>
+                                <span className="text-sm text-[var(--sys-text)] font-medium">{t.type.replace(/_/g, ' ')}</span>
                                 {t.keywords?.length > 0 && (
                                     <div className="flex flex-wrap gap-1">
                                         {t.keywords.map(k => (
                                             <span key={k} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-primary/20 text-sm text-primary font-bold">
                                                 {k}
                                                 {editingTriggers && (
-                                                    <button onClick={() => removeTriggerKeyword(i, k)} className="text-primary/60 hover:text-red-400 cursor-pointer">&times;</button>
+                                                    <button onClick={() => removeTriggerKeyword(i, k)} className="text-primary/60 hover:text-primary cursor-pointer">&times;</button>
                                                 )}
                                             </span>
                                         ))}
                                         {editingTriggers && (
                                             <form onSubmit={e => { e.preventDefault(); addTriggerKeyword(i, newKeyword) }} className="inline-flex">
                                                 <input value={newKeyword} onChange={e => setNewKeyword(e.target.value)} placeholder="+ word"
-                                                    className="w-16 px-1.5 py-0.5 rounded bg-black/30 text-sm text-white border border-primary/20 outline-none" />
+                                                    className="w-16 px-1.5 py-0.5 rounded bg-[var(--sys-surface)] text-sm text-[var(--sys-text)] border border-primary/20 outline-none" />
                                             </form>
                                         )}
                                     </div>
                                 )}
                                 {t.intent && <span className="text-sm text-primary font-bold">{t.intent}</span>}
                                 {editingTriggers && (selectedAutomation.triggers || []).length > 1 && (
-                                    <button onClick={() => removeTrigger(i)} className="text-sm text-slate-500 hover:text-red-400 cursor-pointer">
+                                    <button onClick={() => removeTrigger(i)} className="text-sm text-[var(--sys-text-muted)] hover:text-primary cursor-pointer">
                                         <span className="material-symbols-outlined text-xs">close</span>
                                     </button>
                                 )}
@@ -380,10 +380,10 @@ export default function Automations() {
                                 <button className="flex items-center gap-1 px-3 py-2 rounded-xl border border-dashed border-primary/30 text-sm text-primary/60 hover:text-primary hover:border-primary/50 transition-all cursor-pointer">
                                     <span className="material-symbols-outlined text-xs">add</span> Add Trigger
                                 </button>
-                                <div className="absolute top-full left-0 mt-1 bg-[#121217] border border-slate-700 rounded-xl shadow-xl p-1 hidden group-hover:block z-20 min-w-[200px]">
+                                <div className="absolute top-full left-0 mt-1 bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl shadow-xl p-1 hidden group-hover:block z-20 min-w-[200px]">
                                     {['dm_received', 'keyword_match', 'comment_keyword', 'comment_any', 'story_reply', 'intent_detected'].map(type => (
                                         <button key={type} onClick={() => addTrigger(type)}
-                                            className="w-full text-left px-3 py-2 rounded-lg text-sm text-slate-300 hover:bg-primary/10 hover:text-white transition-all cursor-pointer flex items-center gap-2">
+                                            className="w-full text-left px-3 py-2 rounded-lg text-sm text-[var(--sys-text-muted)] hover:bg-primary/10 hover:text-white transition-all cursor-pointer flex items-center gap-2">
                                             <span className="material-symbols-outlined text-sm text-primary">
                                                 {type === 'dm_received' ? 'mail' : type === 'keyword_match' ? 'key' : type === 'intent_detected' ? 'psychology' : type.includes('comment') ? 'comment' : 'auto_stories'}
                                             </span>
@@ -398,9 +398,9 @@ export default function Automations() {
 
                 {/* Vertical Timeline Flow */}
                 <div className="max-w-2xl mx-auto">
-                    <div className="flex items-center gap-2 mb-4 text-sm text-slate-500 uppercase tracking-widest font-bold">
+                    <div className="flex items-center gap-2 mb-4 text-sm text-[var(--sys-text-muted)] uppercase tracking-widest font-bold">
                         <span className="material-symbols-outlined text-xs">route</span> Flow Steps
-                        <span className="text-slate-600">— drag to reorder</span>
+                        <span className="text-[var(--sys-text-muted)]">— drag to reorder</span>
                     </div>
 
                     {nodes.map((node, idx) => {
@@ -422,17 +422,17 @@ export default function Automations() {
                                 >
                                     {/* Step Number + Timeline Line */}
                                     <div className="flex flex-col items-center shrink-0 w-10">
-                                        <div className="size-10 rounded-xl flex items-center justify-center text-sm font-bold shrink-0 border-2 transition-colors"
+                                        <div className="size-10 rounded-xl flex items-center justify-center text-sm font-bold shrink-0 border transition-colors"
                                             style={{ borderColor: style.color, color: style.color, backgroundColor: `${style.color}15` }}>
                                             {idx + 1}
                                         </div>
                                         {idx < nodes.length - 1 && (
-                                            <div className="w-0.5 flex-1 min-h-[20px] bg-gradient-to-b" style={{ backgroundImage: `linear-gradient(${style.color}40, transparent)` }} />
+                                            <div className="w-0.5 flex-1 min-h-[20px] bg-gradient-to-b" style={{ backgroundImage: `var(--sys-primary)` }} />
                                         )}
                                     </div>
 
                                     {/* Node Content */}
-                                    <div className={`flex-1 mb-3 rounded-xl border transition-all cursor-pointer ${style.border} ${isEditing ? 'ring-2 ring-primary shadow-lg shadow-primary/10' : 'hover:shadow-md'}`}
+                                    <div className={`flex-1 mb-3 rounded-xl border transition-all cursor-pointer ${style.border} ${isEditing ? 'ring-2 ring-primary shadow-none' : 'hover:shadow-md'}`}
                                         style={{ backgroundColor: `${style.color}08` }}
                                         onClick={() => setEditingNode(isEditing ? null : node.nodeId)}>
 
@@ -440,60 +440,60 @@ export default function Automations() {
                                         <div className="flex items-center justify-between px-4 py-3">
                                             <div className="flex items-center gap-3">
                                                 {/* Drag Handle */}
-                                                <span className="material-symbols-outlined text-slate-600 text-sm cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity"
+                                                <span className="material-symbols-outlined text-[var(--sys-text-muted)] text-sm cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity"
                                                     onMouseDown={e => e.stopPropagation()}>drag_indicator</span>
                                                 <div className="size-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${style.color}20` }}>
                                                     <span className="material-symbols-outlined text-base" style={{ color: style.color }}>{style.icon}</span>
                                                 </div>
                                                 <div>
-                                                    <p className="text-white font-bold text-sm">{node.label || node.type.replace(/_/g, ' ')}</p>
-                                                    <p className="text-sm text-slate-500 capitalize">{node.type.replace(/_/g, ' ')}</p>
+                                                    <p className="text-[var(--sys-text)] font-bold text-sm">{node.label || node.type.replace(/_/g, ' ')}</p>
+                                                    <p className="text-sm text-[var(--sys-text-muted)] capitalize">{node.type.replace(/_/g, ' ')}</p>
                                                 </div>
                                             </div>
                                             <div className="flex items-center gap-1">
-                                                <span className="material-symbols-outlined text-sm text-slate-600">{isEditing ? 'expand_less' : 'expand_more'}</span>
+                                                <span className="material-symbols-outlined text-sm text-[var(--sys-text-muted)]">{isEditing ? 'expand_less' : 'expand_more'}</span>
                                             </div>
                                         </div>
 
                                         {/* Collapsed Preview */}
                                         {!isEditing && (
                                             <div className="px-4 pb-3 -mt-1">
-                                                {node.type === 'send_message' && <p className="text-sm text-slate-400 line-clamp-1"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">chat</span> {node.config.messageText || 'Empty message'}</p>}
+                                                {node.type === 'send_message' && <p className="text-sm text-[var(--sys-text-muted)] line-clamp-1"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">chat</span> {node.config.messageText || 'Empty message'}</p>}
                                                 {node.type === 'quick_replies' && (
                                                     <div className="flex flex-wrap gap-1">
-                                                        {(node.config.buttons || []).map((b, bi) => <span key={bi} className="px-2 py-0.5 rounded-md bg-white/[0.06] text-sm text-white">{b.label}</span>)}
+                                                        {(node.config.buttons || []).map((b, bi) => <span key={bi} className="px-2 py-0.5 rounded-md bg-[var(--sys-surface)] text-sm text-[var(--sys-text)]">{b.label}</span>)}
                                                     </div>
                                                 )}
-                                                {node.type === 'ask_question' && <p className="text-sm text-slate-400 line-clamp-1">❓ {node.config.questionText || 'Question'} → <span className="text-primary">{node.config.saveToField}</span></p>}
-                                                {node.type === 'tag_user' && <p className="text-sm text-slate-400">🏷️ Tag: {node.config.tagName}</p>}
-                                                {node.type === 'condition' && <p className="text-sm text-slate-400">🔀 if {node.config.conditionField} {node.config.conditionOperator} {node.config.conditionValue}</p>}
-                                                {node.type === 'delay' && <p className="text-sm text-slate-400">⏱ Wait {node.config.delaySeconds || 0}s</p>}
-                                                {node.type === 'human_handoff' && <p className="text-sm text-slate-400">👤 Transfer to human agent</p>}
-                                                {node.type === 'end' && <p className="text-sm text-slate-400">🏁 Flow ends here</p>}
+                                                {node.type === 'ask_question' && <p className="text-sm text-[var(--sys-text-muted)] line-clamp-1">❓ {node.config.questionText || 'Question'} → <span className="text-primary">{node.config.saveToField}</span></p>}
+                                                {node.type === 'tag_user' && <p className="text-sm text-[var(--sys-text-muted)]">🏷️ Tag: {node.config.tagName}</p>}
+                                                {node.type === 'condition' && <p className="text-sm text-[var(--sys-text-muted)]">🔀 if {node.config.conditionField} {node.config.conditionOperator} {node.config.conditionValue}</p>}
+                                                {node.type === 'delay' && <p className="text-sm text-[var(--sys-text-muted)]">⏱ Wait {node.config.delaySeconds || 0}s</p>}
+                                                {node.type === 'human_handoff' && <p className="text-sm text-[var(--sys-text-muted)]">👤 Transfer to human agent</p>}
+                                                {node.type === 'end' && <p className="text-sm text-[var(--sys-text-muted)]">🏁 Flow ends here</p>}
                                             </div>
                                         )}
 
                                         {/* Expanded Editor */}
                                         {isEditing && (
-                                            <div className="px-4 pb-4 space-y-3 border-t border-white/[0.06] pt-3" onClick={e => e.stopPropagation()}>
+                                            <div className="px-4 pb-4 space-y-3 border-t border-[var(--sys-border)] pt-3" onClick={e => e.stopPropagation()}>
                                                 {/* Label */}
                                                 <div>
-                                                    <label className="text-sm text-slate-500 uppercase tracking-wider font-bold mb-1 block">Step Name</label>
+                                                    <label className="text-sm text-[var(--sys-text-muted)] uppercase tracking-wider font-bold mb-1 block">Step Name</label>
                                                     <input type="text" value={node.label || ''} onChange={e => updateNode(node.nodeId, 'label', e.target.value)}
-                                                        className="w-full bg-black/20 text-white text-sm rounded-lg px-3 py-2 border border-white/[0.1] focus:border-primary/50 outline-none" />
+                                                        className="w-full bg-[var(--sys-surface)] text-[var(--sys-text)] text-sm rounded-lg px-3 py-2 border border-[var(--sys-border)] focus:border-primary/50 outline-none" />
                                                 </div>
 
                                                 {/* Type-specific fields */}
                                                 {(node.type === 'send_message' || node.type === 'quick_replies') && (
                                                     <div>
-                                                        <label className="text-sm text-slate-500 uppercase tracking-wider font-bold mb-1 block">Message</label>
+                                                        <label className="text-sm text-[var(--sys-text-muted)] uppercase tracking-wider font-bold mb-1 block">Message</label>
                                                         <textarea value={node.config.messageText || ''} onChange={e => updateNode(node.nodeId, 'config.messageText', e.target.value)}
-                                                            className="w-full bg-black/20 text-white text-sm rounded-lg px-3 py-2 border border-white/[0.1] focus:border-primary/50 outline-none resize-none" rows={3} />
+                                                            className="w-full bg-[var(--sys-surface)] text-[var(--sys-text)] text-sm rounded-lg px-3 py-2 border border-[var(--sys-border)] focus:border-primary/50 outline-none resize-none" rows={3} />
                                                     </div>
                                                 )}
                                                 {node.type === 'quick_replies' && (
                                                     <div>
-                                                        <label className="text-sm text-slate-500 uppercase tracking-wider font-bold mb-1 block">Quick Reply Buttons</label>
+                                                        <label className="text-sm text-[var(--sys-text-muted)] uppercase tracking-wider font-bold mb-1 block">Quick Reply Buttons</label>
                                                         <div className="flex flex-wrap gap-1.5">
                                                             {(node.config.buttons || []).map((b, bi) => (
                                                                 <span key={bi} className="px-3 py-1.5 rounded-lg bg-primary/10 border border-primary/20 text-sm text-primary font-medium">{b.label}</span>
@@ -504,36 +504,36 @@ export default function Automations() {
                                                 {node.type === 'ask_question' && (
                                                     <>
                                                         <div>
-                                                            <label className="text-sm text-slate-500 uppercase tracking-wider font-bold mb-1 block">Question</label>
+                                                            <label className="text-sm text-[var(--sys-text-muted)] uppercase tracking-wider font-bold mb-1 block">Question</label>
                                                             <textarea value={node.config.questionText || ''} onChange={e => updateNode(node.nodeId, 'config.questionText', e.target.value)}
-                                                                className="w-full bg-black/20 text-white text-sm rounded-lg px-3 py-2 border border-white/[0.1] focus:border-primary/50 outline-none resize-none" rows={2} />
+                                                                className="w-full bg-[var(--sys-surface)] text-[var(--sys-text)] text-sm rounded-lg px-3 py-2 border border-[var(--sys-border)] focus:border-primary/50 outline-none resize-none" rows={2} />
                                                         </div>
                                                         <div>
-                                                            <label className="text-sm text-slate-500 uppercase tracking-wider font-bold mb-1 block">Save response to</label>
+                                                            <label className="text-sm text-[var(--sys-text-muted)] uppercase tracking-wider font-bold mb-1 block">Save response to</label>
                                                             <input type="text" value={node.config.saveToField || ''} onChange={e => updateNode(node.nodeId, 'config.saveToField', e.target.value)}
-                                                                className="w-full bg-black/20 text-white text-sm rounded-lg px-3 py-2 border border-white/[0.1] focus:border-primary/50 outline-none" placeholder="e.g. user_email" />
+                                                                className="w-full bg-[var(--sys-surface)] text-[var(--sys-text)] text-sm rounded-lg px-3 py-2 border border-[var(--sys-border)] focus:border-primary/50 outline-none" placeholder="e.g. user_email" />
                                                         </div>
                                                     </>
                                                 )}
                                                 {node.type === 'delay' && (
                                                     <div>
-                                                        <label className="text-sm text-slate-500 uppercase tracking-wider font-bold mb-1 block">Delay (seconds)</label>
+                                                        <label className="text-sm text-[var(--sys-text-muted)] uppercase tracking-wider font-bold mb-1 block">Delay (seconds)</label>
                                                         <input type="number" value={node.config.delaySeconds || 0} onChange={e => updateNode(node.nodeId, 'config.delaySeconds', parseInt(e.target.value))}
-                                                            className="w-32 bg-black/20 text-white text-sm rounded-lg px-3 py-2 border border-white/[0.1] focus:border-primary/50 outline-none" min={0} />
+                                                            className="w-32 bg-[var(--sys-surface)] text-[var(--sys-text)] text-sm rounded-lg px-3 py-2 border border-[var(--sys-border)] focus:border-primary/50 outline-none" min={0} />
                                                     </div>
                                                 )}
                                                 {node.type === 'tag_user' && (
                                                     <div>
-                                                        <label className="text-sm text-slate-500 uppercase tracking-wider font-bold mb-1 block">Tag Name</label>
+                                                        <label className="text-sm text-[var(--sys-text-muted)] uppercase tracking-wider font-bold mb-1 block">Tag Name</label>
                                                         <input type="text" value={node.config.tagName || ''} onChange={e => updateNode(node.nodeId, 'config.tagName', e.target.value)}
-                                                            className="w-full bg-black/20 text-white text-sm rounded-lg px-3 py-2 border border-white/[0.1] focus:border-primary/50 outline-none" placeholder="e.g. hot_lead" />
+                                                            className="w-full bg-[var(--sys-surface)] text-[var(--sys-text)] text-sm rounded-lg px-3 py-2 border border-[var(--sys-border)] focus:border-primary/50 outline-none" placeholder="e.g. hot_lead" />
                                                     </div>
                                                 )}
 
                                                 {/* Delete */}
                                                 <div className="flex justify-end pt-1">
                                                     <button onClick={() => deleteNode(node.nodeId)}
-                                                        className="flex items-center gap-1 text-sm text-rose-400 hover:text-rose-300 transition-colors cursor-pointer">
+                                                        className="flex items-center gap-1 text-sm text-primary hover:text-[var(--sys-primary)] transition-colors cursor-pointer">
                                                         <span className="material-symbols-outlined text-sm">delete</span> Remove Step
                                                     </button>
                                                 </div>
@@ -546,10 +546,10 @@ export default function Automations() {
                                 {idx < nodes.length - 1 && (
                                     <div className="flex items-center gap-4 mb-3 relative">
                                         <div className="w-10 flex justify-center">
-                                            <div className="w-0.5 h-4 bg-white/[0.06]" />
+                                            <div className="w-0.5 h-4 bg-[var(--sys-surface)]" />
                                         </div>
                                         <button onClick={() => setNodeTypeMenu(nodeTypeMenu === idx ? null : idx)}
-                                            className="flex items-center gap-1 px-3 py-1 rounded-lg text-sm text-slate-500 hover:text-primary hover:bg-primary/5 border border-transparent hover:border-primary/10 transition-all cursor-pointer">
+                                            className="flex items-center gap-1 px-3 py-1 rounded-lg text-sm text-[var(--sys-text-muted)] hover:text-primary hover:bg-primary/5 border border-transparent hover:border-primary/10 transition-all cursor-pointer">
                                             <span className="material-symbols-outlined text-xs">add</span> Add step
                                         </button>
                                         {nodeTypeMenu === idx && (
@@ -564,12 +564,12 @@ export default function Automations() {
                     {/* Add Step at End with Type Picker */}
                     <div className="flex items-center gap-4 mt-2 relative">
                         <div className="w-10 flex justify-center">
-                            <div className="size-6 rounded-full border-2 border-dashed border-white/[0.1] flex items-center justify-center">
-                                <span className="material-symbols-outlined text-xs text-slate-600">add</span>
+                            <div className="size-6 rounded-full border border-dashed border-[var(--sys-border)] flex items-center justify-center">
+                                <span className="material-symbols-outlined text-xs text-[var(--sys-text-muted)]">add</span>
                             </div>
                         </div>
                         <button onClick={() => setNodeTypeMenu(nodeTypeMenu === 'end' ? null : 'end')}
-                            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm text-slate-400 hover:text-primary bg-white/[0.02] hover:bg-primary/5 border border-white/[0.06] hover:border-primary/10 transition-all cursor-pointer">
+                            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm text-[var(--sys-text-muted)] hover:text-primary bg-[var(--sys-surface)] hover:bg-primary/5 border border-[var(--sys-border)] hover:border-primary/10 transition-all cursor-pointer">
                             <span className="material-symbols-outlined text-sm">add_circle</span> Add New Step
                         </button>
                         {nodeTypeMenu === 'end' && (
@@ -586,7 +586,7 @@ export default function Automations() {
         <DashboardLayout title="Conversation Studio" subtitle="Build and manage conversation flows">
             <SEOHead title="Automations — Mantram AI" noIndex={true} />
             {error && (
-                <div className={`mb-6 p-4 rounded-xl border ${error.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'} text-sm flex items-center gap-2`}>
+                <div className={`mb-6 p-4 rounded-xl border ${error.isProviderError ? 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary' : 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary'} text-sm flex items-center gap-2`}>
                     <span className="material-symbols-outlined text-base">
                         {error.isProviderError ? 'warning' : 'error'}
                     </span>
@@ -602,18 +602,18 @@ export default function Automations() {
             {/* Sub-Navigation */}
             <div className="flex items-center gap-1 mb-6 p-1 glass-panel rounded-xl w-fit">
                 <button onClick={() => navigate('/conversations')}
-                    className="px-5 py-2 rounded-lg text-sm font-bold text-slate-400 hover:text-white hover:bg-white/[0.04] transition-all flex items-center gap-2 cursor-pointer">
+                    className="px-5 py-2 rounded-lg text-sm font-bold text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)] transition-all flex items-center gap-2 cursor-pointer">
                     <span className="material-symbols-outlined text-sm">inbox</span> Inbox
                 </button>
                 <button className="px-5 py-2 rounded-lg text-sm font-bold bg-primary/10 text-primary flex items-center gap-2 cursor-pointer">
                     <span className="material-symbols-outlined text-sm">bolt</span> Automations
                 </button>
                 <button onClick={() => navigate('/conversations/ai-settings')}
-                    className="px-5 py-2 rounded-lg text-sm font-bold text-slate-400 hover:text-white hover:bg-white/[0.04] transition-all flex items-center gap-2 cursor-pointer">
+                    className="px-5 py-2 rounded-lg text-sm font-bold text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)] transition-all flex items-center gap-2 cursor-pointer">
                     <span className="material-symbols-outlined text-sm">psychology</span> AI Settings
                 </button>
                 <button onClick={() => navigate('/conversations/insights')}
-                    className="px-5 py-2 rounded-lg text-sm font-bold text-slate-400 hover:text-white hover:bg-white/[0.04] transition-all flex items-center gap-2 cursor-pointer">
+                    className="px-5 py-2 rounded-lg text-sm font-bold text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)] transition-all flex items-center gap-2 cursor-pointer">
                     <span className="material-symbols-outlined text-sm">insights</span> Insights
                 </button>
             </div>
@@ -621,8 +621,8 @@ export default function Automations() {
             <div className="mb-8">
                 <div className="flex items-center gap-2 mb-4">
                     <span className="material-symbols-outlined text-primary">auto_awesome</span>
-                    <h2 className="text-white font-bold text-lg">Create Automation</h2>
-                    <span className="text-sm text-slate-500">Choose a recipe to get started</span>
+                    <h2 className="text-[var(--sys-text)] font-bold text-lg">Create Automation</h2>
+                    <span className="text-sm text-[var(--sys-text-muted)]">Choose a recipe to get started</span>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                     {recipes.map(r => {
@@ -631,11 +631,11 @@ export default function Automations() {
                             <button key={r.id} onClick={() => createFromRecipe(r.id)} disabled={creating === r.id}
                                 className="text-left glass-panel rounded-2xl p-5 hover:border-primary/20 hover:bg-primary/[0.02] transition-all cursor-pointer group disabled:opacity-50">
                                 <div className={`size-12 rounded-xl bg-gradient-to-br ${style.gradient} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
-                                    <span className="material-symbols-outlined text-white text-xl">{style.icon}</span>
+                                    <span className="material-symbols-outlined text-[var(--sys-text)] text-xl">{style.icon}</span>
                                 </div>
-                                <p className="text-white font-bold text-sm mb-1">{r.name}</p>
-                                <p className="text-slate-500 text-sm leading-relaxed line-clamp-2">{r.description}</p>
-                                <div className="flex items-center gap-3 mt-3 text-xs text-slate-600">
+                                <p className="text-[var(--sys-text)] font-bold text-sm mb-1">{r.name}</p>
+                                <p className="text-[var(--sys-text-muted)] text-sm leading-relaxed line-clamp-2">{r.description}</p>
+                                <div className="flex items-center gap-3 mt-3 text-xs text-[var(--sys-text-muted)]">
                                     <span>{r.triggerCount} triggers</span>
                                     <span>{r.nodeCount} steps</span>
                                 </div>
@@ -651,12 +651,12 @@ export default function Automations() {
 
                     {/* Create Custom Automation Button */}
                     <button onClick={() => setShowCreateModal(true)}
-                        className="text-left glass-panel rounded-2xl p-5 border-2 border-dashed border-white/[0.08] hover:border-primary/30 hover:bg-primary/[0.02] transition-all cursor-pointer group">
-                        <div className="size-12 rounded-xl bg-white/[0.04] flex items-center justify-center mb-4 group-hover:scale-110 group-hover:bg-primary/10 transition-all">
-                            <span className="material-symbols-outlined text-slate-400 group-hover:text-primary text-xl">add_circle</span>
+                        className="text-left glass-panel rounded-2xl p-5 border border-dashed border-[var(--sys-border)] hover:border-primary/30 hover:bg-primary/[0.02] transition-all cursor-pointer group">
+                        <div className="size-12 rounded-xl bg-[var(--sys-surface)] flex items-center justify-center mb-4 group-hover:scale-110 group-hover:bg-primary/10 transition-all">
+                            <span className="material-symbols-outlined text-[var(--sys-text-muted)] group-hover:text-primary text-xl">add_circle</span>
                         </div>
-                        <p className="text-white font-bold text-sm mb-1">Create Custom</p>
-                        <p className="text-slate-500 text-sm leading-relaxed">Build your own automation from scratch with custom triggers and steps</p>
+                        <p className="text-[var(--sys-text)] font-bold text-sm mb-1">Create Custom</p>
+                        <p className="text-[var(--sys-text-muted)] text-sm leading-relaxed">Build your own automation from scratch with custom triggers and steps</p>
                         <div className="flex items-center gap-1 mt-3 text-sm text-primary/60">
                             <span className="material-symbols-outlined text-xs">tune</span>
                             Fully customizable
@@ -668,9 +668,9 @@ export default function Automations() {
             {/* Automations List */}
             <div>
                 <div className="flex items-center gap-2 mb-4">
-                    <span className="material-symbols-outlined text-slate-400">list_alt</span>
-                    <h2 className="text-white font-bold text-lg">Your Automations</h2>
-                    <span className="text-sm text-slate-500">{automationsList.length} total</span>
+                    <span className="material-symbols-outlined text-[var(--sys-text-muted)]">list_alt</span>
+                    <h2 className="text-[var(--sys-text)] font-bold text-lg">Your Automations</h2>
+                    <span className="text-sm text-[var(--sys-text-muted)]">{automationsList.length} total</span>
                 </div>
 
                 {loading ? (
@@ -680,8 +680,8 @@ export default function Automations() {
                 ) : automationsList.length === 0 ? (
                     <div className="glass-panel rounded-2xl p-12 text-center">
                         <span className="material-symbols-outlined text-6xl text-slate-700 mb-4">bolt</span>
-                        <p className="text-white font-bold text-lg mb-1">No automations yet</p>
-                        <p className="text-slate-500 text-sm">Pick a recipe above to create your first automation.</p>
+                        <p className="text-[var(--sys-text)] font-bold text-lg mb-1">No automations yet</p>
+                        <p className="text-[var(--sys-text-muted)] text-sm">Pick a recipe above to create your first automation.</p>
                     </div>
                 ) : (
                     <div className="space-y-3">
@@ -697,28 +697,28 @@ export default function Automations() {
                                 {/* Info */}
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2">
-                                        <p className="text-white font-bold text-sm">{a.name}</p>
+                                        <p className="text-[var(--sys-text)] font-bold text-sm">{a.name}</p>
                                         <span className={`px-2 py-0.5 rounded-md text-xs font-bold uppercase ${a.isActive
-                                            ? 'bg-emerald-500/10 text-emerald-400' : 'bg-white/[0.04] text-slate-500'}`}>
+                                            ? 'bg-[var(--sys-primary-dim)] text-primary' : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)]'}`}>
                                             {a.status || 'draft'}
                                         </span>
                                     </div>
-                                    <p className="text-sm text-slate-500 mt-0.5">{a.description}</p>
+                                    <p className="text-sm text-[var(--sys-text-muted)] mt-0.5">{a.description}</p>
                                 </div>
 
                                 {/* Stats */}
                                 <div className="flex items-center gap-6 text-center shrink-0">
                                     <div>
-                                        <p className="text-lg font-bold text-white">{a.stats?.totalRuns || 0}</p>
-                                        <p className="text-xs text-slate-600 uppercase">Runs</p>
+                                        <p className="text-lg font-bold text-[var(--sys-text)]">{a.stats?.totalRuns || 0}</p>
+                                        <p className="text-xs text-[var(--sys-text-muted)] uppercase">Runs</p>
                                     </div>
                                     <div>
-                                        <p className="text-lg font-bold text-white">{a.stats?.completedRuns || 0}</p>
-                                        <p className="text-xs text-slate-600 uppercase">Completed</p>
+                                        <p className="text-lg font-bold text-[var(--sys-text)]">{a.stats?.completedRuns || 0}</p>
+                                        <p className="text-xs text-[var(--sys-text-muted)] uppercase">Completed</p>
                                     </div>
                                     <div>
-                                        <p className="text-lg font-bold text-white">{a.stats?.leadsCollected || 0}</p>
-                                        <p className="text-xs text-slate-600 uppercase">Leads</p>
+                                        <p className="text-lg font-bold text-[var(--sys-text)]">{a.stats?.leadsCollected || 0}</p>
+                                        <p className="text-xs text-[var(--sys-text-muted)] uppercase">Leads</p>
                                     </div>
                                 </div>
 
@@ -726,12 +726,12 @@ export default function Automations() {
                                 <div className="flex items-center gap-1.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
                                     <button onClick={(e) => toggleAutomation(a._id, e)}
                                         className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${a.isActive
-                                            ? 'bg-rose-500/10 text-rose-400 hover:bg-rose-500/20'
-                                            : 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20'}`}>
+                                            ? 'bg-[var(--sys-primary-dim)] text-primary hover:bg-[var(--sys-primary-dim)]'
+                                            : 'bg-[var(--sys-primary-dim)] text-primary hover:bg-[var(--sys-primary-dim)]'}`}>
                                         {a.isActive ? 'Pause' : 'Activate'}
                                     </button>
                                     <button onClick={(e) => deleteAutomation(a._id, e)}
-                                        className="size-8 rounded-lg bg-white/[0.04] flex items-center justify-center text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-all cursor-pointer">
+                                        className="size-8 rounded-lg bg-[var(--sys-surface)] flex items-center justify-center text-[var(--sys-text-muted)] hover:text-primary hover:bg-[var(--sys-primary-dim)] transition-all cursor-pointer">
                                         <span className="material-symbols-outlined text-sm">delete</span>
                                     </button>
                                 </div>

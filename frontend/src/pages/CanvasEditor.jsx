@@ -4,14 +4,17 @@ import { useBrand } from '../context/BrandContext'
 import SEOHead from '../components/SEOHead'
 import FormattedText from '../components/FormattedText'
 import * as fabric from 'fabric'
-import { media as mediaAPI, creatives as creativesAPI, nexus as nexusAPI, voice as voiceAPI, canvasAssets, fidato as fidatoAPI, API_BASE } from '../services/api'
+import { media as mediaAPI, creatives as creativesAPI, nexus as nexusAPI, voice as voiceAPI, canvasAssets, fidato as fidatoAPI, API_BASE, getCorsUrl } from '../services/api'
 import { TEMPLATE_LIBRARY, TEMPLATE_CATEGORIES } from './canvasTemplates'
 import { SVG_ELEMENT_CATEGORIES } from './canvasElements'
 import './CanvasEditor.css'
 import StoryboardBoard from './StoryboardBoard'
 
 
-// ── Platform Size Presets ──
+// ═══════════════════════════════════════════════════════════════
+// UTILS
+// ═══════════════════════════════════════════════════════════════
+
 
 const PRESETS = [
     { id: 'ig-post', label: 'IG Post', icon: 'photo_camera', w: 1080, h: 1080 },
@@ -285,7 +288,7 @@ function CanvasEditorInner() {
     const [elementCategory, setElementCategory] = useState(null) // null=all or key from ELEMENT_CATEGORIES
 
     // Image source — read from sessionStorage (avoids 431 errors with large base64 data URIs)
-    const imageUrl = searchParams.get('image') || sessionStorage.getItem('canvasEditorImage') || ''
+    const imageUrl = getCorsUrl(searchParams.get('image') || sessionStorage.getItem('canvasEditorImage') || '')
     const canvasWidth = parseInt(searchParams.get('w')) || 1080
     const canvasHeight = parseInt(searchParams.get('h')) || 1080
 
@@ -434,7 +437,7 @@ function CanvasEditorInner() {
                 // Load the image
                 if (imageUrl) {
                     console.log('Canvas init: loading image...', imageUrl.substring(0, 80))
-                    fabric.FabricImage.fromURL(imageUrl, { crossOrigin: 'anonymous' }).then(img => {
+                    fabric.FabricImage.fromURL(getCorsUrl(imageUrl), { crossOrigin: 'anonymous' }).then(img => {
                         // Scale and center image in the canvas
                         const maxDim = Math.min(containerW * 0.8, containerH * 0.8)
                         const imgScale = Math.min(maxDim / img.width, maxDim / img.height, 1)
@@ -762,7 +765,7 @@ function CanvasEditorInner() {
             return
         }
 
-        fabric.FabricImage.fromURL(logoUrl, { crossOrigin: 'anonymous' }).then(img => {
+        fabric.FabricImage.fromURL(getCorsUrl(logoUrl), { crossOrigin: 'anonymous' }).then(img => {
             const maxSize = fc.width * 0.15
             const scale = maxSize / Math.max(img.width, img.height)
             img.set({
@@ -801,7 +804,7 @@ function CanvasEditorInner() {
                     const { url } = await mediaAPI.upload({ imageData: ev.target.result, folder: 'canvas-layers' })
                     imgUrl = url
                 } catch (e) { console.warn('S3 upload failed for canvas layer, using base64:', e.message) }
-                fabric.FabricImage.fromURL(imgUrl, { crossOrigin: 'anonymous' }).then(img => {
+                fabric.FabricImage.fromURL(getCorsUrl(imgUrl), { crossOrigin: 'anonymous' }).then(img => {
                     const maxSize = fc.width * 0.5
                     const scale = maxSize / Math.max(img.width, img.height)
                     img.set({
@@ -981,7 +984,7 @@ function CanvasEditorInner() {
         objects.forEach(o => fc.remove(o))
         
         // Add merged image
-        fabric.FabricImage.fromURL(dataUrl, { crossOrigin: 'anonymous' }).then(img => {
+        fabric.FabricImage.fromURL(getCorsUrl(dataUrl), { crossOrigin: 'anonymous' }).then(img => {
             img.set({ left: bounds.left, top: bounds.top })
             img._customName = 'Merged Layer'
             fc.add(img)
@@ -1442,7 +1445,7 @@ function CanvasEditorInner() {
         if (!fc) return
         showToast('⏳ Loading photo...')
         try {
-            const img = await fabric.FabricImage.fromURL(photo.small || photo.regular, { crossOrigin: 'anonymous' })
+            const img = await fabric.FabricImage.fromURL(getCorsUrl(photo.small || photo.regular), { crossOrigin: 'anonymous' })
             const maxDim = Math.min(fc._logicalWidth, fc._logicalHeight) * 0.5
             const scale = Math.min(maxDim / img.width, maxDim / img.height)
             img.set({ left: 50, top: 50, scaleX: scale, scaleY: scale })
@@ -1557,7 +1560,7 @@ function CanvasEditorInner() {
         if (!fc) return
         showToast('⏳ Loading texture...')
         try {
-            const img = await fabric.FabricImage.fromURL(texture.web || texture.large, { crossOrigin: 'anonymous' })
+            const img = await fabric.FabricImage.fromURL(getCorsUrl(texture.web || texture.large), { crossOrigin: 'anonymous' })
             // Scale to fill canvas as overlay
             const scaleX = fc.width / img.width
             const scaleY = fc.height / img.height
@@ -1627,7 +1630,7 @@ function CanvasEditorInner() {
         showToast('⏳ Loading brand asset...')
         try {
             if (asset.type === 'image') {
-                const img = await fabric.FabricImage.fromURL(asset.url, { crossOrigin: 'anonymous' })
+                const img = await fabric.FabricImage.fromURL(getCorsUrl(asset.url), { crossOrigin: 'anonymous' })
                 const maxDim = Math.min(fc.width, fc.height) * 0.3
                 const scale = Math.min(maxDim / img.width, maxDim / img.height)
                 img.set({ left: 100, top: 100, scaleX: scale, scaleY: scale })
@@ -1913,7 +1916,7 @@ function CanvasEditorInner() {
             }
 
             // AUTO-APPLY: Replace entire canvas content directly
-            const img = await fabric.FabricImage.fromURL(imageUrl, { crossOrigin: 'anonymous' })
+            const img = await fabric.FabricImage.fromURL(getCorsUrl(imageUrl), { crossOrigin: 'anonymous' })
             const allObjects = fc.getObjects().filter(o => o.id !== 'artboard').slice()
             allObjects.forEach(o => fc.remove(o))
             const scaleX = fc.width / img.width
@@ -1962,7 +1965,7 @@ function CanvasEditorInner() {
             const compositedUrl = await compositeWithMask(canvasDataUrl, data.imageUrl, maskDataUrl)
 
             // AUTO-APPLY: Replace canvas content directly (no preview step)
-            const img = await fabric.FabricImage.fromURL(compositedUrl, { crossOrigin: 'anonymous' })
+            const img = await fabric.FabricImage.fromURL(getCorsUrl(compositedUrl), { crossOrigin: 'anonymous' })
             const allObjects = fc.getObjects().slice()
             allObjects.forEach(o => fc.remove(o))
             const scaleX = fc.width / img.width
@@ -2012,7 +2015,7 @@ function CanvasEditorInner() {
             }
 
             // AUTO-APPLY: Replace canvas content directly (no preview step)
-            const img = await fabric.FabricImage.fromURL(finalUrl, { crossOrigin: 'anonymous' })
+            const img = await fabric.FabricImage.fromURL(getCorsUrl(finalUrl), { crossOrigin: 'anonymous' })
             const allObjects = fc.getObjects().slice()
             allObjects.forEach(o => fc.remove(o))
             const scaleX = fc.width / img.width
@@ -2047,7 +2050,7 @@ function CanvasEditorInner() {
             if (data.error) throw new Error(data.error)
 
             // AUTO-APPLY: Replace canvas content directly
-            const img = await fabric.FabricImage.fromURL(data.imageUrl, { crossOrigin: 'anonymous' })
+            const img = await fabric.FabricImage.fromURL(getCorsUrl(data.imageUrl), { crossOrigin: 'anonymous' })
             const allObjects = fc.getObjects().slice()
             allObjects.forEach(o => fc.remove(o))
             const scaleX = fc.width / img.width
@@ -2070,7 +2073,7 @@ function CanvasEditorInner() {
         if (resultData.type === 'image' && resultData.imageUrl) {
             showToast('⏳ Applying AI result...')
             try {
-                const img = await fabric.FabricImage.fromURL(resultData.imageUrl, { crossOrigin: 'anonymous' })
+                const img = await fabric.FabricImage.fromURL(getCorsUrl(resultData.imageUrl), { crossOrigin: 'anonymous' })
                 if (resultData.mode === 'inpaint') {
                     // INPAINT MODE: Replace entire canvas content with composited result
                     // Remove all existing objects (the composited image already contains everything)
@@ -2569,7 +2572,7 @@ function CanvasEditorInner() {
         ctx.fillText(data.substring(0, 30), size/2, size - 2)
 
         const dataUrl = qrCanvas.toDataURL('image/png')
-        fabric.FabricImage.fromURL(dataUrl, { crossOrigin: 'anonymous' }).then(img => {
+        fabric.FabricImage.fromURL(getCorsUrl(dataUrl), { crossOrigin: 'anonymous' }).then(img => {
             const scale = Math.min(fc.width, fc.height) * 0.3 / size
             img.set({
                 left: fc.width / 2, top: fc.height / 2,
@@ -2957,7 +2960,7 @@ function CanvasEditorInner() {
             // If background image was generated, add it
             if (data.backgroundImage) {
                 try {
-                    const bgImg = await fabric.FabricImage.fromURL(data.backgroundImage, { crossOrigin: 'anonymous' })
+                    const bgImg = await fabric.FabricImage.fromURL(getCorsUrl(data.backgroundImage), { crossOrigin: 'anonymous' })
                     const imgScale = Math.max(fc.width / bgImg.width, fc.height / bgImg.height)
                     bgImg.set({
                         scaleX: imgScale, scaleY: imgScale,
@@ -3072,7 +3075,7 @@ function CanvasEditorInner() {
             if (data.error) throw new Error(data.error)
             // Add to canvas
             if (!fc) return
-            const img = await fabric.FabricImage.fromURL(data.imageUrl, { crossOrigin: 'anonymous' })
+            const img = await fabric.FabricImage.fromURL(getCorsUrl(data.imageUrl), { crossOrigin: 'anonymous' })
             const scale = Math.min(fc.width / img.width, fc.height / img.height) * 0.8
             img.set({ left: (fc.width - img.width * scale) / 2, top: (fc.height - img.height * scale) / 2, scaleX: scale, scaleY: scale })
             img._customName = 'AI Generated'
@@ -3087,7 +3090,7 @@ function CanvasEditorInner() {
     const addImageUrlToCanvas = useCallback(async (url, label) => {
         try {
             const fc = fabricRef.current; if (!fc) return
-            const img = await fabric.FabricImage.fromURL(url, { crossOrigin: 'anonymous' })
+            const img = await fabric.FabricImage.fromURL(getCorsUrl(url), { crossOrigin: 'anonymous' })
             // Constrain image to max 400px and ensure it fits on canvas
             const maxDim = 400
             const scale = Math.min(maxDim / img.width, maxDim / img.height, 1)
@@ -3212,7 +3215,7 @@ function CanvasEditorInner() {
                     const logoUrl = activeBrand?.dna?.logo?.url
                     if (!logoUrl) return 'No brand logo available'
                     try {
-                        const img = await fabric.FabricImage.fromURL(logoUrl, { crossOrigin: 'anonymous' })
+                        const img = await fabric.FabricImage.fromURL(getCorsUrl(logoUrl), { crossOrigin: 'anonymous' })
                         const scaleFactor = args.scale || 0.15
                         const s = (fc.width * scaleFactor) / Math.max(img.width, img.height)
                         img.set({ scaleX: s, scaleY: s, customName: 'Brand Logo', id: `logo-${Date.now()}` })
@@ -3499,7 +3502,7 @@ function CanvasEditorInner() {
                             const data = await canvasAssets.aiGenerate({ prompt: referenceImagePrompt, size: '512x512' })
                             if (data.imageUrl) {
                                 generatedThumbUrl = data.imageUrl;
-                                const img = await fabric.FabricImage.fromURL(data.imageUrl, { crossOrigin: 'anonymous' })
+                                const img = await fabric.FabricImage.fromURL(getCorsUrl(data.imageUrl), { crossOrigin: 'anonymous' })
                                 const imgSize = 120
                                 const imgScale = imgSize / Math.max(img.width, img.height)
                                 img.set({
@@ -4554,20 +4557,20 @@ function CanvasEditorInner() {
 
                                                 {/* Edit History Timeline */}
                                                 {editHistory.length > 0 && (
-                                                    <div className="bg-black/20 rounded-xl p-3 max-h-[200px] overflow-y-auto custom-scrollbar flex flex-col gap-2 border border-white/5">
+                                                    <div className="bg-[var(--sys-surface)] rounded-xl p-3 max-h-[200px] overflow-y-auto custom-scrollbar flex flex-col gap-2 border border-[var(--sys-border)]">
                                                         <div className="flex items-center justify-between">
-                                                            <span className="text-[10px] font-bold text-slate-500 uppercase">Edit Timeline</span>
+                                                            <span className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase">Edit Timeline</span>
                                                             <button onClick={() => { handleUndo(); setEditHistory(prev => prev.slice(0, -1)); }} 
-                                                                className="text-[10px] text-amber-400 hover:text-amber-300 flex items-center gap-1 cursor-pointer">
+                                                                className="text-[10px] text-primary hover:text-[var(--sys-primary)] flex items-center gap-1 cursor-pointer">
                                                                 <span className="material-symbols-outlined" style={{fontSize: 12}}>undo</span> Revert Last
                                                             </button>
                                                         </div>
                                                         {editHistory.map((h, i) => (
-                                                            <div key={i} className="flex gap-2 items-start bg-white/5 rounded-lg p-2 border border-white/[0.02]">
+                                                            <div key={i} className="flex gap-2 items-start bg-[var(--sys-surface)] rounded-lg p-2 border border-[var(--sys-border)]">
                                                                 <div className="w-4 h-4 rounded-full bg-violet-500/20 text-violet-400 flex items-center justify-center text-[9px] font-bold mt-0.5 flex-shrink-0">
                                                                     {i + 1}
                                                                 </div>
-                                                                <p className="text-[11px] text-slate-300 flex-1 leading-tight">{h.prompt}</p>
+                                                                <p className="text-[11px] text-[var(--sys-text-muted)] flex-1 leading-tight">{h.prompt}</p>
                                                             </div>
                                                         ))}
                                                     </div>
@@ -5467,7 +5470,7 @@ function CanvasEditorInner() {
                                     <div className="ce-gradient-grid">
                                         {GRADIENT_PRESETS.map((g, i) => (
                                             <button key={i} className="ce-gradient-card" onClick={() => addGradientToCanvas(g)} onContextMenu={e => { e.preventDefault(); applyGradientToSelected(g) }} title={`${g.name} — Right-click to apply to selection`}>
-                                                <div className="ce-gradient-preview" style={{ background: `linear-gradient(${g.angle}deg, ${g.colors[0]}, ${g.colors[1]})` }} />
+                                                <div className="ce-gradient-preview" style={{ background: `var(--sys-primary)` }} />
                                                 <span className="ce-gradient-label">{g.name}</span>
                                             </button>
                                         ))}
@@ -5682,7 +5685,7 @@ function CanvasEditorInner() {
                                 // Image
                                 if (scene.imageUrl) {
                                     try {
-                                        const img = await fabric.FabricImage.fromURL(scene.imageUrl, { crossOrigin: 'anonymous' })
+                                        const img = await fabric.FabricImage.fromURL(getCorsUrl(scene.imageUrl), { crossOrigin: 'anonymous' })
                                         const scale = Math.min(imgAreaW / img.width, imgAreaH / img.height)
                                         const sw = img.width * scale
                                         const sh = img.height * scale
@@ -6156,7 +6159,7 @@ function CanvasEditorInner() {
                                         </span>
                                     </button>
                                     {fidatoLoading ? (
-                                        <button className="ce-fidato-send-btn" style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)', borderColor: '#ef4444' }} onClick={() => {
+                                        <button className="ce-fidato-send-btn" style={{ background: 'var(--sys-primary)', borderColor: '#ef4444' }} onClick={() => {
                                             if (fidatoAbortRef.current) {
                                                 fidatoAbortRef.current.abort()
                                                 fidatoAbortRef.current = null
@@ -6622,7 +6625,7 @@ function CanvasEditorInner() {
                                 <button onClick={() => { addText(textInput || 'Your Heading', true); setShowTextModal(false); setTextInput('') }}
                                     style={{
                                         flex: 1, padding: '10px', borderRadius: 10, border: 'none',
-                                        background: 'linear-gradient(135deg, #6366f1, #FF4D00)', color: '#fff', fontWeight: 700,
+                                        background: 'var(--sys-primary)', color: '#fff', fontWeight: 700,
                                         cursor: 'pointer', fontSize: 13,
                                     }}>
                                     Heading

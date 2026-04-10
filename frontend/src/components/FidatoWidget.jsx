@@ -142,10 +142,10 @@ export default function FidatoWidget() {
             {/* ═══════════ BRIEFING POPUP ═══════════ */}
             {showBriefing && briefing && (
                 <div className="fixed inset-0 z-[9998] flex items-center justify-center p-4" onClick={() => dismissBriefing()}>
-                    <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+                    <div className="absolute inset-0 bg-[var(--sys-surface)] " />
                     <div className="relative w-full max-w-md rounded-3xl overflow-hidden animate-fade-in"
                         style={{
-                            background: 'linear-gradient(180deg, rgba(20,15,40,0.98), rgba(10,10,26,0.99))',
+                            background: 'var(--sys-primary), rgba(10,10,26,0.99))',
                             border: '1px solid rgba(255, 77, 0, 0.25)',
                             boxShadow: '0 24px 80px rgba(0,0,0,0.6), 0 0 60px rgba(255, 77, 0, 0.15)',
                         }}
@@ -156,11 +156,11 @@ export default function FidatoWidget() {
                             <div className="absolute inset-0 opacity-20"
                                 style={{ background: 'radial-gradient(circle at 50% 0%, #FF4D00 0%, transparent 70%)' }} />
                             <div className="relative">
-                                <div className="size-16 rounded-full mx-auto mb-3 flex items-center justify-center text-white text-2xl"
-                                    style={{ background: 'linear-gradient(135deg, #FF4D00, #ec4899)' }}>
+                                <div className="size-16 rounded-full mx-auto mb-3 flex items-center justify-center text-[var(--sys-text)] text-2xl"
+                                    style={{ background: 'var(--sys-primary)' }}>
                                     <span className="material-symbols-outlined text-3xl">support_agent</span>
                                 </div>
-                                <p className="text-xl font-bold text-white">{briefing.greeting}</p>
+                                <p className="text-xl font-bold text-[var(--sys-text)]">{briefing.greeting}</p>
                                 {activeBrand?.name && (
                                     <p className="text-xs text-[#FF7A00]/60 mt-1">Advising for {activeBrand.name}</p>
                                 )}
@@ -173,20 +173,20 @@ export default function FidatoWidget() {
                             <div className="rounded-2xl p-3.5 flex items-start gap-3"
                                 style={{ background: 'rgba(255, 77, 0,0.08)', border: '1px solid rgba(255, 77, 0,0.12)' }}>
                                 <span className="material-symbols-outlined text-[#FF4D00] text-lg mt-0.5">celebration</span>
-                                <p className="text-sm text-slate-300 leading-relaxed">{briefing.daySpecial}</p>
+                                <p className="text-sm text-[var(--sys-text-muted)] leading-relaxed">{briefing.daySpecial}</p>
                             </div>
 
                             {/* Brand health */}
                             <div className="rounded-2xl p-3.5 flex items-start gap-3"
                                 style={{ background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.1)' }}>
-                                <span className="material-symbols-outlined text-emerald-400 text-lg mt-0.5">monitoring</span>
-                                <p className="text-sm text-slate-300 leading-relaxed">{briefing.brandHealth}</p>
+                                <span className="material-symbols-outlined text-primary text-lg mt-0.5">monitoring</span>
+                                <p className="text-sm text-[var(--sys-text-muted)] leading-relaxed">{briefing.brandHealth}</p>
                             </div>
 
                             {/* Inspiration */}
                             <div className="rounded-2xl p-3.5 text-center"
                                 style={{ background: 'rgba(236,72,153,0.06)', border: '1px solid rgba(236,72,153,0.1)' }}>
-                                <p className="text-sm text-pink-200/80 italic leading-relaxed">"{briefing.inspiration}"</p>
+                                <p className="text-sm border-[var(--sys-border)] italic leading-relaxed">"{briefing.inspiration}"</p>
                             </div>
 
                             {/* Quick actions */}
@@ -211,12 +211,12 @@ export default function FidatoWidget() {
                         {/* Footer */}
                         <div className="px-6 pb-5 pt-2 flex items-center justify-between">
                             <button onClick={() => dismissBriefing(true)}
-                                className="text-[11px] text-slate-600 hover:text-slate-400 transition-colors cursor-pointer">
+                                className="text-[11px] text-[var(--sys-text-muted)] hover:text-[var(--sys-text-muted)] transition-colors cursor-pointer">
                                 don't show again
                             </button>
                             <button onClick={() => dismissBriefing()}
-                                className="px-5 py-2 rounded-xl text-sm font-bold text-white cursor-pointer transition-all hover:scale-[1.03]"
-                                style={{ background: 'linear-gradient(135deg, #FF4D00, #ec4899)' }}>
+                                className="px-5 py-2 rounded-xl text-sm font-bold text-[var(--sys-text)] cursor-pointer transition-all hover:scale-[1.03]"
+                                style={{ background: 'var(--sys-primary)' }}>
                                 let's go! 🚀
                             </button>
                         </div>
@@ -229,20 +229,20 @@ export default function FidatoWidget() {
                 onClick={() => setOpen(!open)}
                 className="fixed bottom-6 right-6 z-50 size-14 rounded-full shadow-2xl flex items-center justify-center cursor-pointer transition-all hover:scale-110 active:scale-95"
                 style={{
-                    background: 'linear-gradient(135deg, #FF4D00, #ec4899)',
+                    background: 'var(--sys-primary)',
                     boxShadow: '0 8px 32px rgba(255, 77, 0, 0.4)',
                 }}
                 title="Chat with Fidato"
             >
-                <span className="material-symbols-outlined text-white text-2xl">{open ? 'close' : 'support_agent'}</span>
+                <span className="material-symbols-outlined text-[var(--sys-text)] text-2xl">{open ? 'close' : 'support_agent'}</span>
                 {/* Notification badge */}
                 {!open && notifications.length > 0 && (
-                    <span className="absolute -top-1 -right-1 size-5 rounded-full bg-rose-500 border-2 border-[#0a0a1a] flex items-center justify-center text-[10px] font-bold text-white">
+                    <span className="absolute -top-1 -right-1 size-5 rounded-full bg-[var(--sys-surface)] border border-[#0a0a1a] flex items-center justify-center text-[10px] font-bold text-[var(--sys-text)]">
                         {notifications.length}
                     </span>
                 )}
                 {!open && notifications.length === 0 && (
-                    <span className="absolute -top-1 -right-1 size-4 rounded-full bg-emerald-400 border-2 border-[#0a0a1a]" />
+                    <span className="absolute -top-1 -right-1 size-4 rounded-full bg-[var(--sys-surface)] border border-[#0a0a1a]" />
                 )}
             </button>
 
@@ -250,61 +250,61 @@ export default function FidatoWidget() {
             {open && (
                 <div className="fixed bottom-24 right-6 z-50 w-[400px] max-h-[600px] rounded-2xl overflow-hidden flex flex-col animate-fade-in"
                     style={{
-                        background: 'linear-gradient(180deg, rgba(15,15,30,0.98), rgba(10,10,26,0.99))',
+                        background: 'var(--sys-primary), rgba(10,10,26,0.99))',
                         border: '1px solid rgba(255, 77, 0, 0.2)',
                         boxShadow: '0 24px 80px rgba(0,0,0,0.6), 0 0 40px rgba(255, 77, 0, 0.1)',
                         backdropFilter: 'blur(24px)',
                     }}>
 
                     {/* Header */}
-                    <div className="p-4 flex items-center gap-3 border-b border-white/[0.06]"
-                        style={{ background: 'linear-gradient(135deg, rgba(255, 77, 0,0.1), rgba(236,72,153,0.05))' }}>
+                    <div className="p-4 flex items-center gap-3 border-b border-[var(--sys-border)]"
+                        style={{ background: 'var(--sys-primary), rgba(236,72,153,0.05))' }}>
                         <div className="relative">
-                            <div className="size-10 rounded-full flex items-center justify-center text-white text-lg"
-                                style={{ background: 'linear-gradient(135deg, #FF4D00, #ec4899)' }}>
+                            <div className="size-10 rounded-full flex items-center justify-center text-[var(--sys-text)] text-lg"
+                                style={{ background: 'var(--sys-primary)' }}>
                                 <span className="material-symbols-outlined">support_agent</span>
                             </div>
-                            <span className="absolute bottom-0 right-0 size-3 rounded-full bg-emerald-400 border-2 border-[#0f0f1e]" />
+                            <span className="absolute bottom-0 right-0 size-3 rounded-full bg-[var(--sys-surface)] border border-[#0f0f1e]" />
                         </div>
                         <div className="flex-1 min-w-0">
-                            <p className="text-sm font-bold text-white">Fidato</p>
-                            <p className="text-[10px] text-slate-400 truncate">
+                            <p className="text-sm font-bold text-[var(--sys-text)]">Fidato</p>
+                            <p className="text-[10px] text-[var(--sys-text-muted)] truncate">
                                 {activeBrand?.name ? `Branding Expert • ${activeBrand.name}` : 'Your Branding Expert • Always Online'}
                             </p>
                         </div>
                         {notifications.length > 0 && (
                             <button onClick={() => setShowNotifPanel(!showNotifPanel)}
-                                className="relative size-8 rounded-lg bg-white/[0.04] flex items-center justify-center text-slate-400 hover:text-amber-400 cursor-pointer transition-all"
+                                className="relative size-8 rounded-lg bg-[var(--sys-surface)] flex items-center justify-center text-[var(--sys-text-muted)] hover:text-primary cursor-pointer transition-all"
                                 title="Notifications">
                                 <span className="material-symbols-outlined text-sm">notifications</span>
-                                <span className="absolute -top-0.5 -right-0.5 size-3.5 rounded-full bg-rose-500 text-[8px] text-white flex items-center justify-center font-bold">
+                                <span className="absolute -top-0.5 -right-0.5 size-3.5 rounded-full bg-[var(--sys-surface)] text-[8px] text-[var(--sys-text)] flex items-center justify-center font-bold">
                                     {notifications.length}
                                 </span>
                             </button>
                         )}
-                        <button onClick={clearChat} className="size-8 rounded-lg bg-white/[0.04] flex items-center justify-center text-slate-400 hover:text-white cursor-pointer transition-all" title="Clear chat">
+                        <button onClick={clearChat} className="size-8 rounded-lg bg-[var(--sys-surface)] flex items-center justify-center text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer transition-all" title="Clear chat">
                             <span className="material-symbols-outlined text-sm">refresh</span>
                         </button>
-                        <button onClick={() => setOpen(false)} className="size-8 rounded-lg bg-white/[0.04] flex items-center justify-center text-slate-400 hover:text-white cursor-pointer transition-all">
+                        <button onClick={() => setOpen(false)} className="size-8 rounded-lg bg-[var(--sys-surface)] flex items-center justify-center text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer transition-all">
                             <span className="material-symbols-outlined text-sm">close</span>
                         </button>
                     </div>
 
                     {/* Notification panel (slide down) */}
                     {showNotifPanel && notifications.length > 0 && (
-                        <div className="border-b border-white/[0.06] max-h-48 overflow-y-auto">
+                        <div className="border-b border-[var(--sys-border)] max-h-48 overflow-y-auto">
                             {notifications.map((n, i) => (
                                 <button key={i}
                                     onClick={() => {
                                         setShowNotifPanel(false)
                                         if (n.action) sendMessage(n.action)
                                     }}
-                                    className="w-full text-left px-4 py-2.5 flex items-start gap-2.5 hover:bg-white/[0.03] transition-colors cursor-pointer border-b border-white/[0.03] last:border-0">
-                                    <span className={`material-symbols-outlined text-sm mt-0.5 ${n.severity === 'warning' ? 'text-amber-400' : 'text-[#FF4D00]'}`}>
+                                    className="w-full text-left px-4 py-2.5 flex items-start gap-2.5 hover:bg-[var(--sys-surface)] transition-colors cursor-pointer border-b border-[var(--sys-border)] last:border-0">
+                                    <span className={`material-symbols-outlined text-sm mt-0.5 ${n.severity === 'warning' ? 'text-primary' : 'text-[#FF4D00]'}`}>
                                         {n.severity === 'warning' ? 'warning' : 'info'}
                                     </span>
                                     <div className="flex-1 min-w-0">
-                                        <p className="text-xs text-slate-300 leading-relaxed">{n.message}</p>
+                                        <p className="text-xs text-[var(--sys-text-muted)] leading-relaxed">{n.message}</p>
                                         <p className="text-[10px] text-[#FF4D00] mt-0.5">{n.action} →</p>
                                     </div>
                                 </button>
@@ -317,14 +317,14 @@ export default function FidatoWidget() {
                         {messages.map((m, i) => (
                             <div key={i} className={`flex gap-2.5 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
                                 {m.role === 'assistant' && (
-                                    <div className="size-7 rounded-full shrink-0 flex items-center justify-center text-white text-xs"
-                                        style={{ background: 'linear-gradient(135deg, #FF4D00, #ec4899)' }}>
+                                    <div className="size-7 rounded-full shrink-0 flex items-center justify-center text-[var(--sys-text)] text-xs"
+                                        style={{ background: 'var(--sys-primary)' }}>
                                         <span className="material-symbols-outlined text-xs">support_agent</span>
                                     </div>
                                 )}
                                 <div className={`max-w-[80%] px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed ${m.role === 'user'
-                                    ? 'bg-primary/15 text-white rounded-br-sm border border-primary/20'
-                                    : 'bg-white/[0.05] text-slate-200 rounded-bl-sm border border-white/[0.06]'
+                                    ? 'bg-[var(--sys-text)] text-[var(--sys-bg)] rounded-br-sm border border-[var(--sys-border)]'
+                                    : 'bg-[var(--sys-surface)] text-[var(--sys-text)] rounded-bl-sm border border-[var(--sys-border)]'
                                     }`}
                                     style={{ whiteSpace: 'pre-wrap' }}>
                                     {m.content}
@@ -333,11 +333,11 @@ export default function FidatoWidget() {
                         ))}
                         {loading && (
                             <div className="flex gap-2.5">
-                                <div className="size-7 rounded-full shrink-0 flex items-center justify-center text-white text-xs"
-                                    style={{ background: 'linear-gradient(135deg, #FF4D00, #ec4899)' }}>
+                                <div className="size-7 rounded-full shrink-0 flex items-center justify-center text-[var(--sys-text)] text-xs"
+                                    style={{ background: 'var(--sys-primary)' }}>
                                     <span className="material-symbols-outlined text-xs">support_agent</span>
                                 </div>
-                                <div className="px-3.5 py-2.5 rounded-2xl rounded-bl-sm bg-white/[0.05] border border-white/[0.06]">
+                                <div className="px-3.5 py-2.5 rounded-2xl rounded-bl-sm bg-[var(--sys-surface)] border border-[var(--sys-border)]">
                                     <div className="flex gap-1">
                                         <span className="size-2 rounded-full bg-[#FF4D00] animate-bounce" style={{ animationDelay: '0ms' }} />
                                         <span className="size-2 rounded-full bg-[#FF4D00] animate-bounce" style={{ animationDelay: '150ms' }} />
@@ -362,20 +362,20 @@ export default function FidatoWidget() {
                     )}
 
                     {/* Input */}
-                    <div className="p-3 border-t border-white/[0.06] flex gap-2">
+                    <div className="p-3 border-t border-[var(--sys-border)] flex gap-2">
                         <input
                             ref={inputRef}
                             value={input}
                             onChange={e => setInput(e.target.value)}
                             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() } }}
                             placeholder={activeBrand ? `Ask about ${activeBrand.name}...` : 'Ask Fidato anything...'}
-                            className="flex-1 bg-white/[0.04] border border-white/[0.08] rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-500 outline-none focus:border-[#FF4D00]/40 transition-all"
+                            className="flex-1 bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl px-3.5 py-2.5 text-sm text-[var(--sys-text)] placeholder-[var(--sys-text-muted)] outline-none focus:border-[#FF4D00]/40 transition-all"
                         />
                         <button
                             onClick={() => sendMessage()}
                             disabled={loading || !input.trim()}
-                            className="px-3.5 py-2.5 rounded-xl text-white text-sm font-bold cursor-pointer transition-all disabled:opacity-40 flex items-center"
-                            style={{ background: 'linear-gradient(135deg, #FF4D00, #ec4899)' }}
+                            className="px-3.5 py-2.5 rounded-xl text-[var(--sys-text)] text-sm font-bold cursor-pointer transition-all disabled:opacity-40 flex items-center"
+                            style={{ background: 'var(--sys-primary)' }}
                         >
                             <span className="material-symbols-outlined text-sm">send</span>
                         </button>

@@ -14,7 +14,7 @@ import { requireCredits, refundCredits } from '../middleware/credits.js';
 import { addWatermark } from '../utils/watermark.js';
 import { getSetting } from '../models/SystemSettings.js';
 
-import { uploadToS3 } from '../utils/s3.js';
+import { uploadToS3, getSignedUrlIfNeeded } from '../utils/s3.js';
 import { overlayLogo, fetchImageBuffer } from '../utils/logoOverlay.js';
 import { GoogleGenAI } from '@google/genai';
 import { safeErrorMessage } from '../utils/safeError.js';
@@ -22,9 +22,8 @@ import { getRouter } from '../ai/router.js';
 import { runCreativePipeline, postGenerationCriticNode } from '../agents/creativeStudio/nodes.js';
 import { startProgress, addStep, getProgress, endProgress } from '../utils/progressStore.js';
 import { laozhangImageGenerate, laozhangMultimodalImageGenerate, isLaozhangAvailable } from '../agents/videoStudio/laozhangClient.js';
+import { getActiveProvider } from '../ai/providerRouting.js';
 
-
-import { creativeQueue } from '../utils/creativeQueue.js';
 
 const router = Router();
 
@@ -187,7 +186,8 @@ export async function internalGenerateCreative({ body, user, creditsDeducted, jo
                 runCreativePipeline({
                     brandId,
                     brief: prompt,
-                    type: type || 'instagram-post',
+                    format: type || 'instagram-post', // Changed to format to match node signature
+                    mode: 'fast', // Enforce fast-path to bypass sequential LLM criticism delays
                     options: options || {},
                     emit: async (agent, message, status, detail) => {
                         if (progressId) {
@@ -466,7 +466,14 @@ router.get('/jobs', protect, async (req, res) => {
             .limit(20)
             .lean();
 
-        res.json({ success: true, jobs });
+        // Sign S3 URLs before returning to frontend
+        const signedJobs = await Promise.all(jobs.map(async job => ({
+            ...job,
+            imageUrl: await getSignedUrlIfNeeded(job.imageUrl),
+            thumbnailUrl: await getSignedUrlIfNeeded(job.thumbnailUrl)
+        })));
+
+        res.json({ success: true, jobs: signedJobs });
     } catch (error) {
         console.error('❌ [API] GET /api/creatives/jobs error:', error.message);
         console.error('❌ Stack:', error.stack);
@@ -483,7 +490,33 @@ router.get('/jobs/:jobId', protect, async (req, res) => {
               creativeId: 1, result: 1, warnings: 1, createdAt: 1, startedAt: 1, completedAt: 1, steps: 1 }
         ).lean();
         if (!job) return res.status(404).json({ success: false, error: 'Job not found' });
+        // Sign S3 URLs before returning to frontend
+        job.imageUrl = await getSignedUrlIfNeeded(job.imageUrl);
+        if (job.result?.creative) {
+            job.result.creative.imageUrl = await getSignedUrlIfNeeded(job.result.creative.imageUrl);
+            job.result.creative.thumbnailUrl = await getSignedUrlIfNeeded(job.result.creative.thumbnailUrl);
+        }
+
+        // Sign URL if it's an S3 URL
+        if (job && job.imageUrl) {
+            job.imageUrl = await getSignedUrlIfNeeded(job.imageUrl);
+        }
+        if (job && job.result?.creative) {
+            if (job.result.creative.imageUrl) job.result.creative.imageUrl = await getSignedUrlIfNeeded(job.result.creative.imageUrl);
+            if (job.result.creative.thumbnailUrl) job.result.creative.thumbnailUrl = await getSignedUrlIfNeeded(job.result.creative.thumbnailUrl);
+        }
+
+        // Sign URL if it's an S3 URL
+        if (job && job.imageUrl) {
+            job.imageUrl = await getSignedUrlIfNeeded(job.imageUrl);
+        }
+        if (job && job.result?.creative) {
+            if (job.result.creative.imageUrl) job.result.creative.imageUrl = await getSignedUrlIfNeeded(job.result.creative.imageUrl);
+            if (job.result.creative.thumbnailUrl) job.result.creative.thumbnailUrl = await getSignedUrlIfNeeded(job.result.creative.thumbnailUrl);
+        }
+
         res.json({ success: true, job });
+        console.log(`[JOBS] Returned polling status for job ${req.params.jobId}`);
     } catch (error) {
         console.error('❌ [API] GET /jobs/:id error:', error);
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
@@ -956,8 +989,16 @@ async function geminiImageGenerate(promptText, imageParts = [], temperature = 0.
 async function routedImageGenerate(promptText, imageParts = [], temperature = 0.4, aspectRatio = '1:1', imageSize = '1K', selectedModel = 'nanobanana-2', refImageUrls = [], customSize = null) {
     const modelConfig = IMAGE_MODEL_CONFIG[selectedModel] || IMAGE_MODEL_CONFIG['nanobanana-2'];
     const router = getRouter();
+    
+    let activeProvider = modelConfig.provider;
+    try {
+        const liveProvider = await getActiveProvider('image', selectedModel);
+        if (liveProvider) activeProvider = liveProvider;
+    } catch (e) {
+        console.warn('⚠️ Could not read image provider from cache:', e.message);
+    }
 
-    console.log(`🎯 Image Model Router: ${selectedModel} → ${modelConfig.provider} (${modelConfig.name})`);
+    console.log(`🎯 Image Model Router: ${selectedModel} → ${activeProvider} (${modelConfig.name})`);
     if (customSize) console.log(`📐 Custom Size: ${customSize.width}x${customSize.height}`);
 
     // ── HARD TIMEOUT: 180 seconds max for any image generation ──
@@ -1114,13 +1155,13 @@ async function routedImageGenerate(promptText, imageParts = [], temperature = 0.
         }
 
         // Special handling for fal.ai
-        if (modelConfig.provider === 'fal') {
-            const falResult = await falImageGenerate(promptText, modelConfig.endpoint, aspectRatio, customSize);
+        if (activeProvider === 'fal') {
+            const falResult = await falImageGenerate(promptText, modelConfig.endpoint || 'xai/grok-imagine-image', aspectRatio, customSize);
             return { ...falResult, provider: 'fal' };
         }
 
         // Special handling for Grok Imagen (xAI)
-        if (modelConfig.provider === 'grok') {
+        if (activeProvider === 'grok') {
             const grokResult = await grokImageGenerate(promptText, aspectRatio);
             return { ...grokResult, provider: 'grok' };
         }
@@ -1501,7 +1542,15 @@ router.get('/', protect, async (req, res) => {
             .lean();
 
         const total = await Creative.countDocuments(filter);
-        res.json({ success: true, creatives, total });
+        
+        // Sign S3 URLs before returning to frontend
+        const signedCreatives = await Promise.all(creatives.map(async c => ({
+            ...c,
+            imageUrl: await getSignedUrlIfNeeded(c.imageUrl),
+            thumbnailUrl: await getSignedUrlIfNeeded(c.thumbnailUrl)
+        })));
+
+        res.json({ success: true, creatives: signedCreatives, total });
     } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
@@ -1653,7 +1702,14 @@ router.get('/image-bank', protect, async (req, res) => {
             delete img.imageUrlPrefix;
         }
 
-        res.json({ success: true, images, total, counts: { uploaded: uploadedCount, generated: generatedCount, all: uploadedCount + generatedCount } });
+        // Sign S3 URLs before returning to frontend
+        const signedImages = await Promise.all(images.map(async img => ({
+            ...img,
+            imageUrl: await getSignedUrlIfNeeded(img.imageUrl),
+            thumbnailUrl: await getSignedUrlIfNeeded(img.thumbnailUrl)
+        })));
+
+        res.json({ success: true, images: signedImages, total, counts: { uploaded: uploadedCount, generated: generatedCount, all: uploadedCount + generatedCount } });
     } catch (error) {
         console.error('📸 image-bank error:', error);
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
@@ -1835,6 +1891,7 @@ CRITICAL RULES:
             if (imageUrl.startsWith('data:image/')) {
                 try {
                     imageUrl = await uploadToS3(imageUrl, `vto/${brandId || 'default'}/${Date.now()}-preview.png`);
+                    imageUrl = await getSignedUrlIfNeeded(imageUrl);
                 } catch (s3Err) {
                     console.warn('⚠️ VTO Preview S3 upload failed, returning base64:', s3Err.message);
                 }
@@ -2291,7 +2348,7 @@ router.post('/upscale', protect, async (req, res) => {
 
         res.json({
             success: true,
-            imageUrl: upscaledUrl,
+            imageUrl: await getSignedUrlIfNeeded(upscaledUrl),
             scale,
             resolution: scale === '2k' ? '2048px' : '4096px',
             method,
@@ -2452,7 +2509,8 @@ CRITICAL RULES:
         req.user.updateOne({ $inc: { 'usage.creativesGenerated': 1 } }).catch(() => {});
 
         console.log(`✅ Lifestyle Mockup generated — responding immediately`);
-        res.json({ success: true, imageUrl: rawImageUrl, model: genResult.model });
+        const finalSignedUrl = await getSignedUrlIfNeeded(rawImageUrl);
+        res.json({ success: true, imageUrl: finalSignedUrl, model: genResult.model });
 
         // Background S3 upload + DB update
         (async () => {
@@ -2767,7 +2825,8 @@ STRICT RULES: No text, no people, no faces, no products, no logos, no watermarks
         // Register job and respond immediately — background processing continues async
         const carouselId = randomUUID();
         carouselJobs.set(carouselId, { status: 'generating', panels: [], panoramicUrl: panoramicResult.imageUrl, error: null, updatedAt: Date.now() });
-        res.json({ success: true, carouselId, status: 'processing', message: `Panoramic background ready. Splitting into ${slideCount} panels...`, panoramicUrl: panoramicResult.imageUrl, slideCount, provider: panoramicResult.provider });
+        const finalSignedPano = await getSignedUrlIfNeeded(panoramicResult.imageUrl);
+        res.json({ success: true, carouselId, status: 'processing', message: `Panoramic background ready. Splitting into ${slideCount} panels...`, panoramicUrl: finalSignedPano, slideCount, provider: panoramicResult.provider });
 
         // ── Async: Split panoramic, composite products, upload ──
         (async () => {
@@ -2946,11 +3005,14 @@ router.get('/carousel/:carouselId', protect, async (req, res) => {
         // Check in-memory Map first (real-time updates during processing)
         const liveJob = carouselJobs.get(carouselId);
         if (liveJob) {
+            const signedPanels = await Promise.all((liveJob.panels || []).map(p => getSignedUrlIfNeeded(p)));
+            const signedPano = await getSignedUrlIfNeeded(liveJob.panoramicUrl || '');
+            
             return res.json({
                 success: true,
                 status: liveJob.status,
-                panels: liveJob.panels || [],
-                panoramicUrl: liveJob.panoramicUrl || '',
+                panels: signedPanels,
+                panoramicUrl: signedPano,
                 error: liveJob.error || null,
             });
         }
@@ -2965,11 +3027,14 @@ router.get('/carousel/:carouselId', protect, async (req, res) => {
             return res.json({ success: true, status: 'processing', panels: [], panoramicUrl: '' });
         }
 
+        const signedPanels = await Promise.all((creative.aiMeta?.panels || []).map(p => getSignedUrlIfNeeded(p)));
+        const signedPano = await getSignedUrlIfNeeded(creative.aiMeta?.panoramicUrl || '');
+
         res.json({
             success: true,
             status: creative.aiMeta?.processingStatus || 'ready',
-            panels: creative.aiMeta?.panels || [],
-            panoramicUrl: creative.aiMeta?.panoramicUrl || '',
+            panels: signedPanels,
+            panoramicUrl: signedPano,
             slideCount: creative.aiMeta?.slideCount || 0,
             creativeId: creative._id,
         });

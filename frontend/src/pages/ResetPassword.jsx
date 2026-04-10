@@ -37,9 +37,9 @@ export default function ResetPassword() {
         return (
             <div className="min-h-screen flex items-center justify-center" style={{ background: '#0a0c16' }}>
                 <div className="text-center">
-                    <span className="material-symbols-outlined text-5xl text-rose-400 mb-4 block">error</span>
-                    <h2 className="text-white text-xl font-bold mb-2">Invalid Reset Link</h2>
-                    <p className="text-slate-400 text-sm mb-6">This password reset link is invalid or missing a token.</p>
+                    <span className="material-symbols-outlined text-5xl text-primary mb-4 block">error</span>
+                    <h2 className="text-[var(--sys-text)] text-xl font-bold mb-2">Invalid Reset Link</h2>
+                    <p className="text-[var(--sys-text-muted)] text-sm mb-6">This password reset link is invalid or missing a token.</p>
                     <button onClick={() => navigate('/login')} className="btn-primary px-6 py-2.5 rounded-xl text-sm font-bold">
                         Go to Login
                     </button>
@@ -64,32 +64,32 @@ export default function ResetPassword() {
                         <div className="size-10 rounded-xl overflow-hidden">
                             <img src="/mantram-logo.png" alt="Mantram AI" className="size-10" />
                         </div>
-                        <h1 className="text-2xl font-extrabold text-white tracking-tight">Mantram AI</h1>
+                        <h1 className="text-2xl font-extrabold text-[var(--sys-text)] tracking-tight">Mantram AI</h1>
                     </div>
-                    <p className="text-slate-400 text-sm">Set your new password below.</p>
+                    <p className="text-[var(--sys-text-muted)] text-sm">Set your new password below.</p>
                 </div>
 
                 <div className="glass-panel rounded-2xl p-8">
                     <div className="flex items-center gap-3 mb-6">
                         <span className="material-symbols-outlined text-3xl text-primary">lock_reset</span>
                         <div>
-                            <h2 className="text-white text-lg font-bold">New Password</h2>
-                            <p className="text-slate-500 text-xs">Enter and confirm your new password.</p>
+                            <h2 className="text-[var(--sys-text)] text-lg font-bold">New Password</h2>
+                            <p className="text-[var(--sys-text-muted)] text-xs">Enter and confirm your new password.</p>
                         </div>
                     </div>
 
                     {success ? (
                         <div className="text-center py-6">
-                            <span className="material-symbols-outlined text-5xl text-emerald-400 mb-4 block">check_circle</span>
-                            <h3 className="text-white font-bold mb-2">{success}</h3>
-                            <p className="text-slate-400 text-sm">Redirecting to login...</p>
+                            <span className="material-symbols-outlined text-5xl text-primary mb-4 block">check_circle</span>
+                            <h3 className="text-[var(--sys-text)] font-bold mb-2">{success}</h3>
+                            <p className="text-[var(--sys-text-muted)] text-sm">Redirecting to login...</p>
                         </div>
                     ) : (
                         <form onSubmit={handleSubmit} className="space-y-4">
                             <div>
-                                <label className="text-sm text-slate-500 font-bold uppercase tracking-widest mb-1.5 block">New Password</label>
+                                <label className="text-sm text-[var(--sys-text-muted)] font-bold uppercase tracking-widest mb-1.5 block">New Password</label>
                                 <div className="relative">
-                                    <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-600 text-lg">lock</span>
+                                    <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[var(--sys-text-muted)] text-lg">lock</span>
                                     <input
                                         type={showPassword ? 'text' : 'password'}
                                         id="reset-password"
@@ -102,7 +102,7 @@ export default function ResetPassword() {
                                         className="input-glass w-full pl-10 pr-10 py-3"
                                     />
                                     <button type="button" onClick={() => setShowPassword(!showPassword)}
-                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors cursor-pointer"
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--sys-text-muted)] hover:text-[var(--sys-text-muted)] transition-colors cursor-pointer"
                                         tabIndex={-1}>
                                         <span className="material-symbols-outlined text-lg">{showPassword ? 'visibility_off' : 'visibility'}</span>
                                     </button>
@@ -110,9 +110,9 @@ export default function ResetPassword() {
                             </div>
 
                             <div>
-                                <label className="text-sm text-slate-500 font-bold uppercase tracking-widest mb-1.5 block">Confirm Password</label>
+                                <label className="text-sm text-[var(--sys-text-muted)] font-bold uppercase tracking-widest mb-1.5 block">Confirm Password</label>
                                 <div className="relative">
-                                    <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-600 text-lg">lock</span>
+                                    <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[var(--sys-text-muted)] text-lg">lock</span>
                                     <input
                                         type={showPassword ? 'text' : 'password'}
                                         id="reset-confirm-password"
@@ -127,7 +127,7 @@ export default function ResetPassword() {
                             </div>
 
                             {error && (
-                                <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm flex items-center gap-2">
+                                <div className="p-3 rounded-xl bg-[var(--sys-primary-dim)] border border-[var(--sys-border)] text-primary text-sm flex items-center gap-2">
                                     <span className="material-symbols-outlined text-lg">error</span> {error}
                                 </div>
                             )}
@@ -146,7 +146,7 @@ export default function ResetPassword() {
                 </div>
 
                 <div className="text-center mt-6">
-                    <button onClick={() => navigate('/login')} className="text-xs text-slate-600 hover:text-slate-400 transition-colors cursor-pointer">
+                    <button onClick={() => navigate('/login')} className="text-xs text-[var(--sys-text-muted)] hover:text-[var(--sys-text-muted)] transition-colors cursor-pointer">
                         ← Back to Login
                     </button>
                 </div>

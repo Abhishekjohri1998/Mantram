@@ -4,7 +4,7 @@ import { protect } from '../middleware/auth.js'
 import { requireCredits } from '../middleware/credits.js'
 import { URL } from 'url'
 import { safeErrorMessage } from '../utils/safeError.js';
-import { uploadToS3 } from '../utils/s3.js';
+import { uploadToS3, getSignedUrlIfNeeded } from '../utils/s3.js';
 import { callMultimodalAgent, loadBrandContext } from '../agents/shared/agentUtils.js';
 import Brand from '../models/Brand.js';
 import Product from '../models/Product.js';
@@ -299,26 +299,69 @@ router.post('/ai-generate', protect, requireCredits('canvasGenerate'), async (re
             }
         }
         const refCount = parts.length
-        const textPrompt = refCount > 0
-            ? `You are an elite creative director and visual artist with 20+ years of experience at top agencies. You have extraordinary creative intelligence.
+        
+        let dynamicSynthesisPrompt = ''
+        if (refCount > 1) {
+            console.log(`🧠 MCoT Canvas: Multi-subject reference detected. Synthesizing ${refCount} images...`)
+            try {
+                const synthesis = await callMultimodalAgent(
+                    `You are an elite creative analyst. The user has provided ${refCount} reference images and wants: "${prompt}".`,
+                    `For EACH attached image, output a labeled block like this:
+IMAGE 1 SUBJECT: [Describe the exact person/object — age, gender, skin tone, hair color/style, clothing, build, expression, distinguishing features]
+IMAGE 2 SUBJECT: [Same level of detail for the second image]
+...and so on for all images.
 
-CREATIVE ANALYSIS PROCESS:
-1. ANALYZE each reference image: Identify dominant colors, mood, composition style, lighting quality, texture patterns, typography styles, and visual weight distribution
-2. EXTRACT creative DNA: Pull the artistic essence — what makes each reference visually powerful
-3. SYNTHESIZE: Merge the best creative elements into a cohesive new vision
+Then write:
+COMBINED SCENE: [A single paragraph describing ALL subjects together in the scene the user wants: "${prompt}". Every subject must appear with their exact appearance preserved.]
 
-I have provided ${refCount} reference image(s). Study them deeply. Now create a NEW masterpiece based on this instruction: ${prompt}
+Be forensically detailed about each subject's appearance so the image generator cannot hallucinate or swap them.`,
+                    referenceImages.slice(0, 4),
+                    { temperature: 0.1, maxTokens: 1024, returnRaw: true }
+                )
+                if (synthesis && typeof synthesis === 'string') {
+                    dynamicSynthesisPrompt = synthesis.trim()
+                    console.log(`🧠 MCoT Canvas: Subject synthesis complete (${dynamicSynthesisPrompt.length} chars)`)
+                }
+            } catch (e) {
+                console.warn('MCoT Synthesis failed for multiple ref images:', e.message)
+            }
+        }
+
+        const textPrompt = refCount > 1 && dynamicSynthesisPrompt
+            ? `CRITICAL INSTRUCTION — MULTI-SUBJECT IMAGE GENERATION:
+
+You have been given ${refCount} reference images. Each image contains a DIFFERENT subject.
+DO NOT merge them into one person. DO NOT hallucinate or replace any subject's appearance.
+You MUST faithfully reproduce the EXACT appearance of EVERY person/subject from the reference images.
+
+SUBJECT ANALYSIS FROM REFERENCES:
+${dynamicSynthesisPrompt}
+
+USER'S CREATIVE BRIEF: ${prompt}
 ${brandVisualInjection ? `\nBRAND VISUAL DIRECTION: ${brandVisualInjection}` : ''}
 
-CREATIVE PRINCIPLES TO APPLY:
-- Color Harmony: Use complementary/analogous color schemes from the references
-- Visual Hierarchy: Guide the eye through focal points, contrast, and spacing
-- Composition: Apply rule of thirds, golden ratio, or dynamic symmetry
-- Lighting: Professional lighting that creates depth and dimension  
-- Mood: Ensure emotional consistency throughout the image
-- Detail: Crisp, high-resolution output with rich textures
+ABSOLUTE RULES:
+1. Image 1's subject MUST appear exactly as shown in Image 1 — same face, hair, skin tone, build, clothing style
+2. Image 2's subject MUST appear exactly as shown in Image 2 — same face, hair, skin tone, build, clothing style
+${refCount > 2 ? `3. Image 3's subject MUST appear exactly as shown in Image 3\n` : ''}
+- Compose ALL subjects together in a single scene following the user's brief
+- Professional lighting, cinematic composition, 4K quality
+- DO NOT drop any subject. ALL ${refCount} subjects must be clearly visible and recognizable.
 
-The output must be a stunning, gallery-quality image that feels like it was crafted by a top creative agency.`
+Generate ONE stunning image with ALL subjects faithfully preserved.`
+            : refCount > 0
+            ? `You are an elite creative director. I have provided ${refCount} reference image(s).
+Study the reference carefully — reproduce the EXACT subject appearance (face, body, clothing, features).
+
+INSTRUCTION: ${prompt}
+${brandVisualInjection ? `\nBRAND VISUAL DIRECTION: ${brandVisualInjection}` : ''}
+
+RULES:
+- Faithfully preserve the subject's appearance from the reference image
+- Professional composition, cinematic lighting, 4K quality
+- Do NOT hallucinate or change the subject's face, hair, or body
+
+Generate a stunning, gallery-quality image.`
             : `You are an elite creative director and visual artist. Generate a stunning, gallery-quality image with these principles:
 
 INSTRUCTION: ${prompt}
@@ -367,7 +410,13 @@ Make it look like it was produced by a world-class creative studio.`
         const s3Key = `canvas/${req.user._id}/${Date.now()}.png`;
         let s3Url = null; try { s3Url = await uploadToS3(imageUrl, s3Key, 'image/png'); } catch (e) { console.error('S3 Upload Error:', e.message); }
         
-        res.json({ imageUrl: s3Url || imageUrl, model: 'NanoBanana 2', source: s3Url ? 's3' : 'base64', refsUsed: refCount, mcotGrounding: mcotGrounding || undefined })
+        res.json({ 
+            imageUrl: await getSignedUrlIfNeeded(s3Url || imageUrl), 
+            model: 'NanoBanana 2', 
+            source: s3Url ? 's3' : 'base64', 
+            refsUsed: refCount, 
+            mcotGrounding: mcotGrounding || undefined 
+        })
     } catch (err) {
         console.error('AI generate error:', err.message)
         res.status(500).json({ error: safeErrorMessage(err) })
@@ -384,50 +433,102 @@ router.post('/ai-edit', protect, requireCredits('canvasGenerate'), async (req, r
         if (!imageKey) return res.status(400).json({ error: 'GEMINI_API_KEY not configured' })
 
         const baseUrl = 'https://generativelanguage.googleapis.com/v1beta'
-        const base64Data = imageBase64.includes('base64,') ? imageBase64.split('base64,')[1] : imageBase64
-        const mimeType = imageBase64.startsWith('data:') ? imageBase64.split(';')[0].split(':')[1] : 'image/png'
+
+        // Helper: convert a URL or base64 string into a Gemini inlineData part
+        const toImagePart = async (imgInput) => {
+            if (imgInput.startsWith('http://') || imgInput.startsWith('https://')) {
+                // Fetch remote image (S3 URL) and convert to base64
+                try {
+                    const imgResp = await fetch(imgInput)
+                    if (!imgResp.ok) return null
+                    const buffer = await imgResp.arrayBuffer()
+                    const b64 = Buffer.from(buffer).toString('base64')
+                    const contentType = imgResp.headers.get('content-type') || 'image/jpeg'
+                    return { inlineData: { mimeType: contentType, data: b64 } }
+                } catch (e) {
+                    console.warn('Failed to fetch image URL for ai-edit:', e.message)
+                    return null
+                }
+            }
+            // base64 data URI or raw base64
+            const data = imgInput.includes('base64,') ? imgInput.split('base64,')[1] : imgInput
+            const mime = imgInput.startsWith('data:') ? imgInput.split(';')[0].split(':')[1] : 'image/png'
+            return { inlineData: { mimeType: mime, data } }
+        }
 
         // Build multimodal parts: main image + additional images + text prompt
-        const parts = [{ inlineData: { mimeType, data: base64Data } }]
+        const mainPart = await toImagePart(imageBase64)
+        if (!mainPart) return res.status(400).json({ error: 'Could not process the main image' })
+        const parts = [mainPart]
 
         // Add individual images (from selected canvas objects)
         for (const addImg of additionalImages.slice(0, 4)) {
-            const addData = addImg.includes('base64,') ? addImg.split('base64,')[1] : addImg
-            const addMime = addImg.startsWith('data:') ? addImg.split(';')[0].split(':')[1] : 'image/png'
-            parts.push({ inlineData: { mimeType: addMime, data: addData } })
+            const part = await toImagePart(addImg)
+            if (part) parts.push(part)
         }
 
         const imgCount = parts.length
-        const editText = imgCount > 1
-            ? `You are Fidato, an elite AI creative director with extraordinary visual intelligence. You have deep expertise in image composition, color theory, and visual storytelling.
+        
+        let dynamicSynthesisPrompt = ''
+        if (imgCount > 1) {
+            console.log(`🧠 MCoT Canvas: Multi-subject edit detected. Synthesizing ${imgCount} images...`)
+            try {
+                const synthesis = await callMultimodalAgent(
+                    `You are an elite creative analyst. The user has provided ${imgCount} reference images and wants: "${prompt}".`,
+                    `For EACH attached image, output a labeled block like this:
+IMAGE 1 SUBJECT: [Describe the exact person/object — age, gender, skin tone, hair color/style, clothing, build, expression, distinguishing features]
+IMAGE 2 SUBJECT: [Same level of detail for the second image]
+...and so on for all images.
 
-CREATIVE ANALYSIS TASK:
-I have provided ${imgCount} images. The FIRST image is the full canvas context. The remaining ${imgCount - 1} image(s) are individual selected elements on the canvas.
+Then write:
+COMBINED SCENE: [A single paragraph describing ALL subjects together in the scene the user wants: "${prompt}". Every subject must appear with their exact appearance preserved.]
 
-STEP 1 — DEEP IMAGE ANALYSIS (do this internally):
-For each image, analyze:
-• Dominant colors and color palette
-• Subject matter and visual elements
-• Mood, emotion, and visual weight
-• Lighting direction and quality
-• Texture patterns and visual styles
-• Negative space and composition
+Be forensically detailed about each subject's appearance so the image generator cannot hallucinate or swap them.`,
+                    [imageBase64, ...additionalImages].slice(0, 4),
+                    { temperature: 0.1, maxTokens: 1024, returnRaw: true }
+                )
+                if (synthesis && typeof synthesis === 'string') {
+                    dynamicSynthesisPrompt = synthesis.trim()
+                    console.log(`🧠 MCoT Canvas: Edit subject synthesis complete (${dynamicSynthesisPrompt.length} chars)`)
+                }
+            } catch (e) {
+                console.warn('MCoT Synthesis failed for edit payload:', e.message)
+            }
+        }
 
-STEP 2 — CREATIVE INTELLIGENCE:
-Based on the user's instruction: "${prompt}"
-• Identify HOW these images can work together harmoniously
-• Find visual connections — shared colors, complementary themes, consistent mood
-• Plan the optimal composition that balances all elements
-• Determine the best color grading that unifies everything
+        const editText = imgCount > 1 && dynamicSynthesisPrompt
+            ? `CRITICAL INSTRUCTION — MULTI-SUBJECT IMAGE EDIT:
 
-STEP 3 — EXECUTION:
-• Create a single, cohesive masterpiece that intelligently blends elements from all provided images
-• Apply professional color harmony and seamless blending
-• Ensure lighting consistency across all merged elements
-• Use smooth transitions, matching shadows, and consistent perspective
-• The result should look like it was professionally composed — NOT like a collage
+You have been given ${imgCount} reference images. Each image contains a DIFFERENT subject.
+DO NOT merge them into one person. DO NOT hallucinate or replace any subject's appearance.
+You MUST faithfully reproduce the EXACT appearance of EVERY person/subject from the reference images.
 
-CRITICAL: Think like a senior art director. The output must be a stunning, unified image — not a cut-and-paste job. Output the final image.`
+SUBJECT ANALYSIS FROM REFERENCES:
+${dynamicSynthesisPrompt}
+
+USER'S CREATIVE BRIEF: "${prompt}"
+
+ABSOLUTE RULES:
+1. Image 1's subject MUST appear exactly as shown in Image 1 — same face, hair, skin tone, build, clothing style
+2. Image 2's subject MUST appear exactly as shown in Image 2 — same face, hair, skin tone, build, clothing style
+${imgCount > 2 ? `3. Image 3's subject MUST appear exactly as shown in Image 3\n` : ''}
+- Compose ALL subjects together in a single scene following the user's brief
+- Professional lighting, cinematic composition, 4K quality
+- DO NOT drop any subject. ALL ${imgCount} subjects must be clearly visible and recognizable.
+
+Generate ONE stunning image with ALL subjects faithfully preserved.`
+            : imgCount > 1
+            ? `You are Fidato, an elite AI creative director. Your task is to generate a new image using the provided images strictly as VISUAL REFERENCES.
+
+INSTRUCTION: "${prompt}"
+
+CREATIVE RULES:
+1. The provided images are your REFERENCE IMAGES (subject and/or style references).
+2. You MUST generate a new image that prominently features the exact subjects from ALL reference images.
+3. Intelligently compose them together into a single cohesive masterpiece based on the instruction.
+4. Ensure lighting and shadows are globally consistent.
+5. Do NOT hallucinate new products or subjects that conflict with the reference images.
+6. The output must be a stunning, unified image. Output the final image.`
             : `You are Fidato, an elite AI creative director. Edit this image with creative intelligence.
 
 INSTRUCTION: ${prompt}
@@ -476,7 +577,12 @@ Output the modified image.`
         const s3Key = `canvas/${req.user._id}/${Date.now()}_edit.png`;
         let s3Url = null; try { s3Url = await uploadToS3(imageUrl, s3Key, 'image/png'); } catch (e) { console.error('S3 Upload Error:', e.message); }
         
-        res.json({ imageUrl: s3Url || imageUrl, model: 'NanoBanana 2', source: s3Url ? 's3' : 'base64', imagesProcessed: imgCount })
+        res.json({ 
+            imageUrl: await getSignedUrlIfNeeded(s3Url || imageUrl), 
+            model: 'NanoBanana 2', 
+            source: s3Url ? 's3' : 'base64', 
+            imagesProcessed: imgCount 
+        })
     } catch (err) {
         console.error('AI edit error:', err.message)
         res.status(500).json({ error: safeErrorMessage(err) })
@@ -535,7 +641,11 @@ router.post('/ai-edit-visual', protect, requireCredits('canvasGenerate'), async 
         const s3Key = `canvas/${req.user._id}/${Date.now()}_visual.png`;
         let s3Url = null; try { s3Url = await uploadToS3(imageUrl, s3Key, 'image/png'); } catch (e) { console.error('S3 Upload Error:', e.message); }
         
-        res.json({ imageUrl: s3Url || imageUrl, model: 'Gemini Flash', source: s3Url ? 's3' : 'base64' })
+        res.json({ 
+            imageUrl: await getSignedUrlIfNeeded(s3Url || imageUrl), 
+            model: 'Gemini Flash', 
+            source: s3Url ? 's3' : 'base64' 
+        })
     } catch (err) {
         console.error('AI visual edit error:', err.message)
         res.status(500).json({ error: safeErrorMessage(err) })
@@ -598,7 +708,11 @@ router.post('/ai-retouch', protect, requireCredits('canvasGenerate'), async (req
         const s3Key = `canvas/${req.user._id}/${Date.now()}_retouch.png`;
         let s3Url = null; try { s3Url = await uploadToS3(imageUrl, s3Key, 'image/png'); } catch (e) { console.error('S3 Upload Error:', e.message); }
         
-        res.json({ imageUrl: s3Url || imageUrl, model: 'Gemini Flash', source: s3Url ? 's3' : 'base64' })
+        res.json({ 
+            imageUrl: await getSignedUrlIfNeeded(s3Url || imageUrl), 
+            model: 'Gemini Flash', 
+            source: s3Url ? 's3' : 'base64' 
+        })
     } catch (err) {
         console.error('AI retouch error:', err.message)
         res.status(500).json({ error: safeErrorMessage(err) })
@@ -657,7 +771,12 @@ router.post('/ai-background', protect, requireCredits('canvasBgRemove'), async (
         const s3Key = `canvas/${req.user._id}/${Date.now()}_background.png`;
         let s3Url = null; try { s3Url = await uploadToS3(imageUrl, s3Key, 'image/png'); } catch (e) { console.error('S3 Upload Error:', e.message); }
         
-        res.json({ imageUrl: s3Url || imageUrl, action, model: 'Gemini Flash', source: s3Url ? 's3' : 'base64' })
+        res.json({ 
+            imageUrl: await getSignedUrlIfNeeded(s3Url || imageUrl), 
+            action, 
+            model: 'Gemini Flash', 
+            source: s3Url ? 's3' : 'base64' 
+        })
     } catch (err) {
         console.error('AI background error:', err.message)
         res.status(500).json({ error: safeErrorMessage(err) })

@@ -173,7 +173,7 @@
     align-items: center;
     gap: 5px;
     padding: 6px 16px;
-    background: #1d1d1f;
+    background: var(--sys-bg);
     color: #fff;
     font-size: 13px;
     font-weight: 600;
@@ -287,7 +287,7 @@
     top: 12px;
     bottom: 12px;
     width: 3px;
-    background: #1d1d1f;
+    background: var(--sys-bg);
     border-radius: 0 3px 3px 0;
 }
 
@@ -306,7 +306,7 @@
 }
 
 .ce-rail-btn.ai-tab.active::before {
-    background: #7c3aed;
+    background: var(--sys-surface);
 }
 
 /* ── Content Panel ── */
@@ -415,7 +415,7 @@
 }
 
 .ce-asset-card:hover {
-    background: rgba(99, 102, 241, 0.1);
+    background: var(--sys-surface);
     border-color: rgba(99, 102, 241, 0.3);
     transform: translateY(-1px);
 }
@@ -455,7 +455,7 @@
 }
 
 .ce-font-preview:hover {
-    background: rgba(99, 102, 241, 0.1);
+    background: var(--sys-surface);
     border-color: rgba(99, 102, 241, 0.3);
     color: #c7d2fe;
 }
@@ -567,7 +567,7 @@
     background: linear-gradient(135deg, rgba(99, 102, 241, 0.12), rgba(255, 77, 0, 0.08));
     border: 1px solid rgba(99, 102, 241, 0.25);
     border-radius: 10px;
-    color: #a5b4fc;
+    color: #fff;
     font-size: 11.5px;
     font-weight: 600;
     cursor: pointer;
@@ -576,7 +576,7 @@
 }
 
 .ce-search-btn:hover {
-    background: linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(255, 77, 0, 0.15));
+    background: var(--sys-primary-dim);
     border-color: rgba(99, 102, 241, 0.4);
     box-shadow: 0 0 12px rgba(99, 102, 241, 0.1);
     transform: translateY(-1px);
@@ -714,7 +714,7 @@
 }
 
 .ce-brand-color-swatch:hover {
-    background: rgba(99, 102, 241, 0.1);
+    background: var(--sys-surface);
     border-color: rgba(99, 102, 241, 0.3);
     transform: translateY(-1px);
 }
@@ -1118,7 +1118,7 @@
 }
 
 .ce-ai-replace-label:hover {
-    background: rgba(99, 102, 241, 0.06);
+    background: var(--sys-surface);
     border-color: rgba(99, 102, 241, 0.3);
     color: #c7d2fe;
 }
@@ -1363,7 +1363,7 @@
 }
 
 .ce-ai-result-btn:hover {
-    background: rgba(99, 102, 241, 0.12);
+    background: var(--sys-surface);
     color: #c7d2fe;
 }
 
@@ -1428,7 +1428,7 @@
 }
 
 .ce-element-btn:hover {
-    background: rgba(99, 102, 241, 0.06);
+    background: var(--sys-surface);
     border-color: rgba(99, 102, 241, 0.2);
     color: #c7d2fe;
     transform: translateY(-1px);
@@ -1440,7 +1440,7 @@
 }
 
 .ce-element-btn:hover .material-symbols-outlined {
-    color: #a5b4fc;
+    color: #fff;
     transform: scale(1.1);
 }
 
@@ -1466,7 +1466,7 @@
 }
 
 .ce-layer-item.active {
-    background: rgba(99, 102, 241, 0.15);
+    background: var(--sys-surface);
     color: #c7d2fe;
     border: 1px solid rgba(99, 102, 241, 0.2);
 }
@@ -1652,7 +1652,7 @@
 }
 
 .ce-font-btn.active {
-    background: rgba(99, 102, 241, 0.2);
+    background: var(--sys-surface);
     border-color: rgba(99, 102, 241, 0.3);
     color: #818cf8;
 }
@@ -1722,7 +1722,7 @@
 }
 
 .ce-preset-btn.active {
-    background: rgba(99, 102, 241, 0.15);
+    background: var(--sys-surface);
     border-color: rgba(99, 102, 241, 0.3);
     color: #818cf8;
 }
@@ -1756,7 +1756,7 @@
 }
 
 .ce-simple-tool:hover {
-    background: rgba(99, 102, 241, 0.1);
+    background: var(--sys-surface);
     border-color: rgba(99, 102, 241, 0.3);
     color: #c7d2fe;
     transform: translateY(-2px);
@@ -1838,7 +1838,7 @@
 
 .ce-filter-btn:hover,
 .ce-filter-btn.active {
-    background: rgba(99, 102, 241, 0.15);
+    background: var(--sys-surface);
     border-color: rgba(99, 102, 241, 0.3);
     color: #c7d2fe;
 }
@@ -1850,7 +1850,7 @@
     left: 50%;
     transform: translateX(-50%);
     background: rgba(15, 20, 35, 0.95);
-    border: 1px solid rgba(99, 102, 241, 0.3);
+    border: 1px solid var(--sys-primary);
     border-radius: 12px;
     padding: 10px 20px;
     font-size: 13px;
@@ -2193,7 +2193,7 @@
 }
 
 .ce-text-style-card:hover {
-    background: rgba(99, 102, 241, 0.05);
+    background: var(--sys-surface);
     border-color: rgba(99, 102, 241, 0.2);
     transform: translateY(-1px);
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(99, 102, 241, 0.08);
@@ -2477,8 +2477,8 @@
 
 .ce-genimg-ref-add:hover {
     border-color: rgba(99, 102, 241, 0.4);
-    background: rgba(99, 102, 241, 0.06);
-    color: #a5b4fc;
+    background: var(--sys-surface);
+    color: #fff;
 }
 
 .ce-genimg-ref-add .material-symbols-outlined {
@@ -2608,9 +2608,9 @@
 }
 
 .ce-genimg-ratio-btn.active {
-    background: rgba(99, 102, 241, 0.15);
+    background: var(--sys-surface);
     border-color: rgba(99, 102, 241, 0.4);
-    color: #a5b4fc;
+    color: #fff;
 }
 
 .ce-genimg-ratio-icon {
@@ -2745,7 +2745,7 @@
     width: 32px;
     height: 32px;
     border-radius: 10px;
-    background: linear-gradient(135deg, #FF4D00, #ec4899);
+    background: var(--sys-primary);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -2840,12 +2840,12 @@
 }
 
 .ce-fidato-msg.assistant .ce-fidato-msg-avatar {
-    background: linear-gradient(135deg, #FF4D00, #ec4899);
+    background: var(--sys-primary);
 }
 
 .ce-fidato-msg.user .ce-fidato-msg-avatar {
-    background: rgba(99, 102, 241, 0.3);
-    color: #a5b4fc;
+    background: var(--sys-primary);
+    color: #fff;
 }
 
 .ce-fidato-msg-bubble {
@@ -2863,8 +2863,8 @@
 }
 
 .ce-fidato-msg.user .ce-fidato-msg-bubble {
-    background: linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(255, 77, 0, 0.15));
-    border: 1px solid rgba(99, 102, 241, 0.3);
+    background: var(--sys-primary-dim);
+    border: 1px solid var(--sys-primary);
     border-top-right-radius: 4px;
 }
 
@@ -3057,7 +3057,7 @@
 
 .ce-fidato-shortcut:hover {
     border-color: rgba(99, 102, 241, 0.3);
-    color: #a5b4fc;
+    color: #fff;
 }
 
 .ce-fidato-shortcut .material-symbols-outlined {
@@ -3072,7 +3072,7 @@
     width: 48px;
     height: 48px;
     border-radius: 14px;
-    background: linear-gradient(135deg, #FF4D00, #ec4899);
+    background: var(--sys-primary);
     border: none;
     color: #fff;
     cursor: pointer;
@@ -3117,7 +3117,7 @@
 
 .ce-palette-chip:hover {
     border-color: rgba(99, 102, 241, 0.4);
-    background: rgba(99, 102, 241, 0.08);
+    background: var(--sys-surface);
 }
 
 .ce-palette-dot {
@@ -3240,7 +3240,7 @@
 }
 
 .ce-sidebar-collapse-btn:hover {
-    background: rgba(99, 102, 241, 0.2);
+    background: var(--sys-surface);
     border-color: rgba(99, 102, 241, 0.5);
     transform: translateY(-50%) scale(1.1);
 }
@@ -3284,7 +3284,7 @@
     color: #e2e8f0;
 }
 .canvas-editor:not(.theme-light) .ce-tool-btn.active {
-    background: rgba(99, 102, 241, 0.2);
+    background: var(--sys-surface);
     color: #818cf8;
 }
 .canvas-editor:not(.theme-light) .ce-tool-btn-label {
@@ -3295,7 +3295,7 @@
     color: #e2e8f0;
 }
 .canvas-editor:not(.theme-light) .ce-tool-btn-label.active {
-    background: rgba(99, 102, 241, 0.2);
+    background: var(--sys-surface);
     color: #818cf8;
 }
 .canvas-editor:not(.theme-light) .ce-divider {
@@ -3308,7 +3308,7 @@
     color: #64748b;
 }
 .canvas-editor:not(.theme-light) .ce-mode-btn.active {
-    background: rgba(99, 102, 241, 0.2);
+    background: var(--sys-surface);
     color: #818cf8;
     box-shadow: 0 0 12px rgba(99, 102, 241, 0.1);
 }
@@ -3333,12 +3333,12 @@
     color: #4a5568;
 }
 .canvas-editor:not(.theme-light) .ce-rail-btn:hover {
-    background: rgba(99, 102, 241, 0.06);
+    background: var(--sys-surface);
     color: #94a3b8;
 }
 .canvas-editor:not(.theme-light) .ce-rail-btn.active {
-    background: rgba(99, 102, 241, 0.1);
-    color: #a5b4fc;
+    background: var(--sys-surface);
+    color: #fff;
 }
 .canvas-editor:not(.theme-light) .ce-rail-btn.active::before {
     background: linear-gradient(180deg, #818cf8, #6366f1);
@@ -3364,10 +3364,10 @@
     border-right: 1px solid rgba(255, 255, 255, 0.04);
 }
 .canvas-editor:not(.theme-light) .ce-content-panel-inner::-webkit-scrollbar-thumb {
-    background: rgba(99, 102, 241, 0.15);
+    background: var(--sys-surface);
 }
 .canvas-editor:not(.theme-light) .ce-content-panel-inner::-webkit-scrollbar-thumb:hover {
-    background: rgba(99, 102, 241, 0.3);
+    background: var(--sys-primary);
 }
 .canvas-editor:not(.theme-light) .ce-layers-panel {
     border-top: 1px solid rgba(99, 102, 241, 0.15);
@@ -3391,7 +3391,7 @@
     border-left: 1px solid rgba(255, 255, 255, 0.04);
 }
 .canvas-editor:not(.theme-light) .ce-sidebar-right::-webkit-scrollbar-thumb {
-    background: rgba(99, 102, 241, 0.15);
+    background: var(--sys-surface);
 }
 .canvas-editor:not(.theme-light) .ce-prop-label {
     color: #64748b;
@@ -3407,199 +3407,4 @@
     background-color: #0e1017;
     background-image: radial-gradient(circle, rgba(255,255,255,0.12) 1px, transparent 1px);
     background-size: 24px 24px;
-}
-.canvas-editor.theme-light .ce-canvas-area {
-    background-color: #e8eaed;
-    background-image: radial-gradient(circle, rgba(0,0,0,0.1) 1px, transparent 1px);
-    background-size: 24px 24px;
-}
-
-/* ── Zoom Controls ── */
-.canvas-editor:not(.theme-light) .ce-zoom-controls {
-    background: rgba(15, 20, 35, 0.9);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
-    backdrop-filter: blur(12px);
-}
-.canvas-editor:not(.theme-light) .ce-zoom-label {
-    color: #94a3b8;
-}
-
-/* ── Floating Toolbar ── */
-.canvas-editor:not(.theme-light) .ce-floating-toolbar {
-    background: rgba(15, 17, 30, 0.92);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5), 0 0 1px rgba(255, 255, 255, 0.1);
-}
-.canvas-editor:not(.theme-light) .ce-floating-toolbar:hover {
-    box-shadow: 0 12px 48px rgba(0, 0, 0, 0.6), 0 0 1px rgba(255, 255, 255, 0.15);
-}
-.canvas-editor:not(.theme-light) .ce-float-btn {
-    color: #8892a8;
-}
-.canvas-editor:not(.theme-light) .ce-float-btn:hover {
-    background: rgba(255, 255, 255, 0.08);
-    color: #e2e8f0;
-}
-.canvas-editor:not(.theme-light) .ce-float-btn.active {
-    background: linear-gradient(135deg, rgba(99, 102, 241, 0.25), rgba(255, 77, 0, 0.2));
-    color: #a5b4fc;
-    box-shadow: 0 0 16px rgba(99, 102, 241, 0.15);
-}
-
-/* ── Context Menu ── */
-.canvas-editor:not(.theme-light) .ce-context-menu {
-    background: rgba(15, 18, 30, 0.96);
-    border: 1px solid rgba(99, 102, 241, 0.25);
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6), 0 0 1px rgba(99, 102, 241, 0.3);
-}
-.canvas-editor:not(.theme-light) .ce-ctx-item {
-    color: #c7d2fe;
-}
-.canvas-editor:not(.theme-light) .ce-ctx-item:hover {
-    background: rgba(99, 102, 241, 0.15);
-    color: #e0e7ff;
-}
-.canvas-editor:not(.theme-light) .ce-ctx-item .material-symbols-outlined {
-    color: #818cf8;
-}
-.canvas-editor:not(.theme-light) .ce-ctx-item kbd {
-    color: #64748b;
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-}
-.canvas-editor:not(.theme-light) .ce-ctx-divider {
-    background: rgba(255, 255, 255, 0.06);
-}
-
-/* ── Sidebar Collapse Button ── */
-.canvas-editor:not(.theme-light) .ce-sidebar-collapse-btn {
-    border: 1px solid rgba(99, 102, 241, 0.3);
-    background: rgba(15, 18, 30, 0.95);
-    color: #818cf8;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-}
-.canvas-editor:not(.theme-light) .ce-sidebar-collapse-btn:hover {
-    background: rgba(99, 102, 241, 0.2);
-    border-color: rgba(99, 102, 241, 0.5);
-}
-
-/* ══════════════════════════════════════════════════════════════════════ */
-/* ══  LIGHT THEME FIXES — Force Light UI on Hardcoded Dark Components ══ */
-/* ══════════════════════════════════════════════════════════════════════ */
-
-/* Fidato Chat Panel */
-.canvas-editor.theme-light .ce-fidato-panel {
-    background: rgba(255, 255, 255, 0.97);
-    border-left: 1px solid rgba(0, 0, 0, 0.08);
-}
-.canvas-editor.theme-light .ce-fidato-header {
-    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
-}
-.canvas-editor.theme-light .ce-fidato-name,
-.canvas-editor.theme-light .ce-fidato-msg-bubble,
-.canvas-editor.theme-light .ce-fidato-input {
-    color: #1d1d1f;
-}
-.canvas-editor.theme-light .ce-fidato-collapse {
-    background: rgba(0, 0, 0, 0.04);
-    color: #6e6e73;
-}
-.canvas-editor.theme-light .ce-fidato-collapse:hover {
-    background: rgba(0, 0, 0, 0.08);
-    color: #1d1d1f;
-}
-.canvas-editor.theme-light .ce-fidato-msg.assistant .ce-fidato-msg-bubble {
-    background: rgba(0, 0, 0, 0.03);
-    border: 1px solid rgba(0, 0, 0, 0.05);
-}
-.canvas-editor.theme-light .ce-fidato-msg.user .ce-fidato-msg-bubble {
-    background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(255, 77, 0, 0.05));
-    border: 1px solid rgba(99, 102, 241, 0.2);
-    color: #1d1d1f;
-}
-.canvas-editor.theme-light .ce-fidato-input-bar {
-    background: #ffffff;
-    border-top: 1px solid rgba(0, 0, 0, 0.08);
-}
-.canvas-editor.theme-light .ce-fidato-input-row {
-    background: rgba(0, 0, 0, 0.02);
-    border: 1px solid rgba(0, 0, 0, 0.1);
-}
-.canvas-editor.theme-light .ce-fidato-input::placeholder {
-    color: #86868b;
-}
-.canvas-editor.theme-light .ce-fidato-plan {
-    background: rgba(0, 0, 0, 0.02);
-    border: 1px solid rgba(0, 0, 0, 0.06);
-}
-.canvas-editor.theme-light .ce-fidato-plan-title,
-.canvas-editor.theme-light .ce-fidato-plan-item {
-    color: #4a5568;
-}
-.canvas-editor.theme-light .ce-fidato-shortcut {
-    border: 1px solid rgba(0, 0, 0, 0.08);
-    background: #ffffff;
-    color: #4a5568;
-}
-.canvas-editor.theme-light .ce-palette-chip {
-    background: rgba(0, 0, 0, 0.03);
-    border: 1px solid rgba(0, 0, 0, 0.08);
-}
-.canvas-editor.theme-light .ce-palette-hex {
-    color: #4a5568;
-}
-
-/* AI Generating Floating Panel */
-.canvas-editor.theme-light .ce-genimg-panel {
-    background: rgba(255, 255, 255, 0.96);
-    border: 1px solid rgba(0, 0, 0, 0.1);
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
-}
-.canvas-editor.theme-light .ce-genimg-textarea {
-    background: rgba(0, 0, 0, 0.03);
-    border: 1px solid rgba(0, 0, 0, 0.08);
-    color: #1d1d1f;
-}
-.canvas-editor.theme-light .ce-genimg-textarea::placeholder {
-    color: #86868b;
-}
-
-/* Modal UI Overrides */
-.canvas-editor.theme-light .ce-modal-overlay {
-    background: rgba(255, 255, 255, 0.2);
-}
-.canvas-editor.theme-light .ce-modal {
-    background: rgba(255, 255, 255, 0.98);
-    border: 1px solid rgba(0, 0, 0, 0.08);
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
-}
-.canvas-editor.theme-light .ce-modal h3 {
-    color: #1d1d1f;
-}
-.canvas-editor.theme-light .ce-text-modal-textarea {
-    background: rgba(0, 0, 0, 0.03);
-    color: #1d1d1f;
-    border: 1px solid rgba(0, 0, 0, 0.08);
-}
-.canvas-editor.theme-light .ce-text-modal-textarea::focus {
-    border-color: #6366f1;
-}
-
-/* Left Sidebar Drawers (Elements, Images, Masks) */
-.canvas-editor.theme-light .ce-elements-grid,
-.canvas-editor.theme-light .ce-library-grid {
-    background: transparent;
-}
-.canvas-editor.theme-light .ce-element-btn {
-    background: rgba(0, 0, 0, 0.02);
-    border: 1px solid rgba(0, 0, 0, 0.04);
-    color: #4a5568;
-}
-.canvas-editor.theme-light .ce-element-btn:hover {
-    background: rgba(0, 0, 0, 0.05);
-    color: #1d1d1f;
-}
-.canvas-editor.theme-light h4 {
-    color: #1d1d1f;
 }

@@ -85,9 +85,9 @@ export default function Landing() {
             icon: 'draw', name: 'Content Studio', slug: 'content-studio', desc: 'AI-generated blog posts, social captions, ad copy & emails — perfectly aligned to your brand voice.', color: 'from-[#ff4d00] to-[#ff7a00]', tag: 'Writing', accentHex: '#ff4d00',
             preview: () => (
                 <div className="h-full w-full flex items-center justify-center relative overflow-hidden group">
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#08080c] via-transparent to-transparent z-10 pointer-events-none opacity-80" />
+                    <div className="absolute inset-0 bg-[var(--sys-surface)] border border-[var(--sys-border)] z-10 pointer-events-none opacity-80" />
                     <div className="relative rounded-xl overflow-hidden border border-[#48474c]/30 shadow-[0_15px_50px_rgba(0,0,0,0.8)] w-[90%] mx-auto transition-transform duration-500 group-hover:scale-[1.02]">
-                        <div className="h-6 bg-[#121217] border-b border-[#48474c]/30 flex items-center px-3 gap-1.5"><div className="w-2h-v2 w-2.5 h-2.5 rounded-full bg-red-500/20 border border-red-500/50" /><div className="w-2.5 h-2.5 rounded-full bg-yellow-500/20 border border-yellow-500/50" /><div className="w-2.5 h-2.5 rounded-full bg-green-500/20 border border-green-500/50" /></div>
+                        <div className="h-6 bg-[var(--sys-surface)] border-b border-[#48474c]/30 flex items-center px-3 gap-1.5"><div className="w-2h-v2 w-2.5 h-2.5 rounded-full bg-[var(--sys-primary-dim)] border border-[var(--sys-border)]" /><div className="w-2.5 h-2.5 rounded-full bg-yellow-500/20 border border-yellow-500/50" /><div className="w-2.5 h-2.5 rounded-full bg-green-500/20 border border-green-500/50" /></div>
                         <img src="/screenshots/content-studio.png" alt="Content Studio" className="w-full h-auto object-cover object-top opacity-80 group-hover:opacity-100 transition-opacity duration-700 max-h-[300px]" />
                     </div>
                 </div>
@@ -97,9 +97,9 @@ export default function Landing() {
             icon: 'smart_display', name: 'Video Studio', slug: 'video-studio', desc: 'Multi-model video generation — Seedream, Kling, Veo 2 — from brief to cinematic final cut.', color: 'from-[#ff4d00] to-[#ff7a00]', tag: 'Video', accentHex: '#ff4d00',
             preview: () => (
                 <div className="h-full w-full flex items-center justify-center relative overflow-hidden group">
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#08080c] via-transparent to-transparent z-10 pointer-events-none opacity-80" />
+                    <div className="absolute inset-0 bg-[var(--sys-surface)] border border-[var(--sys-border)] z-10 pointer-events-none opacity-80" />
                     <div className="relative rounded-xl overflow-hidden border border-[#48474c]/30 shadow-[0_15px_50px_rgba(0,0,0,0.8)] w-[90%] mx-auto transition-transform duration-500 group-hover:scale-[1.02]">
-                        <div className="h-6 bg-[#121217] border-b border-[#48474c]/30 flex items-center px-3 gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-red-500/20 border border-red-500/50" /><div className="w-2.5 h-2.5 rounded-full bg-yellow-500/20 border border-yellow-500/50" /><div className="w-2.5 h-2.5 rounded-full bg-green-500/20 border border-green-500/50" /></div>
+                        <div className="h-6 bg-[var(--sys-surface)] border-b border-[#48474c]/30 flex items-center px-3 gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-[var(--sys-primary-dim)] border border-[var(--sys-border)]" /><div className="w-2.5 h-2.5 rounded-full bg-yellow-500/20 border border-yellow-500/50" /><div className="w-2.5 h-2.5 rounded-full bg-green-500/20 border border-green-500/50" /></div>
                         <img src="/screenshots/video-studio.png" alt="Video Studio" className="w-full h-auto object-cover object-top opacity-80 group-hover:opacity-100 transition-opacity duration-700 max-h-[300px]" />
                     </div>
                 </div>
@@ -109,45 +109,45 @@ export default function Landing() {
             icon: 'brush', name: 'Creative Studio', slug: 'creative-studio', desc: 'Generate high-fidelity, brand-grounded ad creatives, carousels, and banners.', color: 'from-[#ff4d00] to-[#ff7a00]', tag: 'Graphics', accentHex: '#ff4d00',
             preview: () => (
                 <div className="h-full w-full flex items-center justify-center relative overflow-hidden group">
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#08080c] via-transparent to-transparent z-10 pointer-events-none opacity-80" />
+                    <div className="absolute inset-0 bg-[var(--sys-surface)] border border-[var(--sys-border)] z-10 pointer-events-none opacity-80" />
                     <div className="relative rounded-xl overflow-hidden border border-[#48474c]/30 shadow-[0_15px_50px_rgba(0,0,0,0.8)] w-[90%] mx-auto transition-transform duration-500 group-hover:scale-[1.02]">
-                        <div className="h-6 bg-[#121217] border-b border-[#48474c]/30 flex items-center px-3 gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-red-500/20 border border-red-500/50" /><div className="w-2.5 h-2.5 rounded-full bg-yellow-500/20 border border-yellow-500/50" /><div className="w-2.5 h-2.5 rounded-full bg-green-500/20 border border-green-500/50" /></div>
+                        <div className="h-6 bg-[var(--sys-surface)] border-b border-[#48474c]/30 flex items-center px-3 gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-[var(--sys-primary-dim)] border border-[var(--sys-border)]" /><div className="w-2.5 h-2.5 rounded-full bg-yellow-500/20 border border-yellow-500/50" /><div className="w-2.5 h-2.5 rounded-full bg-green-500/20 border border-green-500/50" /></div>
                         <img src="/screenshots/creative-studio.png" alt="Creative Studio" className="w-full h-auto object-cover object-top opacity-80 group-hover:opacity-100 transition-opacity duration-700 max-h-[300px]" />
                     </div>
                 </div>
             )
         },
         {
-            icon: 'campaign', name: 'Performance Studio', slug: 'performance-studio', desc: 'AI ad strategist that plans budgets & generates Meta/Google campaigns.', color: 'from-emerald-500 to-teal-600', tag: 'Ads', accentHex: '#10b981',
+            icon: 'campaign', name: 'Performance Studio', slug: 'performance-studio', desc: 'AI ad strategist that plans budgets & generates Meta/Google campaigns.', color: 'bg-[var(--sys-surface)] border border-[var(--sys-border)]', tag: 'Ads', accentHex: '#10b981',
             preview: () => (
                 <div className="h-full w-full flex items-center justify-center relative overflow-hidden group">
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#08080c] via-transparent to-transparent z-10 pointer-events-none opacity-80" />
+                    <div className="absolute inset-0 bg-[var(--sys-surface)] border border-[var(--sys-border)] z-10 pointer-events-none opacity-80" />
                     <div className="relative rounded-xl overflow-hidden border border-[#48474c]/30 shadow-[0_15px_50px_rgba(0,0,0,0.8)] w-[90%] mx-auto transition-transform duration-500 group-hover:scale-[1.02]">
-                        <div className="h-6 bg-[#121217] border-b border-[#48474c]/30 flex items-center px-3 gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-red-500/20 border border-red-500/50" /><div className="w-2.5 h-2.5 rounded-full bg-yellow-500/20 border border-yellow-500/50" /><div className="w-2.5 h-2.5 rounded-full bg-green-500/20 border border-green-500/50" /></div>
+                        <div className="h-6 bg-[var(--sys-surface)] border-b border-[#48474c]/30 flex items-center px-3 gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-[var(--sys-primary-dim)] border border-[var(--sys-border)]" /><div className="w-2.5 h-2.5 rounded-full bg-yellow-500/20 border border-yellow-500/50" /><div className="w-2.5 h-2.5 rounded-full bg-green-500/20 border border-green-500/50" /></div>
                         <img src="/screenshots/performance-studio.png" alt="Performance Studio" className="w-full h-auto object-cover object-top opacity-80 group-hover:opacity-100 transition-opacity duration-700 max-h-[300px]" />
                     </div>
                 </div>
             )
         },
         {
-            icon: 'search', name: 'SEO Studio', slug: 'seo-studio', desc: 'Rank rapidly with automated keyword planning and real-time site audits.', color: 'from-amber-500 to-orange-500', tag: 'Traffic', accentHex: '#f59e0b',
+            icon: 'search', name: 'SEO Studio', slug: 'seo-studio', desc: 'Rank rapidly with automated keyword planning and real-time site audits.', color: 'bg-[var(--sys-surface)] border border-[var(--sys-border)]', tag: 'Traffic', accentHex: '#f59e0b',
             preview: () => (
                 <div className="h-full w-full flex items-center justify-center relative overflow-hidden group">
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#08080c] via-transparent to-transparent z-10 pointer-events-none opacity-80" />
+                    <div className="absolute inset-0 bg-[var(--sys-surface)] border border-[var(--sys-border)] z-10 pointer-events-none opacity-80" />
                     <div className="relative rounded-xl overflow-hidden border border-[#48474c]/30 shadow-[0_15px_50px_rgba(0,0,0,0.8)] w-[90%] mx-auto transition-transform duration-500 group-hover:scale-[1.02]">
-                        <div className="h-6 bg-[#121217] border-b border-[#48474c]/30 flex items-center px-3 gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-red-500/20 border border-red-500/50" /><div className="w-2.5 h-2.5 rounded-full bg-yellow-500/20 border border-yellow-500/50" /><div className="w-2.5 h-2.5 rounded-full bg-green-500/20 border border-green-500/50" /></div>
+                        <div className="h-6 bg-[var(--sys-surface)] border-b border-[#48474c]/30 flex items-center px-3 gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-[var(--sys-primary-dim)] border border-[var(--sys-border)]" /><div className="w-2.5 h-2.5 rounded-full bg-yellow-500/20 border border-yellow-500/50" /><div className="w-2.5 h-2.5 rounded-full bg-green-500/20 border border-green-500/50" /></div>
                         <img src="/screenshots/seo-studio.png" alt="SEO Studio" className="w-full h-auto object-cover object-top opacity-80 group-hover:opacity-100 transition-opacity duration-700 max-h-[300px]" />
                     </div>
                 </div>
             )
         },
         {
-            icon: 'hub', name: 'Brainstorm Studio', slug: 'brainstorm-studio', desc: 'Collaborate with Fidato (Brand OS AI) on strategy and campaign ideation.', color: 'from-pink-500 to-rose-500', tag: 'Strategy', accentHex: '#ec4899',
+            icon: 'hub', name: 'Brainstorm Studio', slug: 'brainstorm-studio', desc: 'Collaborate with Fidato (Brand OS AI) on strategy and campaign ideation.', color: 'bg-[var(--sys-surface)] border border-[var(--sys-border)]', tag: 'Strategy', accentHex: '#ec4899',
             preview: () => (
                 <div className="h-full w-full flex items-center justify-center relative overflow-hidden group">
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#08080c] via-transparent to-transparent z-10 pointer-events-none opacity-80" />
+                    <div className="absolute inset-0 bg-[var(--sys-surface)] border border-[var(--sys-border)] z-10 pointer-events-none opacity-80" />
                     <div className="relative rounded-xl overflow-hidden border border-[#48474c]/30 shadow-[0_15px_50px_rgba(0,0,0,0.8)] w-[90%] mx-auto transition-transform duration-500 group-hover:scale-[1.02]">
-                        <div className="h-6 bg-[#121217] border-b border-[#48474c]/30 flex items-center px-3 gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-red-500/20 border border-red-500/50" /><div className="w-2.5 h-2.5 rounded-full bg-yellow-500/20 border border-yellow-500/50" /><div className="w-2.5 h-2.5 rounded-full bg-green-500/20 border border-green-500/50" /></div>
+                        <div className="h-6 bg-[var(--sys-surface)] border-b border-[#48474c]/30 flex items-center px-3 gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-[var(--sys-primary-dim)] border border-[var(--sys-border)]" /><div className="w-2.5 h-2.5 rounded-full bg-yellow-500/20 border border-yellow-500/50" /><div className="w-2.5 h-2.5 rounded-full bg-green-500/20 border border-green-500/50" /></div>
                         <img src="/screenshots/brainstorm-studio.png" alt="Brainstorm Studio" className="w-full h-auto object-cover object-top opacity-80 group-hover:opacity-100 transition-opacity duration-700 max-h-[300px]" />
                     </div>
                 </div>
@@ -157,9 +157,9 @@ export default function Landing() {
             icon: 'analytics', name: 'D2C Analytics', slug: 'd2c-analytics', desc: 'Direct Shopify integration feeding live telemetry into your Command Center.', color: 'from-cyan-500 to-sky-500', tag: 'Sales', accentHex: '#06b6d4',
             preview: () => (
                 <div className="h-full w-full flex items-center justify-center relative overflow-hidden group">
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#08080c] via-transparent to-transparent z-10 pointer-events-none opacity-80" />
+                    <div className="absolute inset-0 bg-[var(--sys-surface)] border border-[var(--sys-border)] z-10 pointer-events-none opacity-80" />
                     <div className="relative rounded-xl overflow-hidden border border-[#48474c]/30 shadow-[0_15px_50px_rgba(0,0,0,0.8)] w-[90%] mx-auto transition-transform duration-500 group-hover:scale-[1.02]">
-                        <div className="h-6 bg-[#121217] border-b border-[#48474c]/30 flex items-center px-3 gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-red-500/20 border border-red-500/50" /><div className="w-2.5 h-2.5 rounded-full bg-yellow-500/20 border border-yellow-500/50" /><div className="w-2.5 h-2.5 rounded-full bg-green-500/20 border border-green-500/50" /></div>
+                        <div className="h-6 bg-[var(--sys-surface)] border-b border-[#48474c]/30 flex items-center px-3 gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-[var(--sys-primary-dim)] border border-[var(--sys-border)]" /><div className="w-2.5 h-2.5 rounded-full bg-yellow-500/20 border border-yellow-500/50" /><div className="w-2.5 h-2.5 rounded-full bg-green-500/20 border border-green-500/50" /></div>
                         <img src="/screenshots/d2c-studio.png" alt="D2C Analytics" className="w-full h-auto object-cover object-top opacity-80 group-hover:opacity-100 transition-opacity duration-700 max-h-[300px]" />
                     </div>
                 </div>
@@ -169,9 +169,9 @@ export default function Landing() {
             icon: 'calendar_month', name: 'Smart Calendar', slug: 'smart-calendar', desc: 'Schedule and deploy intelligent content across connected API networks.', color: 'from-[#ff4d00] to-[#ff7a00]', tag: 'Social', accentHex: '#ff4d00',
             preview: () => (
                 <div className="h-full w-full flex items-center justify-center relative overflow-hidden group">
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#08080c] via-transparent to-transparent z-10 pointer-events-none opacity-80" />
+                    <div className="absolute inset-0 bg-[var(--sys-surface)] border border-[var(--sys-border)] z-10 pointer-events-none opacity-80" />
                     <div className="relative rounded-xl overflow-hidden border border-[#48474c]/30 shadow-[0_15px_50px_rgba(0,0,0,0.8)] w-[90%] mx-auto transition-transform duration-500 group-hover:scale-[1.02]">
-                        <div className="h-6 bg-[#121217] border-b border-[#48474c]/30 flex items-center px-3 gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-red-500/20 border border-red-500/50" /><div className="w-2.5 h-2.5 rounded-full bg-yellow-500/20 border border-yellow-500/50" /><div className="w-2.5 h-2.5 rounded-full bg-green-500/20 border border-green-500/50" /></div>
+                        <div className="h-6 bg-[var(--sys-surface)] border-b border-[#48474c]/30 flex items-center px-3 gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-[var(--sys-primary-dim)] border border-[var(--sys-border)]" /><div className="w-2.5 h-2.5 rounded-full bg-yellow-500/20 border border-yellow-500/50" /><div className="w-2.5 h-2.5 rounded-full bg-green-500/20 border border-green-500/50" /></div>
                         <img src="/screenshots/smart-calendar.png" alt="Smart Calendar" className="w-full h-auto object-cover object-top opacity-80 group-hover:opacity-100 transition-opacity duration-700 max-h-[300px]" />
                     </div>
                 </div>
@@ -182,10 +182,10 @@ export default function Landing() {
     const usps = [
         { icon: 'hub', title: 'Agentic AI Architecture', desc: 'Not prompts — entire AI agent teams. Each studio runs a chain of specialized agents (Researcher, Strategist, Creator) that collaborate like a real marketing team.', gradient: 'from-violet-500/20 to-purple-500/20', iconColor: 'text-violet-400' },
         { icon: 'genetics', title: 'Brand DNA Engine', desc: 'Scan any website in 60 seconds. AI extracts logo, colors, fonts, voice, tone & visual identity — then uses it across every piece of content you create.', gradient: 'from-primary/20 to-[#ff7a00]/20', iconColor: 'text-primary' },
-        { icon: 'auto_awesome', title: 'Multi-Model Intelligence', desc: 'Access Gemini, Claude, GPT-4o, Grok & Imagen in one platform. Each task routes to the best model — no lock-in, maximum quality.', gradient: 'from-amber-500/20 to-orange-500/20', iconColor: 'text-amber-400' },
-        { icon: 'trending_up', title: 'Real-Time Trending', desc: 'Google Trends + Grok-powered intelligence feeds every studio with what\'s trending NOW — so your content is always relevant.', gradient: 'from-emerald-500/20 to-teal-500/20', iconColor: 'text-emerald-400' },
-        { icon: 'groups', title: 'Team Collaboration', desc: 'Multi-user workspaces, approval workflows, brand-level permissions & team chat — built for marketing teams, not solo users.', gradient: 'from-cyan-500/20 to-sky-500/20', iconColor: 'text-cyan-400' },
-        { icon: 'lock', title: 'Enterprise-Ready', desc: 'SOC 2 compliance, SSO, dedicated support, white-labeling & custom integrations. Scale from startup to enterprise.', gradient: 'from-rose-500/20 to-pink-500/20', iconColor: 'text-rose-400' },
+        { icon: 'auto_awesome', title: 'Multi-Model Intelligence', desc: 'Access Gemini, Claude, GPT-4o, Grok & Imagen in one platform. Each task routes to the best model — no lock-in, maximum quality.', gradient: 'bg-[var(--sys-surface)] border border-[var(--sys-border)]', iconColor: 'text-primary' },
+        { icon: 'trending_up', title: 'Real-Time Trending', desc: 'Google Trends + Grok-powered intelligence feeds every studio with what\'s trending NOW — so your content is always relevant.', gradient: 'bg-[var(--sys-surface)] border border-[var(--sys-border)]', iconColor: 'text-primary' },
+        { icon: 'groups', title: 'Team Collaboration', desc: 'Multi-user workspaces, approval workflows, brand-level permissions & team chat — built for marketing teams, not solo users.', gradient: 'from-cyan-500/20 to-sky-500/20', iconColor: 'text-primary' },
+        { icon: 'lock', title: 'Enterprise-Ready', desc: 'SOC 2 compliance, SSO, dedicated support, white-labeling & custom integrations. Scale from startup to enterprise.', gradient: 'bg-[var(--sys-surface)] border border-[var(--sys-border)]', iconColor: 'text-primary' },
     ]
 
     return (
@@ -205,7 +205,7 @@ export default function Landing() {
             <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
                 <div className="absolute -top-[30%] -left-[15%] w-[70%] h-[70%] bg-violet-600/[0.07] rounded-full blur-[150px]" />
                 <div className="absolute top-[30%] -right-[15%] w-[60%] h-[60%] bg-primary/[0.06] rounded-full blur-[150px]" />
-                <div className="absolute bottom-[10%] left-[20%] w-[40%] h-[40%] bg-cyan-600/[0.04] rounded-full blur-[120px]" />
+                <div className="absolute bottom-[10%] left-[20%] w-[40%] h-[40%] bg-[var(--sys-surface)]/[0.04] rounded-full blur-[120px]" />
             </div>
 
             {/* ═══════════════════════════════════════════════════════ */}
@@ -214,26 +214,26 @@ export default function Landing() {
             <nav className={`sticky top-0 z-50 w-full px-4 py-3 transition-all duration-500 ${scrolled ? 'backdrop-blur-2xl bg-[#07070f]/80' : ''}`}>
                 <header className="max-w-7xl mx-auto flex items-center justify-between px-6 py-2.5 rounded-2xl" style={scrolled ? { background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' } : {}}>
                     <div className="flex items-center gap-3">
-                        <div className="size-9 rounded-xl overflow-hidden shadow-lg shadow-primary/20">
+                        <div className="size-9 rounded-xl overflow-hidden shadow-none">
                             <img src="/mantram-logo.png" alt="Mantram AI" className="size-9" />
                         </div>
                         <h2 className="text-[#f3eff6] text-xl font-bold tracking-tight">Mantram <span className="text-primary">AI</span></h2>
                     </div>
                     <div className="hidden md:flex items-center gap-8">
-                        <Link to="/about" className="text-slate-400 hover:text-[#f3eff6] text-sm font-medium transition-colors cursor-pointer">About Us</Link>
-                        <button onClick={() => scrollTo('studios')} className="text-slate-400 hover:text-[#f3eff6] text-sm font-medium transition-colors cursor-pointer">Studios</button>
-                        <button onClick={() => scrollTo('usps')} className="text-slate-400 hover:text-[#f3eff6] text-sm font-medium transition-colors cursor-pointer">Why Mantram</button>
-                        <button onClick={() => scrollTo('how-it-works')} className="text-slate-400 hover:text-[#f3eff6] text-sm font-medium transition-colors cursor-pointer">How It Works</button>
-                        <button onClick={() => scrollTo('early-access')} className="text-slate-400 hover:text-[#f3eff6] text-sm font-medium transition-colors cursor-pointer">Early Access</button>
+                        <Link to="/about" className="text-[var(--sys-text-muted)] hover:text-[#f3eff6] text-sm font-medium transition-colors cursor-pointer">About Us</Link>
+                        <button onClick={() => scrollTo('studios')} className="text-[var(--sys-text-muted)] hover:text-[#f3eff6] text-sm font-medium transition-colors cursor-pointer">Studios</button>
+                        <button onClick={() => scrollTo('usps')} className="text-[var(--sys-text-muted)] hover:text-[#f3eff6] text-sm font-medium transition-colors cursor-pointer">Why Mantram</button>
+                        <button onClick={() => scrollTo('how-it-works')} className="text-[var(--sys-text-muted)] hover:text-[#f3eff6] text-sm font-medium transition-colors cursor-pointer">How It Works</button>
+                        <button onClick={() => scrollTo('early-access')} className="text-[var(--sys-text-muted)] hover:text-[#f3eff6] text-sm font-medium transition-colors cursor-pointer">Early Access</button>
                     </div>
                     <div className="flex items-center gap-3">
                         {isAuthenticated ? (
-                            <Link to="/dashboard" className="hidden sm:block text-slate-300 text-sm font-medium px-4 hover:text-[#f3eff6] transition-colors">Dashboard</Link>
+                            <Link to="/dashboard" className="hidden sm:block text-[var(--sys-text-muted)] text-sm font-medium px-4 hover:text-[#f3eff6] transition-colors">Dashboard</Link>
                         ) : (
-                            <Link to="/auth" className="hidden sm:block text-slate-300 text-sm font-medium px-4 hover:text-[#f3eff6] transition-colors">Login</Link>
+                            <Link to="/auth" className="hidden sm:block text-[var(--sys-text-muted)] text-sm font-medium px-4 hover:text-[#f3eff6] transition-colors">Login</Link>
                         )}
                         <button onClick={() => { setShowWaitlist(true); setTimeout(() => scrollTo('early-access'), 100) }}
-                            className="bg-gradient-to-r from-violet-600 to-primary hover:from-violet-500 hover:to-primary-light text-[#f3eff6] text-sm font-bold py-2.5 px-6 rounded-full transition-all transform hover:scale-105 active:scale-95 shadow-lg shadow-violet-500/20 cursor-pointer">
+                            className="bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:from-violet-500 hover:to-primary-light text-[#f3eff6] text-sm font-bold py-2.5 px-6 rounded-full transition-all transform hover:scale-105 active:scale-95 shadow-none cursor-pointer">
                             Get Early Access
                         </button>
                     </div>
@@ -259,10 +259,10 @@ export default function Landing() {
 
                             <h1 className="text-5xl md:text-6xl lg:text-7xl font-black text-[#f3eff6] leading-[1.05] tracking-tight">
                                 Your brand’s<br />
-                                <span className="bg-gradient-to-r from-violet-400 via-primary to-cyan-400 bg-clip-text text-transparent">AI marketing team.</span>
+                                <span className="bg-[var(--sys-surface)] border border-[var(--sys-border)] bg-clip-text text-transparent">AI marketing team.</span>
                             </h1>
 
-                            <p className="text-slate-400 text-lg md:text-xl max-w-lg leading-relaxed">
+                            <p className="text-[var(--sys-text-muted)] text-lg md:text-xl max-w-lg leading-relaxed">
                                 8 AI studios. 20+ models. 20+ languages. From brand intelligence to ad films, social posts, SEO strategy & e-commerce analytics — Mantram AI is<span className="text-[#f3eff6] font-semibold"> your strategic brand consultant</span>, not just another tool.
                             </p>
 
@@ -273,11 +273,11 @@ export default function Landing() {
                             </div>
 
                             <div className="flex flex-col sm:flex-row gap-4">
-                                <button onClick={() => navigate('/auth')} className="px-8 py-4 bg-gradient-to-r from-violet-600 to-primary hover:from-violet-500 hover:to-primary-light text-[#f3eff6] font-bold text-lg rounded-xl shadow-lg shadow-violet-500/25 transition-all hover:shadow-xl hover:shadow-violet-500/30 hover:scale-[1.02] active:scale-[0.98] cursor-pointer flex items-center gap-2 justify-center">
+                                <button onClick={() => navigate('/auth')} className="px-8 py-4 bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:from-violet-500 hover:to-primary-light text-[#f3eff6] font-bold text-lg rounded-xl shadow-none transition-all hover:shadow-xl hover:shadow-none hover:scale-[1.02] active:scale-[0.98] cursor-pointer flex items-center gap-2 justify-center">
                                     <span className="material-symbols-outlined">rocket_launch</span>
                                     Start Building
                                 </button>
-                                <button onClick={() => scrollTo('studios')} className="px-8 py-4 bg-white/[0.04] hover:bg-white/[0.08] text-[#f3eff6] font-semibold text-lg rounded-xl transition-all cursor-pointer flex items-center gap-2 justify-center" style={{ border: '1px solid rgba(255,255,255,0.08)' }}>
+                                <button onClick={() => scrollTo('studios')} className="px-8 py-4 bg-[var(--sys-surface)] hover:bg-[var(--sys-surface)] text-[#f3eff6] font-semibold text-lg rounded-xl transition-all cursor-pointer flex items-center gap-2 justify-center" style={{ border: '1px solid rgba(255,255,255,0.08)' }}>
                                     <span className="material-symbols-outlined">play_circle</span>
                                     Explore Studios
                                 </button>
@@ -289,7 +289,7 @@ export default function Landing() {
                                     { icon: 'translate', text: '20+ Languages' },
                                     { icon: 'insights', text: 'Deep Analytics' },
                                 ].map((b, i) => (
-                                    <div key={i} className="flex items-center gap-1.5 text-slate-500 text-xs font-semibold uppercase tracking-wider">
+                                    <div key={i} className="flex items-center gap-1.5 text-[var(--sys-text-muted)] text-xs font-semibold uppercase tracking-wider">
                                         <span className="material-symbols-outlined text-sm">{b.icon}</span>{b.text}
                                     </div>
                                 ))}
@@ -299,9 +299,9 @@ export default function Landing() {
                         {/* Right: Hero Carousel Showcase */}
                         <div className="relative">
                             {/* Glow frame */}
-                            <div className="absolute -inset-1 rounded-3xl bg-gradient-to-br from-violet-500/30 via-primary/20 to-cyan-500/30 blur-xl animate-glow-pulse" />
+                            <div className="absolute -inset-1 rounded-3xl bg-[var(--sys-surface)] border border-[var(--sys-border)] blur-xl animate-glow-pulse" />
 
-                            <div className="relative aspect-[4/3] rounded-3xl overflow-hidden shadow-2xl shadow-violet-500/10" style={{ border: '1px solid rgba(139,92,246,0.25)' }}>
+                            <div className="relative aspect-[4/3] rounded-3xl overflow-hidden shadow-none" style={{ border: '1px solid rgba(139,92,246,0.25)' }}>
                                 {/* Carousel slides */}
                                 {heroSlides.map((slide, i) => (
                                     <div key={i} className={`absolute inset-0 transition-all duration-700 ease-in-out ${heroSlide === i ? 'opacity-100 scale-100' : 'opacity-0 scale-105'}`}>
@@ -310,15 +310,15 @@ export default function Landing() {
                                 ))}
 
                                 {/* Overlay gradient */}
-                                <div className="absolute inset-0 bg-gradient-to-t from-[#07070f]/80 via-[#07070f]/10 to-transparent" />
+                                <div className="absolute inset-0 bg-[var(--sys-surface)] border border-[var(--sys-border)]" />
 
                                 {/* Navigation arrows */}
                                 <button onClick={() => { setHeroSlide(p => (p - 1 + heroSlides.length) % heroSlides.length); clearInterval(heroInterval.current); heroInterval.current = setInterval(() => setHeroSlide(p => (p + 1) % heroSlides.length), 4000) }}
-                                    className="absolute left-3 top-1/2 -translate-y-1/2 size-9 rounded-full bg-black/30 backdrop-blur-md flex items-center justify-center text-[#f3eff6]/70 hover:text-[#f3eff6] hover:bg-black/50 transition-all z-20 cursor-pointer">
+                                    className="absolute left-3 top-1/2 -translate-y-1/2 size-9 rounded-full bg-[var(--sys-surface)] flex items-center justify-center text-[#f3eff6]/70 hover:text-[#f3eff6] hover:bg-[var(--sys-surface)] transition-all z-20 cursor-pointer">
                                     <span className="material-symbols-outlined text-lg">chevron_left</span>
                                 </button>
                                 <button onClick={() => { setHeroSlide(p => (p + 1) % heroSlides.length); clearInterval(heroInterval.current); heroInterval.current = setInterval(() => setHeroSlide(p => (p + 1) % heroSlides.length), 4000) }}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 size-9 rounded-full bg-black/30 backdrop-blur-md flex items-center justify-center text-[#f3eff6]/70 hover:text-[#f3eff6] hover:bg-black/50 transition-all z-20 cursor-pointer">
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 size-9 rounded-full bg-[var(--sys-surface)] flex items-center justify-center text-[#f3eff6]/70 hover:text-[#f3eff6] hover:bg-[var(--sys-surface)] transition-all z-20 cursor-pointer">
                                     <span className="material-symbols-outlined text-lg">chevron_right</span>
                                 </button>
 
@@ -327,38 +327,38 @@ export default function Landing() {
                                     <div className="flex items-center justify-between mb-2">
                                         <div>
                                             <p className="text-[#f3eff6] text-sm font-bold">{heroSlides[heroSlide]?.label}</p>
-                                            <p className="text-slate-400 text-[11px] max-w-sm">{heroSlides[heroSlide]?.sub}</p>
+                                            <p className="text-[var(--sys-text-muted)] text-[11px] max-w-sm">{heroSlides[heroSlide]?.sub}</p>
                                         </div>
                                     </div>
                                     <div className="flex gap-1.5">
                                         {heroSlides.map((_, i) => (
                                             <button key={i} onClick={() => { setHeroSlide(i); clearInterval(heroInterval.current); heroInterval.current = setInterval(() => setHeroSlide(p => (p + 1) % heroSlides.length), 4000) }}
-                                                className={`h-1 rounded-full transition-all duration-300 cursor-pointer ${heroSlide === i ? 'w-6 bg-violet-500' : 'w-2 bg-white/20 hover:bg-white/40'}`} />
+                                                className={`h-1 rounded-full transition-all duration-300 cursor-pointer ${heroSlide === i ? 'w-6 bg-violet-500' : 'w-2 bg-[var(--sys-surface)] hover:bg-[var(--sys-surface)]'}`} />
                                         ))}
                                     </div>
                                 </div>
                             </div>
 
                             {/* Floating feature cards */}
-                            <div className="absolute -bottom-6 -left-6 px-4 py-3 rounded-2xl backdrop-blur-xl shadow-2xl animate-float z-20" style={{ background: 'rgba(15,15,30,0.9)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                            <div className="absolute -bottom-6 -left-6 px-4 py-3 rounded-2xl shadow-2xl animate-float z-20" style={{ background: 'rgba(15,15,30,0.9)', border: '1px solid rgba(255,255,255,0.08)' }}>
                                 <div className="flex items-center gap-3">
                                     <div className="size-10 rounded-xl bg-violet-500/20 flex items-center justify-center">
                                         <span className="material-symbols-outlined text-violet-400">genetics</span>
                                     </div>
                                     <div>
                                         <p className="text-[#f3eff6] text-sm font-bold">Brand DNA</p>
-                                        <p className="text-slate-500 text-[10px]">60-second website scan</p>
+                                        <p className="text-[var(--sys-text-muted)] text-[10px]">60-second website scan</p>
                                     </div>
                                 </div>
                             </div>
-                            <div className="absolute -top-4 -right-4 px-4 py-3 rounded-2xl backdrop-blur-xl shadow-2xl z-20" style={{ background: 'rgba(15,15,30,0.9)', border: '1px solid rgba(255,255,255,0.08)', animation: 'float 3s ease-in-out 1s infinite' }}>
+                            <div className="absolute -top-4 -right-4 px-4 py-3 rounded-2xl shadow-2xl z-20" style={{ background: 'rgba(15,15,30,0.9)', border: '1px solid rgba(255,255,255,0.08)', animation: 'float 3s ease-in-out 1s infinite' }}>
                                 <div className="flex items-center gap-3">
-                                    <div className="size-10 rounded-xl bg-emerald-500/20 flex items-center justify-center">
-                                        <span className="material-symbols-outlined text-emerald-400">trending_up</span>
+                                    <div className="size-10 rounded-xl bg-[var(--sys-primary-dim)] flex items-center justify-center">
+                                        <span className="material-symbols-outlined text-primary">trending_up</span>
                                     </div>
                                     <div>
                                         <p className="text-[#f3eff6] text-sm font-bold">Live Trends</p>
-                                        <p className="text-slate-500 text-[10px]">Grok-powered intelligence</p>
+                                        <p className="text-[var(--sys-text-muted)] text-[10px]">Grok-powered intelligence</p>
                                     </div>
                                 </div>
                             </div>
@@ -380,7 +380,7 @@ export default function Landing() {
                             <div key={i} className="text-center group">
                                 <span className="material-symbols-outlined text-[#f3eff6]/10 text-3xl mb-2 block group-hover:text-primary/30 transition-colors">{s.icon}</span>
                                 <p className="text-4xl font-black text-[#f3eff6] mb-1">{s.value}</p>
-                                <p className="text-slate-500 text-sm font-medium uppercase tracking-wider">{s.label}</p>
+                                <p className="text-[var(--sys-text-muted)] text-sm font-medium uppercase tracking-wider">{s.label}</p>
                             </div>
                         ))}
                     </div>
@@ -390,11 +390,11 @@ export default function Landing() {
                 {/*  SOCIAL MEDIA PLATFORMS MARQUEE                         */}
                 {/* ═══════════════════════════════════════════════════════ */}
                 <section className="py-14 overflow-hidden">
-                    <p className="text-center text-slate-600 text-xs font-bold uppercase tracking-[0.25em] mb-10">Create & publish content for every platform</p>
+                    <p className="text-center text-[var(--sys-text-muted)] text-xs font-bold uppercase tracking-[0.25em] mb-10">Create & publish content for every platform</p>
                     <div className="relative">
                         {/* Fade edges */}
-                        <div className="absolute left-0 top-0 bottom-0 w-24 bg-gradient-to-r from-[#07070f] to-transparent z-10" />
-                        <div className="absolute right-0 top-0 bottom-0 w-24 bg-gradient-to-l from-[#07070f] to-transparent z-10" />
+                        <div className="absolute left-0 top-0 bottom-0 w-24 bg-[var(--sys-surface)] border border-[var(--sys-border)] z-10" />
+                        <div className="absolute right-0 top-0 bottom-0 w-24 bg-[var(--sys-surface)] border border-[var(--sys-border)] z-10" />
                         <div className="flex gap-12 animate-marquee">
                             {[...Array(2)].map((_, setIdx) => (
                                 <div key={setIdx} className="flex gap-12 shrink-0">
@@ -414,7 +414,7 @@ export default function Landing() {
                                             <div className="size-16 rounded-2xl flex items-center justify-center transition-all duration-300 group-hover:scale-110 group-hover:shadow-lg" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
                                                  
                                             </div>
-                                            <span className="text-[11px] text-slate-500 font-semibold whitespace-nowrap">{p.name}</span>
+                                            <span className="text-[11px] text-[var(--sys-text-muted)] font-semibold whitespace-nowrap">{p.name}</span>
                                         </div>
                                     ))}
                                 </div>
@@ -430,9 +430,9 @@ export default function Landing() {
                     <div className="text-center mb-16">
                         <p className="text-primary text-sm font-bold uppercase tracking-widest mb-3">The Studio Ecosystem</p>
                         <h2 className="text-4xl md:text-5xl font-black text-[#f3eff6] mb-5">
-                            8 Studios. <span className="bg-gradient-to-r from-violet-400 to-cyan-400 bg-clip-text text-transparent">One Platform.</span>
+                            8 Studios. <span className="bg-[var(--sys-surface)] border border-[var(--sys-border)] bg-clip-text text-transparent">One Platform.</span>
                         </h2>
-                        <p className="text-slate-400 text-lg max-w-2xl mx-auto">Every marketing function — content, design, video, ads, SEO, e-commerce, conversations & strategy — each powered by specialized AI agent teams.</p>
+                        <p className="text-[var(--sys-text-muted)] text-lg max-w-2xl mx-auto">Every marketing function — content, design, video, ads, SEO, e-commerce, conversations & strategy — each powered by specialized AI agent teams.</p>
                     </div>
 
                     {/* Interactive tabbed studio explorer */}
@@ -441,9 +441,9 @@ export default function Landing() {
                         <div className="flex lg:flex-col gap-2 overflow-x-auto lg:overflow-x-visible pb-4 lg:pb-0 lg:max-h-[600px] lg:overflow-y-auto studio-scrollbar">
                             {studios.map((s, i) => (
                                 <button key={i} onClick={() => setActiveStudio(i)}
-                                    className={`flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-300 cursor-pointer text-left flex-shrink-0 lg:flex-shrink group ${activeStudio === i ? 'scale-[1.02]' : 'hover:bg-white/[0.03]'}`}
+                                    className={`flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-300 cursor-pointer text-left flex-shrink-0 lg:flex-shrink group ${activeStudio === i ? 'scale-[1.02]' : 'hover:bg-[var(--sys-surface)]'}`}
                                     style={{
-                                        background: activeStudio === i ? `linear-gradient(135deg, ${s.accentHex}10, ${s.accentHex}05)` : 'transparent',
+                                        background: activeStudio === i ? `var(--sys-primary)` : 'transparent',
                                         border: activeStudio === i ? `1px solid ${s.accentHex}30` : '1px solid transparent',
                                     }}>
                                     <div className={`size-10 rounded-xl bg-gradient-to-br ${s.color} flex items-center justify-center flex-shrink-0 shadow-lg transition-transform ${activeStudio === i ? 'scale-110' : 'group-hover:scale-105'}`}>
@@ -451,10 +451,10 @@ export default function Landing() {
                                     </div>
                                     <div className="min-w-0">
                                         <div className="flex items-center gap-2">
-                                            <h3 className={`font-bold text-sm whitespace-nowrap ${activeStudio === i ? 'text-[#f3eff6]' : 'text-slate-400'}`}>{s.name}</h3>
-                                            <span className="text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-white/[0.06] text-slate-500 hidden lg:inline">{s.tag}</span>
+                                            <h3 className={`font-bold text-sm whitespace-nowrap ${activeStudio === i ? 'text-[#f3eff6]' : 'text-[var(--sys-text-muted)]'}`}>{s.name}</h3>
+                                            <span className="text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-[var(--sys-surface)] text-[var(--sys-text-muted)] hidden lg:inline">{s.tag}</span>
                                         </div>
-                                        <p className="text-slate-600 text-[11px] truncate hidden lg:block mt-0.5">{s.desc.slice(0, 50)}...</p>
+                                        <p className="text-[var(--sys-text-muted)] text-[11px] truncate hidden lg:block mt-0.5">{s.desc.slice(0, 50)}...</p>
                                     </div>
                                     {activeStudio === i && <div className="hidden lg:block ml-auto"><span className="material-symbols-outlined text-sm" style={{ color: s.accentHex }}>chevron_right</span></div>}
                                 </button>
@@ -474,12 +474,12 @@ export default function Landing() {
                                                 </div>
                                                 <div>
                                                     <h3 className="text-[#f3eff6] font-bold text-xl">{s.name}</h3>
-                                                    <p className="text-slate-500 text-xs">{s.tag} • AI-Powered</p>
+                                                    <p className="text-[var(--sys-text-muted)] text-xs">{s.tag} • AI-Powered</p>
                                                 </div>
                                             </div>
                                             <div className="flex items-center gap-2">
                                                 <div className="flex gap-1.5">
-                                                    <div className="size-3 rounded-full bg-red-500/40" />
+                                                    <div className="size-3 rounded-full bg-[var(--sys-primary-dim)]" />
                                                     <div className="size-3 rounded-full bg-yellow-500/40" />
                                                     <div className="size-3 rounded-full bg-green-500/40" />
                                                 </div>
@@ -493,8 +493,8 @@ export default function Landing() {
 
                                         {/* Preview footer */}
                                         <div className="mt-6 pt-4 flex items-center justify-between" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
-                                            <p className="text-slate-500 text-xs max-w-md">{s.desc}</p>
-                                            <Link to={`/studio/${s.slug}`} className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg cursor-pointer hover:bg-white/[0.05] transition-colors" style={{ color: s.accentHex }}>
+                                            <p className="text-[var(--sys-text-muted)] text-xs max-w-md">{s.desc}</p>
+                                            <Link to={`/studio/${s.slug}`} className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg cursor-pointer hover:bg-[var(--sys-surface)] transition-colors" style={{ color: s.accentHex }}>
                                                 <span>Explore</span>
                                                 <span className="material-symbols-outlined text-sm">arrow_forward</span>
                                             </Link>
@@ -514,7 +514,7 @@ export default function Landing() {
                         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[700px] bg-lime-500/[0.04] rounded-full blur-[150px]" />
                     </div>
                     <div className="max-w-6xl mx-auto px-6 relative z-10">
-                        <div className="rounded-3xl p-1 mb-16" style={{ background: 'linear-gradient(135deg, rgba(132,204,22,0.25), rgba(16,185,129,0.15), rgba(132,204,22,0.25))', boxShadow: '0 0 60px rgba(132,204,22,0.08)' }}>
+                        <div className="rounded-3xl p-1 mb-16" style={{ background: 'var(--sys-primary), rgba(16,185,129,0.15), rgba(132,204,22,0.25))', boxShadow: '0 0 60px rgba(132,204,22,0.08)' }}>
                             <div className="rounded-[20px] p-8 md:p-12" style={{ background: 'rgba(7,7,15,0.95)' }}>
                                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
                                     <div>
@@ -523,12 +523,12 @@ export default function Landing() {
                                             <span>⭐</span> Flagship Feature
                                         </div>
                                         <h2 className="text-3xl md:text-4xl font-black text-[#f3eff6] mb-4">
-                                            What if <span className="bg-gradient-to-r from-lime-400 to-emerald-400 bg-clip-text text-transparent">you could build your own AI marketing team?</span>
+                                            What if <span className="bg-[var(--sys-surface)] border border-[var(--sys-border)] bg-clip-text text-transparent">you could build your own AI marketing team?</span>
                                         </h2>
-                                        <p className="text-slate-400 text-base leading-relaxed mb-4">
+                                        <p className="text-[var(--sys-text-muted)] text-base leading-relaxed mb-4">
                                             Skill Hub isn't just another automation tool — it's your personal marketing skill factory. Build custom AI workflows that think, create and execute like your best team member, on demand, every time.
                                         </p>
-                                        <p className="text-slate-500 text-sm leading-relaxed mb-6 italic">
+                                        <p className="text-[var(--sys-text-muted)] text-sm leading-relaxed mb-6 italic">
                                             "Create a Diwali campaign" → Your skill generates 10 posts, 5 reels, ad copy, email sequence & a content calendar. In 60 seconds. Every year.
                                         </p>
                                         <div className="flex flex-wrap gap-2">
@@ -559,7 +559,7 @@ export default function Landing() {
                         </div>
 
                         {/* GEO Highlight */}
-                        <div className="rounded-3xl p-1 mb-16" style={{ background: 'linear-gradient(135deg, rgba(59,130,246,0.2), rgba(139,92,246,0.15), rgba(6,182,212,0.2))', boxShadow: '0 0 60px rgba(59,130,246,0.06)' }}>
+                        <div className="rounded-3xl p-1 mb-16" style={{ background: 'var(--sys-primary), rgba(139,92,246,0.15), rgba(6,182,212,0.2))', boxShadow: '0 0 60px rgba(59,130,246,0.06)' }}>
                             <div className="rounded-[20px] p-8 md:p-12" style={{ background: 'rgba(7,7,15,0.95)' }}>
                                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
                                     <div>
@@ -568,19 +568,19 @@ export default function Landing() {
                                             <span className="material-symbols-outlined text-xs">travel_explore</span> The Future of Search
                                         </div>
                                         <h2 className="text-3xl md:text-4xl font-black text-[#f3eff6] mb-4">
-                                            Google is <span className="line-through text-slate-600">not</span> the only search engine anymore. <span className="bg-gradient-to-r from-blue-400 via-violet-400 to-cyan-400 bg-clip-text text-transparent">Is your brand ready?</span>
+                                            Google is <span className="line-through text-[var(--sys-text-muted)]">not</span> the only search engine anymore. <span className="bg-[var(--sys-surface)] border border-[var(--sys-border)] bg-clip-text text-transparent">Is your brand ready?</span>
                                         </h2>
-                                        <p className="text-slate-400 text-base leading-relaxed mb-4">
+                                        <p className="text-[var(--sys-text-muted)] text-base leading-relaxed mb-4">
                                             When someone asks ChatGPT, Perplexity or Claude about your industry — does your brand show up? GEO (Generative Engine Optimization) ensures your content is visible where the next billion searches happen.
                                         </p>
                                         <div className="rounded-xl p-4 mb-6" style={{ background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.1)' }}>
-                                            <p className="text-blue-300/80 text-sm font-medium italic">"🔍 What's the best skincare brand for oily skin in India?"</p>
-                                            <p className="text-slate-500 text-xs mt-2">GEO ensures your brand appears in AI-generated answers, not just traditional search results.</p>
+                                            <p className="text-[var(--sys-primary)] text-sm font-medium italic">"🔍 What's the best skincare brand for oily skin in India?"</p>
+                                            <p className="text-[var(--sys-text-muted)] text-xs mt-2">GEO ensures your brand appears in AI-generated answers, not just traditional search results.</p>
                                         </div>
-                                        <div className="flex flex-wrap items-center gap-4 text-sm text-slate-500">
-                                            <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-blue-500" /> AI Search Visibility</span>
+                                        <div className="flex flex-wrap items-center gap-4 text-sm text-[var(--sys-text-muted)]">
+                                            <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-[var(--sys-surface)]" /> AI Search Visibility</span>
                                             <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-violet-500" /> LLM Brand Probe</span>
-                                            <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-cyan-500" /> Prompt Mining</span>
+                                            <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-[var(--sys-surface)]" /> Prompt Mining</span>
                                         </div>
                                     </div>
                                     <div className="flex items-center justify-center">
@@ -608,26 +608,26 @@ export default function Landing() {
 
                         {/* Fidato + Other Features Grid */}
                         <div className="text-center mb-10">
-                            <p className="text-cyan-400 text-sm font-bold uppercase tracking-widest mb-3">Platform Features</p>
+                            <p className="text-primary text-sm font-bold uppercase tracking-widest mb-3">Platform Features</p>
                             <h2 className="text-3xl md:text-4xl font-black text-[#f3eff6] mb-4">
-                                Beyond Studios. <span className="bg-gradient-to-r from-cyan-400 to-violet-400 bg-clip-text text-transparent">Powerful Platform Features.</span>
+                                Beyond Studios. <span className="bg-[var(--sys-surface)] border border-[var(--sys-border)] bg-clip-text text-transparent">Powerful Platform Features.</span>
                             </h2>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                             {[
                                 { icon: 'smart_toy', title: 'Fidato AI Assistant', desc: 'One command bar to rule all studios. Ask anything, run skills, generate content — Fidato orchestrates your entire marketing stack.', color: 'from-sky-500/20 to-[#ff7a00]/20', iconColor: 'text-sky-400', accent: 'rgba(14,165,233,0.15)' },
-                                { icon: 'calendar_month', title: 'Smart Calendar', desc: 'Marketing intelligence calendar — trending moments, festivals, and AI-suggested content dates with platform-aware scheduling.', color: 'from-teal-500/20 to-emerald-500/20', iconColor: 'text-teal-400', accent: 'rgba(20,184,166,0.15)' },
-                                { icon: 'analytics', title: 'Analytics Intelligence', desc: 'Traffic intelligence, audience insights, Google Analytics integration & AI-powered growth strategies.', color: 'from-indigo-500/20 to-violet-500/20', iconColor: 'text-indigo-400', accent: 'rgba(99,102,241,0.15)' },
+                                { icon: 'calendar_month', title: 'Smart Calendar', desc: 'Marketing intelligence calendar — trending moments, festivals, and AI-suggested content dates with platform-aware scheduling.', color: 'bg-[var(--sys-surface)] border border-[var(--sys-border)]', iconColor: 'text-primary', accent: 'rgba(20,184,166,0.15)' },
+                                { icon: 'analytics', title: 'Analytics Intelligence', desc: 'Traffic intelligence, audience insights, Google Analytics integration & AI-powered growth strategies.', color: 'from-indigo-500/20 to-violet-500/20', iconColor: 'text-primary', accent: 'rgba(99,102,241,0.15)' },
                                 { icon: 'genetics', title: 'Brand DNA Engine', desc: 'Scan any website in 60 seconds. AI extracts logo, colors, fonts, voice & visual identity — used across every studio.', color: 'from-violet-500/20 to-purple-500/20', iconColor: 'text-violet-400', accent: 'rgba(139,92,246,0.15)' },
-                                { icon: 'auto_awesome', title: 'Multi-Model AI', desc: 'Access Gemini, Claude, GPT-4o, Grok & Imagen in one platform. Each task routes to the best model automatically.', color: 'from-amber-500/20 to-orange-500/20', iconColor: 'text-amber-400', accent: 'rgba(245,158,11,0.15)' },
-                                { icon: 'trending_up', title: 'Real-Time Trends', desc: 'Google Trends + Grok-powered intelligence feeds every studio with what\'s trending NOW — always relevant content.', color: 'from-emerald-500/20 to-teal-500/20', iconColor: 'text-emerald-400', accent: 'rgba(16,185,129,0.15)' },
+                                { icon: 'auto_awesome', title: 'Multi-Model AI', desc: 'Access Gemini, Claude, GPT-4o, Grok & Imagen in one platform. Each task routes to the best model automatically.', color: 'bg-[var(--sys-surface)] border border-[var(--sys-border)]', iconColor: 'text-primary', accent: 'rgba(245,158,11,0.15)' },
+                                { icon: 'trending_up', title: 'Real-Time Trends', desc: 'Google Trends + Grok-powered intelligence feeds every studio with what\'s trending NOW — always relevant content.', color: 'bg-[var(--sys-surface)] border border-[var(--sys-border)]', iconColor: 'text-primary', accent: 'rgba(16,185,129,0.15)' },
                             ].map((f, i) => (
                                 <div key={i} className="rounded-2xl p-6 transition-all duration-300 hover:translate-y-[-3px] group" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
                                     <div className={`size-12 rounded-xl bg-gradient-to-br ${f.color} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`} style={{ border: '1px solid rgba(255,255,255,0.05)' }}>
                                         <span className={`material-symbols-outlined text-2xl ${f.iconColor}`}>{f.icon}</span>
                                     </div>
                                     <h3 className="text-[#f3eff6] font-bold text-lg mb-2">{f.title}</h3>
-                                    <p className="text-slate-400 text-sm leading-relaxed">{f.desc}</p>
+                                    <p className="text-[var(--sys-text-muted)] text-sm leading-relaxed">{f.desc}</p>
                                 </div>
                             ))}
                         </div>
@@ -640,9 +640,9 @@ export default function Landing() {
                 <section id="usps" className="py-24" style={{ background: 'rgba(255,255,255,0.01)' }}>
                     <div className="max-w-7xl mx-auto px-6">
                         <div className="text-center mb-16">
-                            <p className="text-emerald-400 text-sm font-bold uppercase tracking-widest mb-3">Why Mantram AI</p>
+                            <p className="text-primary text-sm font-bold uppercase tracking-widest mb-3">Why Mantram AI</p>
                             <h2 className="text-4xl md:text-5xl font-black text-[#f3eff6] mb-5">
-                                Not another AI tool.<br /><span className="bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">A marketing operating system.</span>
+                                Not another AI tool.<br /><span className="bg-[var(--sys-surface)] border border-[var(--sys-border)] bg-clip-text text-transparent">A marketing operating system.</span>
                             </h2>
                         </div>
 
@@ -655,7 +655,7 @@ export default function Landing() {
                                         <span className={`material-symbols-outlined text-3xl ${u.iconColor}`}>{u.icon}</span>
                                     </div>
                                     <h3 className="text-[#f3eff6] font-bold text-xl mb-3">{u.title}</h3>
-                                    <p className="text-slate-400 text-sm leading-relaxed">{u.desc}</p>
+                                    <p className="text-[var(--sys-text-muted)] text-sm leading-relaxed">{u.desc}</p>
                                 </div>
                             ))}
                         </div>
@@ -667,11 +667,11 @@ export default function Landing() {
                 {/* ═══════════════════════════════════════════════════════ */}
                 <section className="max-w-7xl mx-auto px-6 py-24">
                     <div className="text-center mb-16">
-                        <p className="text-pink-400 text-sm font-bold uppercase tracking-widest mb-3">One Platform, Every Scale</p>
+                        <p className="text-primary text-sm font-bold uppercase tracking-widest mb-3">One Platform, Every Scale</p>
                         <h2 className="text-4xl md:text-5xl font-black text-[#f3eff6] mb-5">
-                            Built for <span className="bg-gradient-to-r from-pink-400 via-rose-400 to-orange-400 bg-clip-text text-transparent">every business.</span>
+                            Built for <span className="bg-[var(--sys-surface)] border border-[var(--sys-border)] bg-clip-text text-transparent">every business.</span>
                         </h2>
-                        <p className="text-slate-400 text-lg max-w-2xl mx-auto">
+                        <p className="text-[var(--sys-text-muted)] text-lg max-w-2xl mx-auto">
                             Whether you're a solo creator or a Fortune 500 brand — Mantram AI adapts to your scale, your goals, and your ambition.
                         </p>
                     </div>
@@ -679,20 +679,20 @@ export default function Landing() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                         {[
                             { emoji: '🚀', segment: 'Solopreneurs', tagline: 'Your entire team, for one', desc: 'Content, design, video, ads — all from one dashboard. No freelancers, no agencies. Just you and your AI marketing team.', highlights: ['1-click content', 'Brand consistency', 'Zero learning curve'], gradient: 'from-violet-500/20 to-purple-500/20', border: 'rgba(139,92,246,0.2)' },
-                            { emoji: '📈', segment: 'SMBs', tagline: 'Enterprise power, startup speed', desc: 'Compete with brands 10x your size. AI-powered strategy, analytics & content production at a fraction of the cost.', highlights: ['Market intelligence', 'Competitor tracking', 'Budget-smart campaigns'], gradient: 'from-blue-500/20 to-cyan-500/20', border: 'rgba(59,130,246,0.2)' },
-                            { emoji: '🛒', segment: 'D2C Brands', tagline: 'From product to purchase', desc: 'Shopify intelligence, product campaigns, catalog content, performance analytics & conversion optimization — all connected.', highlights: ['Shopify integration', 'Product velocity', 'ROAS optimization'], gradient: 'from-emerald-500/20 to-teal-500/20', border: 'rgba(16,185,129,0.2)' },
-                            { emoji: '🏢', segment: 'Agencies', tagline: 'Scale without hiring', desc: 'Manage multiple brands, each with unique DNA. White-label quality output, team collaboration & client-ready reports.', highlights: ['Multi-brand mgmt', 'Team collaboration', 'White-label output'], gradient: 'from-amber-500/20 to-orange-500/20', border: 'rgba(245,158,11,0.2)' },
-                            { emoji: '🌐', segment: 'Corporates', tagline: 'Enterprise intelligence', desc: 'Deep market analytics, brand governance, multi-region campaigns, vernacular localization & ad platform optimization at scale.', highlights: ['Brand governance', 'Multi-region', '20+ languages'], gradient: 'from-rose-500/20 to-pink-500/20', border: 'rgba(244,63,94,0.2)' },
+                            { emoji: '📈', segment: 'SMBs', tagline: 'Enterprise power, startup speed', desc: 'Compete with brands 10x your size. AI-powered strategy, analytics & content production at a fraction of the cost.', highlights: ['Market intelligence', 'Competitor tracking', 'Budget-smart campaigns'], gradient: 'bg-[var(--sys-surface)] border border-[var(--sys-border)]', border: 'rgba(59,130,246,0.2)' },
+                            { emoji: '🛒', segment: 'D2C Brands', tagline: 'From product to purchase', desc: 'Shopify intelligence, product campaigns, catalog content, performance analytics & conversion optimization — all connected.', highlights: ['Shopify integration', 'Product velocity', 'ROAS optimization'], gradient: 'bg-[var(--sys-surface)] border border-[var(--sys-border)]', border: 'rgba(16,185,129,0.2)' },
+                            { emoji: '🏢', segment: 'Agencies', tagline: 'Scale without hiring', desc: 'Manage multiple brands, each with unique DNA. White-label quality output, team collaboration & client-ready reports.', highlights: ['Multi-brand mgmt', 'Team collaboration', 'White-label output'], gradient: 'bg-[var(--sys-surface)] border border-[var(--sys-border)]', border: 'rgba(245,158,11,0.2)' },
+                            { emoji: '🌐', segment: 'Corporates', tagline: 'Enterprise intelligence', desc: 'Deep market analytics, brand governance, multi-region campaigns, vernacular localization & ad platform optimization at scale.', highlights: ['Brand governance', 'Multi-region', '20+ languages'], gradient: 'bg-[var(--sys-surface)] border border-[var(--sys-border)]', border: 'rgba(244,63,94,0.2)' },
                         ].map((s, i) => (
                             <div key={i} className="rounded-2xl p-6 transition-all duration-300 hover:translate-y-[-4px] flex flex-col"
                                 style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${s.border}` }}>
                                 <span className="text-3xl mb-3">{s.emoji}</span>
                                 <h3 className="text-[#f3eff6] font-bold text-lg mb-1">{s.segment}</h3>
-                                <p className="text-slate-500 text-[11px] font-semibold uppercase tracking-wider mb-3">{s.tagline}</p>
-                                <p className="text-slate-400 text-sm leading-relaxed mb-4 flex-grow">{s.desc}</p>
+                                <p className="text-[var(--sys-text-muted)] text-[11px] font-semibold uppercase tracking-wider mb-3">{s.tagline}</p>
+                                <p className="text-[var(--sys-text-muted)] text-sm leading-relaxed mb-4 flex-grow">{s.desc}</p>
                                 <div className="space-y-1.5">
                                     {s.highlights.map((h, j) => (
-                                        <div key={j} className="flex items-center gap-2 text-xs text-slate-500">
+                                        <div key={j} className="flex items-center gap-2 text-xs text-[var(--sys-text-muted)]">
                                             <span className="size-1.5 rounded-full bg-current shrink-0" />
                                             {h}
                                         </div>
@@ -706,22 +706,22 @@ export default function Landing() {
                 {/* ═══════════════════════════════════════════════════════ */}
                 {/*  AD FILMS + VERNACULAR + CONTENT HIGHLIGHTS            */}
                 {/* ═══════════════════════════════════════════════════════ */}
-                <section className="py-20" style={{ background: 'linear-gradient(180deg, rgba(139,92,246,0.03) 0%, transparent 100%)' }}>
+                <section className="py-20" style={{ background: 'var(--sys-primary) 0%, transparent 100%)' }}>
                     <div className="max-w-7xl mx-auto px-6">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             {/* Ad Films & Social Content */}
                             <div className="rounded-2xl p-8 transition-all hover:translate-y-[-2px]"
                                 style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
                                 <div className="flex items-center gap-3 mb-5">
-                                    <div className="size-12 rounded-xl bg-gradient-to-br from-rose-500/20 to-orange-500/20 flex items-center justify-center">
-                                        <span className="material-symbols-outlined text-2xl text-rose-400">movie</span>
+                                    <div className="size-12 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] flex items-center justify-center">
+                                        <span className="material-symbols-outlined text-2xl text-primary">movie</span>
                                     </div>
                                     <div>
                                         <h3 className="text-[#f3eff6] font-bold text-xl">Ad Films & Social Posts</h3>
-                                        <p className="text-slate-500 text-xs">Create studio-quality content at scale</p>
+                                        <p className="text-[var(--sys-text-muted)] text-xs">Create studio-quality content at scale</p>
                                     </div>
                                 </div>
-                                <p className="text-slate-400 text-sm leading-relaxed mb-5">
+                                <p className="text-[var(--sys-text-muted)] text-sm leading-relaxed mb-5">
                                     From scroll-stopping reels to brand ad films — generate professional video content, carousel posts, story templates & ad creatives. Multi-model video AI (Seedance, Kling, Veo 2) meets your brand DNA.
                                 </p>
                                 <div className="flex flex-wrap gap-2">
@@ -735,15 +735,15 @@ export default function Landing() {
                             <div className="rounded-2xl p-8 transition-all hover:translate-y-[-2px]"
                                 style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
                                 <div className="flex items-center gap-3 mb-5">
-                                    <div className="size-12 rounded-xl bg-gradient-to-br from-cyan-500/20 to-[#ff7a00]/20 flex items-center justify-center">
-                                        <span className="material-symbols-outlined text-2xl text-cyan-400">translate</span>
+                                    <div className="size-12 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] flex items-center justify-center">
+                                        <span className="material-symbols-outlined text-2xl text-primary">translate</span>
                                     </div>
                                     <div>
                                         <h3 className="text-[#f3eff6] font-bold text-xl">20+ Languages, One Brand Voice</h3>
-                                        <p className="text-slate-500 text-xs">Vernacular content that actually sounds local</p>
+                                        <p className="text-[var(--sys-text-muted)] text-xs">Vernacular content that actually sounds local</p>
                                     </div>
                                 </div>
-                                <p className="text-slate-400 text-sm leading-relaxed mb-5">
+                                <p className="text-[var(--sys-text-muted)] text-sm leading-relaxed mb-5">
                                     Create content in Hindi, Tamil, Telugu, Bengali, Marathi, Spanish, French, Arabic, Japanese & 15+ more languages. Not just translation — culturally localized, market-aware content that resonates with local audiences globally.
                                 </p>
                                 <div className="flex flex-wrap gap-2">
@@ -761,9 +761,9 @@ export default function Landing() {
                 {/* ═══════════════════════════════════════════════════════ */}
                 <section id="how-it-works" className="max-w-7xl mx-auto px-6 py-24">
                     <div className="text-center mb-16">
-                        <p className="text-amber-400 text-sm font-bold uppercase tracking-widest mb-3">Your Strategic Journey</p>
+                        <p className="text-primary text-sm font-bold uppercase tracking-widest mb-3">Your Strategic Journey</p>
                         <h2 className="text-4xl md:text-5xl font-black text-[#f3eff6] mb-5">
-                            Three steps to <span className="bg-gradient-to-r from-amber-400 to-orange-400 bg-clip-text text-transparent">strategic growth.</span>
+                            Three steps to <span className="bg-[var(--sys-surface)] border border-[var(--sys-border)] bg-clip-text text-transparent">strategic growth.</span>
                         </h2>
                     </div>
 
@@ -771,7 +771,7 @@ export default function Landing() {
                         {[
                             { step: '01', icon: 'genetics', title: 'Deep Brand Intelligence', desc: 'Paste your website URL. Our AI runs a 360° brand scan — extracting DNA, competitive landscape, market positioning, audience insights & growth opportunities. Not just colors and fonts — strategic intelligence.', gradient: 'from-violet-500 to-purple-600' },
                             { step: '02', icon: 'psychology', title: 'Strategize & Create', desc: '8 AI studios act as your strategic team — each with specialized agents for content strategy, visual identity, video production, ad optimization, SEO intelligence & market analysis. Every output is data-informed.', gradient: 'from-primary to-blue-600' },
-                            { step: '03', icon: 'insights', title: 'Analyze, Optimize & Scale', desc: 'Real-time performance analytics, D2C intelligence, GEO optimization & AI-powered growth strategies. Connect ad platforms, Shopify & social accounts — Mantram analyzes what works and amplifies it automatically.', gradient: 'from-cyan-500 to-teal-600' },
+                            { step: '03', icon: 'insights', title: 'Analyze, Optimize & Scale', desc: 'Real-time performance analytics, D2C intelligence, GEO optimization & AI-powered growth strategies. Connect ad platforms, Shopify & social accounts — Mantram analyzes what works and amplifies it automatically.', gradient: 'bg-[var(--sys-surface)] border border-[var(--sys-border)]' },
                         ].map((s, i) => (
                             <div key={i} className="relative rounded-2xl p-8 transition-all duration-300 group"
                                 style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
@@ -780,7 +780,7 @@ export default function Landing() {
                                     <span className="material-symbols-outlined text-[#f3eff6] text-3xl">{s.icon}</span>
                                 </div>
                                 <h3 className="text-xl font-bold text-[#f3eff6] mb-3">{s.title}</h3>
-                                <p className="text-slate-400 leading-relaxed">{s.desc}</p>
+                                <p className="text-[var(--sys-text-muted)] leading-relaxed">{s.desc}</p>
                             </div>
                         ))}
                     </div>
@@ -789,7 +789,7 @@ export default function Landing() {
                 {/* ═══════════════════════════════════════════════════════ */}
                 {/*  EARLY ACCESS WAITLIST                                 */}
                 {/* ═══════════════════════════════════════════════════════ */}
-                <section id="early-access" className="py-24" style={{ background: 'linear-gradient(180deg, rgba(139,92,246,0.03) 0%, rgba(43,75,238,0.05) 50%, rgba(6,182,212,0.03) 100%)' }}>
+                <section id="early-access" className="py-24" style={{ background: 'var(--sys-primary) 0%, rgba(43,75,238,0.05) 50%, rgba(6,182,212,0.03) 100%)' }}>
                     <div className="max-w-4xl mx-auto px-6">
                         <div className="text-center mb-12">
                             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest mb-6"
@@ -801,9 +801,9 @@ export default function Landing() {
                                 Limited Spots Available
                             </div>
                             <h2 className="text-4xl md:text-5xl font-black text-[#f3eff6] mb-5">
-                                Get <span className="bg-gradient-to-r from-violet-400 via-primary to-cyan-400 bg-clip-text text-transparent">early access.</span>
+                                Get <span className="bg-[var(--sys-surface)] border border-[var(--sys-border)] bg-clip-text text-transparent">early access.</span>
                             </h2>
-                            <p className="text-slate-400 text-lg max-w-xl mx-auto">
+                            <p className="text-[var(--sys-text-muted)] text-lg max-w-xl mx-auto">
                                 Join the waitlist for exclusive early access. Be among the first to experience the future of AI-powered marketing.
                             </p>
                         </div>
@@ -819,8 +819,8 @@ export default function Landing() {
                                         ].map(t => (
                                             <button key={t.id} onClick={() => setWaitlistType(t.id)}
                                                 className={`flex items-center gap-2 px-6 py-3 rounded-lg text-sm font-semibold transition-all cursor-pointer ${waitlistType === t.id
-                                                    ? 'bg-gradient-to-r from-violet-600 to-primary text-[#f3eff6] shadow-lg shadow-violet-500/20'
-                                                    : 'text-slate-500 hover:text-[#f3eff6]'}`}>
+                                                    ? 'bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[#f3eff6] shadow-none'
+                                                    : 'text-[var(--sys-text-muted)] hover:text-[#f3eff6]'}`}>
                                                 <span className="material-symbols-outlined text-base">{t.icon}</span>
                                                 {t.label}
                                             </button>
@@ -831,15 +831,15 @@ export default function Landing() {
                                 <form onSubmit={handleWaitlistSubmit} className="space-y-5">
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                                         <div>
-                                            <label className="text-xs text-slate-500 font-semibold uppercase tracking-wider mb-1.5 block">Full Name *</label>
+                                            <label className="text-xs text-[var(--sys-text-muted)] font-semibold uppercase tracking-wider mb-1.5 block">Full Name *</label>
                                             <input type="text" required value={waitlistForm.name} onChange={e => setWaitlistForm(p => ({ ...p, name: e.target.value }))}
-                                                className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3.5 text-[#f3eff6] placeholder:text-slate-600 focus:outline-none focus:border-violet-500/40 focus:ring-2 focus:ring-violet-500/10 transition-all"
+                                                className="w-full bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl px-4 py-3.5 text-[#f3eff6] placeholder:text-[var(--sys-text-muted)] focus:outline-none focus:border-violet-500/40 focus:ring-2 focus: transition-all"
                                                 placeholder="John Doe" />
                                         </div>
                                         <div>
-                                            <label className="text-xs text-slate-500 font-semibold uppercase tracking-wider mb-1.5 block">Email *</label>
+                                            <label className="text-xs text-[var(--sys-text-muted)] font-semibold uppercase tracking-wider mb-1.5 block">Email *</label>
                                             <input type="email" required value={waitlistForm.email} onChange={e => setWaitlistForm(p => ({ ...p, email: e.target.value }))}
-                                                className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3.5 text-[#f3eff6] placeholder:text-slate-600 focus:outline-none focus:border-violet-500/40 focus:ring-2 focus:ring-violet-500/10 transition-all"
+                                                className="w-full bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl px-4 py-3.5 text-[#f3eff6] placeholder:text-[var(--sys-text-muted)] focus:outline-none focus:border-violet-500/40 focus:ring-2 focus: transition-all"
                                                 placeholder="john@company.com" />
                                         </div>
                                     </div>
@@ -848,15 +848,15 @@ export default function Landing() {
                                         <>
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                                                 <div>
-                                                    <label className="text-xs text-slate-500 font-semibold uppercase tracking-wider mb-1.5 block">Company Name *</label>
+                                                    <label className="text-xs text-[var(--sys-text-muted)] font-semibold uppercase tracking-wider mb-1.5 block">Company Name *</label>
                                                     <input type="text" required value={waitlistForm.company} onChange={e => setWaitlistForm(p => ({ ...p, company: e.target.value }))}
-                                                        className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3.5 text-[#f3eff6] placeholder:text-slate-600 focus:outline-none focus:border-violet-500/40 focus:ring-2 focus:ring-violet-500/10 transition-all"
+                                                        className="w-full bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl px-4 py-3.5 text-[#f3eff6] placeholder:text-[var(--sys-text-muted)] focus:outline-none focus:border-violet-500/40 focus:ring-2 focus: transition-all"
                                                         placeholder="Acme Inc." />
                                                 </div>
                                                 <div>
-                                                    <label className="text-xs text-slate-500 font-semibold uppercase tracking-wider mb-1.5 block">Your Role</label>
+                                                    <label className="text-xs text-[var(--sys-text-muted)] font-semibold uppercase tracking-wider mb-1.5 block">Your Role</label>
                                                     <select value={waitlistForm.role} onChange={e => setWaitlistForm(p => ({ ...p, role: e.target.value }))}
-                                                        className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3.5 text-[#f3eff6] focus:outline-none focus:border-violet-500/40 focus:ring-2 focus:ring-violet-500/10 transition-all cursor-pointer appearance-none">
+                                                        className="w-full bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl px-4 py-3.5 text-[#f3eff6] focus:outline-none focus:border-violet-500/40 focus:ring-2 focus: transition-all cursor-pointer appearance-none">
                                                         <option value="" className="bg-[#12122a]">Select role</option>
                                                         <option value="founder" className="bg-[#12122a]">Founder / CEO</option>
                                                         <option value="cmo" className="bg-[#12122a]">CMO / Marketing Head</option>
@@ -868,15 +868,15 @@ export default function Landing() {
                                             </div>
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                                                 <div>
-                                                    <label className="text-xs text-slate-500 font-semibold uppercase tracking-wider mb-1.5 block">Phone</label>
+                                                    <label className="text-xs text-[var(--sys-text-muted)] font-semibold uppercase tracking-wider mb-1.5 block">Phone</label>
                                                     <input type="tel" value={waitlistForm.phone} onChange={e => setWaitlistForm(p => ({ ...p, phone: e.target.value }))}
-                                                        className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3.5 text-[#f3eff6] placeholder:text-slate-600 focus:outline-none focus:border-violet-500/40 focus:ring-2 focus:ring-violet-500/10 transition-all"
+                                                        className="w-full bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl px-4 py-3.5 text-[#f3eff6] placeholder:text-[var(--sys-text-muted)] focus:outline-none focus:border-violet-500/40 focus:ring-2 focus: transition-all"
                                                         placeholder="+91 98765 43210" />
                                                 </div>
                                                 <div>
-                                                    <label className="text-xs text-slate-500 font-semibold uppercase tracking-wider mb-1.5 block">Team Size</label>
+                                                    <label className="text-xs text-[var(--sys-text-muted)] font-semibold uppercase tracking-wider mb-1.5 block">Team Size</label>
                                                     <select value={waitlistForm.teamSize} onChange={e => setWaitlistForm(p => ({ ...p, teamSize: e.target.value }))}
-                                                        className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3.5 text-[#f3eff6] focus:outline-none focus:border-violet-500/40 focus:ring-2 focus:ring-violet-500/10 transition-all cursor-pointer appearance-none">
+                                                        className="w-full bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl px-4 py-3.5 text-[#f3eff6] focus:outline-none focus:border-violet-500/40 focus:ring-2 focus: transition-all cursor-pointer appearance-none">
                                                         <option value="" className="bg-[#12122a]">Select size</option>
                                                         <option value="1-5" className="bg-[#12122a]">1 – 5 people</option>
                                                         <option value="6-20" className="bg-[#12122a]">6 – 20 people</option>
@@ -889,17 +889,17 @@ export default function Landing() {
                                     )}
 
                                     <div>
-                                        <label className="text-xs text-slate-500 font-semibold uppercase tracking-wider mb-1.5 block">
+                                        <label className="text-xs text-[var(--sys-text-muted)] font-semibold uppercase tracking-wider mb-1.5 block">
                                             {waitlistType === 'enterprise' ? 'What are you looking for?' : 'Tell us about your brand (optional)'}
                                         </label>
                                         <textarea value={waitlistForm.message} onChange={e => setWaitlistForm(p => ({ ...p, message: e.target.value }))}
-                                            className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3.5 text-[#f3eff6] placeholder:text-slate-600 focus:outline-none focus:border-violet-500/40 focus:ring-2 focus:ring-violet-500/10 transition-all resize-none"
+                                            className="w-full bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl px-4 py-3.5 text-[#f3eff6] placeholder:text-[var(--sys-text-muted)] focus:outline-none focus:border-violet-500/40 focus:ring-2 focus: transition-all resize-none"
                                             rows={3}
                                             placeholder={waitlistType === 'enterprise' ? 'Custom integrations, white-labeling, team requirements...' : 'Your website URL, industry, or what you would like to achieve...'} />
                                     </div>
 
                                     <button type="submit" disabled={waitlistLoading}
-                                        className="w-full bg-gradient-to-r from-violet-600 to-primary hover:from-violet-500 hover:to-primary-light text-[#f3eff6] font-bold py-4 rounded-xl text-lg transition-all transform hover:scale-[1.01] active:scale-[0.99] shadow-xl shadow-violet-500/20 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                                        className="w-full bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:from-violet-500 hover:to-primary-light text-[#f3eff6] font-bold py-4 rounded-xl text-lg transition-all transform hover:scale-[1.01] active:scale-[0.99] shadow-none cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2">
                                         {waitlistLoading ? (
                                             <><span className="material-symbols-outlined animate-spin text-lg">progress_activity</span> Submitting...</>
                                         ) : (
@@ -907,22 +907,22 @@ export default function Landing() {
                                         )}
                                     </button>
 
-                                    <p className="text-center text-slate-600 text-xs">No credit card required. We'll reach out when your spot opens up.</p>
+                                    <p className="text-center text-[var(--sys-text-muted)] text-xs">No credit card required. We'll reach out when your spot opens up.</p>
                                 </form>
                             </div>
                         ) : (
                             /* ── Success state ── */
                             <div className="rounded-3xl p-12 text-center" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                                <div className="size-20 rounded-full bg-emerald-500/15 flex items-center justify-center mx-auto mb-6">
-                                    <span className="material-symbols-outlined text-emerald-400 text-5xl">check_circle</span>
+                                <div className="size-20 rounded-full bg-[var(--sys-primary-dim)] flex items-center justify-center mx-auto mb-6">
+                                    <span className="material-symbols-outlined text-primary text-5xl">check_circle</span>
                                 </div>
                                 <h3 className="text-3xl font-black text-[#f3eff6] mb-3">You're on the list! 🚀</h3>
-                                <p className="text-slate-400 text-lg max-w-md mx-auto mb-6">
+                                <p className="text-[var(--sys-text-muted)] text-lg max-w-md mx-auto mb-6">
                                     We've received your request. You'll be among the first to get access when we launch. Keep an eye on your inbox.
                                 </p>
                                 <div className="flex justify-center gap-4">
                                     <button onClick={() => { setWaitlistSubmitted(false); setWaitlistForm({ name: '', email: '', company: '', role: '', phone: '', teamSize: '', message: '' }) }}
-                                        className="px-6 py-3 rounded-xl text-sm font-bold text-slate-400 hover:text-[#f3eff6] transition-colors cursor-pointer" style={{ border: '1px solid rgba(255,255,255,0.08)' }}>
+                                        className="px-6 py-3 rounded-xl text-sm font-bold text-[var(--sys-text-muted)] hover:text-[#f3eff6] transition-colors cursor-pointer" style={{ border: '1px solid rgba(255,255,255,0.08)' }}>
                                         Submit Another
                                     </button>
                                 </div>
@@ -950,7 +950,7 @@ export default function Landing() {
                                 </div>
                                 <span className="text-[#f3eff6] text-xl font-bold">Mantram <span className="text-primary">AI</span></span>
                             </div>
-                            <p className="text-slate-500 text-sm max-w-sm leading-relaxed mb-6">
+                            <p className="text-[var(--sys-text-muted)] text-sm max-w-sm leading-relaxed mb-6">
                                 The AI-powered marketing operating system. 8 studios, Skill Hub, GEO & infinite possibilities. From brand DNA to published content in minutes.
                             </p>
                             <div className="flex gap-3">
@@ -959,11 +959,11 @@ export default function Landing() {
                                     { label: 'LinkedIn', href: 'https://linkedin.com/company/mantram-ai', path: 'M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z' },
                                     { label: 'Instagram', href: 'https://instagram.com/mantram.ai', path: 'M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z' },
                                 ].map((s, i) => (
-                                    <a key={i} href={s.href} target="_blank" rel="noopener noreferrer" aria-label={s.label} className="size-10 rounded-xl flex items-center justify-center text-slate-500 hover:text-[#f3eff6] transition-all cursor-pointer" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                                    <a key={i} href={s.href} target="_blank" rel="noopener noreferrer" aria-label={s.label} className="size-10 rounded-xl flex items-center justify-center text-[var(--sys-text-muted)] hover:text-[#f3eff6] transition-all cursor-pointer" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
                                          
                                     </a>
                                 ))}
-                                <a href="mailto:support@mantram.ai" aria-label="Email" className="size-10 rounded-xl flex items-center justify-center text-slate-500 hover:text-[#f3eff6] transition-all cursor-pointer" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                                <a href="mailto:support@mantram.ai" aria-label="Email" className="size-10 rounded-xl flex items-center justify-center text-[var(--sys-text-muted)] hover:text-[#f3eff6] transition-all cursor-pointer" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
                                     <span className="material-symbols-outlined text-lg">mail</span>
                                 </a>
                             </div>
@@ -971,36 +971,36 @@ export default function Landing() {
                         <div>
                             <h4 className="text-[#f3eff6] font-bold text-sm uppercase tracking-wider mb-4">Studios</h4>
                             <ul className="space-y-3">
-                                <li><Link to="/studio/content-studio" className="text-slate-500 hover:text-primary text-sm transition-colors">Content Studio</Link></li>
-                                <li><Link to="/studio/creative-studio" className="text-slate-500 hover:text-primary text-sm transition-colors">Creative Studio</Link></li>
-                                <li><Link to="/studio/video-studio" className="text-slate-500 hover:text-primary text-sm transition-colors">Video Studio</Link></li>
-                                <li><Link to="/studio/performance-studio" className="text-slate-500 hover:text-primary text-sm transition-colors">Performance Studio</Link></li>
-                                <li><Link to="/studio/seo-studio" className="text-slate-500 hover:text-primary text-sm transition-colors">SEO Studio</Link></li>
-                                <li><Link to="/studio/d2c-studio" className="text-slate-500 hover:text-primary text-sm transition-colors">D2C Studio</Link></li>
+                                <li><Link to="/studio/content-studio" className="text-[var(--sys-text-muted)] hover:text-primary text-sm transition-colors">Content Studio</Link></li>
+                                <li><Link to="/studio/creative-studio" className="text-[var(--sys-text-muted)] hover:text-primary text-sm transition-colors">Creative Studio</Link></li>
+                                <li><Link to="/studio/video-studio" className="text-[var(--sys-text-muted)] hover:text-primary text-sm transition-colors">Video Studio</Link></li>
+                                <li><Link to="/studio/performance-studio" className="text-[var(--sys-text-muted)] hover:text-primary text-sm transition-colors">Performance Studio</Link></li>
+                                <li><Link to="/studio/seo-studio" className="text-[var(--sys-text-muted)] hover:text-primary text-sm transition-colors">SEO Studio</Link></li>
+                                <li><Link to="/studio/d2c-studio" className="text-[var(--sys-text-muted)] hover:text-primary text-sm transition-colors">D2C Studio</Link></li>
                             </ul>
                         </div>
                         <div>
                             <h4 className="text-[#f3eff6] font-bold text-sm uppercase tracking-wider mb-4">Resources</h4>
                             <ul className="space-y-3">
-                                <li><Link to="/about" className="text-slate-500 hover:text-primary text-sm transition-colors cursor-pointer">About Us</Link></li>
-                                <li><button onClick={() => scrollTo('how-it-works')} className="text-slate-500 hover:text-primary text-sm transition-colors cursor-pointer">How It Works</button></li>
-                                <li><button onClick={() => scrollTo('usps')} className="text-slate-500 hover:text-primary text-sm transition-colors cursor-pointer">Why Mantram</button></li>
-                                <li><button onClick={() => scrollTo('early-access')} className="text-slate-500 hover:text-primary text-sm transition-colors cursor-pointer">Early Access</button></li>
-                                <li><a href="mailto:support@mantram.ai" className="text-slate-500 hover:text-primary text-sm transition-colors">Contact Us</a></li>
+                                <li><Link to="/about" className="text-[var(--sys-text-muted)] hover:text-primary text-sm transition-colors cursor-pointer">About Us</Link></li>
+                                <li><button onClick={() => scrollTo('how-it-works')} className="text-[var(--sys-text-muted)] hover:text-primary text-sm transition-colors cursor-pointer">How It Works</button></li>
+                                <li><button onClick={() => scrollTo('usps')} className="text-[var(--sys-text-muted)] hover:text-primary text-sm transition-colors cursor-pointer">Why Mantram</button></li>
+                                <li><button onClick={() => scrollTo('early-access')} className="text-[var(--sys-text-muted)] hover:text-primary text-sm transition-colors cursor-pointer">Early Access</button></li>
+                                <li><a href="mailto:support@mantram.ai" className="text-[var(--sys-text-muted)] hover:text-primary text-sm transition-colors">Contact Us</a></li>
                             </ul>
                         </div>
                         <div>
                             <h4 className="text-[#f3eff6] font-bold text-sm uppercase tracking-wider mb-4">Legal</h4>
                             <ul className="space-y-3">
-                                <li><Link to="/privacy-policy" className="text-slate-500 hover:text-primary text-sm transition-colors">Privacy Policy</Link></li>
-                                <li><Link to="/terms" className="text-slate-500 hover:text-primary text-sm transition-colors">Terms of Service</Link></li>
-                                <li><Link to="/data-deletion" className="text-slate-500 hover:text-primary text-sm transition-colors">Data Deletion</Link></li>
-                                <li><a href="mailto:support@mantram.ai" className="text-slate-500 hover:text-primary text-sm transition-colors">Support</a></li>
+                                <li><Link to="/privacy-policy" className="text-[var(--sys-text-muted)] hover:text-primary text-sm transition-colors">Privacy Policy</Link></li>
+                                <li><Link to="/terms" className="text-[var(--sys-text-muted)] hover:text-primary text-sm transition-colors">Terms of Service</Link></li>
+                                <li><Link to="/data-deletion" className="text-[var(--sys-text-muted)] hover:text-primary text-sm transition-colors">Data Deletion</Link></li>
+                                <li><a href="mailto:support@mantram.ai" className="text-[var(--sys-text-muted)] hover:text-primary text-sm transition-colors">Support</a></li>
                             </ul>
                         </div>
                     </div>
                     <div className="border-t border-[#48474c]/20 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
-                        <p className="text-slate-600 text-xs">© {new Date().getFullYear()} Mantram AI. All rights reserved.</p>
+                        <p className="text-[var(--sys-text-muted)] text-xs">© {new Date().getFullYear()} Mantram AI. All rights reserved.</p>
                         <p className="text-slate-700 text-xs">Built with ❤️ for marketers, by marketers.</p>
                     </div>
                 </div>

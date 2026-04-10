@@ -15,7 +15,7 @@ function TBtn({ icon, label, active, onClick, disabled }) {
         <button onClick={onClick} disabled={disabled} title={label}
             className={`p-1.5 rounded-lg transition-all cursor-pointer text-sm ${active
                 ? 'bg-primary/20 text-primary'
-                : 'text-slate-400 hover:text-white hover:bg-white/[0.06]'
+                : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)]'
             } ${disabled ? 'opacity-30 cursor-not-allowed' : ''}`}>
             <span className="material-symbols-outlined text-[18px]">{icon}</span>
         </button>
@@ -23,7 +23,7 @@ function TBtn({ icon, label, active, onClick, disabled }) {
 }
 
 function Divider() {
-    return <div className="w-px h-5 bg-white/[0.08] mx-0.5" />
+    return <div className="w-px h-5 bg-[var(--sys-surface)] mx-0.5" />
 }
 
 // ── Image Style Options ──
@@ -195,38 +195,38 @@ function FloatingPlusButton({ editor, brandId, activeBrand, generatingImage, set
             <button onClick={() => { setMenuOpen(!menuOpen); setShowImagePanel(false) }}
                 className={`w-7 h-7 rounded-full border flex items-center justify-center cursor-pointer transition-all ${menuOpen || showImagePanel
                     ? 'bg-primary/20 border-primary/40 text-primary rotate-45'
-                    : 'border-slate-600 text-slate-500 hover:border-slate-400 hover:text-slate-300'
+                    : 'border-[var(--sys-border)] text-[var(--sys-text-muted)] hover:border-[var(--sys-border)] hover:text-[var(--sys-text-muted)]'
                 }`}>
                 <span className="material-symbols-outlined text-[18px]">add</span>
             </button>
 
             {/* Quick menu */}
             {menuOpen && !showImagePanel && (
-                <div className="absolute left-9 top-0 flex items-center gap-1 animate-fade-in rounded-xl px-2 py-1.5 border border-white/[0.12] shadow-2xl whitespace-nowrap" style={{ background: '#111827' }}>
+                <div className="absolute left-9 top-0 flex items-center gap-1 animate-fade-in rounded-xl px-2 py-1.5 border border-[var(--sys-border)] shadow-2xl whitespace-nowrap" style={{ background: '#111827' }}>
                     <button onClick={openImagePanel}
                         title="Generate AI illustration"
-                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-amber-400 hover:bg-amber-400/10 transition-all cursor-pointer">
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-primary hover:bg-[var(--sys-primary-dim)] transition-all cursor-pointer">
                         <span className="material-symbols-outlined text-[16px]">auto_awesome</span>
                         AI Image
                     </button>
-                    <div className="w-px h-4 bg-white/[0.08]" />
+                    <div className="w-px h-4 bg-[var(--sys-surface)]" />
                     <button onClick={() => {
                         const url = prompt('Enter image URL:')
                         if (url) editor.chain().focus().setImage({ src: url, alt: 'Blog image' }).run()
                         setMenuOpen(false)
                     }}
                         title="Insert image from URL"
-                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white hover:bg-white/[0.06] transition-all cursor-pointer">
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)] transition-all cursor-pointer">
                         <span className="material-symbols-outlined text-[16px]">image</span>
                         Image URL
                     </button>
-                    <div className="w-px h-4 bg-white/[0.08]" />
+                    <div className="w-px h-4 bg-[var(--sys-surface)]" />
                     <button onClick={() => {
                         editor.chain().focus().setHorizontalRule().run()
                         setMenuOpen(false)
                     }}
                         title="Insert divider"
-                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white hover:bg-white/[0.06] transition-all cursor-pointer">
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)] transition-all cursor-pointer">
                         <span className="material-symbols-outlined text-[16px]">horizontal_rule</span>
                         Divider
                     </button>
@@ -236,61 +236,61 @@ function FloatingPlusButton({ editor, brandId, activeBrand, generatingImage, set
             {/* ── AI Image Generation Panel ── */}
             {showImagePanel && (
                 <div ref={panelRef}
-                    className="absolute left-9 top-0 w-[380px] animate-fade-in rounded-2xl border border-white/[0.12] p-4"
+                    className="absolute left-9 top-0 w-[380px] animate-fade-in rounded-2xl border border-[var(--sys-border)] p-4"
                     style={{ background: '#111827', boxShadow: '0 20px 60px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.05)' }}
                     onClick={e => e.stopPropagation()}>
 
                     {/* Header */}
                     <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2">
-                            <span className="material-symbols-outlined text-lg text-amber-400">auto_awesome</span>
-                            <span className="text-sm font-bold text-white">Generate Image</span>
+                            <span className="material-symbols-outlined text-lg text-primary">auto_awesome</span>
+                            <span className="text-sm font-bold text-[var(--sys-text)]">Generate Image</span>
                         </div>
                         <button onClick={() => setShowImagePanel(false)}
-                            className="text-slate-500 hover:text-white cursor-pointer">
+                            className="text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer">
                             <span className="material-symbols-outlined text-sm">close</span>
                         </button>
                     </div>
 
                     {/* Context — Previous Paragraph */}
                     {prevPara && (
-                        <div className={`mb-2 p-2.5 rounded-xl border cursor-pointer transition-all ${usePrev ? 'border-amber-400/30' : 'border-white/[0.06] opacity-50'}`}
+                        <div className={`mb-2 p-2.5 rounded-xl border cursor-pointer transition-all ${usePrev ? 'border-[var(--sys-border)]' : 'border-[var(--sys-border)] opacity-50'}`}
                             style={{ background: '#0d1420' }}
                             onClick={() => setUsePrev(!usePrev)}>
                             <div className="flex items-center gap-2 mb-1">
-                                <div className={`w-4 h-4 rounded border flex items-center justify-center text-[10px] transition-all ${usePrev ? 'bg-amber-400 border-amber-400 text-black' : 'border-slate-600'}`}>
+                                <div className={`w-4 h-4 rounded border flex items-center justify-center text-[10px] transition-all ${usePrev ? 'bg-[var(--sys-surface)] border-[var(--sys-border)] text-black' : 'border-[var(--sys-border)]'}`}>
                                     {usePrev && <span className="material-symbols-outlined text-[12px]">check</span>}
                                 </div>
-                                <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1">
+                                <span className="text-[10px] font-bold text-[var(--sys-text-muted)] flex items-center gap-1">
                                     <span className="material-symbols-outlined text-[10px]">arrow_upward</span>
                                     Previous Paragraph
                                 </span>
                             </div>
-                            <p className="text-[11px] text-slate-500 leading-relaxed line-clamp-2 pl-6">{prevPara.slice(0, 150)}{prevPara.length > 150 ? '...' : ''}</p>
+                            <p className="text-[11px] text-[var(--sys-text-muted)] leading-relaxed line-clamp-2 pl-6">{prevPara.slice(0, 150)}{prevPara.length > 150 ? '...' : ''}</p>
                         </div>
                     )}
 
                     {/* Context — Next Paragraph */}
                     {nextPara && (
-                        <div className={`mb-3 p-2.5 rounded-xl border cursor-pointer transition-all ${useNext ? 'border-amber-400/30' : 'border-white/[0.06] opacity-50'}`}
+                        <div className={`mb-3 p-2.5 rounded-xl border cursor-pointer transition-all ${useNext ? 'border-[var(--sys-border)]' : 'border-[var(--sys-border)] opacity-50'}`}
                             style={{ background: '#0d1420' }}
                             onClick={() => setUseNext(!useNext)}>
                             <div className="flex items-center gap-2 mb-1">
-                                <div className={`w-4 h-4 rounded border flex items-center justify-center text-[10px] transition-all ${useNext ? 'bg-amber-400 border-amber-400 text-black' : 'border-slate-600'}`}>
+                                <div className={`w-4 h-4 rounded border flex items-center justify-center text-[10px] transition-all ${useNext ? 'bg-[var(--sys-surface)] border-[var(--sys-border)] text-black' : 'border-[var(--sys-border)]'}`}>
                                     {useNext && <span className="material-symbols-outlined text-[12px]">check</span>}
                                 </div>
-                                <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1">
+                                <span className="text-[10px] font-bold text-[var(--sys-text-muted)] flex items-center gap-1">
                                     <span className="material-symbols-outlined text-[10px]">arrow_downward</span>
                                     Next Paragraph
                                 </span>
                             </div>
-                            <p className="text-[11px] text-slate-500 leading-relaxed line-clamp-2 pl-6">{nextPara.slice(0, 150)}{nextPara.length > 150 ? '...' : ''}</p>
+                            <p className="text-[11px] text-[var(--sys-text-muted)] leading-relaxed line-clamp-2 pl-6">{nextPara.slice(0, 150)}{nextPara.length > 150 ? '...' : ''}</p>
                         </div>
                     )}
 
                     {!prevPara && !nextPara && (
-                        <div className="mb-3 p-2.5 rounded-xl border border-white/[0.06] text-center" style={{ background: '#0d1420' }}>
-                            <p className="text-[11px] text-slate-600">No surrounding paragraphs found. Enter a prompt below.</p>
+                        <div className="mb-3 p-2.5 rounded-xl border border-[var(--sys-border)] text-center" style={{ background: '#0d1420' }}>
+                            <p className="text-[11px] text-[var(--sys-text-muted)]">No surrounding paragraphs found. Enter a prompt below.</p>
                         </div>
                     )}
 
@@ -299,17 +299,17 @@ function FloatingPlusButton({ editor, brandId, activeBrand, generatingImage, set
                         <textarea value={imgPrompt} onChange={e => setImgPrompt(e.target.value)}
                             placeholder="Describe the image you want, or leave empty to use context above..."
                             rows={2}
-                            className="w-full rounded-xl px-3 py-2.5 text-xs text-white outline-none resize-none placeholder-slate-600 border border-white/[0.08] focus:border-amber-400/30 transition-all" style={{ background: '#0d1420' }} />
+                            className="w-full rounded-xl px-3 py-2.5 text-xs text-[var(--sys-text)] outline-none resize-none placeholder-slate-600 border border-[var(--sys-border)] focus:border-[var(--sys-border)] transition-all" style={{ background: '#0d1420' }} />
                     </div>
 
                     {/* Style Selection */}
-                    <p className="text-[10px] font-bold text-slate-500 mb-2">IMAGE STYLE</p>
+                    <p className="text-[10px] font-bold text-[var(--sys-text-muted)] mb-2">IMAGE STYLE</p>
                     <div className="grid grid-cols-3 gap-1.5 mb-4">
                         {IMAGE_STYLES.map(style => (
                             <button key={style.id} onClick={() => setImgStyle(style.id)}
                                 className={`px-2 py-2 rounded-xl text-center transition-all cursor-pointer border ${imgStyle === style.id
-                                    ? 'border-amber-400/30 text-amber-400'
-                                    : 'border-white/[0.08] text-slate-500 hover:text-white hover:border-white/[0.15]'
+                                    ? 'border-[var(--sys-border)] text-primary'
+                                    : 'border-[var(--sys-border)] text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:border-[var(--sys-border)]'
                                 }`}
                                 style={{ background: imgStyle === style.id ? 'rgba(251,191,36,0.12)' : '#0d1420' }}>
                                 <span className="material-symbols-outlined text-[16px] block mb-0.5">{style.icon}</span>
@@ -321,8 +321,8 @@ function FloatingPlusButton({ editor, brandId, activeBrand, generatingImage, set
                     {/* Generate Button */}
                     <button onClick={handleGenerate} disabled={generatingImage}
                         className={`w-full py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${generatingImage
-                            ? 'bg-amber-400/20 text-amber-400 animate-pulse'
-                            : 'bg-amber-400 text-black hover:bg-amber-300'
+                            ? 'bg-[var(--sys-primary-dim)] text-primary animate-pulse'
+                            : 'bg-[var(--sys-surface)] text-black hover:bg-[var(--sys-surface)]'
                         }`}>
                         {generatingImage ? (
                             <><span className="material-symbols-outlined text-sm animate-spin">progress_activity</span> Generating...</>
@@ -412,10 +412,10 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:2rem 0}.meta{color:#888;font-
         <div className="animate-fade-in max-w-4xl mx-auto">
             {/* Header */}
             <div className="flex items-center justify-between mb-4">
-                <button onClick={onBack} className="flex items-center gap-1.5 text-sm text-slate-400 hover:text-white transition-all cursor-pointer">
+                <button onClick={onBack} className="flex items-center gap-1.5 text-sm text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] transition-all cursor-pointer">
                     <span className="material-symbols-outlined text-sm">arrow_back</span> Back
                 </button>
-                <div className="flex items-center gap-3 text-xs text-slate-500">
+                <div className="flex items-center gap-3 text-xs text-[var(--sys-text-muted)]">
                     <span>{wordCount} words</span>
                     <span>·</span>
                     <span>{readTime} min read</span>
@@ -425,10 +425,10 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:2rem 0}.meta{color:#888;font-
             {/* Title */}
             <input type="text" value={blogTitle} onChange={e => setBlogTitle(e.target.value)}
                 placeholder="Blog Title..."
-                className="w-full bg-transparent text-3xl font-black text-white placeholder-slate-600 border-none outline-none mb-6 leading-tight" />
+                className="w-full bg-transparent text-3xl font-black text-[var(--sys-text)] placeholder-slate-600 border-none outline-none mb-6 leading-tight" />
 
             {/* Toolbar */}
-            <div className="glass-panel rounded-xl px-3 py-2 mb-4 flex flex-wrap items-center gap-0.5 border border-white/[0.06] sticky top-0 z-20 backdrop-blur-xl">
+            <div className="glass-panel rounded-xl px-3 py-2 mb-4 flex flex-wrap items-center gap-0.5 border border-[var(--sys-border)] sticky top-0 z-20 ">
                 <TBtn icon="format_h1" label="Heading 1" active={editor.isActive('heading', { level: 1 })}
                     onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} />
                 <TBtn icon="format_h2" label="Heading 2" active={editor.isActive('heading', { level: 2 })}
@@ -477,19 +477,19 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:2rem 0}.meta{color:#888;font-
                     <span className="material-symbols-outlined text-sm text-primary">link</span>
                     <input type="url" value={linkUrl} onChange={e => setLinkUrl(e.target.value)}
                         placeholder="https://example.com"
-                        className="flex-1 bg-transparent text-sm text-white outline-none placeholder-slate-500"
+                        className="flex-1 bg-transparent text-sm text-[var(--sys-text)] outline-none placeholder-slate-500"
                         onKeyDown={e => e.key === 'Enter' && setLink()} autoFocus />
                     <button onClick={setLink} className="text-xs font-bold text-primary hover:bg-primary/10 px-3 py-1.5 rounded-lg cursor-pointer">
                         {linkUrl ? 'Add' : 'Remove'}
                     </button>
-                    <button onClick={() => setShowLinkInput(false)} className="text-slate-500 hover:text-white cursor-pointer">
+                    <button onClick={() => setShowLinkInput(false)} className="text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer">
                         <span className="material-symbols-outlined text-sm">close</span>
                     </button>
                 </div>
             )}
 
             {/* Editor Area with Floating Plus */}
-            <div className="blog-editor-wrapper glass-panel rounded-2xl border border-white/[0.06] min-h-[500px] p-8 pl-12 mb-4 relative">
+            <div className="blog-editor-wrapper glass-panel rounded-2xl border border-[var(--sys-border)] min-h-[500px] p-8 pl-12 mb-4 relative">
                 <FloatingPlusButton
                     editor={editor}
                     brandId={brandId}
@@ -503,9 +503,9 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:2rem 0}.meta{color:#888;font-
                 {generatingImage && (
                     <div className="absolute inset-0 z-40 flex items-center justify-center rounded-2xl" style={{ background: 'rgba(17,24,39,0.85)' }}>
                         <div className="flex flex-col items-center gap-3">
-                            <div className="w-12 h-12 rounded-full border-2 border-amber-400/30 border-t-amber-400 animate-spin" />
-                            <p className="text-sm font-bold text-amber-400">Generating image...</p>
-                            <p className="text-[11px] text-slate-500">This may take 10-20 seconds</p>
+                            <div className="w-12 h-12 rounded-full border border-[var(--sys-border)] border-t-amber-400 animate-spin" />
+                            <p className="text-sm font-bold text-primary">Generating image...</p>
+                            <p className="text-[11px] text-[var(--sys-text-muted)]">This may take 10-20 seconds</p>
                         </div>
                     </div>
                 )}
@@ -513,7 +513,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:2rem 0}.meta{color:#888;font-
 
             {/* Meta Description */}
             <button onClick={() => setShowMeta(!showMeta)}
-                className="flex items-center gap-2 text-xs text-slate-500 hover:text-white mb-3 cursor-pointer transition-all">
+                className="flex items-center gap-2 text-xs text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] mb-3 cursor-pointer transition-all">
                 <span className="material-symbols-outlined text-sm">{showMeta ? 'expand_less' : 'expand_more'}</span>
                 SEO Meta Description
             </button>
@@ -521,8 +521,8 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:2rem 0}.meta{color:#888;font-
                 <div className="mb-4 animate-fade-in">
                     <textarea value={metaDesc} onChange={e => setMetaDesc(e.target.value)}
                         placeholder="Write a compelling meta description (150-160 chars)..." rows={2}
-                        className="w-full glass-panel rounded-xl px-4 py-3 text-sm text-white bg-transparent border border-white/[0.06] outline-none resize-none placeholder-slate-600" />
-                    <p className="text-[10px] text-slate-600 mt-1">{metaDesc.length}/160 characters</p>
+                        className="w-full glass-panel rounded-xl px-4 py-3 text-sm text-[var(--sys-text)] bg-transparent border border-[var(--sys-border)] outline-none resize-none placeholder-slate-600" />
+                    <p className="text-[10px] text-[var(--sys-text-muted)] mt-1">{metaDesc.length}/160 characters</p>
                 </div>
             )}
 
@@ -530,22 +530,22 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:2rem 0}.meta{color:#888;font-
             <div className="flex flex-wrap items-center gap-2">
                 <button onClick={copyHTML}
                     className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${copied === 'html'
-                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                        : 'glass-panel border border-white/[0.06] text-white hover:border-primary/30'
+                        ? 'bg-[var(--sys-primary-dim)] text-primary border border-[var(--sys-border)]'
+                        : 'glass-panel border border-[var(--sys-border)] text-[var(--sys-text)] hover:border-primary/30'
                     }`}>
                     <span className="material-symbols-outlined text-sm">{copied === 'html' ? 'check' : 'code'}</span>
                     {copied === 'html' ? 'Copied!' : 'Copy HTML'}
                 </button>
                 <button onClick={copyText}
                     className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${copied === 'text'
-                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                        : 'glass-panel border border-white/[0.06] text-white hover:border-primary/30'
+                        ? 'bg-[var(--sys-primary-dim)] text-primary border border-[var(--sys-border)]'
+                        : 'glass-panel border border-[var(--sys-border)] text-[var(--sys-text)] hover:border-primary/30'
                     }`}>
                     <span className="material-symbols-outlined text-sm">{copied === 'text' ? 'check' : 'content_copy'}</span>
                     {copied === 'text' ? 'Copied!' : 'Copy Text'}
                 </button>
                 <button onClick={downloadHTML}
-                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold glass-panel border border-white/[0.06] text-white hover:border-primary/30 transition-all cursor-pointer">
+                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold glass-panel border border-[var(--sys-border)] text-[var(--sys-text)] hover:border-primary/30 transition-all cursor-pointer">
                     <span className="material-symbols-outlined text-sm">download</span>
                     Download HTML
                 </button>

@@ -29,7 +29,8 @@ const AdminDashboard = lazy(() => import('./pages/AdminDashboard'))
 const TeamDashboard = lazy(() => import('./pages/TeamDashboard'))
 const ContentStudio = lazy(() => import('./pages/ContentStudio'))
 const CreativeStudio = lazy(() => import('./pages/CreativeStudio'))
-const CanvasEditor = lazy(() => import('./pages/CanvasEditor'))
+// const CanvasEditor = lazy(() => import('./pages/CanvasEditor'))  // Legacy monolith (6,796 lines) — kept as rollback
+const CanvasEditor = lazy(() => import('./pages/canvas/CanvasShell'))  // New modular shell (910 lines)
 const Integrations = lazy(() => import('./pages/Integrations'))
 const SmartCalendar = lazy(() => import('./pages/SmartCalendar'))
 const PublishSchedule = lazy(() => import('./pages/PublishSchedule'))
@@ -130,7 +131,7 @@ function App() {
                     <Route path="/team" element={<ProtectedRoute><TeamDashboard /></ProtectedRoute>} />
                     <Route path="/content-studio" element={<ProtectedRoute><ContentStudio /></ProtectedRoute>} />
                     <Route path="/creative-studio" element={<ProtectedRoute><CreativeStudio /></ProtectedRoute>} />
-                    <Route path="/ai-canvas" element={<ProtectedRoute><CanvasEditor /></ProtectedRoute>} />
+                    <Route path="/ai-canvas" element={<ProtectedRoute><CanvasEditor /></ProtectedRoute>} />  {/* Now using modular CanvasShell */}
                     <Route path="/video-studio" element={<ProtectedRoute><VideoStudio /></ProtectedRoute>} />
                     <Route path="/performance-marketing" element={<ProtectedRoute><PerformanceMarketing /></ProtectedRoute>} />
                     <Route path="/d2c-analytics" element={<ProtectedRoute><D2CAnalytics /></ProtectedRoute>} />

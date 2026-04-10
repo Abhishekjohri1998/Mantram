@@ -6,6 +6,27 @@
 
 export const API_BASE = (import.meta.env.VITE_API_URL || `${window.location.origin}/api`).replace(/\/$/, '');
 
+/**
+ * Utility to proxy S3 URLs through our backend to avoid CORS issues in the Canvas.
+ * Required for Fabric.js FabricImage.fromURL calls with crossOrigin: 'anonymous'.
+ */
+export const getCorsUrl = (url) => {
+    if (!url) return '';
+    if (url.startsWith('data:') || url.startsWith('blob:')) return url;
+    
+    // Check if it's an S3 URL or external asset that likely lacks CORS headers
+    const isS3 = url.includes('s3.amazonaws.com') || url.includes('.s3.') || url.includes('mantram-assets');
+    const isUnsplash = url.includes('images.unsplash.com');
+    
+    if (isS3 || isUnsplash) {
+        // Return proxied URL
+        return `${API_BASE}/media/proxy?url=${encodeURIComponent(url)}`;
+    }
+    
+    return url;
+};
+
+
 // Token management
 let authToken = localStorage.getItem('mantram_token') || '';
 let dynamicTokenProvider = null;
@@ -429,6 +450,10 @@ export const canvasAssets = {
     generateMusic: (data) => apiFetch('/fidato/canvas-music', { method: 'POST', body: JSON.stringify(data), timeout: 3600000 }),
     generateSoundEffect: (data) => apiFetch('/fidato/canvas-sfx', { method: 'POST', body: JSON.stringify(data) }),
     compileVideo: (data) => apiFetch('/fidato/canvas-compile', { method: 'POST', body: JSON.stringify(data), timeout: 3600000 }),
+    // MCoT — Post-Generation Critique
+    critiqueImage: (data) => apiFetch('/fidato/canvas-critique', { method: 'POST', body: JSON.stringify(data) }),
+    // Multi-size Campaign Generation
+    generateCampaign: (data) => apiFetch('/fidato/canvas-campaign', { method: 'POST', body: JSON.stringify(data) }),
 };
 
 // ============ Video Studio API ============
@@ -621,6 +646,13 @@ export const superadmin = {
     getPricingMonitor: () => apiFetch('/superadmin/pricing-monitor'),
     triggerPricingCheck: () => apiFetch('/superadmin/pricing-monitor/check', { method: 'POST' }),
     dismissPricingAlerts: () => apiFetch('/superadmin/pricing-monitor/dismiss', { method: 'POST' }),
+
+    // LLM Provider Switching
+    getLlmProviders: () => apiFetch('/superadmin/llm-providers'),
+    updateLlmProvider: (data) => apiFetch('/superadmin/llm-providers', { method: 'PUT', body: JSON.stringify(data) }),
+    addLlmProvider: (data) => apiFetch('/superadmin/llm-providers/provider', { method: 'POST', body: JSON.stringify(data) }),
+    modifyLlmProvider: (data) => apiFetch('/superadmin/llm-providers/provider', { method: 'PATCH', body: JSON.stringify(data) }),
+    removeLlmProvider: (data) => apiFetch('/superadmin/llm-providers/provider', { method: 'DELETE', body: JSON.stringify(data) }),
 
     // Video Provider Switching
     getVideoProviders: () => apiFetch('/superadmin/video-providers'),

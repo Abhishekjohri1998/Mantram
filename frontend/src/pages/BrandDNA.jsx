@@ -17,20 +17,20 @@ function EditModal({ title, icon, onClose, onSave, children }) {
     }
     return (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4" onClick={onClose}>
-            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-            <div className="relative w-full max-w-lg rounded-2xl border border-white/[0.08] overflow-hidden animate-fade-in"
+            <div className="absolute inset-0 bg-[var(--sys-surface)] " />
+            <div className="relative w-full max-w-lg rounded-2xl border border-[var(--sys-border)] overflow-hidden animate-fade-in"
                 style={{ background: 'rgba(15,15,25,0.97)' }} onClick={e => e.stopPropagation()}>
-                <div className="flex items-center justify-between p-5 border-b border-white/[0.06]">
-                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <div className="flex items-center justify-between p-5 border-b border-[var(--sys-border)]">
+                    <h3 className="text-lg font-bold text-[var(--sys-text)] flex items-center gap-2">
                         <span className="material-symbols-outlined text-primary">{icon}</span>{title}
                     </h3>
-                    <button onClick={onClose} className="text-slate-500 hover:text-white transition-colors cursor-pointer">
+                    <button onClick={onClose} className="text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] transition-colors cursor-pointer">
                         <span className="material-symbols-outlined">close</span>
                     </button>
                 </div>
                 <div className="p-5 max-h-[60vh] overflow-y-auto space-y-4">{children}</div>
-                <div className="flex justify-end gap-3 p-5 border-t border-white/[0.06]">
-                    <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm text-slate-400 hover:text-white transition-colors cursor-pointer">Cancel</button>
+                <div className="flex justify-end gap-3 p-5 border-t border-[var(--sys-border)]">
+                    <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] transition-colors cursor-pointer">Cancel</button>
                     <button onClick={handleSave} disabled={saving}
                         className="btn-primary px-6 py-2 rounded-xl text-sm font-medium cursor-pointer disabled:opacity-50">
                         {saving ? 'Saving...' : 'Save Changes'}
@@ -45,13 +45,13 @@ function EditModal({ title, icon, onClose, onSave, children }) {
 function SectionHeader({ icon, title, onEdit, badge }) {
     return (
         <div className="flex items-center justify-between mb-5">
-            <h3 className="font-bold text-white flex items-center gap-2">
+            <h3 className="font-bold text-[var(--sys-text)] flex items-center gap-2">
                 <span className="material-symbols-outlined text-primary">{icon}</span> {title}
                 {badge && <span className="ml-2 px-2 py-0.5 rounded-lg bg-primary/10 text-primary text-xs font-bold">{badge}</span>}
             </h3>
             {onEdit && (
                 <button onClick={onEdit}
-                    className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-medium text-slate-400 hover:text-primary hover:bg-primary/5 transition-all cursor-pointer">
+                    className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-medium text-[var(--sys-text-muted)] hover:text-primary hover:bg-primary/5 transition-all cursor-pointer">
                     <span className="material-symbols-outlined text-sm">edit</span> Edit
                 </button>
             )}
@@ -105,16 +105,16 @@ function AddProductModal({ brandId, onClose, onSaved, editProduct }) {
                 { key: 'tags', label: 'Tags (comma-separated)', placeholder: 'premium, new, bestseller' },
             ].map(f => (
                 <div key={f.key}>
-                    <label className="text-sm text-slate-400 mb-1 block">{f.label}</label>
+                    <label className="text-sm text-[var(--sys-text-muted)] mb-1 block">{f.label}</label>
                     {f.area ? (
                         <textarea value={form[f.key]} onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))}
                             placeholder={f.placeholder} rows={3}
-                            className="w-full input-glass rounded-xl p-3 text-sm text-white resize-none" />
+                            className="w-full input-glass rounded-xl p-3 text-sm text-[var(--sys-text)] resize-none" />
                     ) : (
                         <input type={f.type || 'text'} value={form[f.key]}
                             onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))}
                             placeholder={f.placeholder}
-                            className="w-full input-glass rounded-xl p-3 text-sm text-white" />
+                            className="w-full input-glass rounded-xl p-3 text-sm text-[var(--sys-text)]" />
                     )}
                 </div>
             ))}
@@ -142,7 +142,7 @@ function ProductCard({ product, onEdit, onDelete, onEnrich }) {
     const price = product.variants?.[0]?.price
     return (
         <div className="glass-panel rounded-xl overflow-hidden group hover:border-primary/20 transition-all">
-            <div className="h-28 bg-white/[0.03] flex items-center justify-center overflow-hidden">
+            <div className="h-28 bg-[var(--sys-surface)] flex items-center justify-center overflow-hidden">
                 {mainImage ? (
                     <img src={mainImage} alt={product.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
                 ) : (
@@ -150,17 +150,17 @@ function ProductCard({ product, onEdit, onDelete, onEnrich }) {
                 )}
             </div>
             <div className="p-3">
-                <p className="text-sm font-bold text-white truncate">{product.title}</p>
+                <p className="text-sm font-bold text-[var(--sys-text)] truncate">{product.title}</p>
                 <div className="flex items-center gap-2 mt-1">
-                    {product.productType && <span className="text-xs text-slate-500 truncate">{product.productType}</span>}
-                    {price > 0 && <span className="text-xs text-emerald-400 font-bold ml-auto">₹{price}</span>}
+                    {product.productType && <span className="text-xs text-[var(--sys-text-muted)] truncate">{product.productType}</span>}
+                    {price > 0 && <span className="text-xs text-primary font-bold ml-auto">₹{price}</span>}
                 </div>
                 <div className="flex gap-1 mt-2">
-                    <button onClick={() => onEdit(product)} className="flex-1 text-xs text-slate-400 hover:text-primary py-1 rounded cursor-pointer">Edit</button>
-                    <button onClick={handleEnrich} disabled={enriching} className="flex-1 text-xs text-slate-400 hover:text-emerald-400 py-1 rounded cursor-pointer disabled:opacity-50">
+                    <button onClick={() => onEdit(product)} className="flex-1 text-xs text-[var(--sys-text-muted)] hover:text-primary py-1 rounded cursor-pointer">Edit</button>
+                    <button onClick={handleEnrich} disabled={enriching} className="flex-1 text-xs text-[var(--sys-text-muted)] hover:text-primary py-1 rounded cursor-pointer disabled:opacity-50">
                         {enriching ? '...' : 'Enrich'}
                     </button>
-                    <button onClick={handleDelete} className="flex-1 text-xs text-slate-400 hover:text-rose-400 py-1 rounded cursor-pointer">Delete</button>
+                    <button onClick={handleDelete} className="flex-1 text-xs text-[var(--sys-text-muted)] hover:text-primary py-1 rounded cursor-pointer">Delete</button>
                 </div>
             </div>
         </div>
@@ -246,13 +246,13 @@ function ProductCatalog({ brandId, brandWebsite, setError }) {
                         className="input-glass rounded-xl px-3 py-1.5 text-xs w-40" />
                     {brandWebsite && (
                         <button onClick={handleScanWebsite} disabled={scanning}
-                            className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-medium text-slate-400 hover:text-primary hover:bg-primary/5 transition-all cursor-pointer disabled:opacity-50">
+                            className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-medium text-[var(--sys-text-muted)] hover:text-primary hover:bg-primary/5 transition-all cursor-pointer disabled:opacity-50">
                             <span className="material-symbols-outlined text-sm">{scanning ? 'progress_activity' : 'language'}</span>
                             {scanning ? 'Scanning...' : 'Scan Website'}
                         </button>
                     )}
                     <button onClick={handleRepairImages} disabled={repairing}
-                        className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-medium text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/5 transition-all cursor-pointer disabled:opacity-50">
+                        className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-medium text-[var(--sys-text-muted)] hover:text-primary hover:bg-[var(--sys-primary-dim)] transition-all cursor-pointer disabled:opacity-50">
                         <span className="material-symbols-outlined text-sm">{repairing ? 'progress_activity' : 'build'}</span>
                         {repairing ? 'Repairing...' : 'Repair Images'}
                     </button>
@@ -263,11 +263,11 @@ function ProductCatalog({ brandId, brandWebsite, setError }) {
                 </div>
             </div>
             {loading ? (
-                <div className="flex items-center justify-center py-8 text-slate-500"><span className="material-symbols-outlined animate-spin mr-2">progress_activity</span>Loading...</div>
+                <div className="flex items-center justify-center py-8 text-[var(--sys-text-muted)]"><span className="material-symbols-outlined animate-spin mr-2">progress_activity</span>Loading...</div>
             ) : products.length === 0 ? (
                 <div className="text-center py-8">
-                    <span className="material-symbols-outlined text-4xl text-slate-600 mb-2 block">inventory_2</span>
-                    <p className="text-sm text-slate-400">No products yet. Add manually or scan your website.</p>
+                    <span className="material-symbols-outlined text-4xl text-[var(--sys-text-muted)] mb-2 block">inventory_2</span>
+                    <p className="text-sm text-[var(--sys-text-muted)]">No products yet. Add manually or scan your website.</p>
                 </div>
             ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
@@ -297,24 +297,24 @@ function DeleteBrandModal({ brand, onClose, onConfirm }) {
 
     return (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4" onClick={onClose}>
-            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-            <div className="relative w-full max-w-md rounded-2xl border border-rose-500/20 overflow-hidden animate-fade-in"
+            <div className="absolute inset-0 bg-[var(--sys-surface)] " />
+            <div className="relative w-full max-w-md rounded-2xl border border-[var(--sys-border)] overflow-hidden animate-fade-in"
                 style={{ background: 'rgba(15,15,25,0.97)' }} onClick={e => e.stopPropagation()}>
                 <div className="p-6">
                     <div className="flex items-center gap-3 mb-4">
-                        <div className="size-12 rounded-xl bg-rose-500/10 flex items-center justify-center">
-                            <span className="material-symbols-outlined text-rose-400 text-2xl">warning</span>
+                        <div className="size-12 rounded-xl bg-[var(--sys-primary-dim)] flex items-center justify-center">
+                            <span className="material-symbols-outlined text-primary text-2xl">warning</span>
                         </div>
                         <div>
-                            <h3 className="text-lg font-bold text-white">Delete Brand</h3>
-                            <p className="text-sm text-slate-400">This cannot be undone</p>
+                            <h3 className="text-lg font-bold text-[var(--sys-text)]">Delete Brand</h3>
+                            <p className="text-sm text-[var(--sys-text-muted)]">This cannot be undone</p>
                         </div>
                     </div>
-                    <div className="p-4 rounded-xl bg-rose-500/5 border border-rose-500/10 mb-4">
-                        <p className="text-sm text-slate-300 leading-relaxed">
-                            Deleting <strong className="text-rose-400">{brand.name}</strong> will permanently remove:
+                    <div className="p-4 rounded-xl bg-[var(--sys-primary-dim)] border border-[var(--sys-border)] mb-4">
+                        <p className="text-sm text-[var(--sys-text-muted)] leading-relaxed">
+                            Deleting <strong className="text-primary">{brand.name}</strong> will permanently remove:
                         </p>
-                        <ul className="mt-2 space-y-1 text-sm text-slate-400">
+                        <ul className="mt-2 space-y-1 text-sm text-[var(--sys-text-muted)]">
                             <li>• All brand DNA & knowledge</li>
                             <li>• All synced products</li>
                             <li>• All integrations for this brand</li>
@@ -322,18 +322,18 @@ function DeleteBrandModal({ brand, onClose, onConfirm }) {
                         </ul>
                     </div>
                     <div>
-                        <label className="text-sm text-slate-400 mb-1.5 block">
-                            Type <strong className="text-white">{brand.name}</strong> to confirm
+                        <label className="text-sm text-[var(--sys-text-muted)] mb-1.5 block">
+                            Type <strong className="text-[var(--sys-text)]">{brand.name}</strong> to confirm
                         </label>
                         <input type="text" value={confirmText} onChange={e => setConfirmText(e.target.value)}
                             placeholder={brand.name}
-                            className="w-full input-glass rounded-xl p-3 text-sm text-white" />
+                            className="w-full input-glass rounded-xl p-3 text-sm text-[var(--sys-text)]" />
                     </div>
                 </div>
-                <div className="flex justify-end gap-3 p-4 border-t border-white/[0.06]">
-                    <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm text-slate-400 hover:text-white transition-colors cursor-pointer">Cancel</button>
+                <div className="flex justify-end gap-3 p-4 border-t border-[var(--sys-border)]">
+                    <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] transition-colors cursor-pointer">Cancel</button>
                     <button onClick={handleDelete} disabled={!canDelete || deleting}
-                        className="px-6 py-2 rounded-xl text-sm font-medium bg-rose-500 text-white hover:bg-rose-600 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed">
+                        className="px-6 py-2 rounded-xl text-sm font-medium bg-[var(--sys-surface)] text-[var(--sys-text)] hover:bg-[var(--sys-surface)] transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed">
                         {deleting ? 'Deleting...' : 'Delete Permanently'}
                     </button>
                 </div>
@@ -516,7 +516,7 @@ function BrandImageGallery({ dna, brandId, updateBrandDNA, setError }) {
         <div className="col-span-12 glass-panel rounded-2xl p-6 animate-fade-in" style={{ animationDelay: '460ms' }}>
             <div className="flex items-center justify-between mb-5">
                 <SectionHeader icon="photo_library" title="Brand Images" badge={allImages.length} />
-                <p className="text-sm text-slate-500">Scraped from your website • Hover for actions</p>
+                <p className="text-sm text-[var(--sys-text-muted)]">Scraped from your website • Hover for actions</p>
             </div>
 
             {/* Category sections */}
@@ -533,9 +533,9 @@ function BrandImageGallery({ dna, brandId, updateBrandDNA, setError }) {
                                 <div className="size-7 rounded-lg flex items-center justify-center" style={{ background: `${conf.color}15` }}>
                                     <span className="material-symbols-outlined text-sm" style={{ color: conf.color }}>{conf.icon}</span>
                                 </div>
-                                <span className="text-sm font-bold text-white">{conf.label}</span>
-                                <span className="text-xs text-slate-600 font-medium">{imgs.length}</span>
-                                <span className="material-symbols-outlined text-xs text-slate-600 group-hover:text-slate-400 transition-transform ml-auto" style={{ transform: collapsed ? 'rotate(-90deg)' : 'rotate(0deg)' }}>
+                                <span className="text-sm font-bold text-[var(--sys-text)]">{conf.label}</span>
+                                <span className="text-xs text-[var(--sys-text-muted)] font-medium">{imgs.length}</span>
+                                <span className="material-symbols-outlined text-xs text-[var(--sys-text-muted)] group-hover:text-[var(--sys-text-muted)] transition-transform ml-auto" style={{ transform: collapsed ? 'rotate(-90deg)' : 'rotate(0deg)' }}>
                                     expand_more
                                 </span>
                             </button>
@@ -595,9 +595,9 @@ function BrandImageGallery({ dna, brandId, updateBrandDNA, setError }) {
                 <EditModal title="Edit Image" icon="image" onClose={() => setEditingImage(null)} onSave={handleSaveEdit}>
                     {/* Image preview */}
                     <div className="flex items-center gap-4 mb-2">
-                        <img src={editingImage.url} alt={editForm.alt} className="w-20 h-20 object-cover rounded-xl border border-white/[0.08]" />
+                        <img src={editingImage.url} alt={editForm.alt} className="w-20 h-20 object-cover rounded-xl border border-[var(--sys-border)]" />
                         <div className="flex-1 min-w-0">
-                            <p className="text-xs text-slate-500 truncate">{editingImage.url}</p>
+                            <p className="text-xs text-[var(--sys-text-muted)] truncate">{editingImage.url}</p>
                         </div>
                     </div>
                     {[
@@ -609,23 +609,23 @@ function BrandImageGallery({ dna, brandId, updateBrandDNA, setError }) {
                         { key: 'tags', label: 'Tags (comma-separated)', placeholder: 'hero, product, promo' },
                     ].map(f => (
                         <div key={f.key}>
-                            <label className="text-sm text-slate-400 mb-1 block">{f.label}</label>
+                            <label className="text-sm text-[var(--sys-text-muted)] mb-1 block">{f.label}</label>
                             {f.area ? (
                                 <textarea value={editForm[f.key]} onChange={e => setEditForm(p => ({ ...p, [f.key]: e.target.value }))}
                                     placeholder={f.placeholder} rows={3}
-                                    className="w-full input-glass rounded-xl p-3 text-sm text-white resize-none" />
+                                    className="w-full input-glass rounded-xl p-3 text-sm text-[var(--sys-text)] resize-none" />
                             ) : (
                                 <input type={f.type || 'text'} value={editForm[f.key]}
                                     onChange={e => setEditForm(p => ({ ...p, [f.key]: e.target.value }))}
                                     placeholder={f.placeholder}
-                                    className="w-full input-glass rounded-xl p-3 text-sm text-white" />
+                                    className="w-full input-glass rounded-xl p-3 text-sm text-[var(--sys-text)]" />
                             )}
                         </div>
                     ))}
                     <div>
-                        <label className="text-sm text-slate-400 mb-1 block">Source Type</label>
+                        <label className="text-sm text-[var(--sys-text-muted)] mb-1 block">Source Type</label>
                         <select value={editForm.source} onChange={e => setEditForm(p => ({ ...p, source: e.target.value }))}
-                            className="w-full input-glass rounded-xl p-3 text-sm text-white">
+                            className="w-full input-glass rounded-xl p-3 text-sm text-[var(--sys-text)]">
                             <option value="page">Page</option>
                             <option value="hero">Hero</option>
                             <option value="promo">Promo</option>
@@ -643,23 +643,23 @@ function BrandImageGallery({ dna, brandId, updateBrandDNA, setError }) {
             {/* ═══════════ LIGHTBOX VIEWER (Portal to body) ═══════════ */}
             {lightbox && currentImg && ReactDOM.createPortal(
                 <div className="fixed inset-0 z-[9999] flex items-center justify-center" onClick={closeLightbox}>
-                    <div className="absolute inset-0 bg-black/90 backdrop-blur-md" />
+                    <div className="absolute inset-0 bg-[var(--sys-surface)] " />
 
                     {/* Top bar */}
                     <div className="absolute top-0 left-0 right-0 flex items-center justify-between p-4 z-10">
                         <div className="flex items-center gap-3">
-                            <span className="text-sm font-bold text-white/70">{lightbox.index + 1} / {lightbox.images.length}</span>
+                            <span className="text-sm font-bold text-[var(--sys-text)]/70">{lightbox.index + 1} / {lightbox.images.length}</span>
                             <span className="px-2 py-0.5 rounded-lg text-[10px] font-bold uppercase" style={{ background: `${currentConf.color}20`, color: currentConf.color }}>
                                 {currentConf.label}
                             </span>
                         </div>
                         <div className="flex items-center gap-2">
                             <a href={currentImg.url} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()}
-                                className="size-9 rounded-xl bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/60 hover:text-white transition-all" title="Open in new tab">
+                                className="size-9 rounded-xl bg-[var(--sys-surface)] hover:bg-[var(--sys-surface)] flex items-center justify-center text-[var(--sys-text)]/60 hover:text-[var(--sys-text)] transition-all" title="Open in new tab">
                                 <span className="material-symbols-outlined text-lg">open_in_new</span>
                             </a>
                             <button onClick={closeLightbox}
-                                className="size-9 rounded-xl bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/60 hover:text-white transition-all cursor-pointer">
+                                className="size-9 rounded-xl bg-[var(--sys-surface)] hover:bg-[var(--sys-surface)] flex items-center justify-center text-[var(--sys-text)]/60 hover:text-[var(--sys-text)] transition-all cursor-pointer">
                                 <span className="material-symbols-outlined text-lg">close</span>
                             </button>
                         </div>
@@ -669,11 +669,11 @@ function BrandImageGallery({ dna, brandId, updateBrandDNA, setError }) {
                     {lightbox.images.length > 1 && (
                         <>
                             <button onClick={e => { e.stopPropagation(); prevImage() }}
-                                className="absolute left-4 top-1/2 -translate-y-1/2 z-10 size-12 rounded-full bg-white/5 hover:bg-white/15 flex items-center justify-center text-white/60 hover:text-white transition-all cursor-pointer backdrop-blur-sm border border-white/[0.06]">
+                                className="absolute left-4 top-1/2 -translate-y-1/2 z-10 size-12 rounded-full bg-[var(--sys-surface)] hover:bg-[var(--sys-surface)] flex items-center justify-center text-[var(--sys-text)]/60 hover:text-[var(--sys-text)] transition-all cursor-pointer border border-[var(--sys-border)]">
                                 <span className="material-symbols-outlined text-xl">chevron_left</span>
                             </button>
                             <button onClick={e => { e.stopPropagation(); nextImage() }}
-                                className="absolute right-4 top-1/2 -translate-y-1/2 z-10 size-12 rounded-full bg-white/5 hover:bg-white/15 flex items-center justify-center text-white/60 hover:text-white transition-all cursor-pointer backdrop-blur-sm border border-white/[0.06]">
+                                className="absolute right-4 top-1/2 -translate-y-1/2 z-10 size-12 rounded-full bg-[var(--sys-surface)] hover:bg-[var(--sys-surface)] flex items-center justify-center text-[var(--sys-text)]/60 hover:text-[var(--sys-text)] transition-all cursor-pointer border border-[var(--sys-border)]">
                                 <span className="material-symbols-outlined text-xl">chevron_right</span>
                             </button>
                         </>
@@ -687,12 +687,12 @@ function BrandImageGallery({ dna, brandId, updateBrandDNA, setError }) {
                     {/* Bottom info */}
                     {currentImg.alt && (
                         <div className="absolute bottom-6 left-1/2 -translate-x-1/2 max-w-lg text-center">
-                            <p className="text-sm text-white/60 bg-black/40 px-4 py-2 rounded-xl backdrop-blur-sm">{currentImg.alt}</p>
+                            <p className="text-sm text-[var(--sys-text)]/60 bg-[var(--sys-surface)] px-4 py-2 rounded-xl ">{currentImg.alt}</p>
                         </div>
                     )}
 
                     {/* Keyboard hint */}
-                    <div className="absolute bottom-4 right-4 flex items-center gap-1 text-[10px] text-white/20">
+                    <div className="absolute bottom-4 right-4 flex items-center gap-1 text-[10px] text-[var(--sys-text)]/20">
                         <span>← → Navigate</span> • <span>ESC Close</span>
                     </div>
                 </div>,
@@ -885,17 +885,17 @@ function KnowledgeBank({ brandId, setError }) {
 
             {/* Feedback toast */}
             {feedback && (
-                <div className={`mb-4 p-3 rounded-xl text-sm font-medium flex items-center gap-2 animate-fade-in ${feedback.ok ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}`}>
+                <div className={`mb-4 p-3 rounded-xl text-sm font-medium flex items-center gap-2 animate-fade-in ${feedback.ok ? 'bg-[var(--sys-primary-dim)] text-primary border border-[var(--sys-border)]' : 'bg-[var(--sys-primary-dim)] text-primary border border-[var(--sys-border)]'}`}>
                     <span className="material-symbols-outlined text-sm">{feedback.ok ? 'check_circle' : 'error'}</span>
                     {feedback.msg}
                 </div>
             )}
 
             {/* Input Tabs */}
-            <div className="flex items-center gap-1 p-1 rounded-xl bg-white/[0.03] border border-white/[0.06] mb-5 w-fit">
+            <div className="flex items-center gap-1 p-1 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] mb-5 w-fit">
                 {tabs.map(t => (
                     <button key={t.key} onClick={() => setActiveTab(t.key)}
-                        className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${activeTab === t.key ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-slate-400 hover:text-white hover:bg-white/[0.05]'}`}>
+                        className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${activeTab === t.key ? 'bg-primary text-white shadow-none' : 'text-[var(--sys-text-muted)] hover:text-white hover:bg-[var(--sys-surface)]'}`}>
                         <span className="material-symbols-outlined text-sm">{t.icon}</span>{t.label}
                     </button>
                 ))}
@@ -905,12 +905,12 @@ function KnowledgeBank({ brandId, setError }) {
             {activeTab === 'text' && (
                 <div className="space-y-3">
                     <input type="text" value={textTitle} onChange={e => setTextTitle(e.target.value)}
-                        placeholder="Title (optional)" className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-500 outline-none focus:border-primary/40" />
+                        placeholder="Title (optional)" className="w-full bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl px-4 py-2.5 text-sm text-[var(--sys-text)] placeholder-slate-500 outline-none focus:border-primary/40" />
                     <textarea value={textInput} onChange={e => setTextInput(e.target.value)} rows={5}
                         placeholder="Paste brand knowledge here — product details, company history, tone guidelines, FAQ content, key differentiators, anything the AI should know..."
-                        className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-4 py-3 text-sm text-white placeholder-slate-500 outline-none focus:border-primary/40 resize-none" />
+                        className="w-full bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl px-4 py-3 text-sm text-[var(--sys-text)] placeholder-slate-500 outline-none focus:border-primary/40 resize-none" />
                     <div className="flex items-center justify-between">
-                        <span className="text-xs text-slate-600">{textInput.length.toLocaleString()} characters</span>
+                        <span className="text-xs text-[var(--sys-text-muted)]">{textInput.length.toLocaleString()} characters</span>
                         <button onClick={handleSubmit} disabled={submitting || !textInput.trim()}
                             className="btn-primary px-5 py-2.5 rounded-xl text-sm font-bold cursor-pointer disabled:opacity-30 flex items-center gap-2">
                             <span className="material-symbols-outlined text-sm">{submitting ? 'progress_activity' : 'add'}</span>
@@ -924,9 +924,9 @@ function KnowledgeBank({ brandId, setError }) {
             {activeTab === 'file' && (
                 <div className="space-y-3">
                     <input type="text" value={fileTitle} onChange={e => setFileTitle(e.target.value)}
-                        placeholder="Title (optional)" className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-500 outline-none focus:border-primary/40" />
+                        placeholder="Title (optional)" className="w-full bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl px-4 py-2.5 text-sm text-[var(--sys-text)] placeholder-slate-500 outline-none focus:border-primary/40" />
                     <div onDragOver={e => { e.preventDefault(); setDragOver(true) }} onDragLeave={() => setDragOver(false)} onDrop={handleFileDrop}
-                        className={`border-2 border-dashed rounded-xl p-8 text-center transition-all cursor-pointer ${dragOver ? 'border-primary/50 bg-primary/5' : 'border-white/[0.08] hover:border-white/[0.15]'}`}
+                        className={`border border-dashed rounded-xl p-8 text-center transition-all cursor-pointer ${dragOver ? 'border-primary/50 bg-primary/5' : 'border-[var(--sys-border)] hover:border-[var(--sys-border)]'}`}
                         onClick={() => document.getElementById('knowledge-file-input')?.click()}>
                         <input id="knowledge-file-input" type="file" className="hidden" accept=".pdf,.txt,.doc,.docx,.csv,.md"
                             onChange={e => { if (e.target.files?.[0]) setSelectedFile(e.target.files[0]) }} />
@@ -934,19 +934,19 @@ function KnowledgeBank({ brandId, setError }) {
                             <div className="flex items-center justify-center gap-3">
                                 <span className="material-symbols-outlined text-2xl text-primary">description</span>
                                 <div className="text-left">
-                                    <p className="text-sm font-bold text-white">{selectedFile.name}</p>
-                                    <p className="text-xs text-slate-500">{(selectedFile.size / 1024).toFixed(1)} KB</p>
+                                    <p className="text-sm font-bold text-[var(--sys-text)]">{selectedFile.name}</p>
+                                    <p className="text-xs text-[var(--sys-text-muted)]">{(selectedFile.size / 1024).toFixed(1)} KB</p>
                                 </div>
                                 <button onClick={e => { e.stopPropagation(); setSelectedFile(null) }}
-                                    className="ml-3 text-slate-500 hover:text-rose-400 transition-colors cursor-pointer">
+                                    className="ml-3 text-[var(--sys-text-muted)] hover:text-primary transition-colors cursor-pointer">
                                     <span className="material-symbols-outlined text-sm">close</span>
                                 </button>
                             </div>
                         ) : (
                             <>
-                                <span className="material-symbols-outlined text-3xl text-slate-500 mb-2 block">cloud_upload</span>
-                                <p className="text-sm text-slate-400">Drag & drop a file or click to browse</p>
-                                <p className="text-xs text-slate-600 mt-1">PDF, TXT, DOC, DOCX, CSV, Markdown — max 10MB</p>
+                                <span className="material-symbols-outlined text-3xl text-[var(--sys-text-muted)] mb-2 block">cloud_upload</span>
+                                <p className="text-sm text-[var(--sys-text-muted)]">Drag & drop a file or click to browse</p>
+                                <p className="text-xs text-[var(--sys-text-muted)] mt-1">PDF, TXT, DOC, DOCX, CSV, Markdown — max 10MB</p>
                             </>
                         )}
                     </div>
@@ -964,14 +964,14 @@ function KnowledgeBank({ brandId, setError }) {
             {activeTab === 'url' && (
                 <div className="space-y-3">
                     <input type="text" value={urlTitle} onChange={e => setUrlTitle(e.target.value)}
-                        placeholder="Title (optional)" className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-500 outline-none focus:border-primary/40" />
+                        placeholder="Title (optional)" className="w-full bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl px-4 py-2.5 text-sm text-[var(--sys-text)] placeholder-slate-500 outline-none focus:border-primary/40" />
                     <div className="relative">
-                        <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-lg">link</span>
+                        <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[var(--sys-text-muted)] text-lg">link</span>
                         <input type="url" value={urlInput} onChange={e => setUrlInput(e.target.value)}
                             placeholder="https://example.com/about-us"
-                            className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 outline-none focus:border-primary/40" />
+                            className="w-full bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl pl-10 pr-4 py-2.5 text-sm text-[var(--sys-text)] placeholder-slate-500 outline-none focus:border-primary/40" />
                     </div>
-                    <p className="text-xs text-slate-600">We'll extract text content from this page and add it to your brand's knowledge base.</p>
+                    <p className="text-xs text-[var(--sys-text-muted)]">We'll extract text content from this page and add it to your brand's knowledge base.</p>
                     <div className="flex justify-end">
                         <button onClick={handleSubmit} disabled={submitting || !urlInput.trim()}
                             className="btn-primary px-5 py-2.5 rounded-xl text-sm font-bold cursor-pointer disabled:opacity-30 flex items-center gap-2">
@@ -984,37 +984,37 @@ function KnowledgeBank({ brandId, setError }) {
 
             {/* ── Existing Entries ── */}
             {loading ? (
-                <div className="flex items-center justify-center py-6 text-slate-500 mt-4">
+                <div className="flex items-center justify-center py-6 text-[var(--sys-text-muted)] mt-4">
                     <span className="material-symbols-outlined animate-spin mr-2">progress_activity</span>Loading entries...
                 </div>
             ) : entries.length > 0 && (
-                <div className="mt-6 pt-5 border-t border-white/[0.06]">
-                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">
+                <div className="mt-6 pt-5 border-t border-[var(--sys-border)]">
+                    <h4 className="text-xs font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-3">
                         {entries.length} Knowledge {entries.length === 1 ? 'Entry' : 'Entries'}
                     </h4>
                     <div className="space-y-2 max-h-80 overflow-y-auto">
                         {entries.map((entry) => (
-                            <div key={entry.id} className="flex items-start gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/[0.04] hover:border-white/[0.08] transition-all group">
+                            <div key={entry.id} className="flex items-start gap-3 p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:border-[var(--sys-border)] transition-all group">
                                 <div className="size-9 rounded-lg flex items-center justify-center shrink-0" style={{ background: `${sourceColors[entry.sourceType]}15` }}>
                                     <span className="material-symbols-outlined text-base" style={{ color: sourceColors[entry.sourceType] }}>{sourceIcons[entry.sourceType]}</span>
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2 mb-0.5">
-                                        <p className="text-sm font-bold text-white truncate">{entry.title}</p>
-                                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-white/[0.04] text-slate-500 uppercase shrink-0">{entry.sourceType}</span>
+                                        <p className="text-sm font-bold text-[var(--sys-text)] truncate">{entry.title}</p>
+                                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-[var(--sys-surface)] text-[var(--sys-text-muted)] uppercase shrink-0">{entry.sourceType}</span>
                                     </div>
-                                    {entry.preview && <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">{entry.preview}</p>}
+                                    {entry.preview && <p className="text-xs text-[var(--sys-text-muted)] line-clamp-2 leading-relaxed">{entry.preview}</p>}
                                     <div className="flex items-center gap-3 mt-1">
-                                        <span className="text-[10px] text-slate-600">{(entry.charCount || 0).toLocaleString()} chars</span>
+                                        <span className="text-[10px] text-[var(--sys-text-muted)]">{(entry.charCount || 0).toLocaleString()} chars</span>
                                         {entry.sourceUrl && <a href={entry.sourceUrl} target="_blank" rel="noreferrer" className="text-[10px] text-primary hover:underline truncate max-w-[200px]">{entry.sourceUrl.replace(/^https?:\/\//, '')}</a>}
-                                        {entry.fileName && <span className="text-[10px] text-slate-600">{entry.fileName}</span>}
-                                        <span className="text-[10px] text-slate-600">
+                                        {entry.fileName && <span className="text-[10px] text-[var(--sys-text-muted)]">{entry.fileName}</span>}
+                                        <span className="text-[10px] text-[var(--sys-text-muted)]">
                                             {entry.addedAt ? new Date(entry.addedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : ''}
                                         </span>
                                     </div>
                                 </div>
                                 <button onClick={() => handleDelete(entry.id)} disabled={deletingId === entry.id}
-                                    className="opacity-0 group-hover:opacity-100 text-slate-600 hover:text-rose-400 transition-all cursor-pointer p-1" title="Remove">
+                                    className="opacity-0 group-hover:opacity-100 text-[var(--sys-text-muted)] hover:text-primary transition-all cursor-pointer p-1" title="Remove">
                                     <span className="material-symbols-outlined text-sm">{deletingId === entry.id ? 'progress_activity' : 'delete'}</span>
                                 </button>
                             </div>
@@ -1026,18 +1026,18 @@ function KnowledgeBank({ brandId, setError }) {
             {/* ═══════════ DUPLICATE WARNING MODAL ═══════════ */}
             {dupWarnings && (
                 <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4" onClick={() => setDupWarnings(null)}>
-                    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-                    <div className="relative w-full max-w-lg rounded-2xl border border-amber-500/20 overflow-hidden animate-fade-in"
+                    <div className="absolute inset-0 bg-[var(--sys-surface)] " />
+                    <div className="relative w-full max-w-lg rounded-2xl border border-[var(--sys-border)] overflow-hidden animate-fade-in"
                         style={{ background: 'rgba(15,15,25,0.97)' }} onClick={e => e.stopPropagation()}>
                         {/* Header */}
-                        <div className="p-5 border-b border-white/[0.06]">
+                        <div className="p-5 border-b border-[var(--sys-border)]">
                             <div className="flex items-center gap-3 mb-1">
-                                <div className="size-12 rounded-xl bg-amber-500/10 flex items-center justify-center">
-                                    <span className="material-symbols-outlined text-2xl text-amber-400">psychology_alt</span>
+                                <div className="size-12 rounded-xl bg-[var(--sys-primary-dim)] flex items-center justify-center">
+                                    <span className="material-symbols-outlined text-2xl text-primary">psychology_alt</span>
                                 </div>
                                 <div>
-                                    <h3 className="text-lg font-bold text-white">Duplicate Content Detected</h3>
-                                    <p className="text-xs text-slate-400">
+                                    <h3 className="text-lg font-bold text-[var(--sys-text)]">Duplicate Content Detected</h3>
+                                    <p className="text-xs text-[var(--sys-text-muted)]">
                                         AI analysis found {dupWarnings.warnings.length} potential {dupWarnings.warnings.length === 1 ? 'match' : 'matches'}
                                     </p>
                                 </div>
@@ -1048,10 +1048,10 @@ function KnowledgeBank({ brandId, setError }) {
                         <div className="p-5 max-h-[50vh] overflow-y-auto space-y-3">
                             {dupWarnings.warnings.map((w, i) => {
                                 const levelStyles = {
-                                    EXACT_DUPLICATE: { bg: 'bg-rose-500/8', border: 'border-rose-500/15', icon: 'content_copy', iconColor: 'text-rose-400', label: 'Exact Duplicate' },
-                                    CONFLICTING_DATA: { bg: 'bg-amber-500/8', border: 'border-amber-500/15', icon: 'warning', iconColor: 'text-amber-400', label: 'Conflicting Data' },
+                                    EXACT_DUPLICATE: { bg: 'bg-[var(--sys-primary-dim)]', border: 'border-[var(--sys-border)]', icon: 'content_copy', iconColor: 'text-primary', label: 'Exact Duplicate' },
+                                    CONFLICTING_DATA: { bg: 'bg-[var(--sys-primary-dim)]', border: 'border-[var(--sys-border)]', icon: 'warning', iconColor: 'text-primary', label: 'Conflicting Data' },
                                     SAME_SOURCE: { bg: 'bg-[#FF4D00]/8', border: 'border-[#FF4D00]/15', icon: 'source', iconColor: 'text-[#FF4D00]', label: 'Same Source' },
-                                    SIMILAR_CONTENT: { bg: 'bg-slate-500/8', border: 'border-slate-500/15', icon: 'compare', iconColor: 'text-slate-400', label: 'Similar Content' },
+                                    SIMILAR_CONTENT: { bg: 'bg-[var(--sys-border)]/8', border: 'border-[var(--sys-border)]', icon: 'compare', iconColor: 'text-[var(--sys-text-muted)]', label: 'Similar Content' },
                                 }
                                 const s = levelStyles[w.level] || levelStyles.SIMILAR_CONTENT
                                 return (
@@ -1060,35 +1060,35 @@ function KnowledgeBank({ brandId, setError }) {
                                             <span className={`material-symbols-outlined text-base ${s.iconColor}`}>{s.icon}</span>
                                             <span className={`text-xs font-bold uppercase tracking-wider ${s.iconColor}`}>{s.label}</span>
                                         </div>
-                                        <p className="text-sm text-slate-300 leading-relaxed mb-3">{w.message}</p>
+                                        <p className="text-sm text-[var(--sys-text-muted)] leading-relaxed mb-3">{w.message}</p>
 
                                         {/* Match details */}
                                         <div className="flex flex-wrap gap-2 mb-3">
                                             {w.matchDetails?.contentSimilarity > 0 && (
-                                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/[0.04] text-slate-400">
+                                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--sys-surface)] text-[var(--sys-text-muted)]">
                                                     Content: {w.matchDetails.contentSimilarity}% match
                                                 </span>
                                             )}
                                             {w.matchDetails?.titleSimilarity > 0 && (
-                                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/[0.04] text-slate-400">
+                                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--sys-surface)] text-[var(--sys-text-muted)]">
                                                     Title: {w.matchDetails.titleSimilarity}% similar
                                                 </span>
                                             )}
                                             {w.matchDetails?.sharedEntities?.length > 0 && (
-                                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/[0.04] text-slate-400">
+                                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--sys-surface)] text-[var(--sys-text-muted)]">
                                                     Shared: {w.matchDetails.sharedEntities.join(', ')}
                                                 </span>
                                             )}
                                         </div>
 
                                         {/* Existing entry preview */}
-                                        <div className="p-3 rounded-lg bg-black/20 border border-white/[0.04]">
+                                        <div className="p-3 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)]">
                                             <div className="flex items-center gap-2 mb-1">
-                                                <span className="text-xs font-bold text-slate-300">Existing: {w.existingEntry.title}</span>
-                                                <span className="text-[9px] text-slate-600">{(w.existingEntry.charCount || 0).toLocaleString()} chars</span>
+                                                <span className="text-xs font-bold text-[var(--sys-text-muted)]">Existing: {w.existingEntry.title}</span>
+                                                <span className="text-[9px] text-[var(--sys-text-muted)]">{(w.existingEntry.charCount || 0).toLocaleString()} chars</span>
                                             </div>
                                             {w.existingEntry.preview && (
-                                                <p className="text-[11px] text-slate-500 line-clamp-2">{w.existingEntry.preview}</p>
+                                                <p className="text-[11px] text-[var(--sys-text-muted)] line-clamp-2">{w.existingEntry.preview}</p>
                                             )}
                                         </div>
 
@@ -1096,7 +1096,7 @@ function KnowledgeBank({ brandId, setError }) {
                                         {(w.level === 'EXACT_DUPLICATE' || w.level === 'CONFLICTING_DATA' || w.level === 'SAME_SOURCE') && (
                                             <button onClick={() => handleDuplicateAction('replace', w.existingEntry.id)}
                                                 disabled={submitting}
-                                                className="mt-3 w-full py-2 rounded-lg text-xs font-bold text-amber-400 bg-amber-500/5 hover:bg-amber-500/10 border border-amber-500/10 transition-all cursor-pointer disabled:opacity-40 flex items-center justify-center gap-1.5">
+                                                className="mt-3 w-full py-2 rounded-lg text-xs font-bold text-primary bg-[var(--sys-primary-dim)] hover:bg-[var(--sys-primary-dim)] border border-[var(--sys-border)] transition-all cursor-pointer disabled:opacity-40 flex items-center justify-center gap-1.5">
                                                 <span className="material-symbols-outlined text-sm">{submitting ? 'progress_activity' : 'swap_horiz'}</span>
                                                 Replace this entry with new data
                                             </button>
@@ -1107,9 +1107,9 @@ function KnowledgeBank({ brandId, setError }) {
                         </div>
 
                         {/* Actions */}
-                        <div className="flex items-center justify-between gap-3 p-5 border-t border-white/[0.06]">
+                        <div className="flex items-center justify-between gap-3 p-5 border-t border-[var(--sys-border)]">
                             <button onClick={() => handleDuplicateAction('skip')}
-                                className="px-4 py-2.5 rounded-xl text-sm text-slate-400 hover:text-white transition-colors cursor-pointer">
+                                className="px-4 py-2.5 rounded-xl text-sm text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] transition-colors cursor-pointer">
                                 Skip — Don't Add
                             </button>
                             <button onClick={() => handleDuplicateAction('keep_both')}
@@ -1283,21 +1283,21 @@ export default function BrandDNA() {
     }
 
     const actionLabels = {
-        brand_created: { icon: 'add_circle', label: 'Brand Created', color: 'text-emerald-400' },
-        brand_deleted: { icon: 'delete', label: 'Brand Deleted', color: 'text-rose-400' },
-        brand_archived: { icon: 'archive', label: 'Brand Archived', color: 'text-amber-400' },
-        brand_restored: { icon: 'unarchive', label: 'Brand Restored', color: 'text-emerald-400' },
+        brand_created: { icon: 'add_circle', label: 'Brand Created', color: 'text-primary' },
+        brand_deleted: { icon: 'delete', label: 'Brand Deleted', color: 'text-primary' },
+        brand_archived: { icon: 'archive', label: 'Brand Archived', color: 'text-primary' },
+        brand_restored: { icon: 'unarchive', label: 'Brand Restored', color: 'text-primary' },
         dna_updated: { icon: 'edit', label: 'DNA Updated', color: 'text-primary' },
         voice_updated: { icon: 'record_voice_over', label: 'Voice Updated', color: 'text-[#FF4D00]' },
         colors_updated: { icon: 'palette', label: 'Colors Updated', color: 'text-[#FF7A00]' },
-        fonts_updated: { icon: 'text_fields', label: 'Typography Updated', color: 'text-cyan-400' },
-        content_style_updated: { icon: 'checklist', label: 'Style Guide Updated', color: 'text-amber-400' },
+        fonts_updated: { icon: 'text_fields', label: 'Typography Updated', color: 'text-primary' },
+        content_style_updated: { icon: 'checklist', label: 'Style Guide Updated', color: 'text-primary' },
         description_updated: { icon: 'description', label: 'Description Updated', color: 'text-primary' },
-        audience_updated: { icon: 'group', label: 'Audience Updated', color: 'text-emerald-400' },
-        industry_updated: { icon: 'business', label: 'Industry Updated', color: 'text-slate-400' },
+        audience_updated: { icon: 'group', label: 'Audience Updated', color: 'text-primary' },
+        industry_updated: { icon: 'business', label: 'Industry Updated', color: 'text-[var(--sys-text-muted)]' },
         images_updated: { icon: 'photo_library', label: 'Images Updated', color: 'text-primary' },
-        knowledge_added: { icon: 'school', label: 'Knowledge Added', color: 'text-emerald-400' },
-        knowledge_removed: { icon: 'remove_circle', label: 'Knowledge Removed', color: 'text-rose-400' },
+        knowledge_added: { icon: 'school', label: 'Knowledge Added', color: 'text-primary' },
+        knowledge_removed: { icon: 'remove_circle', label: 'Knowledge Removed', color: 'text-primary' },
         brand_rescanned: { icon: 'language', label: 'Website Rescanned', color: 'text-primary' },
     }
 
@@ -1305,9 +1305,9 @@ export default function BrandDNA() {
         return (
             <DashboardLayout title="Brand DNA" subtitle="Your brand's intelligence profile">
                 <div className="flex flex-col items-center justify-center py-20 gap-4">
-                    <span className="material-symbols-outlined text-6xl text-slate-600">fingerprint</span>
-                    <h2 className="text-2xl font-extrabold text-white">No Brand Selected</h2>
-                    <p className="text-slate-400 text-sm">Create or select a brand to view its DNA.</p>
+                    <span className="material-symbols-outlined text-6xl text-[var(--sys-text-muted)]">fingerprint</span>
+                    <h2 className="text-2xl font-extrabold text-[var(--sys-text)]">No Brand Selected</h2>
+                    <p className="text-[var(--sys-text-muted)] text-sm">Create or select a brand to view its DNA.</p>
                     <button onClick={() => navigate('/onboarding')} className="btn-primary py-2.5 px-6 rounded-xl text-sm mt-2">
                         Create Brand
                     </button>
@@ -1337,7 +1337,7 @@ export default function BrandDNA() {
                         } finally { setRescanning(false) }
                     }} disabled={rescanning || !brand?.website}
                         className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all cursor-pointer disabled:opacity-50 ${
-                            rescanning ? 'text-primary bg-primary/10 border border-primary/20' : 'text-slate-400 hover:text-primary hover:bg-primary/5'
+                            rescanning ? 'text-primary bg-primary/10 border border-primary/20' : 'text-[var(--sys-text-muted)] hover:text-primary hover:bg-primary/5'
                         }`}>
                         <span className={`material-symbols-outlined text-sm ${rescanning ? 'animate-spin' : ''}`}>
                             {rescanning ? 'progress_activity' : 'language'}
@@ -1345,7 +1345,7 @@ export default function BrandDNA() {
                         {rescanning ? 'Scanning Website...' : 'Re-scan Website'}
                     </button>
                     <button onClick={() => setShowDelete(true)}
-                        className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium text-rose-400/60 hover:text-rose-400 hover:bg-rose-500/5 transition-all cursor-pointer">
+                        className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium text-primary/60 hover:text-primary hover:bg-[var(--sys-primary-dim)] transition-all cursor-pointer">
                         <span className="material-symbols-outlined text-sm">delete</span> Delete Brand
                     </button>
                 </div>
@@ -1356,20 +1356,20 @@ export default function BrandDNA() {
                 <div className="glass-panel rounded-2xl p-4 mb-4 flex items-center gap-3 border border-primary/20 bg-primary/5 animate-fade-in">
                     <span className="material-symbols-outlined text-primary animate-spin">progress_activity</span>
                     <div>
-                        <div className="text-sm font-medium text-white">Scanning your website...</div>
-                        <div className="text-xs text-slate-400">Refreshing brand images, products, and DNA. This may take up to a minute.</div>
+                        <div className="text-sm font-medium text-[var(--sys-text)]">Scanning your website...</div>
+                        <div className="text-xs text-[var(--sys-text-muted)]">Refreshing brand images, products, and DNA. This may take up to a minute.</div>
                     </div>
                 </div>
             )}
             {rescanResult && !rescanning && (
                 <div className={`glass-panel rounded-2xl p-4 mb-4 flex items-center gap-3 border animate-fade-in ${
-                    rescanResult.success ? 'border-emerald-500/20 bg-emerald-500/5' : 'border-rose-500/20 bg-rose-500/5'
+                    rescanResult.success ? 'border-[var(--sys-border)] bg-[var(--sys-primary-dim)]' : 'border-[var(--sys-border)] bg-[var(--sys-primary-dim)]'
                 }`}>
-                    <span className={`material-symbols-outlined ${rescanResult.success ? 'text-emerald-400' : 'text-rose-400'}`}>
+                    <span className={`material-symbols-outlined ${rescanResult.success ? 'text-primary' : 'text-primary'}`}>
                         {rescanResult.success ? 'check_circle' : 'error'}
                     </span>
-                    <div className="text-sm text-white flex-1">{rescanResult.message}</div>
-                    <button onClick={() => setRescanResult(null)} className="text-slate-400 hover:text-white">
+                    <div className="text-sm text-[var(--sys-text)] flex-1">{rescanResult.message}</div>
+                    <button onClick={() => setRescanResult(null)} className="text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]">
                         <span className="material-symbols-outlined text-sm">close</span>
                     </button>
                 </div>
@@ -1377,7 +1377,7 @@ export default function BrandDNA() {
 
             {/* Brand Identity Header */}
             <div className="glass-panel rounded-2xl p-6 mb-6 flex items-center gap-6 animate-fade-in">
-                <div className="size-20 rounded-2xl flex items-center justify-center text-3xl font-black text-white"
+                <div className="size-20 rounded-2xl flex items-center justify-center text-3xl font-black text-[var(--sys-text)]"
                     style={{ background: dna.colors?.[0]?.hex || '#2B4BEE' }}>
                     {brand.dna?.logo?.url ? (
                         <img src={brand.dna.logo.url} alt="logo" className="w-full h-full object-contain rounded-2xl" />
@@ -1386,16 +1386,16 @@ export default function BrandDNA() {
                     )}
                 </div>
                 <div className="flex-1">
-                    <h3 className="text-2xl font-extrabold text-white">{brand.name}</h3>
+                    <h3 className="text-2xl font-extrabold text-[var(--sys-text)]">{brand.name}</h3>
                     {brand.website && <p className="text-sm text-primary">{brand.website}</p>}
-                    {dna.brandDescription && <p className="text-sm text-slate-400 mt-1 line-clamp-2">{dna.brandDescription}</p>}
+                    {dna.brandDescription && <p className="text-sm text-[var(--sys-text-muted)] mt-1 line-clamp-2">{dna.brandDescription}</p>}
                     <div className="flex gap-2 mt-2 flex-wrap">
-                        {dna.industry && <span className="px-2 py-0.5 rounded-lg bg-white/[0.06] text-sm text-slate-400">{dna.industry}</span>}
-                        <span className="px-2 py-0.5 rounded-lg bg-white/[0.06] text-sm text-slate-400 capitalize">{brand.onboardingMethod}</span>
-                        <span className={`px-2 py-0.5 rounded-lg text-xs font-bold ${brand.status === 'active' ? 'bg-emerald-400/10 text-emerald-400' : 'bg-slate-500/10 text-slate-500'}`}>{brand.status}</span>
+                        {dna.industry && <span className="px-2 py-0.5 rounded-lg bg-[var(--sys-surface)] text-sm text-[var(--sys-text-muted)]">{dna.industry}</span>}
+                        <span className="px-2 py-0.5 rounded-lg bg-[var(--sys-surface)] text-sm text-[var(--sys-text-muted)] capitalize">{brand.onboardingMethod}</span>
+                        <span className={`px-2 py-0.5 rounded-lg text-xs font-bold ${brand.status === 'active' ? 'bg-[var(--sys-primary-dim)] text-primary' : 'bg-[var(--sys-border)]/10 text-[var(--sys-text-muted)]'}`}>{brand.status}</span>
                         {dna.targetMarkets?.length > 0 && (
                             <>
-                                <span className="text-slate-600 text-xs self-center">•</span>
+                                <span className="text-[var(--sys-text-muted)] text-xs self-center">•</span>
                                 {dna.targetMarkets.map(m => {
                                     const flags = { IN: '🇮🇳', US: '🇺🇸', CA: '🇨🇦', UK: '🇬🇧', EU: '🇪🇺', AE: '🇦🇪', SA: '🇸🇦', SG: '🇸🇬', MY: '🇲🇾', ID: '🇮🇩', TH: '🇹🇭', AU: '🇦🇺', NZ: '🇳🇿', BR: '🇧🇷', JP: '🇯🇵', KR: '🇰🇷' };
                                     return <span key={m} className="px-2 py-0.5 rounded-lg bg-primary/10 text-primary text-xs font-bold" title={`Target Market: ${m}`}>{flags[m] || 'language'} {m}</span>;
@@ -1405,13 +1405,13 @@ export default function BrandDNA() {
                     </div>
                 </div>
                 <button onClick={() => startEdit('description')}
-                    className="flex items-center gap-1 px-3 py-2 rounded-xl text-sm text-slate-400 hover:text-primary hover:bg-primary/5 transition-all cursor-pointer shrink-0">
+                    className="flex items-center gap-1 px-3 py-2 rounded-xl text-sm text-[var(--sys-text-muted)] hover:text-primary hover:bg-primary/5 transition-all cursor-pointer shrink-0">
                     <span className="material-symbols-outlined text-sm">edit</span> Edit Info
                 </button>
                 {brand.aiContext?.totalFeedback > 0 && (
                     <div className="text-center glass-panel px-5 py-3 rounded-xl shrink-0">
                         <p className="text-2xl font-extrabold text-primary">{brand.aiContext.totalFeedback}</p>
-                        <p className="text-sm text-slate-500">AI learnings</p>
+                        <p className="text-sm text-[var(--sys-text-muted)]">AI learnings</p>
                     </div>
                 )}
             </div>
@@ -1424,16 +1424,16 @@ export default function BrandDNA() {
                         <div className="flex gap-4 flex-wrap">
                             {dna.colors.map((c, i) => (
                                 <div key={i} className="text-center group">
-                                    <div className="w-16 h-16 rounded-xl border border-white/[0.1] shadow-lg group-hover:scale-110 transition-transform"
+                                    <div className="w-16 h-16 rounded-xl border border-[var(--sys-border)] shadow-lg group-hover:scale-110 transition-transform"
                                         style={{ background: c.hex }} />
-                                    <p className="text-sm text-white mt-2 font-medium">{c.name}</p>
-                                    <p className="text-sm text-slate-500 font-mono">{c.hex}</p>
+                                    <p className="text-sm text-[var(--sys-text)] mt-2 font-medium">{c.name}</p>
+                                    <p className="text-sm text-[var(--sys-text-muted)] font-mono">{c.hex}</p>
                                     <p className="text-sm text-primary capitalize">{c.usage}</p>
                                 </div>
                             ))}
                         </div>
                     ) : (
-                        <p className="text-slate-500 text-sm">No colors extracted yet.</p>
+                        <p className="text-[var(--sys-text-muted)] text-sm">No colors extracted yet.</p>
                     )}
                 </div>
 
@@ -1447,15 +1447,15 @@ export default function BrandDNA() {
                                 { label: 'Body', data: dna.fonts.body },
                                 { label: 'Accent', data: dna.fonts.accent },
                             ].filter(f => f.data?.family).map((f, i) => (
-                                <div key={i} className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
-                                    <p className="text-sm text-slate-500 uppercase tracking-widest mb-1">{f.label} Font</p>
-                                    <p className="text-lg text-white font-bold" style={{ fontFamily: f.data.family }}>{f.data.family}</p>
-                                    <p className="text-sm text-slate-400">Weight: {f.data.weight || 'Regular'} • Style: {f.data.style || 'Normal'}</p>
+                                <div key={i} className="p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                                    <p className="text-sm text-[var(--sys-text-muted)] uppercase tracking-widest mb-1">{f.label} Font</p>
+                                    <p className="text-lg text-[var(--sys-text)] font-bold" style={{ fontFamily: f.data.family }}>{f.data.family}</p>
+                                    <p className="text-sm text-[var(--sys-text-muted)]">Weight: {f.data.weight || 'Regular'} • Style: {f.data.style || 'Normal'}</p>
                                 </div>
                             ))}
                         </div>
                     ) : (
-                        <p className="text-slate-500 text-sm">No typography data yet.</p>
+                        <p className="text-[var(--sys-text-muted)] text-sm">No typography data yet.</p>
                     )}
                 </div>
 
@@ -1466,15 +1466,15 @@ export default function BrandDNA() {
                         <div className="grid grid-cols-12 gap-6">
                             <div className="col-span-12 md:col-span-5">
                                 <p className="text-xl text-primary font-extrabold mb-2">{voice.personality}</p>
-                                {voice.description && <p className="text-sm text-slate-300 leading-relaxed">{voice.description}</p>}
+                                {voice.description && <p className="text-sm text-[var(--sys-text-muted)] leading-relaxed">{voice.description}</p>}
                                 {voice.sampleQuote && (
-                                    <blockquote className="mt-4 p-4 rounded-xl bg-primary/5 border-l-2 border-primary text-sm text-slate-300 italic">
+                                    <blockquote className="mt-4 p-4 rounded-xl bg-primary/5 border-l-2 border-primary text-sm text-[var(--sys-text-muted)] italic">
                                         "{voice.sampleQuote}"
                                     </blockquote>
                                 )}
                                 {voice.keywords?.length > 0 && (
                                     <div className="mt-4">
-                                        <p className="text-sm text-slate-500 uppercase tracking-widest mb-2">Brand Keywords</p>
+                                        <p className="text-sm text-[var(--sys-text-muted)] uppercase tracking-widest mb-2">Brand Keywords</p>
                                         <div className="flex flex-wrap gap-2">
                                             {voice.keywords.map((k, i) => (
                                                 <span key={i} className="px-3 py-1 rounded-lg bg-primary/10 text-primary text-xs font-medium">{k}</span>
@@ -1491,16 +1491,16 @@ export default function BrandDNA() {
                                     { label: 'Formality', value: voice.formality, low: 'Informal', high: 'Formal' },
                                     { label: 'Wit', value: voice.wit, low: 'Serious', high: 'Witty' },
                                 ].filter(v => v.value !== undefined).map((v, i) => (
-                                    <div key={i} className="p-3 rounded-xl bg-white/[0.03]">
+                                    <div key={i} className="p-3 rounded-xl bg-[var(--sys-surface)]">
                                         <div className="flex items-center justify-between mb-1.5">
-                                            <span className="text-sm font-bold text-white">{v.label}</span>
+                                            <span className="text-sm font-bold text-[var(--sys-text)]">{v.label}</span>
                                             <span className="text-sm text-primary font-bold">{v.value}%</span>
                                         </div>
                                         <div className="relative">
                                             <div className="progress-bar"><div className="progress-bar-fill" style={{ width: `${v.value}%` }} /></div>
                                             <div className="flex justify-between mt-1">
-                                                <span className="text-xs text-slate-600">{v.low}</span>
-                                                <span className="text-xs text-slate-600">{v.high}</span>
+                                                <span className="text-xs text-[var(--sys-text-muted)]">{v.low}</span>
+                                                <span className="text-xs text-[var(--sys-text-muted)]">{v.high}</span>
                                             </div>
                                         </div>
                                     </div>
@@ -1508,7 +1508,7 @@ export default function BrandDNA() {
                             </div>
                         </div>
                     ) : (
-                        <p className="text-slate-500 text-sm">No voice data yet. Scan a website or brainstorm to generate voice profile.</p>
+                        <p className="text-[var(--sys-text-muted)] text-sm">No voice data yet. Scan a website or brainstorm to generate voice profile.</p>
                     )}
                 </div>
 
@@ -1519,11 +1519,11 @@ export default function BrandDNA() {
                         <div className="space-y-4">
                             {dna.contentStyle.dos?.length > 0 && (
                                 <div>
-                                    <p className="text-sm text-emerald-400 font-bold mb-2"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">check_circle</span> ALWAYS</p>
+                                    <p className="text-sm text-primary font-bold mb-2"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">check_circle</span> ALWAYS</p>
                                     <ul className="space-y-1.5">
                                         {dna.contentStyle.dos.map((d, i) => (
-                                            <li key={i} className="text-sm text-slate-300 flex items-start gap-2">
-                                                <span className="text-emerald-400 mt-1">•</span> {d}
+                                            <li key={i} className="text-sm text-[var(--sys-text-muted)] flex items-start gap-2">
+                                                <span className="text-primary mt-1">•</span> {d}
                                             </li>
                                         ))}
                                     </ul>
@@ -1531,11 +1531,11 @@ export default function BrandDNA() {
                             )}
                             {dna.contentStyle.donts?.length > 0 && (
                                 <div>
-                                    <p className="text-sm text-rose-400 font-bold mb-2"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">cancel</span> NEVER</p>
+                                    <p className="text-sm text-primary font-bold mb-2"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">cancel</span> NEVER</p>
                                     <ul className="space-y-1.5">
                                         {dna.contentStyle.donts.map((d, i) => (
-                                            <li key={i} className="text-sm text-slate-300 flex items-start gap-2">
-                                                <span className="text-rose-400 mt-1">•</span> {d}
+                                            <li key={i} className="text-sm text-[var(--sys-text-muted)] flex items-start gap-2">
+                                                <span className="text-primary mt-1">•</span> {d}
                                             </li>
                                         ))}
                                     </ul>
@@ -1543,7 +1543,7 @@ export default function BrandDNA() {
                             )}
                         </div>
                     ) : (
-                        <p className="text-slate-500 text-sm">Style guide will be generated as the AI learns from your feedback.</p>
+                        <p className="text-[var(--sys-text-muted)] text-sm">Style guide will be generated as the AI learns from your feedback.</p>
                     )}
                 </div>
 
@@ -1552,20 +1552,20 @@ export default function BrandDNA() {
                     <SectionHeader icon="psychology" title="AI Learning Status" />
                     <div className="space-y-4">
                         <div className="grid grid-cols-2 gap-4">
-                            <div className="p-3 rounded-xl bg-white/[0.03] text-center">
+                            <div className="p-3 rounded-xl bg-[var(--sys-surface)] text-center">
                                 <p className="text-2xl font-extrabold text-primary">{brand.aiContext?.totalFeedback || 0}</p>
-                                <p className="text-sm text-slate-500">Feedback Signals</p>
+                                <p className="text-sm text-[var(--sys-text-muted)]">Feedback Signals</p>
                             </div>
-                            <div className="p-3 rounded-xl bg-white/[0.03] text-center">
-                                <p className="text-2xl font-extrabold text-emerald-400">
+                            <div className="p-3 rounded-xl bg-[var(--sys-surface)] text-center">
+                                <p className="text-2xl font-extrabold text-primary">
                                     {brand.aiContext?.avgRating ? `${(brand.aiContext.avgRating * 100).toFixed(0)}%` : '—'}
                                 </p>
-                                <p className="text-sm text-slate-500">Satisfaction</p>
+                                <p className="text-sm text-[var(--sys-text-muted)]">Satisfaction</p>
                             </div>
                         </div>
-                        <div className="p-4 rounded-xl bg-gradient-to-r from-primary/5 to-[#FF7A00]/5 border border-primary/10">
+                        <div className="p-4 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] border border-primary/10">
                             <p className="text-sm text-primary font-bold mb-1"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">psychology</span> How the AI learns</p>
-                            <p className="text-sm text-slate-400 leading-relaxed">
+                            <p className="text-sm text-[var(--sys-text-muted)] leading-relaxed">
                                 Every like, dislike, edit, and regeneration teaches the AI your preferences.
                                 After enough feedback, generated content becomes indistinguishable from your own writing.
                             </p>
@@ -1586,31 +1586,31 @@ export default function BrandDNA() {
                 <div className="col-span-12 glass-panel rounded-2xl p-6 animate-fade-in" style={{ animationDelay: '600ms' }}>
                     <SectionHeader icon="history" title="Knowledge Change Log" badge={auditLogs.length || null} />
                     {auditLoading ? (
-                        <div className="flex items-center justify-center py-6 text-slate-500">
+                        <div className="flex items-center justify-center py-6 text-[var(--sys-text-muted)]">
                             <span className="material-symbols-outlined animate-spin mr-2">progress_activity</span>Loading...
                         </div>
                     ) : auditLogs.length === 0 ? (
                         <div className="text-center py-6">
-                            <span className="material-symbols-outlined text-3xl text-slate-600 mb-2 block">history</span>
-                            <p className="text-sm text-slate-400">No changes recorded yet. Edits to brand knowledge will appear here.</p>
+                            <span className="material-symbols-outlined text-3xl text-[var(--sys-text-muted)] mb-2 block">history</span>
+                            <p className="text-sm text-[var(--sys-text-muted)]">No changes recorded yet. Edits to brand knowledge will appear here.</p>
                         </div>
                     ) : (
                         <div className="space-y-2 max-h-80 overflow-y-auto">
                             {auditLogs.map((log, i) => {
-                                const meta = actionLabels[log.action] || { icon: 'edit', label: log.action, color: 'text-slate-400' }
+                                const meta = actionLabels[log.action] || { icon: 'edit', label: log.action, color: 'text-[var(--sys-text-muted)]' }
                                 return (
-                                    <div key={log._id || i} className="flex items-start gap-3 p-3 rounded-xl bg-white/[0.02] hover:bg-white/[0.04] transition-colors">
+                                    <div key={log._id || i} className="flex items-start gap-3 p-3 rounded-xl bg-[var(--sys-surface)] hover:bg-[var(--sys-surface)] transition-colors">
                                         <span className={`material-symbols-outlined text-lg mt-0.5 ${meta.color}`}>{meta.icon}</span>
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-2">
-                                                <span className="text-sm font-bold text-white">{meta.label}</span>
+                                                <span className="text-sm font-bold text-[var(--sys-text)]">{meta.label}</span>
                                                 {log.section && (
-                                                    <span className="px-2 py-0.5 rounded bg-white/[0.06] text-xs text-slate-500">{log.section}</span>
+                                                    <span className="px-2 py-0.5 rounded bg-[var(--sys-surface)] text-xs text-[var(--sys-text-muted)]">{log.section}</span>
                                                 )}
                                             </div>
-                                            {log.summary && <p className="text-sm text-slate-400 mt-0.5">{log.summary}</p>}
-                                            <p className="text-xs text-slate-600 mt-1">
-                                                by <span className="text-slate-400">{log.userName || 'Unknown'}</span> • {timeAgo(log.createdAt)}
+                                            {log.summary && <p className="text-sm text-[var(--sys-text-muted)] mt-0.5">{log.summary}</p>}
+                                            <p className="text-xs text-[var(--sys-text-muted)] mt-1">
+                                                by <span className="text-[var(--sys-text-muted)]">{log.userName || 'Unknown'}</span> • {timeAgo(log.createdAt)}
                                             </p>
                                         </div>
                                     </div>
@@ -1626,14 +1626,14 @@ export default function BrandDNA() {
             {editSection === 'voice' && (
                 <EditModal title="Edit Voice & Tone" icon="record_voice_over" onClose={() => setEditSection(null)} onSave={saveSection}>
                     <div>
-                        <label className="text-sm text-slate-400 mb-1 block">Personality</label>
+                        <label className="text-sm text-[var(--sys-text-muted)] mb-1 block">Personality</label>
                         <input type="text" value={editData.personality} onChange={e => setEditData(p => ({ ...p, personality: e.target.value }))}
-                            placeholder="e.g. Professional & Bold" className="w-full input-glass rounded-xl p-3 text-sm text-white" />
+                            placeholder="e.g. Professional & Bold" className="w-full input-glass rounded-xl p-3 text-sm text-[var(--sys-text)]" />
                     </div>
                     <div>
-                        <label className="text-sm text-slate-400 mb-1 block">Description</label>
+                        <label className="text-sm text-[var(--sys-text-muted)] mb-1 block">Description</label>
                         <textarea value={editData.description} onChange={e => setEditData(p => ({ ...p, description: e.target.value }))}
-                            placeholder="How this brand communicates..." rows={3} className="w-full input-glass rounded-xl p-3 text-sm text-white resize-none" />
+                            placeholder="How this brand communicates..." rows={3} className="w-full input-glass rounded-xl p-3 text-sm text-[var(--sys-text)] resize-none" />
                     </div>
                     {[
                         { key: 'tone', label: 'Tone', low: 'Casual', high: 'Authoritative' },
@@ -1644,27 +1644,27 @@ export default function BrandDNA() {
                     ].map(s => (
                         <div key={s.key}>
                             <div className="flex items-center justify-between mb-1">
-                                <label className="text-sm text-slate-400">{s.label}</label>
+                                <label className="text-sm text-[var(--sys-text-muted)]">{s.label}</label>
                                 <span className="text-sm text-primary font-bold">{editData[s.key]}%</span>
                             </div>
                             <input type="range" min="0" max="100" value={editData[s.key]}
                                 onChange={e => setEditData(p => ({ ...p, [s.key]: e.target.value }))}
                                 className="w-full accent-primary" />
                             <div className="flex justify-between">
-                                <span className="text-[10px] text-slate-600">{s.low}</span>
-                                <span className="text-[10px] text-slate-600">{s.high}</span>
+                                <span className="text-[10px] text-[var(--sys-text-muted)]">{s.low}</span>
+                                <span className="text-[10px] text-[var(--sys-text-muted)]">{s.high}</span>
                             </div>
                         </div>
                     ))}
                     <div>
-                        <label className="text-sm text-slate-400 mb-1 block">Sample Quote</label>
+                        <label className="text-sm text-[var(--sys-text-muted)] mb-1 block">Sample Quote</label>
                         <textarea value={editData.sampleQuote} onChange={e => setEditData(p => ({ ...p, sampleQuote: e.target.value }))}
-                            placeholder="A quote that embodies this brand's voice" rows={2} className="w-full input-glass rounded-xl p-3 text-sm text-white resize-none" />
+                            placeholder="A quote that embodies this brand's voice" rows={2} className="w-full input-glass rounded-xl p-3 text-sm text-[var(--sys-text)] resize-none" />
                     </div>
                     <div>
-                        <label className="text-sm text-slate-400 mb-1 block">Keywords (comma-separated)</label>
+                        <label className="text-sm text-[var(--sys-text-muted)] mb-1 block">Keywords (comma-separated)</label>
                         <input type="text" value={editData.keywords} onChange={e => setEditData(p => ({ ...p, keywords: e.target.value }))}
-                            placeholder="bold, modern, premium" className="w-full input-glass rounded-xl p-3 text-sm text-white" />
+                            placeholder="bold, modern, premium" className="w-full input-glass rounded-xl p-3 text-sm text-[var(--sys-text)]" />
                     </div>
                 </EditModal>
             )}
@@ -1672,36 +1672,36 @@ export default function BrandDNA() {
             {editSection === 'description' && (
                 <EditModal title="Edit Brand Information" icon="description" onClose={() => setEditSection(null)} onSave={saveSection}>
                     <div>
-                        <label className="text-sm text-slate-400 mb-1 block">Brand Description</label>
+                        <label className="text-sm text-[var(--sys-text-muted)] mb-1 block">Brand Description</label>
                         <textarea value={editData.brandDescription} onChange={e => setEditData(p => ({ ...p, brandDescription: e.target.value }))}
-                            placeholder="What does this brand do..." rows={4} className="w-full input-glass rounded-xl p-3 text-sm text-white resize-none" />
+                            placeholder="What does this brand do..." rows={4} className="w-full input-glass rounded-xl p-3 text-sm text-[var(--sys-text)] resize-none" />
                     </div>
                     <div>
-                        <label className="text-sm text-slate-400 mb-1 block">Target Audience</label>
+                        <label className="text-sm text-[var(--sys-text-muted)] mb-1 block">Target Audience</label>
                         <textarea value={editData.targetAudience} onChange={e => setEditData(p => ({ ...p, targetAudience: e.target.value }))}
-                            placeholder="Who is this brand for..." rows={2} className="w-full input-glass rounded-xl p-3 text-sm text-white resize-none" />
+                            placeholder="Who is this brand for..." rows={2} className="w-full input-glass rounded-xl p-3 text-sm text-[var(--sys-text)] resize-none" />
                     </div>
                     <div>
-                        <label className="text-sm text-slate-400 mb-1 block">Industry</label>
+                        <label className="text-sm text-[var(--sys-text-muted)] mb-1 block">Industry</label>
                         <input type="text" value={editData.industry} onChange={e => setEditData(p => ({ ...p, industry: e.target.value }))}
-                            placeholder="e.g. Fashion, Technology, Healthcare" className="w-full input-glass rounded-xl p-3 text-sm text-white" />
+                            placeholder="e.g. Fashion, Technology, Healthcare" className="w-full input-glass rounded-xl p-3 text-sm text-[var(--sys-text)]" />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className="text-sm text-slate-400 mb-1 block">Country (Origin)</label>
+                            <label className="text-sm text-[var(--sys-text-muted)] mb-1 block">Country (Origin)</label>
                             <input type="text" value={editData.country} onChange={e => setEditData(p => ({ ...p, country: e.target.value }))}
-                                className="w-full input-glass rounded-xl p-3 text-sm text-white" />
+                                className="w-full input-glass rounded-xl p-3 text-sm text-[var(--sys-text)]" />
                         </div>
                         <div>
-                            <label className="text-sm text-slate-400 mb-1 block">Default Language</label>
+                            <label className="text-sm text-[var(--sys-text-muted)] mb-1 block">Default Language</label>
                             <input type="text" value={editData.defaultLanguage} onChange={e => setEditData(p => ({ ...p, defaultLanguage: e.target.value }))}
-                                className="w-full input-glass rounded-xl p-3 text-sm text-white" />
+                                className="w-full input-glass rounded-xl p-3 text-sm text-[var(--sys-text)]" />
                         </div>
                     </div>
                     {/* Target Markets Multi-Select */}
                     <div>
-                        <label className="text-sm text-slate-400 mb-1.5 block">Target Markets</label>
-                        <p className="text-xs text-slate-600 mb-3">Select the markets where this brand sells or advertises. AI will adapt all content — festivals, currency, language, cultural references — for these markets.</p>
+                        <label className="text-sm text-[var(--sys-text-muted)] mb-1.5 block">Target Markets</label>
+                        <p className="text-xs text-[var(--sys-text-muted)] mb-3">Select the markets where this brand sells or advertises. AI will adapt all content — festivals, currency, language, cultural references — for these markets.</p>
                         <div className="flex flex-wrap gap-2">
                             {[
                                 { code: 'IN', flag: '🇮🇳', name: 'India' },
@@ -1731,8 +1731,8 @@ export default function BrandDNA() {
                                                 : [...(p.targetMarkets || []), market.code]
                                         }))}
                                         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer border ${isSelected
-                                            ? 'bg-primary/15 text-primary border-primary/30 shadow-md shadow-primary/10'
-                                            : 'bg-white/[0.03] text-slate-500 border-white/[0.06] hover:border-white/[0.15] hover:text-slate-300'
+                                            ? 'bg-primary/15 text-primary border-primary/30 shadow-md shadow-none'
+                                            : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] border-[var(--sys-border)] hover:border-[var(--sys-border)] hover:text-[var(--sys-text-muted)]'
                                             }`}>
                                         <span className="text-sm">{market.flag}</span>
                                         {market.name}
@@ -1742,13 +1742,13 @@ export default function BrandDNA() {
                             })}
                         </div>
                         {(editData.targetMarkets || []).length === 0 && (
-                            <p className="text-xs text-amber-400/70 mt-2 flex items-center gap-1">
+                            <p className="text-xs text-primary/70 mt-2 flex items-center gap-1">
                                 <span className="material-symbols-outlined text-xs">info</span>
                                 No markets selected — AI will auto-detect from the Country field above.
                             </p>
                         )}
                         {(editData.targetMarkets || []).length > 0 && (
-                            <p className="text-xs text-emerald-400/70 mt-2 flex items-center gap-1">
+                            <p className="text-xs text-primary/70 mt-2 flex items-center gap-1">
                                 <span className="material-symbols-outlined text-xs">check_circle</span>
                                 {(editData.targetMarkets || []).length} market{(editData.targetMarkets || []).length > 1 ? 's' : ''} selected — AI will adapt content for {(editData.targetMarkets || []).join(', ')}
                             </p>
@@ -1760,35 +1760,35 @@ export default function BrandDNA() {
             {editSection === 'contentStyle' && (
                 <EditModal title="Edit Content Style Guide" icon="checklist" onClose={() => setEditSection(null)} onSave={saveSection}>
                     <div>
-                        <label className="text-sm text-emerald-400 font-bold mb-1 block"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">check_circle</span> ALWAYS (one per line)</label>
+                        <label className="text-sm text-primary font-bold mb-1 block"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">check_circle</span> ALWAYS (one per line)</label>
                         <textarea value={editData.dos} onChange={e => setEditData(p => ({ ...p, dos: e.target.value }))}
                             placeholder="Use active voice&#10;Keep sentences short&#10;Include data points" rows={5}
-                            className="w-full input-glass rounded-xl p-3 text-sm text-white resize-none" />
+                            className="w-full input-glass rounded-xl p-3 text-sm text-[var(--sys-text)] resize-none" />
                     </div>
                     <div>
-                        <label className="text-sm text-rose-400 font-bold mb-1 block"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">cancel</span> NEVER (one per line)</label>
+                        <label className="text-sm text-primary font-bold mb-1 block"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">cancel</span> NEVER (one per line)</label>
                         <textarea value={editData.donts} onChange={e => setEditData(p => ({ ...p, donts: e.target.value }))}
                             placeholder="Don't use jargon&#10;Avoid passive voice&#10;Don't exaggerate claims" rows={5}
-                            className="w-full input-glass rounded-xl p-3 text-sm text-white resize-none" />
+                            className="w-full input-glass rounded-xl p-3 text-sm text-[var(--sys-text)] resize-none" />
                     </div>
                     <div>
-                        <label className="text-sm text-slate-400 mb-1 block">Key Phrases (comma-separated)</label>
+                        <label className="text-sm text-[var(--sys-text-muted)] mb-1 block">Key Phrases (comma-separated)</label>
                         <input type="text" value={editData.keyPhrases} onChange={e => setEditData(p => ({ ...p, keyPhrases: e.target.value }))}
-                            placeholder="innovation, quality, trust" className="w-full input-glass rounded-xl p-3 text-sm text-white" />
+                            placeholder="innovation, quality, trust" className="w-full input-glass rounded-xl p-3 text-sm text-[var(--sys-text)]" />
                     </div>
                 </EditModal>
             )}
 
             {editSection === 'colors' && (
                 <EditModal title="Edit Color Palette" icon="palette" onClose={() => setEditSection(null)} onSave={saveSection}>
-                    <p className="text-sm text-slate-400 mb-2">Edit the JSON array below. Each color should have: name, hex, usage (primary/secondary/accent/background)</p>
+                    <p className="text-sm text-[var(--sys-text-muted)] mb-2">Edit the JSON array below. Each color should have: name, hex, usage (primary/secondary/accent/background)</p>
                     <textarea value={editData.colors} onChange={e => setEditData(p => ({ ...p, colors: e.target.value }))}
-                        rows={12} className="w-full input-glass rounded-xl p-3 text-sm text-white font-mono resize-none" />
+                        rows={12} className="w-full input-glass rounded-xl p-3 text-sm text-[var(--sys-text)] font-mono resize-none" />
                 </EditModal>
             )}
 
             {error && (
-                <div className={`mb-6 p-4 rounded-xl border ${error.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'} text-sm flex items-center gap-2`}>
+                <div className={`mb-6 p-4 rounded-xl border ${error.isProviderError ? 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary' : 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary'} text-sm flex items-center gap-2`}>
                     <span className="material-symbols-outlined text-base">
                         {error.isProviderError ? 'warning' : 'error'}
                     </span>

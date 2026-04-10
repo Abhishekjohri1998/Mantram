@@ -278,7 +278,7 @@ const styles = {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'linear-gradient(145deg, #0a0a1a 0%, #0f0f23 50%, #1a0a2e 100%)',
+        background: 'var(--sys-primary)',
         padding: 24,
         fontFamily: "'Inter', 'Segoe UI', sans-serif",
     },
@@ -315,7 +315,7 @@ const styles = {
     primaryBtn: {
         width: '100%',
         padding: '14px 24px',
-        background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+        background: 'var(--sys-primary)',
         color: '#fff',
         border: 'none',
         borderRadius: 12,

@@ -93,7 +93,7 @@ export default function Analytics() {
         { id: 'devices', label: '📱 Devices', icon: 'devices' },
     ]
 
-    const priorityColors = { high: 'text-rose-400 bg-rose-500/10 border-rose-500/20', medium: 'text-amber-400 bg-amber-500/10 border-amber-500/20', low: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' }
+    const priorityColors = { high: 'text-primary bg-[var(--sys-primary-dim)] border-[var(--sys-border)]', medium: 'text-primary bg-[var(--sys-primary-dim)] border-[var(--sys-border)]', low: 'text-primary bg-[var(--sys-primary-dim)] border-[var(--sys-border)]' }
 
     return (
         <DashboardLayout title="Analytics" subtitle="Platform-wide performance insights">
@@ -111,12 +111,12 @@ export default function Analytics() {
             <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between mb-6 gap-3">
                 <div>
                     <div className="flex items-center gap-3">
-                        <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Live</span>
+                        <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full bg-[var(--sys-primary-dim)] text-primary border border-[var(--sys-border)]">Live</span>
                     </div>
                 </div>
                 <div className="flex items-center gap-3">
                     <select value={timeRange} onChange={e => setTimeRange(e.target.value)}
-                        className="input-glass py-2 px-3 rounded-xl text-xs bg-white/[0.04] cursor-pointer">
+                        className="input-glass py-2 px-3 rounded-xl text-xs bg-[var(--sys-surface)] cursor-pointer">
                         <option value="7d">Last 7 days</option>
                         <option value="30d">Last 30 days</option>
                         <option value="90d">Last 90 days</option>
@@ -126,26 +126,26 @@ export default function Analytics() {
             </div>
 
             {/* ═══════════ STRIKES RADAR DEEP DIVE ═══════════ */}
-            <div className="glass-panel rounded-2xl p-6 mb-6 border border-white/[0.06] overflow-hidden">
+            <div className="glass-panel rounded-2xl p-6 mb-6 border border-[var(--sys-border)] overflow-hidden">
                 <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center gap-3">
-                        <div className="size-10 rounded-xl bg-gradient-to-br from-rose-500/20 to-[#FF7A00]/20 flex items-center justify-center border border-rose-500/20">
-                            <span className="material-symbols-outlined text-rose-400">radar</span>
+                        <div className="size-10 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] flex items-center justify-center border border-[var(--sys-border)]">
+                            <span className="material-symbols-outlined text-primary">radar</span>
                         </div>
                         <div>
-                            <h3 className="text-lg font-bold text-white">Strikes Radar</h3>
-                            <p className="text-xs text-slate-500">Real-time audience & traffic intelligence</p>
+                            <h3 className="text-lg font-bold text-[var(--sys-text)]">Strikes Radar</h3>
+                            <p className="text-xs text-[var(--sys-text-muted)]">Real-time audience & traffic intelligence</p>
                         </div>
                     </div>
                     <button onClick={generateStrategy} disabled={strategyLoading || !radar}
-                        className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-primary/20 to-[#FF7A00]/20 border border-primary/30 text-primary font-medium text-sm hover:from-primary/30 hover:to-[#FF7A00]/30 transition-all cursor-pointer disabled:opacity-50">
+                        className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] border border-primary/30 text-primary font-medium text-sm hover:from-primary/30 hover:to-[#FF7A00]/30 transition-all cursor-pointer disabled:opacity-50">
                         <span className="material-symbols-outlined text-sm">{strategyLoading ? 'progress_activity' : 'auto_awesome'}</span>
                         {strategyLoading ? 'Analyzing...' : 'Generate AI Strategy'}
                     </button>
                 </div>
 
                 {radarLoading ? (
-                    <div className="flex items-center justify-center py-16 text-slate-400">
+                    <div className="flex items-center justify-center py-16 text-[var(--sys-text-muted)]">
                         <span className="material-symbols-outlined animate-spin mr-2 text-2xl">progress_activity</span>
                         Loading radar data...
                     </div>
@@ -160,22 +160,22 @@ export default function Analytics() {
                                 { label: 'Avg Session', value: radar.avgSession, icon: 'timer', color: '#06b6d4', sub: 'duration' },
                                 { label: 'Top Page', value: radar.topPage, icon: 'web', color: '#ec4899', sub: 'most visited' },
                             ].map((m, i) => (
-                                <div key={i} className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.04] hover:bg-white/[0.04] transition-all">
+                                <div key={i} className="p-4 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:bg-[var(--sys-surface)] transition-all">
                                     <div className="flex items-center gap-1.5 mb-2">
                                         <span className="material-symbols-outlined text-sm" style={{ color: m.color }}>{m.icon}</span>
-                                        <span className="text-xs text-slate-500">{m.label}</span>
+                                        <span className="text-xs text-[var(--sys-text-muted)]">{m.label}</span>
                                     </div>
-                                    <p className="text-xl font-extrabold text-white truncate">{m.value}</p>
-                                    <p className="text-[10px] text-slate-600 mt-0.5">{m.sub}</p>
+                                    <p className="text-xl font-extrabold text-[var(--sys-text)] truncate">{m.value}</p>
+                                    <p className="text-[10px] text-[var(--sys-text-muted)] mt-0.5">{m.sub}</p>
                                 </div>
                             ))}
                         </div>
 
                         {/* Radar Tabs */}
-                        <div className="flex gap-1 p-1 rounded-xl bg-white/[0.02] border border-white/[0.04] mb-6 overflow-x-auto">
+                        <div className="flex gap-1 p-1 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] mb-6 overflow-x-auto">
                             {radarTabs.map(tab => (
                                 <button key={tab.id} onClick={() => setActiveRadarTab(tab.id)}
-                                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg text-sm font-medium transition-all whitespace-nowrap cursor-pointer ${activeRadarTab === tab.id ? 'bg-primary/15 text-white border border-primary/30' : 'text-slate-500 hover:text-slate-300'}`}>
+                                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg text-sm font-medium transition-all whitespace-nowrap cursor-pointer ${activeRadarTab === tab.id ? 'bg-primary/15 text-white border border-primary/30' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text-muted)]'}`}>
                                     {tab.label}
                                 </button>
                             ))}
@@ -237,20 +237,20 @@ export default function Analytics() {
 
                                     {/* Sources Detail */}
                                     <div className="flex flex-col justify-center gap-3">
-                                        <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-1">Traffic by Source</h4>
+                                        <h4 className="text-sm font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-1">Traffic by Source</h4>
                                         {radar.sources?.map((s, i) => {
                                             const isHover = radarHover === `src-${i}`
                                             return (
-                                                <div key={i} className={`p-3 rounded-xl border transition-all cursor-default ${isHover ? 'bg-white/[0.04] border-white/[0.1]' : 'bg-white/[0.01] border-white/[0.04]'}`}
+                                                <div key={i} className={`p-3 rounded-xl border transition-all cursor-default ${isHover ? 'bg-[var(--sys-surface)] border-[var(--sys-border)]' : 'bg-[var(--sys-surface)] border-[var(--sys-border)]'}`}
                                                     onMouseEnter={() => setRadarHover(`src-${i}`)} onMouseLeave={() => setRadarHover(null)}>
                                                     <div className="flex items-center justify-between mb-2">
                                                         <div className="flex items-center gap-2">
                                                             <div className="size-3 rounded-full" style={{ background: s.color, boxShadow: isHover ? `0 0 12px ${s.color}` : 'none' }} />
-                                                            <span className={`text-sm font-medium transition-colors ${isHover ? 'text-white' : 'text-slate-300'}`}>{s.name}</span>
+                                                            <span className={`text-sm font-medium transition-colors ${isHover ? 'text-[var(--sys-text)]' : 'text-[var(--sys-text-muted)]'}`}>{s.name}</span>
                                                         </div>
-                                                        <span className="text-lg font-extrabold text-white">{s.value}%</span>
+                                                        <span className="text-lg font-extrabold text-[var(--sys-text)]">{s.value}%</span>
                                                     </div>
-                                                    <div className="h-2 rounded-full bg-white/[0.04] overflow-hidden">
+                                                    <div className="h-2 rounded-full bg-[var(--sys-surface)] overflow-hidden">
                                                         <div className="h-full rounded-full transition-all duration-500" style={{ width: `${s.value}%`, background: s.color }} />
                                                     </div>
                                                 </div>
@@ -264,39 +264,39 @@ export default function Analytics() {
                             {activeRadarTab === 'locations' && (
                                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                                     <div>
-                                        <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">Traffic by Location</h4>
+                                        <h4 className="text-sm font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-4">Traffic by Location</h4>
                                         <div className="space-y-3">
                                             {radar.locations?.map((loc, i) => (
-                                                <div key={i} className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
+                                                <div key={i} className="p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
                                                     <div className="flex items-center justify-between mb-2">
                                                         <div className="flex items-center gap-2">
                                                             <span className="text-lg">{i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i + 1}`}</span>
-                                                            <span className="text-sm font-medium text-white">{loc.name}</span>
+                                                            <span className="text-sm font-medium text-[var(--sys-text)]">{loc.name}</span>
                                                         </div>
-                                                        <span className="text-lg font-extrabold text-white">{loc.value}%</span>
+                                                        <span className="text-lg font-extrabold text-[var(--sys-text)]">{loc.value}%</span>
                                                     </div>
-                                                    <div className="h-2.5 rounded-full bg-white/[0.04] overflow-hidden">
+                                                    <div className="h-2.5 rounded-full bg-[var(--sys-surface)] overflow-hidden">
                                                         <div className="h-full rounded-full transition-all duration-700"
-                                                            style={{ width: `${(loc.value / (radar.locations?.[0]?.value || 1)) * 100}%`, background: `linear-gradient(90deg, #8b5cf6, #06b6d4)` }} />
+                                                            style={{ width: `${(loc.value / (radar.locations?.[0]?.value || 1)) * 100}%`, background: `var(--sys-primary)` }} />
                                                     </div>
                                                 </div>
                                             ))}
                                         </div>
                                     </div>
                                     <div className="flex flex-col gap-4">
-                                        <div className="p-5 rounded-xl bg-gradient-to-br from-[#FF4D00]/5 to-cyan-500/5 border border-[#FF4D00]/10">
+                                        <div className="p-5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] border border-[#FF4D00]/10">
                                             <h4 className="text-sm font-bold text-[#FF4D00] flex items-center gap-2 mb-3">
                                                 <span className="material-symbols-outlined text-sm">lightbulb</span>Location Insights
                                             </h4>
-                                            <div className="space-y-2 text-sm text-slate-300 leading-relaxed">
-                                                <p>• <strong className="text-white">{radar.locations?.[0]?.name}</strong> leads with {radar.locations?.[0]?.value}% of traffic</p>
-                                                <p>• Top 3 locations account for <strong className="text-white">{(radar.locations?.[0]?.value || 0) + (radar.locations?.[1]?.value || 0) + (radar.locations?.[2]?.value || 0)}%</strong> of total audience</p>
+                                            <div className="space-y-2 text-sm text-[var(--sys-text-muted)] leading-relaxed">
+                                                <p>• <strong className="text-[var(--sys-text)]">{radar.locations?.[0]?.name}</strong> leads with {radar.locations?.[0]?.value}% of traffic</p>
+                                                <p>• Top 3 locations account for <strong className="text-[var(--sys-text)]">{(radar.locations?.[0]?.value || 0) + (radar.locations?.[1]?.value || 0) + (radar.locations?.[2]?.value || 0)}%</strong> of total audience</p>
                                                 <p>• Consider regional campaigns and local language content for untapped markets</p>
                                             </div>
                                         </div>
-                                        <div className="p-5 rounded-xl bg-white/[0.02] border border-white/[0.04]">
-                                            <h4 className="text-sm font-bold text-white mb-3"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">ads_click</span> Recommendation</h4>
-                                            <p className="text-sm text-slate-400 leading-relaxed">Strengthen presence in <strong className="text-primary">{radar.locations?.[3]?.name || 'emerging cities'}</strong> and <strong className="text-primary">{radar.locations?.[4]?.name || 'beyond'}</strong> — these regions show growth potential with existing brand awareness.</p>
+                                        <div className="p-5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                                            <h4 className="text-sm font-bold text-[var(--sys-text)] mb-3"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">ads_click</span> Recommendation</h4>
+                                            <p className="text-sm text-[var(--sys-text-muted)] leading-relaxed">Strengthen presence in <strong className="text-primary">{radar.locations?.[3]?.name || 'emerging cities'}</strong> and <strong className="text-primary">{radar.locations?.[4]?.name || 'beyond'}</strong> — these regions show growth potential with existing brand awareness.</p>
                                         </div>
                                     </div>
                                 </div>
@@ -306,45 +306,45 @@ export default function Analytics() {
                             {activeRadarTab === 'demographics' && (
                                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                                     <div>
-                                        <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">Gender Distribution</h4>
+                                        <h4 className="text-sm font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-4">Gender Distribution</h4>
                                         {/* Large Gender Bar */}
                                         <div className="flex h-8 rounded-xl overflow-hidden gap-1 mb-4">
                                             {radar.gender?.map((g, i) => (
                                                 <div key={i} className="h-full flex items-center justify-center transition-all duration-500 hover:scale-y-110 cursor-default"
                                                     title={`${g.name}: ${g.value}%`}
                                                     style={{ width: `${g.value}%`, background: g.color, borderRadius: i === 0 ? '12px 0 0 12px' : i === radar.gender.length - 1 ? '0 12px 12px 0' : '0' }}>
-                                                    <span className="text-xs font-bold text-white drop-shadow-md">{g.value}%</span>
+                                                    <span className="text-xs font-bold text-[var(--sys-text)] drop-shadow-md">{g.value}%</span>
                                                 </div>
                                             ))}
                                         </div>
                                         <div className="grid grid-cols-3 gap-3">
                                             {radar.gender?.map((g, i) => (
-                                                <div key={i} className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.04] text-center">
+                                                <div key={i} className="p-4 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-center">
                                                     <div className="size-10 rounded-full mx-auto mb-2 flex items-center justify-center" style={{ background: `${g.color}20`, border: `1px solid ${g.color}40` }}>
                                                         <span className="material-symbols-outlined text-lg" style={{ color: g.color }}>
                                                             {g.name === 'Male' ? 'male' : g.name === 'Female' ? 'female' : 'diversity_1'}
                                                         </span>
                                                     </div>
-                                                    <p className="text-2xl font-extrabold text-white">{g.value}%</p>
-                                                    <p className="text-xs text-slate-500 mt-0.5">{g.name}</p>
+                                                    <p className="text-2xl font-extrabold text-[var(--sys-text)]">{g.value}%</p>
+                                                    <p className="text-xs text-[var(--sys-text-muted)] mt-0.5">{g.name}</p>
                                                 </div>
                                             ))}
                                         </div>
                                     </div>
                                     <div className="flex flex-col gap-4">
-                                        <div className="p-5 rounded-xl bg-gradient-to-br from-[#FF4D00]/5 to-[#FF7A00]/5 border border-[#FF4D00]/10">
+                                        <div className="p-5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] border border-[#FF4D00]/10">
                                             <h4 className="text-sm font-bold text-[#FF7A00] flex items-center gap-2 mb-3">
                                                 <span className="material-symbols-outlined text-sm">psychology</span>Demographic Insights
                                             </h4>
-                                            <div className="space-y-2 text-sm text-slate-300 leading-relaxed">
-                                                <p>• Primary audience: <strong className="text-white">{radar.gender?.[0]?.name} ({radar.gender?.[0]?.value}%)</strong></p>
+                                            <div className="space-y-2 text-sm text-[var(--sys-text-muted)] leading-relaxed">
+                                                <p>• Primary audience: <strong className="text-[var(--sys-text)]">{radar.gender?.[0]?.name} ({radar.gender?.[0]?.value}%)</strong></p>
                                                 <p>• Gender ratio is {Math.abs((radar.gender?.[0]?.value || 50) - 50) < 10 ? 'relatively balanced' : 'skewed — consider diversifying content appeal'}</p>
                                                 <p>• Tailor messaging tone based on primary demographic preferences</p>
                                             </div>
                                         </div>
-                                        <div className="p-5 rounded-xl bg-white/[0.02] border border-white/[0.04]">
-                                            <h4 className="text-sm font-bold text-white mb-3">💡 Content Tip</h4>
-                                            <p className="text-sm text-slate-400 leading-relaxed">
+                                        <div className="p-5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                                            <h4 className="text-sm font-bold text-[var(--sys-text)] mb-3">💡 Content Tip</h4>
+                                            <p className="text-sm text-[var(--sys-text-muted)] leading-relaxed">
                                                 Create A/B test campaigns with messaging variants targeting different demographics.
                                                 Your <strong className="text-primary">{radar.gender?.sort((a, b) => a.value - b.value)?.[0]?.name}</strong> audience segment at {radar.gender?.sort((a, b) => a.value - b.value)?.[0]?.value}% represents an untapped growth opportunity.
                                             </p>
@@ -358,44 +358,44 @@ export default function Analytics() {
                                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                                     <div className="grid grid-cols-3 gap-4">
                                         {radar.devices?.map((d, i) => (
-                                            <div key={i} className="p-6 rounded-2xl bg-white/[0.02] border border-white/[0.04] text-center hover:bg-white/[0.04] transition-all">
+                                            <div key={i} className="p-6 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-center hover:bg-[var(--sys-surface)] transition-all">
                                                 <div className="size-16 rounded-2xl mx-auto mb-3 flex items-center justify-center" style={{ background: `${d.color}15`, border: `1px solid ${d.color}30` }}>
                                                     <span className="material-symbols-outlined text-3xl" style={{ color: d.color }}>
                                                         {d.name === 'Mobile' ? 'smartphone' : d.name === 'Desktop' ? 'computer' : 'tablet'}
                                                     </span>
                                                 </div>
-                                                <p className="text-3xl font-extrabold text-white">{d.value}%</p>
-                                                <p className="text-sm text-slate-500 mt-1">{d.name}</p>
-                                                <div className="h-1.5 rounded-full bg-white/[0.04] mt-3 overflow-hidden">
+                                                <p className="text-3xl font-extrabold text-[var(--sys-text)]">{d.value}%</p>
+                                                <p className="text-sm text-[var(--sys-text-muted)] mt-1">{d.name}</p>
+                                                <div className="h-1.5 rounded-full bg-[var(--sys-surface)] mt-3 overflow-hidden">
                                                     <div className="h-full rounded-full" style={{ width: `${d.value}%`, background: d.color }} />
                                                 </div>
                                             </div>
                                         ))}
                                     </div>
                                     <div className="flex flex-col gap-4">
-                                        <div className="p-5 rounded-xl bg-gradient-to-br from-cyan-500/5 to-[#FF7A00]/5 border border-cyan-500/10">
-                                            <h4 className="text-sm font-bold text-cyan-400 flex items-center gap-2 mb-3">
+                                        <div className="p-5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] border border-[var(--sys-border)]">
+                                            <h4 className="text-sm font-bold text-primary flex items-center gap-2 mb-3">
                                                 <span className="material-symbols-outlined text-sm">analytics</span>Device Insights
                                             </h4>
-                                            <div className="space-y-2 text-sm text-slate-300 leading-relaxed">
-                                                <p>• <strong className="text-white">{radar.devices?.[0]?.name}</strong> dominates at {radar.devices?.[0]?.value}% of sessions</p>
+                                            <div className="space-y-2 text-sm text-[var(--sys-text-muted)] leading-relaxed">
+                                                <p>• <strong className="text-[var(--sys-text)]">{radar.devices?.[0]?.name}</strong> dominates at {radar.devices?.[0]?.value}% of sessions</p>
                                                 <p>• {(radar.devices?.find(d => d.name === 'Mobile')?.value || 0) > 50 ? 'Mobile-first strategy is essential — optimize all content for vertical formats' : 'Desktop-heavy audience — long-form content performs well'}</p>
                                                 <p>• Test responsive designs across all three device categories</p>
                                             </div>
                                         </div>
-                                        <div className="p-5 rounded-xl bg-white/[0.02] border border-white/[0.04]">
-                                            <h4 className="text-sm font-bold text-white mb-3">📐 Format Guide</h4>
-                                            <div className="grid grid-cols-3 gap-2 text-center text-xs text-slate-400">
-                                                <div className="p-2 rounded-lg bg-white/[0.02]">
-                                                    <p className="font-bold text-white">9:16</p>
+                                        <div className="p-5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                                            <h4 className="text-sm font-bold text-[var(--sys-text)] mb-3">📐 Format Guide</h4>
+                                            <div className="grid grid-cols-3 gap-2 text-center text-xs text-[var(--sys-text-muted)]">
+                                                <div className="p-2 rounded-lg bg-[var(--sys-surface)]">
+                                                    <p className="font-bold text-[var(--sys-text)]">9:16</p>
                                                     <p>Reels/Shorts</p>
                                                 </div>
-                                                <div className="p-2 rounded-lg bg-white/[0.02]">
-                                                    <p className="font-bold text-white">1:1</p>
+                                                <div className="p-2 rounded-lg bg-[var(--sys-surface)]">
+                                                    <p className="font-bold text-[var(--sys-text)]">1:1</p>
                                                     <p>Posts/Carousels</p>
                                                 </div>
-                                                <div className="p-2 rounded-lg bg-white/[0.02]">
-                                                    <p className="font-bold text-white">16:9</p>
+                                                <div className="p-2 rounded-lg bg-[var(--sys-surface)]">
+                                                    <p className="font-bold text-[var(--sys-text)]">16:9</p>
                                                     <p>YouTube/Blog</p>
                                                 </div>
                                             </div>
@@ -407,37 +407,37 @@ export default function Analytics() {
                     </>
                 ) : (
                     <div className="text-center py-16">
-                        <span className="material-symbols-outlined text-5xl text-slate-600 mb-3 block">radar</span>
-                        <p className="text-slate-500">No radar data available yet. Check back after the dashboard loads.</p>
+                        <span className="material-symbols-outlined text-5xl text-[var(--sys-text-muted)] mb-3 block">radar</span>
+                        <p className="text-[var(--sys-text-muted)]">No radar data available yet. Check back after the dashboard loads.</p>
                     </div>
                 )}
             </div>
 
             {/* ═══════════ AI STRATEGY ═══════════ */}
             {aiStrategy && (
-                <div className="glass-panel rounded-2xl p-6 mb-6 border border-primary/20 bg-gradient-to-br from-primary/5 to-[#FF7A00]/5">
+                <div className="glass-panel rounded-2xl p-6 mb-6 border border-primary/20 bg-[var(--sys-surface)] border border-[var(--sys-border)]">
                     <div className="flex items-center gap-3 mb-5">
-                        <div className="size-10 rounded-xl bg-gradient-to-br from-primary/30 to-[#FF7A00]/30 flex items-center justify-center border border-primary/30">
+                        <div className="size-10 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] flex items-center justify-center border border-primary/30">
                             <span className="material-symbols-outlined text-primary">auto_awesome</span>
                         </div>
                         <div>
-                            <h3 className="text-lg font-bold text-white">AI Strategy Recommendations</h3>
-                            <p className="text-xs text-slate-500">{aiStrategy.summary}</p>
+                            <h3 className="text-lg font-bold text-[var(--sys-text)]">AI Strategy Recommendations</h3>
+                            <p className="text-xs text-[var(--sys-text-muted)]">{aiStrategy.summary}</p>
                         </div>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {(aiStrategy.actions || []).map((action, i) => (
-                            <div key={i} className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06] hover:bg-white/[0.04] transition-all">
+                            <div key={i} className="p-4 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:bg-[var(--sys-surface)] transition-all">
                                 <div className="flex items-start gap-3">
-                                    <div className="size-9 rounded-lg bg-white/[0.05] flex items-center justify-center shrink-0 mt-0.5">
+                                    <div className="size-9 rounded-lg bg-[var(--sys-surface)] flex items-center justify-center shrink-0 mt-0.5">
                                         <span className="material-symbols-outlined text-primary text-lg">{action.icon || 'lightbulb'}</span>
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2 mb-1">
-                                            <p className="text-sm font-bold text-white">{action.title}</p>
+                                            <p className="text-sm font-bold text-[var(--sys-text)]">{action.title}</p>
                                             <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full border ${priorityColors[action.priority] || priorityColors.medium}`}>{action.priority}</span>
                                         </div>
-                                        <p className="text-xs text-slate-400 leading-relaxed">{action.desc}</p>
+                                        <p className="text-xs text-[var(--sys-text-muted)] leading-relaxed">{action.desc}</p>
                                     </div>
                                 </div>
                             </div>
@@ -448,7 +448,7 @@ export default function Analytics() {
 
             {/* ═══════════ CONTENT ANALYTICS ═══════════ */}
             {loading ? (
-                <div className="flex items-center justify-center py-20 text-slate-400">
+                <div className="flex items-center justify-center py-20 text-[var(--sys-text-muted)]">
                     <span className="material-symbols-outlined animate-spin mr-2 text-2xl">progress_activity</span>
                     Loading content analytics...
                 </div>
@@ -458,21 +458,21 @@ export default function Analytics() {
                         {[
                             { label: 'Total Content', value: totalContent, icon: 'article', color: 'text-primary' },
                             { label: 'Total Creatives', value: totalCreatives, icon: 'image', color: 'text-[#FF4D00]' },
-                            { label: 'Published', value: published, icon: 'publish', color: 'text-emerald-400' },
-                            { label: 'Drafts', value: drafts, icon: 'edit_note', color: 'text-amber-400' },
+                            { label: 'Published', value: published, icon: 'publish', color: 'text-primary' },
+                            { label: 'Drafts', value: drafts, icon: 'edit_note', color: 'text-primary' },
                             { label: 'Brand Alignment', value: avgScore ? `${avgScore}%` : '—', icon: 'verified', color: 'text-primary' },
                         ].map((s, i) => (
                             <div key={i} className="glass-panel rounded-2xl p-5">
                                 <span className={`material-symbols-outlined text-xl ${s.color} mb-2 block`}>{s.icon}</span>
-                                <p className="text-2xl font-extrabold text-white">{s.value}</p>
-                                <p className="text-sm text-slate-500 mt-0.5">{s.label}</p>
+                                <p className="text-2xl font-extrabold text-[var(--sys-text)]">{s.value}</p>
+                                <p className="text-sm text-[var(--sys-text-muted)] mt-0.5">{s.label}</p>
                             </div>
                         ))}
                     </div>
 
                     <div className="grid grid-cols-12 gap-6">
                         <div className="col-span-12 md:col-span-6 glass-panel rounded-2xl p-6">
-                            <h3 className="font-bold text-white flex items-center gap-2 mb-5">
+                            <h3 className="font-bold text-[var(--sys-text)] flex items-center gap-2 mb-5">
                                 <span className="material-symbols-outlined text-primary">pie_chart</span> Content by Type
                             </h3>
                             {Object.keys(typeBreakdown).length > 0 ? (
@@ -483,37 +483,37 @@ export default function Analytics() {
                                         return (
                                             <div key={type}>
                                                 <div className="flex items-center justify-between mb-1">
-                                                    <span className="text-sm text-white capitalize font-medium">{type}</span>
-                                                    <span className="text-sm text-slate-400">{count} ({pct}%)</span>
+                                                    <span className="text-sm text-[var(--sys-text)] capitalize font-medium">{type}</span>
+                                                    <span className="text-sm text-[var(--sys-text-muted)]">{count} ({pct}%)</span>
                                                 </div>
-                                                <div className="w-full h-2 rounded-full bg-white/[0.05]">
+                                                <div className="w-full h-2 rounded-full bg-[var(--sys-surface)]">
                                                     <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: colors[type] || '#2B4BEE' }} />
                                                 </div>
                                             </div>
                                         )
                                     })}
                                 </div>
-                            ) : <p className="text-slate-500 text-sm text-center py-8">No content data yet.</p>}
+                            ) : <p className="text-[var(--sys-text-muted)] text-sm text-center py-8">No content data yet.</p>}
                         </div>
 
                         <div className="col-span-12 md:col-span-6 glass-panel rounded-2xl p-6">
-                            <h3 className="font-bold text-white flex items-center gap-2 mb-5">
+                            <h3 className="font-bold text-[var(--sys-text)] flex items-center gap-2 mb-5">
                                 <span className="material-symbols-outlined text-primary">psychology</span> AI Performance
                             </h3>
                             <div className="space-y-4">
                                 <div className="grid grid-cols-2 gap-4">
-                                    <div className="p-4 rounded-xl bg-white/[0.03] text-center">
+                                    <div className="p-4 rounded-xl bg-[var(--sys-surface)] text-center">
                                         <p className="text-2xl font-extrabold text-primary">{avgScore || '—'}%</p>
-                                        <p className="text-sm text-slate-500 mt-1">Avg Brand Alignment</p>
+                                        <p className="text-sm text-[var(--sys-text-muted)] mt-1">Avg Brand Alignment</p>
                                     </div>
-                                    <div className="p-4 rounded-xl bg-white/[0.03] text-center">
-                                        <p className="text-2xl font-extrabold text-emerald-400">{activeBrand?.aiContext?.totalFeedback || 0}</p>
-                                        <p className="text-sm text-slate-500 mt-1">Feedback Signals</p>
+                                    <div className="p-4 rounded-xl bg-[var(--sys-surface)] text-center">
+                                        <p className="text-2xl font-extrabold text-primary">{activeBrand?.aiContext?.totalFeedback || 0}</p>
+                                        <p className="text-sm text-[var(--sys-text-muted)] mt-1">Feedback Signals</p>
                                     </div>
                                 </div>
-                                <div className="p-4 rounded-xl bg-gradient-to-r from-primary/5 to-[#FF7A00]/5 border border-primary/10">
+                                <div className="p-4 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] border border-primary/10">
                                     <p className="text-sm text-primary font-bold mb-1"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">trending_up</span> AI Improvement</p>
-                                    <p className="text-sm text-slate-400 leading-relaxed">
+                                    <p className="text-sm text-[var(--sys-text-muted)] leading-relaxed">
                                         {(activeBrand?.aiContext?.totalFeedback || 0) > 10
                                             ? 'AI has enough feedback to produce brand-aligned content.'
                                             : 'Keep providing feedback — AI improves after ~10 interactions.'}

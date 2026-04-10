@@ -1,4 +1,5 @@
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { Upload } from "@aws-sdk/lib-storage";
 import config from "../config/env.js";
 import crypto from "crypto";
@@ -120,5 +121,62 @@ export const ensureS3Url = async (input, folder = 'video-studio/assets') => {
     }
 };
 
+/**
+ * Generates a pre-signed URL for a given S3 key or full S3 URL.
+ * @param {string} urlOrKey - The S3 key (e.g., 'creatives/123.png') or full S3 URL
+ * @param {number} expiresIn - Expiration time in seconds (default: 3600 / 1 hour)
+ * @returns {Promise<string>} - The signed URL
+ */
+export const getSignedUrlForPath = async (urlOrKey, expiresIn = 3600) => {
+    if (!urlOrKey) return urlOrKey;
+    
+    try {
+        let key = urlOrKey;
+        
+        // If it's a full URL, extract the key
+        if (urlOrKey.startsWith('http')) {
+            try {
+                const url = new URL(urlOrKey);
+                // For path-style URLs: /bucket-name/key/path
+                // For virtual-hosted URLs: /key/path
+                const pathParts = url.pathname.split('/').filter(Boolean);
+                
+                if (url.hostname.includes('.amazonaws.com')) {
+                    if (pathParts[0] === config.aws.bucket) {
+                        key = pathParts.slice(1).join('/');
+                    } else {
+                        key = pathParts.join('/');
+                    }
+                }
+            } catch (e) {
+                console.warn("Failed to parse S3 URL for signing, using as raw key:", urlOrKey);
+            }
+        }
+
+        const command = new GetObjectCommand({
+            Bucket: config.aws.bucket,
+            Key: key,
+        });
+
+        const signedUrl = await getSignedUrl(s3Client, command, { expiresIn });
+        return signedUrl;
+    } catch (error) {
+        console.error("Error generating signed URL:", error);
+        return urlOrKey; // Fallback to original
+    }
+};
+
+/**
+ * Helper to sign a URL only if it looks like an S3 URL from our bucket.
+ * Useful for processing lists of mixed URLs.
+ */
+export const getSignedUrlIfNeeded = async (url) => {
+    if (!url || typeof url !== 'string') return url;
+    if (url.includes('amazonaws.com') && url.includes(config.aws.bucket)) {
+        return await getSignedUrlForPath(url);
+    }
+    return url;
+};
+
 export { s3Client };
-export default { uploadToS3, mirrorUrlToS3, ensureS3Url };
+export default { uploadToS3, mirrorUrlToS3, ensureS3Url, getSignedUrlForPath, getSignedUrlIfNeeded };

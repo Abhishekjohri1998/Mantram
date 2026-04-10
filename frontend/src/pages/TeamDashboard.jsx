@@ -189,15 +189,15 @@ export default function TeamDashboard() {
     useEffect(() => { if (activeTab === 'insights') loadHealth() }, [activeTab])
 
     const roleColors = {
-        owner: { bg: 'bg-amber-400/10', text: 'text-amber-400', label: 'Owner' },
+        owner: { bg: 'bg-[var(--sys-primary-dim)]', text: 'text-primary', label: 'Owner' },
         manager: { bg: 'bg-[#FF4D00]/10', text: 'text-[#FF4D00]', label: 'Manager' },
-        member: { bg: 'bg-emerald-400/10', text: 'text-emerald-400', label: 'Member' },
+        member: { bg: 'bg-[var(--sys-primary-dim)]', text: 'text-primary', label: 'Member' },
     }
 
     const statusColors = {
-        pending: { bg: 'bg-amber-500/10', text: 'text-amber-400', icon: 'schedule' },
-        approved: { bg: 'bg-emerald-500/10', text: 'text-emerald-400', icon: 'check_circle' },
-        rejected: { bg: 'bg-rose-500/10', text: 'text-rose-400', icon: 'cancel' },
+        pending: { bg: 'bg-[var(--sys-primary-dim)]', text: 'text-primary', icon: 'schedule' },
+        approved: { bg: 'bg-[var(--sys-primary-dim)]', text: 'text-primary', icon: 'check_circle' },
+        rejected: { bg: 'bg-[var(--sys-primary-dim)]', text: 'text-primary', icon: 'cancel' },
         'revision-requested': { bg: 'bg-[#FF4D00]/10', text: 'text-[#FF4D00]', icon: 'edit_note' },
     }
 
@@ -206,7 +206,7 @@ export default function TeamDashboard() {
             <SEOHead title="Team Dashboard — Mantram AI" noIndex={true} />
             <div className="flex items-end justify-between mb-6">
                 <div>
-                    <p className="text-slate-400 text-sm">
+                    <p className="text-[var(--sys-text-muted)] text-sm">
                          Manage your team, chat, and approvals.
                     </p>
                 </div>
@@ -218,13 +218,13 @@ export default function TeamDashboard() {
             </div>
 
             {/* Tab Bar */}
-            <div className="flex items-center gap-1 p-1 rounded-xl bg-white/[0.03] border border-white/[0.06] mb-6 w-fit">
+            <div className="flex items-center gap-1 p-1 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] mb-6 w-fit">
                 {TABS.map(t => (
                     <button key={t.id} onClick={() => setActiveTab(t.id)}
-                        className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all cursor-pointer ${activeTab === t.id ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-slate-400 hover:text-white hover:bg-white/[0.05]'}`}>
+                        className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all cursor-pointer ${activeTab === t.id ? 'bg-primary text-white shadow-none' : 'text-[var(--sys-text-muted)] hover:text-white hover:bg-[var(--sys-surface)]'}`}>
                         <span className="material-symbols-outlined text-sm">{t.icon}</span>{t.label}
                         {t.id === 'approvals' && approvalStats.pending > 0 && (
-                            <span className="size-5 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center">{approvalStats.pending}</span>
+                            <span className="size-5 rounded-full bg-[var(--sys-surface)] text-[var(--sys-text)] text-[10px] font-bold flex items-center justify-center">{approvalStats.pending}</span>
                         )}
                     </button>
                 ))}
@@ -237,17 +237,17 @@ export default function TeamDashboard() {
                 <div className="grid grid-cols-12 gap-6">
                     <div className="col-span-12 lg:col-span-8">
                         <div className="glass-panel rounded-2xl p-6">
-                            <h3 className="font-bold text-white flex items-center gap-2 mb-5">
+                            <h3 className="font-bold text-[var(--sys-text)] flex items-center gap-2 mb-5">
                                 <span className="material-symbols-outlined text-primary">group</span>Team Members
                             </h3>
                             {loading ? (
-                                <div className="flex items-center justify-center py-12 text-slate-400">
+                                <div className="flex items-center justify-center py-12 text-[var(--sys-text-muted)]">
                                     <span className="material-symbols-outlined animate-spin mr-2">progress_activity</span>Loading...
                                 </div>
                             ) : members.length === 0 ? (
                                 <div className="text-center py-12">
-                                    <span className="material-symbols-outlined text-4xl text-slate-600 mb-3 block">group_add</span>
-                                    <p className="text-slate-400 mb-4">No team members yet. Invite your first member!</p>
+                                    <span className="material-symbols-outlined text-4xl text-[var(--sys-text-muted)] mb-3 block">group_add</span>
+                                    <p className="text-[var(--sys-text-muted)] mb-4">No team members yet. Invite your first member!</p>
                                 </div>
                             ) : (
                                 <div className="space-y-3">
@@ -255,36 +255,36 @@ export default function TeamDashboard() {
                                         const rc = roleColors[m.teamRole] || roleColors.member
                                         const isOwner = !m.organization || m.teamRole === 'owner'
                                         return (
-                                            <div key={m._id} className="flex items-center gap-4 p-4 rounded-xl bg-white/[0.02] border border-white/[0.06] hover:bg-white/[0.04] transition-all animate-fade-in"
+                                            <div key={m._id} className="flex items-center gap-4 p-4 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:bg-[var(--sys-surface)] transition-all animate-fade-in"
                                                 style={{ animationDelay: `${i * 60}ms` }}>
-                                                <div className="size-10 rounded-full bg-gradient-to-br from-primary to-[#FF7A00] flex items-center justify-center text-white text-sm font-bold shrink-0">
+                                                <div className="size-10 rounded-full bg-[var(--sys-surface)] border border-[var(--sys-border)] flex items-center justify-center text-[var(--sys-text)] text-sm font-bold shrink-0">
                                                     {m.name?.charAt(0)?.toUpperCase() || '?'}
                                                 </div>
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-center gap-2">
-                                                        <p className="text-sm text-white font-bold truncate">{m.name}</p>
+                                                        <p className="text-sm text-[var(--sys-text)] font-bold truncate">{m.name}</p>
                                                         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${rc.bg} ${rc.text}`}>{rc.label}</span>
-                                                        {m._id === user?.id && <span className="text-xs text-slate-500">(You)</span>}
+                                                        {m._id === user?.id && <span className="text-xs text-[var(--sys-text-muted)]">(You)</span>}
                                                     </div>
-                                                    <p className="text-xs text-slate-500">{m.email}</p>
+                                                    <p className="text-xs text-[var(--sys-text-muted)]">{m.email}</p>
                                                     <div className="flex gap-1 mt-1 flex-wrap">
                                                         {Object.entries(m.studioAccess || {}).filter(([, v]) => v).slice(0, 5).map(([k]) => (
-                                                            <span key={k} className="text-[9px] px-1.5 py-0.5 rounded bg-white/[0.04] text-slate-400">{STUDIO_LABELS[k]?.label || k}</span>
+                                                            <span key={k} className="text-[9px] px-1.5 py-0.5 rounded bg-[var(--sys-surface)] text-[var(--sys-text-muted)]">{STUDIO_LABELS[k]?.label || k}</span>
                                                         ))}
                                                     </div>
                                                 </div>
                                                 <div className="text-right shrink-0">
-                                                    <p className="text-sm text-slate-400">{m.usage?.contentGenerated || 0} content</p>
-                                                    <p className="text-xs text-slate-600">{m.lastActive ? new Date(m.lastActive).toLocaleDateString() : '—'}</p>
+                                                    <p className="text-sm text-[var(--sys-text-muted)]">{m.usage?.contentGenerated || 0} content</p>
+                                                    <p className="text-xs text-[var(--sys-text-muted)]">{m.lastActive ? new Date(m.lastActive).toLocaleDateString() : '—'}</p>
                                                 </div>
                                                 {isOrgOwner && !isOwner && (
                                                     <div className="flex gap-1 shrink-0">
                                                         <button onClick={() => { setEditingMember(m); setEditAccess({ studioAccess: m.studioAccess || {}, brandAccess: m.brandAccess || [], teamRole: m.teamRole }) }}
-                                                            className="size-8 rounded-lg bg-white/[0.04] flex items-center justify-center text-slate-400 hover:text-primary hover:bg-primary/10 cursor-pointer transition-all" title="Edit Access">
+                                                            className="size-8 rounded-lg bg-[var(--sys-surface)] flex items-center justify-center text-[var(--sys-text-muted)] hover:text-primary hover:bg-primary/10 cursor-pointer transition-all" title="Edit Access">
                                                             <span className="material-symbols-outlined text-sm">tune</span>
                                                         </button>
                                                         <button onClick={() => handleRemove(m._id)}
-                                                            className="size-8 rounded-lg bg-white/[0.04] flex items-center justify-center text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 cursor-pointer transition-all" title="Remove">
+                                                            className="size-8 rounded-lg bg-[var(--sys-surface)] flex items-center justify-center text-[var(--sys-text-muted)] hover:text-primary hover:bg-[var(--sys-primary-dim)] cursor-pointer transition-all" title="Remove">
                                                             <span className="material-symbols-outlined text-sm">person_remove</span>
                                                         </button>
                                                     </div>
@@ -297,18 +297,18 @@ export default function TeamDashboard() {
 
                             {/* Pending invites */}
                             {invites.length > 0 && (
-                                <div className="mt-6 pt-5 border-t border-white/[0.06]">
-                                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Pending Invites</p>
+                                <div className="mt-6 pt-5 border-t border-[var(--sys-border)]">
+                                    <p className="text-xs font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-3">Pending Invites</p>
                                     {invites.map(inv => (
-                                        <div key={inv._id} className="flex items-center gap-3 p-3 rounded-xl bg-amber-500/[0.03] border border-amber-500/10 mb-2">
-                                            <span className="material-symbols-outlined text-amber-400">mail</span>
+                                        <div key={inv._id} className="flex items-center gap-3 p-3 rounded-xl bg-[var(--sys-surface)]/[0.03] border border-[var(--sys-border)] mb-2">
+                                            <span className="material-symbols-outlined text-primary">mail</span>
                                             <div className="flex-1">
-                                                <p className="text-sm text-white">{inv.email}</p>
-                                                <p className="text-xs text-slate-500">Invited by {inv.invitedBy?.name} · Expires {new Date(inv.expiresAt).toLocaleDateString()}</p>
+                                                <p className="text-sm text-[var(--sys-text)]">{inv.email}</p>
+                                                <p className="text-xs text-[var(--sys-text-muted)]">Invited by {inv.invitedBy?.name} · Expires {new Date(inv.expiresAt).toLocaleDateString()}</p>
                                             </div>
                                             {isAdmin && (
                                                 <button onClick={async () => { await teamAPI.revokeInvite(inv._id); loadMembers() }}
-                                                    className="text-xs text-rose-400 hover:text-rose-300 cursor-pointer">Revoke</button>
+                                                    className="text-xs text-primary hover:text-[var(--sys-primary)] cursor-pointer">Revoke</button>
                                             )}
                                         </div>
                                     ))}
@@ -320,33 +320,33 @@ export default function TeamDashboard() {
                     {/* Right sidebar — quick stats */}
                     <div className="col-span-12 lg:col-span-4 space-y-6">
                         <div className="glass-panel rounded-2xl p-6">
-                            <h3 className="font-bold text-white flex items-center gap-2 mb-4">
+                            <h3 className="font-bold text-[var(--sys-text)] flex items-center gap-2 mb-4">
                                 <span className="material-symbols-outlined text-primary">diamond</span>Plan
                             </h3>
-                            <div className="p-4 rounded-xl bg-gradient-to-br from-primary/10 to-[#FF7A00]/10 border border-primary/20 mb-3">
-                                <p className="text-lg font-extrabold text-white capitalize">Mantram Unlimited</p>
-                                <p className="text-sm text-slate-400">Unlimited team members & brands</p>
+                            <div className="p-4 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] border border-primary/20 mb-3">
+                                <p className="text-lg font-extrabold text-[var(--sys-text)] capitalize">Mantram Unlimited</p>
+                                <p className="text-sm text-[var(--sys-text-muted)]">Unlimited team members & brands</p>
                             </div>
                         </div>
 
                         <div className="glass-panel rounded-2xl p-6">
-                            <h3 className="font-bold text-white flex items-center gap-2 mb-4">
-                                <span className="material-symbols-outlined text-emerald-400">storefront</span>Brands
+                            <h3 className="font-bold text-[var(--sys-text)] flex items-center gap-2 mb-4">
+                                <span className="material-symbols-outlined text-primary">storefront</span>Brands
                             </h3>
                             {brands.length === 0 ? (
-                                <p className="text-slate-500 text-sm">No brands yet.</p>
+                                <p className="text-[var(--sys-text-muted)] text-sm">No brands yet.</p>
                             ) : (
                                 <div className="space-y-2">
                                     {brands.map(b => (
                                         <div key={b._id} onClick={() => navigate('/brand-dna')}
-                                            className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/[0.05] hover:bg-white/[0.04] transition-all cursor-pointer">
-                                            <div className="size-8 rounded-lg flex items-center justify-center text-white text-xs font-bold"
+                                            className="flex items-center gap-3 p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:bg-[var(--sys-surface)] transition-all cursor-pointer">
+                                            <div className="size-8 rounded-lg flex items-center justify-center text-[var(--sys-text)] text-xs font-bold"
                                                 style={{ background: b.dna?.colors?.[0]?.hex || '#2B4BEE' }}>
                                                 {b.name?.charAt(0)?.toUpperCase()}
                                             </div>
                                             <div className="flex-1 min-w-0">
-                                                <p className="text-sm text-white font-medium truncate">{b.name}</p>
-                                                <p className="text-xs text-slate-500">{b.sharedWith?.length || 0} members</p>
+                                                <p className="text-sm text-[var(--sys-text)] font-medium truncate">{b.name}</p>
+                                                <p className="text-xs text-[var(--sys-text-muted)]">{b.sharedWith?.length || 0} members</p>
                                             </div>
                                         </div>
                                     ))}
@@ -364,14 +364,14 @@ export default function TeamDashboard() {
                 <div className="grid grid-cols-12 gap-4" style={{ height: 'calc(100vh - 240px)' }}>
                     {/* Channel sidebar */}
                     <div className="col-span-12 md:col-span-3 glass-panel rounded-2xl p-4 overflow-y-auto">
-                        <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Channels</p>
+                        <p className="text-xs font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-3">Channels</p>
                         <div className="space-y-1">
                             {channels.map(ch => (
                                 <button key={ch.id} onClick={() => setActiveChannel(ch.id)}
-                                    className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-left text-sm cursor-pointer transition-all ${activeChannel === ch.id ? 'bg-primary/10 text-primary border border-primary/20' : 'text-slate-400 hover:bg-white/[0.04] hover:text-white'}`}>
+                                    className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-left text-sm cursor-pointer transition-all ${activeChannel === ch.id ? 'bg-primary/10 text-primary border border-primary/20' : 'text-[var(--sys-text-muted)] hover:bg-[var(--sys-surface)] hover:text-white'}`}>
                                     <span className="material-symbols-outlined text-sm" style={{ color: ch.color }}>{ch.icon}</span>
                                     <span className="truncate flex-1">{ch.name}</span>
-                                    {ch.unreadCount > 0 && <span className="size-5 rounded-full bg-rose-500 text-white text-[9px] font-bold flex items-center justify-center">{ch.unreadCount}</span>}
+                                    {ch.unreadCount > 0 && <span className="size-5 rounded-full bg-[var(--sys-surface)] text-[var(--sys-text)] text-[9px] font-bold flex items-center justify-center">{ch.unreadCount}</span>}
                                 </button>
                             ))}
                         </div>
@@ -379,32 +379,32 @@ export default function TeamDashboard() {
 
                     {/* Message area */}
                     <div className="col-span-12 md:col-span-9 glass-panel rounded-2xl flex flex-col">
-                        <div className="p-4 border-b border-white/[0.06] flex items-center gap-2">
+                        <div className="p-4 border-b border-[var(--sys-border)] flex items-center gap-2">
                             <span className="material-symbols-outlined text-primary">forum</span>
-                            <span className="text-sm font-bold text-white">{channels.find(c => c.id === activeChannel)?.name || 'General'}</span>
+                            <span className="text-sm font-bold text-[var(--sys-text)]">{channels.find(c => c.id === activeChannel)?.name || 'General'}</span>
                         </div>
                         <div className="flex-1 overflow-y-auto p-4 space-y-3">
                             {chatLoading ? (
-                                <div className="flex items-center justify-center py-12 text-slate-400">
+                                <div className="flex items-center justify-center py-12 text-[var(--sys-text-muted)]">
                                     <span className="material-symbols-outlined animate-spin mr-2">progress_activity</span>Loading...
                                 </div>
                             ) : messages.length === 0 ? (
                                 <div className="text-center py-12">
-                                    <span className="material-symbols-outlined text-4xl text-slate-600 mb-2 block">chat</span>
-                                    <p className="text-slate-500 text-sm">No messages yet. Start the conversation!</p>
+                                    <span className="material-symbols-outlined text-4xl text-[var(--sys-text-muted)] mb-2 block">chat</span>
+                                    <p className="text-[var(--sys-text-muted)] text-sm">No messages yet. Start the conversation!</p>
                                 </div>
                             ) : messages.map(m => (
                                 <div key={m._id} className={`flex gap-3 ${String(m.sender?._id) === String(user?.id) ? 'flex-row-reverse' : ''}`}>
-                                    <div className="size-8 rounded-full bg-gradient-to-br from-primary to-[#FF7A00] flex items-center justify-center text-white text-xs font-bold shrink-0">
+                                    <div className="size-8 rounded-full bg-[var(--sys-surface)] border border-[var(--sys-border)] flex items-center justify-center text-[var(--sys-text)] text-xs font-bold shrink-0">
                                         {m.sender?.name?.charAt(0) || '?'}
                                     </div>
-                                    <div className={`max-w-[70%] p-3 rounded-2xl ${String(m.sender?._id) === String(user?.id) ? 'bg-primary/15 border border-primary/20' : 'bg-white/[0.04] border border-white/[0.06]'}`}>
-                                        <p className="text-[10px] text-slate-500 mb-1">{m.sender?.name} · {new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
-                                        <p className="text-sm text-white whitespace-pre-wrap">{m.content}</p>
+                                    <div className={`max-w-[70%] p-3 rounded-2xl ${String(m.sender?._id) === String(user?.id) ? 'bg-primary/15 border border-primary/20' : 'bg-[var(--sys-surface)] border border-[var(--sys-border)]'}`}>
+                                        <p className="text-[10px] text-[var(--sys-text-muted)] mb-1">{m.sender?.name} · {new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                                        <p className="text-sm text-[var(--sys-text)] whitespace-pre-wrap">{m.content}</p>
                                         {m.attachments?.length > 0 && (
                                             <div className="mt-2 flex gap-2 flex-wrap">
                                                 {m.attachments.map((a, i) => (
-                                                    <div key={i} className="px-2 py-1 rounded-lg bg-white/[0.05] text-xs text-slate-400 flex items-center gap-1">
+                                                    <div key={i} className="px-2 py-1 rounded-lg bg-[var(--sys-surface)] text-xs text-[var(--sys-text-muted)] flex items-center gap-1">
                                                         <span className="material-symbols-outlined text-xs">{a.type === 'creative' ? 'image' : 'article'}</span>{a.name || a.type}
                                                     </div>
                                                 ))}
@@ -420,11 +420,11 @@ export default function TeamDashboard() {
                             ))}
                             <div ref={chatEndRef} />
                         </div>
-                        <div className="p-3 border-t border-white/[0.06] flex gap-2">
+                        <div className="p-3 border-t border-[var(--sys-border)] flex gap-2">
                             <input value={chatInput} onChange={e => setChatInput(e.target.value)}
                                 onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() } }}
                                 placeholder="Type a message..."
-                                className="flex-1 bg-white/[0.04] border border-white/[0.08] rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-500 outline-none focus:border-primary/40" />
+                                className="flex-1 bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl px-4 py-2.5 text-sm text-[var(--sys-text)] placeholder-slate-500 outline-none focus:border-primary/40" />
                             <button onClick={sendMessage}
                                 className="px-4 py-2.5 rounded-xl bg-primary text-white text-sm font-bold hover:bg-primary/90 cursor-pointer transition-all flex items-center gap-1">
                                 <span className="material-symbols-outlined text-sm">send</span>
@@ -447,48 +447,48 @@ export default function TeamDashboard() {
                             { label: 'Rejected', value: approvalStats.rejected || 0, color: '#f43f5e', filter: 'rejected' },
                         ].map((s, i) => (
                             <button key={i} onClick={() => setApprovalFilter(approvalFilter === s.filter ? '' : s.filter)}
-                                className={`glass-panel rounded-2xl p-5 cursor-pointer transition-all ${approvalFilter === s.filter ? 'border-2' : 'border border-white/[0.06]'}`}
+                                className={`glass-panel rounded-2xl p-5 cursor-pointer transition-all ${approvalFilter === s.filter ? 'border' : 'border border-[var(--sys-border)]'}`}
                                 style={approvalFilter === s.filter ? { borderColor: s.color } : {}}>
-                                <p className="text-2xl font-extrabold text-white">{s.value}</p>
-                                <p className="text-sm text-slate-500">{s.label}</p>
+                                <p className="text-2xl font-extrabold text-[var(--sys-text)]">{s.value}</p>
+                                <p className="text-sm text-[var(--sys-text-muted)]">{s.label}</p>
                             </button>
                         ))}
                     </div>
 
                     <div className="glass-panel rounded-2xl p-6">
-                        <h3 className="font-bold text-white flex items-center gap-2 mb-5">
+                        <h3 className="font-bold text-[var(--sys-text)] flex items-center gap-2 mb-5">
                             <span className="material-symbols-outlined text-primary">task_alt</span>Approval Queue
                         </h3>
                         {approvals.length === 0 ? (
                             <div className="text-center py-12">
-                                <span className="material-symbols-outlined text-4xl text-slate-600 mb-2 block">fact_check</span>
-                                <p className="text-slate-500 text-sm">No approvals {approvalFilter ? `with status "${approvalFilter}"` : 'yet'}.</p>
+                                <span className="material-symbols-outlined text-4xl text-[var(--sys-text-muted)] mb-2 block">fact_check</span>
+                                <p className="text-[var(--sys-text-muted)] text-sm">No approvals {approvalFilter ? `with status "${approvalFilter}"` : 'yet'}.</p>
                             </div>
                         ) : (
                             <div className="space-y-3">
                                 {approvals.map(a => {
                                     const sc = statusColors[a.status] || statusColors.pending
                                     return (
-                                        <div key={a._id} className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+                                        <div key={a._id} className="p-4 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
                                             <div className="flex items-center gap-3 mb-2">
                                                 <span className={`material-symbols-outlined ${sc.text}`}>{sc.icon}</span>
                                                 <div className="flex-1 min-w-0">
-                                                    <p className="text-sm text-white font-bold truncate">{a.itemTitle}</p>
-                                                    <p className="text-xs text-slate-500">
+                                                    <p className="text-sm text-[var(--sys-text)] font-bold truncate">{a.itemTitle}</p>
+                                                    <p className="text-xs text-[var(--sys-text-muted)]">
                                                         {a.itemType} · by {a.requestedBy?.name} → {a.approver?.name} · {new Date(a.createdAt).toLocaleDateString()}
                                                     </p>
                                                 </div>
                                                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${sc.bg} ${sc.text} uppercase`}>{a.status}</span>
                                                 {a.priority !== 'normal' && (
-                                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${a.priority === 'urgent' ? 'bg-rose-500/10 text-rose-400' : a.priority === 'high' ? 'bg-amber-500/10 text-amber-400' : 'bg-white/[0.04] text-slate-400'}`}>{a.priority}</span>
+                                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${a.priority === 'urgent' ? 'bg-[var(--sys-primary-dim)] text-primary' : a.priority === 'high' ? 'bg-[var(--sys-primary-dim)] text-primary' : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)]'}`}>{a.priority}</span>
                                                 )}
                                             </div>
                                             {/* AI Review badge */}
                                             {a.aiReview?.brandVoiceScore != null && (
                                                 <div className="flex items-center gap-2 mb-2 p-2 rounded-lg bg-primary/[0.03] border border-primary/10">
                                                     <span className="material-symbols-outlined text-sm text-primary">auto_awesome</span>
-                                                    <span className="text-xs text-slate-400">AI Brand Voice Score: </span>
-                                                    <span className={`text-xs font-bold ${a.aiReview.brandVoiceScore >= 70 ? 'text-emerald-400' : a.aiReview.brandVoiceScore >= 40 ? 'text-amber-400' : 'text-rose-400'}`}>{a.aiReview.brandVoiceScore}%</span>
+                                                    <span className="text-xs text-[var(--sys-text-muted)]">AI Brand Voice Score: </span>
+                                                    <span className={`text-xs font-bold ${a.aiReview.brandVoiceScore >= 70 ? 'text-primary' : a.aiReview.brandVoiceScore >= 40 ? 'text-primary' : 'text-primary'}`}>{a.aiReview.brandVoiceScore}%</span>
                                                 </div>
                                             )}
                                             {/* Feedback */}
@@ -496,10 +496,10 @@ export default function TeamDashboard() {
                                                 <div className="space-y-1 mb-3">
                                                     {a.feedback.slice(-3).map((f, i) => (
                                                         <div key={i} className="flex items-start gap-2 text-xs">
-                                                            <span className="material-symbols-outlined text-xs text-slate-500" style={{ marginTop: 2 }}>
+                                                            <span className="material-symbols-outlined text-xs text-[var(--sys-text-muted)]" style={{ marginTop: 2 }}>
                                                                 {f.action === 'approve' ? 'check' : f.action === 'reject' ? 'close' : 'chat'}
                                                             </span>
-                                                            <span className="text-slate-300"><strong>{f.user?.name || 'System'}</strong>: {f.message}</span>
+                                                            <span className="text-[var(--sys-text-muted)]"><strong>{f.user?.name || 'System'}</strong>: {f.message}</span>
                                                         </div>
                                                     ))}
                                                 </div>
@@ -508,11 +508,11 @@ export default function TeamDashboard() {
                                             {a.status === 'pending' && String(a.approver?._id) === String(user?.id) && (
                                                 <div className="flex gap-2 mt-2">
                                                     <button onClick={() => handleApprovalAction(a._id, 'approve', 'Approved <span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">check_circle</span>')}
-                                                        className="flex-1 py-2 rounded-xl bg-emerald-500/10 text-emerald-400 text-xs font-bold hover:bg-emerald-500/20 cursor-pointer border border-emerald-500/20 transition-all"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">check_circle</span> Approve</button>
+                                                        className="flex-1 py-2 rounded-xl bg-[var(--sys-primary-dim)] text-primary text-xs font-bold hover:bg-[var(--sys-primary-dim)] cursor-pointer border border-[var(--sys-border)] transition-all"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">check_circle</span> Approve</button>
                                                     <button onClick={() => { const msg = prompt('Revision notes:'); if (msg) handleApprovalAction(a._id, 'revision', msg) }}
-                                                        className="flex-1 py-2 rounded-xl bg-amber-500/10 text-amber-400 text-xs font-bold hover:bg-amber-500/20 cursor-pointer border border-amber-500/20 transition-all"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">edit</span> Request Revision</button>
+                                                        className="flex-1 py-2 rounded-xl bg-[var(--sys-primary-dim)] text-primary text-xs font-bold hover:bg-[var(--sys-primary-dim)] cursor-pointer border border-[var(--sys-border)] transition-all"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">edit</span> Request Revision</button>
                                                     <button onClick={() => handleApprovalAction(a._id, 'reject', 'Rejected')}
-                                                        className="flex-1 py-2 rounded-xl bg-rose-500/10 text-rose-400 text-xs font-bold hover:bg-rose-500/20 cursor-pointer border border-rose-500/20 transition-all"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">cancel</span> Reject</button>
+                                                        className="flex-1 py-2 rounded-xl bg-[var(--sys-primary-dim)] text-primary text-xs font-bold hover:bg-[var(--sys-primary-dim)] cursor-pointer border border-[var(--sys-border)] transition-all"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">cancel</span> Reject</button>
                                                 </div>
                                             )}
                                         </div>
@@ -532,7 +532,7 @@ export default function TeamDashboard() {
                     {healthLoading ? (
                         <div className="glass-panel rounded-2xl p-12 flex items-center justify-center">
                             <span className="material-symbols-outlined animate-spin mr-3 text-primary text-2xl">progress_activity</span>
-                            <span className="text-slate-400">Analyzing team performance...</span>
+                            <span className="text-[var(--sys-text-muted)]">Analyzing team performance...</span>
                         </div>
                     ) : healthData ? (
                         <>
@@ -546,8 +546,8 @@ export default function TeamDashboard() {
                                 ].map((s, i) => (
                                     <div key={i} className="glass-panel rounded-2xl p-5">
                                         <span className={`material-symbols-outlined text-xl mb-2 block`} style={{ color: s.color }}>{s.icon}</span>
-                                        <p className="text-2xl font-extrabold text-white">{s.value}</p>
-                                        <p className="text-sm text-slate-500">{s.label}</p>
+                                        <p className="text-2xl font-extrabold text-[var(--sys-text)]">{s.value}</p>
+                                        <p className="text-sm text-[var(--sys-text-muted)]">{s.label}</p>
                                     </div>
                                 ))}
                             </div>
@@ -555,14 +555,14 @@ export default function TeamDashboard() {
                             {/* Insights */}
                             {healthData.insights?.length > 0 && (
                                 <div className="glass-panel rounded-2xl p-6">
-                                    <h3 className="font-bold text-white flex items-center gap-2 mb-4">
+                                    <h3 className="font-bold text-[var(--sys-text)] flex items-center gap-2 mb-4">
                                         <span className="material-symbols-outlined text-primary">auto_awesome</span>AI Insights
                                     </h3>
                                     <div className="space-y-3">
                                         {healthData.insights.map((ins, i) => (
-                                            <div key={i} className={`flex items-start gap-3 p-3 rounded-xl border ${ins.type === 'urgent' ? 'bg-rose-500/[0.03] border-rose-500/10' : ins.type === 'warning' ? 'bg-amber-500/[0.03] border-amber-500/10' : ins.type === 'success' ? 'bg-emerald-500/[0.03] border-emerald-500/10' : 'bg-primary/[0.03] border-primary/10'}`}>
-                                                <span className={`material-symbols-outlined text-lg ${ins.type === 'urgent' ? 'text-rose-400' : ins.type === 'warning' ? 'text-amber-400' : ins.type === 'success' ? 'text-emerald-400' : 'text-primary'}`}>{ins.icon}</span>
-                                                <p className="text-sm text-white flex-1">{ins.message}</p>
+                                            <div key={i} className={`flex items-start gap-3 p-3 rounded-xl border ${ins.type === 'urgent' ? 'bg-[var(--sys-surface)]/[0.03] border-[var(--sys-border)]' : ins.type === 'warning' ? 'bg-[var(--sys-surface)]/[0.03] border-[var(--sys-border)]' : ins.type === 'success' ? 'bg-[var(--sys-surface)]/[0.03] border-[var(--sys-border)]' : 'bg-primary/[0.03] border-primary/10'}`}>
+                                                <span className={`material-symbols-outlined text-lg ${ins.type === 'urgent' ? 'text-primary' : ins.type === 'warning' ? 'text-primary' : ins.type === 'success' ? 'text-primary' : 'text-primary'}`}>{ins.icon}</span>
+                                                <p className="text-sm text-[var(--sys-text)] flex-1">{ins.message}</p>
                                             </div>
                                         ))}
                                     </div>
@@ -571,26 +571,26 @@ export default function TeamDashboard() {
 
                             {/* Member breakdown */}
                             <div className="glass-panel rounded-2xl p-6">
-                                <h3 className="font-bold text-white flex items-center gap-2 mb-4">
+                                <h3 className="font-bold text-[var(--sys-text)] flex items-center gap-2 mb-4">
                                     <span className="material-symbols-outlined text-[#FF4D00]">leaderboard</span>Member Performance
                                 </h3>
                                 <div className="space-y-2">
                                     {healthData.members?.sort((a, b) => (b.contentGenerated + b.creativesGenerated) - (a.contentGenerated + a.creativesGenerated)).map((m, i) => (
-                                        <div key={i} className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
-                                            <span className="text-sm font-bold text-slate-500 w-6">#{i + 1}</span>
-                                            <div className="size-8 rounded-full bg-gradient-to-br from-primary to-[#FF7A00] flex items-center justify-center text-white text-xs font-bold shrink-0">
+                                        <div key={i} className="flex items-center gap-3 p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                                            <span className="text-sm font-bold text-[var(--sys-text-muted)] w-6">#{i + 1}</span>
+                                            <div className="size-8 rounded-full bg-[var(--sys-surface)] border border-[var(--sys-border)] flex items-center justify-center text-[var(--sys-text)] text-xs font-bold shrink-0">
                                                 {m.name?.charAt(0)}
                                             </div>
                                             <div className="flex-1 min-w-0">
-                                                <p className="text-sm text-white font-medium truncate">{m.name}</p>
-                                                <p className="text-[10px] text-slate-500">{m.role} · {m.studios?.length || 0} studios</p>
+                                                <p className="text-sm text-[var(--sys-text)] font-medium truncate">{m.name}</p>
+                                                <p className="text-[10px] text-[var(--sys-text-muted)]">{m.role} · {m.studios?.length || 0} studios</p>
                                             </div>
                                             <div className="text-right">
-                                                <p className="text-sm font-bold text-white">{m.contentGenerated + m.creativesGenerated}</p>
-                                                <p className="text-[10px] text-slate-500">outputs</p>
+                                                <p className="text-sm font-bold text-[var(--sys-text)]">{m.contentGenerated + m.creativesGenerated}</p>
+                                                <p className="text-[10px] text-[var(--sys-text-muted)]">outputs</p>
                                             </div>
-                                            <div className="w-24 h-1.5 rounded-full bg-white/[0.04] overflow-hidden">
-                                                <div className="h-full rounded-full bg-gradient-to-r from-primary to-[#FF7A00] transition-all"
+                                            <div className="w-24 h-1.5 rounded-full bg-[var(--sys-surface)] overflow-hidden">
+                                                <div className="h-full rounded-full bg-[var(--sys-surface)] border border-[var(--sys-border)] transition-all"
                                                     style={{ width: `${Math.min(100, ((m.contentGenerated + m.creativesGenerated) / Math.max(1, healthData.totalContent + healthData.totalCreatives)) * 100 * healthData.teamSize)}%` }} />
                                             </div>
                                         </div>
@@ -600,8 +600,8 @@ export default function TeamDashboard() {
                         </>
                     ) : (
                         <div className="glass-panel rounded-2xl p-12 text-center">
-                            <span className="material-symbols-outlined text-4xl text-slate-600 mb-3 block">auto_awesome</span>
-                            <p className="text-slate-400 mb-4">Team intelligence will appear here.</p>
+                            <span className="material-symbols-outlined text-4xl text-[var(--sys-text-muted)] mb-3 block">auto_awesome</span>
+                            <p className="text-[var(--sys-text-muted)] mb-4">Team intelligence will appear here.</p>
                             <button onClick={loadHealth} className="btn-primary py-2.5 px-6 rounded-xl text-sm cursor-pointer">Analyze Team</button>
                         </div>
                     )}
@@ -612,34 +612,34 @@ export default function TeamDashboard() {
             {/* INVITE MODAL                                       */}
             {/* ══════════════════════════════════════════════════ */}
             {showInvite && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowInvite(false)}>
-                    <div className="glass-panel rounded-2xl p-6 w-full max-w-lg mx-4 border border-white/[0.1]" onClick={e => e.stopPropagation()}>
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--sys-surface)] " onClick={() => setShowInvite(false)}>
+                    <div className="glass-panel rounded-2xl p-6 w-full max-w-lg mx-4 border border-[var(--sys-border)]" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center justify-between mb-5">
-                            <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                            <h3 className="text-lg font-bold text-[var(--sys-text)] flex items-center gap-2">
                                 <span className="material-symbols-outlined text-primary">person_add</span>Invite Team Member
                             </h3>
-                            <button onClick={() => setShowInvite(false)} className="size-8 rounded-lg bg-white/[0.04] flex items-center justify-center text-slate-400 hover:text-white cursor-pointer">
+                            <button onClick={() => setShowInvite(false)} className="size-8 rounded-lg bg-[var(--sys-surface)] flex items-center justify-center text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer">
                                 <span className="material-symbols-outlined text-sm">close</span>
                             </button>
                         </div>
 
                         <div className="space-y-4">
                             <div>
-                                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1 block">Email *</label>
+                                <label className="text-xs font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-1 block">Email *</label>
                                 <input value={inviteForm.email} onChange={e => setInviteForm(f => ({ ...f, email: e.target.value }))}
                                     placeholder="teammate@company.com"
-                                    className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-500 outline-none focus:border-primary/40" />
+                                    className="w-full bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl px-4 py-2.5 text-sm text-[var(--sys-text)] placeholder-slate-500 outline-none focus:border-primary/40" />
                             </div>
                             <div>
-                                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1 block">Name</label>
+                                <label className="text-xs font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-1 block">Name</label>
                                 <input value={inviteForm.name} onChange={e => setInviteForm(f => ({ ...f, name: e.target.value }))}
                                     placeholder="John Doe"
-                                    className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-500 outline-none focus:border-primary/40" />
+                                    className="w-full bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl px-4 py-2.5 text-sm text-[var(--sys-text)] placeholder-slate-500 outline-none focus:border-primary/40" />
                             </div>
                             <div>
-                                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1 block">Role</label>
+                                <label className="text-xs font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-1 block">Role</label>
                                 <select value={inviteForm.role} onChange={e => setInviteForm(f => ({ ...f, role: e.target.value }))}
-                                    className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:border-primary/40">
+                                    className="w-full bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl px-4 py-2.5 text-sm text-[var(--sys-text)] outline-none focus:border-primary/40">
                                     <option value="member">Member</option>
                                     <option value="manager">Manager</option>
                                 </select>
@@ -647,16 +647,16 @@ export default function TeamDashboard() {
 
                             {/* Studio access toggles */}
                             <div>
-                                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 block">Studio Access</label>
+                                <label className="text-xs font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-2 block">Studio Access</label>
                                 <div className="grid grid-cols-2 gap-2">
                                     {Object.entries(STUDIO_LABELS).map(([key, s]) => (
-                                        <label key={key} className="flex items-center gap-2 p-2 rounded-lg bg-white/[0.02] border border-white/[0.04] cursor-pointer hover:bg-white/[0.04] transition-all">
+                                        <label key={key} className="flex items-center gap-2 p-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] cursor-pointer hover:bg-[var(--sys-surface)] transition-all">
                                             <input type="checkbox"
                                                 checked={inviteForm.studioAccess[key] !== false}
                                                 onChange={e => setInviteForm(f => ({ ...f, studioAccess: { ...f.studioAccess, [key]: e.target.checked } }))}
                                                 className="accent-primary" />
                                             <span className="material-symbols-outlined text-sm" style={{ color: s.color }}>{s.icon}</span>
-                                            <span className="text-xs text-white">{s.label}</span>
+                                            <span className="text-xs text-[var(--sys-text)]">{s.label}</span>
                                         </label>
                                     ))}
                                 </div>
@@ -665,10 +665,10 @@ export default function TeamDashboard() {
                             {/* Brand access */}
                             {brands.length > 0 && (
                                 <div>
-                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 block">Brand Access</label>
+                                    <label className="text-xs font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-2 block">Brand Access</label>
                                     <div className="space-y-1">
                                         {brands.map(b => (
-                                            <label key={b._id} className="flex items-center gap-2 p-2 rounded-lg bg-white/[0.02] cursor-pointer hover:bg-white/[0.04]">
+                                            <label key={b._id} className="flex items-center gap-2 p-2 rounded-lg bg-[var(--sys-surface)] cursor-pointer hover:bg-[var(--sys-surface)]">
                                                 <input type="checkbox"
                                                     checked={inviteForm.brandAccess.includes(b._id)}
                                                     onChange={e => setInviteForm(f => ({
@@ -676,7 +676,7 @@ export default function TeamDashboard() {
                                                         brandAccess: e.target.checked ? [...f.brandAccess, b._id] : f.brandAccess.filter(id => id !== b._id)
                                                     }))}
                                                     className="accent-primary" />
-                                                <span className="text-xs text-white">{b.name}</span>
+                                                <span className="text-xs text-[var(--sys-text)]">{b.name}</span>
                                             </label>
                                         ))}
                                     </div>
@@ -684,7 +684,7 @@ export default function TeamDashboard() {
                             )}
 
                             {inviteResult && (
-                                <div className={`p-3 rounded-xl text-sm ${inviteResult.error ? 'bg-rose-500/10 text-rose-400' : 'bg-emerald-500/10 text-emerald-400'}`}>
+                                <div className={`p-3 rounded-xl text-sm ${inviteResult.error ? 'bg-[var(--sys-primary-dim)] text-primary' : 'bg-[var(--sys-primary-dim)] text-primary'}`}>
                                     {inviteResult.error || ` Invite sent to ${inviteResult.sentTo}! They'll receive an email with a link to join your team.`}
                                 </div>
                             )}
@@ -703,36 +703,36 @@ export default function TeamDashboard() {
             {/* EDIT ACCESS MODAL                                  */}
             {/* ══════════════════════════════════════════════════ */}
             {editingMember && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setEditingMember(null)}>
-                    <div className="glass-panel rounded-2xl p-6 w-full max-w-lg mx-4 border border-white/[0.1]" onClick={e => e.stopPropagation()}>
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--sys-surface)] " onClick={() => setEditingMember(null)}>
+                    <div className="glass-panel rounded-2xl p-6 w-full max-w-lg mx-4 border border-[var(--sys-border)]" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center justify-between mb-5">
-                            <h3 className="text-lg font-bold text-white">Edit Access — {editingMember.name}</h3>
-                            <button onClick={() => setEditingMember(null)} className="size-8 rounded-lg bg-white/[0.04] flex items-center justify-center text-slate-400 hover:text-white cursor-pointer">
+                            <h3 className="text-lg font-bold text-[var(--sys-text)]">Edit Access — {editingMember.name}</h3>
+                            <button onClick={() => setEditingMember(null)} className="size-8 rounded-lg bg-[var(--sys-surface)] flex items-center justify-center text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer">
                                 <span className="material-symbols-outlined text-sm">close</span>
                             </button>
                         </div>
 
                         <div className="space-y-4">
                             <div>
-                                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1 block">Team Role</label>
+                                <label className="text-xs font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-1 block">Team Role</label>
                                 <select value={editAccess.teamRole} onChange={e => setEditAccess(a => ({ ...a, teamRole: e.target.value }))}
-                                    className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-4 py-2.5 text-sm text-white outline-none">
+                                    className="w-full bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl px-4 py-2.5 text-sm text-[var(--sys-text)] outline-none">
                                     <option value="member">Member</option>
                                     <option value="manager">Manager</option>
                                 </select>
                             </div>
 
                             <div>
-                                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 block">Studio Access</label>
+                                <label className="text-xs font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-2 block">Studio Access</label>
                                 <div className="grid grid-cols-2 gap-2">
                                     {Object.entries(STUDIO_LABELS).map(([key, s]) => (
-                                        <label key={key} className="flex items-center gap-2 p-2 rounded-lg bg-white/[0.02] border border-white/[0.04] cursor-pointer hover:bg-white/[0.04]">
+                                        <label key={key} className="flex items-center gap-2 p-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] cursor-pointer hover:bg-[var(--sys-surface)]">
                                             <input type="checkbox"
                                                 checked={editAccess.studioAccess?.[key] !== false}
                                                 onChange={e => setEditAccess(a => ({ ...a, studioAccess: { ...a.studioAccess, [key]: e.target.checked } }))}
                                                 className="accent-primary" />
                                             <span className="material-symbols-outlined text-sm" style={{ color: s.color }}>{s.icon}</span>
-                                            <span className="text-xs text-white">{s.label}</span>
+                                            <span className="text-xs text-[var(--sys-text)]">{s.label}</span>
                                         </label>
                                     ))}
                                 </div>
@@ -740,10 +740,10 @@ export default function TeamDashboard() {
 
                             {brands.length > 0 && (
                                 <div>
-                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 block">Brand Access</label>
+                                    <label className="text-xs font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-2 block">Brand Access</label>
                                     <div className="space-y-1">
                                         {brands.map(b => (
-                                            <label key={b._id} className="flex items-center gap-2 p-2 rounded-lg bg-white/[0.02] cursor-pointer hover:bg-white/[0.04]">
+                                            <label key={b._id} className="flex items-center gap-2 p-2 rounded-lg bg-[var(--sys-surface)] cursor-pointer hover:bg-[var(--sys-surface)]">
                                                 <input type="checkbox"
                                                     checked={(editAccess.brandAccess || []).includes(b._id)}
                                                     onChange={e => setEditAccess(a => ({
@@ -751,7 +751,7 @@ export default function TeamDashboard() {
                                                         brandAccess: e.target.checked ? [...(a.brandAccess || []), b._id] : (a.brandAccess || []).filter(id => id !== b._id)
                                                     }))}
                                                     className="accent-primary" />
-                                                <span className="text-xs text-white">{b.name}</span>
+                                                <span className="text-xs text-[var(--sys-text)]">{b.name}</span>
                                             </label>
                                         ))}
                                     </div>

@@ -22,24 +22,24 @@ function DeleteBrandModal({ brand, onClose, onConfirm }) {
 
     return (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4" onClick={onClose}>
-            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-            <div className="relative w-full max-w-md rounded-2xl border border-rose-500/20 overflow-hidden animate-fade-in"
+            <div className="absolute inset-0 bg-[var(--sys-surface)] " />
+            <div className="relative w-full max-w-md rounded-2xl border border-[var(--sys-border)] overflow-hidden animate-fade-in"
                 style={{ background: 'rgba(15,15,25,0.97)' }} onClick={e => e.stopPropagation()}>
                 <div className="p-6">
                     <div className="flex items-center gap-3 mb-4">
-                        <div className="size-12 rounded-xl bg-rose-500/10 flex items-center justify-center">
-                            <span className="material-symbols-outlined text-rose-400 text-2xl">warning</span>
+                        <div className="size-12 rounded-xl bg-[var(--sys-primary-dim)] flex items-center justify-center">
+                            <span className="material-symbols-outlined text-primary text-2xl">warning</span>
                         </div>
                         <div>
-                            <h3 className="text-lg font-bold text-white">Delete Brand</h3>
-                            <p className="text-sm text-slate-400">This cannot be undone</p>
+                            <h3 className="text-lg font-bold text-[var(--sys-text)]">Delete Brand</h3>
+                            <p className="text-sm text-[var(--sys-text-muted)]">This cannot be undone</p>
                         </div>
                     </div>
-                    <div className="p-4 rounded-xl bg-rose-500/5 border border-rose-500/10 mb-4">
-                        <p className="text-sm text-slate-300 leading-relaxed">
-                            Deleting <strong className="text-rose-400">{brand.name}</strong> will permanently remove:
+                    <div className="p-4 rounded-xl bg-[var(--sys-primary-dim)] border border-[var(--sys-border)] mb-4">
+                        <p className="text-sm text-[var(--sys-text-muted)] leading-relaxed">
+                            Deleting <strong className="text-primary">{brand.name}</strong> will permanently remove:
                         </p>
-                        <ul className="mt-2 space-y-1 text-sm text-slate-400">
+                        <ul className="mt-2 space-y-1 text-sm text-[var(--sys-text-muted)]">
                             <li>• All brand DNA & knowledge</li>
                             <li>• All synced products</li>
                             <li>• All integrations for this brand</li>
@@ -48,18 +48,18 @@ function DeleteBrandModal({ brand, onClose, onConfirm }) {
                         </ul>
                     </div>
                     <div>
-                        <label className="text-sm text-slate-400 mb-1.5 block">
-                            Type <strong className="text-white">{brand.name}</strong> to confirm
+                        <label className="text-sm text-[var(--sys-text-muted)] mb-1.5 block">
+                            Type <strong className="text-[var(--sys-text)]">{brand.name}</strong> to confirm
                         </label>
                         <input type="text" value={confirmText} onChange={e => setConfirmText(e.target.value)}
                             placeholder={brand.name}
-                            className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-600 outline-none focus:border-rose-500/40" />
+                            className="w-full bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl px-4 py-2.5 text-sm text-[var(--sys-text)] placeholder-slate-600 outline-none focus:border-[var(--sys-border)]" />
                     </div>
                 </div>
-                <div className="flex justify-end gap-3 p-4 border-t border-white/[0.06]">
-                    <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm text-slate-400 hover:text-white transition-colors cursor-pointer">Cancel</button>
+                <div className="flex justify-end gap-3 p-4 border-t border-[var(--sys-border)]">
+                    <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] transition-colors cursor-pointer">Cancel</button>
                     <button onClick={handleDelete} disabled={!canDelete || deleting}
-                        className="px-6 py-2 rounded-xl text-sm font-medium bg-rose-500 text-white hover:bg-rose-600 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed">
+                        className="px-6 py-2 rounded-xl text-sm font-medium bg-[var(--sys-surface)] text-[var(--sys-text)] hover:bg-[var(--sys-surface)] transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed">
                         {deleting ? 'Deleting...' : 'Delete Permanently'}
                     </button>
                 </div>
@@ -148,7 +148,7 @@ export default function BrandManagement() {
             {/* Page Header */}
             <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6">
                 <div>
-                    <p className="text-slate-400 text-sm">
+                    <p className="text-[var(--sys-text-muted)] text-sm">
                         {allBrands.length} brand{allBrands.length !== 1 ? 's' : ''} · Manage your brand portfolio
                     </p>
                 </div>
@@ -168,8 +168,8 @@ export default function BrandManagement() {
                 ].map((s, i) => (
                     <div key={i} className="glass-panel rounded-2xl p-5 animate-fade-in" style={{ animationDelay: `${i * 60}ms` }}>
                         <span className="material-symbols-outlined text-xl mb-2 block" style={{ color: s.color }}>{s.icon}</span>
-                        <p className="text-2xl font-extrabold text-white">{s.value}</p>
-                        <p className="text-sm text-slate-500">{s.label}</p>
+                        <p className="text-2xl font-extrabold text-[var(--sys-text)]">{s.value}</p>
+                        <p className="text-sm text-[var(--sys-text-muted)]">{s.label}</p>
                     </div>
                 ))}
             </div>
@@ -177,15 +177,15 @@ export default function BrandManagement() {
             {/* Search & Filter Bar */}
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-6">
                 <div className="relative flex-1">
-                    <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-lg">search</span>
+                    <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[var(--sys-text-muted)] text-lg">search</span>
                     <input type="text" value={search} onChange={e => setSearch(e.target.value)}
                         placeholder="Search brands by name or website..."
-                        className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 outline-none focus:border-primary/40 transition-all" />
+                        className="w-full bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl pl-10 pr-4 py-2.5 text-sm text-[var(--sys-text)] placeholder-slate-500 outline-none focus:border-primary/40 transition-all" />
                 </div>
-                <div className="flex items-center gap-1 p-1 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+                <div className="flex items-center gap-1 p-1 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
                     {['all', 'active', 'archived'].map(f => (
                         <button key={f} onClick={() => setStatusFilter(f)}
-                            className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${statusFilter === f ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-slate-400 hover:text-white hover:bg-white/[0.05]'}`}>
+                            className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${statusFilter === f ? 'bg-primary text-white shadow-none' : 'text-[var(--sys-text-muted)] hover:text-white hover:bg-[var(--sys-surface)]'}`}>
                             {f}
                         </button>
                     ))}
@@ -200,8 +200,8 @@ export default function BrandManagement() {
                             <div className="size-20 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
                                 <span className="material-symbols-outlined text-4xl text-primary">add_business</span>
                             </div>
-                            <h3 className="text-xl font-bold text-white mb-2">No brands yet</h3>
-                            <p className="text-slate-400 text-sm mb-6 max-w-md mx-auto">
+                            <h3 className="text-xl font-bold text-[var(--sys-text)] mb-2">No brands yet</h3>
+                            <p className="text-[var(--sys-text-muted)] text-sm mb-6 max-w-md mx-auto">
                                 Create your first brand by scanning a website or brainstorming from scratch. Your brand DNA will power all AI content generation.
                             </p>
                             <button onClick={() => navigate('/onboarding')}
@@ -211,8 +211,8 @@ export default function BrandManagement() {
                         </>
                     ) : (
                         <>
-                            <span className="material-symbols-outlined text-4xl text-slate-600 mb-3 block">search_off</span>
-                            <p className="text-slate-400 text-sm">No brands match your search or filter.</p>
+                            <span className="material-symbols-outlined text-4xl text-[var(--sys-text-muted)] mb-3 block">search_off</span>
+                            <p className="text-[var(--sys-text-muted)] text-sm">No brands match your search or filter.</p>
                         </>
                     )}
                 </div>
@@ -237,26 +237,26 @@ export default function BrandManagement() {
                         const secondaryColor = brand.dna?.colors?.[1]?.hex || '#6366f1'
                         return (
                             <div key={brand._id}
-                                className={`glass-panel rounded-2xl overflow-hidden transition-all animate-fade-in group hover:border-white/[0.12] ${isActive ? 'ring-2 ring-primary/30' : ''} ${isArchived ? 'opacity-60' : ''} ${isLocked ? 'opacity-75 grayscale-[0.5]' : ''}`}
+                                className={`glass-panel rounded-2xl overflow-hidden transition-all animate-fade-in group hover:border-[var(--sys-border)] ${isActive ? 'ring-2 ring-primary/30' : ''} ${isArchived ? 'opacity-60' : ''} ${isLocked ? 'opacity-75 grayscale-[0.5]' : ''}`}
                                 style={{ animationDelay: `${i * 50}ms` }}>
 
                                 {/* Color strip header */}
-                                <div className="h-2 w-full" style={{ background: `linear-gradient(90deg, ${primaryColor}, ${secondaryColor})` }} />
+                                <div className="h-2 w-full" style={{ background: `var(--sys-primary)` }} />
 
                                 <div className="p-5">
                                     {/* Brand info */}
                                     <div className="flex items-start gap-4 mb-4">
-                                        <div className="size-14 rounded-xl flex items-center justify-center text-2xl font-black text-white shrink-0 shadow-lg"
-                                            style={{ background: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})` }}>
+                                        <div className="size-14 rounded-xl flex items-center justify-center text-2xl font-black text-[var(--sys-text)] shrink-0 shadow-lg"
+                                            style={{ background: `var(--sys-primary)` }}>
                                             {brand.dna?.logo?.url ? (
                                                 <img src={brand.dna.logo.url} alt="logo" className="w-full h-full object-contain rounded-xl" />
                                             ) : brand.name?.charAt(0)?.toUpperCase()}
                                         </div>
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-2 mb-0.5">
-                                                <h3 className="text-lg font-extrabold text-white truncate">{brand.name}</h3>
+                                                <h3 className="text-lg font-extrabold text-[var(--sys-text)] truncate">{brand.name}</h3>
                                                 {isLocked && (
-                                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-500 uppercase tracking-wider shrink-0 animate-pulse">Locked</span>
+                                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-[var(--sys-primary-dim)] text-primary uppercase tracking-wider shrink-0 animate-pulse">Locked</span>
                                                 )}
                                                 {isActive && !isLocked && (
                                                     <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-primary/15 text-primary uppercase tracking-wider shrink-0">Active</span>
@@ -273,22 +273,22 @@ export default function BrandManagement() {
 
                                     {/* Description */}
                                     {brand.dna?.brandDescription && (
-                                        <p className="text-xs text-slate-400 leading-relaxed line-clamp-2 mb-4">{brand.dna.brandDescription}</p>
+                                        <p className="text-xs text-[var(--sys-text-muted)] leading-relaxed line-clamp-2 mb-4">{brand.dna.brandDescription}</p>
                                     )}
 
                                     {/* Meta info */}
                                     <div className="flex items-center gap-3 mb-4 flex-wrap">
-                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isArchived ? 'bg-amber-500/10 text-amber-400' : (isLocked ? 'bg-rose-500/10 text-rose-400' : 'bg-emerald-400/10 text-emerald-400')}`}>
+                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isArchived ? 'bg-[var(--sys-primary-dim)] text-primary' : (isLocked ? 'bg-[var(--sys-primary-dim)] text-primary' : 'bg-[var(--sys-primary-dim)] text-primary')}`}>
                                             {isArchived ? 'Archived' : (isLocked ? 'Upgrade Required' : 'Active')}
                                         </span>
-                                        <span className="text-[10px] text-slate-600 flex items-center gap-1">
+                                        <span className="text-[10px] text-[var(--sys-text-muted)] flex items-center gap-1">
                                             <span className="material-symbols-outlined text-[10px]">calendar_month</span>
                                             {formatDate(brand.createdAt)}
                                         </span>
                                         {brand.dna?.colors?.length > 0 && (
                                             <div className="flex -space-x-1 ml-auto">
                                                 {brand.dna.colors.slice(0, 4).map((c, j) => (
-                                                    <div key={j} className="size-4 rounded-full border-2 border-[#0d0f1a]"
+                                                    <div key={j} className="size-4 rounded-full border border-[#0d0f1a]"
                                                         style={{ background: c.hex }} title={`${c.name}: ${c.hex}`} />
                                                 ))}
                                             </div>
@@ -297,17 +297,17 @@ export default function BrandManagement() {
 
                                     {/* Voice personality tag */}
                                     {brand.dna?.voice?.personality && (
-                                        <div className="flex items-center gap-1.5 mb-4 p-2 rounded-lg bg-white/[0.02] border border-white/[0.04]">
+                                        <div className="flex items-center gap-1.5 mb-4 p-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)]">
                                             <span className="material-symbols-outlined text-xs text-primary">record_voice_over</span>
-                                            <span className="text-[10px] text-slate-400 font-medium">{brand.dna.voice.personality}</span>
+                                            <span className="text-[10px] text-[var(--sys-text-muted)] font-medium">{brand.dna.voice.personality}</span>
                                         </div>
                                     )}
 
                                     {/* Action buttons */}
-                                    <div className="flex gap-2 pt-3 border-t border-white/[0.06]">
+                                    <div className="flex gap-2 pt-3 border-t border-[var(--sys-border)]">
                                         {isLocked ? (
                                             <button onClick={() => navigate('/credits')}
-                                                className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold text-amber-500 bg-amber-500/5 hover:bg-amber-500/10 border border-amber-500/10 transition-all cursor-pointer">
+                                                className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold text-primary bg-[var(--sys-primary-dim)] hover:bg-[var(--sys-primary-dim)] border border-[var(--sys-border)] transition-all cursor-pointer">
                                                 <span className="material-symbols-outlined text-sm">lock</span>Upgrade to Unlock
                                             </button>
                                         ) : (
@@ -319,7 +319,7 @@ export default function BrandManagement() {
                                                     </button>
                                                 )}
                                                 <button onClick={() => handleViewDNA(brand)}
-                                                    className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold text-slate-300 bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] transition-all cursor-pointer">
+                                                    className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold text-[var(--sys-text-muted)] bg-[var(--sys-surface)] hover:bg-[var(--sys-surface)] border border-[var(--sys-border)] transition-all cursor-pointer">
                                                     <span className="material-symbols-outlined text-sm">fingerprint</span>View DNA
                                                 </button>
                                             </>
@@ -328,8 +328,8 @@ export default function BrandManagement() {
                                         {isOwner && (
                                             <button onClick={() => handleToggleStatus(brand)} disabled={togglingId === brand._id}
                                                 className={`flex items-center justify-center gap-1 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer border disabled:opacity-40 ${isArchived
-                                                    ? 'text-emerald-400 bg-emerald-500/5 hover:bg-emerald-500/10 border-emerald-500/10'
-                                                    : 'text-amber-400 bg-amber-500/5 hover:bg-amber-500/10 border-amber-500/10'
+                                                    ? 'text-primary bg-[var(--sys-primary-dim)] hover:bg-[var(--sys-primary-dim)] border-[var(--sys-border)]'
+                                                    : 'text-primary bg-[var(--sys-primary-dim)] hover:bg-[var(--sys-primary-dim)] border-[var(--sys-border)]'
                                                     }`} title={isArchived ? 'Restore Brand' : 'Archive Brand'}>
                                                 <span className="material-symbols-outlined text-sm">{togglingId === brand._id ? 'progress_activity' : (isArchived ? 'unarchive' : 'archive')}</span>
                                             </button>
@@ -337,7 +337,7 @@ export default function BrandManagement() {
 
                                         {isOwner && (
                                             <button onClick={() => setDeleteTarget(brand)}
-                                                className="flex items-center justify-center px-3 py-2 rounded-xl text-xs text-rose-400/60 hover:text-rose-400 bg-white/[0.02] hover:bg-rose-500/5 border border-white/[0.04] hover:border-rose-500/10 transition-all cursor-pointer"
+                                                className="flex items-center justify-center px-3 py-2 rounded-xl text-xs text-primary/60 hover:text-primary bg-[var(--sys-surface)] hover:bg-[var(--sys-primary-dim)] border border-[var(--sys-border)] hover:border-[var(--sys-border)] transition-all cursor-pointer"
                                                 title="Delete Brand">
                                                 <span className="material-symbols-outlined text-sm">delete</span>
                                             </button>
@@ -350,14 +350,14 @@ export default function BrandManagement() {
 
                     {/* Add Brand Card */}
                     <button onClick={() => navigate('/onboarding')}
-                        className="glass-panel rounded-2xl p-8 flex flex-col items-center justify-center gap-3 border-2 border-dashed border-white/[0.08] hover:border-primary/30 hover:bg-primary/[0.02] transition-all cursor-pointer min-h-[280px] group animate-fade-in"
+                        className="glass-panel rounded-2xl p-8 flex flex-col items-center justify-center gap-3 border border-dashed border-[var(--sys-border)] hover:border-primary/30 hover:bg-primary/[0.02] transition-all cursor-pointer min-h-[280px] group animate-fade-in"
                         style={{ animationDelay: `${filteredBrands.length * 50}ms` }}>
                         <div className="size-16 rounded-2xl bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform">
                             <span className="material-symbols-outlined text-3xl text-primary">add</span>
                         </div>
                         <div className="text-center">
-                            <p className="text-sm font-bold text-white mb-0.5">Add New Brand</p>
-                            <p className="text-xs text-slate-500">Scan a website or brainstorm</p>
+                            <p className="text-sm font-bold text-[var(--sys-text)] mb-0.5">Add New Brand</p>
+                            <p className="text-xs text-[var(--sys-text-muted)]">Scan a website or brainstorm</p>
                         </div>
                     </button>
                 </div>

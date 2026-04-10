@@ -247,11 +247,11 @@ export default function Integrations() {
             <SEOHead title="Integrations — Mantram AI" noIndex={true} />
             {/* Brand Indicator */}
             {activeBrand && (
-                <div className="flex items-center gap-2 mb-5 px-4 py-2.5 rounded-xl bg-gradient-to-r from-primary/5 to-transparent border border-primary/10">
+                <div className="flex items-center gap-2 mb-5 px-4 py-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] border border-primary/10">
                     <span className="material-symbols-outlined text-primary text-base">storefront</span>
-                    <span className="text-sm text-slate-400">Showing integrations for</span>
-                    <span className="text-sm font-bold text-white">{activeBrand.name}</span>
-                    <span className="text-xs text-slate-600 ml-auto">Switch brands in the header to manage other brands</span>
+                    <span className="text-sm text-[var(--sys-text-muted)]">Showing integrations for</span>
+                    <span className="text-sm font-bold text-[var(--sys-text)]">{activeBrand.name}</span>
+                    <span className="text-xs text-[var(--sys-text-muted)] ml-auto">Switch brands in the header to manage other brands</span>
                 </div>
             )}
 
@@ -260,11 +260,11 @@ export default function Integrations() {
                 <div></div>
                 <div className="flex gap-2">
                     <button onClick={() => setActiveTab('platforms')}
-                        className={`px-4 py-2 rounded-xl text-sm font-medium transition-all cursor-pointer ${activeTab === 'platforms' ? 'bg-primary text-black' : 'bg-white/[0.05] text-slate-300 hover:bg-white/[0.1]'}`}>
+                        className={`px-4 py-2 rounded-xl text-sm font-medium transition-all cursor-pointer ${activeTab === 'platforms' ? 'bg-primary text-black' : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] hover:bg-[var(--sys-surface)]'}`}>
                         <span className="material-symbols-outlined text-sm mr-1">hub</span> Platforms
                     </button>
                     <button onClick={() => setActiveTab('products')}
-                        className={`px-4 py-2 rounded-xl text-sm font-medium transition-all cursor-pointer ${activeTab === 'products' ? 'bg-primary text-black' : 'bg-white/[0.05] text-slate-300 hover:bg-white/[0.1]'}`}>
+                        className={`px-4 py-2 rounded-xl text-sm font-medium transition-all cursor-pointer ${activeTab === 'products' ? 'bg-primary text-black' : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] hover:bg-[var(--sys-surface)]'}`}>
                         <span className="material-symbols-outlined text-sm mr-1">inventory_2</span> Products
                     </button>
                 </div>
@@ -278,7 +278,7 @@ export default function Integrations() {
                         <section>
                             <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
                                 <span className="text-2xl"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">bar_chart</span></span> Analytics & Search Console
-                                <span className="text-xs text-slate-600 font-normal ml-2">Used by SEO Studio</span>
+                                <span className="text-xs text-[var(--sys-text-muted)] font-normal ml-2">Used by SEO Studio</span>
                             </h2>
                             <div className="glass-panel rounded-2xl p-6">
                                 <div className="flex items-center justify-between mb-4">
@@ -287,20 +287,20 @@ export default function Integrations() {
                                             <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M20 4h-4v16h4V4z" fill="#F9AB00" /><path d="M12 10h-4v10h4V10z" fill="#E37400" /><path d="M4 16h-0a2 2 0 100 4h0a2 2 0 100-4z" fill="#E37400" /></svg>
                                         </div>
                                         <div>
-                                            <h3 className="font-bold text-white">Google Analytics</h3>
-                                            <p className="text-sm text-slate-400">Website traffic, SERP & keyword rankings</p>
+                                            <h3 className="font-bold text-[var(--sys-text)]">Google Analytics</h3>
+                                            <p className="text-sm text-[var(--sys-text-muted)]">Website traffic, SERP & keyword rankings</p>
                                         </div>
                                     </div>
                                     <StatusBadge status={gaConnected ? 'connected' : 'disconnected'} />
                                 </div>
 
                                 {gaConnected ? (
-                                    <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] border border-white/[0.05]">
+                                    <div className="flex items-center justify-between p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
                                         <div className="flex items-center gap-3">
-                                            <span className="material-symbols-outlined text-emerald-400 text-lg">check_circle</span>
+                                            <span className="material-symbols-outlined text-primary text-lg">check_circle</span>
                                             <div>
-                                                <p className="text-sm text-white font-medium">{gaEmail}</p>
-                                                <p className="text-xs text-slate-500">Connected for {activeBrand?.name}</p>
+                                                <p className="text-sm text-[var(--sys-text)] font-medium">{gaEmail}</p>
+                                                <p className="text-xs text-[var(--sys-text-muted)]">Connected for {activeBrand?.name}</p>
                                             </div>
                                         </div>
                                         <div className="flex gap-2">
@@ -309,7 +309,7 @@ export default function Integrations() {
                                                 <span className="material-symbols-outlined text-xs">analytics</span> View in SEO Studio
                                             </button>
                                             <button onClick={disconnectGA}
-                                                className="px-3 py-1.5 rounded-lg text-xs font-medium text-red-400 hover:bg-red-500/10 transition-all cursor-pointer">
+                                                className="px-3 py-1.5 rounded-lg text-xs font-medium text-primary hover:bg-[var(--sys-primary-dim)] transition-all cursor-pointer">
                                                 Disconnect
                                             </button>
                                         </div>
@@ -327,14 +327,14 @@ export default function Integrations() {
                         <section>
                             <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
                                 <span className="material-symbols-outlined text-2xl">📢</span> Ad Platforms
-                                <span className="text-xs text-slate-600 font-normal ml-2">Used by Performance Studio</span>
+                                <span className="text-xs text-[var(--sys-text-muted)] font-normal ml-2">Used by Performance Studio</span>
                             </h2>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {AD_PLATFORMS.map(p => {
                                     const conn = adConnections[p.key] || {}
                                     const isConnected = conn.status === 'connected'
                                     return (
-                                        <div key={p.key} className="glass-panel rounded-2xl p-5 hover:border-white/[0.15] transition-all">
+                                        <div key={p.key} className="glass-panel rounded-2xl p-5 hover:border-[var(--sys-border)] transition-all">
                                             <div className="flex items-center justify-between mb-3">
                                                 <div className="flex items-center gap-3">
                                                     <div className="w-12 h-12 rounded-xl flex items-center justify-center text-xl"
@@ -342,8 +342,8 @@ export default function Integrations() {
                                                         <span className="material-symbols-outlined" style={{ color: p.color }}>{p.icon}</span>
                                                     </div>
                                                     <div>
-                                                        <h3 className="font-bold text-white text-sm">{p.name}</h3>
-                                                        <p className="text-sm text-slate-500">{p.desc}</p>
+                                                        <h3 className="font-bold text-[var(--sys-text)] text-sm">{p.name}</h3>
+                                                        <p className="text-sm text-[var(--sys-text-muted)]">{p.desc}</p>
                                                     </div>
                                                 </div>
                                                 <StatusBadge status={isConnected ? 'connected' : 'disconnected'} />
@@ -351,15 +351,15 @@ export default function Integrations() {
 
                                             {isConnected ? (
                                                 <div className="space-y-2">
-                                                    <div className="flex items-center gap-2 p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.05]">
-                                                        <span className="material-symbols-outlined text-emerald-400 text-sm">check_circle</span>
-                                                        <span className="text-sm text-white font-medium">{conn.email || conn.displayName || 'Connected'}</span>
+                                                    <div className="flex items-center gap-2 p-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                                                        <span className="material-symbols-outlined text-primary text-sm">check_circle</span>
+                                                        <span className="text-sm text-[var(--sys-text)] font-medium">{conn.email || conn.displayName || 'Connected'}</span>
                                                     </div>
                                                     {conn.customerIds?.length > 0 && (
                                                         <div className="px-2.5 py-1.5">
-                                                            <p className="text-xs text-slate-500 mb-1">Customer IDs:</p>
+                                                            <p className="text-xs text-[var(--sys-text-muted)] mb-1">Customer IDs:</p>
                                                             {conn.customerIds.slice(0, 3).map(id => (
-                                                                <p key={id} className="text-xs text-slate-400">{id}</p>
+                                                                <p key={id} className="text-xs text-[var(--sys-text-muted)]">{id}</p>
                                                             ))}
                                                         </div>
                                                     )}
@@ -369,7 +369,7 @@ export default function Integrations() {
                                                             <span className="material-symbols-outlined text-xs">analytics</span> View in PM Studio
                                                         </button>
                                                         <button onClick={() => disconnectAdPlatform(p.key)}
-                                                            className="py-2 px-3 rounded-lg text-xs font-medium text-red-400 hover:bg-red-500/10 transition-all cursor-pointer">
+                                                            className="py-2 px-3 rounded-lg text-xs font-medium text-primary hover:bg-[var(--sys-primary-dim)] transition-all cursor-pointer">
                                                             Disconnect
                                                         </button>
                                                     </div>
@@ -397,15 +397,15 @@ export default function Integrations() {
                         <section>
                             <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
                                 <span className="text-2xl"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">shopping_bag</span></span> E-Commerce
-                                <span className="text-xs text-slate-600 font-normal ml-2">Used by D2C Studio</span>
+                                <span className="text-xs text-[var(--sys-text-muted)] font-normal ml-2">Used by D2C Studio</span>
                             </h2>
                             <div className="glass-panel rounded-2xl p-6">
                                 <div className="flex items-center justify-between mb-4">
                                     <div className="flex items-center gap-4">
                                         <div className="w-14 h-14 rounded-xl bg-[#96BF48]/10 flex items-center justify-center text-2xl font-bold text-[#96BF48]">S</div>
                                         <div>
-                                            <h3 className="font-bold text-white">Shopify</h3>
-                                            <p className="text-sm text-slate-400">Sync products & inventory</p>
+                                            <h3 className="font-bold text-[var(--sys-text)]">Shopify</h3>
+                                            <p className="text-sm text-[var(--sys-text-muted)]">Sync products & inventory</p>
                                         </div>
                                     </div>
                                     <StatusBadge status={shopifyStatus.status || 'disconnected'} />
@@ -414,9 +414,9 @@ export default function Integrations() {
                                 {shopifyStatus.connected ? (
                                     <div className="space-y-3">
                                         <div className="flex items-center gap-4 text-sm">
-                                            <span className="text-slate-400">Store: <span className="text-white">{shopifyStatus.displayName}</span></span>
+                                            <span className="text-[var(--sys-text-muted)]">Store: <span className="text-[var(--sys-text)]">{shopifyStatus.displayName}</span></span>
                                             {shopifyStatus.lastSyncAt && (
-                                                <span className="text-slate-500">Last sync: {new Date(shopifyStatus.lastSyncAt).toLocaleDateString()}</span>
+                                                <span className="text-[var(--sys-text-muted)]">Last sync: {new Date(shopifyStatus.lastSyncAt).toLocaleDateString()}</span>
                                             )}
                                         </div>
                                         <div className="flex gap-2">
@@ -425,7 +425,7 @@ export default function Integrations() {
                                                 {syncing ? '⏳ Syncing...' : '🔄 Sync Products'}
                                             </button>
                                             <button onClick={() => setActiveTab('products')}
-                                                className="px-4 py-2 rounded-xl text-sm bg-white/[0.05] hover:bg-white/[0.1] text-slate-300">
+                                                className="px-4 py-2 rounded-xl text-sm bg-[var(--sys-surface)] hover:bg-[var(--sys-surface)] text-[var(--sys-text-muted)]">
                                                 📦 View Products
                                             </button>
                                             <button onClick={async () => {
@@ -440,7 +440,7 @@ export default function Integrations() {
                                                     setLoading(l => ({ ...l, shopify: false }));
                                                 }
                                             }}
-                                                className="px-4 py-2 rounded-xl text-sm text-red-400 hover:bg-red-500/10">
+                                                className="px-4 py-2 rounded-xl text-sm text-primary hover:bg-[var(--sys-primary-dim)]">
                                                 Disconnect
                                             </button>
                                         </div>
@@ -450,24 +450,24 @@ export default function Integrations() {
                                         {!isEmbedded && (
                                             <div className="flex gap-2 mb-2">
                                                 <button onClick={() => setShopifyMode('token')}
-                                                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${shopifyMode === 'token' ? 'bg-[#96BF48]/20 text-[#96BF48] border border-[#96BF48]/30' : 'bg-white/[0.04] text-slate-400 border border-white/[0.06]'}`}>
+                                                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${shopifyMode === 'token' ? 'bg-[#96BF48]/20 text-[#96BF48] border border-[#96BF48]/30' : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] border border-[var(--sys-border)]'}`}>
                                                     🔑 Access Token
                                                 </button>
                                                 <button onClick={() => setShopifyMode('oauth')}
-                                                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${shopifyMode === 'oauth' ? 'bg-[#96BF48]/20 text-[#96BF48] border border-[#96BF48]/30' : 'bg-white/[0.04] text-slate-400 border border-white/[0.06]'}`}>
+                                                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${shopifyMode === 'oauth' ? 'bg-[#96BF48]/20 text-[#96BF48] border border-[#96BF48]/30' : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] border border-[var(--sys-border)]'}`}>
                                                     🔗 OAuth
                                                 </button>
                                             </div>
                                         )}
                                         <input type="text" value={shopifyDomain} onChange={e => setShopifyDomain(e.target.value)}
                                             placeholder="my-store.myshopify.com"
-                                            className="w-full px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.1] text-white text-sm placeholder:text-slate-500 focus:border-primary focus:outline-none" />
+                                            className="w-full px-4 py-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm placeholder:text-[var(--sys-text-muted)] focus:border-primary focus:outline-none" />
 
                                         {shopifyMode === 'oauth' && (
-                                            <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 flex gap-3">
-                                                <span className="material-symbols-outlined text-amber-500 text-xl">warning</span>
-                                                <div className="text-xs text-amber-200/80 leading-relaxed">
-                                                    <p className="font-bold text-amber-400 mb-1">Shopify Review Pending</p>
+                                            <div className="p-3.5 rounded-xl bg-[var(--sys-primary-dim)] border border-[var(--sys-border)] flex gap-3">
+                                                <span className="material-symbols-outlined text-primary text-xl">warning</span>
+                                                <div className="text-xs border-[var(--sys-border)] leading-relaxed">
+                                                    <p className="font-bold text-primary mb-1">Shopify Review Pending</p>
                                                     Shopify blocks standard OAuth for new apps on production stores until review is complete.
                                                     Please use <strong>Access Token (Custom App)</strong> mode instead to connect immediately.
                                                 </div>
@@ -478,7 +478,7 @@ export default function Integrations() {
                                             <>
                                                 <div className="p-4 rounded-xl bg-primary/5 border border-primary/10 space-y-3">
                                                     <h4 className="text-xs font-bold text-primary uppercase tracking-wider">How to connect using Access Token</h4>
-                                                    <ol className="text-[11px] text-slate-400 space-y-2 list-decimal ml-4">
+                                                    <ol className="text-[11px] text-[var(--sys-text-muted)] space-y-2 list-decimal ml-4">
                                                         <li>Go to <strong>Shopify Admin</strong> → Settings → Apps and sales channels</li>
                                                         <li>Click <strong>Develop apps</strong> → <strong>Create an app</strong></li>
                                                         <li><strong>Configure Admin API scopes</strong>: Select <code>read_products</code>, <code>read_orders</code>, and <code>read_customers</code></li>
@@ -487,7 +487,7 @@ export default function Integrations() {
                                                 </div>
                                                 <input type="password" value={shopifyToken} onChange={e => setShopifyToken(e.target.value)}
                                                     placeholder="Admin API Access Token (shpat_...)"
-                                                    className="w-full px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.1] text-white text-sm placeholder:text-slate-500 focus:border-primary focus:outline-none" />
+                                                    className="w-full px-4 py-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm placeholder:text-[var(--sys-text-muted)] focus:border-primary focus:outline-none" />
                                             </>
                                         )}
                                         <button onClick={connectShopify} disabled={loading.shopify}
@@ -503,13 +503,13 @@ export default function Integrations() {
                         <section>
                             <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
                                 <span className="text-2xl"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">smartphone</span></span> Social Media
-                                <span className="text-xs text-slate-600 font-normal ml-2">Used by Content & Publish Studios</span>
+                                <span className="text-xs text-[var(--sys-text-muted)] font-normal ml-2">Used by Content & Publish Studios</span>
                             </h2>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {SOCIAL_PLATFORMS.map(platform => {
                                     const status = platformStatus[platform.id] || {}
                                     return (
-                                        <div key={platform.id} className="glass-panel rounded-2xl p-5 hover:border-white/[0.15] transition-all">
+                                        <div key={platform.id} className="glass-panel rounded-2xl p-5 hover:border-[var(--sys-border)] transition-all">
                                             <div className="flex items-center justify-between mb-3">
                                                 <div className="flex items-center gap-3">
                                                     <div className="w-12 h-12 rounded-xl flex items-center justify-center text-xl"
@@ -517,8 +517,8 @@ export default function Integrations() {
                                                         {platform.icon}
                                                     </div>
                                                     <div>
-                                                        <h3 className="font-bold text-white text-sm">{platform.name}</h3>
-                                                        <p className="text-sm text-slate-500">{platform.desc}</p>
+                                                        <h3 className="font-bold text-[var(--sys-text)] text-sm">{platform.name}</h3>
+                                                        <p className="text-sm text-[var(--sys-text-muted)]">{platform.desc}</p>
                                                     </div>
                                                 </div>
                                                 <StatusBadge status={status.status || 'disconnected'} />
@@ -527,17 +527,17 @@ export default function Integrations() {
                                             {status.connected && status.accounts ? (
                                                 <div className="space-y-2">
                                                     {status.accounts.map(acc => (
-                                                        <div key={acc._id} className="flex items-center justify-between p-2 rounded-xl bg-white/[0.02] border border-white/[0.05]">
+                                                        <div key={acc._id} className="flex items-center justify-between p-2 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
                                                             <div className="flex items-center gap-3 overflow-hidden">
                                                                 {acc.avatar ? (
                                                                     <img src={acc.avatar} alt="avatar" className="w-8 h-8 rounded-full flex-shrink-0" />
                                                                 ) : (
-                                                                    <div className="w-8 h-8 rounded-full bg-white/[0.1] flex items-center justify-center flex-shrink-0">
-                                                                        <span className="material-symbols-outlined text-sm text-slate-400">person</span>
+                                                                    <div className="w-8 h-8 rounded-full bg-[var(--sys-surface)] flex items-center justify-center flex-shrink-0">
+                                                                        <span className="material-symbols-outlined text-sm text-[var(--sys-text-muted)]">person</span>
                                                                     </div>
                                                                 )}
                                                                 <div className="text-sm truncate pr-2">
-                                                                    <span className="text-white font-medium truncate block">{acc.accountName}</span>
+                                                                    <span className="text-[var(--sys-text)] font-medium truncate block">{acc.accountName}</span>
                                                                 </div>
                                                             </div>
                                                             <div className="flex gap-2">
@@ -548,14 +548,14 @@ export default function Integrations() {
                                                                     </button>
                                                                 )}
                                                                 <button onClick={() => disconnectPlatform(acc._id)}
-                                                                    className="text-xs font-medium text-red-400 hover:text-red-300 px-2 py-1 rounded-lg hover:bg-red-500/10 transition-colors flex-shrink-0">
+                                                                    className="text-xs font-medium text-primary hover:text-[var(--sys-primary)] px-2 py-1 rounded-lg hover:bg-[var(--sys-primary-dim)] transition-colors flex-shrink-0">
                                                                     Disconnect
                                                                 </button>
                                                             </div>
                                                         </div>
                                                     ))}
                                                     <button onClick={() => connectPlatform(platform.id)}
-                                                        className="w-full mt-2 py-2 rounded-xl text-xs font-medium text-slate-300 bg-white/[0.05] hover:bg-white/[0.1] transition-all">
+                                                        className="w-full mt-2 py-2 rounded-xl text-xs font-medium text-[var(--sys-text-muted)] bg-[var(--sys-surface)] hover:bg-[var(--sys-surface)] transition-all">
                                                         + Connect another
                                                     </button>
                                                 </div>
@@ -581,8 +581,8 @@ export default function Integrations() {
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                                 {['WooCommerce', 'Amazon', 'Pinterest', 'YouTube'].map(name => (
                                     <div key={name} className="glass-panel rounded-xl p-4 opacity-50 text-center">
-                                        <p className="text-sm font-medium text-slate-400">{name}</p>
-                                        <p className="text-xs text-slate-600 mt-1">Coming soon</p>
+                                        <p className="text-sm font-medium text-[var(--sys-text-muted)]">{name}</p>
+                                        <p className="text-xs text-[var(--sys-text-muted)] mt-1">Coming soon</p>
                                     </div>
                                 ))}
                             </div>
@@ -593,10 +593,10 @@ export default function Integrations() {
                     <div className="space-y-6">
                         <div className="flex items-center gap-4">
                             <div className="flex-1 relative">
-                                <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 text-lg">search</span>
+                                <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-[var(--sys-text-muted)] text-lg">search</span>
                                 <input type="text" value={productSearch} onChange={e => setProductSearch(e.target.value)}
                                     placeholder="Search products..."
-                                    className="w-full pl-11 pr-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.1] text-white text-sm placeholder:text-slate-500 focus:border-primary focus:outline-none" />
+                                    className="w-full pl-11 pr-4 py-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm placeholder:text-[var(--sys-text-muted)] focus:border-primary focus:outline-none" />
                             </div>
                             {shopifyStatus.connected && (
                                 <button onClick={syncProducts} disabled={syncing}
@@ -609,8 +609,8 @@ export default function Integrations() {
                         {products.length === 0 ? (
                             <div className="text-center py-16">
                                 <span className="material-symbols-outlined text-6xl text-slate-700">inventory_2</span>
-                                <p className="text-slate-400 mt-4 text-lg">No products yet</p>
-                                <p className="text-sm text-slate-600 mt-1">Connect Shopify to sync your product catalog</p>
+                                <p className="text-[var(--sys-text-muted)] mt-4 text-lg">No products yet</p>
+                                <p className="text-sm text-[var(--sys-text-muted)] mt-1">Connect Shopify to sync your product catalog</p>
                                 <button onClick={() => setActiveTab('platforms')}
                                     className="btn-primary px-6 py-3 rounded-xl text-sm mt-6">
                                     Connect Shopify
@@ -619,16 +619,16 @@ export default function Integrations() {
                         ) : (
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                 {products.map(product => (
-                                    <div key={product._id} className="glass-panel rounded-2xl overflow-hidden hover:border-white/[0.15] transition-all group">
+                                    <div key={product._id} className="glass-panel rounded-2xl overflow-hidden hover:border-[var(--sys-border)] transition-all group">
                                         {product.images?.[0] && (
-                                            <div className="h-40 overflow-hidden bg-white/[0.02]">
+                                            <div className="h-40 overflow-hidden bg-[var(--sys-surface)]">
                                                 <img src={product.images[0].url} alt={product.title}
                                                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                                             </div>
                                         )}
                                         <div className="p-4">
-                                            <h3 className="font-bold text-white text-sm truncate">{product.title}</h3>
-                                            <p className="text-sm text-slate-500 mt-0.5">{product.productType || product.vendor}</p>
+                                            <h3 className="font-bold text-[var(--sys-text)] text-sm truncate">{product.title}</h3>
+                                            <p className="text-sm text-[var(--sys-text-muted)] mt-0.5">{product.productType || product.vendor}</p>
                                             <div className="flex items-center justify-between mt-3">
                                                 <span className="text-primary font-bold text-sm">
                                                     ₹{product.variants?.[0]?.price || '—'}
@@ -636,7 +636,7 @@ export default function Integrations() {
                                                 {product.tags?.length > 0 && (
                                                     <div className="flex gap-1">
                                                         {product.tags.slice(0, 2).map((tag, i) => (
-                                                            <span key={i} className="text-xs px-2 py-0.5 rounded-full bg-white/[0.05] text-slate-400">{tag}</span>
+                                                            <span key={i} className="text-xs px-2 py-0.5 rounded-full bg-[var(--sys-surface)] text-[var(--sys-text-muted)]">{tag}</span>
                                                         ))}
                                                     </div>
                                                 )}
@@ -653,23 +653,23 @@ export default function Integrations() {
             {/* Manage Posts Modal */}
             {selectedAccount && (
                 <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-                    <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setSelectedAccount(null)} />
-                    <div className="relative bg-[#0c0f1a] border border-white/10 rounded-3xl w-full max-w-4xl flex flex-col max-h-[85vh] shadow-[0_20px_50px_rgba(0,0,0,0.5)] animate-fade-in">
-                        <div className="flex items-center justify-between p-6 border-b border-white/10">
+                    <div className="absolute inset-0 bg-[var(--sys-surface)] " onClick={() => setSelectedAccount(null)} />
+                    <div className="relative bg-[#0c0f1a] border border-[var(--sys-border)] rounded-3xl w-full max-w-4xl flex flex-col max-h-[85vh] shadow-[0_20px_50px_rgba(0,0,0,0.5)] animate-fade-in">
+                        <div className="flex items-center justify-between p-6 border-b border-[var(--sys-border)]">
                             <div className="flex items-center gap-4">
                                 {selectedAccount.avatar ? (
                                     <img src={selectedAccount.avatar} className="w-10 h-10 rounded-full" alt="" />
                                 ) : (
-                                    <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center font-bold text-primary">
+                                    <div className="w-10 h-10 rounded-full bg-[var(--sys-surface)] flex items-center justify-center font-bold text-primary">
                                         {selectedAccount.accountName[0]}
                                     </div>
                                 )}
                                 <div>
-                                    <h3 className="text-xl font-bold text-white">Manage {selectedAccount.accountName}</h3>
-                                    <p className="text-xs text-slate-500 uppercase tracking-widest">{selectedAccount.platform} Integration</p>
+                                    <h3 className="text-xl font-bold text-[var(--sys-text)]">Manage {selectedAccount.accountName}</h3>
+                                    <p className="text-xs text-[var(--sys-text-muted)] uppercase tracking-widest">{selectedAccount.platform} Integration</p>
                                 </div>
                             </div>
-                            <button onClick={() => setSelectedAccount(null)} className="text-slate-500 hover:text-white transition-colors">
+                            <button onClick={() => setSelectedAccount(null)} className="text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] transition-colors">
                                 <span className="material-symbols-outlined">close</span>
                             </button>
                         </div>
@@ -678,28 +678,28 @@ export default function Integrations() {
                             {loadingPosts ? (
                                 <div className="py-20 text-center">
                                     <span className="material-symbols-outlined animate-spin text-primary text-4xl">progress_activity</span>
-                                    <p className="text-slate-500 mt-4 font-medium">Fetching recent posts...</p>
+                                    <p className="text-[var(--sys-text-muted)] mt-4 font-medium">Fetching recent posts...</p>
                                 </div>
                             ) : posts.length === 0 ? (
-                                <div className="py-20 text-center bg-white/[0.02] rounded-2xl border border-dashed border-white/10">
-                                    <span className="material-symbols-outlined text-5xl text-slate-700 mb-4 text-slate-600">post_add</span>
-                                    <p className="text-slate-400 font-medium">No recent posts found on this account.</p>
+                                <div className="py-20 text-center bg-[var(--sys-surface)] rounded-2xl border border-dashed border-[var(--sys-border)]">
+                                    <span className="material-symbols-outlined text-5xl text-slate-700 mb-4 text-[var(--sys-text-muted)]">post_add</span>
+                                    <p className="text-[var(--sys-text-muted)] font-medium">No recent posts found on this account.</p>
                                 </div>
                             ) : (
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     {posts.map(post => (
-                                        <div key={post.id} className="glass-panel p-4 rounded-2xl border border-white/5 hover:border-primary/30 transition-all group flex gap-4">
+                                        <div key={post.id} className="glass-panel p-4 rounded-2xl border border-[var(--sys-border)] hover:border-primary/30 transition-all group flex gap-4">
                                             {post.imageUrl && (
-                                                <div className="w-20 h-20 rounded-xl overflow-hidden flex-shrink-0 bg-black/40 border border-white/10">
+                                                <div className="w-20 h-20 rounded-xl overflow-hidden flex-shrink-0 bg-[var(--sys-surface)] border border-[var(--sys-border)]">
                                                     <img src={post.imageUrl} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" alt="" />
                                                 </div>
                                             )}
                                             <div className="min-w-0 flex-1 flex flex-col justify-between">
                                                 <div>
-                                                    <p className="text-sm text-slate-300 line-clamp-2 leading-relaxed">
-                                                        {post.content || <span className="italic text-slate-500">No caption</span>}
+                                                    <p className="text-sm text-[var(--sys-text-muted)] line-clamp-2 leading-relaxed">
+                                                        {post.content || <span className="italic text-[var(--sys-text-muted)]">No caption</span>}
                                                     </p>
-                                                    <span className="text-[10px] text-slate-500 mt-2 block">
+                                                    <span className="text-[10px] text-[var(--sys-text-muted)] mt-2 block">
                                                         {new Date(post.createdAt).toLocaleDateString()} at {new Date(post.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                                     </span>
                                                 </div>
@@ -725,10 +725,10 @@ export default function Integrations() {
 // ── Status Badge Component ──
 function StatusBadge({ status }) {
     const config = {
-        connected: { bg: 'bg-emerald-500/10', text: 'text-emerald-400', dot: 'bg-emerald-400', label: 'Connected' },
+        connected: { bg: 'bg-[var(--sys-primary-dim)]', text: 'text-primary', dot: 'bg-[var(--sys-surface)]', label: 'Connected' },
         pending: { bg: 'bg-yellow-500/10', text: 'text-yellow-400', dot: 'bg-yellow-400', label: 'Pending' },
-        expired: { bg: 'bg-red-500/10', text: 'text-red-400', dot: 'bg-red-400', label: 'Expired' },
-        disconnected: { bg: 'bg-slate-500/10', text: 'text-slate-400', dot: 'bg-slate-500', label: 'Not Connected' },
+        expired: { bg: 'bg-[var(--sys-primary-dim)]', text: 'text-primary', dot: 'bg-[var(--sys-surface)]', label: 'Expired' },
+        disconnected: { bg: 'bg-[var(--sys-border)]/10', text: 'text-[var(--sys-text-muted)]', dot: 'bg-[var(--sys-border)]', label: 'Not Connected' },
     }
     const c = config[status] || config.disconnected
     return (
