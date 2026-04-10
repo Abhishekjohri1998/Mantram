@@ -212,12 +212,22 @@ export async function executeToolCall(toolCall, fc, ctx = {}, deps = {}) {
                     enhancedPrompt += `. Brand color accents: ${brandColors.join(' and ')} as ambient glow, lighting tones, or background elements. Professional 4K quality.`
                 }
 
-                const refUrls = (ctx.referenceImages || []).slice(0, 3).map(r => r.url).filter(Boolean)
+                const baseRefUrls = (ctx.referenceImages || []).slice(0, 3).map(r => r.url).filter(Boolean)
+                const activeImages = fc.getActiveObjects?.()?.filter(o => o.type === 'image') || []
+                const selectedImageSources = activeImages.map(obj => {
+                    const src = obj._element?.src || obj.getSrc?.() || ''
+                    if (src && (src.startsWith('http://') || src.startsWith('https://'))) return src
+                    if (src && src.startsWith('data:')) return src
+                    try { return obj.toDataURL({ format: 'png', quality: 0.9 }) } catch { return '' }
+                }).filter(Boolean)
+                
+                const finalRefUrls = [...baseRefUrls, ...selectedImageSources].slice(0, 4)
+
                 const data = await canvasAssets.aiGenerate({
                     prompt: enhancedPrompt,
                     size: args.size || '1024x1024',
                     brandId: brand?._id || undefined,
-                    referenceImages: refUrls.length > 0 ? refUrls : undefined,
+                    referenceImages: finalRefUrls.length > 0 ? finalRefUrls : undefined,
                 })
                 if (data.imageUrl) {
                     let newImg = null
