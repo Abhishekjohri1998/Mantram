@@ -10,6 +10,7 @@
     "dependencies": {
         "@aws-sdk/client-s3": "^3.1004.0",
         "@aws-sdk/lib-storage": "^3.1004.0",
+        "@aws-sdk/s3-request-presigner": "^3.1028.0",
         "@ffmpeg-installer/ffmpeg": "^1.1.0",
         "@google/genai": "^1.48.0",
         "@modelcontextprotocol/sdk": "^1.29.0",

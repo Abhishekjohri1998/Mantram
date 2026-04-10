@@ -4,7 +4,7 @@ import { protect } from '../middleware/auth.js'
 import { requireCredits } from '../middleware/credits.js'
 import { URL } from 'url'
 import { safeErrorMessage } from '../utils/safeError.js';
-import { uploadToS3 } from '../utils/s3.js';
+import { uploadToS3, getSignedUrlIfNeeded } from '../utils/s3.js';
 import { callMultimodalAgent, loadBrandContext } from '../agents/shared/agentUtils.js';
 import Brand from '../models/Brand.js';
 import Product from '../models/Product.js';
@@ -367,7 +367,13 @@ Make it look like it was produced by a world-class creative studio.`
         const s3Key = `canvas/${req.user._id}/${Date.now()}.png`;
         let s3Url = null; try { s3Url = await uploadToS3(imageUrl, s3Key, 'image/png'); } catch (e) { console.error('S3 Upload Error:', e.message); }
         
-        res.json({ imageUrl: s3Url || imageUrl, model: 'NanoBanana 2', source: s3Url ? 's3' : 'base64', refsUsed: refCount, mcotGrounding: mcotGrounding || undefined })
+        res.json({ 
+            imageUrl: await getSignedUrlIfNeeded(s3Url || imageUrl), 
+            model: 'NanoBanana 2', 
+            source: s3Url ? 's3' : 'base64', 
+            refsUsed: refCount, 
+            mcotGrounding: mcotGrounding || undefined 
+        })
     } catch (err) {
         console.error('AI generate error:', err.message)
         res.status(500).json({ error: safeErrorMessage(err) })
@@ -479,7 +485,12 @@ Output the modified image.`
         const s3Key = `canvas/${req.user._id}/${Date.now()}_edit.png`;
         let s3Url = null; try { s3Url = await uploadToS3(imageUrl, s3Key, 'image/png'); } catch (e) { console.error('S3 Upload Error:', e.message); }
         
-        res.json({ imageUrl: s3Url || imageUrl, model: 'NanoBanana 2', source: s3Url ? 's3' : 'base64', imagesProcessed: imgCount })
+        res.json({ 
+            imageUrl: await getSignedUrlIfNeeded(s3Url || imageUrl), 
+            model: 'NanoBanana 2', 
+            source: s3Url ? 's3' : 'base64', 
+            imagesProcessed: imgCount 
+        })
     } catch (err) {
         console.error('AI edit error:', err.message)
         res.status(500).json({ error: safeErrorMessage(err) })
@@ -538,7 +549,11 @@ router.post('/ai-edit-visual', protect, requireCredits('canvasGenerate'), async 
         const s3Key = `canvas/${req.user._id}/${Date.now()}_visual.png`;
         let s3Url = null; try { s3Url = await uploadToS3(imageUrl, s3Key, 'image/png'); } catch (e) { console.error('S3 Upload Error:', e.message); }
         
-        res.json({ imageUrl: s3Url || imageUrl, model: 'Gemini Flash', source: s3Url ? 's3' : 'base64' })
+        res.json({ 
+            imageUrl: await getSignedUrlIfNeeded(s3Url || imageUrl), 
+            model: 'Gemini Flash', 
+            source: s3Url ? 's3' : 'base64' 
+        })
     } catch (err) {
         console.error('AI visual edit error:', err.message)
         res.status(500).json({ error: safeErrorMessage(err) })
@@ -601,7 +616,11 @@ router.post('/ai-retouch', protect, requireCredits('canvasGenerate'), async (req
         const s3Key = `canvas/${req.user._id}/${Date.now()}_retouch.png`;
         let s3Url = null; try { s3Url = await uploadToS3(imageUrl, s3Key, 'image/png'); } catch (e) { console.error('S3 Upload Error:', e.message); }
         
-        res.json({ imageUrl: s3Url || imageUrl, model: 'Gemini Flash', source: s3Url ? 's3' : 'base64' })
+        res.json({ 
+            imageUrl: await getSignedUrlIfNeeded(s3Url || imageUrl), 
+            model: 'Gemini Flash', 
+            source: s3Url ? 's3' : 'base64' 
+        })
     } catch (err) {
         console.error('AI retouch error:', err.message)
         res.status(500).json({ error: safeErrorMessage(err) })
@@ -660,7 +679,12 @@ router.post('/ai-background', protect, requireCredits('canvasBgRemove'), async (
         const s3Key = `canvas/${req.user._id}/${Date.now()}_background.png`;
         let s3Url = null; try { s3Url = await uploadToS3(imageUrl, s3Key, 'image/png'); } catch (e) { console.error('S3 Upload Error:', e.message); }
         
-        res.json({ imageUrl: s3Url || imageUrl, action, model: 'Gemini Flash', source: s3Url ? 's3' : 'base64' })
+        res.json({ 
+            imageUrl: await getSignedUrlIfNeeded(s3Url || imageUrl), 
+            action, 
+            model: 'Gemini Flash', 
+            source: s3Url ? 's3' : 'base64' 
+        })
     } catch (err) {
         console.error('AI background error:', err.message)
         res.status(500).json({ error: safeErrorMessage(err) })

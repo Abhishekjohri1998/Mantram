@@ -25,6 +25,7 @@ import config from '../config/env.js';
 import { verifyShopifyWebhook } from '../middleware/shopifyWebhookAuth.js';
 import { verifyShopifySessionToken } from '../middleware/shopifySessionAuth.js';
 import { safeErrorMessage } from '../utils/safeError.js';
+import { getSignedUrlIfNeeded } from '../utils/s3.js';
 
 const router = Router();
 
@@ -277,6 +278,20 @@ router.post('/sync', protect, async (req, res) => {
     }
 });
 
+/**
+ * Sign S3 URLs for all images in a product object
+ */
+async function signProductAssets(product) {
+    if (!product) return null;
+    const p = product.toObject ? product.toObject() : product;
+    if (Array.isArray(p.images)) {
+        for (const img of p.images) {
+            if (img.url) img.url = await getSignedUrlIfNeeded(img.url);
+        }
+    }
+    return p;
+}
+
 // GET /api/shopify/products — List synced products
 router.get('/products', protect, async (req, res) => {
     try {
@@ -295,12 +310,15 @@ router.get('/products', protect, async (req, res) => {
         const products = await query
             .sort('-syncedAt')
             .limit(parseInt(limit))
-            .skip((parseInt(page) - 1) * parseInt(limit));
+            .skip((parseInt(page) - 1) * parseInt(limit))
+            .lean();
 
         const total = await Product.countDocuments(filter);
         const categories = await Product.distinct('productType', { user: req.user._id });
 
-        res.json({ success: true, products, total, page: parseInt(page), pages: Math.ceil(total / parseInt(limit)), categories });
+        const signedProducts = await Promise.all(products.map(p => signProductAssets(p)));
+
+        res.json({ success: true, products: signedProducts, total, page: parseInt(page), pages: Math.ceil(total / parseInt(limit)), categories });
     } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
@@ -311,7 +329,8 @@ router.get('/products/:id', protect, async (req, res) => {
     try {
         const product = await Product.findById(req.params.id);
         if (!product) return res.status(404).json({ success: false, error: 'Product not found' });
-        res.json({ success: true, product });
+        const signedProduct = await signProductAssets(product);
+        res.json({ success: true, product: signedProduct });
     } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
