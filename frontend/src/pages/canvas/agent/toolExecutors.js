@@ -569,7 +569,7 @@ export async function executeToolCall(toolCall, fc, ctx = {}, deps = {}) {
         }
 
         case 'generate_video_clip': {
-            let { prompt, duration, aspectRatio, sourceImageUrl, sceneRef } = args
+            let { prompt, duration, aspectRatio, sourceImageUrl, sceneRef, model, resolution } = args
             
             // Extract image and prompt from scene if omitted
             if (sceneRef && ctx.scenes && ctx.scenes[sceneRef - 1]) {
@@ -595,6 +595,8 @@ export async function executeToolCall(toolCall, fc, ctx = {}, deps = {}) {
                     prompt, duration: duration || 5,
                     aspectRatio: aspectRatio || '16:9',
                     sourceImageUrl: sourceImageUrl || '',
+                    model: model || 'grok',
+                    resolution: resolution || '1080p',
                 })
                 if (data.success && data.taskId) {
                     if (!ctx.videos) ctx.videos = {}

@@ -300,6 +300,8 @@ const CANVAS_TOOLS = [
                 prompt: { type: 'string', description: 'Detailed cinematic prompt describing the video scene. Be specific about motion, camera movement, lighting, and action.' },
                 duration: { type: 'number', description: 'Duration in seconds (3-10, default: 5)' },
                 aspectRatio: { type: 'string', enum: ['16:9', '9:16', '1:1'], description: 'Aspect ratio (default: 16:9)' },
+                model: { type: 'string', description: 'Which AI video model to use. Always default to "grok" unless specified.' },
+                resolution: { type: 'string', enum: ['720p', '1080p', '4k'], description: 'Video resolution (default: 1080p)' },
                 sourceImageUrl: { type: 'string', description: 'Optional: URL of a storyboard frame image to animate (Image-to-Video)' },
                 sceneRef: { type: 'number', description: 'CRITICAL: If you just generated this scene using create_storyboard_frames and do not know its URL yet, pass the 1-based scene index here (e.g. 1, 2) and the system will automatically animate it!' },
             },
@@ -632,7 +634,7 @@ When calling create_script_block, use this structure:
 - For video ads: script scenes must include voiceover text and duration per scene
 - For voiceover: ONLY use speaker 'anushka' (female) or 'abhilash' (male). No other speakers.
 - NEVER just add plain text elements for ad requests — use the full pipeline
-- NEVER auto-generate videos without user confirmation — videos cost credits`;
+- ⚠️ CRITICAL: NEVER auto-generate videos without user confirmation. When a user asks to create or animate a video, ALWAYS pause and ask them to confirm their preferred model and resolution FIRST, explaining that these impact the generation cost. Inform them that the default model is 'grok' and the default resolution is '1080p'. Only use the generate_video_clip tool AFTER they reply.`;
 
 
 
@@ -993,22 +995,20 @@ Respond ONLY with valid JSON: { "reply": "friendly message", "actions": [{ "tool
 // ═══════════════════════════════════════════════════════════════════════
 router.post('/canvas-video', protect, requireCredits('videoGenerate'), async (req, res) => {
     try {
-        const { prompt, duration, aspectRatio, sourceImageUrl } = req.body;
+        const { prompt, duration, aspectRatio, sourceImageUrl, model, resolution } = req.body;
         if (!prompt?.trim()) return res.status(400).json({ error: 'Prompt is required' });
 
-        console.log(`🎬 Canvas Video: "${prompt.substring(0, 60)}..." | duration=${duration || 5}`);
+        console.log(`🎬 Canvas Video: "${prompt.substring(0, 60)}..." | model=${model || 'grok'} | res=${resolution || '1080p'}`);
 
         // Route both I2V and T2V through the main pipeline for LZ-first routing
-        // I2V: uses seedance-2.0 (LZ-first → PiAPI fallback)
-        // T2V: uses kling-3.0 (fal.ai direct, no LZ equivalent)
         const { advancedGenerateNode } = await import('../agents/videoStudio/nodes.js');
-        const selectedModel = sourceImageUrl ? 'seedance-2.0' : 'kling-3.0';
+        const selectedModel = model || 'grok';
 
         const state = await advancedGenerateNode({
             prompt: prompt.trim(),
             model: selectedModel,
             duration: duration || 5,
-            resolution: '1080p',
+            resolution: resolution || '1080p',
             qualityMode: 'fast',
             aspectRatio: aspectRatio || '16:9',
             firstImageUrl: sourceImageUrl || '',

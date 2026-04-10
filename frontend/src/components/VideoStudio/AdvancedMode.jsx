@@ -17,142 +17,119 @@ async function api(path, opts = {}) {
     return data
 }
 
-/* ── Models — icons use Material Symbols names ── */
 const MODELS = {
-    'seedance-2.0': { id: 'seedance-2.0', name: 'Seedance 2.0', msIcon: 'movie_filter', dur: [5, 15], ratios: ['16:9', '9:16', '1:1', '4:3', '21:9'], has: { firstFrame: true, refImages: true, refVideo: true, refAudio: true, audio: true }, cost: 0.08 },
-    'kling-3.0': { id: 'kling-3.0', name: 'Kling 3.0', msIcon: 'videocam', dur: [3, 15], ratios: ['16:9', '9:16', '1:1'], has: { firstFrame: true, lastFrame: true, audio: true }, cost: 0.07 },
-    'veo-3.1': { id: 'veo-3.1', name: 'Veo 3.1', msIcon: 'smart_display', dur: [5, 8], ratios: ['16:9', '9:16'], has: { firstFrame: true, lastFrame: true, refImages: true, audio: true }, cost: 0.10 },
-    'veo-3.1-fast': { id: 'veo-3.1-fast', name: 'Veo 3.1 Fast', msIcon: 'bolt', dur: [5, 8], ratios: ['16:9', '9:16'], has: { firstFrame: true, refImages: true, audio: true }, cost: 0.06 },
-    'seedance-1.0': { id: 'seedance-1.0', name: 'Seedance 1.0', msIcon: 'slow_motion_video', dur: [5, 10], ratios: ['16:9', '9:16', '1:1', '4:3'], has: { firstFrame: true, lastFrame: true }, cost: 0.05 },
-    'grok-imagine': { id: 'grok-imagine', name: 'Grok Imagine', msIcon: 'neurology', dur: [1, 15], ratios: ['16:9', '9:16', '1:1'], has: { firstFrame: true }, cost: 0.08 },
+    'kling-3.0-o': { id: 'kling-3.0-o', name: 'Kling 3.O Omni', msIcon: 'all_inclusive', durs: [5, 10], ratios: ['16:9', '9:16', '1:1'], res: ['1080p', '720p'], has: { firstFrame: false, lastFrame: false, audio: true, quality: true, multishot: true, refImages: true, refVideo: false, refAudio: false }, cost: 0.12, desc: "Ultimate cinematic omni-model. Supports multi-shot & dynamic ref images." },
+    'seedance-2.0': { id: 'seedance-2.0', name: 'Seedance 2.0', msIcon: 'movie_filter', durs: [5, 10, 15], ratios: ['16:9', '9:16', '1:1', '4:3', '21:9'], res: ['1080p', '720p'], has: { firstFrame: true, refImages: true, refVideo: true, refAudio: true, audio: true, quality: true }, cost: 0.08, desc: "Best for Lip-Sync and precise motion tracking." },
+    'kling-3.0': { id: 'kling-3.0', name: 'Kling 3.0', msIcon: 'videocam', durs: [5, 10], ratios: ['16:9', '9:16', '1:1'], res: ['1080p', '720p'], has: { firstFrame: true, lastFrame: true, audio: true, quality: true }, cost: 0.07, desc: "High realistic generation with Fast and Pro options." },
+    'veo-3.1': { id: 'veo-3.1', name: 'Veo 3.1', msIcon: 'smart_display', durs: [5], ratios: ['16:9', '9:16'], res: ['1080p'], has: { firstFrame: true, lastFrame: true, refImages: true, audio: true, quality: true }, cost: 0.10, desc: "Incredible Cinematic physics. Fast and Pro options." },
+    'seedance-1.0': { id: 'seedance-1.0', name: 'Seedance 1.0', msIcon: 'slow_motion_video', durs: [5], ratios: ['16:9', '9:16', '1:1', '4:3'], res: ['720p'], has: { firstFrame: true, lastFrame: true }, cost: 0.05, desc: "Cost-effective, reliable motion." },
+    'grok-imagine': { id: 'grok-imagine', name: 'Grok Imagine', msIcon: 'neurology', durs: [5, 15], ratios: ['16:9', '9:16', '1:1'], res: ['1080p'], has: { firstFrame: true }, cost: 0.08, desc: "Ultra-fast text-to-video capabilities without reference locks." }
 }
 
 /* ── Minimal CSS ── */
 const css = `
-/* Layout: compose at bottom, video above */
-.vm-layout { display: flex; flex-direction: column; min-height: calc(100vh - 200px); justify-content: flex-end; }
-.vm-video-area { flex: 1; display: flex; align-items: center; justify-content: center; padding: 20px; }
+/* Layout */
+.vm-studio-root { position: relative; width: 100%; min-height: calc(100vh - 80px); display: flex; flex-direction: column; background: transparent; }
+.vm-layout { position: fixed; bottom: 0; left: 0; width: 100%; z-index: 50; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; padding: 0 16px 24px 16px; pointer-events: none; transition: transform 0.4s ease; }
+.vm-layout.layout-scrolled { transform: translateY(120px); }
+.vm-layout:hover { transform: translateY(0); }
+.vm-layout * { pointer-events: auto; }
 
-/* Glass floating card */
-.vm-card { max-width: 780px; margin: 0 auto; background: rgba(255,255,255,0.025); border: 1px solid rgba(255,255,255,0.08); border-radius: 20px; padding: 0; backdrop-filter: blur(20px); overflow: visible; }
+/* Background Grid */
+.vm-bg-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; padding: 24px; padding-bottom: 400px; pointer-events: auto; opacity: 0.9; }
+@media(max-width: 1024px) { .vm-bg-grid { grid-template-columns: repeat(3, 1fr); padding-bottom: 500px; } }
+@media(max-width: 768px) { .vm-bg-grid { grid-template-columns: repeat(2, 1fr); padding-bottom: 500px; } }
+.vm-bg-item { width: 100%; height: 100%; object-fit: cover; border-radius: 8px; opacity: 1.0; transition: opacity .4s, transform .5s; position: relative; overflow: hidden; pointer-events: auto; }
+.vm-bg-item video { width: 100%; height: 100%; object-fit: cover; }
+.vm-bg-item:hover { opacity: 0.8; transform: scale(1.02); z-index: 2; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
 
-/* Mode toggle */
-.vm-modes { display: flex; border-bottom: 1px solid rgba(255,255,255,0.06); }
-.vm-mode-btn { flex: 1; padding: 14px; text-align: center; font-size: 14px; font-weight: 600; color: #64748b; cursor: pointer; border: none; background: none; transition: all .2s; display: flex; align-items: center; justify-content: center; gap: 8px; }
-.vm-mode-btn:hover { color: #94a3b8; background: rgba(255,255,255,0.02); }
-.vm-mode-btn.active { color: #e2e8f0; background: rgba(255, 77, 0,0.08); border-bottom: 2px solid #7c3aed; }
-.vm-mode-btn .badge { font-size: 9px; font-weight: 800; padding: 2px 6px; border-radius: 6px; background: linear-gradient(135deg, #f59e0b, #ef4444); color: #fff; text-transform: uppercase; }
+/* Director Panel (Floating Card) */
+.vm-card { margin-top: auto; margin-bottom: 0; width: 100%; max-width: 860px; background: var(--sys-surface-glass); border: 1px solid var(--sys-border); border-radius: 24px; padding: 0; backdrop-filter: blur(36px); box-shadow: 0 30px 60px rgba(0,0,0,0.4); z-index: 10; display: flex; flex-direction: column; color: var(--sys-text); font-family: 'Inter', sans-serif; position: relative; transition: all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.vm-card.collapsed { transform: translateY(30%); opacity: 0.8; }
+.vm-card.collapsed:hover { transform: translateY(0); opacity: 1; }
+.vm-card.collapsed .vm-upper-controls, .vm-card.collapsed .vm-bottom { display: none; }
+
+/* Panel Header */
+.vm-card-header { padding: 12px 24px; border-bottom: 1px solid var(--sys-border); display: flex; align-items: center; justify-content: space-between; font-weight: 700; font-size: 13px; color: var(--sys-text); background: rgba(0,0,0,0.15); }
+
+/* Upper Controls (Thumbnails & Quality) */
+.vm-upper-controls { padding: 16px 24px; display: flex; gap: 16px; border-bottom: 1px solid var(--sys-border); align-items: center; flex-wrap: wrap; background: rgba(0,0,0,0.05); }
+
+.vm-thumb-group { display: flex; align-items: center; gap: 8px; }
+.vm-thumb-box { width: 48px; height: 48px; border-radius: 12px; border: 1px dashed var(--sys-border); background: var(--sys-surface); display: flex; align-items: center; justify-content: center; cursor: pointer; position: relative; overflow: hidden; transition: all .2s; }
+.vm-thumb-box:hover { border-color: var(--sys-primary); background: var(--sys-surface-raised); }
+.vm-thumb-box img { width: 100%; height: 100%; object-fit: cover; }
+.vm-thumb-label { font-size: 11px; font-weight: 600; color: var(--sys-text-muted); text-align: center; margin-top: 4px; }
+
+.vm-quality-group { display: flex; align-items: center; gap: 6px; margin-left: auto; background: rgba(0,0,0,0.2); padding: 4px; border-radius: 12px; border: 1px solid var(--sys-border); }
+.vm-quality-pill { padding: 8px 16px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; border: none; background: transparent; color: var(--sys-text-muted); transition: all .2s; display: flex; align-items: center; gap: 6px; }
+.vm-quality-pill:hover { color: var(--sys-text); }
+.vm-quality-pill.active { background: var(--sys-surface-glass); color: var(--sys-text); box-shadow: 0 4px 12px rgba(0,0,0,0.2); border: 1px solid var(--sys-border); }
 
 /* Prompt area */
-.vm-prompt { padding: 20px 24px 0; }
-.vm-textarea { width: 100%; background: transparent; border: none; outline: none; resize: none; color: #f1f5f9; font-size: 15px; line-height: 1.7; font-family: inherit; min-height: 100px; }
-.vm-textarea::placeholder { color: rgba(148,163,184,0.3); }
+.vm-prompt { padding: 16px 20px; position: relative; flex: 1; min-height: 120px; background: rgba(0,0,0,0.15); border-radius: 12px; margin: 16px 24px; border: 1px solid rgba(255,255,255,0.05); }
+.vm-card.collapsed .vm-prompt { min-height: 50px; margin: 12px 24px; padding: 12px 20px; }
+.vm-card.collapsed .vm-textarea { min-height: 24px; max-height: 50px; overflow: hidden; }
+.vm-textarea { width: 100%; background: transparent; border: none; outline: none; resize: none; color: var(--sys-text); font-size: 15px; line-height: 1.6; font-family: inherit; min-height: 80px; font-weight: 500; margin: 0; padding: 0; letter-spacing: 0.3px; }
+.vm-textarea::placeholder { color: var(--sys-text-muted); font-weight: 500; opacity: 0.8; }
 
-/* I2V upload zone */
-.vm-i2v-zone { margin: 0 24px 16px; border: 2px dashed rgba(255, 77, 0,0.2); border-radius: 16px; padding: 32px 20px; display: flex; flex-direction: column; align-items: center; gap: 10px; cursor: pointer; transition: all .2s; background: rgba(255, 77, 0,0.02); }
-.vm-i2v-zone:hover { border-color: rgba(255, 77, 0,0.5); background: rgba(255, 77, 0,0.05); }
-.vm-i2v-zone.has { border-style: solid; border-color: rgba(34,197,94,0.3); background: rgba(34,197,94,0.02); padding: 12px; position: relative; }
-.vm-i2v-zone img { width: 100%; max-height: 220px; object-fit: contain; border-radius: 12px; }
-.vm-i2v-remove { position: absolute; top: 8px; right: 8px; width: 28px; height: 28px; border-radius: 50%; background: rgba(0,0,0,0.6); border: none; color: #f87171; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; }
+/* Config modules */
+.vm-config-trigger { display: flex; align-items: center; gap: 5px; padding: 6px 12px; border-radius: 10px; font-size: 12px; font-weight: 600; cursor: pointer; border: 1px solid transparent; background: transparent; color: var(--sys-text); transition: all .15s; }
+.vm-config-trigger:hover { background: rgba(255,255,255,0.05); border-color: var(--sys-border); }
+.vm-config-menu { position: absolute; bottom: -8px; left: -8px; min-width: 200px; max-height: 320px; overflow-y: auto; background: var(--sys-surface); border: 1px solid var(--sys-border); border-radius: 16px; padding: 8px; z-index: 100; box-shadow: 0 15px 40px rgba(0,0,0,0.4); display: flex; flex-direction: column; gap: 2px; }
+.vm-config-opt { display: flex; align-items: center; width: 100%; padding: 10px 12px; border: none; background: transparent; color: var(--sys-text-muted); font-size: 13px; cursor: pointer; border-radius: 8px; text-align: left; transition: all .2s; }
+.vm-config-opt.sel { color: var(--sys-text); background: var(--sys-surface-raised); }
+.vm-config-opt:hover { background: var(--sys-surface-hover); color: var(--sys-text); }
 
-/* Asset tags row (below prompt) */
-.vm-tags { display: flex; gap: 6px; flex-wrap: wrap; padding: 10px 24px 0; }
-.vm-tag { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px 3px 3px; border-radius: 8px; background: rgba(255, 77, 0,0.08); border: 1px solid rgba(255, 77, 0,0.18); font-size: 12px; color: #c4b5fd; font-weight: 600; transition: all .15s; }
-.vm-tag.linked { border-color: rgba(34,197,94,0.4); background: rgba(34,197,94,0.06); color: #4ade80; }
-.vm-tag img { width: 22px; height: 22px; border-radius: 5px; object-fit: cover; }
-.vm-tag .icon { width: 22px; height: 22px; border-radius: 5px; background: rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: center; font-size: 12px; }
-.vm-tag button { background: none; border: none; color: #f87171; cursor: pointer; padding: 0; font-size: 12px; margin-left: 2px; }
-.vm-tag .uploading { font-size: 10px; color: #64748b; font-style: italic; }
+/* Bottom Bar */
+.vm-bottom { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 24px; border-top: 1px solid var(--sys-border); background: rgba(0,0,0,0.15); }
+.vm-bottom-left { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; flex: 1; }
+.vm-btn-icon-label { display: flex; align-items: center; gap: 4px; padding: 6px 12px; background: transparent; border: 1px solid transparent; color: var(--sys-text); cursor: pointer; font-size: 12px; font-weight: 600; border-radius: 10px; transition: 0.2s; }
+.vm-btn-icon-label:hover { background: rgba(255,255,255,0.05); border-color: var(--sys-border); }
 
-/* @ Autocomplete popup */
-.vm-autocomplete { position: absolute; bottom: 100%; left: 16px; right: 16px; background: #1e1e26; border: 1px solid rgba(255, 77, 0,0.3); border-radius: 12px; padding: 8px; display: flex; gap: 6px; flex-wrap: wrap; z-index: 20; box-shadow: 0 8px 24px rgba(0,0,0,0.5); }
-.vm-ac-item { display: flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 8px; cursor: pointer; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); font-size: 12px; color: #c4b5fd; font-weight: 600; }
-.vm-ac-item:hover { border-color: rgba(255, 77, 0,0.4); background: rgba(255, 77, 0,0.08); }
-.vm-ac-item img { width: 28px; height: 28px; border-radius: 6px; object-fit: cover; }
-.vm-ac-item .icon { width: 28px; height: 28px; border-radius: 6px; background: rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: center; font-size: 14px; }
+.vm-generate { padding: 12px 32px; border-radius: 12px; font-weight: 700; font-size: 14px; cursor: pointer; border: none; display: flex; align-items: center; justify-content: center; gap: 8px; color: var(--sys-surface); background: var(--sys-primary); box-shadow: 0 4px 15px rgba(0,0,0,0.1); transition: all .2s; }
+.vm-generate:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,0,0,0.2); opacity: 0.9; }
+.vm-generate:disabled { opacity: 0.4; cursor: default; background: var(--sys-border); color: var(--sys-text-muted); box-shadow: none; transform: none; }
 
-/* Asset dock (compact icon row) */
-.vm-dock { display: flex; align-items: center; gap: 6px; padding: 10px 20px; border-top: 1px solid rgba(255,255,255,0.04); }
-.vm-dock-btn { display: flex; align-items: center; gap: 4px; padding: 6px 10px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; border: 1px solid rgba(255,255,255,0.06); background: rgba(255,255,255,0.02); color: #64748b; transition: all .15s; white-space: nowrap; }
-.vm-dock-btn:hover { border-color: rgba(255, 77, 0,0.3); color: #c4b5fd; background: rgba(255, 77, 0,0.04); }
-.vm-dock-btn.has { color: #4ade80; border-color: rgba(34,197,94,0.3); background: rgba(34,197,94,0.04); }
-.vm-dock-btn.ai { background: linear-gradient(135deg, rgba(124,58,237,0.1), rgba(6,182,212,0.1)); color: #c4b5fd; border-color: rgba(255, 77, 0,0.2); }
-.vm-dock-btn.ai:disabled { opacity: 0.5; }
-.vm-dock-btn .material-symbols-outlined { font-size: 16px; }
-.vm-dock-sep { width: 1px; height: 20px; background: rgba(255,255,255,0.06); margin: 0 4px; flex-shrink: 0; }
+/* Status overlays */
+.vm-err { margin: 12px 24px; padding: 12px 16px; border-radius: 12px; background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.2); color: #fca5a5; font-size: 13px; display: flex; align-items: center; gap: 8px; }
 
-/* Config bar (inline compact) */
-.vm-config { display: flex; align-items: center; gap: 8px; padding: 12px 24px; border-top: 1px solid rgba(255,255,255,0.04); flex-wrap: wrap; }
-.vm-config-item { position: relative; }
-.vm-config-trigger { display: flex; align-items: center; gap: 5px; padding: 7px 12px; border-radius: 10px; font-size: 13px; font-weight: 600; cursor: pointer; border: 1px solid rgba(255,255,255,0.06); background: rgba(255,255,255,0.03); color: #e2e8f0; transition: all .15s; white-space: nowrap; }
-.vm-config-trigger:hover { border-color: rgba(255,255,255,0.15); background: rgba(255,255,255,0.06); }
-.vm-config-trigger.open { border-color: rgba(255, 77, 0,0.4); background: rgba(255, 77, 0,0.08); }
-.vm-config-trigger .material-symbols-outlined { font-size: 14px; color: #64748b; }
-.vm-config-menu { position: absolute; bottom: calc(100% + 6px); left: 0; min-width: 140px; max-height: 220px; overflow-y: auto; background: #1e1e26; border: 1px solid rgba(255, 77, 0,0.25); border-radius: 12px; padding: 4px; z-index: 50; box-shadow: 0 10px 30px rgba(0,0,0,0.6); }
-.vm-config-menu::-webkit-scrollbar { width: 5px; }
-.vm-config-menu::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
-.vm-config-opt { display: flex; align-items: center; gap: 6px; width: 100%; padding: 8px 10px; border: none; background: transparent; color: #94a3b8; font-size: 13px; font-weight: 500; cursor: pointer; border-radius: 8px; text-align: left; transition: all .12s; }
-.vm-config-opt:hover { background: rgba(255,255,255,0.05); color: #e2e8f0; }
-.vm-config-opt.sel { background: rgba(255, 77, 0,0.15); color: #c4b5fd; font-weight: 600; }
-.vm-quality-pill { padding: 7px 14px; border-radius: 10px; font-size: 13px; font-weight: 600; cursor: pointer; border: 1px solid rgba(255,255,255,0.06); background: rgba(255,255,255,0.02); color: #64748b; transition: all .15s; }
-.vm-quality-pill:hover { border-color: rgba(255,255,255,0.12); color: #94a3b8; }
-.vm-quality-pill.active { background: rgba(255, 77, 0,0.12); color: #c4b5fd; border-color: rgba(255, 77, 0,0.3); }
+.vm-gen-card { max-width: 600px; width: 100%; z-index: 20; background: var(--sys-surface-glass); border: 1px solid var(--sys-border); border-radius: 20px; overflow: hidden; backdrop-filter: blur(24px); box-shadow: 0 20px 40px rgba(0,0,0,0.5); margin: 0 auto; position: relative; }
+.vm-gen-preview { position: relative; width: 100%; padding-bottom: 56.25%; background: var(--sys-surface); }
+.vm-gen-preview img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0.5; }
+.vm-gen-info { padding: 20px 24px; color: var(--sys-text); }
+.vm-progress-bar { width: 100%; height: 6px; border-radius: 3px; background: rgba(255,255,255,0.1); overflow: hidden; }
+.vm-progress-fill { height: 100%; border-radius: 3px; background: #eab308; transition: width 1s ease; }
 
-/* Bottom bar (enhance + generate) */
-.vm-bottom { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 24px; border-top: 1px solid rgba(255,255,255,0.06); background: rgba(255,255,255,0.015); }
-@media (max-width: 560px) { .vm-bottom { flex-direction: column; } }
-.vm-enhance { display: flex; align-items: center; gap: 6px; padding: 10px 18px; border-radius: 12px; font-size: 13px; font-weight: 600; cursor: pointer; border: 1px solid rgba(255, 77, 0,0.25); background: rgba(255, 77, 0,0.06); color: #c4b5fd; transition: all .15s; }
-.vm-enhance:hover { border-color: rgba(255, 77, 0,0.5); background: rgba(255, 77, 0,0.12); }
-.vm-enhance:disabled { opacity: 0.4; cursor: default; }
-.vm-generate { flex: 1; max-width: 320px; padding: 12px 24px; border-radius: 14px; font-weight: 700; font-size: 15px; cursor: pointer; border: none; display: flex; align-items: center; justify-content: center; gap: 8px; color: #fff; background: linear-gradient(135deg, #7c3aed 0%, #06b6d4 100%); box-shadow: 0 4px 20px rgba(124,58,237,0.2); transition: all .2s; }
-.vm-generate:hover { transform: translateY(-1px); box-shadow: 0 6px 24px rgba(124,58,237,0.3); }
-.vm-generate:disabled { opacity: 0.4; cursor: default; background: rgba(255,255,255,0.04); color: #475569; box-shadow: none; transform: none; }
-
-/* Library modal */
-.vm-library { margin: 0 24px 16px; background: rgba(255,255,255,0.025); border: 1px solid rgba(255,255,255,0.06); border-radius: 14px; padding: 14px; }
-.vm-library-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
-.vm-library-head span { font-size: 13px; font-weight: 700; color: #e2e8f0; }
-.vm-library-head button { background: none; border: none; color: #94a3b8; cursor: pointer; }
-.vm-library-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; max-height: 140px; overflow-y: auto; }
-@media (max-width: 640px) { .vm-library-grid { grid-template-columns: repeat(3, 1fr); } }
-.vm-library-grid img { width: 100%; height: 56px; border-radius: 8px; object-fit: cover; cursor: pointer; border: 1px solid rgba(255,255,255,0.05); display: block; transition: border-color .12s; }
-.vm-library-grid img:hover { border-color: rgba(255, 77, 0,0.4); }
-
-/* Error */
-.vm-err { margin: 12px 24px; padding: 10px 14px; border-radius: 10px; background: rgba(239,68,68,0.06); border: 1px solid rgba(239,68,68,0.12); color: #fca5a5; font-size: 13px; display: flex; align-items: center; gap: 8px; }
-.vm-err button { background: none; border: none; color: #fca5a5; cursor: pointer; padding: 0; }
-
-/* Generating / Done (reuse) */
-.vm-gen-card { max-width: 560px; margin: 0 auto; background: rgba(255,255,255,0.025); border: 1px solid rgba(255,255,255,0.06); border-radius: 20px; overflow: hidden; }
-.vm-gen-preview { position: relative; width: 100%; padding-bottom: 56.25%; background: linear-gradient(135deg, #0f172a, #1e293b); }
-.vm-gen-preview img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0.4; }
-.vm-gen-preview .badges { position: absolute; top: 14px; left: 14px; display: flex; gap: 8px; }
-.vm-gen-badge { padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; }
-.vm-gen-info { padding: 20px 24px; }
-.vm-progress-bar { width: 100%; height: 6px; border-radius: 3px; background: rgba(255,255,255,0.05); overflow: hidden; }
-.vm-progress-fill { height: 100%; border-radius: 3px; background: linear-gradient(90deg, #7c3aed, #06b6d4); transition: width 1s ease; }
-
-.vm-done-card { max-width: 680px; margin: 0 auto; background: rgba(255,255,255,0.025); border: 1px solid rgba(255,255,255,0.06); border-radius: 20px; overflow: hidden; margin-bottom: 20px; }
+.vm-done-card { max-width: 800px; width: 100%; z-index: 20; background: var(--sys-surface-glass); border: 1px solid var(--sys-border); border-radius: 20px; overflow: hidden; margin: 0 auto 20px auto; backdrop-filter: blur(24px); box-shadow: 0 20px 40px rgba(0,0,0,0.5); position: relative; }
 .vm-done-card video { width: 100%; display: block; }
-.vm-done-btns { display: flex; gap: 12px; max-width: 680px; margin: 0 auto; flex-wrap: wrap; }
-.vm-btn-sec { flex: 1; padding: 12px; border-radius: 12px; font-weight: 600; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; border: 1px solid rgba(255, 77, 0,0.2); background: rgba(255, 77, 0,0.08); color: #c4b5fd; transition: all .15s; }
-.vm-btn-sec:hover { background: rgba(255, 77, 0,0.14); }
-.vm-btn-pri { padding: 12px 20px; border-radius: 12px; font-weight: 600; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; border: none; background: linear-gradient(135deg, #7c3aed, #06b6d4); color: #fff; text-decoration: none; transition: all .15s; }
-.vm-btn-pri:hover { transform: translateY(-1px); }
+.vm-done-btns { display: flex; gap: 12px; max-width: 800px; margin: 0 auto; flex-wrap: wrap; z-index: 20; position: relative; }
+.vm-btn-sec { flex: 1; padding: 12px; border-radius: 12px; font-weight: 600; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; border: 1px solid var(--sys-border); background: var(--sys-surface-glass); color: var(--sys-text); transition: all .15s; }
+.vm-btn-sec:hover { background: rgba(255,255,255,0.05); }
+.vm-btn-pri { flex: 1; padding: 12px; border-radius: 12px; font-weight: 600; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; border: none; background: #eab308; color: #111; transition: all .15s; }
+.vm-btn-pri:hover { transform: translateY(-1px); background: #fde047; }
 
 /* Extend */
-.vm-extend { padding: 16px; border-radius: 14px; background: rgba(255, 77, 0,0.05); border: 1px solid rgba(255, 77, 0,0.18); margin-top: 16px; max-width: 680px; margin-left: auto; margin-right: auto; }
+.vm-extend { padding: 16px; border-radius: 14px; background: rgba(255, 77, 0,0.05); border: 1px solid rgba(255, 77, 0,0.18); margin-top: 16px; max-width: 680px; margin-left: auto; margin-right: auto; z-index: 20; position: relative; }
 .vm-extend h4 { font-size: 13px; font-weight: 700; color: #c4b5fd; margin-bottom: 12px; display: flex; align-items: center; gap: 6px; }
 .vm-extend-row { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
-.vm-extend-input { flex: 1; min-width: 160px; padding: 10px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08); background: rgba(0,0,0,0.2); color: #e2e8f0; font-size: 13px; }
-.vm-extend-input::placeholder { color: #475569; }
-.vm-btn-extend { padding: 10px 16px; border-radius: 10px; border: none; background: linear-gradient(135deg, #7c3aed, #06b6d4); color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; white-space: nowrap; }
-.vm-btn-extend:disabled { opacity: 0.4; cursor: default; }
+.vm-extend-input { flex: 1; min-width: 160px; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--sys-border); background: var(--sys-surface); color: var(--sys-text); font-size: 13px; }
+.vm-btn-extend { padding: 10px 16px; border-radius: 10px; border: none; background: #eab308; color: #111; font-size: 13px; font-weight: 600; cursor: pointer; }
+
+/* Autocomplete & Library */
+.vm-autocomplete { position: absolute; bottom: 100%; left: 24px; right: 24px; background: var(--sys-surface-glass); backdrop-filter: blur(20px); border: 1px solid var(--sys-border); border-radius: 12px; padding: 8px; display: flex; gap: 6px; flex-wrap: wrap; z-index: 20; box-shadow: 0 10px 30px rgba(0,0,0,0.6); }
+.vm-ac-item { display: flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 8px; cursor: pointer; background: rgba(255,255,255,0.02); border: 1px solid transparent; font-size: 12px; color: var(--sys-text); font-weight: 600; }
+.vm-ac-item:hover { border-color: var(--sys-border); background: rgba(255,255,255,0.05); }
+
+.vm-library { margin: 0 24px 16px; background: var(--sys-surface-glass); backdrop-filter: blur(20px); border: 1px solid var(--sys-border); border-radius: 14px; padding: 14px; color: var(--sys-text); position: absolute; bottom: 100%; max-width: calc(100% - 48px); z-index: 100; box-shadow: 0 10px 30px rgba(0,0,0,0.6); }
+.vm-library-head { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 13px; font-weight: 700; }
+.vm-library-grid img { width: 100%; height: 56px; border-radius: 8px; object-fit: cover; cursor: pointer; border: 1px solid transparent; transition: all .2s; }
+.vm-library-grid img:hover { border-color: #eab308; }
+.vm-tag { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 8px; background: rgba(255, 77, 0,0.08); border: 1px solid var(--sys-border); font-size: 12px; color: var(--sys-text); font-weight: 600; }
 
 @keyframes vm-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 .vm-spin { animation: vm-spin 1s linear infinite; }
-`
-
+`;
 function ConfigDropdown({ value, onChange, options, label }) {
     const [open, setOpen] = useState(false)
     const ref = useRef(null)
@@ -182,19 +159,25 @@ function ConfigDropdown({ value, onChange, options, label }) {
     )
 }
 
-export default function AdvancedMode({ activeBrand, initialData }) {
+export default function AdvancedMode({ activeBrand, initialData, projects = [] }) {
+    const bgProjects = projects.filter(p => (p.status === 'done' || p.status === 'critique') && p.generation?.videoUrl).slice(0, 16);
     const [model, setModel] = useState('seedance-2.0')
     const [prompt, setPrompt] = useState('')
     const [duration, setDuration] = useState(6)
     const [aspectRatio, setAspectRatio] = useState('16:9')
     const [quality, setQuality] = useState('fast')
+    const [resolution, setResolution] = useState('1080p')
     const [phase, setPhase] = useState('compose')
     const [videoMode, setVideoMode] = useState('t2v')
+    const [shots, setShots] = useState([{ prompt: '' }])
+    const [viewVideo, setViewVideo] = useState(null)
+    const hlRef = useRef(null)
     const [i2vImage, setI2vImage] = useState(null)
     const [extending, setExtending] = useState(false)
     const [showExtendPanel, setShowExtendPanel] = useState(false)
     const [extendPrompt, setExtendPrompt] = useState('')
     const [extendDuration, setExtendDuration] = useState(5)
+    const [isScrolled, setIsScrolled] = useState(false)
     const i2vRef = useRef(null)
 
     const [firstFrame, setFirstFrame] = useState(null)
@@ -286,15 +269,28 @@ export default function AdvancedMode({ activeBrand, initialData }) {
     }, [initialData])
 
     useEffect(() => {
-        if (duration < m.dur[0]) setDuration(m.dur[0])
-        if (duration > m.dur[1]) setDuration(m.dur[1])
+        if (duration < m.durs[0]) setDuration(m.durs[0])
+        if (duration > m.durs[m.durs.length - 1]) setDuration(m.durs[m.durs.length - 1])
         if (!m.ratios.includes(aspectRatio)) setAspectRatio(m.ratios[0])
+        if (!m.res.includes(resolution)) setResolution(m.res[0])
         if (!m.has.lastFrame) setLastFrame(null)
         if (!m.has.refVideo) setRefVideo(null)
         if (!m.has.refAudio) setRefAudio(null)
         if (!m.has.refImages) setRefImages([])
+        if (!m.has.firstFrame && videoMode !== 'i2v') setFirstFrame(null)
     }, [model])
 
+    const observerRef = useRef(null)
+
+    useEffect(() => {
+        const observer = new IntersectionObserver(([entry]) => {
+            setIsScrolled(!entry.isIntersecting)
+        }, { threshold: 0, rootMargin: '-80px 0px 0px 0px' })
+        
+        if (observerRef.current) observer.observe(observerRef.current)
+        return () => observer.disconnect()
+    }, [])
+    
     useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current) }, [])
 
     // ── Library ──
@@ -379,13 +375,24 @@ export default function AdvancedMode({ activeBrand, initialData }) {
     }
     function insertTag(tag) {
         const textarea = promptRef.current
+        const currentPrompt = m.has.multishot ? shots[0].prompt : prompt
         if (textarea) {
             const cursorPos = textarea.selectionStart
-            const before = prompt.substring(0, cursorPos - 1)
-            const after = prompt.substring(cursorPos)
-            setPrompt(before + tag + ' ' + after)
+            const before = currentPrompt.substring(0, cursorPos - 1)
+            const after = currentPrompt.substring(cursorPos)
+            const newPrompt = before + tag + ' ' + after
+            
+            if (m.has.multishot) {
+                const n = [...shots]; n[0].prompt = newPrompt; setShots(n);
+            } else {
+                setPrompt(newPrompt)
+            }
         } else {
-            setPrompt(prev => prev + tag + ' ')
+            if (m.has.multishot) {
+                const n = [...shots]; n[0].prompt = n[0].prompt + tag + ' '; setShots(n);
+            } else {
+                setPrompt(prev => prev + tag + ' ')
+            }
         }
         setShowAutocomplete(false)
     }
@@ -435,7 +442,10 @@ export default function AdvancedMode({ activeBrand, initialData }) {
             const d = await api('/video-studio/advanced/generate', {
                 method: 'POST',
                 body: JSON.stringify({
-                    prompt: prompt.trim(), model, duration, resolution: '1080p', aspectRatio,
+                    prompt: m.has.multishot ? shots.map(s => s.prompt).join(' | ') : prompt.trim(), 
+                    model, duration, resolution, aspectRatio, 
+                    mode: m.has.quality ? quality : 'fast',
+                    shots: m.has.multishot ? shots : [],
                     firstImageUrl: firstFrame?.url || '',
                     lastImageUrl: lastFrame?.url || '',
                     generateAudio: !!m.has.audio, qualityMode: quality,
@@ -542,9 +552,51 @@ export default function AdvancedMode({ activeBrand, initialData }) {
     // ═══════════════════════════
     // RENDER
     // ═══════════════════════════
+    // Render Viewer Modal overlay early layout hook
+    if (viewVideo) {
+        return (
+            <div className="vm-studio-root" style={{background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(10px)', zIndex: 1000}}>
+                <div style={{maxWidth: 1000, width: '100%', margin: 'auto', position: 'relative'}}>
+                    <button style={{position: 'absolute', top: -40, right: 0, background: 'none', border: 'none', color: '#fff', cursor: 'pointer', zIndex: 10}} onClick={() => setViewVideo(null)}><span className="material-symbols-outlined" style={{fontSize: 28}}>close</span></button>
+                    <video src={viewVideo.url} controls autoPlay loop style={{width: '100%', borderRadius: 16, border: '1px solid var(--sys-border)'}} />
+                    <div style={{display: 'flex', gap: 12, marginTop: 16, justifyContent: 'center'}}>
+                        <button className="vm-generate" onClick={() => { 
+                            setModel(viewVideo.model||'kling-3.0-o'); 
+                            setPrompt(viewVideo.prompt||''); 
+                            setDuration(Number(viewVideo.duration)||5); 
+                            setViewVideo(null); 
+                            window.scrollTo(0,0);
+                        }}><span className="material-symbols-outlined">auto_fix_high</span> Reuse Settings</button>
+                        <button className="vm-config-trigger" style={{background: 'var(--sys-surface-glass)'}} onClick={() => navigator.clipboard.writeText(viewVideo.prompt)}><span className="material-symbols-outlined">content_copy</span> Copy Prompt</button>
+                        <a href={viewVideo.url} download className="vm-config-trigger" style={{background: 'var(--sys-surface-glass)', textDecoration:'none'}}><span className="material-symbols-outlined">download</span> Download</a>
+                    </div>
+                </div>
+            </div>
+        )
+    }
+
     return (
-        <>
+        <div className="vm-studio-root">
             <style>{css}</style>
+            <div ref={observerRef} style={{position: 'absolute', top: 0, left: 0, height: 1, width: '100%', pointerEvents: 'none'}} />
+            
+            {/* Ambient Background Grid */}
+            <div className="vm-bg-grid">
+                 {bgProjects.map((p, i) => (
+                      <div key={p._id || i} className="vm-bg-item">
+                           <video 
+                               src={`${API_BASE}/video-studio/${p._id}/video#t=1`} 
+                               muted loop autoPlay={false} playsInline crossOrigin="anonymous" preload="auto"
+                               onMouseOver={e => e.target.play()}
+                               onMouseOut={e => { e.target.pause(); e.target.currentTime = 1; }}
+                           />
+                      </div>
+                 ))}
+                 {[...Array(Math.max(0, 12 - bgProjects.length))].map((_, i) => (
+                      <div key={`empty-${i}`} className="vm-bg-item" style={{ background: 'rgba(0,0,0,0.02)', border: '1px dashed var(--sys-border)' }} />
+                 ))}
+            </div>
+
 
             {/* ── GENERATING ── */}
             {phase === 'generating' && (
@@ -624,120 +676,151 @@ export default function AdvancedMode({ activeBrand, initialData }) {
             {/* ══════════ COMPOSE — Floating Card at Bottom ══════════ */}
             {phase === 'compose' && (
                 <div className="vm-layout">
-                    <div style={{ maxWidth: '780px', width: '100%', margin: '0 auto', padding: '0 4px 20px' }}>
-                        {error && (
-                            <div className="vm-err">
-                                <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>error</span>
-                                <span style={{ flex: 1 }}>{error}</span>
-                                <button onClick={() => setError('')}><span className="material-symbols-outlined" style={{ fontSize: '14px' }}>close</span></button>
+                        <div className={`vm-card ${isScrolled ? 'collapsed' : ''}`}>
+                            {/* Panel Header */}
+                            <div className="vm-card-header">
+                                <span style={{display: 'flex', alignItems: 'center', gap: 8}}>
+                                    <span className="material-symbols-outlined" style={{fontSize: 18, color: '#eab308'}}>movie_creation</span> Scott Panel
+                                </span>
                             </div>
-                        )}
+                            
+                            {error && (
+                                <div className="vm-err">
+                                    <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>error</span>
+                                    <span style={{ flex: 1 }}>{error}</span>
+                                    <button onClick={() => setError('')}><span className="material-symbols-outlined" style={{ fontSize: '14px' }}>close</span></button>
+                                </div>
+                            )}
 
-                        <div className="vm-card">
-                            {/* §1 — Mode Toggle */}
-                            <div className="vm-modes">
-                                <button className={`vm-mode-btn ${videoMode === 't2v' ? 'active' : ''}`} onClick={() => setVideoMode('t2v')}>
-                                    <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>text_fields</span> Text to Video
-                                </button>
-                                <button className={`vm-mode-btn ${videoMode === 'i2v' ? 'active' : ''}`} onClick={() => setVideoMode('i2v')}>
-                                    <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>image</span> Image to Video <span className="badge">New</span>
-                                </button>
-                            </div>
+                            {/* Upper Controls: File upload thumbnails and quality flags */}
+                            <div className="vm-upper-controls">
+                                {/* DYNAMIC MODEL BANNER */}
+                                <div style={{width: '100%', marginBottom: 16, paddingBottom: 16, borderBottom: '1px dashed var(--sys-border)', display: 'flex', gap: 6, alignItems: 'center'}}>
+                                    <span style={{fontSize: 13, fontWeight: 600, color: 'var(--sys-primary)'}}>💡 {m.desc || 'Optimized for high-fidelity videos.'}</span>
+                                    {videoMode === 'i2v' && <span style={{marginLeft: 'auto', fontSize: 11, background: 'var(--sys-primary-dim)', padding: '4px 10px', borderRadius: 8, color: 'var(--sys-text)', fontWeight: 600}}>Image-to-Video Active</span>}
+                                </div>
 
-                            {/* §1b — I2V image upload */}
-                            {videoMode === 'i2v' && (
-                                <>
-                                    <div className={`vm-i2v-zone ${i2vImage ? 'has' : ''}`} onClick={() => !i2vImage && i2vRef.current?.click()}>
-                                        {i2vImage ? (
+                                {m.has.firstFrame && (
+                                    <div className="vm-thumb-group">
+                                        <div style={{display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
+                                            <div className="vm-thumb-box" onClick={() => videoMode === 'i2v' ? (!i2vImage && i2vRef.current?.click()) : firstFrameRef.current?.click()} title={videoMode === 'i2v' ? "Upload Image to Animate" : "Start Frame"}>
+                                                {(videoMode === 'i2v' && i2vImage) ? <img src={i2vImage.url} alt=""/> : (firstFrame ? <img src={firstFrame.url} alt=""/> : <span className="material-symbols-outlined" style={{fontSize: 20, color: 'var(--sys-text-muted)'}}>add_photo_alternate</span>)}
+                                            </div>
+                                            <span className="vm-thumb-label">Start Point</span>
+                                        </div>
+                                        
+                                        {m.has.lastFrame && (
                                             <>
-                                                <img src={i2vImage.url} alt="Source" />
-                                                {i2vImage.uploading && <p style={{ fontSize: '11px', color: '#64748b', fontStyle: 'italic' }}>Uploading...</p>}
-                                                <button className="vm-i2v-remove" onClick={e => { e.stopPropagation(); setI2vImage(null) }}>×</button>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <span className="material-symbols-outlined" style={{ fontSize: '36px', color: '#7c3aed' }}>add_photo_alternate</span>
-                                                <span style={{ fontSize: '14px', color: '#94a3b8', fontWeight: 500 }}>Upload image to animate</span>
-                                                <span style={{ fontSize: '11px', color: '#475569' }}>Product photo, brand image, or any still</span>
+                                                <span className="material-symbols-outlined" style={{color: 'var(--sys-border)', fontSize: 16, margin: '0 4px'}}>arrow_forward_ios</span>
+                                                <div style={{display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
+                                                    <div className="vm-thumb-box" onClick={() => lastFrameRef.current?.click()} title="End Frame (Optional)">
+                                                        {lastFrame ? <img src={lastFrame.url} alt=""/> : <span className="material-symbols-outlined" style={{fontSize: 20, color: 'var(--sys-text-muted)'}}>add_photo_alternate</span>}
+                                                    </div>
+                                                    <span className="vm-thumb-label">End Point</span>
+                                                </div>
                                             </>
                                         )}
                                     </div>
-                                    <input ref={i2vRef} type="file" accept="image/*" onChange={onI2VFile} style={{ display: 'none' }} />
-                                </>
-                            )}
+                                )}
 
-                            {/* §2 — Prompt Area */}
-                            <div className="vm-prompt" style={{ position: 'relative' }}>
-                                <textarea
-                                    ref={promptRef}
-                                    className="vm-textarea"
-                                    value={prompt}
-                                    onChange={handlePromptChange}
-                                    placeholder={videoMode === 'i2v'
-                                        ? 'Describe the motion... e.g. "Camera slowly zooms in, product rotates 360°"'
-                                        : activeBrand?.name
-                                            ? `What's your ${activeBrand.name} ad about? Type @ to tag assets...`
-                                            : 'What\'s your ad about? Type @ to tag images, video, audio...'}
-                                />
-                                {/* @ Autocomplete popup */}
+                                {m.has.firstFrame && (m.has.refAudio || m.has.refVideo || m.has.refImages) && <div style={{width: 1, height: 32, background: 'var(--sys-border)', margin: '0 12px'}}></div>}
+
+
+                                {m.has.refAudio && (
+                                    <button className="vm-btn-icon-label" style={{opacity: refAudio ? 1 : 0.6, background: refAudio ? 'var(--sys-primary-dim)' : 'transparent'}} onClick={() => refAudioRef.current?.click()}>
+                                        <span className="material-symbols-outlined" style={{fontSize: 16}}>{refAudio ? 'audio_file' : 'music_note'}</span> {refAudio ? 'Audio Attached' : 'Add Audio'}
+                                    </button>
+                                )}
+                                
+                                {m.has.refVideo && (
+                                    <button className="vm-btn-icon-label" style={{opacity: refVideo ? 1 : 0.6, background: refVideo ? 'var(--sys-primary-dim)' : 'transparent'}} onClick={() => refVideoRef.current?.click()}>
+                                        <span className="material-symbols-outlined" style={{fontSize: 16}}>video_library</span> {refVideo ? 'Ref Attached' : 'Add Ref Video'}
+                                    </button>
+                                )}
+
+                                {m.has.quality && (
+                                    <div className="vm-quality-group" style={{marginLeft: 'auto'}}>
+                                        <button className={`vm-quality-pill ${quality === 'fast' ? 'active' : ''}`} onClick={() => setQuality('fast')}><span className="material-symbols-outlined" style={{ fontSize: '14px' }}>bolt</span> Fast Mode</button>
+                                        <button className={`vm-quality-pill ${quality === 'quality' ? 'active' : ''}`} onClick={() => setQuality('quality')}><span className="material-symbols-outlined" style={{ fontSize: '14px' }}>auto_awesome</span> Pro Quality</button>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Prompt area */}
+                            <div className="vm-prompt">
+                                <div style={{ position: 'relative', width: '100%', minHeight: '90px' }}>
+                                    <div 
+                                        className="vm-textarea" 
+                                        style={{ position: 'absolute', inset: 0, color: 'var(--sys-text)', pointerEvents: 'none', whiteSpace: 'pre-wrap', wordWrap: 'break-word', overflow: 'hidden' }}
+                                        dangerouslySetInnerHTML={{ __html: (m.has.multishot ? shots[0].prompt : prompt).replace(/(@image\d+|@video\d+|@audio\d+)/g, '<span style="color: var(--sys-primary)">$1</span>') }}
+                                    />
+                                    <textarea
+                                        ref={promptRef}
+                                        className="vm-textarea"
+                                        value={m.has.multishot ? shots[0].prompt : prompt}
+                                        onChange={e => {
+                                            if (m.has.multishot) {
+                                                const n = [...shots]; n[0].prompt = e.target.value; setShots(n);
+                                            } else {
+                                                handlePromptChange(e);
+                                            }
+                                        }}
+                                        style={{ position: 'relative', background: 'transparent', color: 'transparent', caretColor: 'var(--sys-text)', WebkitTextFillColor: 'transparent' }}
+                                        placeholder={activeBrand?.name ? `What's your ${activeBrand.name} ad about? Type @ to tag assets...` : `What's your ad about? Type @ to tag images, video, audio...`}
+                                    />
+                                </div>
+                                
+                                {m.has.multishot && (
+                                    <div style={{marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8}}>
+                                        {shots.slice(1).map((s, idx) => (
+                                            <div key={idx} style={{display: 'flex', gap: 8}}>
+                                                <input className="vm-textarea" style={{minHeight: '40px', flex:1}} value={s.prompt} onChange={(e) => { const n = [...shots]; n[idx+1].prompt = e.target.value; setShots(n); }} placeholder={`Shot ${idx+2} Prompt`} />
+                                                <button className="vm-config-trigger" style={{color:'var(--sys-error)'}} onClick={() => setShots(shots.filter((_, i) => i !== idx+1))}><span className="material-symbols-outlined">delete</span></button>
+                                            </div>
+                                        ))}
+                                        {shots.length < 6 && <button className="vm-btn-icon-label" style={{alignSelf: 'flex-start'}} onClick={() => setShots([...shots, {prompt: ''}])}><span className="material-symbols-outlined" style={{fontSize:16}}>add</span> Add Shot</button>}
+                                    </div>
+                                )}
+                                
                                 {showAutocomplete && acItems.length > 0 && (
                                     <div className="vm-autocomplete">
                                         {acItems.map(item => (
                                             <button key={item.tag} className="vm-ac-item" onClick={() => insertTag(item.tag)}>
-                                                {item.thumb ? <img src={item.thumb} alt="" /> : <span className="icon"><span className="material-symbols-outlined" style={{ fontSize: '14px' }}>{item.msIcon || 'attach_file'}</span></span>}
+                                                {item.thumb ? <img src={item.thumb} alt="" style={{width: 20, height: 20, borderRadius: 4, objectFit: 'cover'}} /> : <span className="icon"><span className="material-symbols-outlined" style={{ fontSize: '14px' }}>{item.msIcon || 'attach_file'}</span></span>}
                                                 <span>{item.tag}</span>
                                             </button>
                                         ))}
                                     </div>
                                 )}
+                                
+                                {showLibrary && (
+                                    <div className="vm-library">
+                                        <div className="vm-library-head">
+                                            <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span className="material-symbols-outlined" style={{ fontSize: '16px' }}>photo_library</span> Image Library</span>
+                                            <button onClick={() => setShowLibrary(false)}>
+                                                <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>close</span>
+                                            </button>
+                                        </div>
+                                        {libraryLoading ? <p style={{ fontSize: '12px', color: 'var(--sys-text-muted)', textAlign: 'center', padding: '12px 0' }}>Loading...</p>
+                                            : libraryImages.length === 0 ? <p style={{ fontSize: '12px', color: 'var(--sys-text-muted)', textAlign: 'center', padding: '12px 0' }}>No images yet</p>
+                                                : <div className="vm-library-grid">{libraryImages.map((img, i) => <img key={i} src={img.url || img.imageUrl} alt="" onClick={() => pickFromLibrary(img)} />)}</div>
+                                        }
+                                    </div>
+                                )}
                             </div>
 
-                            {/* §3 — Asset Tags (shows attached files) */}
+                            {/* Tags (if any exist) */}
                             {allTags.length > 0 && (
-                                <div className="vm-tags">
+                                <div style={{padding: '0 24px 16px', display: 'flex', gap: 6, flexWrap: 'wrap'}}>
                                     {allTags.map(tag => (
-                                        <div key={tag.id} className={`vm-tag ${tag.linked ? 'linked' : ''}`}>
-                                            {tag.thumb ? <img src={tag.thumb} alt="" /> : <span className="icon"><span className="material-symbols-outlined" style={{ fontSize: '13px' }}>{tag.type === 'video' ? 'video_file' : tag.type === 'audio' ? 'audio_file' : 'attach_file'}</span></span>}
+                                        <div key={tag.id} className="vm-tag">
+                                            {tag.thumb && <img src={tag.thumb} alt="" style={{width: 16, height: 16, borderRadius: 4, objectFit: 'cover'}} />}
                                             <span>{tag.label}</span>
-                                            {tag.linked && <span className="material-symbols-outlined" style={{ fontSize: 11, color: '#4ade80' }}>link</span>}
-                                            {tag.name && <span style={{ fontSize: 10, color: '#64748b' }}>{tag.name.length > 12 ? tag.name.slice(0, 12) + '…' : tag.name}</span>}
-                                            {tag.uploading && <span className="uploading">uploading…</span>}
-                                            <button onClick={() => removeTag(tag)}>×</button>
+                                            <button style={{background: 'none', border: 'none', color: 'var(--sys-text-muted)', padding: 0, marginLeft: 4, cursor: 'pointer', fontSize: 14}} onClick={() => removeTag(tag)}>×</button>
                                         </div>
                                     ))}
                                 </div>
                             )}
-
-                            {/* §4 — Asset Dock (compact icon buttons) */}
-                            <div className="vm-dock">
-                                {dockButtons.map(btn => (
-                                    <button key={btn.key} className={`vm-dock-btn ${btn.has ? 'has' : ''}`} onClick={btn.action} title={btn.label}>
-                                        <span className="material-symbols-outlined">{btn.msIcon}</span> {btn.label}
-                                    </button>
-                                ))}
-
-                                {/* AI First Frame button */}
-                                {m.has.firstFrame && videoMode === 't2v' && !firstFrame && (
-                                    <>
-                                        <div className="vm-dock-sep" />
-                                        <button className="vm-dock-btn ai" onClick={generateFirstFrame} disabled={generatingFrame || !prompt.trim()}>
-                                            {generatingFrame ? <span className="material-symbols-outlined vm-spin" style={{ fontSize: '14px' }}>progress_activity</span> : <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>auto_awesome</span>} AI Frame
-                                        </button>
-                                    </>
-                                )}
-
-                                {/* Library button */}
-                                {m.has.refImages && (
-                                    <>
-                                        <div className="vm-dock-sep" />
-                                        <button className="vm-dock-btn" onClick={() => loadLibrary('ref')}>
-                                            <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>photo_library</span> Library
-                                        </button>
-                                    </>
-                                )}
-
-                                <span style={{ marginLeft: 'auto', fontSize: '11px', color: '#475569' }}>{prompt.length} chars</span>
-                            </div>
 
                             {/* Hidden file inputs */}
                             <input ref={firstFrameRef} type="file" accept="image/*" onChange={e => onFile(e, setFirstFrame)} style={{ display: 'none' }} />
@@ -745,72 +828,60 @@ export default function AdvancedMode({ activeBrand, initialData }) {
                             <input ref={refImgRef} type="file" accept="image/*" onChange={onRefFile} style={{ display: 'none' }} />
                             <input ref={refVideoRef} type="file" accept="video/*" onChange={e => onMediaFile(e, setRefVideo)} style={{ display: 'none' }} />
                             <input ref={refAudioRef} type="file" accept="audio/*" onChange={e => onMediaFile(e, setRefAudio)} style={{ display: 'none' }} />
+                            <input ref={i2vRef} type="file" accept="image/*" onChange={onI2VFile} style={{ display: 'none' }} />
 
-                            {/* Library Modal (inline) */}
-                            {showLibrary && (
-                                <div className="vm-library">
-                                    <div className="vm-library-head">
-                                        <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span className="material-symbols-outlined" style={{ fontSize: '16px' }}>photo_library</span> Image Library</span>
-                                        <button onClick={() => setShowLibrary(false)}>
-                                            <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>close</span>
-                                        </button>
-                                    </div>
-                                    {libraryLoading ? <p style={{ fontSize: '12px', color: '#64748b', textAlign: 'center', padding: '12px 0' }}>Loading...</p>
-                                        : libraryImages.length === 0 ? <p style={{ fontSize: '12px', color: '#64748b', textAlign: 'center', padding: '12px 0' }}>No images yet</p>
-                                            : <div className="vm-library-grid">{libraryImages.map((img, i) => <img key={i} src={img.url || img.imageUrl} alt="" onClick={() => pickFromLibrary(img)} />)}</div>
-                                    }
-                                </div>
-                            )}
-
-                            {/* §5 — Config Bar (inline compact) */}
-                            <div className="vm-config">
-                                <ConfigDropdown
-                                    value={model}
-                                    onChange={setModel}
-                                    options={Object.values(MODELS).map(mod => ({ value: mod.id, label: mod.name, msIcon: mod.msIcon }))}
-                                    label="Model"
-                                />
-                                <ConfigDropdown
-                                    value={aspectRatio}
-                                    onChange={setAspectRatio}
-                                    options={m.ratios.map(r => ({ value: r, label: r }))}
-                                    label="Ratio"
-                                />
-                                <ConfigDropdown
-                                    value={duration}
-                                    onChange={setDuration}
-                                    options={Array.from({ length: m.dur[1] - m.dur[0] + 1 }, (_, i) => m.dur[0] + i).map(d => ({ value: d, label: `${d}s` }))}
-                                    label="Duration"
-                                />
-                                <button className={`vm-quality-pill ${quality === 'fast' ? 'active' : ''}`} onClick={() => setQuality('fast')}><span className="material-symbols-outlined" style={{ fontSize: '14px' }}>bolt</span> Fast</button>
-                                <button className={`vm-quality-pill ${quality === 'quality' ? 'active' : ''}`} onClick={() => setQuality('quality')}><span className="material-symbols-outlined" style={{ fontSize: '14px' }}>auto_awesome</span> Quality</button>
-                            </div>
-
-                            {/* §6 — Bottom bar (Enhance + Generate) */}
+                            {/* Bottom Bar Controls */}
                             <div className="vm-bottom">
-                                <CreditTooltipWrapper action="promptEnhance">
-                                    <button className="vm-enhance" onClick={handleEnhance} disabled={enhancing || !prompt.trim()}>
-                                        {enhancing ? <><span className="material-symbols-outlined vm-spin" style={{ fontSize: '14px' }}>progress_activity</span> Enhancing...</>
-                                            : <><span className="material-symbols-outlined" style={{ fontSize: '16px' }}>auto_awesome</span> Enhance</>}
-                                    </button>
-                                </CreditTooltipWrapper>
+                                <div className="vm-bottom-left">
+                                    <ConfigDropdown
+                                        value={model}
+                                        onChange={setModel}
+                                        options={Object.values(MODELS).map(mod => ({ value: mod.id, label: mod.name, msIcon: mod.msIcon }))}
+                                        label="Model"
+                                    />
+                                    <ConfigDropdown
+                                        value={aspectRatio}
+                                        onChange={setAspectRatio}
+                                        options={m.ratios.map(r => ({ value: r, label: r, meta: r === '16:9' || r === '21:9' ? 'Cinematic' : null }))}
+                                        label="Ratio"
+                                    />
+                                    <ConfigDropdown
+                                        value={resolution}
+                                        onChange={setResolution}
+                                        options={m.res.map(r => ({ value: r, label: r }))}
+                                        label="Resolution"
+                                    />
+                                    <ConfigDropdown
+                                        value={duration}
+                                        onChange={setDuration}
+                                        options={m.durs.map(d => ({ value: d, label: `${d}s` }))}
+                                        label="Duration"
+                                    />
+                                </div>
 
-                                {videoMode === 'i2v' ? (
-                                    <button className="vm-generate" onClick={handleI2VGenerate} disabled={loading || !i2vImage?.url}>
-                                        {loading ? <><span className="material-symbols-outlined vm-spin" style={{ fontSize: '16px' }}>progress_activity</span> Animating...</>
-                                            : <><span className="material-symbols-outlined" style={{ fontSize: '18px' }}>animation</span> Animate · {credits} cr</>}
-                                    </button>
-                                ) : (
-                                    <button className="vm-generate" onClick={handleGenerate} disabled={loading || !prompt.trim()}>
-                                        {loading ? <><span className="material-symbols-outlined vm-spin" style={{ fontSize: '16px' }}>progress_activity</span> Submitting...</>
-                                            : <><span className="material-symbols-outlined" style={{ fontSize: '18px' }}>movie_creation</span> Generate · {credits} cr · ~2 min</>}
-                                    </button>
-                                )}
+                                <div style={{display: 'flex', gap: 12, alignItems: 'center'}}>
+                                    <CreditTooltipWrapper action="promptEnhance">
+                                        <button className="vm-btn-icon-label" onClick={handleEnhance} disabled={enhancing || !prompt.trim()} style={{color: 'var(--sys-primary)'}}>
+                                            {enhancing ? <><span className="material-symbols-outlined vm-spin" style={{fontSize: 16}}>progress_activity</span></> : <><span className="material-symbols-outlined" style={{fontSize: 16}}>auto_awesome</span> Enhance</>}
+                                        </button>
+                                    </CreditTooltipWrapper>
+
+                                    {videoMode === 'i2v' ? (
+                                        <button className="vm-generate" onClick={handleI2VGenerate} disabled={loading || !i2vImage?.url}>
+                                            {loading ? <><span className="material-symbols-outlined vm-spin" style={{ fontSize: 18 }}>progress_activity</span></>
+                                                : <><span className="material-symbols-outlined" style={{ fontSize: 18 }}>animation</span> GENERATE <span style={{fontSize: 12, opacity: 0.6}}>· {credits}</span></>}
+                                        </button>
+                                    ) : (
+                                        <button className="vm-generate" onClick={handleGenerate} disabled={loading || !prompt.trim()}>
+                                            {loading ? <><span className="material-symbols-outlined vm-spin" style={{ fontSize: 18 }}>progress_activity</span></>
+                                                : <><span className="material-symbols-outlined" style={{ fontSize: 18 }}>movie_creation</span> GENERATE <span style={{fontSize: 12, opacity: 0.6}}>· {credits}</span></>}
+                                        </button>
+                                    )}
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
             )}
-        </>
+        </div>
     )
 }

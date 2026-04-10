@@ -15,6 +15,7 @@ const FAL_BASE_URL = 'https://queue.fal.run';
 const GROK_BASE_URL = 'https://api.x.ai/v1';
 
 const MODEL_ENDPOINTS = {
+    'kling-3.0-o': { textToVideo: 'fal-ai/kling-video/v3/omni/text-to-video', imageToVideo: 'fal-ai/kling-video/v3/omni/image-to-video' },
     'kling-3.0': { textToVideo: 'fal-ai/kling-video/v3/standard/text-to-video', imageToVideo: 'fal-ai/kling-video/v3/standard/image-to-video' },
     'veo-3.1': { textToVideo: 'fal-ai/veo3', imageToVideo: 'fal-ai/veo3/image-to-video', extendVideo: 'fal-ai/veo3.1/extend-video' },
     'veo-3.1-fast': { textToVideo: 'fal-ai/veo3/fast', imageToVideo: 'fal-ai/veo3/fast/image-to-video', extendVideo: 'fal-ai/veo3.1/fast/extend-video' },
@@ -25,7 +26,7 @@ const MODEL_ENDPOINTS = {
 };
 
 export const MODEL_AVAILABLE = {
-    'kling-3.0': true, 'veo-3.1': true, 'veo-3.1-fast': true,
+    'kling-3.0-o': true, 'kling-3.0': true, 'veo-3.1': true, 'veo-3.1-fast': true,
     'seedance-1.0': true, 'seedance-2.0': true, 'grok-imagine': true,
     'hunyuan': true, 'sora-2': true,
 };
