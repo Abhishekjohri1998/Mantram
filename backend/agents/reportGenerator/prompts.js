@@ -128,8 +128,14 @@ ${instruction}
 AVAILABLE DATA:
 ${JSON.stringify(data, null, 2).substring(0, 6000)}
 
+IMPORTANT: The "computedSummary" object contains pre-calculated, verified counts from the raw crawl data. 
+Use ONLY these numbers in all summary stats, KPI grids, and tables. 
+Do NOT recount, estimate, or guess from the page lists — your count will be wrong. 
+If a count in "computedSummary" is 0, report it as 0.
+
 CRITICAL: Generate ONLY sections relevant to "${reportType}". Do NOT include unrelated sections.
 `;
+
 };
 
 export const PM_REPORT_CONTEXT = (data, reportType) => {

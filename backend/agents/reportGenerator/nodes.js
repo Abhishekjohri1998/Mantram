@@ -214,8 +214,27 @@ export async function generateReportNode(state) {
     switch (studio) {
         case 'seo':
             studioData = await gatherSEOData(userId, brandId, reportType);
+            
+            // ── Fix 4: Compute summary stats deterministically before AI ──
+            const pages = studioData.healthCheck?.pages || studioData.healthCheck?.pageReports || [];
+            const si = studioData.healthCheck?.siteStats || {};
+            
+            studioData.computedSummary = {
+                totalPages: si.pagesCrawled || pages.length,
+                thinPages: si.thinPageCount || pages.filter(p => (p.wordCount || 0) < 300).length,
+                noMetaPages: si.missingMetaDescCount || pages.filter(p => !p.metaDescription?.trim()).length,
+                noH1Pages: si.missingH1Count || pages.filter(p => !p.hasH1).length,
+                slowPages: si.slowPageCount || pages.filter(p => (p.responseTimeMs || p.responseTime) > 3000).length,
+                headingSkipPages: si.headingSkippedCount || pages.filter(p => p.hasHeadingSkip || !p.headingHierarchyValid).length,
+                duplicates: si.duplicateContentCount || 0,
+                brokenInternal: si.brokenInternalCount || 0,
+                technicalScore: studioData.scores?.technicalScore || 0,
+                healthScore: studioData.scores?.seoHealth || 0,
+            };
+
             studioContext = SEO_REPORT_CONTEXT(studioData, reportType);
             break;
+
         case 'pm':
             studioData = await gatherPMData(userId, brandId, reportType);
             studioContext = PM_REPORT_CONTEXT(studioData, reportType);

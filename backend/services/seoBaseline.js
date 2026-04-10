@@ -418,10 +418,11 @@ function computeOnPageScore(siteIntelligence, pages) {
     }
 
     // Meta descriptions (15 pts) — split
-    const metaPages = pages.filter(p => p.metaDescription && p.metaDescription.length > 0);
-    const missingMetaPages = pages.filter(p => !p.metaDescription);
+    const metaPages = pages.filter(p => p.metaDescription && p.metaDescription.trim().length > 0);
+    const missingMetaPages = pages.filter(p => !p.metaDescription || p.metaDescription.trim().length === 0);
     const metaTooLong = metaPages.filter(p => p.metaDescription.length > 160);
     const metaTooShort = metaPages.filter(p => p.metaDescription.length < 120);
+
     const goodMeta = metaPages.filter(p => p.metaDescription.length >= 120 && p.metaDescription.length <= 160);
     const metaRatio = metaPages.length / totalPages;
     const metaScore = Math.round((metaRatio * 9) + ((goodMeta.length / totalPages) * 6));
@@ -484,8 +485,8 @@ function computeOnPageScore(siteIntelligence, pages) {
     });
 
     // Content length (15 pts) — >300 words on important pages
-    const thinPages = (siteIntelligence.thinPages || []).length;
-    const thinRatio = totalPages > 0 ? thinPages / totalPages : 0;
+    const thinPagesCount = pages.filter(p => (p.wordCount || 0) < 300).length;
+    const thinRatio = totalPages > 0 ? thinPagesCount / totalPages : 0;
     const contentScore = Math.round((1 - thinRatio) * 15);
     score += contentScore;
     details.push({
@@ -493,9 +494,10 @@ function computeOnPageScore(siteIntelligence, pages) {
         score: contentScore,
         max: 15,
         status: contentScore >= 12 ? 'pass' : contentScore >= 7 ? 'warning' : 'fail',
-        value: `Avg ${siteIntelligence.avgWordCount || 0} words/page, ${thinPages} thin pages (<300 words)`,
-        fix: thinPages > 0 ? `${thinPages} pages have thin content (<300 words). Expand with useful, relevant content.` : undefined,
+        value: `Avg ${siteIntelligence.avgWordCount || 0} words/page, ${thinPagesCount} thin pages (<300 words)`,
+        fix: thinPagesCount > 0 ? `${thinPagesCount} pages have thin content (<300 words). Expand with useful, relevant content.` : undefined,
     });
+
 
     // Internal linking (10 pts)
     const internalLinks = siteIntelligence.internalLinkCount || 0;
@@ -1079,8 +1081,24 @@ export async function runSEOBaseline(brand) {
     const pages = siteResearch.pages;
     console.log(`  📊 Crawled ${si.totalPages} pages, ${si.totalWordCount} total words`);
 
+    // ── Fix 3: Deterministic Duplicate Detection via Normalization ──
+    const seenUrls = new Map();
+    const canonicalConflicts = [];
+    pages.forEach(p => {
+        const normalized = normalizeUrl(p.url);
+        if (seenUrls.has(normalized)) {
+            canonicalConflicts.push({ url1: seenUrls.get(normalized), url2: p.url });
+        } else {
+            seenUrls.set(normalized, p.url);
+        }
+    });
+    // Update site intelligence stats with deterministic counts
+    si.duplicateContentCount = canonicalConflicts.length;
+    si.duplicateContent = canonicalConflicts;
+
     // ── Step 2: Deterministic scoring ──
     const technicalResult = computeTechnicalScore(si, siteResearch.robotsTxt, siteResearch.sitemap, pageSpeed, website);
+
     const onPageResult = computeOnPageScore(si, pages);
     const contentResult = computeContentScore(si, siteResearch.homepage);
     const authorityResult = computeAuthorityScore(backlinkData);
@@ -1184,25 +1202,37 @@ export async function runSEOBaseline(brand) {
             noticeCount: categorizedIssues.notices.length,
         },
         // ── Per-page report cards (like Semrush/Ahrefs) ──
-        pageReports: pages.slice(0, 20).map(p => ({
-            url: p.url,
-            title: p.title || 'Untitled',
-            statusCode: p.statusCode || 200,
-            responseTimeMs: p.responseTimeMs || 0,
-            pageSizeKB: p.pageSizeKB || 0,
-            wordCount: p.wordCount || 0,
-            titleLength: p.titleLength || 0,
-            metaDescLength: p.metaDescLength || 0,
-            hasH1: !!(p.h1?.length),
-            h1Count: p.h1?.length || 0,
-            imagesWithoutAlt: p.images?.withoutAlt || 0,
-            headingHierarchyValid: p.headingHierarchy?.valid ?? true,
-            hasSchema: p.hasSchemaOrg || false,
-            hasCanonical: !!p.canonical,
-            urlTooLong: p.urlTooLong || false,
-            metaRobots: p.metaRobots || {},
-            issues: [],
-        })),
+        pageReports: pages.slice(0, 20).map(p => {
+            const pageIssues = [];
+            if (!p.h1 || p.h1.length === 0) pageIssues.push('No H1');
+            if (p.h1 && p.h1.length > 1) pageIssues.push(`${p.h1.length} H1s`);
+            if (p.metaDescription && p.metaDescription.trim().length === 0) pageIssues.push('Empty Meta');
+            if (!p.metaDescription) pageIssues.push('No Meta');
+            if ((p.wordCount || 0) < 300) pageIssues.push('Thin');
+            if (p.images?.withoutAlt > 0) pageIssues.push(`${p.images.withoutAlt} no-alt imgs`);
+            if (p.responseTimeMs > 2000) pageIssues.push('Slow');
+            
+            return {
+                url: p.url,
+                title: p.title || 'Untitled',
+                statusCode: p.statusCode || 200,
+                responseTimeMs: p.responseTimeMs || 0,
+                pageSizeKB: p.pageSizeKB || 0,
+                wordCount: p.wordCount || 0,
+                titleLength: p.titleLength || 0,
+                metaDescLength: p.metaDescLength || 0,
+                hasH1: !!(p.h1?.length),
+                h1Count: p.h1?.length || 0,
+                imagesWithoutAlt: p.images?.withoutAlt || 0,
+                headingHierarchyValid: p.headingHierarchy?.valid ?? true,
+                hasSchema: p.hasSchemaOrg || false,
+                hasCanonical: !!p.canonical,
+                urlTooLong: p.urlTooLong || false,
+                metaRobots: p.metaRobots || {},
+                issues: pageIssues,
+            };
+        }),
+
         siteStats: {
             pagesCrawled: si.totalPages,
             totalWordCount: si.totalWordCount,
@@ -1344,3 +1374,21 @@ function getGrade(score) {
     if (score >= 50) return 'D';
     return 'F';
 }
+
+/**
+ * Normalize URL for duplicate detection
+ */
+function normalizeUrl(url) {
+    try {
+        const u = new URL(url);
+        // Decode percent-encoding, lowercase the path, remove trailing slash and common space chars
+        let path = decodeURIComponent(u.pathname).toLowerCase().replace(/\s+/g, '');
+        if (path.length > 1 && path.endsWith('/')) path = path.slice(0, -1);
+        u.pathname = path;
+        u.hash = ''; // Ignore fragments
+        return u.toString();
+    } catch {
+        return url.toLowerCase().replace(/\s+/g, '').replace(/\/$/, '');
+    }
+}
+
