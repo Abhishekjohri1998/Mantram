@@ -1294,7 +1294,6 @@ small{color:#94a3b8;font-size:10px}
                                                     </span>
                                                 )}
                                             </div>
-                                            </div>
                                         )}
                                         {results.crawlIntelligence && (
                                             <>
