@@ -37,6 +37,14 @@ npm run dev
 
 ---
 
+## 🛠️ Configuration & Organization
+- **Shopify Config**: `backend/shopify.app.toml` is the single source of truth for the Shopify application. Do NOT add config files to the root.
+- **Maintenance Scripts**: Utility tools for data fixes and migrations are located in `scripts/`.
+- **Testing**: Backend tests are organized within `backend/__tests__/`.
+- **Environment**: Use `backend/.env` and `frontend/.env`.
+
+---
+
 ## 🛠️ Key Commands
 
 | Directory | Command | Description |

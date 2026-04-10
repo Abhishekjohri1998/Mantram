@@ -7,34 +7,13 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Build artifacts
 node_modules
 dist
 dist-ssr
 *.local
 
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
-.DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-# Logs
-logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
-
-node_modules
-dist
-dist-ssr
-*.local
-
-# Editor directories and files
+# Editor directories
 .vscode/*
 !.vscode/extensions.json
 .idea
@@ -45,11 +24,32 @@ dist-ssr
 *.sln
 *.sw?
 
-# Environment variables
+# Environment
 .env
 .env.*
 backend/secrets/
-*.json
-gcp-service-account.json
 secrets/
-gen-lang-client-0968421394-3e882db757f0.json
+gcp-service-account.json
+gen-lang-client-*.json
+
+# Shopify / App Config
+shopify.app.toml
+backend/shopify.app.toml.local
+
+# Sensitive Business Files
+waitlist.xlsx
+pitch_deck_research.json
+
+# Scripts & Scratch
+/scripts/fix_*.py
+/scripts/fix_*.js
+/scripts/patch_*.js
+/scripts/scratch.js
+scratch.js
+
+# Data
+*.json
+!package.json
+!package-lock.json
+!tsconfig.json
+!shopify.app.toml
