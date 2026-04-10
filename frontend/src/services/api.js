@@ -423,6 +423,10 @@ export const canvasAssets = {
     generateMusic: (data) => apiFetch('/fidato/canvas-music', { method: 'POST', body: JSON.stringify(data), timeout: 3600000 }),
     generateSoundEffect: (data) => apiFetch('/fidato/canvas-sfx', { method: 'POST', body: JSON.stringify(data) }),
     compileVideo: (data) => apiFetch('/fidato/canvas-compile', { method: 'POST', body: JSON.stringify(data), timeout: 3600000 }),
+    // MCoT — Post-Generation Critique
+    critiqueImage: (data) => apiFetch('/fidato/canvas-critique', { method: 'POST', body: JSON.stringify(data) }),
+    // Multi-size Campaign Generation
+    generateCampaign: (data) => apiFetch('/fidato/canvas-campaign', { method: 'POST', body: JSON.stringify(data) }),
 };
 
 // ============ Video Studio API ============

@@ -384,50 +384,53 @@ router.post('/ai-edit', protect, requireCredits('canvasGenerate'), async (req, r
         if (!imageKey) return res.status(400).json({ error: 'GEMINI_API_KEY not configured' })
 
         const baseUrl = 'https://generativelanguage.googleapis.com/v1beta'
-        const base64Data = imageBase64.includes('base64,') ? imageBase64.split('base64,')[1] : imageBase64
-        const mimeType = imageBase64.startsWith('data:') ? imageBase64.split(';')[0].split(':')[1] : 'image/png'
+
+        // Helper: convert a URL or base64 string into a Gemini inlineData part
+        const toImagePart = async (imgInput) => {
+            if (imgInput.startsWith('http://') || imgInput.startsWith('https://')) {
+                // Fetch remote image (S3 URL) and convert to base64
+                try {
+                    const imgResp = await fetch(imgInput)
+                    if (!imgResp.ok) return null
+                    const buffer = await imgResp.arrayBuffer()
+                    const b64 = Buffer.from(buffer).toString('base64')
+                    const contentType = imgResp.headers.get('content-type') || 'image/jpeg'
+                    return { inlineData: { mimeType: contentType, data: b64 } }
+                } catch (e) {
+                    console.warn('Failed to fetch image URL for ai-edit:', e.message)
+                    return null
+                }
+            }
+            // base64 data URI or raw base64
+            const data = imgInput.includes('base64,') ? imgInput.split('base64,')[1] : imgInput
+            const mime = imgInput.startsWith('data:') ? imgInput.split(';')[0].split(':')[1] : 'image/png'
+            return { inlineData: { mimeType: mime, data } }
+        }
 
         // Build multimodal parts: main image + additional images + text prompt
-        const parts = [{ inlineData: { mimeType, data: base64Data } }]
+        const mainPart = await toImagePart(imageBase64)
+        if (!mainPart) return res.status(400).json({ error: 'Could not process the main image' })
+        const parts = [mainPart]
 
         // Add individual images (from selected canvas objects)
         for (const addImg of additionalImages.slice(0, 4)) {
-            const addData = addImg.includes('base64,') ? addImg.split('base64,')[1] : addImg
-            const addMime = addImg.startsWith('data:') ? addImg.split(';')[0].split(':')[1] : 'image/png'
-            parts.push({ inlineData: { mimeType: addMime, data: addData } })
+            const part = await toImagePart(addImg)
+            if (part) parts.push(part)
         }
 
         const imgCount = parts.length
         const editText = imgCount > 1
-            ? `You are Fidato, an elite AI creative director with extraordinary visual intelligence. You have deep expertise in image composition, color theory, and visual storytelling.
+            ? `You are Fidato, an elite AI creative director. Your task is to generate a new image using the provided images strictly as VISUAL REFERENCES.
 
-CREATIVE ANALYSIS TASK:
-I have provided ${imgCount} images. The FIRST image is the full canvas context. The remaining ${imgCount - 1} image(s) are individual selected elements on the canvas.
+INSTRUCTION: "${prompt}"
 
-STEP 1 — DEEP IMAGE ANALYSIS (do this internally):
-For each image, analyze:
-• Dominant colors and color palette
-• Subject matter and visual elements
-• Mood, emotion, and visual weight
-• Lighting direction and quality
-• Texture patterns and visual styles
-• Negative space and composition
-
-STEP 2 — CREATIVE INTELLIGENCE:
-Based on the user's instruction: "${prompt}"
-• Identify HOW these images can work together harmoniously
-• Find visual connections — shared colors, complementary themes, consistent mood
-• Plan the optimal composition that balances all elements
-• Determine the best color grading that unifies everything
-
-STEP 3 — EXECUTION:
-• Create a single, cohesive masterpiece that intelligently blends elements from all provided images
-• Apply professional color harmony and seamless blending
-• Ensure lighting consistency across all merged elements
-• Use smooth transitions, matching shadows, and consistent perspective
-• The result should look like it was professionally composed — NOT like a collage
-
-CRITICAL: Think like a senior art director. The output must be a stunning, unified image — not a cut-and-paste job. Output the final image.`
+CREATIVE RULES:
+1. The provided images are your REFERENCE IMAGES (subject and/or style references).
+2. You MUST generate a new image that prominently features the exact subjects, products, or styles shown in these reference images.
+3. Intelligently compose them together into a single cohesive masterpiece based on the instruction.
+4. Ensure lighting and shadows are globally consistent.
+5. Do NOT hallucinate new products or subjects that conflict with the reference images.
+6. The output must be a stunning, unified image. Output the final image.`
             : `You are Fidato, an elite AI creative director. Edit this image with creative intelligence.
 
 INSTRUCTION: ${prompt}
