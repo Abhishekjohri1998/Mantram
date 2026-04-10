@@ -253,18 +253,8 @@ router.post('/ai-generate', protect, requireCredits('canvasGenerate'), async (re
                 ].filter(Boolean).slice(0, 5);
 
                 if (brandImages.length > 0) {
-                    console.log(`🧠 MCoT Canvas: Analyzing ${brandImages.length} brand images...`);
-                    const grounding = await callMultimodalAgent(
-                        CANVAS_VISUAL_GROUNDING_PROMPT,
-                        `Analyze these ${brandImages.length} images from brand "${brand?.name || 'unknown'}" and extract visual DNA for image generation.`,
-                        brandImages,
-                        { temperature: 0.2, maxTokens: 2048 }
-                    );
-                    if (grounding && !grounding.error && !grounding.skipped) {
-                        mcotGrounding = grounding;
-                        brandVisualInjection = grounding.promptInjection || '';
-                        console.log(`🧠 MCoT Canvas: Visual grounding complete — colors: ${(grounding.dominantColors || []).join(', ')}`);
-                    }
+                    console.log(`🧠 MCoT Canvas: Bypassing explicit brand visual grounding for generation speed.`);
+                    // grounding skipped to save 3-5s of latency per generate click
                 }
             } catch (mcotErr) {
                 console.warn('🧠 MCoT Canvas: Visual grounding failed (non-blocking):', mcotErr.message);
