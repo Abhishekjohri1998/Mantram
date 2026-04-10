@@ -45,12 +45,58 @@ import { generateUGCScript, UGC_STYLES } from '../agents/videoStudio/ugcScriptGe
 import { saveLearnings, getStylePreferences } from '../agents/videoStudio/selfLearning.js';
 import { getRouter as getAIRouter } from '../ai/router.js';
 import { getProviderBadge } from '../ai/providerRouting.js';
-import { uploadToS3, mirrorUrlToS3 } from '../utils/s3.js';
+import { uploadToS3, mirrorUrlToS3, getSignedUrlIfNeeded } from '../utils/s3.js';
 import { safeErrorMessage } from '../utils/safeError.js';
 
 const router = Router();
 
-// ══════════════════════════════════════════════════════════════════════════════
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+/**
+ * Recursively signs all S3 URLs in a VideoProject object or array.
+ */
+async function signVideoProjectAssets(data) {
+    if (!data) return data;
+    if (Array.isArray(data)) {
+        return Promise.all(data.map(item => signVideoProjectAssets(item)));
+    }
+
+    const project = typeof data.toObject === 'function' ? data.toObject() : { ...data };
+
+    // Sign top-level URLs
+    if (project.finalVideoUrl) project.finalVideoUrl = await getSignedUrlIfNeeded(project.finalVideoUrl);
+    if (project.firstFrameUrl) project.firstFrameUrl = await getSignedUrlIfNeeded(project.firstFrameUrl);
+
+    // Sign generation object
+    if (project.generation) {
+        if (project.generation.videoUrl) project.generation.videoUrl = await getSignedUrlIfNeeded(project.generation.videoUrl);
+        if (project.generation.thumbnailUrl) project.generation.thumbnailUrl = await getSignedUrlIfNeeded(project.generation.thumbnailUrl);
+    }
+
+    // Sign input images
+    if (project.input?.images) {
+        project.input.images = await Promise.all(project.input.images.map(img => getSignedUrlIfNeeded(img)));
+    }
+    if (project.images) { // in-memory response override
+        project.images = await Promise.all(project.images.map(img => getSignedUrlIfNeeded(img)));
+    }
+
+    // Sign concepts
+    if (project.concepts) {
+        for (const concept of project.concepts) {
+            if (concept.imageUrl) concept.imageUrl = await getSignedUrlIfNeeded(concept.imageUrl);
+        }
+    }
+
+    // Sign script shots
+    if (project.script?.shots) {
+        for (const shot of project.script.shots) {
+            if (shot.previewUrl) shot.previewUrl = await getSignedUrlIfNeeded(shot.previewUrl);
+        }
+    }
+
+    return project;
+}
 // POST /api/video-studio/advanced/i2v — Alias for /advanced/image-to-video
 // ══════════════════════════════════════════════════════════════════════════════
 router.post(['/advanced/i2v', '/advanced/image-to-video'], protect, requireCredits('videoGenerate'), async (req, res) => {
@@ -420,7 +466,8 @@ router.post('/agent/upload', protect, agentUpload.single('file'), async (req, re
 
         console.log(`✅ Agent upload complete: ${s3Url.substring(0, 80)}`);
 
-        res.json({ success: true, url: s3Url });
+        const finalUrl = await getSignedUrlIfNeeded(s3Url);
+        res.json({ success: true, url: finalUrl });
     } catch (error) {
         console.error('Agent upload error:', error);
         res.status(500).json({ success: false, error: `Upload failed: ${error.message}` });
@@ -3060,11 +3107,11 @@ router.get('/:id/status', protect, async (req, res) => {
 
                     return res.json({
                         success: true,
-                        project: {
+                        project: await signVideoProjectAssets({
                             _id: project._id,
                             status: 'completed',
                             generation: updatedGen,
-                        },
+                        }),
                     });
                 }
 
@@ -3086,25 +3133,25 @@ router.get('/:id/status', protect, async (req, res) => {
 
                     return res.json({
                         success: true,
-                        project: {
+                        project: await signVideoProjectAssets({
                             _id: project._id,
                             status: 'failed',
                             generation: updatedGen,
-                        },
+                        }),
                     });
                 }
 
                 // Still processing — return real-time progress from HeyGen
                 return res.json({
                     success: true,
-                    project: {
+                    project: await signVideoProjectAssets({
                         _id: project._id,
                         status: project.status,
                         generation: {
                             ...project.generation,
                             progress: heygenStatus.progress || project.generation.progress || 20,
                         },
-                    },
+                    }),
                 });
             }
 
@@ -3147,38 +3194,38 @@ router.get('/:id/status', protect, async (req, res) => {
 
                     return res.json({
                         success: true,
-                        project: {
+                        project: await signVideoProjectAssets({
                             _id: project._id,
                             status: 'critique',
                             generation: updated.generation,
                             critique: criticState.critique,
                             pipeline: getPipelineInfo('critique'),
-                        },
+                        }),
                     });
                 }
             }
 
             return res.json({
                 success: true,
-                project: {
+                project: await signVideoProjectAssets({
                     _id: project._id,
                     status: updated.status === 'generating' ? 'generating' : updated.status,
                     generation: updated.generation,
                     pipeline: getPipelineInfo(updated.status === 'generating' ? 'generating' : updated.status),
-                },
+                }),
             });
         }
 
         // Not in generating state — return full project
         res.json({
             success: true,
-            project: {
+            project: await signVideoProjectAssets({
                 _id: project._id,
                 status: project.status,
                 generation: project.generation,
                 critique: project.critique,
                 pipeline: getPipelineInfo(project.status),
-            },
+            }),
         });
     } catch (error) {
         console.error('Video Studio status error:', error);
@@ -3388,7 +3435,7 @@ router.get('/', protect, async (req, res) => {
             }));
         }
 
-        res.json({ success: true, projects, total });
+        res.json({ success: true, projects: await signVideoProjectAssets(projects), total });
     } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
@@ -3406,10 +3453,10 @@ router.get('/:id', protect, async (req, res) => {
 
         res.json({
             success: true,
-            project: {
+            project: await signVideoProjectAssets({
                 ...project,
                 pipeline: getPipelineInfo(project.status),
-            },
+            }),
         });
     } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
