@@ -570,11 +570,25 @@ export async function executeToolCall(toolCall, fc, ctx = {}, deps = {}) {
 
         case 'generate_video_clip': {
             let { prompt, duration, aspectRatio, sourceImageUrl, sceneRef } = args
-            if (!sourceImageUrl && sceneRef && ctx.scenes && ctx.scenes[sceneRef - 1]?.imageUrl) {
-                sourceImageUrl = ctx.scenes[sceneRef - 1].imageUrl
+            
+            // Extract image and prompt from scene if omitted
+            if (sceneRef && ctx.scenes && ctx.scenes[sceneRef - 1]) {
+                const scene = ctx.scenes[sceneRef - 1]
+                if (!sourceImageUrl && scene.imageUrl) {
+                    sourceImageUrl = scene.imageUrl
+                }
+                if (!prompt || !prompt.trim()) {
+                    prompt = scene.visual || scene.script || ''
+                }
             }
+            
+            // Backend validation requires a prompt string
+            if (!prompt || !prompt.trim()) {
+                prompt = sourceImageUrl ? "Cinematic subtle motion animation, 4k resolution" : "A cinematic 4k video scene"
+            }
+
             if (setFidatoMessages) {
-                setFidatoMessages(prev => [...prev, { role: 'assistant', content: `🎬 Generating video: "${prompt?.substring(0, 50)}..."` }])
+                setFidatoMessages(prev => [...prev, { role: 'assistant', content: `🎬 Generating video: "${prompt.substring(0, 50)}..."` }])
             }
             try {
                 const data = await canvasAssets.generateVideo({

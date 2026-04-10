@@ -837,56 +837,11 @@ When calling create_script_block, use this structure:
             }
 
             // ═══════════════════════════════════════════════════════════════
-            // MCoT Stage 1: VISUAL GROUNDING — Analyze product/brand images
-            // Runs in parallel with research compilation (~2-3s with Gemini Flash)
-            // Prevents product hallucination by giving Claude real visual facts
+            // MCoT Stage 1: VISUAL GROUNDING — SKIPPED FOR LATENCY
+            // Native visual grounding deferred directly to the diffusion model
             // ═══════════════════════════════════════════════════════════════
             let visualGroundingResult = null;
-            const imageUrlsForGrounding = referenceImages
-                .filter(img => img.source === 'product-catalog' || img.source === 'brand-onboarding')
-                .map(img => img.url)
-                .slice(0, 4);
-
-            if (imageUrlsForGrounding.length > 0) {
-                console.log(`🧠 MCoT Canvas: Running visual grounding on ${imageUrlsForGrounding.length} images...`);
-                try {
-                    const groundingStart = Date.now();
-                    visualGroundingResult = await callMultimodalAgent(
-                        VISUAL_GROUNDING_PROMPT,
-                        [
-                            `CREATIVE BRIEF: ${message}`,
-                            `BRAND: ${brand.name || 'Unknown'}`,
-                            brand.dna?.industry ? `INDUSTRY: ${brand.dna.industry}` : '',
-                            `\nAnalyze the ${imageUrlsForGrounding.length} provided image(s) and produce your visual rationale.`,
-                        ].filter(Boolean).join('\n'),
-                        imageUrlsForGrounding,
-                        { temperature: 0.2, maxTokens: 1024 }
-                    );
-
-                    if (visualGroundingResult && !visualGroundingResult.error) {
-                        console.log(`🧠 MCoT Canvas: Visual grounding complete in ${Date.now() - groundingStart}ms — confidence: ${visualGroundingResult.confidence || 'unknown'}`);
-                        
-                        // Inject visual grounding into pre-flight research
-                        preFlightResearch += `\n## 🧠 MCoT VISUAL GROUNDING (AI analyzed your actual product/brand images)\n`;
-                        if (visualGroundingResult.productAnalysis) preFlightResearch += `Product Analysis: ${visualGroundingResult.productAnalysis}\n`;
-                        if (visualGroundingResult.keyVisualFeatures?.length) preFlightResearch += `Key Visual Features: ${visualGroundingResult.keyVisualFeatures.join(', ')}\n`;
-                        if (visualGroundingResult.colorPalette?.length) preFlightResearch += `Accurate Colors: ${visualGroundingResult.colorPalette.join(', ')}\n`;
-                        if (visualGroundingResult.materialFinish) preFlightResearch += `Material & Finish: ${visualGroundingResult.materialFinish}\n`;
-                        if (visualGroundingResult.brandAesthetic) preFlightResearch += `Brand Aesthetic: ${visualGroundingResult.brandAesthetic}\n`;
-                        if (visualGroundingResult.generationGuidance) preFlightResearch += `⚠️ CRITICAL GENERATION GUIDANCE: ${visualGroundingResult.generationGuidance}\n`;
-                        if (visualGroundingResult.avoidList?.length) preFlightResearch += `DO NOT: ${visualGroundingResult.avoidList.join('; ')}\n`;
-                        preFlightResearch += `\n⚠️ USE THIS VISUAL INTELLIGENCE: When generating images, Claude MUST reference these real visual observations. Do NOT invent product features, colors, or materials that contradict this analysis.\n`;
-                    } else {
-                        console.warn(`🧠 MCoT Canvas: Visual grounding skipped (${visualGroundingResult?.error || 'no result'})`);
-                    }
-                } catch (groundingErr) {
-                    console.warn(`🧠 MCoT Canvas: Visual grounding failed (non-blocking): ${groundingErr.message}`);
-                    // Non-blocking — pipeline continues without grounding
-                }
-            } else {
-                console.log(`🧠 MCoT Canvas: No product images for visual grounding — skipping`);
-            }
-
+            
             console.log(`   ✅ Brand DNA research: ${preFlightResearch.length} chars, ${referenceImages.length} images`);
 
             // ── Return pre-flight results for user confirmation ──

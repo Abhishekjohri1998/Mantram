@@ -164,12 +164,13 @@ export default function SidebarLeft({
 
     // ── Tab click handler ──
     const handleTabClick = (tabId) => {
-        if (sidebarTab === tabId && panelOpen) {
+        if (sidebarTab === tabId && panelOpen && !sidebarCollapsed) {
             setPanelOpen(false)
+            setSidebarCollapsed(true)
         } else {
             setSidebarTab(tabId)
             setPanelOpen(true)
-            if (sidebarCollapsed) toggleSidebar()
+            setSidebarCollapsed(false)
         }
     }
 
@@ -201,8 +202,16 @@ export default function SidebarLeft({
     return (
         <div className={`ce-sidebar-left ${sidebarCollapsed ? 'collapsed' : ''}`}>
             {/* Collapse toggle */}
-            <button className="ce-sidebar-collapse-btn" onClick={() => toggleSidebar()} title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
-                <span className="material-symbols-outlined">{sidebarCollapsed ? 'chevron_right' : 'chevron_left'}</span>
+            <button className="ce-sidebar-collapse-btn" onClick={() => {
+                if (sidebarCollapsed || !panelOpen) {
+                    setSidebarCollapsed(false)
+                    setPanelOpen(true)
+                } else {
+                    setSidebarCollapsed(true)
+                    setPanelOpen(false)
+                }
+            }} title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
+                <span className="material-symbols-outlined">{sidebarCollapsed || !panelOpen ? 'chevron_right' : 'chevron_left'}</span>
             </button>
 
             {/* ── Icon Rail ── */}
