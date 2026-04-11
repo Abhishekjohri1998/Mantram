@@ -1692,12 +1692,16 @@
     align-items: center;
     justify-content: center;
     gap: 6px;
-    height: 48px;
-    padding: 0 16px;
+    min-height: 48px;
+    height: auto;
+    padding: 6px 16px;
+    flex-wrap: wrap;
     background: rgba(15, 20, 35, 0.95);
     border-top: 1px solid rgba(255, 255, 255, 0.06);
     flex-shrink: 0;
-    overflow-x: auto;
+    position: relative;
+    z-index: 50;
+    overflow: visible;
 }
 
 .ce-preset-btn {

@@ -9,6 +9,8 @@ import path from 'path';
 import { execSync } from 'child_process';
 import { searchWeb, searchBrandImages } from '../utils/searchManager.js';
 import Product from '../models/Product.js';
+import { callMultimodalAgent, loadBrandContext } from '../agents/shared/agentUtils.js';
+import { VISUAL_GROUNDING_PROMPT, POST_GENERATION_CRITIC_PROMPT } from '../agents/creativeStudio/prompts.js';
 import { callMultimodalAgent } from '../agents/shared/agentUtils.js';
 import { VISUAL_GROUNDING_PROMPT, POST_GENERATION_CRITIC_PROMPT } from '../agents/creativeStudio/prompts.js';
 
@@ -132,8 +134,7 @@ const CANVAS_TOOLS = [
             properties: {
                 preset: {
                     type: 'string',
-                    enum: ['ig-post', 'ig-post-square', 'ig-story', 'ig-reel', 'fb-post', 'fb-story', 'linkedin', 'yt-thumb', 'twitter', 'whatsapp-status', 'carousel', 'pinterest', 'banner', 'banner-square'],
-                    description: 'Platform preset sizes — ig-post=1080x1350 (4:5 portrait, recommended), ig-post-square=1080x1080 (1:1), ig-story=1080x1920 (9:16), ig-reel=1080x1920, fb-post=1200x630, fb-story=1080x1920, linkedin=1200x628, yt-thumb=1280x720, twitter=1600x900, whatsapp-status=1080x1920, carousel=1080x1080, pinterest=1000x1500, banner=1920x600, banner-square=1200x1200'
+                    description: 'Platform preset sizes. It accepts fuzzy inputs like "Facebook", "Instagram Story", "YouTube thumb", etc. Exact IDs: ig-post=1080x1350, ig-story=1080x1920, fb-post=1200x630, yt-thumb=1280x720, twitter=1600x900, whatsapp-status=1080x1920'
                 },
             },
             required: ['preset'],
@@ -312,7 +313,7 @@ const CANVAS_TOOLS = [
                 prompt: { type: 'string', description: 'Detailed cinematic prompt describing the video scene. Be specific about motion, camera movement, lighting, and action.' },
                 duration: { type: 'number', description: 'Duration in seconds (3-10, default: 5)' },
                 aspectRatio: { type: 'string', enum: ['16:9', '9:16', '1:1'], description: 'Aspect ratio (default: 16:9)' },
-                model: { type: 'string', description: 'Which AI video model to use. Always default to "grok" unless specified.' },
+                model: { type: 'string', description: 'Which AI video model to use. Always default to "grok-imagine" unless specified.' },
                 resolution: { type: 'string', enum: ['720p', '1080p', '4k'], description: 'Video resolution (default: 1080p)' },
                 sourceImageUrl: { type: 'string', description: 'Optional: URL of a storyboard frame image to animate (Image-to-Video)' },
                 sceneRef: { type: 'number', description: 'CRITICAL: If you just generated this scene using create_storyboard_frames and do not know its URL yet, pass the 1-based scene index here (e.g. 1, 2) and the system will automatically animate it!' },
@@ -666,8 +667,8 @@ When calling create_script_block, use this structure:
 - For video ads: script scenes must include voiceover text and duration per scene
 - For voiceover: ONLY use speaker 'anushka' (female) or 'abhilash' (male). No other speakers.
 - NEVER just add plain text elements for ad requests — use the full pipeline
-- ⚡ VIDEO GENERATION — DEFAULT MODEL: **grok** (Grok Video by xAI). DO NOT ask for model confirmation before starting. Instead:
-  1. Call generate_video_clip immediately with model="grok" and resolution="1080p" as defaults.
+- ⚡ VIDEO GENERATION — DEFAULT MODEL: **grok-imagine** (Grok Video by xAI). DO NOT ask for model confirmation before starting. Instead:
+  1. Call generate_video_clip immediately with model="grok-imagine" and resolution="1080p" as defaults.
   2. In your response text BEFORE calling the tool, say: "🎬 Generating your video with **Grok** (default). Reply with a model name below to switch:"
   3. Then offer these model options inline in your message text (user can reply to switch):
      - **Grok** (default) — Fast & cinematic. Best for brand ads.
@@ -676,7 +677,7 @@ When calling create_script_block, use this structure:
      - **Wan** — Creative/surreal visuals, best for abstract.
      - **Hailuo** — High-fidelity, cinematic motion.
   4. If the user replies with a model name, regenerate with that model using generate_video_clip.
-  5. NEVER block generation waiting for a model choice. Default to Grok and keep moving.
+  5. NEVER block generation waiting for a model choice. Default to grok-imagine and keep moving.
   6. Resolution default is 1080p. If user says "4K" use resolution="4k". If on mobile/story use aspectRatio="9:16".`;
 
         // ── PRE-FLIGHT: Pull data from Brand DNA + Product catalog (NO web search) ──
@@ -702,14 +703,15 @@ When calling create_script_block, use this structure:
                 .trim();
             console.log(`   📌 Product keywords: "${productKeywords}"`);
 
-            // ── Step 1: Brand DNA context ──
-            const dna = brand.dna || {};
-            const brandCountry = dna.country || brand.country || 'India';
+            // ── Step 1: Brand DNA context (Using Cached MCP util) ──
+            const { brand: cachedBrand } = await loadBrandContext(brand._id);
+            const dna = cachedBrand?.dna || brand.dna || {};
+            const brandCountry = dna.country || cachedBrand?.country || 'India';
             const currencyMap = { 'India': 'INR ₹', 'US': 'USD $', 'USA': 'USD $', 'UK': 'GBP £', 'UAE': 'AED', 'Canada': 'CAD' };
             const localCurrency = currencyMap[brandCountry] || brandCountry;
 
             preFlightResearch += `\n## BRAND DNA (FROM DATABASE — VERIFIED DATA)\n`;
-            preFlightResearch += `Brand: ${brand.name || 'Unknown'}\n`;
+            preFlightResearch += `Brand: ${cachedBrand?.name || 'Unknown'}\n`;
             preFlightResearch += `Market: ${brandCountry} | Currency: ${localCurrency}\n`;
             if (dna.tagline) preFlightResearch += `Tagline: "${dna.tagline}"\n`;
             if (dna.industry) preFlightResearch += `Industry: ${dna.industry}\n`;
@@ -941,11 +943,27 @@ When calling create_script_block, use this structure:
         } catch (claudeErr) {
             console.warn(`   ⚠️ Claude tool-use failed: ${claudeErr.message?.substring(0, 100)}`);
 
-            // Fallback: use regular text generation to suggest what to do
-            // IMPORTANT: List EXACT tool names to prevent hallucinated tool names like "update_layer"
-            const validToolNames = clientTools.map(t => t.name).join(', ');
-            const fallbackResult = await aiRouter.generateText({
-                systemPrompt: `You are Fidato, an AI creative director. The user wants to modify their canvas. Since tool-use is unavailable, respond with a JSON object containing "actions" — an array of canvas actions the frontend should execute.
+            // RETRY: Try Claude again with a clean slate before resorting to Gemini
+            try {
+                const anthropic = aiRouter.getProvider('anthropic');
+                console.log('   🔄 Retrying Claude with simple configuration...');
+                result = await anthropic.generateWithTools({
+                    systemPrompt: systemPrompt,
+                    userPrompt: message,
+                    tools: clientTools,
+                    temperature: 0.2, // lower temp for stability
+                    maxTokens: 2048,
+                    model: 'claude-3-5-sonnet-20240620'
+                });
+                req._referenceImages = referenceImages;
+            } catch (claudeRetryErr) {
+                console.warn(`   ❌ Claude retry failed: ${claudeRetryErr.message?.substring(0, 50)}. Falling back to Gemini...`);
+                
+                // Fallback: use regular text generation to suggest what to do
+                // IMPORTANT: List EXACT tool names to prevent hallucinated tool names like "update_layer"
+                const validToolNames = clientTools.map(t => t.name).join(', ');
+                const fallbackResult = await aiRouter.generateText({
+                    systemPrompt: `You are Fidato, an AI creative director. The user wants to modify their canvas. Since tool-use is unavailable, respond with a JSON object containing "actions" — an array of canvas actions the frontend should execute.
 ${brandContext}
 ${canvasContext}
 
@@ -955,41 +973,42 @@ ${validToolNames}
 For repositioning elements, use "move_element" with { position: "center" | "top-left" | etc. } or "change_element_property" with { property: "left" | "top", value: "number" }.
 
 Respond ONLY with valid JSON: { "reply": "friendly message", "actions": [{ "tool": "EXACT_TOOL_NAME_FROM_LIST", "args": {...} }] }`,
-                userPrompt: message,
-                maxTokens: 2048,
-                temperature: 0.5,
-            });
-
-            // Parse fallback response
-            try {
-                const raw = (fallbackResult.text || '').replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
-                const jsonMatch = raw.match(/\{[\s\S]*\}/);
-                const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : raw);
-                return res.json({
-                    success: true,
-                    reply: parsed.reply || 'Here are the changes I suggest:',
-                    toolCalls: (parsed.actions || []).map(a => ({ name: a.tool, args: a.args })),
-                    fallback: true,
-                    provider: fallbackResult.provider,
-                    generationTime: Date.now() - startTime,
+                    userPrompt: message,
+                    maxTokens: 2048,
+                    temperature: 0.5,
                 });
-            } catch (parseErr) {
-                console.warn('⚠️ Fallback JSON parsing failed:', parseErr.message);
-                
-                // If text contains a JSON block, don't show it to the user. Provide a clean apology.
-                let cleanReply = fallbackResult.text || 'I can help with your canvas design. Could you be more specific?';
-                if (cleanReply.includes('```json') || cleanReply.includes('"actions":')) {
-                   cleanReply = "I planned some updates for your canvas, but encountered an unexpected error formatting them. Could you try asking me to make that change again?";
+
+                // Parse fallback response
+                try {
+                    const raw = (fallbackResult.text || '').replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+                    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+                    const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : raw);
+                    return res.json({
+                        success: true,
+                        reply: parsed.reply || 'Here are the changes I suggest:',
+                        toolCalls: (parsed.actions || []).map(a => ({ name: a.tool, args: a.args })),
+                        fallback: true,
+                        provider: fallbackResult.provider,
+                        generationTime: Date.now() - startTime,
+                    });
+                } catch (parseErr) {
+                    console.warn('⚠️ Fallback JSON parsing failed:', parseErr.message);
+                    
+                    // If text contains a JSON block, don't show it to the user. Provide a clean apology.
+                    let cleanReply = fallbackResult.text || 'I can help with your canvas design. Could you be more specific?';
+                    if (cleanReply.includes('```json') || cleanReply.includes('"actions":')) {
+                       cleanReply = "I planned some updates for your canvas, but encountered an unexpected error formatting them. Could you try asking me to make that change again?";
+                    }
+
+                    return res.json({
+                        success: true,
+                        reply: cleanReply,
+                        toolCalls: [],
+                        fallback: true,
+                        provider: fallbackResult.provider,
+                        generationTime: Date.now() - startTime,
+                    });
                 }
-
-                return res.json({
-                    success: true,
-                    reply: cleanReply,
-                    toolCalls: [],
-                    fallback: true,
-                    provider: fallbackResult.provider,
-                    generationTime: Date.now() - startTime,
-                });
             }
         }
 

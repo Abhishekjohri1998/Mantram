@@ -327,7 +327,7 @@ You MUST faithfully reproduce the EXACT appearance of EVERY person/subject from 
 SUBJECT ANALYSIS FROM REFERENCES:
 ${dynamicSynthesisPrompt}
 
-USER'S CREATIVE BRIEF: ${prompt}
+USER'S CREATIVE BRIEF: ${prompt} (Format/Aspect Ratio required: ${size})
 ${brandVisualInjection ? `\nBRAND VISUAL DIRECTION: ${brandVisualInjection}` : ''}
 
 ABSOLUTE RULES:
@@ -343,7 +343,7 @@ Generate ONE stunning image with ALL subjects faithfully preserved.`
             ? `You are an elite creative director. I have provided ${refCount} reference image(s).
 Study the reference carefully — reproduce the EXACT subject appearance (face, body, clothing, features).
 
-INSTRUCTION: ${prompt}
+INSTRUCTION: ${prompt} (Format/Aspect Ratio required: ${size})
 ${brandVisualInjection ? `\nBRAND VISUAL DIRECTION: ${brandVisualInjection}` : ''}
 
 RULES:
@@ -354,7 +354,7 @@ RULES:
 Generate a stunning, gallery-quality image.`
             : `You are an elite creative director and visual artist. Generate a stunning, gallery-quality image with these principles:
 
-INSTRUCTION: ${prompt}
+INSTRUCTION: ${prompt} (Format/Aspect Ratio required: ${size})
 ${brandVisualInjection ? `\nBRAND VISUAL DIRECTION: ${brandVisualInjection}` : ''}
 
 CREATIVE PRINCIPLES:
@@ -459,42 +459,12 @@ router.post('/ai-edit', protect, requireCredits('canvasGenerate'), async (req, r
 
         const imgCount = parts.length
         
-        let dynamicSynthesisPrompt = ''
-        if (imgCount > 1) {
-            console.log(`🧠 MCoT Canvas: Multi-subject edit detected. Synthesizing ${imgCount} images...`)
-            try {
-                const synthesis = await callMultimodalAgent(
-                    `You are an elite creative analyst. The user has provided ${imgCount} reference images and wants: "${prompt}".`,
-                    `For EACH attached image, output a labeled block like this:
-IMAGE 1 SUBJECT: [Describe the exact person/object — age, gender, skin tone, hair color/style, clothing, build, expression, distinguishing features]
-IMAGE 2 SUBJECT: [Same level of detail for the second image]
-...and so on for all images.
-
-Then write:
-COMBINED SCENE: [A single paragraph describing ALL subjects together in the scene the user wants: "${prompt}". Every subject must appear with their exact appearance preserved.]
-
-Be forensically detailed about each subject's appearance so the image generator cannot hallucinate or swap them.`,
-                    [imageBase64, ...additionalImages].slice(0, 4),
-                    { temperature: 0.1, maxTokens: 1024, returnRaw: true }
-                )
-                if (synthesis && typeof synthesis === 'string') {
-                    dynamicSynthesisPrompt = synthesis.trim()
-                    console.log(`🧠 MCoT Canvas: Edit subject synthesis complete (${dynamicSynthesisPrompt.length} chars)`)
-                }
-            } catch (e) {
-                console.warn('MCoT Synthesis failed for edit payload:', e.message)
-            }
-        }
-
-        const editText = imgCount > 1 && dynamicSynthesisPrompt
+        const editText = imgCount > 1
             ? `CRITICAL INSTRUCTION — MULTI-SUBJECT IMAGE EDIT:
 
 You have been given ${imgCount} reference images. Each image contains a DIFFERENT subject.
 DO NOT merge them into one person. DO NOT hallucinate or replace any subject's appearance.
 You MUST faithfully reproduce the EXACT appearance of EVERY person/subject from the reference images.
-
-SUBJECT ANALYSIS FROM REFERENCES:
-${dynamicSynthesisPrompt}
 
 USER'S CREATIVE BRIEF: "${prompt}"
 
@@ -504,21 +474,9 @@ ABSOLUTE RULES:
 ${imgCount > 2 ? `3. Image 3's subject MUST appear exactly as shown in Image 3\n` : ''}
 - Compose ALL subjects together in a single scene following the user's brief
 - Professional lighting, cinematic composition, 4K quality
-- DO NOT drop any subject. ALL ${imgCount} subjects must be clearly visible and recognizable.
+- DO NOT drop any subject. ALL ${imgCount} subjects must be clearly recognizable.
 
 Generate ONE stunning image with ALL subjects faithfully preserved.`
-            : imgCount > 1
-            ? `You are Fidato, an elite AI creative director. Your task is to generate a new image using the provided images strictly as VISUAL REFERENCES.
-
-INSTRUCTION: "${prompt}"
-
-CREATIVE RULES:
-1. The provided images are your REFERENCE IMAGES (subject and/or style references).
-2. You MUST generate a new image that prominently features the exact subjects from ALL reference images.
-3. Intelligently compose them together into a single cohesive masterpiece based on the instruction.
-4. Ensure lighting and shadows are globally consistent.
-5. Do NOT hallucinate new products or subjects that conflict with the reference images.
-6. The output must be a stunning, unified image. Output the final image.`
             : `You are Fidato, an elite AI creative director. Edit this image with creative intelligence.
 
 INSTRUCTION: ${prompt}

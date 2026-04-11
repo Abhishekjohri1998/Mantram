@@ -135,7 +135,7 @@ export default function BottomBar({ onResizeCanvas, onResizeToPreset }) {
             <div style={{ width: 1, height: 22, background: 'rgba(255,255,255,0.07)', margin: '0 6px', flexShrink: 0 }} />
 
             {/* ─── Platform Preset Groups ─── */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 2, overflowX: 'auto', flexShrink: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap', flexShrink: 1 }}>
                 {PRESET_GROUPS.map(group => {
                     const groupPresets = group.ids.map(id => PRESET_MAP[id]).filter(Boolean)
                     const isGroupActive = groupPresets.some(p => p.id === activePreset)

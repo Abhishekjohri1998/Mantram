@@ -169,8 +169,32 @@ export async function executeToolCall(toolCall, fc, ctx = {}, deps = {}) {
             return `Removed "${el.customName || el.type}"`
         }
 
+        // ── Fuzzy Preset Normalizer Helper ──
+        const normalizePresetId = (input) => {
+            if (!input || typeof input !== 'string') return input
+            const lower = input.toLowerCase().trim()
+            if (PRESETS.some(p => p.id === lower)) return lower
+            if (/facebook|fb/i.test(lower)) return /story/i.test(lower) ? 'fb-story' : 'fb-post'
+            if (/instagram|ig|insta/i.test(lower)) {
+                if (/story/i.test(lower)) return 'ig-story'
+                if (/reel/i.test(lower)) return 'ig-reel'
+                if (/square|1:1/i.test(lower)) return 'ig-post-square'
+                return 'ig-post'
+            }
+            if (/youtube|yt/i.test(lower)) return 'yt-thumb'
+            if (/linkedin/i.test(lower)) return 'linkedin'
+            if (/twitter|x\b/i.test(lower)) return 'twitter'
+            if (/whatsapp/i.test(lower)) return 'whatsapp-status'
+            if (/pinterest/i.test(lower)) return 'pinterest'
+            if (/banner/i.test(lower) && /square/i.test(lower)) return 'banner-square'
+            if (/banner/i.test(lower)) return 'banner'
+            if (/carousel/i.test(lower)) return 'carousel'
+            return input
+        }
+
         case 'set_canvas_size': {
-            const preset = PRESETS.find(p => p.id === args.preset)
+            const normalizedId = normalizePresetId(args.preset)
+            const preset = PRESETS.find(p => p.id === normalizedId)
             if (preset) {
                 resizeToPreset(fc, preset)
                 return `Canvas resized to ${preset.label} (${preset.w}×${preset.h})`
@@ -887,7 +911,8 @@ export async function executeToolCall(toolCall, fc, ctx = {}, deps = {}) {
                 prompt = sourceImageUrl ? 'Cinematic subtle motion animation, 4k resolution' : 'A cinematic 4k video scene'
             }
 
-            const selectedModel = model || 'grok'
+            let selectedModel = model || 'grok-imagine'
+            if (selectedModel === 'grok') selectedModel = 'grok-imagine'
             const selectedRes = resolution || '1080p'
 
             if (setFidatoMessages) {
@@ -1329,7 +1354,7 @@ export async function executeToolCall(toolCall, fc, ctx = {}, deps = {}) {
                     const refUrls = (ctx.referenceImages || []).slice(0, 3).map(r => r.url).filter(Boolean)
                     const data = await canvasAssets.aiGenerate({
                         prompt: adaptedPrompt,
-                        size: '1024x1024',
+                        size: spec.aspectRatio || '1:1',
                         brandId: brand?._id || undefined,
                         referenceImages: refUrls.length > 0 ? refUrls : undefined,
                     })
