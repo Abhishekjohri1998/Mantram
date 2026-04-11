@@ -412,7 +412,27 @@ const CANVAS_TOOLS = [
             required: ['imageUrl'],
         },
     },
+    {
+        name: 'adapt_design',
+        description: 'Smart Design Adaptation — intelligently adapts the current canvas design (all elements: images, text, CTAs, features, shapes) to multiple platform sizes WITHOUT losing the design\'s visual essence. Each element is AI-repositioned, rescaled, and reflowed to fit each target platform\'s aspect ratio while maintaining the visual hierarchy, brand colors, and design intent. Creates separate artboards side-by-side on the canvas. Use this when the user says "adapt this to IG", "resize for all platforms", "create variants for LinkedIn and Stories", "adapt to different sizes", or "magic resize".',
+        input_schema: {
+            type: 'object',
+            properties: {
+                presets: {
+                    type: 'array',
+                    description: 'List of target platform presets to adapt the design to. Choose from the full preset list based on what the user requests.',
+                    items: {
+                        type: 'string',
+                        enum: ['ig-post', 'ig-post-square', 'ig-story', 'ig-reel', 'fb-post', 'fb-story', 'linkedin', 'yt-thumb', 'twitter', 'whatsapp-status', 'carousel', 'pinterest', 'banner', 'banner-square'],
+                    },
+                    minItems: 1,
+                },
+            },
+            required: ['presets'],
+        },
+    },
 ];
+
 
 // ── POST /api/fidato/canvas-direct ──
 router.post('/canvas-direct', protect, requireCredits('fidatoCanvas'), async (req, res) => {

@@ -1055,4 +1055,207 @@ router.get('/textures', protect, async (req, res) => {
     }
 })
 
+// ══════════════════════════════════════════════════════════════════════
+// POST /api/canvas-assets/smart-adapt — Smart Design Adaptation Engine
+// Powered by Gemini: intelligently repositions/rescales all canvas elements
+// to fit target platform sizes while preserving visual hierarchy & brand DNA
+// ══════════════════════════════════════════════════════════════════════
+router.post('/smart-adapt', protect, requireCredits('canvasGenerate'), async (req, res) => {
+    try {
+        const { elements, sourceWidth, sourceHeight, targetPresets, brand } = req.body
+
+        if (!elements?.length) return res.status(400).json({ error: 'Canvas elements are required' })
+        if (!targetPresets?.length) return res.status(400).json({ error: 'At least one target preset is required' })
+
+        const apiKey = process.env.GEMINI_API_KEY
+        if (!apiKey) return res.status(400).json({ error: 'GEMINI_API_KEY not configured' })
+
+        console.log(`🎨 [SmartAdapt] Adapting ${elements.length} elements to ${targetPresets.length} platform sizes`)
+        const startTime = Date.now()
+
+        // ── PRESET DIMENSIONS MAP ──
+        const PRESET_MAP = {
+            'ig-post':         { w: 1080, h: 1350, label: 'Instagram Post (4:5)',    aspectRatio: '4:5',    orientation: 'portrait' },
+            'ig-post-square':  { w: 1080, h: 1080, label: 'Instagram Square (1:1)',  aspectRatio: '1:1',    orientation: 'square' },
+            'ig-story':        { w: 1080, h: 1920, label: 'Instagram Story (9:16)',  aspectRatio: '9:16',   orientation: 'portrait-tall' },
+            'ig-reel':         { w: 1080, h: 1920, label: 'Instagram Reel (9:16)',   aspectRatio: '9:16',   orientation: 'portrait-tall' },
+            'fb-post':         { w: 1200, h: 630,  label: 'Facebook Post (1.91:1)', aspectRatio: '1.91:1', orientation: 'landscape' },
+            'fb-story':        { w: 1080, h: 1920, label: 'Facebook Story (9:16)',  aspectRatio: '9:16',   orientation: 'portrait-tall' },
+            'linkedin':        { w: 1200, h: 628,  label: 'LinkedIn (1.91:1)',       aspectRatio: '1.91:1', orientation: 'landscape' },
+            'yt-thumb':        { w: 1280, h: 720,  label: 'YouTube Thumbnail (16:9)',aspectRatio: '16:9',   orientation: 'landscape' },
+            'twitter':         { w: 1600, h: 900,  label: 'Twitter/X (16:9)',        aspectRatio: '16:9',   orientation: 'landscape' },
+            'whatsapp-status': { w: 1080, h: 1920, label: 'WhatsApp Status (9:16)',  aspectRatio: '9:16',   orientation: 'portrait-tall' },
+            'carousel':        { w: 1080, h: 1080, label: 'Carousel (1:1)',          aspectRatio: '1:1',    orientation: 'square' },
+            'pinterest':       { w: 1000, h: 1500, label: 'Pinterest Pin (2:3)',     aspectRatio: '2:3',    orientation: 'portrait' },
+            'banner':          { w: 1920, h: 600,  label: 'Web Banner (~3.2:1)',     aspectRatio: '~3.2:1', orientation: 'ultra-wide' },
+            'banner-square':   { w: 1200, h: 1200, label: 'Display Ad (1:1)',        aspectRatio: '1:1',    orientation: 'square' },
+        }
+
+        // ── ASSIGN SEMANTIC ROLES TO ELEMENTS ──
+        // Infer role from element properties so the AI gets a labeled layer tree
+        const labeledElements = elements.map((el, i) => {
+            let role = el._role || 'decoration'
+            const name = (el.customName || el.name || '').toLowerCase()
+            const text = (el.text || '').toLowerCase()
+            const nodeType = el._nodeType || ''
+
+            if (nodeType === 'logo' || name.includes('logo')) role = 'logo'
+            else if (nodeType === 'product' || name.includes('product')) role = 'product-image'
+            else if (el.type === 'image' && i === 0) role = 'background-image'
+            else if (el.type === 'image') role = 'product-image'
+            else if (el.type === 'rect' && i <= 1) role = 'background'
+            else if (el.type === 'textbox' || el.type === 'i-text') {
+                const fontSize = el.fontSize || 24
+                if (fontSize >= 48 || name.includes('heading') || name.includes('headline') || name.includes('title')) role = 'headline'
+                else if (fontSize >= 28) role = 'subheadline'
+                else if (text.includes('₹') || text.includes('$') || name.includes('price')) role = 'price'
+                else if (name.includes('cta') || name.includes('button') || text.includes('shop') || text.includes('buy') || text.includes('order')) role = 'cta'
+                else if (name.includes('feature') || name.includes('bullet')) role = 'feature-point'
+                else if (name.includes('tagline') || name.includes('sub')) role = 'tagline'
+                else role = 'body-text'
+            } else if (el.type === 'rect' || el.type === 'circle' || el.type === 'ellipse') role = 'shape'
+            else if (nodeType === 'shape') role = 'shape'
+
+            return {
+                id: el.id || `el-${i}`,
+                index: i,
+                type: el.type,
+                role,
+                name: el.customName || el.name || `Layer ${i + 1}`,
+                text: el.text ? el.text.substring(0, 200) : null,
+                src: el.src ? el.src.substring(0, 100) : null,
+                // Position and size as percentages of source canvas (portable across sizes)
+                xPct: Math.round((el.left / sourceWidth) * 1000) / 10,
+                yPct: Math.round((el.top / sourceHeight) * 1000) / 10,
+                wPct: Math.round((el.width / sourceWidth) * 1000) / 10,
+                hPct: Math.round((el.height / sourceHeight) * 1000) / 10,
+                // Raw px values for reference
+                left: Math.round(el.left), top: Math.round(el.top),
+                width: Math.round(el.width), height: Math.round(el.height),
+                fontSize: el.fontSize || null,
+                fontWeight: el.fontWeight || null,
+                fill: el.fill || null,
+                opacity: el.opacity ?? 1,
+                zIndex: i,
+            }
+        })
+
+        // ── COMPOSE AI PROMPT ──
+        const systemPrompt = `You are an expert graphic design layout engine. Your job is to intelligently adapt a visual design layout to multiple platform sizes.
+
+CORE PRINCIPLES:
+1. Preserve visual hierarchy — headline stays most prominent, product/hero image stays focal
+2. Maintain brand DNA — colors, style, personality unchanged
+3. Smart overflow handling — if space is tight, SHRINK size/font, not remove elements (unless truly forced)
+4. Anchor critical elements — logo always near top, CTA always near bottom
+5. Adapt spacing proportionally — elements spaced relative to canvas, not fixed px
+6. For landscape formats (FB, LinkedIn, YT, Twitter/Banner): arrange elements horizontally (image left, text right)
+7. For portrait formats (IG Post, Story, Reel, Pinterest): stack elements vertically, full-width
+8. For square formats (IG Square, Carousel, Display Ad): balanced centered layout
+
+LAYOUT RULES BY ROLE:
+- background/background-image: ALWAYS fill full canvas (x:0, y:0, w:100%, h:100%)
+- logo: top corner (top-left or top-right), small (5-8% of canvas height), never scaled up
+- headline: 60-80% canvas width, top 30-50% of canvas, font 4-6% of canvas height
+- subheadline: just below headline, font 2-3% of canvas height
+- product-image: center or dominant (40-60% of canvas), no cropping allowed
+- feature-point: stack below subheadline, reduce font if needed (1.5-2% of canvas height)
+- price: near CTA, medium-bold prominence
+- cta: bottom 15-20% of canvas, centered or right-aligned
+- tagline: very small, near bottom or top, 1-1.5% canvas height
+- shape/decoration: scale proportionally with canvas
+
+OUTPUT FORMAT — Return ONLY valid JSON like this:
+{
+  "adaptations": {
+    "ig-post": {
+      "canvasWidth": 1080,
+      "canvasHeight": 1350,
+      "label": "Instagram Post (4:5)",
+      "layoutStrategy": "Vertical portrait stack — product image top 50%, text block bottom 50%, CTA anchored at bottom",
+      "elements": [
+        {
+          "id": "el-0",
+          "role": "background",
+          "x": 0, "y": 0, "w": 1080, "h": 1350,
+          "fontSize": null,
+          "opacity": 1,
+          "visible": true,
+          "notes": "Full-canvas background fill"
+        }
+      ]
+    }
+  }
+}`
+
+        const userPrompt = `SOURCE CANVAS: ${sourceWidth}×${sourceHeight}px
+BRAND: ${brand?.name || 'Not specified'}
+BRAND COLORS: ${brand?.dna?.brandColors?.map?.(c => c.hex)?.join(', ') || 'Not specified'}
+
+CURRENT LAYOUT ELEMENTS (${labeledElements.length} elements):
+${JSON.stringify(labeledElements, null, 2)}
+
+TARGET PLATFORM SIZES TO ADAPT TO:
+${targetPresets.map(p => {
+    const spec = PRESET_MAP[p]
+    return spec ? `- ${p}: ${spec.w}×${spec.h}px (${spec.label}, ${spec.orientation})` : `- ${p}: unknown preset`
+}).join('\n')}
+
+For each target platform, return the adapted layout spec. For EVERY element in the source layout:
+1. Calculate new x, y, w, h in PIXELS (not percentages) for the target canvas size
+2. Adjust fontSize proportionally to target canvas height  
+3. Set visible=false ONLY if there is truly no space (rare)
+4. Add a brief "notes" field explaining your layout decision for that element
+
+Remember: landscape formats = horizontal split, portrait = vertical stack, square = centered balanced.
+Return ONLY valid JSON, no explanation text outside the JSON.`
+
+        const baseUrl = 'https://generativelanguage.googleapis.com/v1beta'
+        const url = `${baseUrl}/models/gemini-2.5-flash:generateContent?key=${apiKey}`
+        const resp = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [{ role: 'user', parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }] }],
+                generationConfig: { temperature: 0.15, maxOutputTokens: 8192, thinkingConfig: { thinkingBudget: 1000 } },
+            }),
+        })
+        const data = await resp.json()
+        if (data.error) throw new Error(data.error.message)
+
+        // Extract text from all parts (gemini-2.5 may return thought + text parts)
+        const allParts = data.candidates?.[0]?.content?.parts || []
+        let text = ''
+        for (const p of allParts) {
+            if (p.text && !p.thought) text += p.text
+        }
+
+        // Parse JSON response
+        let parsed
+        try {
+            const jsonMatch = text.match(/\{[\s\S]*\}/)
+            parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : null
+        } catch (e) {
+            console.error('[SmartAdapt] JSON parse failed:', e.message, text.substring(0, 300))
+            return res.status(500).json({ error: 'AI returned unparseable layout spec — please try again' })
+        }
+
+        if (!parsed?.adaptations) {
+            return res.status(500).json({ error: 'AI did not return expected adaptations format' })
+        }
+
+        console.log(`✅ [SmartAdapt] Done in ${Date.now() - startTime}ms — ${Object.keys(parsed.adaptations).length} platform layouts generated`)
+        res.json({
+            success: true,
+            sourceWidth, sourceHeight,
+            labeledElements, // Return labeled elements for FE re-rendering
+            adaptations: parsed.adaptations,
+            presetsProcessed: Object.keys(parsed.adaptations).length,
+        })
+    } catch (err) {
+        console.error('[SmartAdapt] Error:', err.message)
+        res.status(500).json({ error: err.message })
+    }
+})
+
 export default router
