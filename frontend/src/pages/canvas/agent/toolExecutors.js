@@ -651,249 +651,176 @@ export async function executeToolCall(toolCall, fc, ctx = {}, deps = {}) {
         }
 
         case 'adapt_design': {
-            const { presets: targetPresets = [], createSeparateArtboards = true } = args
-            const brand = deps?.brand || null
+            const { presets: targetPresets = [] } = args
 
             if (!targetPresets || targetPresets.length === 0) {
                 return 'Please specify which platform sizes to adapt to (e.g. ig-post, linkedin, yt-thumb)'
             }
 
+            const PRESET_MAP = {
+                'ig-post':         { w: 1080, h: 1350, label: 'Instagram Post (4:5)' },
+                'ig-post-square':  { w: 1080, h: 1080, label: 'Instagram Square (1:1)' },
+                'ig-story':        { w: 1080, h: 1920, label: 'Instagram Story (9:16)' },
+                'ig-reel':         { w: 1080, h: 1920, label: 'Instagram Reel (9:16)' },
+                'fb-post':         { w: 1200, h: 630,  label: 'Facebook Post (1.91:1)' },
+                'fb-story':        { w: 1080, h: 1920, label: 'Facebook Story (9:16)' },
+                'linkedin':        { w: 1200, h: 628,  label: 'LinkedIn (1.91:1)' },
+                'yt-thumb':        { w: 1280, h: 720,  label: 'YouTube Thumbnail (16:9)' },
+                'twitter':         { w: 1600, h: 900,  label: 'Twitter/X (16:9)' },
+                'whatsapp-status': { w: 1080, h: 1920, label: 'WhatsApp Status (9:16)' },
+                'carousel':        { w: 1080, h: 1080, label: 'Carousel (1:1)' },
+                'pinterest':       { w: 1000, h: 1500, label: 'Pinterest Pin (2:3)' },
+                'banner':          { w: 1920, h: 600,  label: 'Web Banner' },
+            }
+
+            const validPresets = targetPresets.filter(p => PRESET_MAP[p])
+            if (validPresets.length === 0) {
+                return `❌ Unknown presets: ${targetPresets.join(', ')}. Valid: ${Object.keys(PRESET_MAP).join(', ')}`
+            }
+
             if (setFidatoMessages) {
                 setFidatoMessages(prev => [...prev, {
                     role: 'assistant',
-                    content: `🎨 **Smart Adapt** — Analysing your design and adapting it to ${targetPresets.length} platform size(s):\n${targetPresets.map(p => `• ${p}`).join('\n')}\n\n⏳ Gemini is computing optimised layouts for each platform...`
+                    content: `🎨 **Smart Adapt** — Scaling your design to ${validPresets.length} platform size(s):\n${validPresets.map(p => `• ${PRESET_MAP[p].label}`).join('\n')}\n\n⚡ Computing layouts instantly...`
                 }])
             }
 
-            // ── Serialize canvas elements ──
+            // Get source artboard bounds
             const artboard = fc.getObjects().find(o => o.id === 'artboard')
-            const sourceWidth = artboard ? Math.round(artboard.width) : fc._logicalWidth || 1080
-            const sourceHeight = artboard ? Math.round(artboard.height) : fc._logicalHeight || 1080
+            const sourceWidth  = artboard ? Math.round(artboard.width  * (artboard.scaleX || 1)) : fc._logicalWidth  || 1080
+            const sourceHeight = artboard ? Math.round(artboard.height * (artboard.scaleY || 1)) : fc._logicalHeight || 1080
+            const srcLeft = artboard ? (artboard.left - sourceWidth  / 2) : 0
+            const srcTop  = artboard ? (artboard.top  - sourceHeight / 2) : 0
 
-            const elements = fc.getObjects()
-                .filter(o => o.id !== 'artboard')
-                .map((obj, i) => ({
-                    id: obj.id || `el-${i}`,
-                    type: obj.type,
-                    customName: obj.customName || obj._customName || null,
-                    name: obj.customName || obj._customName || obj.type,
-                    _nodeType: obj._nodeType || null,
-                    _role: obj._role || null,
-                    left: Math.round(obj.left || 0),
-                    top: Math.round(obj.top || 0),
-                    width: Math.round((obj.width || 0) * (obj.scaleX || 1)),
-                    height: Math.round((obj.height || 0) * (obj.scaleY || 1)),
-                    scaleX: obj.scaleX || 1,
-                    scaleY: obj.scaleY || 1,
-                    fill: obj.fill || null,
-                    stroke: obj.stroke || null,
-                    opacity: obj.opacity ?? 1,
-                    text: obj.text ? obj.text.substring(0, 300) : null,
-                    fontSize: obj.fontSize || null,
-                    fontWeight: obj.fontWeight || null,
-                    fontFamily: obj.fontFamily || null,
-                    textAlign: obj.textAlign || null,
-                    src: obj.type === 'image' ? (obj._element?.src || obj.getSrc?.() || '').substring(0, 200) : null,
-                    rx: obj.rx || null, ry: obj.ry || null,
-                    zIndex: i,
-                }))
+            const contentObjects = fc.getObjects().filter(o =>
+                o.id !== 'artboard' && !(o._nodeType === 'artboard') &&
+                !(o._nodeType === 'artboard-label') && !o.id?.startsWith('artboard-') &&
+                !o.id?.startsWith('auto-frame')
+            )
+            if (contentObjects.length === 0) return '❌ Canvas is empty — add elements first'
 
-            if (elements.length === 0) {
-                return '❌ Canvas is empty — add elements first before adapting'
+            // Get true top-left coordinate regardless of originX/Y
+            const getTruePos = (obj) => {
+                const w = (obj.width || 0) * (obj.scaleX || 1)
+                const h = (obj.height || 0) * (obj.scaleY || 1)
+                return {
+                    x: obj.originX === 'center' ? (obj.left || 0) - w / 2 : (obj.left || 0),
+                    y: obj.originY === 'center' ? (obj.top  || 0) - h / 2 : (obj.top  || 0),
+                    w, h,
+                }
             }
 
-            try {
-                const { canvasAssets } = await import('../../../services/api')
-                const adaptData = await canvasAssets.smartAdapt({
-                    elements, sourceWidth, sourceHeight,
-                    targetPresets,
-                    brand: brand ? { name: brand.name, dna: brand.dna } : null,
+            const ARTBOARD_GAP = 80
+            let xOffset = srcLeft + sourceWidth + ARTBOARD_GAP
+            let rendered = 0
+
+            for (const presetId of validPresets) {
+                const spec = PRESET_MAP[presetId]
+                const targetW = spec.w, targetH = spec.h
+                const scaleX = targetW / sourceWidth, scaleY = targetH / sourceHeight
+                const uniformScale = Math.min(scaleX, scaleY)
+
+                // Draw artboard background
+                const artboardRect = new fabric.Rect({
+                    left: xOffset + targetW / 2, top: srcTop + targetH / 2,
+                    width: targetW, height: targetH,
+                    originX: 'center', originY: 'center',
+                    fill: '#ffffff', stroke: 'rgba(99,102,241,0.45)', strokeWidth: 2,
+                    rx: 6, ry: 6, selectable: false, evented: false,
+                    id: `artboard-${presetId}`, _nodeType: 'artboard',
+                    shadow: new fabric.Shadow({ color: 'rgba(0,0,0,0.18)', blur: 28, offsetY: 10 }),
+                })
+                fc.add(artboardRect)
+                fc.sendObjectToBack(artboardRect)
+
+                // Label above artboard
+                fc.add(new fabric.Textbox(`${spec.label}\n${targetW}×${targetH}`, {
+                    left: xOffset, top: srcTop - 56, width: targetW,
+                    fontSize: 13, fontWeight: '700', fontFamily: 'Inter',
+                    fill: '#818cf8', textAlign: 'center', selectable: false, evented: false,
+                    id: `artboard-label-${presetId}`, _nodeType: 'artboard-label',
+                }))
+
+                const makeClip = () => new fabric.Rect({
+                    left: xOffset, top: srcTop, width: targetW, height: targetH,
+                    absolutePositioned: true,
                 })
 
-                if (!adaptData.success || !adaptData.adaptations) {
-                    return `❌ Smart Adapt failed: ${adaptData.error || 'No adaptations returned'}`
-                }
+                for (const obj of contentObjects) {
+                    const { x: ox, y: oy, w: ow, h: oh } = getTruePos(obj)
+                    const relX = (ox - srcLeft) / sourceWidth
+                    const relY = (oy - srcTop)  / sourceHeight
+                    const nx = xOffset + relX * targetW
+                    const ny = srcTop  + relY * targetH
+                    const nw = ow * scaleX, nh = oh * scaleY
+                    const newId = `${obj.id || 'el'}-${presetId}`
 
-                const { adaptations, labeledElements } = adaptData
-
-                // ── Render each adapted preset as a new artboard on canvas ──
-                // Offset artboards horizontally so they don't overlap
-                const ARTBOARD_GAP = 80
-                let xOffset = sourceWidth + ARTBOARD_GAP
-
-                const totalAdapted = Object.keys(adaptations).length
-                let rendered = 0
-
-                for (const [presetId, layout] of Object.entries(adaptations)) {
-                    const { canvasWidth, canvasHeight, label, layoutStrategy, elements: adaptedEls } = layout
-                    if (!adaptedEls || !Array.isArray(adaptedEls)) continue
-
-                    // Draw artboard frame for this preset
-                    const artboardRect = new fabric.Rect({
-                        left: xOffset, top: 0,
-                        width: canvasWidth, height: canvasHeight,
-                        fill: '#ffffff', stroke: 'rgba(99,102,241,0.4)', strokeWidth: 2,
-                        rx: 4, ry: 4,
-                        selectable: false, evented: false,
-                        id: `artboard-${presetId}`, _nodeType: 'artboard',
-                        shadow: new fabric.Shadow({ color: 'rgba(0,0,0,0.15)', blur: 24, offsetY: 8 }),
-                    })
-                    fc.add(artboardRect)
-                    fc.sendObjectToBack(artboardRect)
-
-                    // Platform label above the artboard
-                    const labelText = new fabric.Textbox(`${label}\n${canvasWidth}×${canvasHeight}`, {
-                        left: xOffset, top: -52,
-                        width: canvasWidth,
-                        fontSize: 14, fontWeight: '700', fontFamily: 'Inter',
-                        fill: '#818cf8', textAlign: 'center',
-                        selectable: false, evented: false,
-                        id: `artboard-label-${presetId}`, _nodeType: 'artboard-label',
-                    })
-                    fc.add(labelText)
-
-                    // Build a map of adapted element specs by id
-                    const adaptedMap = {}
-                    for (const ael of adaptedEls) {
-                        adaptedMap[ael.id] = ael
-                    }
-
-                    // Re-render each element using the original Fabric object's properties + adapted layout
-                    for (const srcEl of labeledElements) {
-                        const adapted = adaptedMap[srcEl.id]
-                        if (!adapted || adapted.visible === false) continue
-
-                        // Find the original Fabric object to copy its properties (fill, src, font, etc.)
-                        const origFabricObj = fc.getObjects().find(o => o.id === srcEl.id)
-
-                        const elLeft = xOffset + (adapted.x ?? 0)
-                        const elTop = adapted.y ?? 0
-                        const elWidth = adapted.w ?? srcEl.width
-                        const elHeight = adapted.h ?? srcEl.height
-                        const elFontSize = adapted.fontSize ?? srcEl.fontSize
-                        const elOpacity = adapted.opacity ?? srcEl.opacity ?? 1
-
-                        if (srcEl.type === 'image' && srcEl.src) {
-                            // ── Image element ──
-                            await new Promise(resolve => {
-                                fabric.Image.fromURL(srcEl.src, img => {
-                                    if (!img) { resolve(); return }
-                                    const scX = elWidth / (img.width || 1)
-                                    const scY = elHeight / (img.height || 1)
-                                    img.set({
-                                        left: elLeft, top: elTop,
-                                        scaleX: scX, scaleY: scY,
-                                        opacity: elOpacity,
-                                        id: `${srcEl.id}-${presetId}`,
-                                        _nodeType: srcEl._nodeType || 'adapted',
-                                        customName: srcEl.name,
-                                        _adaptedFrom: srcEl.id,
-                                        _preset: presetId,
-                                    })
-                                    // Clip image to artboard bounds
-                                    const clipRect = new fabric.Rect({
-                                        left: xOffset, top: 0,
-                                        width: canvasWidth, height: canvasHeight,
-                                        absolutePositioned: true,
-                                    })
-                                    img.clipPath = clipRect
-                                    fc.add(img)
-                                    resolve()
-                                }, { crossOrigin: 'anonymous' })
+                    if (obj.type === 'image') {
+                        await new Promise(resolve => {
+                            obj.clone(cloned => {
+                                if (!cloned) { resolve(); return }
+                                cloned.set({
+                                    left: nx + nw / 2, top: ny + nh / 2,
+                                    originX: 'center', originY: 'center',
+                                    scaleX: nw / (cloned.width || 1),
+                                    scaleY: nh / (cloned.height || 1),
+                                    opacity: obj.opacity ?? 1,
+                                    id: newId, _adaptedFrom: obj.id, _preset: presetId,
+                                    clipPath: makeClip(),
+                                })
+                                fc.add(cloned)
+                                resolve()
                             })
-                        } else if ((srcEl.type === 'textbox' || srcEl.type === 'i-text') && srcEl.text) {
-                            // ── Text element ──
-                            const txt = new fabric.Textbox(srcEl.text, {
-                                left: elLeft, top: elTop,
-                                width: elWidth,
-                                fontSize: elFontSize || 24,
-                                fontWeight: origFabricObj?.fontWeight || srcEl.fontWeight || 'normal',
-                                fontFamily: origFabricObj?.fontFamily || srcEl.fontFamily || 'Inter',
-                                fill: origFabricObj?.fill || srcEl.fill || '#000000',
-                                textAlign: origFabricObj?.textAlign || srcEl.textAlign || 'left',
-                                opacity: elOpacity,
-                                id: `${srcEl.id}-${presetId}`,
-                                _nodeType: srcEl._nodeType || 'adapted',
-                                customName: srcEl.name,
-                                _adaptedFrom: srcEl.id,
-                                _preset: presetId,
+                        })
+                    } else if (obj.type === 'textbox' || obj.type === 'i-text') {
+                        fc.add(new fabric.Textbox(obj.text || '', {
+                            left: nx, top: ny, originX: 'left', originY: 'top', width: nw,
+                            fontSize: Math.max(8, Math.round((obj.fontSize || 16) * uniformScale)),
+                            fontWeight: obj.fontWeight || 'normal',
+                            fontFamily: obj.fontFamily || 'Inter',
+                            fill: obj.fill || '#000000',
+                            textAlign: obj.textAlign || 'left',
+                            opacity: obj.opacity ?? 1,
+                            id: newId, _adaptedFrom: obj.id, _preset: presetId,
+                            clipPath: makeClip(),
+                        }))
+                    } else {
+                        await new Promise(resolve => {
+                            obj.clone(cloned => {
+                                if (!cloned) { resolve(); return }
+                                cloned.set({
+                                    left: nx, top: ny, originX: 'left', originY: 'top',
+                                    scaleX: (obj.scaleX || 1) * scaleX,
+                                    scaleY: (obj.scaleY || 1) * scaleY,
+                                    opacity: obj.opacity ?? 1,
+                                    id: newId, _adaptedFrom: obj.id, _preset: presetId,
+                                    clipPath: makeClip(),
+                                })
+                                fc.add(cloned)
+                                fc.sendObjectToBack(cloned)
+                                fc.sendObjectToBack(artboardRect)
+                                resolve()
                             })
-                            // Clip text to artboard bounds
-                            const txtClip = new fabric.Rect({
-                                left: xOffset, top: 0, width: canvasWidth, height: canvasHeight,
-                                absolutePositioned: true,
-                            })
-                            txt.clipPath = txtClip
-                            fc.add(txt)
-                        } else if (srcEl.type === 'rect' || srcEl.type === 'circle' || srcEl.type === 'ellipse') {
-                            // ── Shape element ──
-                            let shape
-                            const shapeProps = {
-                                left: elLeft, top: elTop,
-                                width: elWidth, height: elHeight,
-                                fill: origFabricObj?.fill || srcEl.fill || 'transparent',
-                                stroke: origFabricObj?.stroke || srcEl.stroke || null,
-                                strokeWidth: origFabricObj?.strokeWidth || 0,
-                                rx: origFabricObj?.rx || srcEl.rx || 0,
-                                ry: origFabricObj?.ry || srcEl.ry || 0,
-                                opacity: elOpacity,
-                                id: `${srcEl.id}-${presetId}`,
-                                _nodeType: srcEl._nodeType || 'adapted',
-                                customName: srcEl.name,
-                                _adaptedFrom: srcEl.id,
-                                _preset: presetId,
-                            }
-                            if (srcEl.type === 'circle') {
-                                shape = new fabric.Circle({ ...shapeProps, radius: elWidth / 2 })
-                            } else if (srcEl.type === 'ellipse') {
-                                shape = new fabric.Ellipse({ ...shapeProps, rx: elWidth / 2, ry: elHeight / 2 })
-                            } else {
-                                shape = new fabric.Rect(shapeProps)
-                            }
-                            // Clip to artboard
-                            const shapeClip = new fabric.Rect({
-                                left: xOffset, top: 0, width: canvasWidth, height: canvasHeight,
-                                absolutePositioned: true,
-                            })
-                            shape.clipPath = shapeClip
-                            fc.add(shape)
-                            fc.sendObjectToBack(shape)
-                            if (artboardRect) fc.sendObjectToBack(artboardRect)
-                        }
-                    }
-
-                    rendered++
-                    xOffset += canvasWidth + ARTBOARD_GAP
-
-                    if (setFidatoMessages) {
-                        setFidatoMessages(prev => {
-                            const last = prev[prev.length - 1]
-                            if (last?.role === 'assistant' && last.content.includes('Smart Adapt')) {
-                                return [...prev.slice(0, -1), { ...last, content: last.content.replace('⏳ Gemini is computing optimised layouts for each platform...', `✅ Rendered ${rendered}/${totalAdapted} layouts...`) }]
-                            }
-                            return prev
                         })
                     }
                 }
 
+                rendered++
+                xOffset += targetW + ARTBOARD_GAP
                 fc.requestRenderAll()
-
-                if (setFidatoMessages) {
-                    setFidatoMessages(prev => [...prev, {
-                        role: 'assistant',
-                        content: `✅ **Smart Adapt Complete!** ${rendered} platform layouts generated side-by-side.\n\nEach artboard has been intelligently repositioned and scaled:\n${Object.entries(adaptations).filter(([,l]) => l.layoutStrategy).map(([p, l]) => `• **${p}**: ${l.layoutStrategy}`).join('\n')}\n\nYou can scroll right on the canvas to see all variants.`
-                    }])
-                }
-
-                return {
-                    text: `Smart Adapt complete — ${rendered} platform layouts created side-by-side`,
-                    presetsRendered: rendered,
-                }
-            } catch (e) {
-                console.error('[adapt_design]', e)
-                return `❌ Smart Adapt failed: ${e.message}`
             }
+
+            fc.requestRenderAll()
+            const summary = validPresets.map(p => `• **${PRESET_MAP[p].label}** (${PRESET_MAP[p].w}×${PRESET_MAP[p].h})`).join('\n')
+            if (setFidatoMessages) {
+                setFidatoMessages(prev => [...prev, {
+                    role: 'assistant',
+                    content: `✅ **Smart Adapt Complete!** ${rendered} platform layouts created side-by-side.\n\n${summary}\n\nScroll right to see all variants.`
+                }])
+            }
+            return { text: `Smart Adapt complete — ${rendered} platform layouts created`, presetsRendered: rendered }
         }
+
 
         case 'generate_video_clip': {
 
