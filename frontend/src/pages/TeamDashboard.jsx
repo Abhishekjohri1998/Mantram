@@ -219,7 +219,7 @@ export default function TeamDashboard() {
             </div>
 
             {/* Tab Bar - Scrollable on mobile */}
-            <div className="flex items-center gap-1.5 p-1.5 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] mb-8 w-full overflow-x-auto whitespace-nowrap no-scrollbar scroll-smooth">
+            <div className="flex items-center gap-1.5 p-1.5 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] mb-8 w-full overflow-x-auto whitespace-nowrap no-scrollbar scroll-smooth relative z-10">
                 {TABS.map(t => (
                     <button key={t.id} onClick={() => setActiveTab(t.id)}
                         className={`flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-bold transition-all cursor-pointer shrink-0 min-w-max ${activeTab === t.id ? 'bg-primary text-white shadow-lg shadow-primary/20 scale-[1.02]' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)]'}`}>
@@ -269,9 +269,9 @@ export default function TeamDashboard() {
                                                             {m._id === user?.id && <span className="text-[10px] font-bold text-primary/60 px-2 py-0.5 rounded-full bg-primary/5">You</span>}
                                                         </div>
                                                         <p className="text-xs text-[var(--sys-text-muted)] truncate mb-2">{m.email}</p>
-                                                        <div className="flex gap-1.5 flex-wrap">
-                                                            {Object.entries(m.studioAccess || {}).filter(([, v]) => v).slice(0, 6).map(([k]) => (
-                                                                <span key={k} className="text-[9px] font-bold px-2 py-1 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text-muted)]">{STUDIO_LABELS[k]?.label || k}</span>
+                                                        <div className="flex gap-2 flex-wrap mt-1">
+                                                            {Object.entries(m.studioAccess || {}).filter(([, v]) => v).slice(0, 10).map(([k]) => (
+                                                                <span key={k} className="text-[10px] md:text-[11px] font-bold px-3 py-1 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] transition-colors whitespace-nowrap">{STUDIO_LABELS[k]?.label || k}</span>
                                                             ))}
                                                         </div>
                                                     </div>
@@ -628,7 +628,7 @@ export default function TeamDashboard() {
             {/* INVITE MODAL                                       */}
             {/* ══════════════════════════════════════════════════ */}
             {showInvite && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" onClick={() => setShowInvite(false)}>
+                <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 sm:p-6" onClick={() => setShowInvite(false)}>
                     <div className="absolute inset-0 bg-background/80 backdrop-blur-md" />
                     <div className="glass-panel rounded-[32px] p-6 sm:p-10 w-full max-w-xl relative border border-white/10 shadow-2xl animate-in fade-in zoom-in duration-300" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center justify-between mb-5">
@@ -724,7 +724,7 @@ export default function TeamDashboard() {
             {/* EDIT ACCESS MODAL                                  */}
             {/* ══════════════════════════════════════════════════ */}
             {editingMember && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" onClick={() => setEditingMember(null)}>
+                <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 sm:p-6" onClick={() => setEditingMember(null)}>
                     <div className="absolute inset-0 bg-background/80 backdrop-blur-md" />
                     <div className="glass-panel rounded-[32px] p-6 sm:p-10 w-full max-w-xl relative border border-white/10 shadow-2xl animate-in fade-in zoom-in duration-300" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center justify-between mb-5">
