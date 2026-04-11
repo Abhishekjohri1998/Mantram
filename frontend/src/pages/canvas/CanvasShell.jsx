@@ -576,95 +576,149 @@ function CanvasShellInner() {
         const fc = fabricRef.current
         if (!fc) return
         setActivePreset(preset.id)
+
         const canvasW = fc.width, canvasH = fc.height
         const scale = Math.min((canvasW - 80) / preset.w, (canvasH - 80) / preset.h, 1)
         const displayW = Math.round(preset.w * scale), displayH = Math.round(preset.h * scale)
-        const artboardLeft = Math.round((canvasW - displayW) / 2), artboardTop = Math.round((canvasH - displayH) / 2)
+        const artboardLeft = Math.round((canvasW - displayW) / 2)
+        const artboardTop = Math.round((canvasH - displayH) / 2)
 
-        // ── Track old artboard bounds for proportional reflow ──
+        // Helper: get the TRUE top-left position of any object regardless of origin
+        const getTrueLeft = (obj) => {
+            const w = (obj.width || 0) * (obj.scaleX || 1)
+            const h = (obj.height || 0) * (obj.scaleY || 1)
+            let x = obj.left || 0
+            let y = obj.top || 0
+            if (obj.originX === 'center') x -= w / 2
+            else if (obj.originX === 'right') x -= w
+            if (obj.originY === 'center') y -= h / 2
+            else if (obj.originY === 'bottom') y -= h
+            return { x, y, w, h }
+        }
+
+        // ── Track old artboard bounds ──
         let artboard = fc.getObjects().find(o => o.id === 'artboard')
         let oldAbLeft, oldAbTop, oldAbW, oldAbH
 
         if (artboard) {
-            oldAbLeft = artboard.left
-            oldAbTop = artboard.top
-            oldAbW = artboard.width
-            oldAbH = artboard.height
+            // Existing artboard — use as reference origin
+            const ab = getTrueLeft(artboard)
+            oldAbLeft = ab.x; oldAbTop = ab.y
+            oldAbW = artboard.width || displayW
+            oldAbH = artboard.height || displayH
         } else {
-            // No artboard yet — compute bounding box of all content
-            const cObjs = fc.getObjects().filter(o => o.id !== 'artboard')
+            // No artboard: compute bounding box of all content objects
+            const cObjs = fc.getObjects().filter(o => o.id !== 'artboard' && !o.id?.startsWith('artboard-'))
             if (cObjs.length > 0) {
                 let mnX = Infinity, mnY = Infinity, mxX = -Infinity, mxY = -Infinity
                 cObjs.forEach(o => {
-                    const br = o.getBoundingRect()
-                    mnX = Math.min(mnX, br.left)
-                    mnY = Math.min(mnY, br.top)
-                    mxX = Math.max(mxX, br.left + br.width)
-                    mxY = Math.max(mxY, br.top + br.height)
+                    const { x, y, w, h } = getTrueLeft(o)
+                    mnX = Math.min(mnX, x)
+                    mnY = Math.min(mnY, y)
+                    mxX = Math.max(mxX, x + w)
+                    mxY = Math.max(mxY, y + h)
                 })
                 oldAbLeft = mnX; oldAbTop = mnY
                 oldAbW = Math.max(mxX - mnX, 10)
                 oldAbH = Math.max(mxY - mnY, 10)
             } else {
+                // Empty canvas — set bounds to new artboard directly
                 oldAbLeft = artboardLeft; oldAbTop = artboardTop
                 oldAbW = displayW; oldAbH = displayH
             }
         }
 
+        // ── Create or update the artboard Rect ──
+        // Artboard is transparent with a border — NOT a white fill (white fill is added at export time)
         if (!artboard) {
             artboard = new fabric.Rect({
-                left: artboardLeft, top: artboardTop, width: displayW, height: displayH,
-                fill: '#ffffff', rx: 4, ry: 4, selectable: false, evented: false,
-                hoverCursor: 'default', id: 'artboard', excludeFromExport: false,
-                shadow: new fabric.Shadow({ color: 'rgba(0,0,0,0.25)', blur: 30, offsetX: 0, offsetY: 4 }),
+                left: artboardLeft, top: artboardTop,
+                width: displayW, height: displayH,
+                fill: '#ffffff',
+                stroke: 'rgba(99,102,241,0.25)', strokeWidth: 1,
+                rx: 4, ry: 4,
+                selectable: false, evented: false,
+                hoverCursor: 'default',
+                id: 'artboard',
+                shadow: new fabric.Shadow({ color: 'rgba(0,0,0,0.3)', blur: 32, offsetX: 0, offsetY: 6 }),
             })
-            fc.add(artboard); fc.sendObjectToBack(artboard)
+            fc.add(artboard)
+            fc.sendObjectToBack(artboard)
         } else {
-            artboard.set({ left: artboardLeft, top: artboardTop, width: displayW, height: displayH })
+            artboard.set({
+                left: artboardLeft, top: artboardTop,
+                width: displayW, height: displayH,
+            })
+            artboard.setCoords()
         }
 
-        // ── Proportionally scale & reposition all content elements ──
-        const contentObjects = fc.getObjects().filter(o =>
+        // ── Proportionally scale & reposition content elements ──
+        const contentObjs = fc.getObjects().filter(o =>
             o.id !== 'artboard' && !o.id?.startsWith('artboard-') && !o.id?.startsWith('artboard-label-')
         )
 
-        if (contentObjects.length > 0 && (oldAbW !== displayW || oldAbH !== displayH)) {
-            const scaleRatioX = displayW / oldAbW
-            const scaleRatioY = displayH / oldAbH
-            const uniformScale = Math.min(scaleRatioX, scaleRatioY)
+        if (contentObjs.length > 0 && (oldAbW !== displayW || oldAbH !== displayH)) {
+            const uniformScale = Math.min(displayW / oldAbW, displayH / oldAbH)
 
-            // Center content after scaling
-            const scaledW = oldAbW * uniformScale
-            const scaledH = oldAbH * uniformScale
-            const padX = (displayW - scaledW) / 2
-            const padY = (displayH - scaledH) / 2
+            // After uniform scaling, content dims:
+            const scaledContentW = oldAbW * uniformScale
+            const scaledContentH = oldAbH * uniformScale
 
-            contentObjects.forEach(obj => {
-                const relX = (obj.left - oldAbLeft) / oldAbW
-                const relY = (obj.top - oldAbTop) / oldAbH
-                const newLeft = artboardLeft + padX + relX * scaledW
-                const newTop = artboardTop + padY + relY * scaledH
+            // Padding to center the content inside the new artboard
+            const padX = (displayW - scaledContentW) / 2
+            const padY = (displayH - scaledContentH) / 2
+
+            contentObjs.forEach(obj => {
+                const { x: objLeft, y: objTop, w: objW, h: objH } = getTrueLeft(obj)
+
+                // Relative position within old artboard (0-1)
+                const relX = (objLeft - oldAbLeft) / oldAbW
+                const relY = (objTop - oldAbTop) / oldAbH
+
+                // New top-left position in new artboard coordinate space
+                const newTrueLeft = artboardLeft + padX + relX * scaledContentW
+                const newTrueTop = artboardTop + padY + relY * scaledContentH
+
+                // Convert back to object's native origin
                 const newScaleX = (obj.scaleX || 1) * uniformScale
                 const newScaleY = (obj.scaleY || 1) * uniformScale
+                const newW = (obj.width || 0) * newScaleX
+                const newH = (obj.height || 0) * newScaleY
 
-                obj.set({ left: newLeft, top: newTop, scaleX: newScaleX, scaleY: newScaleY })
+                let finalLeft = newTrueLeft
+                let finalTop = newTrueTop
+                if (obj.originX === 'center') finalLeft = newTrueLeft + newW / 2
+                else if (obj.originX === 'right') finalLeft = newTrueLeft + newW
+                if (obj.originY === 'center') finalTop = newTrueTop + newH / 2
+                else if (obj.originY === 'bottom') finalTop = newTrueTop + newH
 
+                obj.set({ left: finalLeft, top: finalTop, scaleX: newScaleX, scaleY: newScaleY })
+
+                // Text: scale fontSize directly to avoid double-scaling
                 if ((obj.type === 'textbox' || obj.type === 'i-text' || obj.type === 'text') && obj.fontSize) {
-                    obj.set({ fontSize: Math.max(8, Math.round(obj.fontSize * uniformScale)) })
-                    obj.set({ scaleX: 1, scaleY: 1 })
+                    obj.set({
+                        fontSize: Math.max(8, Math.round(obj.fontSize * uniformScale)),
+                        scaleX: 1, scaleY: 1,
+                    })
                     if (obj.type === 'textbox') {
-                        obj.set({ width: Math.round((obj.width || 200) * uniformScale) })
+                        obj.set({ width: Math.max(20, Math.round((obj.width || 200) * uniformScale)) })
                     }
                 }
+
                 obj.setCoords()
             })
         }
 
-        fc._logicalScale = scale; fc._logicalWidth = preset.w; fc._logicalHeight = preset.h
-        fc._artboardLeft = artboardLeft; fc._artboardTop = artboardTop
-        fc.renderAll()
+        fc._logicalScale = scale
+        fc._logicalWidth = preset.w
+        fc._logicalHeight = preset.h
+        fc._artboardLeft = artboardLeft
+        fc._artboardTop = artboardTop
+        fc.requestRenderAll()
+
         setZoom(Math.round(scale * 100))
-        setCustomW(preset.w); setCustomH(preset.h)
+        setCustomW(preset.w)
+        setCustomH(preset.h)
         saveHistory()
         showToast(`📐 Adapted to ${preset.label} (${preset.w}×${preset.h})`)
     }, [setActivePreset, setZoom, setCustomW, setCustomH, saveHistory, showToast])
