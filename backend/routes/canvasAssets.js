@@ -1203,7 +1203,7 @@ Remember: landscape formats = horizontal split, portrait = vertical stack, squar
 Return ONLY valid JSON, no explanation text outside the JSON.`
 
         const baseUrl = 'https://generativelanguage.googleapis.com/v1beta'
-        const modelsToTry = ['gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-1.5-flash']
+        const modelsToTry = ['gemini-1.5-flash', 'gemini-2.5-flash', 'gemini-1.5-pro']
         let resp, data
 
         // Try models in order until one works
@@ -1225,25 +1225,36 @@ Return ONLY valid JSON, no explanation text outside the JSON.`
                 clearTimeout(timeoutId)
                 data = await resp.json()
                 if (data.error) {
-                    const errMsg = data.error.message || ''
-                    if (errMsg.includes('503') || errMsg.includes('overloaded') || errMsg.includes('high demand') || resp.status === 503) {
-                        console.warn(`   [SmartAdapt] ${modelName} busy, trying next model...`)
+                    const errMsg = (data.error.message || '').toLowerCase()
+                    const isRetryable = resp.status === 503
+                        || errMsg.includes('503')
+                        || errMsg.includes('overloaded')
+                        || errMsg.includes('high demand')
+                        || errMsg.includes('no longer available')
+                        || errMsg.includes('deprecated')
+                        || errMsg.includes('not found')
+                        || resp.status === 404
+                        || resp.status === 400 && errMsg.includes('model')
+                    if (isRetryable) {
+                        console.warn(`   [SmartAdapt] ${modelName} unavailable (${resp.status}): ${data.error.message?.substring(0, 80)}. Trying next...`)
+                        data = null
                         continue
                     }
                     throw new Error(data.error.message)
                 }
-                console.log(`   [SmartAdapt] Using ${modelName} successfully`)
+                console.log(`   [SmartAdapt] ✅ Using ${modelName} successfully`)
                 break // Success
             } catch (fetchErr) {
                 if (fetchErr.name === 'AbortError') {
                     console.warn(`   [SmartAdapt] ${modelName} timed out after 28s, trying next...`)
+                    data = null
                     continue
                 }
                 throw fetchErr
             }
         }
 
-        if (!data) throw new Error('All Gemini models unavailable for SmartAdapt')
+        if (!data) throw new Error('All Gemini models unavailable for SmartAdapt — please try again shortly')
 
         // Extract text from all parts (gemini-2.5 may return thought + text parts)
         const allParts = data.candidates?.[0]?.content?.parts || []
