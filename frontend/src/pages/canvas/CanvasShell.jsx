@@ -224,10 +224,13 @@ function CanvasShellInner() {
                 fabricRef.current = fc
 
                 if (imageUrl) {
-                    if (failedUrlsRef.current.has(imageUrl)) {
-                        console.warn('⏭️ Skipping image that failed previously:', imageUrl);
+                    // Persistent tracking in sessionStorage survives re-mounts during this session
+                    const failedUrls = JSON.parse(sessionStorage.getItem('canvas_failed_urls') || '[]');
+                    if (failedUrls.includes(imageUrl)) {
+                        console.warn('⏭️ Skipping image that failed previously in this session:', imageUrl);
                         return;
                     }
+                    
                     if (loadingRef.current) return;
                     loadingRef.current = true;
 
@@ -248,7 +251,14 @@ function CanvasShellInner() {
                         // saveHistory() // Skip for initial load to avoid redundant state updates
                     }).catch((err) => {
                         console.error('❌ Failed to load initial image:', err);
-                        failedUrlsRef.current.add(imageUrl);
+                        
+                        // Persist failure to block retry loop
+                        const currentFailed = JSON.parse(sessionStorage.getItem('canvas_failed_urls') || '[]');
+                        if (!currentFailed.includes(imageUrl)) {
+                            currentFailed.push(imageUrl);
+                            sessionStorage.setItem('canvas_failed_urls', JSON.stringify(currentFailed));
+                        }
+                        
                         showToast('⚠️ Failed to load image')
                     }).finally(() => {
                         loadingRef.current = false;
@@ -256,6 +266,7 @@ function CanvasShellInner() {
                 } else {
                     saveHistory()
                 }
+
 
 
                 // Events
