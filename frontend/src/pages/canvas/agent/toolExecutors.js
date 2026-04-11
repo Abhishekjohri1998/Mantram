@@ -808,15 +808,41 @@ export async function executeToolCall(toolCall, fc, ctx = {}, deps = {}) {
             }
 
             fc.requestRenderAll()
+
+            // ── Zoom canvas to fit all artboards in view ──
+            try {
+                const canvasW = fc.width  || 900
+                const canvasH = fc.height || 600
+                const PADDING = 60
+
+                // Total bounding box: from srcLeft to xOffset (which now points past the last artboard)
+                const totalContentW = xOffset - srcLeft  // srcLeft + all artboards + gaps
+                const totalContentH = Math.max(sourceHeight, ...validPresets.map(p => PRESET_MAP[p].h))
+
+                const zoomX = (canvasW - PADDING) / totalContentW
+                const zoomY = (canvasH - PADDING) / totalContentH
+                const newZoom = Math.min(zoomX, zoomY, 0.5) // cap at 0.5 so we don't zoom in too much
+
+                // Pan so srcLeft/srcTop is at top-left with padding
+                const vpt = [newZoom, 0, 0, newZoom,
+                    -srcLeft * newZoom + PADDING / 2,
+                    -srcTop  * newZoom + PADDING / 2]
+                fc.setViewportTransform(vpt)
+                fc.requestRenderAll()
+            } catch (vpErr) {
+                console.warn('[adapt_design] zoom-to-fit failed:', vpErr.message)
+            }
+
             const summary = validPresets.map(p => `\u2022 **${PRESET_MAP[p].label}** (${PRESET_MAP[p].w}\u00d7${PRESET_MAP[p].h})`).join('\n')
             if (setFidatoMessages) {
                 setFidatoMessages(prev => [...prev, {
                     role: 'assistant',
-                    content: `\u2705 **Smart Adapt Complete!** ${rendered} platform layouts created side-by-side.\n\n${summary}\n\nScroll right to see all variants.`
+                    content: `\u2705 **Smart Adapt Complete!** ${rendered} platform layouts created side-by-side.\n\n${summary}\n\nAll variants are now visible on the canvas!`
                 }])
             }
             return { text: `Smart Adapt complete \u2014 ${rendered} platform layouts created`, presetsRendered: rendered }
         }
+
 
                 case 'generate_video_clip': {
 
