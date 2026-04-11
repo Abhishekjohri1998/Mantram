@@ -106,12 +106,16 @@ export function BrandProvider({ children }) {
 
             if (brandToActivate) {
                 setActiveBrand(brandToActivate);
-                // On initial load, restore last active page for this brand
-                if (!initializedRef.current) {
+                // On session start, restore last active page for this brand
+                // We use sessionStorage to ensure this ONLY happens once per tab session.
+                const resumptionKey = `mantram_resumed_${brandToActivate._id}`;
+                const alreadyResumed = sessionStorage.getItem(resumptionKey);
+
+                if (!initializedRef.current && !alreadyResumed) {
                     const session = restoreSession(brandToActivate._id);
                     const currentPath = window.location.pathname;
                     
-                    // Only auto-resume if we are on a "entry" page (root or dashboard)
+                    // Only auto-resume if we are on a "entry" page (root, dashboard, or nexus)
                     // If the user already navigated to a specific tool, don't force-resume them back.
                     const isEntryPage = currentPath === '/' || currentPath === '/dashboard' || currentPath === '/nexus';
                     
@@ -128,10 +132,14 @@ export function BrandProvider({ children }) {
                             console.log(`ℹ️ Already at resumption target base: ${targetBase}`);
                         } else {
                             console.log(`🔁 Resuming brand "${brandToActivate.name}" at: ${session.lastActivePage}`);
+                            sessionStorage.setItem(resumptionKey, 'true'); // Mark as done BEFORE navigating
                             navigate(session.lastActivePage, { replace: true });
                         }
                     }
+                    // Even if we didn't navigate, mark as resumed for this session to prevent hijacking later
+                    sessionStorage.setItem(resumptionKey, 'true');
                 }
+
 
             }
 
