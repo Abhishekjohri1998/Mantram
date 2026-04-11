@@ -14,6 +14,16 @@ import { getRouter } from '../../ai/router.js';
 import { resolveTargetMarkets, getMarketContext, getRelevantFestivals } from '../../utils/globalCalendar.js';
 import redis from '../../utils/redisClient.js';
 
+// Namespace object for all agent utilities to prevent ESM name conflicts
+export const agentUtils = {
+    callAgent,
+    callAgentText,
+    loadBrandContext,
+    buildBrandContext,
+    callMultimodalAgent,
+    buildStyleMemory
+};
+
 // Brand context cache TTL — 5 minutes (300s)
 // Invalidated instantly on any brand update via redis.del() in brands.js
 const BRAND_CACHE_TTL = 300;

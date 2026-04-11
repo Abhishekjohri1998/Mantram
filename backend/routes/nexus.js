@@ -20,7 +20,7 @@ import { Router } from 'express';
 import { protect } from '../middleware/auth.js';
 import { getRouter } from '../ai/router.js';
 import { getSmartRouter } from '../ai/smartRouter.js';
-import { loadBrandContext, callMultimodalAgent } from '../agents/shared/agentUtils.js';
+import { agentUtils } from '../agents/shared/agentUtils.js';
 import redis from '../utils/redisClient.js';
 import User from '../models/User.js';
 import { safeErrorMessage } from '../utils/safeError.js';
@@ -495,7 +495,7 @@ router.post('/chat', protect, async (req, res) => {
         let brandLangDirective = '';
         if (brandId) {
             try {
-                const { brandContext: ctx, brand } = await loadBrandContext(brandId);
+                const { brandContext: ctx, brand } = await agentUtils.loadBrandContext(brandId);
                 brandContext = ctx || '';
                 brandName = brand?.name || '';
                 // Inject brand language directive so Fidato knows what language to generate content in
@@ -536,7 +536,7 @@ ${brandContext ? `## Active Brand Context\n${brandContext}` : '(No brand selecte
         if (images && images.length > 0) {
             try {
                 console.log(`🧠 MCoT Nexus: Analyzing ${images.length} shared image(s)...`);
-                const mcotResult = await callMultimodalAgent(
+                const mcotResult = await agentUtils.callMultimodalAgent(
                     FIDATO_VISUAL_ANALYSIS_PROMPT,
                     `The user said: "${message}"\nAnalyze the ${images.length} image(s) they shared and provide structured visual intelligence.`,
                     images,
@@ -775,7 +775,7 @@ router.post('/stream', protect, async (req, res) => {
         let brandLangDirective = '';
         if (brandId) {
             try {
-                const { brandContext: ctx, brand } = await loadBrandContext(brandId);
+                const { brandContext: ctx, brand } = await agentUtils.loadBrandContext(brandId);
                 brandContext = ctx || '';
                 brandName = brand?.name || '';
                 const langInfo = inferBrandLanguage(brand);
@@ -810,7 +810,7 @@ ${brandContext ? `## Active Brand Context\n${brandContext}` : '(No brand selecte
             try {
                 console.log(`🧠 MCoT Nexus Stream: Analyzing ${images.length} shared image(s)...`);
                 sendSSE('status', { status: 'analyzing', message: '🧠 Analyzing image...' });
-                const mcotResult = await callMultimodalAgent(
+                const mcotResult = await agentUtils.callMultimodalAgent(
                     FIDATO_VISUAL_ANALYSIS_PROMPT,
                     `The user said: "${message}"\nAnalyze the ${images.length} image(s) they shared.`,
                     images,
@@ -1069,7 +1069,7 @@ router.post('/briefing', protect, async (req, res) => {
         let brandName = '';
         if (brandId) {
             try {
-                const { brand, products } = await loadBrandContext(brandId);
+                const { brand, products } = await agentUtils.loadBrandContext(brandId);
                 if (brand) {
                     brandName = brand.name || '';
                     const dna = brand.dna || {};
@@ -1174,7 +1174,7 @@ router.get('/notifications', protect, async (req, res) => {
 
         if (brandId) {
             try {
-                const { brand, products } = await loadBrandContext(brandId);
+                const { brand, products } = await agentUtils.loadBrandContext(brandId);
                 if (brand) {
                     const dna = brand.dna || {};
 
