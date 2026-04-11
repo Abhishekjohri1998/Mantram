@@ -110,14 +110,20 @@ export function BrandProvider({ children }) {
                 if (!initializedRef.current) {
                     const session = restoreSession(brandToActivate._id);
                     const currentPath = window.location.pathname;
-                    if (session.lastActivePage && 
+                    
+                    // Only auto-resume if we are on a "entry" page (root or dashboard)
+                    // If the user already navigated to a specific tool, don't force-resume them back.
+                    const isEntryPage = currentPath === '/' || currentPath === '/dashboard' || currentPath === '/nexus';
+                    
+                    if (isEntryPage && session.lastActivePage && 
                         session.lastActivePage !== currentPath && 
                         !currentPath.startsWith('/onboarding') && 
                         !currentPath.startsWith('/auth')) {
                         
                         // Avoid redirect loops: if we are already at the target page (ignoring query params) skip
-                        const targetBase = session.lastActivePage.split('?')[0];
-                        const currentBase = currentPath.split('?')[0];
+                        const targetBase = session.lastActivePage.split('?')[0].replace(/\/$/, '');
+                        const currentBase = currentPath.split('?')[0].replace(/\/$/, '');
+                        
                         if (targetBase === currentBase) {
                             console.log(`ℹ️ Already at resumption target base: ${targetBase}`);
                         } else {
@@ -125,8 +131,8 @@ export function BrandProvider({ children }) {
                             navigate(session.lastActivePage, { replace: true });
                         }
                     }
-
                 }
+
             }
 
             initializedRef.current = true;
