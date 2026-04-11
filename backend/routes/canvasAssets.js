@@ -55,19 +55,20 @@ router.post('/upload-canvas-export', protect, async (req, res) => {
 })
 
 // POST /api/canvas-assets/ai-adapt — AI-powered design adaptation using NanoBanana 2
-// Uses DIRECT Gemini API (@google/genai SDK) — no LaoZhang middleman
-// Flow: S3 URL → backend fetches image → sends inline to Gemini → gets image back → uploads to S3 → returns S3 URL
+// 2-Step MCoT Pipeline:
+//   Step A: Gemini text-only analyzes the source image (subjects, text, layout, colors)
+//   Step B: NanoBanana 2 generates adapted image using detailed analysis as prompt
 router.post('/ai-adapt', protect, async (req, res) => {
     const startTime = Date.now()
     try {
-        const { canvasImageUrl, preset, brandContext } = req.body
+        const { canvasImageUrl, preset, brandContext, cachedAnalysis } = req.body
 
         if (!preset) return res.status(400).json({ success: false, error: 'preset is required' })
         if (!canvasImageUrl) {
             return res.status(400).json({ success: false, error: 'canvasImageUrl (S3 URL) is required' })
         }
         if (canvasImageUrl.startsWith('data:')) {
-            return res.status(400).json({ success: false, error: 'base64 data URIs not accepted. Provide an S3/HTTP URL.' })
+            return res.status(400).json({ success: false, error: 'base64 not accepted. Provide an S3/HTTP URL.' })
         }
 
         const geminiKey = process.env.GEMINI_API_KEY
@@ -91,62 +92,109 @@ router.post('/ai-adapt', protect, async (req, res) => {
         const spec = PRESET_MAP[preset]
         if (!spec) return res.status(400).json({ success: false, error: `Unknown preset: ${preset}. Valid: ${Object.keys(PRESET_MAP).join(', ')}` })
 
-        const brand = brandContext || {}
-        const brandColors = brand.dna?.brandColors?.map(c => c.hex || c.name).filter(Boolean).join(', ') || ''
-
-        const adaptPrompt = `Adapt this reference image to ${spec.label} format (${spec.aspectRatio} aspect ratio, ${spec.w}x${spec.h}px).
-
-RULES:
-- Output exactly ${spec.w}x${spec.h}px at ${spec.aspectRatio} ratio
-- PRESERVE all subjects, people, faces, products, text, and visual elements from the reference
-- RECOMPOSE for ${spec.orientation} layout: ${spec.orientation.includes('portrait') ? 'extend background vertically' : spec.orientation.includes('landscape') ? 'extend background horizontally' : 'center elements'}
-- Keep identical colors, style, mood, and visual identity
-- Fill empty space by intelligently extending the background${brandColors ? ', using brand colors: ' + brandColors : ''}
-- Do NOT invent new content, only adapt composition and aspect ratio
-- Generate the adapted image now.`
-
-        console.log(`🎨 [AI-Adapt] ${preset} (${spec.w}x${spec.h}) — Direct Gemini API`)
-
-        // Step 1: Fetch S3 image server-side (Gemini needs inline data)
+        // ── Step 0: Fetch S3 image server-side ──
         let imageBuffer, imageMimeType
         try {
             const imgResp = await fetch(canvasImageUrl, {
                 headers: { 'User-Agent': 'Mozilla/5.0' },
                 signal: AbortSignal.timeout(30000),
             })
-            if (!imgResp.ok) throw new Error(`S3 fetch failed (${imgResp.status})`)
+            if (!imgResp.ok) throw new Error(`S3 fetch (${imgResp.status})`)
             imageMimeType = imgResp.headers.get('content-type') || 'image/jpeg'
-            const arrBuf = await imgResp.arrayBuffer()
-            imageBuffer = Buffer.from(arrBuf)
-            console.log(`✅ [AI-Adapt] Image fetched: ${Math.round(imageBuffer.length / 1024)}KB, type=${imageMimeType}`)
+            imageBuffer = Buffer.from(await imgResp.arrayBuffer())
+            console.log(`✅ [AI-Adapt] Image fetched: ${Math.round(imageBuffer.length / 1024)}KB`)
         } catch (imgErr) {
-            throw new Error(`Failed to fetch reference image from S3: ${imgErr.message}`)
+            throw new Error(`Failed to fetch image: ${imgErr.message}`)
         }
 
-        // Step 2: Call Gemini directly via @google/genai SDK
         const { GoogleGenAI } = await import('@google/genai')
         const ai = new GoogleGenAI({ apiKey: geminiKey })
+        const imageInline = { inlineData: { mimeType: imageMimeType, data: imageBuffer.toString('base64') } }
 
+        // ── Step A: MCoT — Analyze source image (text-only, fast ~3s) ──
+        let analysis = cachedAnalysis || null
+        if (!analysis) {
+            console.log(`🔍 [AI-Adapt] Step A: Analyzing source image...`)
+            const analyzeStart = Date.now()
+            try {
+                const analyzeResp = await ai.models.generateContent({
+                    model: 'gemini-2.5-flash',
+                    contents: [{
+                        role: 'user',
+                        parts: [
+                            imageInline,
+                            { text: `Analyze this design image in extreme detail. Return ONLY a JSON object (no markdown, no code fences):
+{
+  "headline": "exact text of the main headline/title if any",
+  "subtext": "exact text of any subtitle, tagline, or body text",
+  "subjects": "detailed description of all people, characters, products, objects",
+  "background": "describe the background color, gradient, texture, or scene",
+  "layout": "describe the spatial arrangement — what's on top, bottom, left, right, center",
+  "colors": "list the dominant colors as hex codes",
+  "style": "photography style, mood, lighting, artistic treatment",
+  "brandElements": "logos, icons, decorative elements, borders, shapes"
+}` },
+                        ],
+                    }],
+                })
+                const analysisText = analyzeResp.candidates?.[0]?.content?.parts?.map(p => p.text).filter(Boolean).join('') || ''
+                try {
+                    const cleaned = analysisText.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim()
+                    analysis = JSON.parse(cleaned)
+                } catch { analysis = { raw: analysisText } }
+                console.log(`✅ [AI-Adapt] Analysis done in ${Date.now() - analyzeStart}ms:`, JSON.stringify(analysis).substring(0, 200))
+            } catch (analyzeErr) {
+                console.warn(`⚠️ [AI-Adapt] Analysis failed, using generic prompt:`, analyzeErr.message)
+                analysis = {}
+            }
+        }
+
+        // ── Step B: Build precision prompt from analysis ──
+        const a = analysis || {}
+        const brand = brandContext || {}
+        const brandColors = brand.dna?.brandColors?.map(c => c.hex || c.name).filter(Boolean).join(', ') || ''
+
+        let detailedPrompt = `Recreate this exact design for ${spec.label} format at ${spec.aspectRatio} aspect ratio (${spec.w}x${spec.h}px).
+
+THE DESIGN CONTAINS:`
+
+        if (a.headline) detailedPrompt += `\n- HEADLINE TEXT (must be reproduced exactly): "${a.headline}"`
+        if (a.subtext) detailedPrompt += `\n- SUBTITLE/BODY TEXT: "${a.subtext}"`
+        if (a.subjects) detailedPrompt += `\n- MAIN SUBJECTS: ${a.subjects}`
+        if (a.background) detailedPrompt += `\n- BACKGROUND: ${a.background}`
+        if (a.colors) detailedPrompt += `\n- COLOR PALETTE: ${typeof a.colors === 'string' ? a.colors : JSON.stringify(a.colors)}`
+        if (a.style) detailedPrompt += `\n- VISUAL STYLE: ${a.style}`
+        if (a.brandElements) detailedPrompt += `\n- BRAND ELEMENTS: ${a.brandElements}`
+        if (a.layout) detailedPrompt += `\n- ORIGINAL LAYOUT: ${a.layout}`
+
+        detailedPrompt += `
+
+ADAPTATION INSTRUCTIONS for ${spec.orientation} ${spec.aspectRatio} format:
+- Maintain EVERY visual element from the original — same subjects, same text, same colors
+- ${spec.orientation.includes('portrait') ? 'Extend the background VERTICALLY (add more space above and below the main content)' : spec.orientation.includes('landscape') ? 'Extend the background HORIZONTALLY (add more space to the left and right)' : 'Balance the composition equally in all directions'}
+- Keep the main subject as the focal point, centered and prominent
+- Preserve exact text content, fonts, and styling
+- Match the identical color palette and visual mood
+- Output a complete, polished ${spec.label} creative at ${spec.w}x${spec.h}px${brandColors ? `\n- Brand colors to maintain: ${brandColors}` : ''}
+- DO NOT crop, cut off, or lose ANY element from the original
+
+Generate the adapted image now.`
+
+        console.log(`🎨 [AI-Adapt] Step B: Generating ${preset} (${spec.w}x${spec.h}) with ${detailedPrompt.length}-char prompt`)
+
+        // ── Step C: Generate with NanoBanana 2 ──
         const response = await ai.models.generateContent({
             model: 'gemini-3.1-flash-image-preview',
-            contents: [
-                {
-                    role: 'user',
-                    parts: [
-                        { inlineData: { mimeType: imageMimeType, data: imageBuffer.toString('base64') } },
-                        { text: adaptPrompt },
-                    ],
-                },
-            ],
-            config: {
-                responseModalities: ['TEXT', 'IMAGE'],
-            },
+            contents: [{
+                role: 'user',
+                parts: [imageInline, { text: detailedPrompt }],
+            }],
+            config: { responseModalities: ['TEXT', 'IMAGE'] },
         })
 
-        // Step 3: Extract generated image from response
+        // Extract image
         let generatedImageBuffer = null
         let generatedMimeType = 'image/png'
-
         if (response.candidates?.[0]?.content?.parts) {
             for (const part of response.candidates[0].content.parts) {
                 if (part.inlineData?.data) {
@@ -159,11 +207,11 @@ RULES:
 
         if (!generatedImageBuffer) {
             const textContent = response.candidates?.[0]?.content?.parts?.map(p => p.text).filter(Boolean).join(' ') || ''
-            console.error(`❌ [AI-Adapt] No image in Gemini response. Text: ${textContent.substring(0, 400)}`)
-            throw new Error('Gemini returned text but no image. The model may need a different prompt or the content was blocked.')
+            console.error(`❌ [AI-Adapt] No image. Text: ${textContent.substring(0, 400)}`)
+            throw new Error('Gemini returned no image — content may have been blocked or prompt needs adjustment.')
         }
 
-        // Step 4: Upload result to S3
+        // Upload to S3
         const ext = generatedMimeType.includes('png') ? 'png' : 'jpg'
         const s3Key = `canvas-adapt/${preset}/${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`
         const finalUrl = await uploadToS3(generatedImageBuffer, s3Key, generatedMimeType)
@@ -176,6 +224,7 @@ RULES:
             preset,
             imageUrl: finalUrl,
             spec,
+            analysis,  // Return analysis so frontend can cache it for subsequent presets
             generationTime: elapsed,
         })
     } catch (err) {

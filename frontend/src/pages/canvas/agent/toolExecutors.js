@@ -717,6 +717,7 @@ export async function executeToolCall(toolCall, fc, ctx = {}, deps = {}) {
             let rendered = 0
             const results = []
             const generatedImages = []  // { presetId, aiImageUrl, spec }
+            let cachedAnalysis = null  // MCoT: cache analysis from first preset, reuse for rest
 
             for (const presetId of validPresets) {
                 const spec = PRESET_MAP[presetId]
@@ -739,11 +740,18 @@ export async function executeToolCall(toolCall, fc, ctx = {}, deps = {}) {
                         canvasImageUrl: sourceImageUrl,
                         preset: presetId,
                         brandContext: brand ? { name: brand.name, dna: brand.dna } : null,
+                        cachedAnalysis,  // Send cached analysis to skip analysis step for 2nd+ presets
                     })
 
                     if (!adaptResult?.success || !adaptResult?.imageUrl) {
                         results.push({ presetId, success: false, error: adaptResult?.error || 'No image returned' })
                         continue
+                    }
+
+                    // Cache the analysis from the first successful call
+                    if (!cachedAnalysis && adaptResult.analysis) {
+                        cachedAnalysis = adaptResult.analysis
+                        console.log('[adapt_design] MCoT analysis cached for remaining presets')
                     }
 
                     generatedImages.push({ presetId, aiImageUrl: adaptResult.imageUrl, spec })
@@ -754,12 +762,15 @@ export async function executeToolCall(toolCall, fc, ctx = {}, deps = {}) {
                 }
             }
 
-            // ── Step 3: Clean old adapted artboards ──
-            const oldAdapted = fc.getObjects().filter(o =>
-                o._nodeType === 'artboard' && o.id !== 'artboard' ||
-                o._nodeType === 'artboard-label' ||
-                o._nodeType === 'ai-adapted'
-            )
+            // ── Step 3: Clean old adapted artboards (preserve the original artboard) ──
+            const oldAdapted = fc.getObjects().filter(o => {
+                if (o.id === 'artboard') return false  // Never remove the original artboard
+                if (o._nodeType === 'artboard') return true
+                if (o._nodeType === 'artboard-label') return true
+                if (o._nodeType === 'ai-adapted') return true
+                if (o.id === 'adapt-section-title') return true
+                return false
+            })
             oldAdapted.forEach(o => fc.remove(o))
 
             // ── Step 4: Loma-style grid layout ──
