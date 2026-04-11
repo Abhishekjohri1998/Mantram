@@ -949,7 +949,7 @@ When calling create_script_block, use this structure:
                 toolHandlers: {}, // No server-side tools needed — research done pre-flight
                 temperature: 0.5,
                 maxTokens: 4096,
-                model: 'claude-3-5-sonnet-20240620',
+                model: 'claude-3-5-sonnet-20241022',
             });
 
             // Attach reference images to response
@@ -967,16 +967,71 @@ When calling create_script_block, use this structure:
                     systemPrompt: systemPrompt,
                     userPrompt: message,
                     tools: clientTools,
-                    temperature: 0.2, // lower temp for stability
+                    temperature: 0.2,
                     maxTokens: 2048,
-                    model: 'claude-3-5-sonnet-20240620'
+                    model: 'claude-3-5-sonnet-20241022'
                 });
                 req._referenceImages = referenceImages;
             } catch (claudeRetryErr) {
-                console.warn(`   ❌ Claude retry failed: ${claudeRetryErr.message?.substring(0, 50)}. Falling back to Gemini...`);
+                // ── Detect adapt/resize intent before calling Gemini ──
+                // If user wants to adapt/resize to platforms, return adapt_design directly
+                // without calling AI (Gemini can't reliably pick adapt_design over basic tools)
+                const lowerMsg = message.toLowerCase();
+                const isAdaptIntent = /adapt|resize|size for|optimise for|optimize for|version for/i.test(lowerMsg);
+                const platformMentioned = /facebook|fb|instagram|insta|ig|youtube|yt|linkedin|twitter|whatsapp|wa|tiktok|pinterest/i.test(lowerMsg);
                 
-                // Fallback: use regular text generation to suggest what to do
-                // IMPORTANT: List EXACT tool names to prevent hallucinated tool names like "update_layer"
+                if (isAdaptIntent && platformMentioned) {
+                    // Resolve platform names to preset IDs directly
+                    const resolvedPresets = [];
+                    if (/facebook|fb/i.test(lowerMsg)) {
+                        resolvedPresets.push(/story/i.test(lowerMsg) ? 'fb-story' : 'fb-post');
+                    }
+                    if (/instagram|insta|\big\b|\bigs\b/i.test(lowerMsg)) {
+                        if (/story/i.test(lowerMsg)) resolvedPresets.push('ig-story');
+                        else if (/reel/i.test(lowerMsg)) resolvedPresets.push('ig-reel');
+                        else resolvedPresets.push('ig-post');
+                    }
+                    if (/youtube|\byt\b/i.test(lowerMsg)) resolvedPresets.push('yt-thumb');
+                    if (/linkedin/i.test(lowerMsg)) resolvedPresets.push('linkedin');
+                    if (/twitter|\bx\b/i.test(lowerMsg)) resolvedPresets.push('twitter');
+                    if (/whatsapp|\bwa\b/i.test(lowerMsg)) resolvedPresets.push('whatsapp-status');
+                    if (/pinterest/i.test(lowerMsg)) resolvedPresets.push('pinterest');
+                    // If no specific platform matched but intent detected, default to top 3
+                    if (resolvedPresets.length === 0) resolvedPresets.push('ig-post', 'fb-post', 'yt-thumb');
+                    
+                    console.log(`   🎯 [Fallback] Detected adapt intent → calling adapt_design directly with [${resolvedPresets.join(', ')}]`);
+                    return res.json({
+                        success: true,
+                        reply: `🎨 Adapting your design for ${resolvedPresets.length} platform${resolvedPresets.length > 1 ? 's' : ''}: ${resolvedPresets.join(', ')}...`,
+                        toolCalls: [{ name: 'adapt_design', args: { presets: resolvedPresets } }],
+                        fallback: true,
+                        provider: 'rule-based',
+                        generationTime: Date.now() - startTime,
+                    });
+                }
+                
+                // Also detect a single platform resize request
+                const isSingleResize = /resize to|change to|switch to|make it|set (canvas|size|canvas size) to/i.test(lowerMsg);
+                if (isSingleResize && platformMentioned) {
+                    let presetId = 'ig-post';
+                    if (/facebook|fb/i.test(lowerMsg)) presetId = /story/i.test(lowerMsg) ? 'fb-story' : 'fb-post';
+                    else if (/youtube|\byt\b/i.test(lowerMsg)) presetId = 'yt-thumb';
+                    else if (/linkedin/i.test(lowerMsg)) presetId = 'linkedin';
+                    else if (/story/i.test(lowerMsg)) presetId = 'ig-story';
+                    else if (/reel/i.test(lowerMsg)) presetId = 'ig-reel';
+                    
+                    console.log(`   🎯 [Fallback] Detected resize intent → calling set_canvas_size with [${presetId}]`);
+                    return res.json({
+                        success: true,
+                        reply: `📐 Resizing canvas to ${presetId}...`,
+                        toolCalls: [{ name: 'set_canvas_size', args: { preset: presetId } }],
+                        fallback: true,
+                        provider: 'rule-based',
+                        generationTime: Date.now() - startTime,
+                    });
+                }
+
+                // General fallback: Gemini generates basic canvas actions
                 const validToolNames = clientTools.map(t => t.name).join(', ');
                 const fallbackResult = await aiRouter.generateText({
                     systemPrompt: `You are Fidato, an AI creative director. The user wants to modify their canvas. Since tool-use is unavailable, respond with a JSON object containing "actions" — an array of canvas actions the frontend should execute.
@@ -987,6 +1042,8 @@ VALID TOOLS (you MUST only use these exact names — NO other tool names):
 ${validToolNames}
 
 For repositioning elements, use "move_element" with { position: "center" | "top-left" | etc. } or "change_element_property" with { property: "left" | "top", value: "number" }.
+
+DO NOT use set_background or add_text unless the user EXPLICITLY asks to change background or add text.
 
 Respond ONLY with valid JSON: { "reply": "friendly message", "actions": [{ "tool": "EXACT_TOOL_NAME_FROM_LIST", "args": {...} }] }`,
                     userPrompt: message,
@@ -1009,13 +1066,10 @@ Respond ONLY with valid JSON: { "reply": "friendly message", "actions": [{ "tool
                     });
                 } catch (parseErr) {
                     console.warn('⚠️ Fallback JSON parsing failed:', parseErr.message);
-                    
-                    // If text contains a JSON block, don't show it to the user. Provide a clean apology.
                     let cleanReply = fallbackResult.text || 'I can help with your canvas design. Could you be more specific?';
                     if (cleanReply.includes('```json') || cleanReply.includes('"actions":')) {
                        cleanReply = "I planned some updates for your canvas, but encountered an unexpected error formatting them. Could you try asking me to make that change again?";
                     }
-
                     return res.json({
                         success: true,
                         reply: cleanReply,
