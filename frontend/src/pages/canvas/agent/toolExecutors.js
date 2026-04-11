@@ -675,13 +675,13 @@ export async function executeToolCall(toolCall, fc, ctx = {}, deps = {}) {
 
             const validPresets = targetPresets.filter(p => PRESET_MAP[p])
             if (validPresets.length === 0) {
-                return `❌ Unknown presets: ${targetPresets.join(', ')}. Valid: ${Object.keys(PRESET_MAP).join(', ')}`
+                return `\u274c Unknown presets: ${targetPresets.join(', ')}. Valid: ${Object.keys(PRESET_MAP).join(', ')}`
             }
 
             if (setFidatoMessages) {
                 setFidatoMessages(prev => [...prev, {
                     role: 'assistant',
-                    content: `🎨 **Smart Adapt** — Scaling your design to ${validPresets.length} platform size(s):\n${validPresets.map(p => `• ${PRESET_MAP[p].label}`).join('\n')}\n\n⚡ Computing layouts instantly...`
+                    content: `\ud83c\udfa8 **Smart Adapt** \u2014 Scaling your design to ${validPresets.length} platform size(s):\n${validPresets.map(p => `\u2022 ${PRESET_MAP[p].label}`).join('\n')}\n\n\u26a1 Computing layouts instantly...`
                 }])
             }
 
@@ -689,6 +689,7 @@ export async function executeToolCall(toolCall, fc, ctx = {}, deps = {}) {
             const artboard = fc.getObjects().find(o => o.id === 'artboard')
             const sourceWidth  = artboard ? Math.round(artboard.width  * (artboard.scaleX || 1)) : fc._logicalWidth  || 1080
             const sourceHeight = artboard ? Math.round(artboard.height * (artboard.scaleY || 1)) : fc._logicalHeight || 1080
+            // artboard uses originX:'center', so left = center X
             const srcLeft = artboard ? (artboard.left - sourceWidth  / 2) : 0
             const srcTop  = artboard ? (artboard.top  - sourceHeight / 2) : 0
 
@@ -697,9 +698,9 @@ export async function executeToolCall(toolCall, fc, ctx = {}, deps = {}) {
                 !(o._nodeType === 'artboard-label') && !o.id?.startsWith('artboard-') &&
                 !o.id?.startsWith('auto-frame')
             )
-            if (contentObjects.length === 0) return '❌ Canvas is empty — add elements first'
+            if (contentObjects.length === 0) return '\u274c Canvas is empty \u2014 add elements first'
 
-            // Get true top-left coordinate regardless of originX/Y
+            // Get true top-left coordinate regardless of originX/Y (Fabric v7)
             const getTruePos = (obj) => {
                 const w = (obj.width || 0) * (obj.scaleX || 1)
                 const h = (obj.height || 0) * (obj.scaleY || 1)
@@ -734,7 +735,7 @@ export async function executeToolCall(toolCall, fc, ctx = {}, deps = {}) {
                 fc.sendObjectToBack(artboardRect)
 
                 // Label above artboard
-                fc.add(new fabric.Textbox(`${spec.label}\n${targetW}×${targetH}`, {
+                fc.add(new fabric.Textbox(`${spec.label}\n${targetW}\u00d7${targetH}`, {
                     left: xOffset, top: srcTop - 56, width: targetW,
                     fontSize: 13, fontWeight: '700', fontFamily: 'Inter',
                     fill: '#818cf8', textAlign: 'center', selectable: false, evented: false,
@@ -755,53 +756,49 @@ export async function executeToolCall(toolCall, fc, ctx = {}, deps = {}) {
                     const nw = ow * scaleX, nh = oh * scaleY
                     const newId = `${obj.id || 'el'}-${presetId}`
 
-                    if (obj.type === 'image') {
-                        await new Promise(resolve => {
-                            obj.clone(cloned => {
-                                if (!cloned) { resolve(); return }
-                                cloned.set({
-                                    left: nx + nw / 2, top: ny + nh / 2,
-                                    originX: 'center', originY: 'center',
-                                    scaleX: nw / (cloned.width || 1),
-                                    scaleY: nh / (cloned.height || 1),
-                                    opacity: obj.opacity ?? 1,
-                                    id: newId, _adaptedFrom: obj.id, _preset: presetId,
-                                    clipPath: makeClip(),
-                                })
-                                fc.add(cloned)
-                                resolve()
+                    try {
+                        if (obj.type === 'image') {
+                            // Fabric v7: clone() returns a Promise
+                            const cloned = await obj.clone()
+                            cloned.set({
+                                left: nx + nw / 2, top: ny + nh / 2,
+                                originX: 'center', originY: 'center',
+                                scaleX: nw / (cloned.width || 1),
+                                scaleY: nh / (cloned.height || 1),
+                                opacity: obj.opacity ?? 1,
+                                id: newId, _adaptedFrom: obj.id, _preset: presetId,
+                                clipPath: makeClip(),
                             })
-                        })
-                    } else if (obj.type === 'textbox' || obj.type === 'i-text') {
-                        fc.add(new fabric.Textbox(obj.text || '', {
-                            left: nx, top: ny, originX: 'left', originY: 'top', width: nw,
-                            fontSize: Math.max(8, Math.round((obj.fontSize || 16) * uniformScale)),
-                            fontWeight: obj.fontWeight || 'normal',
-                            fontFamily: obj.fontFamily || 'Inter',
-                            fill: obj.fill || '#000000',
-                            textAlign: obj.textAlign || 'left',
-                            opacity: obj.opacity ?? 1,
-                            id: newId, _adaptedFrom: obj.id, _preset: presetId,
-                            clipPath: makeClip(),
-                        }))
-                    } else {
-                        await new Promise(resolve => {
-                            obj.clone(cloned => {
-                                if (!cloned) { resolve(); return }
-                                cloned.set({
-                                    left: nx, top: ny, originX: 'left', originY: 'top',
-                                    scaleX: (obj.scaleX || 1) * scaleX,
-                                    scaleY: (obj.scaleY || 1) * scaleY,
-                                    opacity: obj.opacity ?? 1,
-                                    id: newId, _adaptedFrom: obj.id, _preset: presetId,
-                                    clipPath: makeClip(),
-                                })
-                                fc.add(cloned)
-                                fc.sendObjectToBack(cloned)
-                                fc.sendObjectToBack(artboardRect)
-                                resolve()
+                            fc.add(cloned)
+                        } else if (obj.type === 'textbox' || obj.type === 'i-text') {
+                            fc.add(new fabric.Textbox(obj.text || '', {
+                                left: nx, top: ny, originX: 'left', originY: 'top', width: Math.max(10, nw),
+                                fontSize: Math.max(8, Math.round((obj.fontSize || 16) * uniformScale)),
+                                fontWeight: obj.fontWeight || 'normal',
+                                fontFamily: obj.fontFamily || 'Inter',
+                                fill: obj.fill || '#000000',
+                                textAlign: obj.textAlign || 'left',
+                                opacity: obj.opacity ?? 1,
+                                id: newId, _adaptedFrom: obj.id, _preset: presetId,
+                                clipPath: makeClip(),
+                            }))
+                        } else {
+                            // Fabric v7: clone() returns a Promise
+                            const cloned = await obj.clone()
+                            cloned.set({
+                                left: nx, top: ny, originX: 'left', originY: 'top',
+                                scaleX: (obj.scaleX || 1) * scaleX,
+                                scaleY: (obj.scaleY || 1) * scaleY,
+                                opacity: obj.opacity ?? 1,
+                                id: newId, _adaptedFrom: obj.id, _preset: presetId,
+                                clipPath: makeClip(),
                             })
-                        })
+                            fc.add(cloned)
+                            fc.sendObjectToBack(cloned)
+                            fc.sendObjectToBack(artboardRect)
+                        }
+                    } catch (objErr) {
+                        console.warn(`[adapt_design] Failed to clone object ${obj.id}:`, objErr.message)
                     }
                 }
 
@@ -811,18 +808,17 @@ export async function executeToolCall(toolCall, fc, ctx = {}, deps = {}) {
             }
 
             fc.requestRenderAll()
-            const summary = validPresets.map(p => `• **${PRESET_MAP[p].label}** (${PRESET_MAP[p].w}×${PRESET_MAP[p].h})`).join('\n')
+            const summary = validPresets.map(p => `\u2022 **${PRESET_MAP[p].label}** (${PRESET_MAP[p].w}\u00d7${PRESET_MAP[p].h})`).join('\n')
             if (setFidatoMessages) {
                 setFidatoMessages(prev => [...prev, {
                     role: 'assistant',
-                    content: `✅ **Smart Adapt Complete!** ${rendered} platform layouts created side-by-side.\n\n${summary}\n\nScroll right to see all variants.`
+                    content: `\u2705 **Smart Adapt Complete!** ${rendered} platform layouts created side-by-side.\n\n${summary}\n\nScroll right to see all variants.`
                 }])
             }
-            return { text: `Smart Adapt complete — ${rendered} platform layouts created`, presetsRendered: rendered }
+            return { text: `Smart Adapt complete \u2014 ${rendered} platform layouts created`, presetsRendered: rendered }
         }
 
-
-        case 'generate_video_clip': {
+                case 'generate_video_clip': {
 
             let { prompt, duration, aspectRatio, sourceImageUrl, sceneRef, model, resolution } = args
             
