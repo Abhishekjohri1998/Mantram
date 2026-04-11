@@ -8,6 +8,7 @@ import { useBrand } from '../context/BrandContext'
 import VoiceInput from '../components/VoiceInput'
 import PublishModal from '../components/PublishModal'
 import GlobalLoader from '../components/GlobalLoader'
+import MaskingCanvas from '../components/MaskingCanvas'
 
 // ── Helper: Time Ago ──
 
@@ -512,6 +513,18 @@ export default function CreativeStudio() {
     const animatePollRef = useRef(null)
     const animateImageRef = useRef(null) // Stores the image URL being animated (avoids stale closure)
 
+    // ── Gemini Edit Image State ── (inline panel, mirrors animate panel UX)
+    const [showEditPanel, setShowEditPanel] = useState(false)
+    const [editSourceImageUrl, setEditSourceImageUrl] = useState(null) // Original image being edited
+    const [editPromptText, setEditPromptText] = useState('')
+    const [editGenerating, setEditGenerating] = useState(false)
+    const [editResult, setEditResult] = useState(null) // { imageUrl, description }
+    const [editError, setEditError] = useState(null)
+    const [editHistory, setEditHistory] = useState([]) // Multi-turn edit conversation
+    const editImageRef = useRef(null) // Avoids stale closure — stores current source URL
+    const [isMaskingMode, setIsMaskingMode] = useState(false)
+    const maskingCanvasRef = useRef(null)
+
     // Synced with backend MODEL_CAPABILITIES (falClient.js) + xAI/fal.ai/PiAPI API docs
     const ANIMATE_MODELS = {
         'grok-imagine': { name: 'Grok Imagine', icon: 'memory', dur: [5, 5], ratios: ['16:9', '1:1', '9:16'], firstFrame: true, refImages: false, nativeAudio: false, desc: 'Fast, affordable, image-to-video' },
@@ -668,11 +681,75 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
     // Cleanup animate polling on unmount
     useEffect(() => () => { if (animatePollRef.current) clearInterval(animatePollRef.current) }, [])
 
-    // ── AI Image Editing ──
+    // ── AI Image Editing — Inline Edit Panel (like Animate) ──
     const handleOpenEditPanel = (imageUrl, title = 'Creative') => {
-        if (!imageUrl) return;
-        sessionStorage.setItem('canvasEditorImage', imageUrl);
-        navigate('/ai-canvas');
+        if (!imageUrl) return
+        // Show the inline edit panel instead of navigating to canvas
+        editImageRef.current = imageUrl
+        setEditSourceImageUrl(imageUrl)
+        setShowEditPanel(true)
+        setEditResult(null)
+        setEditError(null)
+        setEditPromptText('')
+        setEditHistory([])
+        setEditGenerating(false)
+        // Collapse animate panel if open
+        if (showAnimatePanel) {
+            setShowAnimatePanel(false)
+            setAnimateModalOpen(false)
+        }
+        // Scroll to top of gallery so user sees the edit panel
+        requestAnimationFrame(() => {
+            document.querySelector('.creative-gallery')?.scrollTo({ top: 0, behavior: 'smooth' })
+        })
+    }
+
+    // ── Gemini Edit: Generate edited image ──
+    const handleEditGenerate = async () => {
+        const sourceUrl = editImageRef.current || editSourceImageUrl
+        if (!sourceUrl || !editPromptText.trim()) return
+        
+        let maskBase64 = null;
+        if (isMaskingMode && maskingCanvasRef.current) {
+            maskBase64 = maskingCanvasRef.current.extractMask();
+        }
+        
+        setEditGenerating(true)
+        setEditError(null)
+        try {
+            const result = await creativesAPI.editImage({
+                imageUrl: sourceUrl,
+                editPrompt: editPromptText.trim(),
+                maskBase64,
+                editMode: isMaskingMode ? 'masked' : 'freeform',
+                editHistory: editHistory.map(h => ({
+                    prompt: h.prompt,
+                    imageUrl: h.sourceImageUrl,
+                    resultImageUrl: h.resultImageUrl,
+                })),
+                brandId: activeBrand?._id,
+            })
+            if (result?.success && result?.imageUrl) {
+                // Add to multi-turn history so user can chain edits
+                const historyEntry = {
+                    prompt: editPromptText.trim(),
+                    sourceImageUrl: sourceUrl,
+                    resultImageUrl: result.imageUrl,
+                }
+                setEditHistory(prev => [...prev, historyEntry])
+                setEditResult({ imageUrl: result.imageUrl, description: result.editDescription })
+                // Update source for next edit — chained editing
+                editImageRef.current = result.imageUrl
+                setEditSourceImageUrl(result.imageUrl)
+                setEditPromptText('')
+            } else {
+                throw new Error(result?.error || 'Edit returned no image')
+            }
+        } catch (e) {
+            setEditError({ message: e.message || 'Edit failed. Try again.' })
+        } finally {
+            setEditGenerating(false)
+        }
     }
     
     // ── Studio Mode — driven by URL ?mode= param ──
@@ -932,7 +1009,10 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
     async function handleDownloadImage(url, filename) {
         if (!url) return
         try {
-            const res = await fetch(url)
+            const token = localStorage.getItem('token') || '';
+            const proxyUrl = `${API_BASE}/creatives/proxy-download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename || 'mantram-creative.png')}`;
+            const res = await fetch(proxyUrl, { headers: { 'Authorization': `Bearer ${token}` }});
+            if (!res.ok) throw new Error('Proxy download failed, status ' + res.status);
             const blob = await res.blob()
             const blobUrl = window.URL.createObjectURL(blob)
             const a = document.createElement('a')
@@ -940,8 +1020,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
             a.download = filename || 'mantram-creative.png'
             document.body.appendChild(a)
             a.click()
-            document.body.removeChild(a)
-            window.URL.revokeObjectURL(blobUrl)
+            setTimeout(() => { document.body.removeChild(a); window.URL.revokeObjectURL(blobUrl) }, 100)
         } catch (err) {
             console.error('Download failed, falling back to new tab:', err)
             window.open(url, '_blank')
@@ -2544,8 +2623,206 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             </div>
                         )}
 
+                        {/* ═══ GEMINI EDIT IMAGE WORKSPACE ═══ */}
+                        {showEditPanel && studioMode === 'create' && (
+                            <div className="mb-6 studio-card border-violet-500/30 shadow-lg shadow-violet-500/5 bg-[var(--sys-surface)] overflow-hidden animate-fade-in relative">
+                                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-violet-500 to-indigo-500" />
+                                <div className="p-5 sm:p-6 xl:p-8">
+                                    <div className="flex flex-col xl:flex-row gap-6 xl:gap-8">
 
+                                        {/* Left: Image Preview */}
+                                        <div className="w-full xl:w-[40%] flex flex-col gap-3 shrink-0">
+                                            <div className="flex items-center justify-between xl:hidden">
+                                                <h3 className="text-sm font-bold text-[var(--sys-text)] flex items-center gap-2">
+                                                    <span className="material-symbols-outlined text-violet-400">auto_fix_high</span> Gemini Edit
+                                                </h3>
+                                                <button onClick={() => { if (!editGenerating) setShowEditPanel(false) }}
+                                                    className="w-8 h-8 rounded-full bg-[var(--sys-surface-hover)] flex items-center justify-center text-[var(--sys-text-muted)] hover:text-violet-400 transition-colors cursor-pointer border border-transparent">
+                                                    <span className="material-symbols-outlined text-sm">close</span>
+                                                </button>
+                                            </div>
+                                            <div className="rounded-2xl overflow-hidden bg-[var(--sys-surface-hover)] border border-[var(--sys-border)] relative shadow-inner xl:max-h-[500px]">
+                                                {editSourceImageUrl ? (
+                                                    <div className="relative">
+                                                        {isMaskingMode ? (
+                                                            <div className="p-2">
+                                                                <MaskingCanvas ref={maskingCanvasRef} imageUrl={editSourceImageUrl} />
+                                                            </div>
+                                                        ) : (
+                                                            <img src={editSourceImageUrl} alt="Image being edited" className="w-full h-auto object-contain bg-black/40 xl:max-h-[420px]" />
+                                                        )}
+                                                    </div>
+                                                ) : (
+                                                    <div className="w-full aspect-video flex flex-col items-center justify-center text-[var(--sys-text-muted)]">
+                                                        <span className="material-symbols-outlined text-3xl mb-2">image_not_supported</span>
+                                                        <span className="text-xs">No image selected</span>
+                                                    </div>
+                                                )}
+                                                <div className="absolute top-3 left-3 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded text-[10px] font-bold text-white tracking-widest uppercase border border-white/10 flex items-center gap-1.5 z-10">
+                                                    <span className="material-symbols-outlined text-[12px] text-violet-400">photo_library</span>
+                                                    {editHistory.length > 0 ? `After ${editHistory.length} Edit${editHistory.length > 1 ? 's' : ''}` : 'Source Image'}
+                                                </div>
+                                                {editSourceImageUrl && (
+                                                    <button onClick={() => setIsMaskingMode(!isMaskingMode)} className={`absolute top-3 right-3 px-2.5 py-1 rounded text-[10px] font-bold tracking-widest uppercase border flex items-center gap-1.5 transition-colors z-10 ${isMaskingMode ? 'bg-violet-500 text-white border-violet-400' : 'bg-black/60 backdrop-blur-md text-white border-white/10 hover:bg-black/80'}`}>
+                                                        <span className="material-symbols-outlined text-[14px]">{isMaskingMode ? 'brush' : 'brush'}</span>
+                                                        {isMaskingMode ? 'Exit Masking' : 'Draw Mask'}
+                                                    </button>
+                                                )}
+                                            </div>
+                                            {/* Edit History Timeline */}
+                                            {editHistory.length > 0 && (
+                                                <div className="space-y-1.5 mt-2">
+                                                    <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-wider flex items-center gap-1.5">
+                                                        <span className="material-symbols-outlined text-[12px]">history</span>
+                                                        Edit History ({editHistory.length} turn{editHistory.length > 1 ? 's' : ''})
+                                                    </p>
+                                                    <div className="space-y-1 max-h-[120px] overflow-y-auto" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(139,92,246,0.3) transparent' }}>
+                                                        {editHistory.map((h, i) => (
+                                                            <div key={i} className="flex items-center gap-2 p-2 rounded-lg bg-violet-500/5 border border-violet-500/10">
+                                                                <span className="text-[10px] font-bold text-violet-400 w-5 text-center shrink-0">{i + 1}</span>
+                                                                <span className="text-[10px] text-[var(--sys-text-muted)] truncate flex-1">{h.prompt}</span>
+                                                                <button onClick={() => { editImageRef.current = h.resultImageUrl; setEditSourceImageUrl(h.resultImageUrl); setEditResult(null); setEditHistory(prev => prev.slice(0, i + 1)) }}
+                                                                    className="text-[9px] text-violet-400 hover:text-violet-300 cursor-pointer shrink-0 font-bold" title="Revert to this version">
+                                                                    Revert
+                                                                </button>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
 
+                                        {/* Right: Prompt & Controls */}
+                                        <div className="flex-1 flex flex-col min-w-0">
+                                            <div className="hidden xl:flex items-center justify-between mb-6 pb-4 border-b border-[var(--sys-border)]">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-10 h-10 rounded-xl bg-violet-500/10 flex items-center justify-center border border-violet-500/20">
+                                                        <span className="material-symbols-outlined text-violet-400">auto_fix_high</span>
+                                                    </div>
+                                                    <div>
+                                                        <h3 className="text-base font-bold text-[var(--sys-text)] leading-tight">Gemini Edit Workspace</h3>
+                                                        <p className="text-[11px] text-[var(--sys-text-muted)] leading-tight mt-0.5">Edit images with natural language — chain multiple edits</p>
+                                                    </div>
+                                                </div>
+                                                <button onClick={() => { if (!editGenerating) setShowEditPanel(false) }}
+                                                    className="w-10 h-10 rounded-full bg-[var(--sys-surface-hover)] flex items-center justify-center text-[var(--sys-text-muted)] hover:text-violet-400 transition-colors cursor-pointer border border-transparent hover:border-violet-500/30 hover:bg-violet-500/10">
+                                                    <span className="material-symbols-outlined text-sm">close</span>
+                                                </button>
+                                            </div>
+
+                                            {/* Quick Edit Suggestions */}
+                                            <div className="mb-4">
+                                                <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-2">Quick Edits</p>
+                                                <div className="flex flex-wrap gap-1.5">
+                                                    {['Remove the background', 'Make it more vibrant', 'Add cinematic lighting', 'Make it look like a product photo', 'Add a subtle gradient overlay', 'Make it black and white', 'Enhance the colors'].map(suggestion => (
+                                                        <button key={suggestion}
+                                                            onClick={() => setEditPromptText(suggestion)}
+                                                            className="px-2.5 py-1 rounded-lg text-[10px] font-medium bg-violet-500/10 text-violet-300 hover:bg-violet-500/25 hover:text-violet-200 border border-violet-500/20 cursor-pointer transition-all">
+                                                            {suggestion}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            {/* Prompt Input */}
+                                            <div className="mb-5 flex-1">
+                                                <label className="text-[11px] font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-2 flex justify-between">
+                                                    <span>Edit Instruction</span>
+                                                    <span className="text-violet-400 flex items-center gap-1"><span className="material-symbols-outlined text-[12px]">auto_awesome</span> Gemini Flash</span>
+                                                </label>
+                                                <textarea value={editPromptText} onChange={e => setEditPromptText(e.target.value)}
+                                                    onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !editGenerating) handleEditGenerate() }}
+                                                    placeholder="Describe how to edit this image... e.g. 'Remove the background', 'Make the colors more vibrant', 'Add dramatic studio lighting'"
+                                                    className="input-glass w-full py-3.5 px-4 text-[13px] resize-none focus:border-violet-500 min-h-[110px] shadow-inner font-medium text-[var(--sys-text)] bg-[var(--sys-bg)]" rows={4} />
+                                                <p className="text-[9px] text-[var(--sys-text-muted)] mt-1">⌘+Enter to apply · Edits are chained — each edit builds on the last</p>
+                                            </div>
+
+                                            {/* Error */}
+                                            {editError && (
+                                                <div className="mb-4 p-4 rounded-xl border bg-rose-500/10 border-rose-500/20 text-rose-400 flex items-start gap-3">
+                                                    <span className="material-symbols-outlined text-lg mt-0.5">error</span>
+                                                    <div className="flex-1 text-[13px] leading-relaxed">{editError.message}</div>
+                                                    <button onClick={() => setEditError(null)} className="text-rose-400 hover:text-rose-300 cursor-pointer"><span className="material-symbols-outlined text-sm">close</span></button>
+                                                </div>
+                                            )}
+
+                                            {/* Result Preview */}
+                                            {editResult && (
+                                                <div className="mb-5 rounded-2xl overflow-hidden border border-emerald-500/30 bg-emerald-500/5 shadow-[0_0_20px_rgba(16,185,129,0.08)]">
+                                                    <div className="relative">
+                                                        <img src={editResult.imageUrl} alt="Edited result" className="w-full max-h-[280px] xl:max-h-[300px] object-contain bg-black/30 cursor-pointer"
+                                                            onClick={() => setZoomImage(editResult.imageUrl)} />
+                                                        <div className="absolute top-3 left-3 bg-emerald-500/90 backdrop-blur-md px-2.5 py-1 rounded text-[10px] font-bold text-white tracking-widest uppercase border border-white/20 flex items-center gap-1.5 shadow-lg">
+                                                            <span className="material-symbols-outlined text-[12px]">check_circle</span> Edit Applied
+                                                        </div>
+                                                        <button onClick={() => setZoomImage(editResult.imageUrl)} className="absolute top-3 right-3 bg-black/60 hover:bg-black/80 backdrop-blur-md p-1.5 rounded-lg text-white transition-all cursor-pointer">
+                                                            <span className="material-symbols-outlined text-sm">open_in_full</span>
+                                                        </button>
+                                                    </div>
+                                                    <div className="p-3 bg-[var(--sys-surface)] border-t border-[var(--sys-border)] flex items-center justify-between gap-2">
+                                                        <div className="flex gap-2">
+                                                            <button onClick={() => handleDownloadImage(editResult.imageUrl, 'gemini-edit.png')}
+                                                                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-500 text-white text-[12px] font-bold hover:bg-emerald-600 transition-colors uppercase tracking-wider cursor-pointer">
+                                                                <span className="material-symbols-outlined text-[14px]">cloud_download</span> Download
+                                                            </button>
+                                                            <button onClick={async () => { try { await creativesAPI.uploadToBank({ imageUrl: editResult.imageUrl, brandId: activeBrand?._id, title: 'Gemini Edited — ' + (editPromptText.slice(0, 40) || 'Edit') }); setFeedbackToast('Saved to Image Bank!'); setTimeout(() => setFeedbackToast(''), 2500) } catch(e) { console.error(e) } }}
+                                                                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[var(--sys-primary-dim)] hover:opacity-80 text-primary text-[12px] font-bold border border-[var(--sys-border)] transition-colors cursor-pointer uppercase tracking-wider">
+                                                                <span className="material-symbols-outlined text-[14px]">save</span> Save
+                                                            </button>
+                                                            <button onClick={() => { setPublishData({ image: editResult.imageUrl, text: '' }) }}
+                                                                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#1877F2]/20 hover:bg-[#1877F2]/40 text-[12px] font-bold text-[#1877F2] border border-[#1877F2]/30 transition-colors cursor-pointer">
+                                                                <span className="material-symbols-outlined text-[14px]">send</span> Share
+                                                            </button>
+                                                        </div>
+                                                        <button onClick={() => handleAnimateClick({ imageUrl: editResult.imageUrl })}
+                                                            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#FF4D00]/10 hover:bg-[#FF4D00]/20 text-[12px] font-bold text-[#FF4D00] border border-[#FF4D00]/20 transition-colors cursor-pointer">
+                                                            <span className="material-symbols-outlined text-[14px]">animation</span> Animate
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Action Buttons */}
+                                            <div className="flex gap-3">
+                                                <button onClick={handleEditGenerate}
+                                                    disabled={editGenerating || !editPromptText.trim() || !editImageRef.current}
+                                                    className={`flex-1 py-3.5 rounded-xl text-[13px] font-bold flex items-center justify-center gap-2 cursor-pointer transition-all uppercase tracking-wider ${
+                                                        editGenerating || !editPromptText.trim() || !editImageRef.current
+                                                            ? 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] border border-[var(--sys-border)] opacity-60 cursor-not-allowed'
+                                                            : 'bg-violet-600 text-white hover:bg-violet-500 shadow-[0_0_20px_rgba(139,92,246,0.3)] hover:shadow-[0_0_25px_rgba(139,92,246,0.5)] hover:-translate-y-0.5'
+                                                    }`}>
+                                                    {editGenerating ? (
+                                                        <><div className="w-4 h-4 border-2 border-white/80 border-t-transparent rounded-full animate-spin" /> Applying Edit...</>
+                                                    ) : (
+                                                        <><span className="material-symbols-outlined text-[18px]">auto_fix_high</span> {editHistory.length > 0 ? 'Apply Next Edit' : 'Apply Edit'}</>
+                                                    )}
+                                                </button>
+                                                {editHistory.length > 0 && (
+                                                    <button onClick={() => {
+                                                        // Reset to original image
+                                                        const origUrl = editHistory[0].sourceImageUrl
+                                                        editImageRef.current = origUrl
+                                                        setEditSourceImageUrl(origUrl)
+                                                        setEditHistory([])
+                                                        setEditResult(null)
+                                                        setEditPromptText('')
+                                                    }}
+                                                        disabled={editGenerating}
+                                                        className="px-4 py-3.5 rounded-xl border border-[var(--sys-border)] bg-[var(--sys-surface)] hover:bg-[var(--sys-surface-hover)] text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] transition-all text-[12px] font-bold cursor-pointer" title="Reset to original">
+                                                        <span className="material-symbols-outlined text-sm">restart_alt</span>
+                                                    </button>
+                                                )}
+                                                <button onClick={() => { if (!editGenerating) setShowEditPanel(false) }}
+                                                    disabled={editGenerating}
+                                                    className={`px-4 py-3.5 rounded-xl border border-[var(--sys-border)] bg-[var(--sys-surface)] hover:bg-[var(--sys-surface-hover)] text-[var(--sys-text)] transition-colors text-[12px] font-bold ${editGenerating ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
+                                                    Cancel
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
                         {/* ── AI Provider Warnings ── */}
                         {aiWarnings.length > 0 && (
@@ -2651,22 +2928,38 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                         Reuse Settings
                                     </button>
                                     <button onClick={() => { navigator.clipboard.writeText(prompt); setFeedbackToast('Prompt copied!'); setTimeout(() => setFeedbackToast(''), 2000); }}
-                                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)] cursor-pointer transition-all">
+                                        className="hidden sm:flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)] cursor-pointer transition-all">
                                         <span className="material-symbols-outlined text-sm">content_copy</span>
-                                        Copy Prompt
+                                        Copy
                                     </button>
 
-                                    {/* Link to advanced actions */}
-                                    <button onClick={() => handleAnimateClick(result)}
-                                        className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-[var(--sys-bg)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-text)] cursor-pointer transition-all border border-[var(--sys-text)] bg-[var(--sys-text)]">
-                                        <span className="material-symbols-outlined text-sm">animation</span>
-                                        Animate
-                                    </button>
-                                    <button onClick={() => result.imageUrl && setZoomImage(result.imageUrl)}
-                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-violet-300 hover:text-[var(--sys-text)] hover:bg-violet-500/20 cursor-pointer transition-all border border-violet-500/20 bg-violet-500/10">
-                                        <span className="material-symbols-outlined text-sm">open_in_full</span>
-                                        Expand
-                                    </button>
+                                    {/* Action items on the right side */}
+                                    <div className="flex items-center gap-1.5 ml-auto">
+                                        <button onClick={async () => {
+                                            try { await creativesAPI.uploadToBank({ imageUrl: result.imageUrl, brandId: activeBrand?._id, title: result.title || 'Creative' }); setFeedbackToast('Saved to Image Bank!'); setTimeout(() => setFeedbackToast(''), 2500) } catch(e) { console.error(e) }
+                                        }}
+                                            className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[11px] font-bold text-primary bg-[var(--sys-primary-dim)] hover:opacity-80 transition-colors cursor-pointer border border-[var(--sys-border)]" title="Save to Image Bank">
+                                            <span className="material-symbols-outlined text-[14px]">save</span>
+                                        </button>
+                                        <button onClick={() => handleDownloadImage(result.imageUrl, `${result.title || 'creative'}.png`)}
+                                            className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[11px] font-bold text-[var(--sys-text)] bg-[var(--sys-surface)] hover:bg-[var(--sys-surface-hover)] transition-colors cursor-pointer border border-[var(--sys-border)]" title="Download">
+                                            <span className="material-symbols-outlined text-[14px]">download</span>
+                                        </button>
+                                        <button onClick={() => result.imageUrl && handleOpenEditPanel(result.imageUrl, result.title || 'Creative')}
+                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-violet-300 hover:text-white hover:bg-violet-600 cursor-pointer transition-all border border-violet-500/30 bg-violet-500/10">
+                                            <span className="material-symbols-outlined text-sm">auto_fix_high</span>
+                                            Edit
+                                        </button>
+                                        <button onClick={() => handleAnimateClick(result)}
+                                            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-[var(--sys-bg)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-text)] cursor-pointer transition-all border border-[var(--sys-text)] bg-[var(--sys-text)]">
+                                            <span className="material-symbols-outlined text-sm">animation</span>
+                                            Animate
+                                        </button>
+                                        <button onClick={() => result.imageUrl && setZoomImage(result.imageUrl)}
+                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-violet-300 hover:text-[var(--sys-text)] hover:bg-violet-500/20 cursor-pointer transition-all border border-violet-500/20 bg-violet-500/10">
+                                            <span className="material-symbols-outlined text-sm">open_in_full</span>
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         )}
@@ -3894,6 +4187,145 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
 
                     {/* ═══ Full-Width Photoshoot Result ═══ */}
                     <div className="flex-1 flex flex-col">
+
+                        {/* ═══ GEMINI EDIT IMAGE WORKSPACE (Photoshoot) ═══ */}
+                        {showEditPanel && studioMode === 'photoshoot' && (
+                            <div className="mb-6 studio-card border-violet-500/30 shadow-lg shadow-violet-500/5 bg-[var(--sys-surface)] overflow-hidden animate-fade-in relative">
+                                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-violet-500 to-indigo-500" />
+                                <div className="p-5 sm:p-6">
+                                    <div className="flex flex-col xl:flex-row gap-5 xl:gap-7">
+                                        {/* Left: Image preview */}
+                                        <div className="w-full xl:w-[38%] flex flex-col gap-3 shrink-0">
+                                            <div className="flex items-center justify-between">
+                                                <h3 className="text-sm font-bold text-[var(--sys-text)] flex items-center gap-2">
+                                                    <span className="material-symbols-outlined text-violet-400">auto_fix_high</span> Gemini Edit
+                                                    {editHistory.length > 0 && <span className="text-[10px] font-normal text-violet-400">· {editHistory.length} edit{editHistory.length > 1 ? 's' : ''} applied</span>}
+                                                </h3>
+                                                <button onClick={() => { if (!editGenerating) setShowEditPanel(false) }}
+                                                    className="w-7 h-7 rounded-full bg-[var(--sys-surface-hover)] flex items-center justify-center text-[var(--sys-text-muted)] hover:text-violet-400 transition-colors cursor-pointer border border-transparent">
+                                                    <span className="material-symbols-outlined text-sm">close</span>
+                                                </button>
+                                            </div>
+                                            <div className="rounded-2xl overflow-hidden bg-[var(--sys-surface-hover)] border border-[var(--sys-border)] relative shadow-inner">
+                                                {editSourceImageUrl ? (
+                                                    <img src={editSourceImageUrl} alt="Image being edited" className="w-full h-auto object-contain bg-black/40 max-h-[340px]" />
+                                                ) : (
+                                                    <div className="w-full aspect-square flex flex-col items-center justify-center text-[var(--sys-text-muted)]">
+                                                        <span className="material-symbols-outlined text-3xl mb-2">image_not_supported</span>
+                                                        <span className="text-xs">No image selected</span>
+                                                    </div>
+                                                )}
+                                                <div className="absolute top-2 left-2 bg-black/60 backdrop-blur-md px-2 py-0.5 rounded text-[9px] font-bold text-white uppercase border border-white/10 flex items-center gap-1">
+                                                    <span className="material-symbols-outlined text-[10px] text-violet-400">photo_library</span>
+                                                    {editHistory.length > 0 ? `v${editHistory.length + 1}` : 'Original'}
+                                                </div>
+                                            </div>
+                                            {editHistory.length > 0 && (
+                                                <div className="space-y-1">
+                                                    {editHistory.slice(-3).map((h, i) => (
+                                                        <div key={i} className="flex items-center gap-2 p-1.5 rounded-lg bg-violet-500/5 border border-violet-500/10">
+                                                            <span className="text-[9px] font-bold text-violet-400 w-4 text-center shrink-0">{editHistory.length - 3 + i + 1}</span>
+                                                            <span className="text-[9px] text-[var(--sys-text-muted)] truncate flex-1">{h.prompt}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                        {/* Right: Controls */}
+                                        <div className="flex-1 flex flex-col gap-4 min-w-0">
+                                            <div>
+                                                <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-[6px]">Quick Edits — Nano Banana 2 Capabilities</p>
+                                                <div className="space-y-1.5">
+                                                    {[
+                                                        { label: '🎨 bg', chips: ['Remove background', 'White studio background', 'Add outdoor lifestyle background', 'Blur background'] },
+                                                        { label: '📸 product', chips: ['Add cinematic studio lighting', 'Make it look premium', 'Place on marble surface', 'Editorial product shot'] },
+                                                        { label: '🎭 style', chips: ['Make colors more vibrant', 'Add moody dark tones', 'Warm golden hour light', 'Black and white'] },
+                                                    ].map(g => (
+                                                        <div key={g.label} className="flex flex-wrap gap-1">
+                                                            {g.chips.map(chip => (
+                                                                <button key={chip} onClick={() => setEditPromptText(chip)}
+                                                                    className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-violet-500/10 text-violet-300 hover:bg-violet-500/25 border border-violet-500/20 cursor-pointer transition-all">{chip}</button>
+                                                            ))}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            <div className="flex-1">
+                                                <label className="text-[11px] font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-2 flex justify-between">
+                                                    <span>Edit Instruction</span>
+                                                    <span className="text-violet-400 flex items-center gap-1"><span className="material-symbols-outlined text-[12px]">auto_awesome</span> Gemini</span>
+                                                </label>
+                                                <textarea value={editPromptText} onChange={e => setEditPromptText(e.target.value)}
+                                                    onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !editGenerating) handleEditGenerate() }}
+                                                    placeholder="Describe how to edit this photoshoot image..."
+                                                    className="input-glass w-full py-3 px-4 text-[13px] resize-none focus:border-violet-500 min-h-[90px] bg-[var(--sys-bg)]" rows={3} />
+                                            </div>
+                                            {editError && (
+                                                <div className="p-3 rounded-xl border bg-rose-500/10 border-rose-500/20 text-rose-400 flex items-center gap-2 text-xs">
+                                                    <span className="material-symbols-outlined text-sm">error</span>
+                                                    <span className="flex-1">{editError.message}</span>
+                                                    <button onClick={() => setEditError(null)} className="cursor-pointer"><span className="material-symbols-outlined text-sm">close</span></button>
+                                                </div>
+                                            )}
+                                            {editResult && (
+                                                <div className="rounded-xl overflow-hidden border border-emerald-500/30 bg-emerald-500/5">
+                                                    <div className="relative">
+                                                        <img src={editResult.imageUrl} alt="Edited" className="w-full max-h-[220px] object-contain bg-black/20 cursor-pointer" onClick={() => setZoomImage(editResult.imageUrl)} />
+                                                        <div className="absolute top-2 left-2 bg-emerald-500/80 px-2 py-0.5 rounded text-[9px] font-bold text-white uppercase flex items-center gap-1">
+                                                            <span className="material-symbols-outlined text-[10px]">check_circle</span> Done
+                                                        </div>
+                                                    </div>
+                                                    <div className="p-2.5 bg-[var(--sys-surface)] border-t border-[var(--sys-border)] flex items-center gap-2">
+                                                        <button onClick={() => handleDownloadImage(editResult.imageUrl, 'gemini-photoshoot-edit.png')}
+                                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500 text-white text-[11px] font-bold hover:bg-emerald-600 transition-colors cursor-pointer">
+                                                            <span className="material-symbols-outlined text-[12px]">cloud_download</span> Download
+                                                        </button>
+                                                        <button onClick={async () => { try { await creativesAPI.uploadToBank({ imageUrl: editResult.imageUrl, brandId: activeBrand?._id, title: 'Gemini Edited Photoshoot' }); setFeedbackToast('Saved to Image Bank!'); setTimeout(() => setFeedbackToast(''), 2500) } catch(e) { console.error(e) } }}
+                                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--sys-primary-dim)] text-primary text-[11px] font-bold border border-[var(--sys-border)] hover:opacity-80 transition-colors cursor-pointer">
+                                                            <span className="material-symbols-outlined text-[12px]">save</span> Save
+                                                        </button>
+                                                        <button onClick={() => { setPublishData({ image: editResult.imageUrl, text: '' }) }}
+                                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#1877F2]/10 hover:bg-[#1877F2]/30 text-[11px] font-bold text-[#1877F2] border border-[#1877F2]/20 transition-colors cursor-pointer">
+                                                            <span className="material-symbols-outlined text-[12px]">send</span> Share
+                                                        </button>
+                                                        <button onClick={() => { setShowEditPanel(false); setPhotoshootResult(prev => prev ? { ...prev, imageUrl: editResult.imageUrl } : prev) }}
+                                                            className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-violet-500/10 hover:bg-violet-500/20 text-[11px] font-bold text-violet-300 border border-violet-500/20 transition-colors cursor-pointer">
+                                                            <span className="material-symbols-outlined text-[12px]">check</span> Use This
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
+                                            <div className="flex gap-2">
+                                                <button onClick={handleEditGenerate}
+                                                    disabled={editGenerating || !editPromptText.trim() || !editImageRef.current}
+                                                    className={`flex-1 py-3 rounded-xl text-[12px] font-bold flex items-center justify-center gap-2 cursor-pointer transition-all uppercase tracking-wider ${
+                                                        editGenerating || !editPromptText.trim() || !editImageRef.current
+                                                            ? 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] border border-[var(--sys-border)] opacity-60 cursor-not-allowed'
+                                                            : 'bg-violet-600 text-white hover:bg-violet-500 shadow-[0_0_20px_rgba(139,92,246,0.3)]'
+                                                    }`}>
+                                                    {editGenerating ? (
+                                                        <><div className="w-4 h-4 border-2 border-white/80 border-t-transparent rounded-full animate-spin" /> Applying...</>
+                                                    ) : (
+                                                        <><span className="material-symbols-outlined text-[16px]">auto_fix_high</span> {editHistory.length > 0 ? 'Apply Next Edit' : 'Apply Edit'}</>
+                                                    )}
+                                                </button>
+                                                {editHistory.length > 0 && (
+                                                    <button onClick={() => { const o = editHistory[0].sourceImageUrl; editImageRef.current = o; setEditSourceImageUrl(o); setEditHistory([]); setEditResult(null); setEditPromptText('') }}
+                                                        disabled={editGenerating} className="px-3 py-3 rounded-xl border border-[var(--sys-border)] bg-[var(--sys-surface)] hover:bg-[var(--sys-surface-hover)] text-[var(--sys-text-muted)] transition-all text-[11px] font-bold cursor-pointer" title="Reset">
+                                                        <span className="material-symbols-outlined text-sm">restart_alt</span>
+                                                    </button>
+                                                )}
+                                                <button onClick={() => { if (!editGenerating) setShowEditPanel(false) }}
+                                                    className="px-4 py-3 rounded-xl border border-[var(--sys-border)] bg-[var(--sys-surface)] hover:bg-[var(--sys-surface-hover)] text-[var(--sys-text)] text-[12px] font-bold cursor-pointer transition-all">
+                                                    Cancel
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
                         {/* ══ Product Image Picker Modal ══ */}
                         {productPickerOpen && (
                             <div className="fixed inset-0 z-[200] flex items-center justify-center bg-[var(--sys-surface)] " onClick={() => setProductPickerOpen(false)}>
@@ -4279,8 +4711,8 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                             <span className="material-symbols-outlined text-[10px]">open_in_full</span>
                                                         </button>
                                                         <button onClick={(e) => { e.stopPropagation(); handleOpenEditPanel(item.imageUrl, item._brief || item.description || 'Photoshoot'); }}
-                                                            className="flex items-center gap-1 px-1.5 py-1 rounded bg-violet-500/20 hover:bg-violet-500/40 text-[9px] text-violet-200 font-medium transition-all border border-violet-500/30" title="Edit in AI Canvas">
-                                                            <span className="material-symbols-outlined text-[10px]">auto_fix_high</span> Canvas
+                                                            className="flex items-center gap-1 px-1.5 py-1 rounded bg-violet-500/20 hover:bg-violet-500/40 text-[9px] text-violet-200 font-medium transition-all border border-violet-500/30" title="Edit with Gemini AI">
+                                                            <span className="material-symbols-outlined text-[10px]">auto_fix_high</span> Edit
                                                         </button>
                                                         <button onClick={(e) => { e.stopPropagation(); handleAnimateClick({ imageUrl: item.imageUrl }); }}
                                                             className="flex items-center gap-1 px-1.5 py-1 rounded bg-[var(--sys-text)] hover:bg-[var(--sys-text)] text-[9px] text-[#FFeedd] font-medium transition-all border border-[var(--sys-text)]" title="Animate via Grok">
@@ -7342,6 +7774,170 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
             {studioMode === 'imagebank' && (
                 <div className="fade-up">
 
+                    {/* ═══ GEMINI EDIT IMAGE WORKSPACE (Image Bank) ═══ */}
+                    {showEditPanel && studioMode === 'imagebank' && (
+                        <div className="mb-6 studio-card border-violet-500/30 shadow-lg shadow-violet-500/5 bg-[var(--sys-surface)] overflow-hidden animate-fade-in relative">
+                            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-violet-500 to-indigo-500" />
+                            <div className="p-5 sm:p-6">
+                                <div className="flex flex-col xl:flex-row gap-5 xl:gap-7">
+                                    {/* Left: Source Image */}
+                                    <div className="w-full xl:w-[38%] flex flex-col gap-3 shrink-0">
+                                        <div className="flex items-center justify-between">
+                                            <h3 className="text-sm font-bold text-[var(--sys-text)] flex items-center gap-2">
+                                                <span className="material-symbols-outlined text-violet-400">auto_fix_high</span> Gemini Edit
+                                                {editHistory.length > 0 && <span className="text-[10px] font-normal text-violet-400">· {editHistory.length} edit{editHistory.length > 1 ? 's' : ''} applied</span>}
+                                            </h3>
+                                            <button onClick={() => { if (!editGenerating) setShowEditPanel(false) }}
+                                                className="w-7 h-7 rounded-full bg-[var(--sys-surface-hover)] flex items-center justify-center text-[var(--sys-text-muted)] hover:text-violet-400 transition-colors cursor-pointer border border-transparent">
+                                                <span className="material-symbols-outlined text-sm">close</span>
+                                            </button>
+                                        </div>
+                                        <div className="rounded-2xl overflow-hidden bg-[var(--sys-surface-hover)] border border-[var(--sys-border)] relative shadow-inner xl:max-h-[500px]">
+                                            {editSourceImageUrl ? (
+                                                <div className="relative">
+                                                    {isMaskingMode ? (
+                                                        <div className="p-2">
+                                                            <MaskingCanvas ref={maskingCanvasRef} imageUrl={editSourceImageUrl} />
+                                                        </div>
+                                                    ) : (
+                                                        <img src={editSourceImageUrl} alt="Image being edited" className="w-full h-auto object-contain bg-black/40 max-h-[360px]" />
+                                                    )}
+                                                </div>
+                                            ) : (
+                                                <div className="w-full aspect-square flex flex-col items-center justify-center text-[var(--sys-text-muted)]">
+                                                    <span className="material-symbols-outlined text-3xl mb-2">image_not_supported</span>
+                                                    <span className="text-xs">No image selected</span>
+                                                </div>
+                                            )}
+                                            <div className="absolute top-2 left-2 bg-black/60 backdrop-blur-md px-2 py-0.5 rounded text-[9px] font-bold text-white uppercase border border-white/10 flex items-center gap-1 z-10">
+                                                <span className="material-symbols-outlined text-[10px] text-violet-400">photo_library</span>
+                                                {editHistory.length > 0 ? `v${editHistory.length + 1}` : 'Original'}
+                                            </div>
+                                            {editSourceImageUrl && (
+                                                <button onClick={() => setIsMaskingMode(!isMaskingMode)} className={`absolute top-2 right-2 px-2 py-0.5 rounded text-[9px] font-bold tracking-widest uppercase border flex items-center gap-1 transition-colors z-10 ${isMaskingMode ? 'bg-violet-500 text-white border-violet-400' : 'bg-black/60 backdrop-blur-md text-white border-white/10 hover:bg-black/80'}`}>
+                                                    <span className="material-symbols-outlined text-[12px]">{isMaskingMode ? 'brush' : 'brush'}</span>
+                                                    {isMaskingMode ? 'Exit Masking' : 'Draw Mask'}
+                                                </button>
+                                            )}
+                                        </div>
+                                        {editHistory.length > 0 && (
+                                            <div className="space-y-1">
+                                                {editHistory.slice(-3).map((h, i) => (
+                                                    <div key={i} className="flex items-center gap-2 p-1.5 rounded-lg bg-violet-500/5 border border-violet-500/10">
+                                                        <span className="text-[9px] font-bold text-violet-400 w-4 text-center shrink-0">{editHistory.length - 3 + i + 1}</span>
+                                                        <span className="text-[9px] text-[var(--sys-text-muted)] truncate flex-1">{h.prompt}</span>
+                                                        <button onClick={() => { editImageRef.current = h.resultImageUrl; setEditSourceImageUrl(h.resultImageUrl); setEditResult(null); setEditHistory(prev => prev.slice(0, editHistory.length - 3 + i + 1)) }}
+                                                            className="text-[9px] text-violet-400 hover:text-violet-300 cursor-pointer font-bold shrink-0">Revert</button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                    {/* Right: Controls */}
+                                    <div className="flex-1 flex flex-col gap-4 min-w-0">
+                                        <div>
+                                            <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-1.5">Quick Edits — Full Nano Banana 2 Capabilities</p>
+                                            <div className="space-y-1.5">
+                                                {[
+                                                    { label: '🎨 Background', chips: ['Remove background', 'White studio background', 'Replace bg with outdoor scene', 'Blur background', 'Add gradient background'] },
+                                                    { label: '✏️ Remove / Fix', chips: ['Remove unwanted objects', 'Remove text from image', 'Fix blemishes', 'Remove watermark'] },
+                                                    { label: '🌈 Color & Light', chips: ['Make colors vibrant', 'Add cinematic lighting', 'Golden hour warm light', 'Black and white', 'Add moody dark tones'] },
+                                                    { label: '🎭 Style', chips: ['Anime illustration style', 'Watercolor painting', 'Claymation 3D style', 'Editorial magazine style', 'Pencil sketch'] },
+                                                    { label: '📸 Commercial', chips: ['Premium product photo', 'Marble surface background', 'Add lifestyle context', 'Dramatic studio lighting'] },
+                                                    { label: '🔲 Extend', chips: ['Extend image wider', 'Extend image taller', 'Add scene around subject'] },
+                                                ].map(g => (
+                                                    <div key={g.label}>
+                                                        <p className="text-[8px] font-bold text-[var(--sys-text-muted)]/50 uppercase tracking-widest mb-0.5">{g.label}</p>
+                                                        <div className="flex flex-wrap gap-1">
+                                                            {g.chips.map(chip => (
+                                                                <button key={chip} onClick={() => setEditPromptText(chip)}
+                                                                    className="px-2 py-0.5 rounded-md text-[9px] font-medium bg-violet-500/10 text-violet-300 hover:bg-violet-500/25 border border-violet-500/20 cursor-pointer transition-all">{chip}</button>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <div className="flex-1">
+                                            <label className="text-[11px] font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-2 flex justify-between">
+                                                <span>Edit Instruction</span>
+                                                <span className="text-violet-400 flex items-center gap-1"><span className="material-symbols-outlined text-[12px]">auto_awesome</span> Gemini Flash</span>
+                                            </label>
+                                            <textarea value={editPromptText} onChange={e => setEditPromptText(e.target.value)}
+                                                onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !editGenerating) handleEditGenerate() }}
+                                                placeholder="Describe how to edit this image... e.g. 'Remove the background', 'Make colors more vibrant', 'Add cinematic lighting'"
+                                                className="input-glass w-full py-3.5 px-4 text-[13px] resize-none focus:border-violet-500 min-h-[100px] bg-[var(--sys-bg)]" rows={3} />
+                                            <p className="text-[9px] text-[var(--sys-text-muted)] mt-1">⌘+Enter to apply · Edits build on each other for multi-step refinement</p>
+                                        </div>
+                                        {editError && (
+                                            <div className="p-3 rounded-xl border bg-rose-500/10 border-rose-500/20 text-rose-400 flex items-center gap-2 text-xs">
+                                                <span className="material-symbols-outlined text-sm">error</span>
+                                                <span className="flex-1">{editError.message}</span>
+                                                <button onClick={() => setEditError(null)} className="cursor-pointer"><span className="material-symbols-outlined text-sm">close</span></button>
+                                            </div>
+                                        )}
+                                        {editResult && (
+                                            <div className="rounded-xl overflow-hidden border border-emerald-500/30 bg-emerald-500/5">
+                                                <div className="relative">
+                                                    <img src={editResult.imageUrl} alt="Edited" className="w-full max-h-[280px] object-contain bg-black/20 cursor-pointer" onClick={() => setZoomImage(editResult.imageUrl)} />
+                                                    <div className="absolute top-2 left-2 bg-emerald-500/80 px-2 py-0.5 rounded text-[9px] font-bold text-white uppercase flex items-center gap-1">
+                                                        <span className="material-symbols-outlined text-[10px]">check_circle</span> Edit Applied
+                                                    </div>
+                                                    <button onClick={() => setZoomImage(editResult.imageUrl)} className="absolute top-2 right-2 bg-black/60 hover:bg-black/80 p-1.5 rounded-lg text-white transition-all cursor-pointer">
+                                                        <span className="material-symbols-outlined text-sm">open_in_full</span>
+                                                    </button>
+                                                </div>
+                                                <div className="p-2.5 bg-[var(--sys-surface)] border-t border-[var(--sys-border)] flex items-center flex-wrap gap-2">
+                                                    <button onClick={() => handleDownloadImage(editResult.imageUrl, 'gemini-edited.png')}
+                                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500 text-white text-[11px] font-bold hover:bg-emerald-600 transition-colors cursor-pointer">
+                                                        <span className="material-symbols-outlined text-[12px]">cloud_download</span> Download
+                                                    </button>
+                                                    <button onClick={async () => {
+                                                        try {
+                                                            await creativesAPI.uploadToBank({ imageUrl: editResult.imageUrl, brandId: activeBrand?._id, title: 'Gemini Edited Image' })
+                                                            loadImageBank()
+                                                            setShowEditPanel(false)
+                                                        } catch (err) { console.error(err) }
+                                                    }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--sys-primary-dim)] hover:bg-[var(--sys-primary-dim)] text-primary text-[11px] font-bold border border-[var(--sys-border)] transition-colors cursor-pointer">
+                                                        <span className="material-symbols-outlined text-[12px]">save</span> Save to Bank
+                                                    </button>
+                                                    <button onClick={() => handleAnimateClick({ imageUrl: editResult.imageUrl })}
+                                                        className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#FF4D00]/10 hover:bg-[#FF4D00]/20 text-[11px] font-bold text-[#FF4D00] border border-[#FF4D00]/20 transition-colors cursor-pointer">
+                                                        <span className="material-symbols-outlined text-[12px]">animation</span> Animate
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
+                                        <div className="flex gap-2">
+                                            <button onClick={handleEditGenerate}
+                                                disabled={editGenerating || !editPromptText.trim() || !editImageRef.current}
+                                                className={`flex-1 py-3 rounded-xl text-[12px] font-bold flex items-center justify-center gap-2 cursor-pointer transition-all uppercase tracking-wider ${
+                                                    editGenerating || !editPromptText.trim() || !editImageRef.current
+                                                        ? 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] border border-[var(--sys-border)] opacity-60 cursor-not-allowed'
+                                                        : 'bg-violet-600 text-white hover:bg-violet-500 shadow-[0_0_20px_rgba(139,92,246,0.3)]'
+                                                }`}>
+                                                {editGenerating ? (
+                                                    <><div className="w-4 h-4 border-2 border-white/80 border-t-transparent rounded-full animate-spin" /> Applying Edit...</>
+                                                ) : (
+                                                    <><span className="material-symbols-outlined text-[16px]">auto_fix_high</span> {editHistory.length > 0 ? 'Apply Next Edit' : 'Apply Edit'}</>
+                                                )}
+                                            </button>
+                                            {editHistory.length > 0 && (
+                                                <button onClick={() => { const o = editHistory[0].sourceImageUrl; editImageRef.current = o; setEditSourceImageUrl(o); setEditHistory([]); setEditResult(null); setEditPromptText('') }}
+                                                    disabled={editGenerating} className="px-3 py-3 rounded-xl border border-[var(--sys-border)] bg-[var(--sys-surface)] hover:bg-[var(--sys-surface-hover)] text-[var(--sys-text-muted)] transition-all text-[11px] font-bold cursor-pointer" title="Reset to original">
+                                                    <span className="material-symbols-outlined text-sm">restart_alt</span>
+                                                </button>
+                                            )}
+                                            <button onClick={() => { if (!editGenerating) setShowEditPanel(false) }}
+                                                className="px-4 py-3 rounded-xl border border-[var(--sys-border)] bg-[var(--sys-surface)] hover:bg-[var(--sys-surface-hover)] text-[var(--sys-text)] text-[12px] font-bold cursor-pointer transition-all">
+                                                Cancel
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     {/* ── Tab Bar ── */}
                     <div className="flex items-center justify-between mb-5">
@@ -7489,16 +8085,20 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                         async function handleDownloadImage(url, title) {
                             if (!url) return;
                             try {
-                                const resp = await fetch(url);
+                                const token = localStorage.getItem('token') || '';
+                                const filename = `${(title || 'image').replace(/[^a-zA-Z0-9_-]/g, '_')}.png`;
+                                const proxyUrl = `${API_BASE}/creatives/proxy-download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}`;
+                                const resp = await fetch(proxyUrl, { headers: { 'Authorization': `Bearer ${token}` }});
+                                if (!resp.ok) throw new Error('Proxy download failed');
                                 const blob = await resp.blob();
                                 const blobUrl = URL.createObjectURL(blob);
                                 const a = document.createElement('a');
                                 a.href = blobUrl;
-                                a.download = `${(title || 'image').replace(/[^a-zA-Z0-9_-]/g, '_')}.png`;
+                                a.download = filename;
                                 document.body.appendChild(a);
                                 a.click();
                                 setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(blobUrl) }, 100);
-                            } catch { window.open(url, '_blank') }
+                            } catch (err) { window.open(url, '_blank') }
                         }
                         function handleCopyImagePrompt(text, id) {
                             if (!text) return;
@@ -7569,12 +8169,12 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                 </button>
                                                 <button onClick={(e) => {
                                                     e.stopPropagation();
-                                                    sessionStorage.setItem('canvasEditorImage', img.imageUrl);
-                                                    navigate('/ai-canvas')
+                                                    handleOpenEditPanel(img.imageUrl, img.title || 'Image Bank')
+                                                    setStudioMode('imagebank')
                                                 }}
-                                                    className="p-1.5 rounded-lg text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-text)] transition-all cursor-pointer"
-                                                    title="Edit in Canvas">
-                                                    <span className="material-symbols-outlined text-base">edit</span>
+                                                    className="p-1.5 rounded-lg text-violet-400 hover:text-violet-200 hover:bg-violet-500/20 transition-all cursor-pointer"
+                                                    title="Edit with Gemini AI">
+                                                    <span className="material-symbols-outlined text-base">auto_fix_high</span>
                                                 </button>
                                                 <button onClick={(e) => {
                                                     e.stopPropagation();
@@ -7636,9 +8236,9 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                         className="p-1.5 rounded-lg bg-[var(--sys-surface)] text-[var(--sys-text)] hover:bg-[var(--sys-surface)] transition-all cursor-pointer" title="Download">
                                                         <span className="material-symbols-outlined text-xs">download</span>
                                                     </button>
-                                                    <button onClick={(e) => { e.stopPropagation(); sessionStorage.setItem('canvasEditorImage', img.imageUrl); navigate('/ai-canvas') }}
-                                                        className="p-1.5 rounded-lg bg-[var(--sys-text)] text-[var(--sys-text)] hover:bg-[var(--sys-text)] transition-all cursor-pointer" title="Edit">
-                                                        <span className="material-symbols-outlined text-xs">edit</span>
+                                                    <button onClick={(e) => { e.stopPropagation(); handleOpenEditPanel(img.imageUrl, img.title || 'Image Bank'); setStudioMode('imagebank') }}
+                                                        className="p-1.5 rounded-lg bg-violet-500/20 text-violet-300 hover:bg-violet-500/40 transition-all cursor-pointer" title="Edit with Gemini AI">
+                                                        <span className="material-symbols-outlined text-xs">auto_fix_high</span>
                                                     </button>
                                                     <button onClick={async (e) => {
                                                         e.stopPropagation();
@@ -7800,7 +8400,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                             <button onClick={(e) => { e.stopPropagation(); handleOpenEditPanel(zoomImage, 'Creative'); setZoomImage(null); }}
                                 className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-[var(--sys-text)] hover:bg-[var(--sys-surface-hover)] cursor-pointer transition-all whitespace-nowrap">
                                 <span className="material-symbols-outlined text-[18px] text-violet-500">auto_fix_high</span>
-                                Edit in AI Canvas
+                                Edit with Gemini
                             </button>
                             <div className="w-px h-6 bg-[var(--sys-border)]" />
                             <button onClick={(e) => { e.stopPropagation(); handleAnimateClick({ imageUrl: zoomImage }); setZoomImage(null); }}
