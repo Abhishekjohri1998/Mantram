@@ -167,13 +167,25 @@ const CANVAS_TOOLS = [
     },
     {
         name: 'generate_image',
-        description: 'Generate an AI image and add it to the canvas. Use when the user wants a new image, photo, illustration, or visual created by AI.',
+        description: 'Generate a BRAND NEW AI image and add it to the canvas. Use when the user wants to create a new image, photo, illustration, or visual from scratch.',
         input_schema: {
             type: 'object',
             properties: {
                 prompt: { type: 'string', description: 'Detailed image generation prompt' },
                 position: { type: 'string', enum: ['center', 'top-center', 'bottom-center', 'top-left', 'top-right', 'bottom-left', 'bottom-right'], description: 'Where to place the image' },
                 size: { type: 'string', enum: ['256x256', '512x512', '1024x1024'], description: 'Image size (default: 1024x1024)' },
+            },
+            required: ['prompt'],
+        },
+    },
+    {
+        name: 'edit_image',
+        description: 'Edit an EXISTING image on the canvas using Gemini AI. Use this when the user says "change the background of this image", "make this image look cinematic", "add X to this image", "edit this", "modify this photo", "retouch", etc. This PRESERVES the original subject and only applies the requested edit. Gemini analyzes the existing image and makes targeted edits. If no image is on canvas, falls back to generate_image.',
+        input_schema: {
+            type: 'object',
+            properties: {
+                prompt: { type: 'string', description: 'Precise edit instruction (e.g. "Change the background to a tropical beach at golden hour", "Make the lighting more dramatic with rim lighting", "Remove the background and make it transparent", "Add cinematic color grading")' },
+                position: { type: 'string', enum: ['center', 'top-center', 'bottom-center', 'top-left', 'top-right', 'bottom-left', 'bottom-right'], description: 'Where to place the edited image result' },
             },
             required: ['prompt'],
         },
@@ -601,8 +613,8 @@ ${creativeMasterySections}
   - Pass specific image names via \`imageNames\` array if the user references specific images
   - Always include a detailed \`prompt\` describing how the images should be combined
 - **Generating new images**: Use **generate_image** with a detailed prompt
-- **Editing existing images**: If user says "change the background", "add X to this image", etc. — first note which images are on canvas from the canvas state, then use generate_image with a prompt that describes the edit
-- ⚠️ NEVER use tool names like "edit_image", "swap_image", "replace_image" — these do NOT exist. Use merge_images or generate_image.
+- **Editing existing images**: If user says "change the background", "make this cinematic", "add X to this image", "edit this photo", "retouch" — use **edit_image** with a precise edit instruction. Gemini will analyze the canvas image and apply targeted edits while preserving the subject.
+- ⚠️ NEVER use tool names like "swap_image", "replace_image" — these do NOT exist. Use merge_images, generate_image, or edit_image.
 
 ## MCoT VISUAL GROUNDING
 If the research data below includes a "🧠 MCoT VISUAL GROUNDING" section, this means our AI has ALREADY analyzed the brand's actual product images. You MUST reference these observations in your prompts:

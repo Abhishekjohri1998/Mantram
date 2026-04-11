@@ -8,7 +8,7 @@ import * as fabric from 'fabric'
 import { addShapeToCanvas } from '../tools/shapeTools'
 import { PRESETS } from '../data/presets'
 import { resizeToPreset } from '../engine/fabricEngine'
-import { getCorsUrl } from '../../../services/api'
+import { getCorsUrl, API_BASE, creatives as creativesAPI } from '../../../services/api'
 
 // ── Position element by named position ──
 export function positionElement(obj, position, fc) {
@@ -71,7 +71,7 @@ export async function executeToolCall(toolCall, fc, ctx = {}, deps = {}) {
         'create_image': 'generate_image',
         'replace_image': 'generate_image',
         'swap_image': 'generate_image',
-        'edit_image': 'generate_image',
+        // NOTE: 'edit_image' is now a dedicated case — NOT aliased to generate_image
         'add_image': 'generate_image',
     }
     const name = TOOL_ALIASES[rawName] || rawName
@@ -199,6 +199,64 @@ export async function executeToolCall(toolCall, fc, ctx = {}, deps = {}) {
             if (ab) fc.sendObjectToBack(ab)
             fc.requestRenderAll()
             return `Layer reorder: ${args.action} on "${el.customName || el.type}"`
+        }
+
+        case 'edit_image': {
+            // ⚡ Gemini native image editing — edits the existing image on canvas
+            // vs generate_image which creates a brand new image
+            if (setFidatoMessages) {
+                setFidatoMessages(prev => [...prev, { role: 'assistant', content: `🎨 Editing image with Gemini: "${args.prompt?.substring(0, 50)}..."` }])
+            }
+            try {
+                // Get the source image from canvas — selected image first, else full canvas
+                let sourceImageUrl = null
+                const activeObjs = fc.getActiveObjects?.()?.filter(o => o.type === 'image') || []
+                if (activeObjs.length > 0) {
+                    const obj = activeObjs[0]
+                    const src = obj._element?.src || obj.getSrc?.() || ''
+                    if (src && (src.startsWith('http') || src.startsWith('data:'))) {
+                        sourceImageUrl = src
+                    } else {
+                        try { sourceImageUrl = obj.toDataURL({ format: 'png', quality: 0.92 }) } catch (_) {}
+                    }
+                }
+                // Fall back to all-canvas snapshot
+                if (!sourceImageUrl) {
+                    const allImages = fc.getObjects().filter(o => o.type === 'image' && o.id !== 'artboard')
+                    if (allImages.length > 0) {
+                        const obj = allImages[allImages.length - 1]
+                        const src = obj._element?.src || obj.getSrc?.() || ''
+                        sourceImageUrl = (src && (src.startsWith('http') || src.startsWith('data:'))) ? src
+                            : (() => { try { return obj.toDataURL({ format: 'png', quality: 0.9 }) } catch { return null } })()
+                    }
+                }
+                if (!sourceImageUrl) {
+                    // No image on canvas — fall through to generate_image
+                    return await executeToolCall({ name: 'generate_image', args }, fc, ctx, deps)
+                }
+
+                const result = await creativesAPI.editImage({
+                    imageUrl: sourceImageUrl,
+                    editPrompt: args.prompt || args.editInstruction || 'Apply the requested edit',
+                    editHistory: [],
+                    brandId: brand?._id,
+                })
+
+                if (result?.success && result?.imageUrl) {
+                    let newImg = null
+                    if (addImageUrlToCanvas) newImg = await addImageUrlToCanvas(result.imageUrl, 'Gemini Edit')
+                    if (args.position && newImg) {
+                        positionElement(newImg, args.position, fc)
+                        fc.requestRenderAll()
+                    }
+                    return { text: `Image edited: ${args.prompt?.substring(0, 40)}`, thumbnail: result.imageUrl }
+                }
+                throw new Error(result?.error || 'Edit returned no image')
+            } catch (e) {
+                // Graceful fallback to generation on edit failure
+                console.warn('edit_image failed, falling back to generate_image:', e.message)
+                return await executeToolCall({ name: 'generate_image', args }, fc, ctx, deps)
+            }
         }
 
         case 'generate_image': {

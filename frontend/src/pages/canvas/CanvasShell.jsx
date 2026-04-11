@@ -635,6 +635,159 @@ function CanvasShellInner() {
         fc.add(rect); fc.setActiveObject(rect); fc.renderAll(); saveHistory()
     }, [saveHistory])
 
+    // ── AI Editor Submit (Gemini Image Edit) ──
+    const handleAiSubmit = useCallback(async () => {
+        const fc = fabricRef.current
+        if (!aiPrompt.trim()) return
+        setAiLoading(true)
+        setAiError('')
+
+        try {
+            // Determine source image: selected image object > full canvas snapshot
+            let sourceImageUrl = null
+            const activeObj = fc?.getActiveObject()
+            if (activeObj?.type === 'image') {
+                // Use the actual image source URL if available (S3/HTTP)
+                const src = activeObj._element?.src || activeObj.getSrc?.() || ''
+                if (src && (src.startsWith('http') || src.startsWith('data:'))) {
+                    sourceImageUrl = src
+                } else {
+                    // Fall back to canvas data URL of selection
+                    try { sourceImageUrl = activeObj.toDataURL({ format: 'png', quality: 0.92 }) } catch (_) {}
+                }
+            }
+
+            // If no image selected, use full canvas as the image to edit
+            if (!sourceImageUrl && fc) {
+                const objs = fc.getObjects().filter(o => o.id !== 'artboard')
+                if (objs.length > 0) {
+                    sourceImageUrl = fc.toDataURL({ format: 'png', quality: 0.9, multiplier: 1 })
+                }
+            }
+
+            // Determine edit instruction based on aiTool
+            let editInstruction = aiPrompt.trim()
+            if (aiTool === 'background') {
+                editInstruction = bgAction === 'remove'
+                    ? 'Remove the background completely and make it transparent. Keep the main subject perfectly intact.'
+                    : `Replace the background with: ${bgPrompt || aiPrompt}. Keep the main subject perfectly intact.`
+            } else if (aiTool === 'visual' || aiTool === 'retouch') {
+                editInstruction = `In the indicated area: ${aiPrompt}. Keep everything else exactly the same.`
+            }
+
+            if (!sourceImageUrl) {
+                // No image to edit — generate a new one instead
+                showToast('No image to edit — generating new image...')
+                const data = await canvasAssets.aiGenerate({ prompt: editInstruction, size: '1024x1024' })
+                if (data?.imageUrl) {
+                    await addImageUrlToCanvas(data.imageUrl, 'AI Generated')
+                    showToast('✨ Image generated')
+                }
+                setAiLoading(false)
+                return
+            }
+
+            // Call Gemini edit-image endpoint
+            const buildHistory = (editHistory || []).slice(-3) // last 3 turns for context
+            const result = await creativesAPI.editImage({
+                imageUrl: sourceImageUrl,
+                editPrompt: editInstruction,
+                editHistory: buildHistory,
+                brandId: activeBrand?._id,
+            })
+
+            if (!result?.success || !result?.imageUrl) {
+                throw new Error(result?.error || 'Image edit returned no result')
+            }
+
+            // Add the edited image to canvas
+            await addImageUrlToCanvas(result.imageUrl, 'AI Edit')
+
+            // Update edit history for multi-turn refinement
+            setEditHistory(prev => [...prev, {
+                prompt: aiPrompt.trim(),
+                imageUrl: sourceImageUrl,
+                resultImageUrl: result.imageUrl,
+            }])
+
+            setAiPrompt('')
+            showToast('✨ Image edited with Gemini')
+            saveHistory()
+        } catch (err) {
+            console.error('AI Edit error:', err)
+            setAiError(err.message || 'Something went wrong. Try again.')
+        } finally {
+            setAiLoading(false)
+        }
+    }, [aiPrompt, aiTool, bgAction, bgPrompt, activeBrand, editHistory, setAiLoading, setAiError, setAiPrompt, setEditHistory, addImageUrlToCanvas, saveHistory, showToast])
+
+    // ── AI Creative Generate (Keywords → Design) ──
+    const handleAiCreativeGenerate = useCallback(async () => {
+        const { aiCreativeKeywords, aiCreativeStyle, setAiCreativeLoading: setLoading } = useCanvasStore.getState()
+        if (!aiCreativeKeywords.trim()) return
+        setAiCreativeLoading(true)
+        try {
+            const prompt = `${aiCreativeKeywords}. Style: ${aiCreativeStyle || 'modern'}. Clean, premium advertising creative. High quality, 4K.`
+            const data = await canvasAssets.aiGenerate({
+                prompt,
+                size: '1024x1024',
+                brandId: activeBrand?._id,
+            })
+            if (data?.imageUrl) {
+                await addImageUrlToCanvas(data.imageUrl, 'AI Creative')
+                showToast('🎨 Creative design generated')
+                saveHistory()
+            }
+        } catch (err) {
+            setAiError(err.message || 'Creative generation failed')
+        } finally {
+            setAiCreativeLoading(false)
+        }
+    }, [activeBrand, addImageUrlToCanvas, setAiCreativeLoading, setAiError, saveHistory, showToast])
+
+    // ── Icon search ──
+    const handleSearchIcons = useCallback(async (query) => {
+        if (!query || query.length < 2) return
+        setIconLoading(true)
+        try {
+            const resp = await fetch(`https://api.iconify.design/search?query=${encodeURIComponent(query)}&limit=50`)
+            const data = await resp.json()
+            setIconResults(data.icons || [])
+        } catch (e) { console.warn('Icon search error:', e) }
+        setIconLoading(false)
+    }, [setIconLoading, setIconResults])
+
+    const handleAddIconToCanvas = useCallback((iconName) => {
+        const fc = fabricRef.current; if (!fc) return
+        const url = `https://api.iconify.design/${iconName}.svg?width=80&height=80&color=%23818cf8`
+        fabric.FabricImage.fromURL(getCorsUrl(url), { crossOrigin: 'anonymous' }).then(img => {
+            img.set({ left: fc.width / 2, top: fc.height / 2, originX: 'center', originY: 'center', customName: iconName.split(':').pop() || 'Icon', id: `icon-${Date.now()}` })
+            fc.add(img); fc.setActiveObject(img); fc.renderAll(); saveHistory()
+            showToast(`☆ Icon added: ${iconName.split(':').pop()}`)
+        }).catch(() => showToast('⚠️ Failed to load icon'))
+    }, [saveHistory, showToast])
+
+    // ── Photo search (Unsplash) ──
+    const handleSearchPhotos = useCallback(async (query) => {
+        if (!query) return
+        setPhotoLoading(true)
+        try {
+            const token = localStorage.getItem('mantram_token') || ''
+            const resp = await fetch(`${API_BASE}/canvas-assets/photos/search?query=${encodeURIComponent(query)}&limit=20`, {
+                headers: { Authorization: `Bearer ${token}` }
+            })
+            const data = await resp.json()
+            if (data.photos) setPhotoResults(data.photos)
+            else if (data.setupRequired) setPhotoSetupRequired(true)
+        } catch (e) { console.warn('Photo search error:', e) }
+        setPhotoLoading(false)
+    }, [setPhotoLoading, setPhotoResults, setPhotoSetupRequired])
+
+    const handleAddPhotoToCanvas = useCallback((photo) => {
+        addImageUrlToCanvas(photo.url || photo.thumb, photo.alt || 'Photo')
+        showToast('🖼️ Photo added')
+    }, [addImageUrlToCanvas, showToast])
+
     // ── Fidato send ──
     const fidatoAbortRef = useRef(null)
     const handleFidatoSend = useCallback(async (voiceText) => {
@@ -886,6 +1039,17 @@ function CanvasShellInner() {
                     onAddElement={handleAddElement}
                     onUploadImage={uploadImage}
                     onAddGradient={addGradientToCanvas}
+                    onApplyGradientToSelected={(g) => {
+                        const fc = fabricRef.current; const obj = fc?.getActiveObject()
+                        if (obj) {
+                            const angle = (g.angle || 0) * Math.PI / 180
+                            obj.set('fill', new fabric.Gradient({
+                                type: 'linear',
+                                coords: { x1: 0, y1: 0, x2: Math.cos(angle) * (obj.width || 200), y2: Math.sin(angle) * (obj.height || 200) },
+                                colorStops: [{ offset: 0, color: g.colors[0] }, { offset: 1, color: g.colors[1] }],
+                            })); fc.renderAll(); saveHistory()
+                        }
+                    }}
                     onAddBrandAsset={addBrandAssetToCanvas}
                     onAddBrandColorBlock={addBrandColorBlock}
                     onApplyFontToSelected={applyFontToSelected}
@@ -895,14 +1059,41 @@ function CanvasShellInner() {
                     onAddImageUrlToCanvas={addImageUrlToCanvas}
                     generatedImages={store.generatedImages}
                     loadingBankImages={store.loadingBankImages}
+                    // AI Editor
+                    onAiSubmit={handleAiSubmit}
+                    onAiCreativeGenerate={handleAiCreativeGenerate}
+                    // Icon search
+                    onSearchIcons={handleSearchIcons}
+                    onAddIconToCanvas={handleAddIconToCanvas}
                     iconResults={store.iconResults}
                     iconLoading={store.iconLoading}
+                    // Photo search
+                    onSearchPhotos={handleSearchPhotos}
+                    onAddPhotoToCanvas={handleAddPhotoToCanvas}
                     photoResults={store.photoResults}
                     photoLoading={store.photoLoading}
                     photoSetupRequired={store.photoSetupRequired}
+                    // Texture search (stub — extend if Unsplash texture key added)
+                    onSearchTextures={() => {}}
+                    onAddTextureToCanvas={(t) => addImageUrlToCanvas(t.url || t.thumb, t.alt || 'Texture')}
                     textureResults={store.textureResults}
                     textureLoading={store.textureLoading}
                     textureSetupRequired={store.textureSetupRequired}
+                    // SVG elements, text styles, templates, apps — stubs
+                    onAddSvgElement={(svgEl) => showToast(`SVG: ${svgEl.label}`)}
+                    onAddTextStyle={(preset) => addText(preset.sample || 'Text', preset.size >= 40)}
+                    onAddFontCombo={(combo) => { addText('Heading', true); addText('Body text', false) }}
+                    onApplyTemplate={() => showToast('Templates coming soon')}
+                    onApplyBrandKit={() => showToast('Brand kit applied')}
+                    onAddCollage={() => showToast('Collage coming soon')}
+                    onApplyBlur={() => showToast('Blur coming soon')}
+                    onAddCurvedText={() => showToast('Curved text coming soon')}
+                    onAddQrCode={() => showToast('QR code coming soon')}
+                    onAddChart={() => showToast('Chart coming soon')}
+                    onAddCountdown={() => showToast('Countdown coming soon')}
+                    onGeneratePalette={() => showToast('Palette generation coming soon')}
+                    onAddPaletteToCanvas={() => {}}
+                    canvasApps={[]}
                     onSaveHistory={saveHistory}
                 />
 
