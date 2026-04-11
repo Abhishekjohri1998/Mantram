@@ -35,6 +35,27 @@ Return JSON:
 // ── AI CANVAS ENDPOINTS ──
 // ══════════════════════════════════════════════════════════════════════
 
+// POST /api/canvas-assets/upload-canvas-export — Upload canvas export base64 to S3, return S3 URL
+// This is the ONLY place base64 should ever be accepted. All downstream calls use S3 URLs.
+router.post('/upload-canvas-export', protect, async (req, res) => {
+    try {
+        const { imageDataUrl, mimeType = 'image/jpeg' } = req.body
+        if (!imageDataUrl) return res.status(400).json({ success: false, error: 'imageDataUrl is required' })
+        if (!imageDataUrl.startsWith('data:')) {
+            return res.status(400).json({ success: false, error: 'imageDataUrl must be a base64 data URI' })
+        }
+
+        const ext = mimeType.includes('png') ? 'png' : 'jpg'
+        const filename = `canvas-exports/${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`
+        const s3Url = await uploadToS3(imageDataUrl, filename, mimeType)
+        console.log(`📤 [UploadCanvasExport] Uploaded to S3: ${s3Url.substring(0, 80)}`)
+        return res.json({ success: true, s3Url })
+    } catch (err) {
+        console.error('[UploadCanvasExport] Error:', err.message)
+        return res.status(500).json({ success: false, error: err.message })
+    }
+})
+
 // POST /api/canvas-assets/ai-adapt — AI-powered design adaptation using NanoBanana 2
 // Takes a canvas screenshot + target preset → returns AI-regenerated image sized for that platform
 router.post('/ai-adapt', protect, async (req, res) => {
@@ -43,8 +64,11 @@ router.post('/ai-adapt', protect, async (req, res) => {
         const { canvasImageUrl, canvasImageBase64, preset, brandContext } = req.body
 
         if (!preset) return res.status(400).json({ success: false, error: 'preset is required' })
-        if (!canvasImageUrl && !canvasImageBase64) {
-            return res.status(400).json({ success: false, error: 'canvasImageUrl or canvasImageBase64 is required' })
+        if (!canvasImageUrl) {
+            return res.status(400).json({ success: false, error: 'canvasImageUrl (S3 URL) is required. Use /upload-canvas-export first to get a S3 URL from a base64 export.' })
+        }
+        if (canvasImageUrl.startsWith('data:')) {
+            return res.status(400).json({ success: false, error: 'base64 data URIs are not accepted here. Upload the canvas export via /upload-canvas-export first to get a S3 URL.' })
         }
 
         const lzKey = process.env.LAOZHANG_API_KEY
@@ -95,17 +119,9 @@ IMPORTANT: DO NOT just crop or resize — intelligently recompose the entire des
 
         console.log(`🎨 [AI-Adapt] ${preset} (${lzSize}) using NanoBanana 2 via LaoZhang`)
 
-        // Build multimodal request with the canvas image as reference
+        // Build multimodal request — only S3 URLs, no base64 in transit
         const contentParts = []
-        if (canvasImageUrl && canvasImageUrl.startsWith('http')) {
-            contentParts.push({ type: 'image_url', image_url: { url: canvasImageUrl } })
-        } else if (canvasImageBase64) {
-            const b64 = canvasImageBase64.includes('base64,')
-                ? canvasImageBase64.split('base64,')[1]
-                : canvasImageBase64
-            const mimeType = canvasImageBase64.includes('image/png') ? 'image/png' : 'image/jpeg'
-            contentParts.push({ type: 'image_url', image_url: { url: `data:${mimeType};base64,${b64}` } })
-        }
+        contentParts.push({ type: 'image_url', image_url: { url: canvasImageUrl } })
         contentParts.push({ type: 'text', text: adaptPrompt })
 
         const controller = new AbortController()

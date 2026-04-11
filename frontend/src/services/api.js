@@ -456,8 +456,11 @@ export const canvasAssets = {
     generateCampaign: (data) => apiFetch('/fidato/canvas-campaign', { method: 'POST', body: JSON.stringify(data) }),
     // Smart Design Adaptation — AI-powered layout re-composition for different platform sizes
     smartAdapt: (data) => apiFetch('/canvas-assets/smart-adapt', { method: 'POST', body: JSON.stringify(data), timeout: 120000 }),
-    // AI Design Adaptation — NanoBanana 2 image regeneration for each platform size
+    // AI Design Adaptation — NanoBanana 2 image regeneration for each platform size (S3 URL only)
     aiAdapt: (data) => apiFetch('/canvas-assets/ai-adapt', { method: 'POST', body: JSON.stringify(data), timeout: 90000 }),
+    // Upload canvas export base64 to S3 — use this BEFORE aiAdapt so no base64 travels in adapt calls
+    uploadCanvasExport: (data) => apiFetch('/canvas-assets/upload-canvas-export', { method: 'POST', body: JSON.stringify(data), timeout: 30000 }),
+
 
 };
 

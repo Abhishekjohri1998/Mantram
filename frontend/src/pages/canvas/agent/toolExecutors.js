@@ -692,13 +692,11 @@ export async function executeToolCall(toolCall, fc, ctx = {}, deps = {}) {
             const srcLeft = artboard ? (artboard.left - sourceWidth  / 2) : 0
             const srcTop  = artboard ? (artboard.top  - sourceHeight / 2) : 0
 
-            // Export canvas region as PNG data URL
-            let canvasDataUrl = null
+            // ── Step 1: Export the canvas artboard as JPEG, upload immediately to S3 ──
+            // Base64 only lives in memory briefly; NEVER sent to any AI endpoint
+            let canvasS3Url = null
             try {
-                // Use fabric's toDataURL with the artboard region
-                const vpt = fc.viewportTransform.slice()
-                const currentZoom = fc.getZoom()
-                canvasDataUrl = fc.toDataURL({
+                const canvasDataUrl = fc.toDataURL({
                     format: 'jpeg',
                     quality: 0.85,
                     left: srcLeft,
@@ -707,19 +705,31 @@ export async function executeToolCall(toolCall, fc, ctx = {}, deps = {}) {
                     height: sourceHeight,
                     multiplier: Math.min(1024 / sourceWidth, 1024 / sourceHeight, 1),
                 })
+                if (!canvasDataUrl || canvasDataUrl === 'data:,') {
+                    return '❌ Canvas export returned empty image. Add content to the canvas first.'
+                }
+
+                // Upload base64 to S3 immediately — discarded from memory after upload
+                const { canvasAssets: canvasAssetsApi } = await import('../../../services/api')
+                const uploadResult = await canvasAssetsApi.uploadCanvasExport({
+                    imageDataUrl: canvasDataUrl,
+                    mimeType: 'image/jpeg',
+                })
+                if (!uploadResult.success || !uploadResult.s3Url) {
+                    return `❌ Failed to upload canvas to S3: ${uploadResult.error || 'Unknown error'}`
+                }
+                canvasS3Url = uploadResult.s3Url
+                console.log('[adapt_design] Canvas exported → S3:', canvasS3Url.substring(0, 80))
             } catch (exportErr) {
-                console.error('[adapt_design] Canvas export failed:', exportErr)
-                return `\u274c Failed to export canvas: ${exportErr.message}`
+                console.error('[adapt_design] Canvas export/upload failed:', exportErr)
+                return `❌ Failed to export canvas: ${exportErr.message}`
             }
 
-            if (!canvasDataUrl || canvasDataUrl === 'data:,') {
-                return '\u274c Canvas export returned empty image. Add content to the canvas first.'
-            }
-
-            // ── Step 2: For each preset, call NanoBanana 2 AI adapt ──
-            const { canvasAssets: canvasAssetsApi } = await import('../../../services/api')
+            // ── Step 2: For each preset, call NanoBanana 2 with the S3 URL only ──
+            // canvasAssetsApi already imported in step 1
 
             const ARTBOARD_GAP = 80
+
             let xOffset = srcLeft + sourceWidth + ARTBOARD_GAP
             let rendered = 0
             const results = []
@@ -742,7 +752,7 @@ export async function executeToolCall(toolCall, fc, ctx = {}, deps = {}) {
 
                 try {
                     const adaptResult = await canvasAssetsApi.aiAdapt({
-                        canvasImageBase64: canvasDataUrl,
+                        canvasImageUrl: canvasS3Url,  // S3 URL only — no base64
                         preset: presetId,
                         brandContext: brand ? { name: brand.name, dna: brand.dna } : null,
                     })
