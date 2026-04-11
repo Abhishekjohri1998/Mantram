@@ -80,7 +80,13 @@ router.get('/proxy', async (req, res) => {
         response.data.pipe(res);
     } catch (error) {
         const status = error.response?.status || 500;
-        const msg = typeof error.response?.data === 'object' ? JSON.stringify(error.response?.data) : (error.response?.data || error.message);
+        // SAFE ERROR EXTRACTION: Avoid circular JSON structures (like sockets) in error.response
+        let msg = error.message;
+        if (error.response?.data) {
+            msg = typeof error.response.data === 'string' 
+                ? error.response.data 
+                : (typeof error.response.data === 'object' ? 'S3 Error' : JSON.stringify(error.response.data));
+        }
         console.error(`❌ [PROXY] Final Failure: Status=${status} | Target=${url.substring(0, 80)}... | Error=${msg}`);
         res.status(status).send(`Proxy failed: ${msg}`);
     }
