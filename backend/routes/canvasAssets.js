@@ -35,9 +35,154 @@ Return JSON:
 // ── AI CANVAS ENDPOINTS ──
 // ══════════════════════════════════════════════════════════════════════
 
+// POST /api/canvas-assets/ai-adapt — AI-powered design adaptation using NanoBanana 2
+// Takes a canvas screenshot + target preset → returns AI-regenerated image sized for that platform
+router.post('/ai-adapt', protect, async (req, res) => {
+    const startTime = Date.now()
+    try {
+        const { canvasImageUrl, canvasImageBase64, preset, brandContext } = req.body
+
+        if (!preset) return res.status(400).json({ success: false, error: 'preset is required' })
+        if (!canvasImageUrl && !canvasImageBase64) {
+            return res.status(400).json({ success: false, error: 'canvasImageUrl or canvasImageBase64 is required' })
+        }
+
+        const lzKey = process.env.LAOZHANG_API_KEY
+        if (!lzKey) return res.status(400).json({ success: false, error: 'LAOZHANG_API_KEY not configured' })
+
+        const PRESET_MAP = {
+            'ig-post':         { w: 1080, h: 1350, label: 'Instagram Post',       aspectRatio: '4:5',   orientation: 'portrait' },
+            'ig-post-square':  { w: 1080, h: 1080, label: 'Instagram Square',     aspectRatio: '1:1',   orientation: 'square' },
+            'ig-story':        { w: 1080, h: 1920, label: 'Instagram Story',       aspectRatio: '9:16',  orientation: 'portrait tall' },
+            'ig-reel':         { w: 1080, h: 1920, label: 'Instagram Reel',        aspectRatio: '9:16',  orientation: 'portrait tall' },
+            'fb-post':         { w: 1200, h: 630,  label: 'Facebook Post',         aspectRatio: '1.91:1',orientation: 'landscape' },
+            'fb-story':        { w: 1080, h: 1920, label: 'Facebook Story',        aspectRatio: '9:16',  orientation: 'portrait tall' },
+            'linkedin':        { w: 1200, h: 628,  label: 'LinkedIn Post',         aspectRatio: '1.91:1',orientation: 'landscape' },
+            'yt-thumb':        { w: 1280, h: 720,  label: 'YouTube Thumbnail',     aspectRatio: '16:9',  orientation: 'landscape' },
+            'twitter':         { w: 1600, h: 900,  label: 'Twitter/X Post',        aspectRatio: '16:9',  orientation: 'landscape' },
+            'whatsapp-status': { w: 1080, h: 1920, label: 'WhatsApp Status',       aspectRatio: '9:16',  orientation: 'portrait tall' },
+            'pinterest':       { w: 1000, h: 1500, label: 'Pinterest Pin',         aspectRatio: '2:3',   orientation: 'portrait' },
+            'banner':          { w: 1920, h: 600,  label: 'Web Banner',            aspectRatio: '16:5',  orientation: 'ultrawide landscape' },
+        }
+
+        const spec = PRESET_MAP[preset]
+        if (!spec) return res.status(400).json({ success: false, error: `Unknown preset: ${preset}. Valid: ${Object.keys(PRESET_MAP).join(', ')}` })
+
+        const brand = brandContext || {}
+        const brandName = brand.name || 'the brand'
+        const brandColors = brand.dna?.brandColors?.map(c => c.hex || c.name).filter(Boolean).join(', ') || ''
+        const brandStyle = brand.dna?.brandVoice || brand.dna?.visualStyle || ''
+
+        // Build a strong adaptation prompt
+        const adaptPrompt = `You are a professional graphic designer adapting a creative design for ${spec.label} (${spec.w}×${spec.h}px, ${spec.aspectRatio} aspect ratio, ${spec.orientation} format).
+
+REFERENCE IMAGE: The attached image is the source design. Recreate and adapt it for the ${spec.label} format.
+
+ADAPTATION RULES:
+1. OUTPUT SIZE: Exactly ${spec.w}×${spec.h}px with ${spec.aspectRatio} aspect ratio
+2. PRESERVE: All key subjects, characters, products, people, faces, and brand elements from the original
+3. COMPOSITION: Recompose for ${spec.orientation} layout — ${spec.orientation.includes('portrait') ? 'stack elements vertically, extend background top to bottom' : spec.orientation.includes('landscape') ? 'arrange elements horizontally, extend background left to right' : 'center elements in equal proportion'}
+4. BACKGROUND: Intelligently extend/generate background to fill the new canvas dimensions using content-aware continuation
+5. VISUAL HIERARCHY: Maintain the design's primary subject as the focal point, adapt text and secondary elements naturally
+6. STYLE: Keep the identical color palette, lighting, mood, and visual style as the source${brandColors ? `\n7. BRAND COLORS: ${brandColors}` : ''}${brandStyle ? `\n8. BRAND STYLE: ${brandStyle}` : ''}
+9. QUALITY: High-resolution, professional ad-quality output
+
+IMPORTANT: DO NOT just crop or resize — intelligently recompose the entire design for ${spec.label}. Generate a complete, polished creative that looks native to the platform.`
+
+        // Use LaoZhang NanoBanana 2 (Gemini 3.1 Flash Image)
+        const lzModel = 'gemini-3.1-flash-image-preview'
+        const lzSize = `${spec.w}x${spec.h}`
+
+        console.log(`🎨 [AI-Adapt] ${preset} (${lzSize}) using NanoBanana 2 via LaoZhang`)
+
+        // Build multimodal request with the canvas image as reference
+        const contentParts = []
+        if (canvasImageUrl && canvasImageUrl.startsWith('http')) {
+            contentParts.push({ type: 'image_url', image_url: { url: canvasImageUrl } })
+        } else if (canvasImageBase64) {
+            const b64 = canvasImageBase64.includes('base64,')
+                ? canvasImageBase64.split('base64,')[1]
+                : canvasImageBase64
+            const mimeType = canvasImageBase64.includes('image/png') ? 'image/png' : 'image/jpeg'
+            contentParts.push({ type: 'image_url', image_url: { url: `data:${mimeType};base64,${b64}` } })
+        }
+        contentParts.push({ type: 'text', text: adaptPrompt })
+
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 90000)
+
+        const response = await fetch('https://api.laozhang.ai/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${lzKey}`,
+            },
+            body: JSON.stringify({
+                model: lzModel,
+                messages: [{ role: 'user', content: contentParts }],
+                size: lzSize,
+            }),
+            signal: controller.signal,
+        })
+        clearTimeout(timeoutId)
+
+        if (!response.ok) {
+            const errText = await response.text()
+            console.error(`❌ [AI-Adapt] LaoZhang failed (${response.status}): ${errText.substring(0, 300)}`)
+            throw new Error(`NanoBanana 2 failed (${response.status}): ${errText.substring(0, 200)}`)
+        }
+
+        const data = await response.json()
+        let imageUrl = ''
+
+        // Extract image from response (Gemini native format)
+        const parts = data.choices?.[0]?.message?.parts || []
+        for (const part of parts) {
+            if (part.inline_data?.data && part.inline_data?.mime_type) {
+                imageUrl = `data:${part.inline_data.mime_type};base64,${part.inline_data.data}`
+                break
+            }
+        }
+
+        // Fallback: parse from content string
+        if (!imageUrl) {
+            const content = data.choices?.[0]?.message?.content || ''
+            const dataUriMatch = content.match(/!\[.*?\]\((data:image\/[^)]+)\)/)
+            if (dataUriMatch) imageUrl = dataUriMatch[1]
+            if (!imageUrl) { const httpsMatch = content.match(/\[.*?\]\((https?:\/\/[^\s)]+)\)/); if (httpsMatch) imageUrl = httpsMatch[1] }
+            if (!imageUrl) { const directImg = content.match(/(https?:\/\/[^\s"']+\.(png|jpg|jpeg|webp))/i); if (directImg) imageUrl = directImg[1] }
+            if (!imageUrl) { const rawB64 = content.match(/(data:image\/[a-z]+;base64,[A-Za-z0-9+/=]+)/); if (rawB64) imageUrl = rawB64[1] }
+        }
+
+        if (!imageUrl) {
+            const content = data.choices?.[0]?.message?.content || ''
+            console.error(`❌ [AI-Adapt] No image in NanoBanana 2 response:`, content.substring(0, 400))
+            throw new Error('NanoBanana 2 returned response but no image found. The model may have generated text instead.')
+        }
+
+        // Upload base64 to S3 to avoid huge payloads
+        const { ensureS3Url } = await import('../utils/s3.js')
+        const finalUrl = await ensureS3Url(imageUrl, `canvas-adapt/${preset}`)
+
+        console.log(`✅ [AI-Adapt] ${preset} done in ${Date.now() - startTime}ms → ${finalUrl.substring(0, 80)}`)
+
+        return res.json({
+            success: true,
+            preset,
+            imageUrl: finalUrl,
+            spec,
+            generationTime: Date.now() - startTime,
+        })
+    } catch (err) {
+        console.error('[AI-Adapt] Error:', err.message)
+        return res.status(500).json({ success: false, error: err.message })
+    }
+})
+
 // POST /api/canvas-assets/ai-analyze — Analyze image and return TEXT description (for reverse prompting)
 router.post('/ai-analyze', protect, async (req, res) => {
     try {
+
         const { prompt, imageBase64, imageUrl } = req.body
         if (!prompt) return res.status(400).json({ error: 'Prompt is required' })
 

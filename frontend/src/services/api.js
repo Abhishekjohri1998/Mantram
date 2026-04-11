@@ -456,6 +456,9 @@ export const canvasAssets = {
     generateCampaign: (data) => apiFetch('/fidato/canvas-campaign', { method: 'POST', body: JSON.stringify(data) }),
     // Smart Design Adaptation — AI-powered layout re-composition for different platform sizes
     smartAdapt: (data) => apiFetch('/canvas-assets/smart-adapt', { method: 'POST', body: JSON.stringify(data), timeout: 120000 }),
+    // AI Design Adaptation — NanoBanana 2 image regeneration for each platform size
+    aiAdapt: (data) => apiFetch('/canvas-assets/ai-adapt', { method: 'POST', body: JSON.stringify(data), timeout: 90000 }),
+
 };
 
 // ============ Video Studio API ============

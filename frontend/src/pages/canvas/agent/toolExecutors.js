@@ -652,6 +652,7 @@ export async function executeToolCall(toolCall, fc, ctx = {}, deps = {}) {
 
         case 'adapt_design': {
             const { presets: targetPresets = [] } = args
+            const brand = deps?.brand || null
 
             if (!targetPresets || targetPresets.length === 0) {
                 return 'Please specify which platform sizes to adapt to (e.g. ig-post, linkedin, yt-thumb)'
@@ -668,7 +669,6 @@ export async function executeToolCall(toolCall, fc, ctx = {}, deps = {}) {
                 'yt-thumb':        { w: 1280, h: 720,  label: 'YouTube Thumbnail (16:9)' },
                 'twitter':         { w: 1600, h: 900,  label: 'Twitter/X (16:9)' },
                 'whatsapp-status': { w: 1080, h: 1920, label: 'WhatsApp Status (9:16)' },
-                'carousel':        { w: 1080, h: 1080, label: 'Carousel (1:1)' },
                 'pinterest':       { w: 1000, h: 1500, label: 'Pinterest Pin (2:3)' },
                 'banner':          { w: 1920, h: 600,  label: 'Web Banner' },
             }
@@ -681,168 +681,160 @@ export async function executeToolCall(toolCall, fc, ctx = {}, deps = {}) {
             if (setFidatoMessages) {
                 setFidatoMessages(prev => [...prev, {
                     role: 'assistant',
-                    content: `\ud83c\udfa8 **Smart Adapt** \u2014 Scaling your design to ${validPresets.length} platform size(s):\n${validPresets.map(p => `\u2022 ${PRESET_MAP[p].label}`).join('\n')}\n\n\u26a1 Computing layouts instantly...`
+                    content: `\ud83c\udfa8 **Smart Adapt (NanoBanana 2)** \u2014 Exporting your canvas and letting AI regenerate it for ${validPresets.length} platform size(s):\n${validPresets.map(p => `\u2022 ${PRESET_MAP[p].label}`).join('\n')}\n\n\u23f3 Generating... (each takes ~20-40s)`
                 }])
             }
 
-            // Get source artboard bounds
+            // ── Step 1: Export the current canvas artboard as a base64 image ──
             const artboard = fc.getObjects().find(o => o.id === 'artboard')
             const sourceWidth  = artboard ? Math.round(artboard.width  * (artboard.scaleX || 1)) : fc._logicalWidth  || 1080
             const sourceHeight = artboard ? Math.round(artboard.height * (artboard.scaleY || 1)) : fc._logicalHeight || 1080
-            // artboard uses originX:'center', so left = center X
             const srcLeft = artboard ? (artboard.left - sourceWidth  / 2) : 0
             const srcTop  = artboard ? (artboard.top  - sourceHeight / 2) : 0
 
-            const contentObjects = fc.getObjects().filter(o =>
-                o.id !== 'artboard' && !(o._nodeType === 'artboard') &&
-                !(o._nodeType === 'artboard-label') && !o.id?.startsWith('artboard-') &&
-                !o.id?.startsWith('auto-frame')
-            )
-            if (contentObjects.length === 0) return '\u274c Canvas is empty \u2014 add elements first'
-
-            // Get true top-left coordinate regardless of originX/Y (Fabric v7)
-            const getTruePos = (obj) => {
-                const w = (obj.width || 0) * (obj.scaleX || 1)
-                const h = (obj.height || 0) * (obj.scaleY || 1)
-                return {
-                    x: obj.originX === 'center' ? (obj.left || 0) - w / 2 : (obj.left || 0),
-                    y: obj.originY === 'center' ? (obj.top  || 0) - h / 2 : (obj.top  || 0),
-                    w, h,
-                }
+            // Export canvas region as PNG data URL
+            let canvasDataUrl = null
+            try {
+                // Use fabric's toDataURL with the artboard region
+                const vpt = fc.viewportTransform.slice()
+                const currentZoom = fc.getZoom()
+                canvasDataUrl = fc.toDataURL({
+                    format: 'jpeg',
+                    quality: 0.85,
+                    left: srcLeft,
+                    top: srcTop,
+                    width: sourceWidth,
+                    height: sourceHeight,
+                    multiplier: Math.min(1024 / sourceWidth, 1024 / sourceHeight, 1),
+                })
+            } catch (exportErr) {
+                console.error('[adapt_design] Canvas export failed:', exportErr)
+                return `\u274c Failed to export canvas: ${exportErr.message}`
             }
+
+            if (!canvasDataUrl || canvasDataUrl === 'data:,') {
+                return '\u274c Canvas export returned empty image. Add content to the canvas first.'
+            }
+
+            // ── Step 2: For each preset, call NanoBanana 2 AI adapt ──
+            const { canvasAssets: canvasAssetsApi } = await import('../../../services/api')
 
             const ARTBOARD_GAP = 80
             let xOffset = srcLeft + sourceWidth + ARTBOARD_GAP
             let rendered = 0
+            const results = []
 
             for (const presetId of validPresets) {
                 const spec = PRESET_MAP[presetId]
-                const targetW = spec.w, targetH = spec.h
-                const scaleX = targetW / sourceWidth, scaleY = targetH / sourceHeight
-                const uniformScale = Math.min(scaleX, scaleY)
 
-                // Draw artboard background
-                const artboardRect = new fabric.Rect({
-                    left: xOffset + targetW / 2, top: srcTop + targetH / 2,
-                    width: targetW, height: targetH,
-                    originX: 'center', originY: 'center',
-                    fill: '#ffffff', stroke: 'rgba(99,102,241,0.45)', strokeWidth: 2,
-                    rx: 6, ry: 6, selectable: false, evented: false,
-                    id: `artboard-${presetId}`, _nodeType: 'artboard',
-                    shadow: new fabric.Shadow({ color: 'rgba(0,0,0,0.18)', blur: 28, offsetY: 10 }),
-                })
-                fc.add(artboardRect)
-                fc.sendObjectToBack(artboardRect)
-
-                // Label above artboard
-                fc.add(new fabric.Textbox(`${spec.label}\n${targetW}\u00d7${targetH}`, {
-                    left: xOffset, top: srcTop - 56, width: targetW,
-                    fontSize: 13, fontWeight: '700', fontFamily: 'Inter',
-                    fill: '#818cf8', textAlign: 'center', selectable: false, evented: false,
-                    id: `artboard-label-${presetId}`, _nodeType: 'artboard-label',
-                }))
-
-                const makeClip = () => new fabric.Rect({
-                    left: xOffset, top: srcTop, width: targetW, height: targetH,
-                    absolutePositioned: true,
-                })
-
-                for (const obj of contentObjects) {
-                    const { x: ox, y: oy, w: ow, h: oh } = getTruePos(obj)
-                    const relX = (ox - srcLeft) / sourceWidth
-                    const relY = (oy - srcTop)  / sourceHeight
-                    const nx = xOffset + relX * targetW
-                    const ny = srcTop  + relY * targetH
-                    const nw = ow * scaleX, nh = oh * scaleY
-                    const newId = `${obj.id || 'el'}-${presetId}`
-
-                    try {
-                        if (obj.type === 'image') {
-                            // Fabric v7: clone() returns a Promise
-                            const cloned = await obj.clone()
-                            cloned.set({
-                                left: nx + nw / 2, top: ny + nh / 2,
-                                originX: 'center', originY: 'center',
-                                scaleX: nw / (cloned.width || 1),
-                                scaleY: nh / (cloned.height || 1),
-                                opacity: obj.opacity ?? 1,
-                                id: newId, _adaptedFrom: obj.id, _preset: presetId,
-                                clipPath: makeClip(),
-                            })
-                            fc.add(cloned)
-                        } else if (obj.type === 'textbox' || obj.type === 'i-text') {
-                            fc.add(new fabric.Textbox(obj.text || '', {
-                                left: nx, top: ny, originX: 'left', originY: 'top', width: Math.max(10, nw),
-                                fontSize: Math.max(8, Math.round((obj.fontSize || 16) * uniformScale)),
-                                fontWeight: obj.fontWeight || 'normal',
-                                fontFamily: obj.fontFamily || 'Inter',
-                                fill: obj.fill || '#000000',
-                                textAlign: obj.textAlign || 'left',
-                                opacity: obj.opacity ?? 1,
-                                id: newId, _adaptedFrom: obj.id, _preset: presetId,
-                                clipPath: makeClip(),
-                            }))
-                        } else {
-                            // Fabric v7: clone() returns a Promise
-                            const cloned = await obj.clone()
-                            cloned.set({
-                                left: nx, top: ny, originX: 'left', originY: 'top',
-                                scaleX: (obj.scaleX || 1) * scaleX,
-                                scaleY: (obj.scaleY || 1) * scaleY,
-                                opacity: obj.opacity ?? 1,
-                                id: newId, _adaptedFrom: obj.id, _preset: presetId,
-                                clipPath: makeClip(),
-                            })
-                            fc.add(cloned)
-                            fc.sendObjectToBack(cloned)
-                            fc.sendObjectToBack(artboardRect)
+                if (setFidatoMessages) {
+                    setFidatoMessages(prev => {
+                        const last = prev[prev.length - 1]
+                        if (last?.role === 'assistant' && last.content.includes('NanoBanana')) {
+                            return [...prev.slice(0, -1), {
+                                ...last,
+                                content: last.content.replace('\u23f3 Generating...', `\u23f3 Generating ${presetId}... (${rendered}/${validPresets.length} done)`)
+                            }]
                         }
-                    } catch (objErr) {
-                        console.warn(`[adapt_design] Failed to clone object ${obj.id}:`, objErr.message)
-                    }
+                        return prev
+                    })
                 }
 
-                rendered++
-                xOffset += targetW + ARTBOARD_GAP
-                fc.requestRenderAll()
+                try {
+                    const adaptResult = await canvasAssetsApi.aiAdapt({
+                        canvasImageBase64: canvasDataUrl,
+                        preset: presetId,
+                        brandContext: brand ? { name: brand.name, dna: brand.dna } : null,
+                    })
+
+                    if (!adaptResult.success || !adaptResult.imageUrl) {
+                        console.warn(`[adapt_design] ${presetId} failed:`, adaptResult.error)
+                        results.push({ presetId, success: false, error: adaptResult.error })
+                        continue
+                    }
+
+                    const aiImageUrl = adaptResult.imageUrl
+                    const targetW = spec.w, targetH = spec.h
+
+                    // Draw artboard background
+                    const artboardRect = new fabric.Rect({
+                        left: xOffset + targetW / 2, top: srcTop + targetH / 2,
+                        width: targetW, height: targetH,
+                        originX: 'center', originY: 'center',
+                        fill: '#ffffff', stroke: 'rgba(99,102,241,0.45)', strokeWidth: 2,
+                        rx: 6, ry: 6, selectable: false, evented: false,
+                        id: `artboard-${presetId}`, _nodeType: 'artboard',
+                        shadow: new fabric.Shadow({ color: 'rgba(0,0,0,0.18)', blur: 28, offsetY: 10 }),
+                    })
+                    fc.add(artboardRect)
+                    fc.sendObjectToBack(artboardRect)
+
+                    // Label above artboard
+                    fc.add(new fabric.Textbox(`${spec.label}\n${targetW}\u00d7${targetH}`, {
+                        left: xOffset, top: srcTop - 56, width: targetW,
+                        fontSize: 13, fontWeight: '700', fontFamily: 'Inter',
+                        fill: '#818cf8', textAlign: 'center', selectable: false, evented: false,
+                        id: `artboard-label-${presetId}`, _nodeType: 'artboard-label',
+                    }))
+
+                    // Place AI-generated image filling the artboard
+                    const adaptedImg = await fabric.FabricImage.fromURL(aiImageUrl, { crossOrigin: 'anonymous' })
+                    const scaleX = targetW / (adaptedImg.width || 1)
+                    const scaleY = targetH / (adaptedImg.height || 1)
+                    adaptedImg.set({
+                        left: xOffset + targetW / 2, top: srcTop + targetH / 2,
+                        originX: 'center', originY: 'center',
+                        scaleX, scaleY,
+                        id: `ai-adapted-${presetId}`,
+                        _nodeType: 'ai-adapted',
+                        _preset: presetId,
+                        clipPath: new fabric.Rect({
+                            left: xOffset, top: srcTop, width: targetW, height: targetH,
+                            absolutePositioned: true,
+                        }),
+                    })
+                    fc.add(adaptedImg)
+
+                    rendered++
+                    results.push({ presetId, success: true })
+                    xOffset += targetW + ARTBOARD_GAP
+                    fc.requestRenderAll()
+
+                } catch (presetErr) {
+                    console.error(`[adapt_design] ${presetId} error:`, presetErr)
+                    results.push({ presetId, success: false, error: presetErr.message })
+                }
             }
 
             fc.requestRenderAll()
 
-            // ── Zoom canvas to fit all artboards in view ──
+            // Auto zoom-to-fit all artboards
             try {
-                const canvasW = fc.width  || 900
-                const canvasH = fc.height || 600
+                const canvasW = fc.width || 900, canvasH = fc.height || 600
                 const PADDING = 60
-
-                // Total bounding box: from srcLeft to xOffset (which now points past the last artboard)
-                const totalContentW = xOffset - srcLeft  // srcLeft + all artboards + gaps
-                const totalContentH = Math.max(sourceHeight, ...validPresets.map(p => PRESET_MAP[p].h))
-
-                const zoomX = (canvasW - PADDING) / totalContentW
-                const zoomY = (canvasH - PADDING) / totalContentH
-                const newZoom = Math.min(zoomX, zoomY, 0.5) // cap at 0.5 so we don't zoom in too much
-
-                // Pan so srcLeft/srcTop is at top-left with padding
-                const vpt = [newZoom, 0, 0, newZoom,
+                const totalW = xOffset - srcLeft
+                const totalH = Math.max(sourceHeight, ...validPresets.map(p => PRESET_MAP[p].h))
+                const newZoom = Math.min((canvasW - PADDING) / totalW, (canvasH - PADDING) / totalH, 0.5)
+                fc.setViewportTransform([newZoom, 0, 0, newZoom,
                     -srcLeft * newZoom + PADDING / 2,
-                    -srcTop  * newZoom + PADDING / 2]
-                fc.setViewportTransform(vpt)
+                    -srcTop  * newZoom + PADDING / 2])
                 fc.requestRenderAll()
             } catch (vpErr) {
                 console.warn('[adapt_design] zoom-to-fit failed:', vpErr.message)
             }
 
-            const summary = validPresets.map(p => `\u2022 **${PRESET_MAP[p].label}** (${PRESET_MAP[p].w}\u00d7${PRESET_MAP[p].h})`).join('\n')
+            const successList = results.filter(r => r.success).map(r => `\u2022 ${PRESET_MAP[r.presetId].label}`).join('\n')
+            const failList = results.filter(r => !r.success).map(r => `\u2022 ${r.presetId}: ${r.error}`).join('\n')
+
             if (setFidatoMessages) {
                 setFidatoMessages(prev => [...prev, {
                     role: 'assistant',
-                    content: `\u2705 **Smart Adapt Complete!** ${rendered} platform layouts created side-by-side.\n\n${summary}\n\nAll variants are now visible on the canvas!`
+                    content: `\u2705 **NanoBanana 2 Adapt Complete!** ${rendered}/${validPresets.length} platform variants generated.\n\n${successList}${failList ? `\n\n\u26a0\ufe0f Failed:\n${failList}` : ''}\n\nEach variant was intelligently regenerated by AI for its platform aspect ratio \u2014 backgrounds extended, composition adapted, characters preserved.`
                 }])
             }
-            return { text: `Smart Adapt complete \u2014 ${rendered} platform layouts created`, presetsRendered: rendered }
-        }
 
+            return { text: `NanoBanana 2 Adapt complete \u2014 ${rendered} AI-generated platform variants created`, presetsRendered: rendered }
+        }
 
                 case 'generate_video_clip': {
 
