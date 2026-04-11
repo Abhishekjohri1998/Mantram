@@ -10,7 +10,7 @@
  */
 import { Router } from 'express';
 import axios from 'axios';
-import { uploadToS3, mirrorUrlToS3, getSignedUrlIfNeeded, getSignedUrlForPath } from '../utils/s3.js';
+import { uploadToS3, mirrorUrlToS3, getSignedUrlIfNeeded, getSignedUrlForPath, getObjectStream } from '../utils/s3.js';
 import { protect } from '../middleware/auth.js';
 import crypto from 'crypto';
 
@@ -85,7 +85,6 @@ router.get('/proxy', async (req, res) => {
         res.status(status).send(`Proxy failed: ${msg}`);
     }
 });
-
 
 
 // ══════════════════════════════════════════════════════════════════════════════
