@@ -142,6 +142,9 @@
   }
 
   .refractive-border { border: 1px solid var(--sys-border); }
+  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .smooth-scroll { scroll-behavior: smooth; -webkit-overflow-scrolling: touch; }
   .molten-glow, .cyan-glow, .glow-border, .orange-glow-border { box-shadow: none; border-color: var(--sys-primary); text-shadow: none; }
   .mic-glow { filter: none; color: var(--sys-primary); }
 

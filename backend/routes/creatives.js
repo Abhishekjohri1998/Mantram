@@ -1,5 +1,8 @@
 import mongoose from 'mongoose';
 import { randomUUID } from 'crypto';
+import express from 'express';
+import multer from 'multer';
+import FormData from 'form-data';
 
 import GenerationJob from '../models/GenerationJob.js';
 import { Router } from 'express';
@@ -8,8 +11,8 @@ import Feedback from '../models/Feedback.js';
 import Brand from '../models/Brand.js';
 import Product from '../models/Product.js';
 import { protect } from '../middleware/auth.js';
+import { requireCredits as requireCredits, refundCredits } from '../middleware/credits.js';
 import { requireStudio } from '../middleware/studioAccess.js';
-import { requireCredits, refundCredits } from '../middleware/credits.js';
 // orchestrator import removed — no fallback routing
 import { addWatermark } from '../utils/watermark.js';
 import { getSetting } from '../models/SystemSettings.js';
@@ -436,6 +439,28 @@ export async function internalGenerateCreative({ body, user, creditsDeducted, jo
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+
+// GET /api/creatives/proxy-download - Proxies an image to bypass browser CORS on download
+router.get('/proxy-download', protect, async (req, res) => {
+    try {
+        const { url, filename } = req.query;
+        if (!url) return res.status(400).json({ error: 'URL is required' });
+
+        const response = await fetch(decodeURIComponent(url));
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        
+        const contentType = response.headers.get('content-type') || 'application/octet-stream';
+        res.setHeader('Content-Type', contentType);
+        res.setHeader('Content-Disposition', `attachment; filename="${(filename || 'download.png').replace(/[^a-zA-Z0-9_.-]/g, '_')}"`);
+        
+        const arrayBuffer = await response.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        res.send(buffer);
+    } catch (e) {
+        console.error('Proxy download error:', e.message);
+        res.status(500).json({ error: 'Failed to proxy download' });
+    }
+});
 
 // POST /api/creatives/ — Create a new generation job (Queue-based)
 router.post('/', protect, requireCredits('creative'), async (req, res) => {
@@ -1989,7 +2014,7 @@ router.get('/vto-status/:requestId', protect, async (req, res) => {
 // ══════════════════════════════════════════════════════════════════════════════
 router.post('/edit-image', protect, requireCredits('creative'), async (req, res) => {
     try {
-        const { imageUrl, editPrompt, editHistory = [], brandId } = req.body;
+        const { imageUrl, editPrompt, editHistory = [], brandId, maskBase64, editMode } = req.body;
         if (!imageUrl) return res.status(400).json({ success: false, error: 'imageUrl is required' });
         if (!editPrompt) return res.status(400).json({ success: false, error: 'editPrompt is required' });
 
@@ -2087,9 +2112,25 @@ router.post('/edit-image', protect, requireCredits('creative'), async (req, res)
 
         // Current turn: source image + edit prompt
         const currentParts = [
-            { inlineData: { mimeType: sourceMime, data: sourceBase64 } },
-            { text: `You are an elite AI image editor. Edit this image precisely as instructed. CRITICAL RULES:\n1. Apply ONLY the requested change — do not alter any other aspect of the image\n2. Maintain the exact same resolution, lighting quality, and color temperature for unaffected areas\n3. Ensure the edit blends seamlessly with the rest of the image\n4. The result must look professionally retouched, not AI-generated\n\nEDIT INSTRUCTION: ${editPrompt}\n\nOutput the complete modified image.` },
+            { inlineData: { mimeType: sourceMime, data: sourceBase64 } }
         ];
+
+        let instructions = `You are an elite AI image editor. Edit this image precisely as instructed. CRITICAL RULES:\n1. Apply ONLY the requested change — do not alter any other aspect of the image\n2. Maintain the exact same resolution, lighting quality, and color temperature for unaffected areas\n3. Ensure the edit blends seamlessly with the rest of the image\n4. The result must look professionally retouched, not AI-generated\n\n`;
+
+        if (maskBase64) {
+            let pureMask = maskBase64;
+            let maskMime = 'image/png';
+            if (maskBase64.startsWith('data:')) {
+                const match = maskBase64.match(/^data:([\w/+]+);base64,(.+)$/);
+                if (match) { maskMime = match[1]; pureMask = match[2]; }
+            }
+            currentParts.push({ inlineData: { mimeType: maskMime, data: pureMask } });
+            instructions += `[MASK PROVIDED] The second image provided is a black-and-white mask. Use this mask to strictly isolate the edit to the painted area (white) while leaving the rest of the image (black) completely untouched.\n`;
+        }
+
+        instructions += `EDIT INSTRUCTION: ${editPrompt}\n\nOutput the complete modified image.`;
+        currentParts.push({ text: instructions });
+
         contents.push({ role: 'user', parts: currentParts });
 
         // ── Call Gemini with 90s timeout ──
