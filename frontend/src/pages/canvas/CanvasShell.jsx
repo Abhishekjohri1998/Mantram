@@ -571,7 +571,7 @@ function CanvasShellInner() {
         showToast(`📥 Exported as ${format.toUpperCase()}`)
     }, [showToast])
 
-    // ── Resize ──
+    // ── Resize (Intelligent Content Adaptation) ──
     const resizeToPreset = useCallback((preset) => {
         const fc = fabricRef.current
         if (!fc) return
@@ -581,7 +581,36 @@ function CanvasShellInner() {
         const displayW = Math.round(preset.w * scale), displayH = Math.round(preset.h * scale)
         const artboardLeft = Math.round((canvasW - displayW) / 2), artboardTop = Math.round((canvasH - displayH) / 2)
 
+        // ── Track old artboard bounds for proportional reflow ──
         let artboard = fc.getObjects().find(o => o.id === 'artboard')
+        let oldAbLeft, oldAbTop, oldAbW, oldAbH
+
+        if (artboard) {
+            oldAbLeft = artboard.left
+            oldAbTop = artboard.top
+            oldAbW = artboard.width
+            oldAbH = artboard.height
+        } else {
+            // No artboard yet — compute bounding box of all content
+            const cObjs = fc.getObjects().filter(o => o.id !== 'artboard')
+            if (cObjs.length > 0) {
+                let mnX = Infinity, mnY = Infinity, mxX = -Infinity, mxY = -Infinity
+                cObjs.forEach(o => {
+                    const br = o.getBoundingRect()
+                    mnX = Math.min(mnX, br.left)
+                    mnY = Math.min(mnY, br.top)
+                    mxX = Math.max(mxX, br.left + br.width)
+                    mxY = Math.max(mxY, br.top + br.height)
+                })
+                oldAbLeft = mnX; oldAbTop = mnY
+                oldAbW = Math.max(mxX - mnX, 10)
+                oldAbH = Math.max(mxY - mnY, 10)
+            } else {
+                oldAbLeft = artboardLeft; oldAbTop = artboardTop
+                oldAbW = displayW; oldAbH = displayH
+            }
+        }
+
         if (!artboard) {
             artboard = new fabric.Rect({
                 left: artboardLeft, top: artboardTop, width: displayW, height: displayH,
@@ -593,14 +622,53 @@ function CanvasShellInner() {
         } else {
             artboard.set({ left: artboardLeft, top: artboardTop, width: displayW, height: displayH })
         }
+
+        // ── Proportionally scale & reposition all content elements ──
+        const contentObjects = fc.getObjects().filter(o =>
+            o.id !== 'artboard' && !o.id?.startsWith('artboard-') && !o.id?.startsWith('artboard-label-')
+        )
+
+        if (contentObjects.length > 0 && (oldAbW !== displayW || oldAbH !== displayH)) {
+            const scaleRatioX = displayW / oldAbW
+            const scaleRatioY = displayH / oldAbH
+            const uniformScale = Math.min(scaleRatioX, scaleRatioY)
+
+            // Center content after scaling
+            const scaledW = oldAbW * uniformScale
+            const scaledH = oldAbH * uniformScale
+            const padX = (displayW - scaledW) / 2
+            const padY = (displayH - scaledH) / 2
+
+            contentObjects.forEach(obj => {
+                const relX = (obj.left - oldAbLeft) / oldAbW
+                const relY = (obj.top - oldAbTop) / oldAbH
+                const newLeft = artboardLeft + padX + relX * scaledW
+                const newTop = artboardTop + padY + relY * scaledH
+                const newScaleX = (obj.scaleX || 1) * uniformScale
+                const newScaleY = (obj.scaleY || 1) * uniformScale
+
+                obj.set({ left: newLeft, top: newTop, scaleX: newScaleX, scaleY: newScaleY })
+
+                if ((obj.type === 'textbox' || obj.type === 'i-text' || obj.type === 'text') && obj.fontSize) {
+                    obj.set({ fontSize: Math.max(8, Math.round(obj.fontSize * uniformScale)) })
+                    obj.set({ scaleX: 1, scaleY: 1 })
+                    if (obj.type === 'textbox') {
+                        obj.set({ width: Math.round((obj.width || 200) * uniformScale) })
+                    }
+                }
+                obj.setCoords()
+            })
+        }
+
         fc._logicalScale = scale; fc._logicalWidth = preset.w; fc._logicalHeight = preset.h
         fc._artboardLeft = artboardLeft; fc._artboardTop = artboardTop
         fc.renderAll()
         setZoom(Math.round(scale * 100))
         setCustomW(preset.w); setCustomH(preset.h)
         saveHistory()
-        showToast(`📐 Resized to ${preset.label} (${preset.w}×${preset.h})`)
+        showToast(`📐 Adapted to ${preset.label} (${preset.w}×${preset.h})`)
     }, [setActivePreset, setZoom, setCustomW, setCustomH, saveHistory, showToast])
+
 
     const resizeCanvas = useCallback((w, h) => {
         resizeToPreset({ id: 'custom', label: 'Custom', icon: 'crop', w, h })

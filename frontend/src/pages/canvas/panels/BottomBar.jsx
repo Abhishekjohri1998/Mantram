@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════════
-// BottomBar.jsx — Canvas Bottom Bar with Resize + Platform Presets
-// Grouped presets: Social | Display | Print
+// BottomBar.jsx — Canvas Bottom Bar with Size Controls + Platform Adapt
+// Intelligently adapts canvas content when a platform preset is clicked
 // ═══════════════════════════════════════════════════════════════
 
-import React, { useState } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import useCanvasStore from '../state/useCanvasStore'
 import { PRESETS } from '../data/presets'
 
@@ -12,26 +12,31 @@ const PRESET_GROUPS = [
     {
         label: 'Instagram',
         icon: 'photo_camera',
+        color: '#E1306C',
         ids: ['ig-post', 'ig-post-square', 'ig-story', 'ig-reel'],
     },
     {
         label: 'Facebook',
         icon: 'thumb_up',
+        color: '#1877F2',
         ids: ['fb-post', 'fb-story'],
     },
     {
         label: 'Social',
         icon: 'public',
+        color: '#14b8a6',
         ids: ['linkedin', 'twitter', 'whatsapp-status', 'pinterest'],
     },
     {
         label: 'Video',
         icon: 'smart_display',
+        color: '#FF0000',
         ids: ['yt-thumb'],
     },
     {
         label: 'Ads & Web',
         icon: 'web',
+        color: '#f59e0b',
         ids: ['carousel', 'banner', 'banner-square'],
     },
 ]
@@ -46,19 +51,28 @@ export default function BottomBar({ onResizeCanvas, onResizeToPreset }) {
         activePreset,
     } = useCanvasStore()
 
-    const [hoveredPreset, setHoveredPreset] = useState(null)
     const [expandedGroup, setExpandedGroup] = useState(null)
+    const popupRef = useRef(null)
 
     const currentPreset = PRESETS.find(p => p.id === activePreset)
 
+    // Close popup when clicking outside
+    useEffect(() => {
+        if (!expandedGroup) return
+        const handleClick = (e) => {
+            if (popupRef.current && !popupRef.current.contains(e.target)) {
+                setExpandedGroup(null)
+            }
+        }
+        document.addEventListener('mousedown', handleClick)
+        return () => document.removeEventListener('mousedown', handleClick)
+    }, [expandedGroup])
+
     return (
         <div className="ce-bottom-bar">
-            {/* ─── Custom Size Controls ─── */}
-            <div className="ce-bb-resize-group">
-                <span className="material-symbols-outlined" style={{ fontSize: 13, color: '#818cf8', flexShrink: 0 }}>
-                    crop_square
-                </span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            {/* ─── Size Controls ─── */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'rgba(255,255,255,0.04)', borderRadius: 8, padding: '2px 8px', border: '1px solid rgba(255,255,255,0.06)' }}>
                     <input
                         className="ce-resize-input"
                         type="number" min={100} max={8000} value={customW}
@@ -68,11 +82,9 @@ export default function BottomBar({ onResizeCanvas, onResizeToPreset }) {
                             if (lockRatio && customH && customW) setCustomH(Math.round(w * (customH / customW)))
                         }}
                         title="Width (px)"
+                        style={{ width: 48 }}
                     />
-                    <span style={{ fontSize: 10, color: '#475569', flexShrink: 0 }}>W</span>
-                </div>
-                <span style={{ fontSize: 11, color: '#334155', flexShrink: 0 }}>×</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ fontSize: 9, color: '#64748b', fontWeight: 600 }}>×</span>
                     <input
                         className="ce-resize-input"
                         type="number" min={100} max={8000} value={customH}
@@ -82,115 +94,105 @@ export default function BottomBar({ onResizeCanvas, onResizeToPreset }) {
                             if (lockRatio && customW && customH) setCustomW(Math.round(h * (customW / customH)))
                         }}
                         title="Height (px)"
+                        style={{ width: 48 }}
                     />
-                    <span style={{ fontSize: 10, color: '#475569', flexShrink: 0 }}>H</span>
+                    <button
+                        className="ce-bb-icon-btn"
+                        onClick={() => setLockRatio(!lockRatio)}
+                        title={lockRatio ? 'Unlock aspect ratio' : 'Lock aspect ratio'}
+                    >
+                        <span className="material-symbols-outlined" style={{ fontSize: 13, color: lockRatio ? '#818cf8' : '#475569' }}>
+                            {lockRatio ? 'lock' : 'lock_open'}
+                        </span>
+                    </button>
+                    <button
+                        className="ce-bb-icon-btn"
+                        onClick={() => { const tmp = customW; setCustomW(customH); setCustomH(tmp) }}
+                        title="Flip orientation"
+                    >
+                        <span className="material-symbols-outlined" style={{ fontSize: 13 }}>swap_horiz</span>
+                    </button>
                 </div>
-
-                {/* Lock ratio */}
                 <button
-                    className="ce-tool-btn"
-                    onClick={() => setLockRatio(!lockRatio)}
-                    style={{ width: 22, height: 22, flexShrink: 0 }}
-                    title={lockRatio ? 'Unlock aspect ratio' : 'Lock aspect ratio'}
-                >
-                    <span className="material-symbols-outlined" style={{ fontSize: 12, color: lockRatio ? '#818cf8' : '#475569' }}>
-                        {lockRatio ? 'lock' : 'lock_open'}
-                    </span>
-                </button>
-
-                {/* Flip W/H */}
-                <button
-                    className="ce-tool-btn"
-                    onClick={() => { const tmp = customW; setCustomW(customH); setCustomH(tmp) }}
-                    style={{ width: 22, height: 22, flexShrink: 0 }}
-                    title="Flip orientation (portrait ↔ landscape)"
-                >
-                    <span className="material-symbols-outlined" style={{ fontSize: 12 }}>swap_horiz</span>
-                </button>
-
-                {/* Apply */}
-                <button
-                    className="ce-preset-btn active"
+                    className="ce-bb-apply-btn"
                     onClick={() => onResizeCanvas?.(customW, customH)}
-                    style={{ padding: '3px 10px', fontSize: 10, height: 24, flexShrink: 0 }}
-                    title={`Resize artboard to ${customW}×${customH}px`}
+                    title={`Adapt canvas to ${customW}×${customH}px`}
                 >
                     Apply
                 </button>
             </div>
 
-            {/* ─── Divider ─── */}
-            <div style={{ width: 1, height: 22, background: 'rgba(255,255,255,0.07)', margin: '0 6px', flexShrink: 0 }} />
+            {/* ─── Separator ─── */}
+            <div className="ce-bb-separator" />
 
-            {/* ─── Active preset indicator ─── */}
+            {/* ─── Active preset chip ─── */}
             {currentPreset && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0, background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 6, padding: '3px 8px' }}>
+                <div className="ce-bb-active-chip">
                     <span className="material-symbols-outlined" style={{ fontSize: 12, color: '#818cf8' }}>{currentPreset.icon}</span>
                     <span style={{ fontSize: 10, color: '#a5b4fc', fontWeight: 600 }}>{currentPreset.label}</span>
                     <span style={{ fontSize: 9, color: '#64748b' }}>{currentPreset.w}×{currentPreset.h}</span>
                 </div>
             )}
 
-            {/* ─── Divider ─── */}
-            <div style={{ width: 1, height: 22, background: 'rgba(255,255,255,0.07)', margin: '0 6px', flexShrink: 0 }} />
+            {/* ─── Separator ─── */}
+            <div className="ce-bb-separator" />
+
+            {/* ─── Adapt to label ─── */}
+            <span style={{ fontSize: 10, color: '#52525b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', flexShrink: 0 }}>
+                Adapt&nbsp;to
+            </span>
 
             {/* ─── Platform Preset Groups ─── */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap', flexShrink: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 3, flexWrap: 'nowrap', flexShrink: 1 }}>
                 {PRESET_GROUPS.map(group => {
                     const groupPresets = group.ids.map(id => PRESET_MAP[id]).filter(Boolean)
                     const isGroupActive = groupPresets.some(p => p.id === activePreset)
                     const isExpanded = expandedGroup === group.label
 
                     return (
-                        <div key={group.label} style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <div key={group.label} style={{ position: 'relative' }} ref={isExpanded ? popupRef : undefined}>
                             {/* Group label button */}
                             <button
-                                className={`ce-preset-btn ${isGroupActive ? 'active' : ''}`}
+                                className={`ce-bb-group-btn ${isGroupActive ? 'active' : ''}`}
                                 onClick={() => setExpandedGroup(isExpanded ? null : group.label)}
-                                style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 8px', whiteSpace: 'nowrap', fontSize: 10 }}
-                                title={`${group.label} presets`}
+                                title={`Adapt design to ${group.label} sizes`}
                             >
-                                <span className="material-symbols-outlined" style={{ fontSize: 12 }}>{group.icon}</span>
-                                {group.label}
-                                <span className="material-symbols-outlined" style={{ fontSize: 10, opacity: 0.6 }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 14, color: isGroupActive ? group.color : undefined }}>{group.icon}</span>
+                                <span>{group.label}</span>
+                                <span className="material-symbols-outlined" style={{ fontSize: 10, opacity: 0.5 }}>
                                     {isExpanded ? 'expand_less' : 'expand_more'}
                                 </span>
                             </button>
 
-                            {/* Expanded preset sub-buttons */}
+                            {/* Expanded preset dropdown */}
                             {isExpanded && (
-                                <div style={{
-                                    position: 'absolute', bottom: '100%', left: 0, marginBottom: 6,
-                                    background: '#141420', border: '1px solid rgba(255,255,255,0.08)',
-                                    borderRadius: 8, padding: 6, display: 'flex', flexDirection: 'column',
-                                    gap: 2, minWidth: 154, zIndex: 100,
-                                    boxShadow: '0 -8px 24px rgba(0,0,0,0.5)'
-                                }}>
-                                    <div style={{ fontSize: 9, fontWeight: 700, color: '#52525b', padding: '2px 6px 4px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                                <div className="ce-bb-dropdown">
+                                    <div className="ce-bb-dropdown-header">
+                                        <span style={{ color: group.color }}>●</span>
                                         {group.label} Sizes
                                     </div>
                                     {groupPresets.map(p => (
                                         <button
                                             key={p.id}
-                                            className={`ce-preset-btn ${activePreset === p.id ? 'active' : ''}`}
+                                            className={`ce-bb-dropdown-item ${activePreset === p.id ? 'active' : ''}`}
                                             onClick={() => { onResizeToPreset?.(p); setExpandedGroup(null) }}
-                                            onMouseEnter={() => setHoveredPreset(p.id)}
-                                            onMouseLeave={() => setHoveredPreset(null)}
-                                            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '6px 8px', fontSize: 11, textAlign: 'left', width: '100%' }}
                                         >
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                                <span className="material-symbols-outlined" style={{ fontSize: 13 }}>{p.icon}</span>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
+                                                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>{p.icon}</span>
                                                 <div>
                                                     <div style={{ fontWeight: 600, lineHeight: 1.2 }}>{p.label}</div>
-                                                    {p.note && <div style={{ fontSize: 9, color: '#64748b', lineHeight: 1.2 }}>{p.note}</div>}
+                                                    {p.note && <div style={{ fontSize: 9, color: '#64748b', lineHeight: 1.2, marginTop: 1 }}>{p.note}</div>}
                                                 </div>
                                             </div>
                                             <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                                                <div style={{ fontSize: 9, color: '#a1a1aa', fontVariantNumeric: 'tabular-nums' }}>{p.ratio || ''}</div>
+                                                <div style={{ fontSize: 10, color: '#a1a1aa', fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>{p.ratio || ''}</div>
                                                 <div style={{ fontSize: 9, color: '#52525b', fontVariantNumeric: 'tabular-nums' }}>{p.w}×{p.h}</div>
                                             </div>
                                         </button>
                                     ))}
+                                    <div style={{ fontSize: 8, color: '#3f3f46', padding: '4px 8px 2px', textAlign: 'center', borderTop: '1px solid rgba(255,255,255,0.04)', marginTop: 2 }}>
+                                        Click to adapt your canvas
+                                    </div>
                                 </div>
                             )}
                         </div>
