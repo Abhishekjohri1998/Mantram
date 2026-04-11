@@ -277,6 +277,127 @@ function CanvasShellInner() {
                 fc.on('object:added', updateLayers)
                 fc.on('object:removed', updateLayers)
 
+                // ══════════════════════════════════════════════════════════
+                // ── Canvas Navigation: Zoom, Pan, Drag ──
+                // ══════════════════════════════════════════════════════════
+
+                // 1) Mouse wheel zoom (Ctrl/Cmd + scroll) & trackpad pinch
+                fc.on('mouse:wheel', (opt) => {
+                    const e = opt.e
+                    e.preventDefault()
+                    e.stopPropagation()
+
+                    // If Ctrl/Meta is held (or pinch gesture), zoom toward cursor
+                    if (e.ctrlKey || e.metaKey) {
+                        const delta = -e.deltaY / 300
+                        let newZoom = fc.getZoom() * (1 + delta)
+                        newZoom = Math.max(0.05, Math.min(5, newZoom))
+                        fc.zoomToPoint(new fabric.Point(e.offsetX, e.offsetY), newZoom)
+                        setZoom(Math.round(newZoom * 100))
+                    } else {
+                        // Plain scroll = pan (trackpad two-finger drag)
+                        const vpt = fc.viewportTransform.slice()
+                        vpt[4] -= e.deltaX
+                        vpt[5] -= e.deltaY
+                        fc.setViewportTransform(vpt)
+                    }
+                    fc.requestRenderAll()
+                })
+
+                // 2) Middle-click drag to pan
+                let isPanning = false
+                let panStartX = 0, panStartY = 0
+
+                fc.on('mouse:down', (opt) => {
+                    const e = opt.e
+                    // Middle mouse button (button 1) or Alt + left click
+                    if (e.button === 1 || (e.altKey && e.button === 0)) {
+                        isPanning = true
+                        panStartX = e.clientX
+                        panStartY = e.clientY
+                        fc.setCursor('grabbing')
+                        fc.selection = false
+                        e.preventDefault()
+                    }
+                    // Spacebar pan (tracked by keydown below)
+                    if (fc._spacebarDown && e.button === 0) {
+                        isPanning = true
+                        panStartX = e.clientX
+                        panStartY = e.clientY
+                        fc.setCursor('grabbing')
+                        fc.selection = false
+                    }
+                })
+
+                fc.on('mouse:move', (opt) => {
+                    if (!isPanning) return
+                    const e = opt.e
+                    const vpt = fc.viewportTransform.slice()
+                    vpt[4] += e.clientX - panStartX
+                    vpt[5] += e.clientY - panStartY
+                    fc.setViewportTransform(vpt)
+                    panStartX = e.clientX
+                    panStartY = e.clientY
+                    fc.requestRenderAll()
+                })
+
+                fc.on('mouse:up', () => {
+                    if (isPanning) {
+                        isPanning = false
+                        fc.setCursor('default')
+                        fc.selection = true
+                        fc.requestRenderAll()
+                    }
+                })
+
+                // 3) Spacebar held = pan mode (like Photoshop/Figma)
+                fc._spacebarDown = false
+                const handleKeyDown = (e) => {
+                    if (e.code === 'Space' && !e.repeat && !['INPUT', 'TEXTAREA'].includes(e.target?.tagName)) {
+                        e.preventDefault()
+                        fc._spacebarDown = true
+                        fc.setCursor('grab')
+                        fc.selection = false
+                        fc.forEachObject(o => { o._wasEvented = o.evented; o.evented = false })
+                    }
+                    // Keyboard zoom: +/= to zoom in, - to zoom out, 0 to reset
+                    if ((e.key === '+' || e.key === '=') && (e.ctrlKey || e.metaKey)) {
+                        e.preventDefault()
+                        const nz = Math.min(5, fc.getZoom() * 1.15)
+                        fc.zoomToPoint(new fabric.Point(fc.width / 2, fc.height / 2), nz)
+                        setZoom(Math.round(nz * 100))
+                        fc.requestRenderAll()
+                    }
+                    if (e.key === '-' && (e.ctrlKey || e.metaKey)) {
+                        e.preventDefault()
+                        const nz = Math.max(0.05, fc.getZoom() * 0.85)
+                        fc.zoomToPoint(new fabric.Point(fc.width / 2, fc.height / 2), nz)
+                        setZoom(Math.round(nz * 100))
+                        fc.requestRenderAll()
+                    }
+                    if (e.key === '0' && (e.ctrlKey || e.metaKey)) {
+                        e.preventDefault()
+                        fc.setViewportTransform([1, 0, 0, 1, 0, 0])
+                        setZoom(100)
+                        fc.requestRenderAll()
+                    }
+                }
+                const handleKeyUp = (e) => {
+                    if (e.code === 'Space') {
+                        fc._spacebarDown = false
+                        fc.setCursor('default')
+                        fc.selection = true
+                        fc.forEachObject(o => { if (o._wasEvented !== undefined) { o.evented = o._wasEvented; delete o._wasEvented } })
+                    }
+                }
+                document.addEventListener('keydown', handleKeyDown)
+                document.addEventListener('keyup', handleKeyUp)
+                fc._navCleanup = () => {
+                    document.removeEventListener('keydown', handleKeyDown)
+                    document.removeEventListener('keyup', handleKeyUp)
+                }
+
+
                 // Context menu
                 const showCtx = (e) => {
                     e.preventDefault()
@@ -305,7 +426,7 @@ function CanvasShellInner() {
 
         return () => {
             cancelAnimationFrame(initTimer)
-            if (fabricRef.current) { fabricRef.current.dispose(); fabricRef.current = null }
+            if (fabricRef.current) { fabricRef.current._navCleanup?.(); fabricRef.current.dispose(); fabricRef.current = null }
         }
     }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
