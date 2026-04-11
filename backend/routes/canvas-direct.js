@@ -949,7 +949,7 @@ When calling create_script_block, use this structure:
                 toolHandlers: {}, // No server-side tools needed — research done pre-flight
                 temperature: 0.5,
                 maxTokens: 4096,
-                model: 'claude-3-5-sonnet-20241022',
+                model: 'claude-sonnet-4-20250514',
             });
 
             // Attach reference images to response
@@ -969,7 +969,7 @@ When calling create_script_block, use this structure:
                     tools: clientTools,
                     temperature: 0.2,
                     maxTokens: 2048,
-                    model: 'claude-3-5-sonnet-20241022'
+                    model: 'claude-sonnet-4-20250514'
                 });
                 req._referenceImages = referenceImages;
             } catch (claudeRetryErr) {
@@ -977,13 +977,22 @@ When calling create_script_block, use this structure:
                 // If user wants to adapt/resize to platforms, return adapt_design directly
                 // without calling AI (Gemini can't reliably pick adapt_design over basic tools)
                 const lowerMsg = message.toLowerCase();
-                const isAdaptIntent = /adapt|resize|size for|optimise for|optimize for|version for/i.test(lowerMsg);
-                const platformMentioned = /facebook|fb|instagram|insta|ig|youtube|yt|linkedin|twitter|whatsapp|wa|tiktok|pinterest/i.test(lowerMsg);
-                
-                if (isAdaptIntent && platformMentioned) {
-                    // Resolve platform names to preset IDs directly
+
+                // ── Broad intent detection — catches natural language variations ──
+                const isAdaptIntent = /adapt|resize|reformat|repurpose|optimise|optimize|convert|size for|version for|create.*(version|variant|size|format)|make.*for|export.*for|fit.*for|tailor.*for/i.test(lowerMsg);
+
+                // Platform mentioned: specific platform OR generic terms like "social media", "all platforms", "different sizes"
+                const specificPlatform = /facebook|fb|instagram|insta|\big\b|\bigs\b|youtube|\byt\b|linkedin|twitter|\bx\b|whatsapp|\bwa\b|tiktok|pinterest/i.test(lowerMsg);
+                const genericPlatform = /social media|all platform|multiple platform|every platform|different (size|format|platform)|multiple (size|format)|various (size|format|platform)|different social|all (size|format)|platforms?/i.test(lowerMsg);
+                const platformMentioned = specificPlatform || genericPlatform;
+
+                // Also detect if user just mentions sizes/dimensions without "adapt"
+                const isSizeOnly = /sizes?|dimensions?|formats?/i.test(lowerMsg) && platformMentioned;
+
+                if ((isAdaptIntent || isSizeOnly) && platformMentioned) {
+                    // Resolve specific platforms
                     const resolvedPresets = [];
-                    if (/facebook|fb/i.test(lowerMsg)) {
+                    if (/facebook|\bfb\b/i.test(lowerMsg)) {
                         resolvedPresets.push(/story/i.test(lowerMsg) ? 'fb-story' : 'fb-post');
                     }
                     if (/instagram|insta|\big\b|\bigs\b/i.test(lowerMsg)) {
@@ -993,11 +1002,15 @@ When calling create_script_block, use this structure:
                     }
                     if (/youtube|\byt\b/i.test(lowerMsg)) resolvedPresets.push('yt-thumb');
                     if (/linkedin/i.test(lowerMsg)) resolvedPresets.push('linkedin');
-                    if (/twitter|\bx\b/i.test(lowerMsg)) resolvedPresets.push('twitter');
+                    if (/\btwitter\b|\bx\b/i.test(lowerMsg)) resolvedPresets.push('twitter');
                     if (/whatsapp|\bwa\b/i.test(lowerMsg)) resolvedPresets.push('whatsapp-status');
                     if (/pinterest/i.test(lowerMsg)) resolvedPresets.push('pinterest');
-                    // If no specific platform matched but intent detected, default to top 3
-                    if (resolvedPresets.length === 0) resolvedPresets.push('ig-post', 'fb-post', 'yt-thumb');
+
+                    // No specific platform = "social media", "all platforms", "different sizes" etc.
+                    // Default to the 4 most common platforms
+                    if (resolvedPresets.length === 0) {
+                        resolvedPresets.push('ig-post', 'fb-post', 'yt-thumb', 'linkedin');
+                    }
                     
                     console.log(`   🎯 [Fallback] Detected adapt intent → calling adapt_design directly with [${resolvedPresets.join(', ')}]`);
                     return res.json({
