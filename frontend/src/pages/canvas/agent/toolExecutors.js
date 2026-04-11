@@ -678,58 +678,58 @@ export async function executeToolCall(toolCall, fc, ctx = {}, deps = {}) {
                 return `\u274c Unknown presets: ${targetPresets.join(', ')}. Valid: ${Object.keys(PRESET_MAP).join(', ')}`
             }
 
+            // ── Step 1: Get source image URL directly from canvas objects ──
+            // No toDataURL(), no base64. Canvas images already have S3/HTTP source URLs.
+            const allObjects = fc.getObjects()
+            let sourceImageUrl = null
+
+            // Priority 1: FabricImage objects (getSrc() returns the original URL)
+            for (const obj of allObjects) {
+                if (obj._nodeType === 'artboard' || obj._nodeType === 'artboard-label') continue
+                const type = obj.type || ''
+                if (type === 'image' || type === 'Image' || obj instanceof fabric.FabricImage) {
+                    // getSrc() on Fabric v7 FabricImage returns the source URL
+                    const src = typeof obj.getSrc === 'function' ? obj.getSrc() : obj._element?.src || obj.src || ''
+                    if (src && src.startsWith('http') && !src.startsWith('data:')) {
+                        sourceImageUrl = src
+                        console.log('[adapt_design] Found S3/HTTP image source:', src.substring(0, 80))
+                        break
+                    }
+                }
+            }
+
+            // Priority 2: Any object with a stored _originalSrc or _src
+            if (!sourceImageUrl) {
+                for (const obj of allObjects) {
+                    const s = obj._originalSrc || obj._src || obj._imageUrl || obj.imageUrl || ''
+                    if (s && s.startsWith('http')) { sourceImageUrl = s; break }
+                }
+            }
+
+            if (!sourceImageUrl) {
+                return '\u274c No image found on canvas with a direct S3/HTTP URL. Please add an image to the canvas before adapting.\n\nTip: Upload your creative image to the canvas first, then ask Fidato to adapt it.'
+            }
+
+            console.log('[adapt_design] Source URL for NanoBanana 2:', sourceImageUrl.substring(0, 100))
+
             if (setFidatoMessages) {
                 setFidatoMessages(prev => [...prev, {
                     role: 'assistant',
-                    content: `\ud83c\udfa8 **Smart Adapt (NanoBanana 2)** \u2014 Exporting your canvas and letting AI regenerate it for ${validPresets.length} platform size(s):\n${validPresets.map(p => `\u2022 ${PRESET_MAP[p].label}`).join('\n')}\n\n\u23f3 Generating... (each takes ~20-40s)`
+                    content: `\ud83c\udfa8 **Smart Adapt (NanoBanana 2)** \u2014 Using your image directly from S3, generating AI-adapted versions for ${validPresets.length} platform(s):\n${validPresets.map(p => `\u2022 ${PRESET_MAP[p].label}`).join('\n')}\n\n\u23f3 Generating... (~20-40s per platform, zero base64)`
                 }])
             }
 
-            // ── Step 1: Export the current canvas artboard as a base64 image ──
-            const artboard = fc.getObjects().find(o => o.id === 'artboard')
+            // ── Step 2: Artboard layout anchors ──
+            const artboard = allObjects.find(o => o.id === 'artboard')
             const sourceWidth  = artboard ? Math.round(artboard.width  * (artboard.scaleX || 1)) : fc._logicalWidth  || 1080
             const sourceHeight = artboard ? Math.round(artboard.height * (artboard.scaleY || 1)) : fc._logicalHeight || 1080
             const srcLeft = artboard ? (artboard.left - sourceWidth  / 2) : 0
             const srcTop  = artboard ? (artboard.top  - sourceHeight / 2) : 0
 
-            // ── Step 1: Export the canvas artboard as JPEG, upload immediately to S3 ──
-            // Base64 only lives in memory briefly; NEVER sent to any AI endpoint
-            let canvasS3Url = null
-            try {
-                const canvasDataUrl = fc.toDataURL({
-                    format: 'jpeg',
-                    quality: 0.85,
-                    left: srcLeft,
-                    top: srcTop,
-                    width: sourceWidth,
-                    height: sourceHeight,
-                    multiplier: Math.min(1024 / sourceWidth, 1024 / sourceHeight, 1),
-                })
-                if (!canvasDataUrl || canvasDataUrl === 'data:,') {
-                    return '❌ Canvas export returned empty image. Add content to the canvas first.'
-                }
-
-                // Upload base64 to S3 immediately — discarded from memory after upload
-                const { canvasAssets: canvasAssetsApi } = await import('../../../services/api')
-                const uploadResult = await canvasAssetsApi.uploadCanvasExport({
-                    imageDataUrl: canvasDataUrl,
-                    mimeType: 'image/jpeg',
-                })
-                if (!uploadResult.success || !uploadResult.s3Url) {
-                    return `❌ Failed to upload canvas to S3: ${uploadResult.error || 'Unknown error'}`
-                }
-                canvasS3Url = uploadResult.s3Url
-                console.log('[adapt_design] Canvas exported → S3:', canvasS3Url.substring(0, 80))
-            } catch (exportErr) {
-                console.error('[adapt_design] Canvas export/upload failed:', exportErr)
-                return `❌ Failed to export canvas: ${exportErr.message}`
-            }
-
-            // ── Step 2: For each preset, call NanoBanana 2 with the S3 URL only ──
-            // canvasAssetsApi already imported in step 1
+            // ── Step 3: For each preset, call NanoBanana 2 with the S3 URL directly ──
+            const { canvasAssets: canvasAssetsApi } = await import('../../../services/api')
 
             const ARTBOARD_GAP = 80
-
             let xOffset = srcLeft + sourceWidth + ARTBOARD_GAP
             let rendered = 0
             const results = []
@@ -743,7 +743,7 @@ export async function executeToolCall(toolCall, fc, ctx = {}, deps = {}) {
                         if (last?.role === 'assistant' && last.content.includes('NanoBanana')) {
                             return [...prev.slice(0, -1), {
                                 ...last,
-                                content: last.content.replace('\u23f3 Generating...', `\u23f3 Generating ${presetId}... (${rendered}/${validPresets.length} done)`)
+                                content: last.content.split('\n\u23f3')[0] + `\n\n\u23f3 Generating **${spec.label}**... (${rendered}/${validPresets.length} done)`
                             }]
                         }
                         return prev
@@ -751,22 +751,26 @@ export async function executeToolCall(toolCall, fc, ctx = {}, deps = {}) {
                 }
 
                 try {
+                    console.log(`[adapt_design] Calling aiAdapt for ${presetId} with S3 URL`)
                     const adaptResult = await canvasAssetsApi.aiAdapt({
-                        canvasImageUrl: canvasS3Url,  // S3 URL only — no base64
+                        canvasImageUrl: sourceImageUrl,  // Direct S3/HTTP URL — zero base64
                         preset: presetId,
                         brandContext: brand ? { name: brand.name, dna: brand.dna } : null,
                     })
 
-                    if (!adaptResult.success || !adaptResult.imageUrl) {
-                        console.warn(`[adapt_design] ${presetId} failed:`, adaptResult.error)
-                        results.push({ presetId, success: false, error: adaptResult.error })
+                    if (!adaptResult?.success || !adaptResult?.imageUrl) {
+                        const errMsg = adaptResult?.error || 'No image returned'
+                        console.error(`[adapt_design] ${presetId} failed:`, errMsg)
+                        results.push({ presetId, success: false, error: errMsg })
                         continue
                     }
 
-                    const aiImageUrl = adaptResult.imageUrl
+                    const aiImageUrl = adaptResult.imageUrl  // S3 URL from backend
                     const targetW = spec.w, targetH = spec.h
 
-                    // Draw artboard background
+                    console.log(`[adapt_design] ${presetId} \u2713 got S3 result:`, aiImageUrl.substring(0, 80))
+
+                    // Artboard rect
                     const artboardRect = new fabric.Rect({
                         left: xOffset + targetW / 2, top: srcTop + targetH / 2,
                         width: targetW, height: targetH,
@@ -779,7 +783,7 @@ export async function executeToolCall(toolCall, fc, ctx = {}, deps = {}) {
                     fc.add(artboardRect)
                     fc.sendObjectToBack(artboardRect)
 
-                    // Label above artboard
+                    // Label
                     fc.add(new fabric.Textbox(`${spec.label}\n${targetW}\u00d7${targetH}`, {
                         left: xOffset, top: srcTop - 56, width: targetW,
                         fontSize: 13, fontWeight: '700', fontFamily: 'Inter',
@@ -787,9 +791,9 @@ export async function executeToolCall(toolCall, fc, ctx = {}, deps = {}) {
                         id: `artboard-label-${presetId}`, _nodeType: 'artboard-label',
                     }))
 
-                    // Place AI-generated image filling the artboard
+                    // Load and place the AI-generated image (S3 URL)
                     const adaptedImg = await fabric.FabricImage.fromURL(aiImageUrl, { crossOrigin: 'anonymous' })
-                    const scaleX = targetW / (adaptedImg.width || 1)
+                    const scaleX = targetW / (adaptedImg.width  || 1)
                     const scaleY = targetH / (adaptedImg.height || 1)
                     adaptedImg.set({
                         left: xOffset + targetW / 2, top: srcTop + targetH / 2,
@@ -811,7 +815,7 @@ export async function executeToolCall(toolCall, fc, ctx = {}, deps = {}) {
                     fc.requestRenderAll()
 
                 } catch (presetErr) {
-                    console.error(`[adapt_design] ${presetId} error:`, presetErr)
+                    console.error(`[adapt_design] ${presetId} exception:`, presetErr.message)
                     results.push({ presetId, success: false, error: presetErr.message })
                 }
             }
@@ -834,12 +838,12 @@ export async function executeToolCall(toolCall, fc, ctx = {}, deps = {}) {
             }
 
             const successList = results.filter(r => r.success).map(r => `\u2022 ${PRESET_MAP[r.presetId].label}`).join('\n')
-            const failList = results.filter(r => !r.success).map(r => `\u2022 ${r.presetId}: ${r.error}`).join('\n')
+            const failList    = results.filter(r => !r.success).map(r => `\u2022 ${r.presetId}: ${r.error}`).join('\n')
 
             if (setFidatoMessages) {
                 setFidatoMessages(prev => [...prev, {
                     role: 'assistant',
-                    content: `\u2705 **NanoBanana 2 Adapt Complete!** ${rendered}/${validPresets.length} platform variants generated.\n\n${successList}${failList ? `\n\n\u26a0\ufe0f Failed:\n${failList}` : ''}\n\nEach variant was intelligently regenerated by AI for its platform aspect ratio \u2014 backgrounds extended, composition adapted, characters preserved.`
+                    content: `\u2705 **NanoBanana 2 Adapt Complete!** ${rendered}/${validPresets.length} platform variants generated.\n\n${successList}${failList ? `\n\n\u26a0\ufe0f Failed:\n${failList}` : ''}\n\nAll variants were AI-regenerated from your original S3 image \u2014 no base64, no canvas screenshot.`
                 }])
             }
 
