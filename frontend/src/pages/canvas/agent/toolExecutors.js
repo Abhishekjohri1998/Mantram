@@ -679,26 +679,21 @@ export async function executeToolCall(toolCall, fc, ctx = {}, deps = {}) {
             }
 
             // ── Step 1: Get source image URL directly from canvas objects ──
-            // No toDataURL(), no base64. Canvas images already have S3/HTTP source URLs.
             const allObjects = fc.getObjects()
             let sourceImageUrl = null
 
-            // Priority 1: FabricImage objects (getSrc() returns the original URL)
             for (const obj of allObjects) {
                 if (obj._nodeType === 'artboard' || obj._nodeType === 'artboard-label') continue
                 const type = obj.type || ''
                 if (type === 'image' || type === 'Image' || obj instanceof fabric.FabricImage) {
-                    // getSrc() on Fabric v7 FabricImage returns the source URL
                     const src = typeof obj.getSrc === 'function' ? obj.getSrc() : obj._element?.src || obj.src || ''
                     if (src && src.startsWith('http') && !src.startsWith('data:')) {
                         sourceImageUrl = src
-                        console.log('[adapt_design] Found S3/HTTP image source:', src.substring(0, 80))
                         break
                     }
                 }
             }
 
-            // Priority 2: Any object with a stored _originalSrc or _src
             if (!sourceImageUrl) {
                 for (const obj of allObjects) {
                     const s = obj._originalSrc || obj._src || obj._imageUrl || obj.imageUrl || ''
@@ -707,32 +702,21 @@ export async function executeToolCall(toolCall, fc, ctx = {}, deps = {}) {
             }
 
             if (!sourceImageUrl) {
-                return '\u274c No image found on canvas with a direct S3/HTTP URL. Please add an image to the canvas before adapting.\n\nTip: Upload your creative image to the canvas first, then ask Fidato to adapt it.'
+                return '\u274c No image found on canvas with an S3/HTTP URL. Upload an image first.'
             }
-
-            console.log('[adapt_design] Source URL for NanoBanana 2:', sourceImageUrl.substring(0, 100))
 
             if (setFidatoMessages) {
                 setFidatoMessages(prev => [...prev, {
                     role: 'assistant',
-                    content: `\ud83c\udfa8 **Smart Adapt (NanoBanana 2)** \u2014 Using your image directly from S3, generating AI-adapted versions for ${validPresets.length} platform(s):\n${validPresets.map(p => `\u2022 ${PRESET_MAP[p].label}`).join('\n')}\n\n\u23f3 Generating... (~20-40s per platform, zero base64)`
+                    content: `\ud83c\udfa8 **Smart Adapt (NanoBanana 2)** \u2014 Generating AI-adapted versions for ${validPresets.length} platform(s):\n${validPresets.map(p => `\u2022 ${PRESET_MAP[p].label}`).join('\n')}\n\n\u23f3 Generating... (~15-30s per platform)`
                 }])
             }
 
-            // ── Step 2: Artboard layout anchors ──
-            const artboard = allObjects.find(o => o.id === 'artboard')
-            const sourceWidth  = artboard ? Math.round(artboard.width  * (artboard.scaleX || 1)) : fc._logicalWidth  || 1080
-            const sourceHeight = artboard ? Math.round(artboard.height * (artboard.scaleY || 1)) : fc._logicalHeight || 1080
-            const srcLeft = artboard ? (artboard.left - sourceWidth  / 2) : 0
-            const srcTop  = artboard ? (artboard.top  - sourceHeight / 2) : 0
-
-            // ── Step 3: For each preset, call NanoBanana 2 with the S3 URL directly ──
+            // ── Step 2: Generate all variants via NanoBanana 2 ──
             const { canvasAssets: canvasAssetsApi } = await import('../../../services/api')
-
-            const ARTBOARD_GAP = 80
-            let xOffset = srcLeft + sourceWidth + ARTBOARD_GAP
             let rendered = 0
             const results = []
+            const generatedImages = []  // { presetId, aiImageUrl, spec }
 
             for (const presetId of validPresets) {
                 const spec = PRESET_MAP[presetId]
@@ -751,87 +735,175 @@ export async function executeToolCall(toolCall, fc, ctx = {}, deps = {}) {
                 }
 
                 try {
-                    console.log(`[adapt_design] Calling aiAdapt for ${presetId} with S3 URL`)
                     const adaptResult = await canvasAssetsApi.aiAdapt({
-                        canvasImageUrl: sourceImageUrl,  // Direct S3/HTTP URL — zero base64
+                        canvasImageUrl: sourceImageUrl,
                         preset: presetId,
                         brandContext: brand ? { name: brand.name, dna: brand.dna } : null,
                     })
 
                     if (!adaptResult?.success || !adaptResult?.imageUrl) {
-                        const errMsg = adaptResult?.error || 'No image returned'
-                        console.error(`[adapt_design] ${presetId} failed:`, errMsg)
-                        results.push({ presetId, success: false, error: errMsg })
+                        results.push({ presetId, success: false, error: adaptResult?.error || 'No image returned' })
                         continue
                     }
 
-                    const aiImageUrl = adaptResult.imageUrl  // S3 URL from backend
-                    const targetW = spec.w, targetH = spec.h
-
-                    console.log(`[adapt_design] ${presetId} \u2713 got S3 result:`, aiImageUrl.substring(0, 80))
-
-                    // Artboard rect
-                    const artboardRect = new fabric.Rect({
-                        left: xOffset + targetW / 2, top: srcTop + targetH / 2,
-                        width: targetW, height: targetH,
-                        originX: 'center', originY: 'center',
-                        fill: '#ffffff', stroke: 'rgba(99,102,241,0.45)', strokeWidth: 2,
-                        rx: 6, ry: 6, selectable: false, evented: false,
-                        id: `artboard-${presetId}`, _nodeType: 'artboard',
-                        shadow: new fabric.Shadow({ color: 'rgba(0,0,0,0.18)', blur: 28, offsetY: 10 }),
-                    })
-                    fc.add(artboardRect)
-                    fc.sendObjectToBack(artboardRect)
-
-                    // Label
-                    fc.add(new fabric.Textbox(`${spec.label}\n${targetW}\u00d7${targetH}`, {
-                        left: xOffset, top: srcTop - 56, width: targetW,
-                        fontSize: 13, fontWeight: '700', fontFamily: 'Inter',
-                        fill: '#818cf8', textAlign: 'center', selectable: false, evented: false,
-                        id: `artboard-label-${presetId}`, _nodeType: 'artboard-label',
-                    }))
-
-                    // Load and place the AI-generated image (S3 URL)
-                    const adaptedImg = await fabric.FabricImage.fromURL(aiImageUrl, { crossOrigin: 'anonymous' })
-                    const scaleX = targetW / (adaptedImg.width  || 1)
-                    const scaleY = targetH / (adaptedImg.height || 1)
-                    adaptedImg.set({
-                        left: xOffset + targetW / 2, top: srcTop + targetH / 2,
-                        originX: 'center', originY: 'center',
-                        scaleX, scaleY,
-                        id: `ai-adapted-${presetId}`,
-                        _nodeType: 'ai-adapted',
-                        _preset: presetId,
-                        clipPath: new fabric.Rect({
-                            left: xOffset, top: srcTop, width: targetW, height: targetH,
-                            absolutePositioned: true,
-                        }),
-                    })
-                    fc.add(adaptedImg)
-
+                    generatedImages.push({ presetId, aiImageUrl: adaptResult.imageUrl, spec })
                     rendered++
                     results.push({ presetId, success: true })
-                    xOffset += targetW + ARTBOARD_GAP
-                    fc.requestRenderAll()
-
                 } catch (presetErr) {
-                    console.error(`[adapt_design] ${presetId} exception:`, presetErr.message)
                     results.push({ presetId, success: false, error: presetErr.message })
                 }
             }
 
+            // ── Step 3: Clean old adapted artboards ──
+            const oldAdapted = fc.getObjects().filter(o =>
+                o._nodeType === 'artboard' && o.id !== 'artboard' ||
+                o._nodeType === 'artboard-label' ||
+                o._nodeType === 'ai-adapted'
+            )
+            oldAdapted.forEach(o => fc.remove(o))
+
+            // ── Step 4: Loma-style grid layout ──
+            // All artboards are normalized to a uniform DISPLAY height.
+            // This ensures clean visual rows regardless of actual pixel dimensions.
+            const DISPLAY_HEIGHT = 360        // Normalized display height for all artboards
+            const GAP_X = 48                  // Horizontal gap between artboards
+            const GAP_Y = 70                  // Vertical gap between rows (includes label space)
+            const LABEL_HEIGHT = 44           // Space reserved above each artboard for label
+            const MAX_ROW_WIDTH = 2200        // Max width before wrapping to next row
+
+            // Calculate display widths for each image (maintaining aspect ratio at DISPLAY_HEIGHT)
+            const layoutItems = generatedImages.map(item => {
+                const displayW = Math.round((item.spec.w / item.spec.h) * DISPLAY_HEIGHT)
+                return { ...item, displayW, displayH: DISPLAY_HEIGHT }
+            })
+
+            // Build rows using bin-packing (first-fit decreasing width)
+            const rows = []
+            let currentRow = []
+            let currentRowWidth = 0
+
+            for (const item of layoutItems) {
+                if (currentRowWidth + item.displayW + GAP_X > MAX_ROW_WIDTH && currentRow.length > 0) {
+                    rows.push(currentRow)
+                    currentRow = []
+                    currentRowWidth = 0
+                }
+                currentRow.push(item)
+                currentRowWidth += item.displayW + GAP_X
+            }
+            if (currentRow.length > 0) rows.push(currentRow)
+
+            // Get the original artboard position as anchor
+            const artboard = fc.getObjects().find(o => o.id === 'artboard')
+            const sourceWidth  = artboard ? Math.round(artboard.width  * (artboard.scaleX || 1)) : fc._logicalWidth  || 1080
+            const sourceHeight = artboard ? Math.round(artboard.height * (artboard.scaleY || 1)) : fc._logicalHeight || 1080
+            const srcLeft = artboard ? (artboard.left - sourceWidth  / 2) : 0
+            const srcTop  = artboard ? (artboard.top  - sourceHeight / 2) : 0
+
+            // Place adapted artboards below the original, in a grid
+            const gridStartX = srcLeft
+            const gridStartY = srcTop + sourceHeight + GAP_Y + 40  // Below the original artboard
+
+            // Add a section title
+            fc.add(new fabric.Textbox(`\ud83c\udfa8 Adapted Variants \u2014 ${rendered} Platform Sizes`, {
+                left: gridStartX, top: gridStartY - 36,
+                width: MAX_ROW_WIDTH,
+                fontSize: 18, fontWeight: '800', fontFamily: 'Inter, sans-serif',
+                fill: '#a78bfa', textAlign: 'left',
+                selectable: false, evented: false,
+                id: 'adapt-section-title', _nodeType: 'artboard-label',
+            }))
+
+            let cursorY = gridStartY + 16
+
+            for (let rowIdx = 0; rowIdx < rows.length; rowIdx++) {
+                const row = rows[rowIdx]
+                // Center the row horizontally
+                const rowTotalW = row.reduce((sum, item) => sum + item.displayW, 0) + (row.length - 1) * GAP_X
+                let cursorX = gridStartX
+
+                for (const item of row) {
+                    const { presetId, aiImageUrl, spec, displayW, displayH } = item
+
+                    // ── Artboard background with shadow ──
+                    const artRect = new fabric.Rect({
+                        left: cursorX + displayW / 2,
+                        top: cursorY + LABEL_HEIGHT + displayH / 2,
+                        width: displayW, height: displayH,
+                        originX: 'center', originY: 'center',
+                        fill: '#1a1a2e',
+                        stroke: 'rgba(139,92,246,0.3)', strokeWidth: 1.5,
+                        rx: 8, ry: 8,
+                        selectable: false, evented: false,
+                        id: `artboard-${presetId}`, _nodeType: 'artboard',
+                        shadow: new fabric.Shadow({ color: 'rgba(0,0,0,0.35)', blur: 24, offsetY: 8 }),
+                    })
+                    fc.add(artRect)
+                    fc.sendObjectToBack(artRect)
+
+                    // ── Label above artboard ──
+                    fc.add(new fabric.Textbox(`${spec.label}  \u2022  ${spec.w}\u00d7${spec.h}`, {
+                        left: cursorX, top: cursorY,
+                        width: displayW,
+                        fontSize: 12, fontWeight: '600', fontFamily: 'Inter, sans-serif',
+                        fill: '#94a3b8', textAlign: 'center',
+                        selectable: false, evented: false,
+                        id: `label-${presetId}`, _nodeType: 'artboard-label',
+                    }))
+
+                    // ── Load and place the AI image ──
+                    try {
+                        const adaptedImg = await fabric.FabricImage.fromURL(aiImageUrl, { crossOrigin: 'anonymous' })
+                        const imgScale = Math.min(displayW / (adaptedImg.width || 1), displayH / (adaptedImg.height || 1))
+                        adaptedImg.set({
+                            left: cursorX + displayW / 2,
+                            top: cursorY + LABEL_HEIGHT + displayH / 2,
+                            originX: 'center', originY: 'center',
+                            scaleX: imgScale, scaleY: imgScale,
+                            id: `ai-adapted-${presetId}`,
+                            _nodeType: 'ai-adapted',
+                            _preset: presetId,
+                            selectable: true, evented: true,
+                        })
+                        fc.add(adaptedImg)
+                    } catch (imgLoadErr) {
+                        console.error(`[adapt_design] Failed to load image for ${presetId}:`, imgLoadErr.message)
+                    }
+
+                    cursorX += displayW + GAP_X
+                }
+
+                cursorY += DISPLAY_HEIGHT + LABEL_HEIGHT + GAP_Y
+            }
+
             fc.requestRenderAll()
 
-            // Auto zoom-to-fit all artboards
+            // ── Step 5: Auto zoom-to-fit the entire layout ──
             try {
-                const canvasW = fc.width || 900, canvasH = fc.height || 600
-                const PADDING = 60
-                const totalW = xOffset - srcLeft
-                const totalH = Math.max(sourceHeight, ...validPresets.map(p => PRESET_MAP[p].h))
-                const newZoom = Math.min((canvasW - PADDING) / totalW, (canvasH - PADDING) / totalH, 0.5)
-                fc.setViewportTransform([newZoom, 0, 0, newZoom,
-                    -srcLeft * newZoom + PADDING / 2,
-                    -srcTop  * newZoom + PADDING / 2])
+                const canvasW = fc.width || 1200
+                const canvasH = fc.height || 800
+                const PAD = 80
+
+                // Compute bounding box of everything
+                const allObjsNow = fc.getObjects()
+                let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+                for (const obj of allObjsNow) {
+                    const bound = obj.getBoundingRect(true)
+                    if (bound.left < minX) minX = bound.left
+                    if (bound.top < minY) minY = bound.top
+                    if (bound.left + bound.width > maxX) maxX = bound.left + bound.width
+                    if (bound.top + bound.height > maxY) maxY = bound.top + bound.height
+                }
+
+                const contentW = maxX - minX
+                const contentH = maxY - minY
+                const zoom = Math.min((canvasW - PAD) / contentW, (canvasH - PAD) / contentH, 0.4)
+
+                // Center the content
+                const vpX = (canvasW / 2) - (minX + contentW / 2) * zoom
+                const vpY = (canvasH / 2) - (minY + contentH / 2) * zoom
+
+                fc.setViewportTransform([zoom, 0, 0, zoom, vpX, vpY])
                 fc.requestRenderAll()
             } catch (vpErr) {
                 console.warn('[adapt_design] zoom-to-fit failed:', vpErr.message)
@@ -843,7 +915,7 @@ export async function executeToolCall(toolCall, fc, ctx = {}, deps = {}) {
             if (setFidatoMessages) {
                 setFidatoMessages(prev => [...prev, {
                     role: 'assistant',
-                    content: `\u2705 **NanoBanana 2 Adapt Complete!** ${rendered}/${validPresets.length} platform variants generated.\n\n${successList}${failList ? `\n\n\u26a0\ufe0f Failed:\n${failList}` : ''}\n\nAll variants were AI-regenerated from your original S3 image \u2014 no base64, no canvas screenshot.`
+                    content: `\u2705 **NanoBanana 2 Adapt Complete!** ${rendered}/${validPresets.length} platform variants generated.\n\n${successList}${failList ? `\n\n\u26a0\ufe0f Failed:\n${failList}` : ''}\n\nAll variants are arranged in a clean grid below your original design. Click any image to select and download it.`
                 }])
             }
 
