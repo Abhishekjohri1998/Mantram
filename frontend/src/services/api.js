@@ -454,6 +454,8 @@ export const canvasAssets = {
     critiqueImage: (data) => apiFetch('/fidato/canvas-critique', { method: 'POST', body: JSON.stringify(data) }),
     // Multi-size Campaign Generation
     generateCampaign: (data) => apiFetch('/fidato/canvas-campaign', { method: 'POST', body: JSON.stringify(data) }),
+    // Smart Design Adaptation — AI-powered layout re-composition for different platform sizes
+    smartAdapt: (data) => apiFetch('/canvas-assets/smart-adapt', { method: 'POST', body: JSON.stringify(data), timeout: 120000 }),
 };
 
 // ============ Video Studio API ============
