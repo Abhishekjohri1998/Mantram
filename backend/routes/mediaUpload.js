@@ -10,7 +10,7 @@
  */
 import { Router } from 'express';
 import axios from 'axios';
-import { uploadToS3, mirrorUrlToS3, getSignedUrlIfNeeded } from '../utils/s3.js';
+import { uploadToS3, mirrorUrlToS3, getSignedUrlIfNeeded, getSignedUrlForPath } from '../utils/s3.js';
 import { protect } from '../middleware/auth.js';
 import crypto from 'crypto';
 
@@ -37,27 +37,51 @@ router.get('/proxy', async (req, res) => {
             return res.status(403).send('Forbidden: Only authorized S3 or Unsplash assets can be proxied');
         }
 
+        let fetchUrl = url;
+        
+        // RE-SIGNING LOGIC: If it's our S3 bucket, always generate a fresh signature.
+        if (isS3) {
+            try {
+                // Extract key for logging before signing
+                const urlObj = new URL(url);
+                const pathKey = urlObj.pathname.split('/').filter(Boolean).join('/');
+                console.log(`🔍 [PROXY] Attempting re-sign for key: ${pathKey} | Bucket: ${process.env.AWS_S3_BUCKET}`);
+
+                const freshUrl = await getSignedUrlForPath(url, 3600);
+                if (freshUrl && freshUrl !== url) {
+                    console.log(`🔄 [PROXY] Re-signed stale S3 URL. Fresh signature generated.`);
+                    fetchUrl = freshUrl;
+                } else {
+                    console.log(`ℹ️ [PROXY] getSignedUrlForPath returned original URL/failed to sign.`);
+                }
+            } catch (signErr) {
+                console.warn(`⚠️ [PROXY] Failed to re-sign URL: ${signErr.message}`);
+            }
+        }
+
+        console.log(`🌐 [PROXY] Fetching: ${fetchUrl.substring(0, 100)}...`);
+
         const response = await axios({
             method: 'get',
-            url: url,
+            url: fetchUrl,
             responseType: 'stream',
-            timeout: 10000, // Slightly tighter timeout for production
-            maxContentLength: 20 * 1024 * 1024, // 20MB limit
+            timeout: 10000,
+            maxContentLength: 20 * 1024 * 1024,
         });
 
         // Forward essential headers
         if (response.headers['content-type']) {
             res.setHeader('Content-Type', response.headers['content-type']);
         }
-        res.setHeader('Cache-Control', 'public, max-age=86400'); // 24h cache
-        res.setHeader('Access-Control-Allow-Origin', '*'); // Core fix for Canvas CORS
+        res.setHeader('Cache-Control', 'public, max-age=86400');
+        res.setHeader('Access-Control-Allow-Origin', '*');
         res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
 
         response.data.pipe(res);
     } catch (error) {
         const status = error.response?.status || 500;
-        const msg = error.response?.data || error.message;
-        console.error(`❌ [PROXY] Error for ${url}: ${status} - ${msg}`);
+        const msg = typeof error.response?.data === 'object' ? JSON.stringify(error.response?.data) : (error.response?.data || error.message);
+        console.error(`❌ [PROXY] Final Error: Status=${status} | Target=${fetchUrl.substring(0, 100)}... | Error=${msg}`);
         res.status(status).send(`Proxy failed: ${msg}`);
     }
 });
