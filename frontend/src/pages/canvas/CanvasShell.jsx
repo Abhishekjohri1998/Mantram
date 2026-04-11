@@ -263,6 +263,7 @@ function CanvasShellInner() {
                         isGroup: active?.type === 'group',
                         isMultiSelect: active?.type === 'activeselection',
                         isLocked: active?.lockMovementX || false,
+                        isImage: active?.type === 'image',
                     })
                 }
                 if (fc.upperCanvasEl) fc.upperCanvasEl.addEventListener('contextmenu', showCtx)
@@ -484,10 +485,60 @@ function CanvasShellInner() {
     }, [saveHistory, updateLayers])
 
     // ── Export ──
-    const exportCanvas = useCallback((format = 'png') => {
+    const exportCanvas = useCallback((format = 'png', selectedOnly = false) => {
         const fc = fabricRef.current
         if (!fc) return
-        const dataURL = fc.toDataURL({ format, quality: format === 'jpeg' ? 0.92 : 1.0, multiplier: 2 })
+
+        // Check if user has a single image selected — export just that image
+        const activeObjs = fc.getActiveObjects?.() || []
+        const singleImage = activeObjs.length === 1 && activeObjs[0].type === 'image' ? activeObjs[0] : null
+
+        if (selectedOnly && singleImage) {
+            // Export the selected image at its native resolution
+            try {
+                const src = singleImage._element?.src || singleImage.getSrc?.() || ''
+                if (src && src.startsWith('http')) {
+                    // HTTP image — open in new tab for download
+                    const link = document.createElement('a')
+                    link.download = `image-export.${format}`
+                    link.href = src
+                    link.target = '_blank'
+                    link.click()
+                    showToast(`📥 Selected image downloaded`)
+                    return
+                }
+                // Render just the selected object to a temp canvas
+                const dataURL = singleImage.toDataURL({ format, quality: format === 'jpeg' ? 0.92 : 1.0, multiplier: 2 })
+                const link = document.createElement('a')
+                link.download = `image-export.${format}`
+                link.href = dataURL
+                link.click()
+                showToast(`📥 Selected image exported`)
+            } catch (e) {
+                console.warn('Single image export failed, falling back to canvas export:', e)
+                exportCanvas(format, false)
+            }
+            return
+        }
+
+        // Default: export the full canvas (artboard area clipped)
+        const artboard = fc.getObjects().find(o => o.id === 'artboard')
+        let dataURL
+        if (artboard) {
+            // Clip export to artboard bounds for clean output
+            dataURL = fc.toDataURL({
+                format,
+                quality: format === 'jpeg' ? 0.92 : 1.0,
+                multiplier: 2,
+                left: artboard.left,
+                top: artboard.top,
+                width: artboard.width * (artboard.scaleX || 1),
+                height: artboard.height * (artboard.scaleY || 1),
+            })
+        } else {
+            dataURL = fc.toDataURL({ format, quality: format === 'jpeg' ? 0.92 : 1.0, multiplier: 2 })
+        }
+
         const link = document.createElement('a')
         link.download = `canvas-export.${format}`
         link.href = dataURL
@@ -1221,6 +1272,18 @@ function CanvasShellInner() {
                             <button className="ce-ctx-item" onClick={() => { sendBackward(); setContextMenu(null) }}>
                                 <span className="material-symbols-outlined">flip_to_back</span> Send Backward
                             </button>
+                            {contextMenu.isImage && (
+                                <>
+                                    <div className="ce-ctx-divider" />
+                                    <button className="ce-ctx-item" onClick={() => { exportCanvas('png', true); setContextMenu(null) }}>
+                                        <span className="material-symbols-outlined">image</span> Export Selected Image
+                                    </button>
+                                </>
+                            )}
+                            <div className="ce-ctx-divider" />
+                            <button className="ce-ctx-item" onClick={() => { exportCanvas('png'); setContextMenu(null) }}>
+                                <span className="material-symbols-outlined">download</span> Export Canvas
+                            </button>
                         </>
                     ) : (
                         <>
@@ -1234,6 +1297,7 @@ function CanvasShellInner() {
                     )}
                 </div>
             )}
+
 
             {/* ── TOAST ── */}
             {toast && <div className="ce-toast">{toast}</div>}

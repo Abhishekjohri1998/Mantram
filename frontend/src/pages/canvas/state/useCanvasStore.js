@@ -106,7 +106,7 @@ const useCanvasStore = create((set, get) => ({
     setAiLoading: (v) => set({ aiLoading: v }),
     setAiResult: (v) => set({ aiResult: v }),
     setAiError: (v) => set({ aiError: v }),
-    setEditHistory: (v) => set({ editHistory: v }),
+    setEditHistory: (v) => set(s => ({ editHistory: typeof v === 'function' ? v(s.editHistory) : v })),
     setIsMaskMode: (v) => set({ isMaskMode: v }),
     setMaskBrushSize: (v) => set({ maskBrushSize: v }),
     setReplaceImage: (v) => set({ replaceImage: v }),

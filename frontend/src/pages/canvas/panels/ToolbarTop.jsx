@@ -23,8 +23,12 @@ export default function ToolbarTop({
         canvasView, setCanvasView,
         activeTool, setActiveTool,
         showTextModal, setShowTextModal,
+        selectedObjType,
         showToast,
     } = useCanvasStore()
+
+    // When an image is selected, export buttons target only that image
+    const hasImageSelected = selectedObjType === 'image'
 
     return (
         <div className="ce-toolbar">
@@ -84,17 +88,35 @@ export default function ToolbarTop({
             </div>
 
             <div className="ce-toolbar-right">
-                <button className="ce-tool-btn-label" onClick={() => onExport('png')}>
-                    <span className="material-symbols-outlined" style={{ fontSize: 18 }}>download</span>
+                {/* Show export scope hint when image is selected */}
+                {hasImageSelected && (
+                    <span style={{ fontSize: 10, color: '#818cf8', fontWeight: 600, letterSpacing: '0.05em', padding: '0 4px', opacity: 0.9 }}>
+                        IMAGE
+                    </span>
+                )}
+                <button
+                    className="ce-tool-btn-label"
+                    onClick={() => onExport('png', hasImageSelected)}
+                    title={hasImageSelected ? 'Export selected image as PNG' : 'Export canvas as PNG'}
+                >
+                    <span className="material-symbols-outlined" style={{ fontSize: 18 }}>
+                        {hasImageSelected ? 'image' : 'download'}
+                    </span>
                     PNG
                 </button>
-                <button className="ce-tool-btn-label" onClick={() => onExport('jpeg')}>
-                    <span className="material-symbols-outlined" style={{ fontSize: 18 }}>download</span>
+                <button
+                    className="ce-tool-btn-label"
+                    onClick={() => onExport('jpeg', hasImageSelected)}
+                    title={hasImageSelected ? 'Export selected image as JPG' : 'Export canvas as JPG'}
+                >
+                    <span className="material-symbols-outlined" style={{ fontSize: 18 }}>
+                        {hasImageSelected ? 'image' : 'download'}
+                    </span>
                     JPG
                 </button>
                 <div className="ce-divider" />
                 <button className="ce-save-btn" onClick={() => {
-                    onExport('png')
+                    onExport('png', false) // Save & Use always exports full canvas
                     showToast('✅ Saved & ready for campaign!')
                 }}>
                     <span className="material-symbols-outlined" style={{ fontSize: 18 }}>check_circle</span>
@@ -104,3 +126,4 @@ export default function ToolbarTop({
         </div>
     )
 }
+
