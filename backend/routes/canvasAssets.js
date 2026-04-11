@@ -93,36 +93,47 @@ router.post('/ai-adapt', protect, async (req, res) => {
         if (!spec) return res.status(400).json({ success: false, error: `Unknown preset: ${preset}. Valid: ${Object.keys(PRESET_MAP).join(', ')}` })
 
         const brand = brandContext || {}
-        const brandName = brand.name || 'the brand'
         const brandColors = brand.dna?.brandColors?.map(c => c.hex || c.name).filter(Boolean).join(', ') || ''
         const brandStyle = brand.dna?.brandVoice || brand.dna?.visualStyle || ''
 
-        // Build a strong adaptation prompt
-        const adaptPrompt = `You are a professional graphic designer adapting a creative design for ${spec.label} (${spec.w}×${spec.h}px, ${spec.aspectRatio} aspect ratio, ${spec.orientation} format).
+        // Build a focused adaptation prompt
+        const adaptPrompt = `Adapt the provided reference image to ${spec.label} format (${spec.aspectRatio} aspect ratio, ${spec.w}\u00d7${spec.h}px).
 
-REFERENCE IMAGE: The attached image is the source design. Recreate and adapt it for the ${spec.label} format.
-
-ADAPTATION RULES:
-1. OUTPUT SIZE: Exactly ${spec.w}×${spec.h}px with ${spec.aspectRatio} aspect ratio
-2. PRESERVE: All key subjects, characters, products, people, faces, and brand elements from the original
-3. COMPOSITION: Recompose for ${spec.orientation} layout — ${spec.orientation.includes('portrait') ? 'stack elements vertically, extend background top to bottom' : spec.orientation.includes('landscape') ? 'arrange elements horizontally, extend background left to right' : 'center elements in equal proportion'}
-4. BACKGROUND: Intelligently extend/generate background to fill the new canvas dimensions using content-aware continuation
-5. VISUAL HIERARCHY: Maintain the design's primary subject as the focal point, adapt text and secondary elements naturally
-6. STYLE: Keep the identical color palette, lighting, mood, and visual style as the source${brandColors ? `\n7. BRAND COLORS: ${brandColors}` : ''}${brandStyle ? `\n8. BRAND STYLE: ${brandStyle}` : ''}
-9. QUALITY: High-resolution, professional ad-quality output
-
-IMPORTANT: DO NOT just crop or resize — intelligently recompose the entire design for ${spec.label}. Generate a complete, polished creative that looks native to the platform.`
+RULES:
+- OUTPUT exactly ${spec.w}\u00d7${spec.h}px at ${spec.aspectRatio} ratio
+- PRESERVE all subjects, people, faces, products, text, and visual elements from the reference
+- RECOMPOSE for ${spec.orientation} layout: ${spec.orientation.includes('portrait') ? 'extend background vertically' : spec.orientation.includes('landscape') ? 'extend background horizontally' : 'center elements'}
+- Keep identical colors, style, mood, and visual identity
+- Fill empty space by intelligently extending the background${brandColors ? `\n- Brand colors: ${brandColors}` : ''}
+- Do NOT invent new content \u2014 only adapt composition and aspect ratio`
 
         // Use LaoZhang NanoBanana 2 (Gemini 3.1 Flash Image)
         const lzModel = 'gemini-3.1-flash-image-preview'
         const lzSize = `${spec.w}x${spec.h}`
 
-        console.log(`🎨 [AI-Adapt] ${preset} (${lzSize}) using NanoBanana 2 via LaoZhang`)
+        console.log(`🎨 [AI-Adapt] ${preset} (${lzSize}) — downloading S3 image for LaoZhang`)
 
-        // Build multimodal request — only S3 URLs, no base64 in transit
-        const contentParts = []
-        contentParts.push({ type: 'image_url', image_url: { url: canvasImageUrl } })
-        contentParts.push({ type: 'text', text: adaptPrompt })
+        // ── Fetch the S3 image server-side and send as inline data ──
+        // LaoZhang (Chinese gateway) cannot access AWS S3 ap-south-1 URLs directly.
+        // We download the image on the backend and send inline — server-to-server only.
+        let imageInlinePart
+        try {
+            const imgResp = await fetch(canvasImageUrl, {
+                headers: { 'User-Agent': 'Mozilla/5.0' },
+                signal: AbortSignal.timeout(30000),
+            })
+            if (!imgResp.ok) throw new Error(`S3 fetch failed (${imgResp.status})`)
+            const contentType = imgResp.headers.get('content-type') || 'image/jpeg'
+            const arrBuf = await imgResp.arrayBuffer()
+            const b64 = Buffer.from(arrBuf).toString('base64')
+            // Gemini inline_data format (via LaoZhang chat completions)
+            imageInlinePart = { type: 'image_url', image_url: { url: `data:${contentType};base64,${b64}` } }
+            console.log(`✅ [AI-Adapt] Image fetched: ${Math.round(arrBuf.byteLength / 1024)}KB, type=${contentType}`)
+        } catch (imgErr) {
+            throw new Error(`Failed to fetch reference image from S3: ${imgErr.message}`)
+        }
+
+        const contentParts = [imageInlinePart, { type: 'text', text: adaptPrompt }]
 
         const controller = new AbortController()
         const timeoutId = setTimeout(() => controller.abort(), 120000)  // 120s for NanoBanana 2
