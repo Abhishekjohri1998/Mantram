@@ -114,9 +114,18 @@ export function BrandProvider({ children }) {
                         session.lastActivePage !== currentPath && 
                         !currentPath.startsWith('/onboarding') && 
                         !currentPath.startsWith('/auth')) {
-                        console.log(`🔁 Resuming brand "${brandToActivate.name}" at: ${session.lastActivePage}`);
-                        navigate(session.lastActivePage, { replace: true });
+                        
+                        // Avoid redirect loops: if we are already at the target page (ignoring query params) skip
+                        const targetBase = session.lastActivePage.split('?')[0];
+                        const currentBase = currentPath.split('?')[0];
+                        if (targetBase === currentBase) {
+                            console.log(`ℹ️ Already at resumption target base: ${targetBase}`);
+                        } else {
+                            console.log(`🔁 Resuming brand "${brandToActivate.name}" at: ${session.lastActivePage}`);
+                            navigate(session.lastActivePage, { replace: true });
+                        }
                     }
+
                 }
             }
 

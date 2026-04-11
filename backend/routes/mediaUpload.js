@@ -37,42 +37,42 @@ router.get('/proxy', async (req, res) => {
             return res.status(403).send('Forbidden: Only authorized S3 or Unsplash assets can be proxied');
         }
 
-        let fetchUrl = url;
-        
-        // RE-SIGNING LOGIC: If it's our S3 bucket, always generate a fresh signature.
+        // 1. Handle S3 Assets with Direct Streaming (Bypasses Signatures)
         if (isS3) {
             try {
-                // Extract key for logging before signing
-                const urlObj = new URL(url);
-                const pathKey = urlObj.pathname.split('/').filter(Boolean).join('/');
-                console.log(`🔍 [PROXY] Attempting re-sign for key: ${pathKey} | Bucket: ${process.env.AWS_S3_BUCKET}`);
-
-                const freshUrl = await getSignedUrlForPath(url, 3600);
-                if (freshUrl && freshUrl !== url) {
-                    console.log(`🔄 [PROXY] Re-signed stale S3 URL. Fresh signature generated.`);
-                    fetchUrl = freshUrl;
-                } else {
-                    console.log(`ℹ️ [PROXY] getSignedUrlForPath returned original URL/failed to sign.`);
-                }
-            } catch (signErr) {
-                console.warn(`⚠️ [PROXY] Failed to re-sign URL: ${signErr.message}`);
+                console.log(`📡 [PROXY] S3 detected. Using direct SDK stream: ${url.substring(0, 100)}...`);
+                const { stream, contentType, contentLength } = await getObjectStream(url);
+                
+                if (contentType) res.setHeader('Content-Type', contentType);
+                if (contentLength) res.setHeader('Content-Length', contentLength);
+                
+                res.setHeader('Cache-Control', 'public, max-age=86400');
+                res.setHeader('Access-Control-Allow-Origin', '*');
+                
+                // Pipe directly from S3 SDK to Express response
+                return stream.pipe(res);
+            } catch (s3Err) {
+                console.error(`❌ [PROXY] S3 direct stream failed: ${s3Err.message}. Falling back to Axios...`);
+                // Fall through to Axios if SDK fails (e.g. key extraction error)
             }
         }
 
-        console.log(`🌐 [PROXY] Fetching: ${fetchUrl.substring(0, 100)}...`);
+        // 2. Fallback / Unsplash Proxy via Axios
+        const fetchUrl = url;
+        console.log(`🌐 [PROXY] Fetching via Axios: ${fetchUrl.substring(0, 100)}...`);
 
         const response = await axios({
             method: 'get',
             url: fetchUrl,
             responseType: 'stream',
             timeout: 10000,
-            maxContentLength: 20 * 1024 * 1024,
+            maxContentLength: 30 * 1024 * 1024, // Increased to 30MB
         });
 
         // Forward essential headers
-        if (response.headers['content-type']) {
-            res.setHeader('Content-Type', response.headers['content-type']);
-        }
+        if (response.headers['content-type']) res.setHeader('Content-Type', response.headers['content-type']);
+        if (response.headers['content-length']) res.setHeader('Content-Length', response.headers['content-length']);
+        
         res.setHeader('Cache-Control', 'public, max-age=86400');
         res.setHeader('Access-Control-Allow-Origin', '*');
         res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
@@ -81,10 +81,11 @@ router.get('/proxy', async (req, res) => {
     } catch (error) {
         const status = error.response?.status || 500;
         const msg = typeof error.response?.data === 'object' ? JSON.stringify(error.response?.data) : (error.response?.data || error.message);
-        console.error(`❌ [PROXY] Final Error: Status=${status} | Target=${fetchUrl.substring(0, 100)}... | Error=${msg}`);
+        console.error(`❌ [PROXY] Final Failure: Status=${status} | Target=${url.substring(0, 80)}... | Error=${msg}`);
         res.status(status).send(`Proxy failed: ${msg}`);
     }
 });
+
 
 
 // ══════════════════════════════════════════════════════════════════════════════

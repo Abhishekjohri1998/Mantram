@@ -58,6 +58,9 @@ function CanvasShellInner() {
     const historyRef = useRef([])
     const historyIndexRef = useRef(-1)
     const clipboardRef = useRef(null)
+    const loadingRef = useRef(false)
+    const failedUrlsRef = useRef(new Set())
+
 
     // ── Zustand store ──
     const store = useCanvasStore()
@@ -221,6 +224,13 @@ function CanvasShellInner() {
                 fabricRef.current = fc
 
                 if (imageUrl) {
+                    if (failedUrlsRef.current.has(imageUrl)) {
+                        console.warn('⏭️ Skipping image that failed previously:', imageUrl);
+                        return;
+                    }
+                    if (loadingRef.current) return;
+                    loadingRef.current = true;
+
                     fabric.FabricImage.fromURL(getCorsUrl(imageUrl), { crossOrigin: 'anonymous' }).then(img => {
                         const maxDim = Math.min(containerW * 0.8, containerH * 0.8)
                         const imgScale = Math.min(maxDim / img.width, maxDim / img.height, 1)
@@ -235,14 +245,18 @@ function CanvasShellInner() {
                         fc.sendToBack(img)
                         fc.renderAll()
                         updateLayers()
-                        saveHistory()
-                    }).catch(() => {
+                        // saveHistory() // Skip for initial load to avoid redundant state updates
+                    }).catch((err) => {
+                        console.error('❌ Failed to load initial image:', err);
+                        failedUrlsRef.current.add(imageUrl);
                         showToast('⚠️ Failed to load image')
-                        saveHistory()
+                    }).finally(() => {
+                        loadingRef.current = false;
                     })
                 } else {
                     saveHistory()
                 }
+
 
                 // Events
                 fc.on('selection:created', updateSelectedProps)

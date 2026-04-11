@@ -139,15 +139,25 @@ export const getSignedUrlForPath = async (urlOrKey, expiresIn = 3600) => {
                 const url = new URL(urlOrKey);
                 // For path-style URLs: /bucket-name/key/path
                 // For virtual-hosted URLs: /key/path
-                const pathParts = url.pathname.split('/').filter(Boolean);
+                let pathname = url.pathname;
+                
+                // Remove trailing/leading slashes for splitting
+                const pathParts = pathname.split('/').filter(Boolean);
                 
                 if (url.hostname.includes('.amazonaws.com')) {
+                    // If first part of path matches bucket name, it's path-style. Remove it.
                     if (pathParts[0] === config.aws.bucket) {
                         key = pathParts.slice(1).join('/');
                     } else {
                         key = pathParts.join('/');
                     }
+                } else if (url.hostname.includes('mantram-assets')) {
+                    // Custom domain or partial match
+                    key = pathParts.join('/');
                 }
+
+                // Strip query params just in case they were passed as part of the "key"
+                key = key.split('?')[0];
             } catch (e) {
                 console.warn("Failed to parse S3 URL for signing, using as raw key:", urlOrKey);
             }
@@ -165,6 +175,38 @@ export const getSignedUrlForPath = async (urlOrKey, expiresIn = 3600) => {
         return urlOrKey; // Fallback to original
     }
 };
+
+/**
+ * Returns a readable stream for an S3 object (used by internal proxy fallback)
+ */
+export const getObjectStream = async (urlOrKey) => {
+    try {
+        let key = urlOrKey;
+        if (urlOrKey.startsWith('http')) {
+            const url = new URL(urlOrKey);
+            const pathParts = url.pathname.split('/').filter(Boolean);
+            if (pathParts[0] === config.aws.bucket) key = pathParts.slice(1).join('/');
+            else key = pathParts.join('/');
+            key = key.split('?')[0]; 
+        }
+
+        const command = new GetObjectCommand({
+            Bucket: config.aws.bucket,
+            Key: key,
+        });
+
+        const response = await s3Client.send(command);
+        return {
+            stream: response.Body,
+            contentType: response.ContentType,
+            contentLength: response.ContentLength
+        };
+    } catch (error) {
+        console.error("S3 GetObject stream error:", error);
+        throw error;
+    }
+};
+
 
 /**
  * Helper to sign a URL only if it looks like an S3 URL from our bucket.
