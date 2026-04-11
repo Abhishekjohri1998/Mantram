@@ -320,16 +320,6 @@ function computeTechnicalScore(siteIntelligence, robotsTxt, sitemap, pageSpeed, 
             howToFix: 'Consolidate duplicate pages using canonical tags or 301 redirects. If both pages are needed, differentiate their content significantly.' });
     }
 
-    // ── Mixed Content HTTPS→HTTP (penalty, -2 max) ──
-    const mixedContentPages = (siteIntelligence.mixedContentPages || []);
-    if (mixedContentPages.length > 0) {
-        score -= Math.min(2, mixedContentPages.length);
-        details.push({ check: 'Mixed Content (HTTPS→HTTP)', issueType: 'error', score: -Math.min(2, mixedContentPages.length), max: 0, status: 'fail',
-            value: `${mixedContentPages.length} pages load HTTP resources on HTTPS pages`,
-            aboutThisIssue: 'Loading HTTP resources on HTTPS pages triggers browser security warnings and can cause content to be blocked entirely.',
-            howToFix: 'Update all resource URLs (images, scripts, stylesheets) to use HTTPS. Use protocol-relative URLs or absolute HTTPS URLs.' });
-    }
-
     // ── Cache-Control Header (bonus, +1 pt) ──
     if (siteIntelligence.cacheControlPresent) {
         score += 1;

@@ -292,7 +292,8 @@ router.post('/advanced/generate', protect, requireCredits('videoGenerate'), asyn
         const {
             prompt, model, duration, resolution, aspectRatio,
             firstImageUrl, lastImageUrl, referenceImages,
-            generateAudio, qualityMode, brandId, shots
+            generateAudio, qualityMode, brandId, shots,
+            refAudio, refVideo
         } = req.body;
 
         // 🔍 DIAGNOSTIC: Log start of handler
@@ -330,6 +331,9 @@ router.post('/advanced/generate', protect, requireCredits('videoGenerate'), asyn
                 firstImageUrl: (firstImageUrl && !firstImageUrl.startsWith('data:')) ? firstImageUrl : '',
                 lastImageUrl: (lastImageUrl && !lastImageUrl.startsWith('data:')) ? lastImageUrl : '',
                 referenceImages: (referenceImages || []).filter(Boolean).map(url => ({ url })),
+                refAudio: refAudio || '',
+                refVideo: refVideo || '',
+                shots: shots || [],
                 aspectRatio: aspectRatio || '16:9',
                 duration: duration || 5,
                 generateAudio: generateAudio !== false,
@@ -359,7 +363,9 @@ router.post('/advanced/generate', protect, requireCredits('videoGenerate'), asyn
             generateAudio: generateAudio !== false,
             aspectRatio: aspectRatio || '16:9',
             referenceImages: referenceImages || [],
-            shots: shots || []
+            shots: shots || [],
+            refAudio: refAudio || '',
+            refVideo: refVideo || ''
         });
 
         // Update project with generation details

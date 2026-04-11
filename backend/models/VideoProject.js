@@ -28,6 +28,13 @@ const videoProjectSchema = new mongoose.Schema({
         firstImageUrl: { type: String, default: '' },
         lastImageUrl: { type: String, default: '' },
         referenceImages: [{ url: String, label: String }],
+        refAudio: { type: String, default: '' },
+        refVideo: { type: String, default: '' },
+        shots: [{
+            visual: { type: String },
+            duration: { type: Number },
+            audio: { type: String },
+        }],
         aspectRatio: { type: String, default: '16:9' },
         duration: { type: Number, default: 5 },
         generateAudio: { type: Boolean, default: true },

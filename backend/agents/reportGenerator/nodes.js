@@ -182,13 +182,20 @@ async function gatherD2CData(userId, brandId, reportType) {
     // D2C data comes from Shopify analytics API calls
     // We construct a summary prompt since the data is fetched live
     try {
+        const { getShopifyAnalytics } = await import('../../services/shopifyAnalytics.js');
+        const analytics = await getShopifyAnalytics(userId, brandId);
         return {
             reportType,
-            note: 'Shopify data is fetched live — AI will generate realistic D2C analytics based on brand context',
+            revenue: analytics.revenue || {},
+            orders: analytics.orders || {},
+            products: analytics.topProducts || [],
+            customers: analytics.customerSegments || {},
         };
     } catch (err) {
+        console.warn('D2C data gather failed:', err.message);
         return { reportType, note: 'Using AI-generated sample data' };
     }
+
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
