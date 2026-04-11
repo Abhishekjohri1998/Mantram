@@ -1244,6 +1244,15 @@ export default function BrandOnboarding() {
     const [loadingCount, setLoadingCount] = useState(true)
     const scanUrlParam = searchParams.get('scanUrl') || ''
 
+    // Role-based Access Control: Only Managers and above can create brands
+    // "Member" role is restricted from this page.
+    useEffect(() => {
+        if (!authLoading && user && user.role === 'member') {
+            console.warn('Access denied: Members cannot create brands.');
+            navigate('/dashboard');
+        }
+    }, [user, authLoading, navigate]);
+
     // Safety Guard: Allow users to stay on onboarding if they explicitly nav here
     // ProtectedRoute.jsx handles forcing 0-brand users to onboarding.
     useEffect(() => {

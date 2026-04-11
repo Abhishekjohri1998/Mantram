@@ -167,15 +167,18 @@ export default function Sidebar({ mobileOpen, onClose }) {
 
             {/* ── Bottom CTA + Plan indicator ── */}
             <div className={`p-3 space-y-2 border-t border-[var(--sys-border)] flex flex-col ${isCollapsed ? 'items-center px-1' : ''}`}>
-                <NavLink
-                    to="/onboarding"
-                    onClick={handleNavClick}
-                    title={isCollapsed ? "New Brand" : undefined}
-                    className={`bg-primary text-white text-xs font-bold uppercase tracking-tighter rounded-lg heavy-in-soft-out transition-all flex items-center justify-center gap-2 cursor-pointer font-headline active:scale-95 ${isCollapsed ? 'w-10 h-10 p-0 rounded-full' : 'w-full py-3 px-4'}`}
-                >
-                    <span className="material-symbols-outlined text-sm">add</span>
-                    {!isCollapsed && "New Brand"}
-                </NavLink>
+                {/* New Brand Action - Only for Managers and above */}
+                {user?.role !== 'member' && (
+                    <NavLink
+                        to="/onboarding"
+                        onClick={handleNavClick}
+                        title={isCollapsed ? "New Brand" : undefined}
+                        className={`bg-primary text-white text-xs font-bold uppercase tracking-tighter rounded-lg heavy-in-soft-out transition-all flex items-center justify-center gap-2 cursor-pointer font-headline active:scale-95 ${isCollapsed ? 'w-10 h-10 p-0 rounded-full' : 'w-full py-3 px-4'}`}
+                    >
+                        <span className="material-symbols-outlined text-sm">add</span>
+                        {!isCollapsed && "New Brand"}
+                    </NavLink>
+                )}
 
                 {/* Theme Toggle */}
                 {!isCollapsed && (
