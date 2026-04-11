@@ -204,27 +204,28 @@ export default function TeamDashboard() {
     return (
         <DashboardLayout title="Team Dashboard" subtitle="Team activity & collaboration hub">
             <SEOHead title="Team Dashboard — Mantram AI" noIndex={true} />
-            <div className="flex items-end justify-between mb-6">
+            <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-6 mb-8">
                 <div>
+                    <h1 className="text-2xl font-black text-[var(--sys-text)] mb-1">Team Dashboard</h1>
                     <p className="text-[var(--sys-text-muted)] text-sm">
                          Manage your team, chat, and approvals.
                     </p>
                 </div>
                 {isOrgOwner && (
-                    <button onClick={() => setShowInvite(true)} className="btn-primary py-2.5 px-5 rounded-xl text-sm cursor-pointer flex items-center gap-2">
+                    <button onClick={() => setShowInvite(true)} className="btn-primary py-3 px-6 rounded-xl text-sm cursor-pointer flex items-center justify-center gap-2 w-full sm:w-auto shadow-lg shadow-primary/10 transition-all hover:scale-[1.02] active:scale-[0.98]">
                         <span className="material-symbols-outlined text-sm">person_add</span>Invite Member
                     </button>
                 )}
             </div>
 
-            {/* Tab Bar */}
-            <div className="flex items-center gap-1 p-1 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] mb-6 w-fit">
+            {/* Tab Bar - Scrollable on mobile */}
+            <div className="flex items-center gap-2 p-2 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] mb-8 w-full overflow-x-auto whitespace-nowrap no-scrollbar scroll-smooth relative z-10">
                 {TABS.map(t => (
                     <button key={t.id} onClick={() => setActiveTab(t.id)}
-                        className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all cursor-pointer ${activeTab === t.id ? 'bg-primary text-white shadow-none' : 'text-[var(--sys-text-muted)] hover:text-white hover:bg-[var(--sys-surface)]'}`}>
-                        <span className="material-symbols-outlined text-sm">{t.icon}</span>{t.label}
+                        className={`flex items-center gap-2.5 px-6 py-4 rounded-xl text-sm font-bold transition-all cursor-pointer shrink-0 min-w-max ${activeTab === t.id ? 'bg-primary text-white shadow-lg shadow-primary/20 scale-[1.02]' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)]'}`}>
+                        <span className="material-symbols-outlined text-[20px]">{t.icon}</span>{t.label}
                         {t.id === 'approvals' && approvalStats.pending > 0 && (
-                            <span className="size-5 rounded-full bg-[var(--sys-surface)] text-[var(--sys-text)] text-[10px] font-bold flex items-center justify-center">{approvalStats.pending}</span>
+                            <span className="size-5 rounded-full bg-white/20 text-white text-[10px] font-black flex items-center justify-center border border-white/10">{approvalStats.pending}</span>
                         )}
                     </button>
                 ))}
@@ -234,9 +235,9 @@ export default function TeamDashboard() {
             {/* MEMBERS TAB                                        */}
             {/* ══════════════════════════════════════════════════ */}
             {activeTab === 'members' && (
-                <div className="grid grid-cols-12 gap-6">
-                    <div className="col-span-12 lg:col-span-8">
-                        <div className="glass-panel rounded-2xl p-6">
+                <div className="flex flex-col lg:flex-row gap-8 items-start">
+                    <div className="w-full lg:flex-1 space-y-8">
+                        <div className="glass-panel rounded-3xl p-6 sm:p-8">
                             <h3 className="font-bold text-[var(--sys-text)] flex items-center gap-2 mb-5">
                                 <span className="material-symbols-outlined text-primary">group</span>Team Members
                             </h3>
@@ -250,45 +251,53 @@ export default function TeamDashboard() {
                                     <p className="text-[var(--sys-text-muted)] mb-4">No team members yet. Invite your first member!</p>
                                 </div>
                             ) : (
-                                <div className="space-y-3">
+                                <div className="space-y-4">
                                     {members.map((m, i) => {
                                         const rc = roleColors[m.teamRole] || roleColors.member
                                         const isOwner = !m.organization || m.teamRole === 'owner'
                                         return (
-                                            <div key={m._id} className="flex items-center gap-4 p-4 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:bg-[var(--sys-surface)] transition-all animate-fade-in"
+                                            <div key={m._id} className="group relative flex flex-col md:grid md:grid-cols-[1fr_auto] items-stretch md:items-center gap-5 p-6 rounded-[24px] bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:border-primary/40 transition-all animate-fade-in"
                                                 style={{ animationDelay: `${i * 60}ms` }}>
-                                                <div className="size-10 rounded-full bg-[var(--sys-surface)] border border-[var(--sys-border)] flex items-center justify-center text-[var(--sys-text)] text-sm font-bold shrink-0">
-                                                    {m.name?.charAt(0)?.toUpperCase() || '?'}
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="flex items-center gap-2">
-                                                        <p className="text-sm text-[var(--sys-text)] font-bold truncate">{m.name}</p>
-                                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${rc.bg} ${rc.text}`}>{rc.label}</span>
-                                                        {m._id === user?.id && <span className="text-xs text-[var(--sys-text-muted)]">(You)</span>}
+                                                <div className="flex items-center gap-4 flex-1">
+                                                    <div className="size-12 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-primary text-base font-black shrink-0 shadow-inner">
+                                                        {m.name?.charAt(0)?.toUpperCase() || '?'}
                                                     </div>
-                                                    <p className="text-xs text-[var(--sys-text-muted)]">{m.email}</p>
-                                                    <div className="flex gap-1 mt-1 flex-wrap">
-                                                        {Object.entries(m.studioAccess || {}).filter(([, v]) => v).slice(0, 5).map(([k]) => (
-                                                            <span key={k} className="text-[9px] px-1.5 py-0.5 rounded bg-[var(--sys-surface)] text-[var(--sys-text-muted)]">{STUDIO_LABELS[k]?.label || k}</span>
-                                                        ))}
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex flex-wrap items-center gap-2 mb-0.5">
+                                                            <p className="text-sm text-[var(--sys-text)] font-black truncate">{m.name}</p>
+                                                            <span className={`text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider ${rc.bg} ${rc.text}`}>{rc.label}</span>
+                                                            {m._id === user?.id && <span className="text-[10px] font-bold text-primary/60 px-2 py-0.5 rounded-full bg-primary/5">You</span>}
+                                                        </div>
+                                                        <p className="text-xs text-[var(--sys-text-muted)] truncate mb-2">{m.email}</p>
+                                                        <div className="flex gap-2 flex-wrap mt-1">
+                                                            {Object.entries(m.studioAccess || {}).filter(([, v]) => v).slice(0, 10).map(([k]) => (
+                                                                <span key={k} className="text-[10px] md:text-[11px] font-bold px-3 py-1 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] transition-colors whitespace-nowrap">{STUDIO_LABELS[k]?.label || k}</span>
+                                                            ))}
+                                                        </div>
                                                     </div>
                                                 </div>
-                                                <div className="text-right shrink-0">
-                                                    <p className="text-sm text-[var(--sys-text-muted)]">{m.usage?.contentGenerated || 0} content</p>
-                                                    <p className="text-xs text-[var(--sys-text-muted)]">{m.lastActive ? new Date(m.lastActive).toLocaleDateString() : '—'}</p>
-                                                </div>
-                                                {isOrgOwner && !isOwner && (
-                                                    <div className="flex gap-1 shrink-0">
-                                                        <button onClick={() => { setEditingMember(m); setEditAccess({ studioAccess: m.studioAccess || {}, brandAccess: m.brandAccess || [], teamRole: m.teamRole }) }}
-                                                            className="size-8 rounded-lg bg-[var(--sys-surface)] flex items-center justify-center text-[var(--sys-text-muted)] hover:text-primary hover:bg-primary/10 cursor-pointer transition-all" title="Edit Access">
-                                                            <span className="material-symbols-outlined text-sm">tune</span>
-                                                        </button>
-                                                        <button onClick={() => handleRemove(m._id)}
-                                                            className="size-8 rounded-lg bg-[var(--sys-surface)] flex items-center justify-center text-[var(--sys-text-muted)] hover:text-primary hover:bg-[var(--sys-primary-dim)] cursor-pointer transition-all" title="Remove">
-                                                            <span className="material-symbols-outlined text-sm">person_remove</span>
-                                                        </button>
+                                                
+                                                <div className="flex flex-row md:flex-col items-center md:items-end justify-between md:justify-center gap-4 pt-5 md:pt-0 border-t md:border-t-0 border-white/5">
+                                                    <div className="text-left md:text-right shrink-0">
+                                                        <p className="text-base font-black text-[var(--sys-text)]">{m.usage?.contentGenerated || 0} prints</p>
+                                                        <p className="text-[10px] font-bold text-primary/60 uppercase tracking-widest">
+                                                            Active: {m.lastActive ? new Date(m.lastActive).toLocaleDateString([], { month: 'short', day: 'numeric' }) : 'Never'}
+                                                        </p>
                                                     </div>
-                                                )}
+                                                    
+                                                    {isOrgOwner && !isOwner && (
+                                                        <div className="flex gap-2">
+                                                            <button onClick={() => { setEditingMember(m); setEditAccess({ studioAccess: m.studioAccess || {}, brandAccess: m.brandAccess || [], teamRole: m.teamRole }) }}
+                                                                className="size-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-[var(--sys-text-muted)] hover:text-primary hover:bg-primary/10 hover:border-primary/20 cursor-pointer transition-all active:scale-95" title="Edit Access">
+                                                                <span className="material-symbols-outlined text-xl">tune</span>
+                                                            </button>
+                                                            <button onClick={() => handleRemove(m._id)}
+                                                                className="size-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-[var(--sys-text-muted)] hover:text-error hover:bg-error/10 hover:border-error/20 cursor-pointer transition-all active:scale-95" title="Remove">
+                                                                <span className="material-symbols-outlined text-xl">person_remove</span>
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
                                         )
                                     })}
@@ -318,7 +327,7 @@ export default function TeamDashboard() {
                     </div>
 
                     {/* Right sidebar — quick stats */}
-                    <div className="col-span-12 lg:col-span-4 space-y-6">
+                    <div className="w-full lg:w-80 space-y-6 shrink-0">
                         <div className="glass-panel rounded-2xl p-6">
                             <h3 className="font-bold text-[var(--sys-text)] flex items-center gap-2 mb-4">
                                 <span className="material-symbols-outlined text-primary">diamond</span>Plan
@@ -361,9 +370,9 @@ export default function TeamDashboard() {
             {/* CHAT TAB                                           */}
             {/* ══════════════════════════════════════════════════ */}
             {activeTab === 'chat' && (
-                <div className="grid grid-cols-12 gap-4" style={{ height: 'calc(100vh - 240px)' }}>
+                <div className="flex flex-col md:flex-row gap-6 h-[600px] md:h-[calc(100vh-320px)] lg:h-[calc(100vh-240px)]">
                     {/* Channel sidebar */}
-                    <div className="col-span-12 md:col-span-3 glass-panel rounded-2xl p-4 overflow-y-auto">
+                    <div className="w-full md:w-64 glass-panel rounded-3xl p-5 overflow-y-auto custom-scrollbar shrink-0 border border-[var(--sys-border)]">
                         <p className="text-xs font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-3">Channels</p>
                         <div className="space-y-1">
                             {channels.map(ch => (
@@ -378,12 +387,13 @@ export default function TeamDashboard() {
                     </div>
 
                     {/* Message area */}
-                    <div className="col-span-12 md:col-span-9 glass-panel rounded-2xl flex flex-col">
+                    <div className="flex-1 glass-panel rounded-3xl border border-[var(--sys-border)] flex flex-col overflow-hidden">
                         <div className="p-4 border-b border-[var(--sys-border)] flex items-center gap-2">
                             <span className="material-symbols-outlined text-primary">forum</span>
                             <span className="text-sm font-bold text-[var(--sys-text)]">{channels.find(c => c.id === activeChannel)?.name || 'General'}</span>
                         </div>
-                        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                        <div className="flex-1 overflow-y-auto custom-scrollbar p-0">
+                            <div className="p-4 space-y-4">
                             {chatLoading ? (
                                 <div className="flex items-center justify-center py-12 text-[var(--sys-text-muted)]">
                                     <span className="material-symbols-outlined animate-spin mr-2">progress_activity</span>Loading...
@@ -420,19 +430,21 @@ export default function TeamDashboard() {
                             ))}
                             <div ref={chatEndRef} />
                         </div>
-                        <div className="p-3 border-t border-[var(--sys-border)] flex gap-2">
-                            <input value={chatInput} onChange={e => setChatInput(e.target.value)}
-                                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() } }}
-                                placeholder="Type a message..."
-                                className="flex-1 bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl px-4 py-2.5 text-sm text-[var(--sys-text)] placeholder-slate-500 outline-none focus:border-primary/40" />
-                            <button onClick={sendMessage}
-                                className="px-4 py-2.5 rounded-xl bg-primary text-white text-sm font-bold hover:bg-primary/90 cursor-pointer transition-all flex items-center gap-1">
-                                <span className="material-symbols-outlined text-sm">send</span>
-                            </button>
-                        </div>
+                    </div>
+
+                    <div className="p-3 border-t border-[var(--sys-border)] flex gap-2">
+                        <input value={chatInput} onChange={e => setChatInput(e.target.value)}
+                            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() } }}
+                            placeholder="Type a message..."
+                            className="flex-1 bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl px-4 py-2.5 text-sm text-[var(--sys-text)] placeholder-slate-500 outline-none focus:border-primary/40" />
+                        <button onClick={sendMessage}
+                            className="px-4 py-2.5 rounded-xl bg-primary text-white text-sm font-bold hover:bg-primary/90 cursor-pointer transition-all flex items-center gap-1">
+                            <span className="material-symbols-outlined text-sm">send</span>
+                        </button>
                     </div>
                 </div>
-            )}
+            </div>
+        )}
 
             {/* ══════════════════════════════════════════════════ */}
             {/* APPROVALS TAB                                      */}
@@ -440,17 +452,19 @@ export default function TeamDashboard() {
             {activeTab === 'approvals' && (
                 <div className="space-y-6">
                     {/* Stats bar */}
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         {[
-                            { label: 'Pending', value: approvalStats.pending || 0, color: '#f59e0b', filter: 'pending' },
-                            { label: 'Approved', value: approvalStats.approved || 0, color: '#34d399', filter: 'approved' },
-                            { label: 'Rejected', value: approvalStats.rejected || 0, color: '#f43f5e', filter: 'rejected' },
+                            { label: 'Pending', value: approvalStats.pending || 0, color: '#f59e0b', filter: 'pending', icon: 'schedule' },
+                            { label: 'Approved', value: approvalStats.approved || 0, color: '#34d399', filter: 'approved', icon: 'check_circle' },
+                            { label: 'Rejected', value: approvalStats.rejected || 0, color: '#f43f5e', filter: 'rejected', icon: 'cancel' },
                         ].map((s, i) => (
                             <button key={i} onClick={() => setApprovalFilter(approvalFilter === s.filter ? '' : s.filter)}
-                                className={`glass-panel rounded-2xl p-5 cursor-pointer transition-all ${approvalFilter === s.filter ? 'border' : 'border border-[var(--sys-border)]'}`}
-                                style={approvalFilter === s.filter ? { borderColor: s.color } : {}}>
-                                <p className="text-2xl font-extrabold text-[var(--sys-text)]">{s.value}</p>
-                                <p className="text-sm text-[var(--sys-text-muted)]">{s.label}</p>
+                                className={`glass-panel rounded-2xl p-6 cursor-pointer transition-all border group hover:scale-[1.02] active:scale-[0.98] ${approvalFilter === s.filter ? 'border-primary ring-1 ring-primary/20 bg-primary/[0.02]' : 'border-[var(--sys-border)]'}`}>
+                                <div className="flex items-center justify-between mb-2">
+                                    <p className="text-3xl font-black text-[var(--sys-text)]">{s.value}</p>
+                                    <span className="material-symbols-outlined text-xl opacity-20 group-hover:opacity-100 transition-opacity" style={{ color: s.color }}>{s.icon}</span>
+                                </div>
+                                <p className="text-xs font-bold text-[var(--sys-text-muted)] uppercase tracking-wider">{s.label}</p>
                             </button>
                         ))}
                     </div>
@@ -537,17 +551,19 @@ export default function TeamDashboard() {
                     ) : healthData ? (
                         <>
                             {/* KPI Cards */}
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                                 {[
                                     { label: 'Team Size', value: healthData.teamSize, icon: 'group', color: '#8b5cf6' },
                                     { label: 'Active This Week', value: healthData.activeThisWeek, icon: 'trending_up', color: '#34d399' },
                                     { label: 'Total Content', value: healthData.totalContent, icon: 'article', color: '#06b6d4' },
                                     { label: 'Chat Messages', value: healthData.chatMessages, icon: 'forum', color: '#f59e0b' },
                                 ].map((s, i) => (
-                                    <div key={i} className="glass-panel rounded-2xl p-5">
-                                        <span className={`material-symbols-outlined text-xl mb-2 block`} style={{ color: s.color }}>{s.icon}</span>
-                                        <p className="text-2xl font-extrabold text-[var(--sys-text)]">{s.value}</p>
-                                        <p className="text-sm text-[var(--sys-text-muted)]">{s.label}</p>
+                                    <div key={i} className="glass-panel rounded-2xl p-6 border border-[var(--sys-border)]">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <p className="text-3xl font-black text-[var(--sys-text)]">{s.value}</p>
+                                            <span className={`material-symbols-outlined text-xl`} style={{ color: s.color }}>{s.icon}</span>
+                                        </div>
+                                        <p className="text-xs font-bold text-[var(--sys-text-muted)] uppercase tracking-wider">{s.label}</p>
                                     </div>
                                 ))}
                             </div>
@@ -612,8 +628,9 @@ export default function TeamDashboard() {
             {/* INVITE MODAL                                       */}
             {/* ══════════════════════════════════════════════════ */}
             {showInvite && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--sys-surface)] " onClick={() => setShowInvite(false)}>
-                    <div className="glass-panel rounded-2xl p-6 w-full max-w-lg mx-4 border border-[var(--sys-border)]" onClick={e => e.stopPropagation()}>
+                <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 sm:p-6" onClick={() => setShowInvite(false)}>
+                    <div className="absolute inset-0 bg-background/80 backdrop-blur-md" />
+                    <div className="glass-panel rounded-[32px] p-6 sm:p-10 w-full max-w-xl relative border border-white/10 shadow-2xl animate-in fade-in zoom-in duration-300" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center justify-between mb-5">
                             <h3 className="text-lg font-bold text-[var(--sys-text)] flex items-center gap-2">
                                 <span className="material-symbols-outlined text-primary">person_add</span>Invite Team Member
@@ -623,76 +640,80 @@ export default function TeamDashboard() {
                             </button>
                         </div>
 
-                        <div className="space-y-4">
-                            <div>
-                                <label className="text-xs font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-1 block">Email *</label>
-                                <input value={inviteForm.email} onChange={e => setInviteForm(f => ({ ...f, email: e.target.value }))}
-                                    placeholder="teammate@company.com"
-                                    className="w-full bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl px-4 py-2.5 text-sm text-[var(--sys-text)] placeholder-slate-500 outline-none focus:border-primary/40" />
-                            </div>
-                            <div>
-                                <label className="text-xs font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-1 block">Name</label>
-                                <input value={inviteForm.name} onChange={e => setInviteForm(f => ({ ...f, name: e.target.value }))}
-                                    placeholder="John Doe"
-                                    className="w-full bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl px-4 py-2.5 text-sm text-[var(--sys-text)] placeholder-slate-500 outline-none focus:border-primary/40" />
-                            </div>
-                            <div>
-                                <label className="text-xs font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-1 block">Role</label>
-                                <select value={inviteForm.role} onChange={e => setInviteForm(f => ({ ...f, role: e.target.value }))}
-                                    className="w-full bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl px-4 py-2.5 text-sm text-[var(--sys-text)] outline-none focus:border-primary/40">
-                                    <option value="member">Member</option>
-                                    <option value="manager">Manager</option>
-                                </select>
-                            </div>
-
-                            {/* Studio access toggles */}
-                            <div>
-                                <label className="text-xs font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-2 block">Studio Access</label>
-                                <div className="grid grid-cols-2 gap-2">
-                                    {Object.entries(STUDIO_LABELS).map(([key, s]) => (
-                                        <label key={key} className="flex items-center gap-2 p-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] cursor-pointer hover:bg-[var(--sys-surface)] transition-all">
-                                            <input type="checkbox"
-                                                checked={inviteForm.studioAccess[key] !== false}
-                                                onChange={e => setInviteForm(f => ({ ...f, studioAccess: { ...f.studioAccess, [key]: e.target.checked } }))}
-                                                className="accent-primary" />
-                                            <span className="material-symbols-outlined text-sm" style={{ color: s.color }}>{s.icon}</span>
-                                            <span className="text-xs text-[var(--sys-text)]">{s.label}</span>
-                                        </label>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* Brand access */}
-                            {brands.length > 0 && (
+                        <div className="max-h-[60vh] overflow-y-auto custom-scrollbar -mx-6 px-6 py-2">
+                            <div className="space-y-5">
                                 <div>
-                                    <label className="text-xs font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-2 block">Brand Access</label>
-                                    <div className="space-y-1">
-                                        {brands.map(b => (
-                                            <label key={b._id} className="flex items-center gap-2 p-2 rounded-lg bg-[var(--sys-surface)] cursor-pointer hover:bg-[var(--sys-surface)]">
+                                    <label className="text-xs font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-2 block">Email *</label>
+                                    <input value={inviteForm.email} onChange={e => setInviteForm(f => ({ ...f, email: e.target.value }))}
+                                        placeholder="teammate@company.com"
+                                        className="w-full bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl px-4 py-3 text-sm text-[var(--sys-text)] placeholder-slate-500 outline-none focus:border-primary/40" />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-2 block">Name</label>
+                                    <input value={inviteForm.name} onChange={e => setInviteForm(f => ({ ...f, name: e.target.value }))}
+                                        placeholder="John Doe"
+                                        className="w-full bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl px-4 py-3 text-sm text-[var(--sys-text)] placeholder-slate-500 outline-none focus:border-primary/40" />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-2 block">Role</label>
+                                    <select value={inviteForm.role} onChange={e => setInviteForm(f => ({ ...f, role: e.target.value }))}
+                                        className="w-full bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl px-4 py-3 text-sm text-[var(--sys-text)] outline-none focus:border-primary/40">
+                                        <option value="member">Member</option>
+                                        <option value="manager">Manager</option>
+                                    </select>
+                                </div>
+
+                                {/* Studio access toggles */}
+                                <div>
+                                    <label className="text-xs font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-3 block">Studio Access</label>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        {Object.entries(STUDIO_LABELS).map(([key, s]) => (
+                                            <label key={key} className="flex items-center gap-3 p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] cursor-pointer hover:border-primary/30 transition-all">
                                                 <input type="checkbox"
-                                                    checked={inviteForm.brandAccess.includes(b._id)}
-                                                    onChange={e => setInviteForm(f => ({
-                                                        ...f,
-                                                        brandAccess: e.target.checked ? [...f.brandAccess, b._id] : f.brandAccess.filter(id => id !== b._id)
-                                                    }))}
-                                                    className="accent-primary" />
-                                                <span className="text-xs text-[var(--sys-text)]">{b.name}</span>
+                                                    checked={inviteForm.studioAccess[key] !== false}
+                                                    onChange={e => setInviteForm(f => ({ ...f, studioAccess: { ...f.studioAccess, [key]: e.target.checked } }))}
+                                                    className="accent-primary size-4" />
+                                                <span className="material-symbols-outlined text-base" style={{ color: s.color }}>{s.icon}</span>
+                                                <span className="text-xs font-bold text-[var(--sys-text)]">{s.label}</span>
                                             </label>
                                         ))}
                                     </div>
                                 </div>
-                            )}
 
-                            {inviteResult && (
-                                <div className={`p-3 rounded-xl text-sm ${inviteResult.error ? 'bg-[var(--sys-primary-dim)] text-primary' : 'bg-[var(--sys-primary-dim)] text-primary'}`}>
-                                    {inviteResult.error || ` Invite sent to ${inviteResult.sentTo}! They'll receive an email with a link to join your team.`}
-                                </div>
-                            )}
+                                {/* Brand access */}
+                                {brands.length > 0 && (
+                                    <div>
+                                        <label className="text-xs font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-3 block">Brand Access</label>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                            {brands.map(b => (
+                                                <label key={b._id} className="flex items-center gap-3 p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] cursor-pointer hover:border-primary/30 transition-all">
+                                                    <input type="checkbox"
+                                                        checked={inviteForm.brandAccess.includes(b._id)}
+                                                        onChange={e => setInviteForm(f => ({
+                                                            ...f,
+                                                            brandAccess: e.target.checked ? [...f.brandAccess, b._id] : f.brandAccess.filter(id => id !== b._id)
+                                                        }))}
+                                                        className="accent-primary size-4" />
+                                                    <span className="text-xs font-bold text-[var(--sys-text)] truncate">{b.name}</span>
+                                                </label>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
 
+                        {inviteResult && (
+                            <div className={`mt-5 p-4 rounded-2xl text-sm font-bold border ${inviteResult.error ? 'bg-error/10 border-error/20 text-error' : 'bg-primary/10 border-primary/20 text-primary'}`}>
+                                {inviteResult.error || `Invite sent to ${inviteResult.sentTo}! They'll receive an email with link.`}
+                            </div>
+                        )}
+
+                        <div className="mt-8">
                             <button onClick={handleInvite} disabled={inviteLoading || !inviteForm.email}
-                                className="w-full py-3 rounded-xl bg-primary text-white font-bold hover:bg-primary/90 cursor-pointer transition-all disabled:opacity-50 flex items-center justify-center gap-2">
-                                {inviteLoading ? <span className="material-symbols-outlined animate-spin text-sm">progress_activity</span> : <span className="material-symbols-outlined text-sm">send</span>}
-                                {inviteLoading ? 'Sending...' : 'Send Invite'}
+                                className="w-full py-4 rounded-2xl bg-primary text-white font-black hover:bg-primary/90 cursor-pointer transition-all disabled:opacity-50 flex items-center justify-center gap-3 shadow-xl shadow-primary/20">
+                                {inviteLoading ? <span className="material-symbols-outlined animate-spin text-lg">progress_activity</span> : <span className="material-symbols-outlined text-lg">send</span>}
+                                {inviteLoading ? 'Sending...' : 'Send Invitation'}
                             </button>
                         </div>
                     </div>
@@ -703,8 +724,9 @@ export default function TeamDashboard() {
             {/* EDIT ACCESS MODAL                                  */}
             {/* ══════════════════════════════════════════════════ */}
             {editingMember && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--sys-surface)] " onClick={() => setEditingMember(null)}>
-                    <div className="glass-panel rounded-2xl p-6 w-full max-w-lg mx-4 border border-[var(--sys-border)]" onClick={e => e.stopPropagation()}>
+                <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 sm:p-6" onClick={() => setEditingMember(null)}>
+                    <div className="absolute inset-0 bg-background/80 backdrop-blur-md" />
+                    <div className="glass-panel rounded-[32px] p-6 sm:p-10 w-full max-w-xl relative border border-white/10 shadow-2xl animate-in fade-in zoom-in duration-300" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center justify-between mb-5">
                             <h3 className="text-lg font-bold text-[var(--sys-text)]">Edit Access — {editingMember.name}</h3>
                             <button onClick={() => setEditingMember(null)} className="size-8 rounded-lg bg-[var(--sys-surface)] flex items-center justify-center text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer">
@@ -712,55 +734,59 @@ export default function TeamDashboard() {
                             </button>
                         </div>
 
-                        <div className="space-y-4">
-                            <div>
-                                <label className="text-xs font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-1 block">Team Role</label>
-                                <select value={editAccess.teamRole} onChange={e => setEditAccess(a => ({ ...a, teamRole: e.target.value }))}
-                                    className="w-full bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl px-4 py-2.5 text-sm text-[var(--sys-text)] outline-none">
-                                    <option value="member">Member</option>
-                                    <option value="manager">Manager</option>
-                                </select>
-                            </div>
-
-                            <div>
-                                <label className="text-xs font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-2 block">Studio Access</label>
-                                <div className="grid grid-cols-2 gap-2">
-                                    {Object.entries(STUDIO_LABELS).map(([key, s]) => (
-                                        <label key={key} className="flex items-center gap-2 p-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] cursor-pointer hover:bg-[var(--sys-surface)]">
-                                            <input type="checkbox"
-                                                checked={editAccess.studioAccess?.[key] !== false}
-                                                onChange={e => setEditAccess(a => ({ ...a, studioAccess: { ...a.studioAccess, [key]: e.target.checked } }))}
-                                                className="accent-primary" />
-                                            <span className="material-symbols-outlined text-sm" style={{ color: s.color }}>{s.icon}</span>
-                                            <span className="text-xs text-[var(--sys-text)]">{s.label}</span>
-                                        </label>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {brands.length > 0 && (
+                        <div className="max-h-[60vh] overflow-y-auto custom-scrollbar -mx-6 px-6 py-2">
+                            <div className="space-y-5">
                                 <div>
-                                    <label className="text-xs font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-2 block">Brand Access</label>
-                                    <div className="space-y-1">
-                                        {brands.map(b => (
-                                            <label key={b._id} className="flex items-center gap-2 p-2 rounded-lg bg-[var(--sys-surface)] cursor-pointer hover:bg-[var(--sys-surface)]">
+                                    <label className="text-xs font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-2 block">Team Role</label>
+                                    <select value={editAccess.teamRole} onChange={e => setEditAccess(a => ({ ...a, teamRole: e.target.value }))}
+                                        className="w-full bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl px-4 py-3 text-sm text-[var(--sys-text)] outline-none focus:border-primary/40">
+                                        <option value="member">Member</option>
+                                        <option value="manager">Manager</option>
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="text-xs font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-3 block">Studio Access</label>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        {Object.entries(STUDIO_LABELS).map(([key, s]) => (
+                                            <label key={key} className="flex items-center gap-3 p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] cursor-pointer hover:border-primary/30 transition-all">
                                                 <input type="checkbox"
-                                                    checked={(editAccess.brandAccess || []).includes(b._id)}
-                                                    onChange={e => setEditAccess(a => ({
-                                                        ...a,
-                                                        brandAccess: e.target.checked ? [...(a.brandAccess || []), b._id] : (a.brandAccess || []).filter(id => id !== b._id)
-                                                    }))}
-                                                    className="accent-primary" />
-                                                <span className="text-xs text-[var(--sys-text)]">{b.name}</span>
+                                                    checked={editAccess.studioAccess?.[key] !== false}
+                                                    onChange={e => setEditAccess(a => ({ ...a, studioAccess: { ...a.studioAccess, [key]: e.target.checked } }))}
+                                                    className="accent-primary size-4" />
+                                                <span className="material-symbols-outlined text-base" style={{ color: s.color }}>{s.icon}</span>
+                                                <span className="text-xs font-bold text-[var(--sys-text)]">{s.label}</span>
                                             </label>
                                         ))}
                                     </div>
                                 </div>
-                            )}
 
+                                {brands.length > 0 && (
+                                    <div>
+                                        <label className="text-xs font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-3 block">Brand Access</label>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                            {brands.map(b => (
+                                                <label key={b._id} className="flex items-center gap-3 p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] cursor-pointer hover:border-primary/30 transition-all">
+                                                    <input type="checkbox"
+                                                        checked={(editAccess.brandAccess || []).includes(b._id)}
+                                                        onChange={e => setEditAccess(a => ({
+                                                            ...a,
+                                                            brandAccess: e.target.checked ? [...(a.brandAccess || []), b._id] : (a.brandAccess || []).filter(id => id !== b._id)
+                                                        }))}
+                                                        className="accent-primary size-4" />
+                                                    <span className="text-xs font-bold text-[var(--sys-text)] truncate">{b.name}</span>
+                                                </label>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="mt-8">
                             <button onClick={handleSaveAccess}
-                                className="w-full py-3 rounded-xl bg-primary text-white font-bold hover:bg-primary/90 cursor-pointer transition-all flex items-center justify-center gap-2">
-                                <span className="material-symbols-outlined text-sm">save</span>Save Changes
+                                className="w-full py-4 rounded-2xl bg-primary text-white font-black hover:bg-primary/90 cursor-pointer transition-all flex items-center justify-center gap-3 shadow-xl shadow-primary/20">
+                                <span className="material-symbols-outlined text-lg">save</span>Save Access Changes
                             </button>
                         </div>
                     </div>
