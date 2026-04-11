@@ -5,7 +5,7 @@ import { requireCredits } from '../middleware/credits.js'
 import { URL } from 'url'
 import { safeErrorMessage } from '../utils/safeError.js';
 import { uploadToS3, getSignedUrlIfNeeded } from '../utils/s3.js';
-import { callMultimodalAgent, loadBrandContext } from '../agents/shared/agentUtils.js';
+import { agentUtils } from '../agents/shared/agentUtils.js';
 import Brand from '../models/Brand.js';
 import Product from '../models/Product.js';
 const router = express.Router()
@@ -294,7 +294,7 @@ router.post('/ai-generate', protect, requireCredits('canvasGenerate'), async (re
         if (refCount > 1) {
             console.log(`🧠 MCoT Canvas: Multi-subject reference detected. Synthesizing ${refCount} images...`)
             try {
-                const synthesis = await callMultimodalAgent(
+                const synthesis = await agentUtils.callMultimodalAgent(
                     `You are an elite creative analyst. The user has provided ${refCount} reference images and wants: "${prompt}".`,
                     `For EACH attached image, output a labeled block like this:
 IMAGE 1 SUBJECT: [Describe the exact person/object — age, gender, skin tone, hair color/style, clothing, build, expression, distinguishing features]
@@ -463,7 +463,7 @@ router.post('/ai-edit', protect, requireCredits('canvasGenerate'), async (req, r
         if (imgCount > 1) {
             console.log(`🧠 MCoT Canvas: Multi-subject edit detected. Synthesizing ${imgCount} images...`)
             try {
-                const synthesis = await callMultimodalAgent(
+                const synthesis = await agentUtils.callMultimodalAgent(
                     `You are an elite creative analyst. The user has provided ${imgCount} reference images and wants: "${prompt}".`,
                     `For EACH attached image, output a labeled block like this:
 IMAGE 1 SUBJECT: [Describe the exact person/object — age, gender, skin tone, hair color/style, clothing, build, expression, distinguishing features]

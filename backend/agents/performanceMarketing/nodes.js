@@ -11,7 +11,7 @@ import AdLearning from '../../models/AdLearning.js';
 import Integration from '../../models/Integration.js';
 import Product from '../../models/Product.js';
 import { getRouter } from '../../ai/router.js';
-import { callAgent, callMultimodalAgent, loadBrandContext, buildBrandContext } from '../shared/agentUtils.js';
+import { agentUtils } from '../shared/agentUtils.js';
 import {
     COMPETITOR_RESEARCH_PROMPT,
     STRATEGY_PROMPT,
@@ -37,7 +37,7 @@ import { getSEOKeywordsForTargeting } from './crossStudioBridge.js';
 export async function competitorResearchNode(state) {
     console.log('🔍 PM Node: Competitor Research — analyzing...');
 
-    const { brandContext } = await loadBrandContext(state.brandId);
+    const { brandContext } = await agentUtils.loadBrandContext(state.brandId);
 
     // Build prompt with live intelligence if available
     const trendContext = state.marketIntelligence?.contextString || '';
@@ -57,7 +57,7 @@ export async function competitorResearchNode(state) {
         historicalContext ? `\n── HISTORICAL LEARNINGS ──\n${historicalContext}\n` : '',
     ].filter(Boolean).join('\n');
 
-    const result = await callAgent(
+    const result = await agentUtils.callAgent(
         COMPETITOR_RESEARCH_PROMPT(brandContext),
         userPrompt,
         0.6
@@ -356,7 +356,7 @@ function formatPMIntelligence(intel, platforms, targetGeo) {
 export async function strategyNode(state) {
     console.log('📋 PM Node: Strategy — building expert data-driven plan...');
 
-    const { brand, brandContext } = await loadBrandContext(state.brandId);
+    const { brand, brandContext } = await agentUtils.loadBrandContext(state.brandId);
     const industry = brand?.dna?.industry || brand?.industry || state.input?.query || '';
     const platforms = state.input?.platforms || ['meta', 'google'];
     const goals = Array.isArray(state.input?.goals) ? state.input.goals : [state.input?.objective || 'traffic'];
@@ -396,7 +396,7 @@ export async function strategyNode(state) {
         state.input?.query ? `USER'S GOAL: "${state.input.query}"` : '',
     ].filter(Boolean).join('\n');
 
-    const result = await callAgent(
+    const result = await agentUtils.callAgent(
         STRATEGY_PROMPT(brandContext, currency),
         userPrompt,
         0.5
@@ -487,7 +487,7 @@ export async function strategyNode(state) {
 export async function budgetPlannerNode(state) {
     console.log('💰 PM Node: Budget Planner — allocating with real benchmarks...');
 
-    const { brand, brandContext } = await loadBrandContext(state.brandId);
+    const { brand, brandContext } = await agentUtils.loadBrandContext(state.brandId);
     const industry = brand?.dna?.industry || brand?.industry || '';
     const platforms = state.input?.platforms || ['meta', 'google'];
 
@@ -518,7 +518,7 @@ export async function budgetPlannerNode(state) {
             `Market insights: ${state.aiAnalysis.keyFindings.slice(0, 3).join('; ')}` : '',
     ].filter(Boolean).join('\n');
 
-    const result = await callAgent(
+    const result = await agentUtils.callAgent(
         BUDGET_PLANNER_PROMPT(brandContext),
         userPrompt,
         0.3
@@ -550,7 +550,7 @@ export async function budgetPlannerNode(state) {
 export async function adCreatorNode(state) {
     console.log('🎨 PM Node: Ad Creator — generating creatives...');
 
-    const { brandContext } = await loadBrandContext(state.brandId);
+    const { brandContext } = await agentUtils.loadBrandContext(state.brandId);
 
     const userPrompt = [
         `CAMPAIGN OBJECTIVE: ${state.input?.objective || 'traffic'}`,
@@ -566,7 +566,7 @@ export async function adCreatorNode(state) {
         state.input?.query ? `SPECIFIC DIRECTION: "${state.input.query}"` : '',
     ].filter(Boolean).join('\n');
 
-    const result = await callAgent(
+    const result = await agentUtils.callAgent(
         AD_CREATOR_PROMPT(brandContext),
         userPrompt,
         0.8 // Higher creativity for ad copy
@@ -599,7 +599,7 @@ export async function adCreatorNode(state) {
 export async function abTestDesignerNode(state) {
     console.log('🧪 PM Node: A/B Test Designer — designing experiment...');
 
-    const { brandContext } = await loadBrandContext(state.brandId);
+    const { brandContext } = await agentUtils.loadBrandContext(state.brandId);
 
     const creativesSummary = (state.adCreatives || [])
         .map((c, i) => `Variant ${i + 1}: "${c.headline}" — ${c.hook}`)
@@ -613,7 +613,7 @@ export async function abTestDesignerNode(state) {
         `DAILY BUDGET: ${state.budgetPlan?.allocation?.[0]?.amount || 1000} ${state.budgetPlan?.currency || 'INR'}`,
     ].join('\n');
 
-    const result = await callAgent(
+    const result = await agentUtils.callAgent(
         AB_TEST_PROMPT(brandContext),
         userPrompt,
         0.4
@@ -632,7 +632,7 @@ export async function abTestDesignerNode(state) {
 export async function performanceAnalystNode(state) {
     console.log('📊 PM Node: Performance Analyst — analyzing data...');
 
-    const { brandContext } = await loadBrandContext(state.brandId);
+    const { brandContext } = await agentUtils.loadBrandContext(state.brandId);
 
     const userPrompt = [
         `CAMPAIGN PERFORMANCE DATA:`,
@@ -644,7 +644,7 @@ export async function performanceAnalystNode(state) {
         `Budget: ${state.budgetPlan?.totalBudget || 'unknown'} ${state.budgetPlan?.currency || 'INR'}`,
     ].join('\n');
 
-    const result = await callAgent(
+    const result = await agentUtils.callAgent(
         PERFORMANCE_ANALYST_PROMPT(brandContext),
         userPrompt,
         0.4
@@ -677,7 +677,7 @@ export async function performanceAnalystNode(state) {
 export async function reportGeneratorNode(state) {
     console.log('📄 PM Node: Report Generator — creating report...');
 
-    const { brandContext } = await loadBrandContext(state.brandId);
+    const { brandContext } = await agentUtils.loadBrandContext(state.brandId);
 
     const userPrompt = [
         `REPORT TYPE: ${state.type || 'performance'}`,
@@ -695,7 +695,7 @@ export async function reportGeneratorNode(state) {
         `KPIs: ${(state.strategyPlan?.kpis || []).map(k => `${k.metric}: ${k.target}`).join(', ')}`,
     ].join('\n');
 
-    const result = await callAgent(
+    const result = await agentUtils.callAgent(
         REPORT_GENERATOR_PROMPT(brandContext),
         userPrompt,
         0.5
@@ -724,7 +724,7 @@ export async function pmVisualGroundingNode(state) {
     console.log('🧠 PM MCoT: Visual grounding — fetching brand/product images...');
     try {
         // Use cached loadBrandContext — avoids raw Brand.findById on every MCoT call
-        const { brand } = await loadBrandContext(state.brandId);
+        const { brand } = await agentUtils.loadBrandContext(state.brandId);
         if (!brand) return state;
 
         const imageUrls = [];
@@ -760,7 +760,7 @@ export async function pmVisualGroundingNode(state) {
 
         console.log(`🧠 PM MCoT: Analyzing ${imageUrls.length} brand images for ad creative grounding...`);
 
-        const grounding = await callMultimodalAgent(
+        const grounding = await agentUtils.callMultimodalAgent(
             PM_VISUAL_GROUNDING_PROMPT,
             `Analyze these brand/product images for ${brand.name} (${dna.industry || 'consumer brand'}). Extract ad creative guidance for performance marketing.`,
             imageUrls,
@@ -808,7 +808,7 @@ export async function pmCompetitorAdAnalysisNode(state) {
     console.log(`🧠 PM MCoT: Analyzing ${competitorAdImages.length} competitor ad creatives...`);
     try {
         const brandName = state.brandName || 'this brand';
-        const analysis = await callMultimodalAgent(
+        const analysis = await agentUtils.callMultimodalAgent(
             PM_COMPETITOR_AD_ANALYSIS_PROMPT,
             `Analyze these competitor ad creatives for the ${brandName} competitive landscape. Extract patterns, gaps, and differentiators.`,
             competitorAdImages.slice(0, 5), // Max 5 competitor ads

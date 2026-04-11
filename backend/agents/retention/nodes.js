@@ -10,7 +10,7 @@ import Integration from '../../models/Integration.js';
 import { getRouter } from '../../ai/router.js';
 import { sendRetentionEmail } from './mailer.js';
 import { buildRetentionBrandCtx, CREATIVE_DESIGN_PROMPT, MAILER_COMPOSE_PROMPT } from './prompts.js';
-import { callAgent } from '../shared/agentUtils.js';
+import { agentUtils } from '../shared/agentUtils.js';
 
 // ── Helper: Parse CSV text to contacts array ──
 function parseCSV(text) {
@@ -90,7 +90,7 @@ export function substituteTemplate(html, contact, brand) {
 // Uses canonical callAgent with provider override + 8192 token budget for full HTML
 // Note: router registers Gemini under key 'gemini', not 'google'
 function callGeminiAgent(systemPrompt, userPrompt, temperature = 0.7) {
-    return callAgent(systemPrompt, userPrompt, temperature, 8192, { provider: 'gemini' });
+    return agentUtils.callAgent(systemPrompt, userPrompt, temperature, 8192, { provider: 'gemini' });
 }
 
 // ══════════════════════════════════════════════════════════════

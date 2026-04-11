@@ -30,7 +30,7 @@ import { getPiApiGenerationStatus, resubmitPiApiTask, uploadImageToHostedUrl } f
 import { getMuApiGenerationStatus, resubmitMuApiTask } from './muapiClient.js';
 
 import { getPastProjects } from './selfLearning.js';
-import { callAgent, callMultimodalAgent, loadBrandContext } from '../shared/agentUtils.js';
+import { agentUtils } from '../shared/agentUtils.js';
 import { callMcpTool } from '../../mcp/registry.js';
 import Product from '../../models/Product.js';
 import { inferBrandLanguage, buildLanguageDirective } from '../../utils/brandLanguage.js';
@@ -86,7 +86,7 @@ async function callFastAgent(systemPrompt, userPrompt, temperature = 0.3, maxTok
 // Uses Redis-cached loadBrandContext (5-min TTL, invalidated on brand updates)
 async function loadContext(brandId, userId) {
     // loadBrandContext is Redis-backed: avoids a DB hit on every node call
-    const { brand } = await loadBrandContext(brandId);
+    const { brand } = await agentUtils.loadBrandContext(brandId);
     const pastProjects = await getPastProjects(brandId, userId);
     // buildBrandContext here is video-specific (from prompts.js) — intentionally kept separate
     const brandContext = buildBrandContext(brand);
@@ -114,7 +114,7 @@ export async function videoVisualGroundingNode(state) {
 
     try {
         // Load brand via cached loadBrandContext (Brand import removed — use shared utility)
-        const { brand } = await loadBrandContext(state.brandId);
+        const { brand } = await agentUtils.loadBrandContext(state.brandId);
         const products = await Product.find({ brand: state.brandId, status: 'active' })
             .select('images title')
             .limit(5)
@@ -132,7 +132,7 @@ export async function videoVisualGroundingNode(state) {
         }
 
         console.log(`🧠 MCoT: Analyzing ${brandImages.length} brand images for video context...`);
-        const grounding = await callMultimodalAgent(
+        const grounding = await agentUtils.callMultimodalAgent(
             VIDEO_VISUAL_GROUNDING_PROMPT,
             `Analyze these ${brandImages.length} images from brand "${brand?.name || 'unknown'}" and extract visual DNA for video production. The user's brief: "${state.brief || 'Create a professional video'}".`,
             brandImages,
@@ -217,7 +217,7 @@ export async function brainstormNode(state) {
         ? `${languageDirective}\n\n${BRAINSTORM_PROMPT(brandContext, styleMemory)}`
         : BRAINSTORM_PROMPT(brandContext, styleMemory);
 
-    const result = await callAgent(
+    const result = await agentUtils.callAgent(
         systemPrompt,
         userPrompt,
         0.8 // Higher creativity for brainstorming
@@ -296,7 +296,7 @@ export async function scriptDirectorNode(state) {
         ? `${languageDirective}\n\n${SCRIPT_DIRECTOR_PROMPT(brandContext, styleMemory, targetModel)}`
         : SCRIPT_DIRECTOR_PROMPT(brandContext, styleMemory, targetModel);
 
-    const result = await callAgent(
+    const result = await agentUtils.callAgent(
         systemPrompt,
         userPrompt,
         0.6

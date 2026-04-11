@@ -9,7 +9,7 @@
  * and web intelligence so the routing decision is grounded in current reality.
  */
 
-import { callAgent, loadBrandContext } from './shared/agentUtils.js';
+import { agentUtils } from './shared/agentUtils.js';
 import { callMcpToolsParallel } from '../mcp/registry.js';
 
 // ── Intent Classification Prompt ──
@@ -102,11 +102,11 @@ async function fetchRoutingIntel(brandId) {
  */
 export async function classifyIntent(userCommand, brandId) {
     const [{ brandContext }, marketIntel] = await Promise.all([
-        loadBrandContext(brandId),
+        agentUtils.loadBrandContext(brandId),
         fetchRoutingIntel(brandId),
     ]);
 
-    const result = await callAgent(
+    const result = await agentUtils.callAgent(
         CLASSIFIER_PROMPT(brandContext, marketIntel),
         `USER COMMAND: ${userCommand}`,
         0.3,
@@ -121,11 +121,11 @@ export async function classifyIntent(userCommand, brandId) {
  */
 export async function planCampaign(userCommand, brandId) {
     const [{ brandContext }, marketIntel] = await Promise.all([
-        loadBrandContext(brandId),
+        agentUtils.loadBrandContext(brandId),
         fetchRoutingIntel(brandId),
     ]);
 
-    const result = await callAgent(
+    const result = await agentUtils.callAgent(
         CAMPAIGN_PLANNER_PROMPT(brandContext, marketIntel),
         `CAMPAIGN REQUEST: ${userCommand}`,
         0.5,

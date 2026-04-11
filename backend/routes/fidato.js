@@ -8,7 +8,7 @@
 import { Router } from 'express';
 import { protect } from '../middleware/auth.js';
 import { getRouter } from '../ai/router.js';
-import { loadBrandContext } from '../agents/shared/agentUtils.js';
+import { agentUtils } from '../agents/shared/agentUtils.js';
 import { loadActiveSkillInstructions } from '../utils/skillHelpers.js';
 import User from '../models/User.js';
 import { safeErrorMessage } from '../utils/safeError.js';
@@ -156,7 +156,7 @@ router.post('/chat', protect, async (req, res) => {
         let brandContext = '';
         if (brandId) {
             try {
-                const { brandContext: ctx } = await loadBrandContext(brandId);
+                const { brandContext: ctx } = await agentUtils.loadBrandContext(brandId);
                 brandContext = ctx || '';
             } catch (e) {
                 console.warn('Fidato: could not load brand context:', e.message);
@@ -300,7 +300,7 @@ router.post('/briefing', protect, async (req, res) => {
         let brandName = '';
         if (brandId) {
             try {
-                const { brand, products } = await loadBrandContext(brandId);
+                const { brand, products } = await agentUtils.loadBrandContext(brandId);
                 if (brand) {
                     brandName = brand.name || '';
                     const dna = brand.dna || {};
@@ -407,7 +407,7 @@ router.get('/notifications', protect, async (req, res) => {
 
         if (brandId) {
             try {
-                const { brand, products } = await loadBrandContext(brandId);
+                const { brand, products } = await agentUtils.loadBrandContext(brandId);
                 if (brand) {
                     const dna = brand.dna || {};
 

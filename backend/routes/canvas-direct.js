@@ -9,7 +9,7 @@ import path from 'path';
 import { execSync } from 'child_process';
 import { searchWeb, searchBrandImages } from '../utils/searchManager.js';
 import Product from '../models/Product.js';
-import { callMultimodalAgent } from '../agents/shared/agentUtils.js';
+import { agentUtils } from '../agents/shared/agentUtils.js';
 import { VISUAL_GROUNDING_PROMPT, POST_GENERATION_CRITIC_PROMPT } from '../agents/creativeStudio/prompts.js';
 
 const router = express.Router();
@@ -1406,7 +1406,7 @@ router.post('/canvas-critique', protect, requireCredits('creativeCritique'), asy
             `\nAnalyze the generated image (provided) against these requirements. Score it honestly.`,
         ].filter(Boolean).join('\n');
 
-        const result = await callMultimodalAgent(
+        const result = await agentUtils.callMultimodalAgent(
             POST_GENERATION_CRITIC_PROMPT,
             userPrompt,
             [imageUrl],

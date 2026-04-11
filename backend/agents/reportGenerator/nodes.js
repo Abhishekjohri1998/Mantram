@@ -11,7 +11,7 @@ import AdCampaign from '../../models/AdCampaign.js';
 import Funnel from '../../models/Funnel.js';
 import FunnelEntry from '../../models/FunnelEntry.js';
 import { getRouter } from '../../ai/router.js';
-import { buildBrandContext, loadBrandContext } from '../shared/agentUtils.js';
+import { agentUtils, buildBrandContext } from '../shared/agentUtils.js';
 import {
     REPORT_SECTIONS_PROMPT,
     SEO_REPORT_CONTEXT,
@@ -210,7 +210,7 @@ export async function generateReportNode(state) {
     console.log(`📊 Report Generator: Generating ${studio}/${reportType} report...`);
 
     // 1. Load brand context (Redis-cached, 5-min TTL)
-    const { brand } = brandId ? await loadBrandContext(brandId) : { brand: null };
+    const { brand } = brandId ? await agentUtils.loadBrandContext(brandId) : { brand: null };
     const brandContext = buildBrandContext(brand);
     const branding = extractBranding(brand);
 

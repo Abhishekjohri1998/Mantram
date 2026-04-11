@@ -8,8 +8,7 @@
  * Each node: (state) → updatedState
  */
 
-import { callAgent, callMultimodalAgent } from '../shared/agentUtils.js';
-import { loadBrandContext } from '../shared/agentUtils.js';
+import { agentUtils } from '../shared/agentUtils.js';
 import { gatherIntelligence } from './tools.js';
 import Brand from '../../models/Brand.js';
 import Product from '../../models/Product.js';
@@ -39,7 +38,7 @@ async function getLangDirective(state) {
         return { langInfo: state.langInfo || { isRegional: false }, languageDirective: state.languageDirective };
     }
     try {
-        const { brand } = await loadBrandContext(state.brandId);
+        const { brand } = await agentUtils.loadBrandContext(state.brandId);
         const langInfo = inferBrandLanguage(brand);
         const languageDirective = buildLanguageDirective(langInfo, brand?.name || '', brand?.dna?.targetAudience || '');
         return { langInfo, languageDirective };
@@ -115,7 +114,7 @@ export async function researchNode(state) {
         : RESEARCH_PROMPT(brandContext);
 
     // ⚡ preferFast — Research is analytical, not creative: Gemini 2.5 Flash is fast enough
-    const result = await callAgent(systemPrompt, userPrompt, 0.6, 4096, { preferFast: true });
+    const result = await agentUtils.callAgent(systemPrompt, userPrompt, 0.6, 4096, { preferFast: true });
 
     return {
         ...state,
@@ -138,7 +137,7 @@ export async function writerNode(state) {
 
     const { brandContext } = state.brandContext
         ? { brandContext: state.brandContext }                // ⚡ Reuse from state (set by researchNode)
-        : await loadBrandContext(state.brandId);              // Fallback for standalone calls
+        : await agentUtils.loadBrandContext(state.brandId);              // Fallback for standalone calls
     // Reuse language directive from researchNode (already on state)
     const languageDirective = state.languageDirective || '';
     const langInfo = state.langInfo || { isRegional: false, displayName: 'English' };
@@ -218,7 +217,7 @@ Top Pages: ${(state.intelligence.ga4.data?.pages || []).slice(0, 3).map(p => `${
         ? `${languageDirective}\n\n${WRITER_PROMPT(brandContext)}`
         : WRITER_PROMPT(brandContext);
 
-    const result = await callAgent(systemPrompt, userPrompt, 0.7);
+    const result = await agentUtils.callAgent(systemPrompt, userPrompt, 0.7);
 
     return {
         ...state,
@@ -257,7 +256,7 @@ export async function seoNode(state) {
         : SEO_PROMPT(brandContext);
 
     // ⚡ preferFast — SEO optimization is analytical: Gemini 2.5 Flash is sufficient
-    const result = await callAgent(systemPrompt, userPrompt, 0.3, 4096, { preferFast: true });
+    const result = await agentUtils.callAgent(systemPrompt, userPrompt, 0.3, 4096, { preferFast: true });
 
     return {
         ...state,
@@ -293,7 +292,7 @@ export async function toneMatcherNode(state) {
         : TONE_MATCHER_PROMPT(brandContext);
 
     // ⚡ preferFast — Tone matching is pattern-based: fast model sufficient
-    const result = await callAgent(systemPrompt, userPrompt, 0.4, 4096, { preferFast: true });
+    const result = await agentUtils.callAgent(systemPrompt, userPrompt, 0.4, 4096, { preferFast: true });
 
     return {
         ...state,
@@ -310,7 +309,7 @@ export async function contentStrategistNode(state) {
 
     const { brandContext } = state.brandContext
         ? { brandContext: state.brandContext }                // ⚡ Reuse from state
-        : await loadBrandContext(state.brandId);
+        : await agentUtils.loadBrandContext(state.brandId);
     const languageDirective = state.languageDirective || '';
 
     // Competitor context if available
@@ -347,7 +346,7 @@ export async function contentStrategistNode(state) {
         : CONTENT_STRATEGIST_PROMPT(brandContext);
 
     // ⚡ preferFast — Strategy planning is structured analysis: Gemini 2.5 Flash sufficient
-    const result = await callAgent(systemPrompt, userPrompt, 0.5, 4096, { preferFast: true });
+    const result = await agentUtils.callAgent(systemPrompt, userPrompt, 0.5, 4096, { preferFast: true });
 
     return {
         ...state,
@@ -384,7 +383,7 @@ export async function platformOptimizerNode(state) {
         : PLATFORM_OPTIMIZER_PROMPT(brandContext);
 
     // ⚡ preferFast — Platform optimization is rule-based: Gemini 2.5 Flash sufficient
-    const result = await callAgent(systemPrompt, userPrompt, 0.4, 4096, { preferFast: true });
+    const result = await agentUtils.callAgent(systemPrompt, userPrompt, 0.4, 4096, { preferFast: true });
 
     return {
         ...state,
@@ -420,7 +419,7 @@ export async function qualityCriticNode(state) {
         : QUALITY_CRITIC_PROMPT(brandContext);
 
     // ⚡ preferFast — Quality critic scoring is evaluation, not generation: Gemini sufficient
-    const result = await callAgent(systemPrompt, userPrompt, 0.3, 4096, { preferFast: true });
+    const result = await agentUtils.callAgent(systemPrompt, userPrompt, 0.3, 4096, { preferFast: true });
 
     const overallScore = result?.scores?.overall || result?.overallScore || 10;
     const rewriteCount = state.rewriteCount || 0;
@@ -472,7 +471,7 @@ export async function qualityCriticNode(state) {
 export async function contentABTestNode(state) {
     console.log('🔬 Content Agent: A/B Test — generating variants...');
 
-    const { brandContext } = await loadBrandContext(state.brandId);
+    const { brandContext } = await agentUtils.loadBrandContext(state.brandId);
     const { langInfo, languageDirective } = await getLangDirective(state);
 
     const userPrompt = [
@@ -494,7 +493,7 @@ export async function contentABTestNode(state) {
         ? `${languageDirective}\n\n${CONTENT_AB_TEST_PROMPT(brandContext)}`
         : CONTENT_AB_TEST_PROMPT(brandContext);
 
-    const result = await callAgent(systemPrompt, userPrompt, 0.7);
+    const result = await agentUtils.callAgent(systemPrompt, userPrompt, 0.7);
 
     return {
         ...state,
@@ -510,7 +509,7 @@ export async function contentABTestNode(state) {
 export async function youtubeResearchNode(state) {
     console.log('🎬 YouTube Agent: Research — analyzing topic for YouTube...');
 
-    const { brandContext } = await loadBrandContext(state.brandId);
+    const { brandContext } = await agentUtils.loadBrandContext(state.brandId);
     const { langInfo, languageDirective } = await getLangDirective(state);
 
     // Gather intelligence for YouTube too
@@ -540,7 +539,7 @@ export async function youtubeResearchNode(state) {
         ? `${languageDirective}\n\n${YOUTUBE_RESEARCH_PROMPT(brandContext)}`
         : YOUTUBE_RESEARCH_PROMPT(brandContext);
 
-    const result = await callAgent(systemPrompt, userPrompt, 0.6);
+    const result = await agentUtils.callAgent(systemPrompt, userPrompt, 0.6);
 
     return {
         ...state,
@@ -554,7 +553,7 @@ export async function youtubeResearchNode(state) {
 export async function youtubeWriterNode(state) {
     console.log('✍️ YouTube Agent: Writer — creating YouTube content...');
 
-    const { brandContext } = await loadBrandContext(state.brandId);
+    const { brandContext } = await agentUtils.loadBrandContext(state.brandId);
     const { langInfo, languageDirective } = await getLangDirective(state);
     const research = state.youtubeResearch || {};
 
@@ -581,7 +580,7 @@ export async function youtubeWriterNode(state) {
         ? `${languageDirective}\n\n${YOUTUBE_WRITER_PROMPT(brandContext)}`
         : YOUTUBE_WRITER_PROMPT(brandContext);
 
-    const result = await callAgent(systemPrompt, userPrompt, 0.7, 8192);
+    const result = await agentUtils.callAgent(systemPrompt, userPrompt, 0.7, 8192);
 
     return {
         ...state,
@@ -593,7 +592,7 @@ export async function youtubeWriterNode(state) {
 export async function youtubeSeoNode(state) {
     console.log('🚀 YouTube Agent: SEO Optimizer — generating publish metadata...');
 
-    const { brandContext } = await loadBrandContext(state.brandId);
+    const { brandContext } = await agentUtils.loadBrandContext(state.brandId);
     const { langInfo, languageDirective } = await getLangDirective(state);
     const research = state.youtubeResearch || {};
 
@@ -617,7 +616,7 @@ export async function youtubeSeoNode(state) {
         ? `${languageDirective}\n\n${YOUTUBE_SEO_PROMPT(brandContext)}`
         : YOUTUBE_SEO_PROMPT(brandContext);
 
-    const result = await callAgent(systemPrompt, userPrompt, 0.5, 4096);
+    const result = await agentUtils.callAgent(systemPrompt, userPrompt, 0.5, 4096);
 
     return {
         ...state,
@@ -695,7 +694,7 @@ function buildIntelligenceContext(intelligence) {
 export async function blogWriterNode(state) {
     console.log('📝 Blog Agent: Writing structured blog article...');
 
-    const { brandContext } = await loadBrandContext(state.brandId);
+    const { brandContext } = await agentUtils.loadBrandContext(state.brandId);
     const { langInfo, languageDirective } = await getLangDirective(state);
     if (langInfo.isRegional) {
         console.log(`🌍 Blog Agent: Language directive active — ${langInfo.displayName}`);
@@ -717,7 +716,7 @@ export async function blogWriterNode(state) {
         .replace('{audience}', state.targetAudience || 'general')
         .replace('{tone}', state.tone || 'professional, engaging') + langNote;
 
-    const result = await callAgent(prompt, `Generate a structured blog article about: ${state.topic || state.brief}`, 0.7, 8192);
+    const result = await agentUtils.callAgent(prompt, `Generate a structured blog article about: ${state.topic || state.brief}`, 0.7, 8192);
 
     // callAgent already parses JSON and returns an object
     // result is either { title, subtitle, slug, sections, ... } or { error, raw }
@@ -822,7 +821,7 @@ export async function contentVisualGroundingNode(state) {
 
         console.log(`🧠 Content MCoT: Analyzing ${imageUrls.length} brand images...`);
 
-        const grounding = await callMultimodalAgent(
+        const grounding = await agentUtils.callMultimodalAgent(
             CONTENT_VISUAL_GROUNDING_PROMPT,
             `Analyze these brand/product images for ${brand.name} (${dna.industry || 'consumer brand'}). Extract copywriting guidance.`,
             imageUrls,
