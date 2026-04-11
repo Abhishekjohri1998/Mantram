@@ -36,7 +36,6 @@ Return JSON:
 // ══════════════════════════════════════════════════════════════════════
 
 // POST /api/canvas-assets/upload-canvas-export — Upload canvas export base64 to S3, return S3 URL
-// This is the ONLY place base64 should ever be accepted. All downstream calls use S3 URLs.
 router.post('/upload-canvas-export', protect, async (req, res) => {
     try {
         const { imageDataUrl, mimeType = 'image/jpeg' } = req.body
@@ -44,7 +43,6 @@ router.post('/upload-canvas-export', protect, async (req, res) => {
         if (!imageDataUrl.startsWith('data:')) {
             return res.status(400).json({ success: false, error: 'imageDataUrl must be a base64 data URI' })
         }
-
         const ext = mimeType.includes('png') ? 'png' : 'jpg'
         const filename = `canvas-exports/${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`
         const s3Url = await uploadToS3(imageDataUrl, filename, mimeType)
@@ -57,22 +55,23 @@ router.post('/upload-canvas-export', protect, async (req, res) => {
 })
 
 // POST /api/canvas-assets/ai-adapt — AI-powered design adaptation using NanoBanana 2
-// Takes a canvas screenshot + target preset → returns AI-regenerated image sized for that platform
+// Uses DIRECT Gemini API (@google/genai SDK) — no LaoZhang middleman
+// Flow: S3 URL → backend fetches image → sends inline to Gemini → gets image back → uploads to S3 → returns S3 URL
 router.post('/ai-adapt', protect, async (req, res) => {
     const startTime = Date.now()
     try {
-        const { canvasImageUrl, canvasImageBase64, preset, brandContext } = req.body
+        const { canvasImageUrl, preset, brandContext } = req.body
 
         if (!preset) return res.status(400).json({ success: false, error: 'preset is required' })
         if (!canvasImageUrl) {
-            return res.status(400).json({ success: false, error: 'canvasImageUrl (S3 URL) is required. Use /upload-canvas-export first to get a S3 URL from a base64 export.' })
+            return res.status(400).json({ success: false, error: 'canvasImageUrl (S3 URL) is required' })
         }
         if (canvasImageUrl.startsWith('data:')) {
-            return res.status(400).json({ success: false, error: 'base64 data URIs are not accepted here. Upload the canvas export via /upload-canvas-export first to get a S3 URL.' })
+            return res.status(400).json({ success: false, error: 'base64 data URIs not accepted. Provide an S3/HTTP URL.' })
         }
 
-        const lzKey = process.env.LAOZHANG_API_KEY
-        if (!lzKey) return res.status(400).json({ success: false, error: 'LAOZHANG_API_KEY not configured' })
+        const geminiKey = process.env.GEMINI_API_KEY
+        if (!geminiKey) return res.status(400).json({ success: false, error: 'GEMINI_API_KEY not configured' })
 
         const PRESET_MAP = {
             'ig-post':         { w: 1080, h: 1350, label: 'Instagram Post',       aspectRatio: '4:5',   orientation: 'portrait' },
@@ -94,120 +93,90 @@ router.post('/ai-adapt', protect, async (req, res) => {
 
         const brand = brandContext || {}
         const brandColors = brand.dna?.brandColors?.map(c => c.hex || c.name).filter(Boolean).join(', ') || ''
-        const brandStyle = brand.dna?.brandVoice || brand.dna?.visualStyle || ''
 
-        // Build a focused adaptation prompt
-        const adaptPrompt = `Adapt the provided reference image to ${spec.label} format (${spec.aspectRatio} aspect ratio, ${spec.w}\u00d7${spec.h}px).
+        const adaptPrompt = `Adapt this reference image to ${spec.label} format (${spec.aspectRatio} aspect ratio, ${spec.w}x${spec.h}px).
 
 RULES:
-- OUTPUT exactly ${spec.w}\u00d7${spec.h}px at ${spec.aspectRatio} ratio
+- Output exactly ${spec.w}x${spec.h}px at ${spec.aspectRatio} ratio
 - PRESERVE all subjects, people, faces, products, text, and visual elements from the reference
 - RECOMPOSE for ${spec.orientation} layout: ${spec.orientation.includes('portrait') ? 'extend background vertically' : spec.orientation.includes('landscape') ? 'extend background horizontally' : 'center elements'}
 - Keep identical colors, style, mood, and visual identity
-- Fill empty space by intelligently extending the background${brandColors ? `\n- Brand colors: ${brandColors}` : ''}
-- Do NOT invent new content \u2014 only adapt composition and aspect ratio`
+- Fill empty space by intelligently extending the background${brandColors ? ', using brand colors: ' + brandColors : ''}
+- Do NOT invent new content, only adapt composition and aspect ratio
+- Generate the adapted image now.`
 
-        // Use LaoZhang NanoBanana 2 (Gemini 3.1 Flash Image)
-        const lzModel = 'gemini-3.1-flash-image-preview'
-        const lzSize = `${spec.w}x${spec.h}`
+        console.log(`🎨 [AI-Adapt] ${preset} (${spec.w}x${spec.h}) — Direct Gemini API`)
 
-        console.log(`🎨 [AI-Adapt] ${preset} (${lzSize}) — downloading S3 image for LaoZhang`)
-
-        // ── Fetch the S3 image server-side and send as inline data ──
-        // LaoZhang (Chinese gateway) cannot access AWS S3 ap-south-1 URLs directly.
-        // We download the image on the backend and send inline — server-to-server only.
-        let imageInlinePart
+        // Step 1: Fetch S3 image server-side (Gemini needs inline data)
+        let imageBuffer, imageMimeType
         try {
             const imgResp = await fetch(canvasImageUrl, {
                 headers: { 'User-Agent': 'Mozilla/5.0' },
                 signal: AbortSignal.timeout(30000),
             })
             if (!imgResp.ok) throw new Error(`S3 fetch failed (${imgResp.status})`)
-            const contentType = imgResp.headers.get('content-type') || 'image/jpeg'
+            imageMimeType = imgResp.headers.get('content-type') || 'image/jpeg'
             const arrBuf = await imgResp.arrayBuffer()
-            const b64 = Buffer.from(arrBuf).toString('base64')
-            // Gemini inline_data format (via LaoZhang chat completions)
-            imageInlinePart = { type: 'image_url', image_url: { url: `data:${contentType};base64,${b64}` } }
-            console.log(`✅ [AI-Adapt] Image fetched: ${Math.round(arrBuf.byteLength / 1024)}KB, type=${contentType}`)
+            imageBuffer = Buffer.from(arrBuf)
+            console.log(`✅ [AI-Adapt] Image fetched: ${Math.round(imageBuffer.length / 1024)}KB, type=${imageMimeType}`)
         } catch (imgErr) {
             throw new Error(`Failed to fetch reference image from S3: ${imgErr.message}`)
         }
 
-        const contentParts = [imageInlinePart, { type: 'text', text: adaptPrompt }]
+        // Step 2: Call Gemini directly via @google/genai SDK
+        const { GoogleGenAI } = await import('@google/genai')
+        const ai = new GoogleGenAI({ apiKey: geminiKey })
 
-        const controller = new AbortController()
-        const timeoutId = setTimeout(() => controller.abort(), 120000)  // 120s for NanoBanana 2
-
-        let response
-        try {
-            response = await fetch('https://api.laozhang.ai/v1/chat/completions', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${lzKey}`,
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.0-flash-exp',
+            contents: [
+                {
+                    role: 'user',
+                    parts: [
+                        { inlineData: { mimeType: imageMimeType, data: imageBuffer.toString('base64') } },
+                        { text: adaptPrompt },
+                    ],
                 },
-                body: JSON.stringify({
-                    model: lzModel,
-                    messages: [{ role: 'user', content: contentParts }],
-                    size: lzSize,
-                }),
-                signal: controller.signal,
-            })
-        } catch (fetchErr) {
-            clearTimeout(timeoutId)
-            if (fetchErr.name === 'AbortError') {
-                throw new Error(`NanoBanana 2 timed out after 120s for preset ${preset}. LaoZhang may be overloaded.`)
-            }
-            throw fetchErr
-        }
-        clearTimeout(timeoutId)
+            ],
+            config: {
+                responseModalities: ['TEXT', 'IMAGE'],
+            },
+        })
 
-        if (!response.ok) {
-            const errText = await response.text()
-            console.error(`❌ [AI-Adapt] LaoZhang failed (${response.status}): ${errText.substring(0, 300)}`)
-            throw new Error(`NanoBanana 2 failed (${response.status}): ${errText.substring(0, 200)}`)
-        }
+        // Step 3: Extract generated image from response
+        let generatedImageBuffer = null
+        let generatedMimeType = 'image/png'
 
-        const data = await response.json()
-        let imageUrl = ''
-
-        // Extract image from response (Gemini native format)
-        const parts = data.choices?.[0]?.message?.parts || []
-        for (const part of parts) {
-            if (part.inline_data?.data && part.inline_data?.mime_type) {
-                imageUrl = `data:${part.inline_data.mime_type};base64,${part.inline_data.data}`
-                break
+        if (response.candidates?.[0]?.content?.parts) {
+            for (const part of response.candidates[0].content.parts) {
+                if (part.inlineData?.data) {
+                    generatedImageBuffer = Buffer.from(part.inlineData.data, 'base64')
+                    generatedMimeType = part.inlineData.mimeType || 'image/png'
+                    break
+                }
             }
         }
 
-        // Fallback: parse from content string
-        if (!imageUrl) {
-            const content = data.choices?.[0]?.message?.content || ''
-            const dataUriMatch = content.match(/!\[.*?\]\((data:image\/[^)]+)\)/)
-            if (dataUriMatch) imageUrl = dataUriMatch[1]
-            if (!imageUrl) { const httpsMatch = content.match(/\[.*?\]\((https?:\/\/[^\s)]+)\)/); if (httpsMatch) imageUrl = httpsMatch[1] }
-            if (!imageUrl) { const directImg = content.match(/(https?:\/\/[^\s"']+\.(png|jpg|jpeg|webp))/i); if (directImg) imageUrl = directImg[1] }
-            if (!imageUrl) { const rawB64 = content.match(/(data:image\/[a-z]+;base64,[A-Za-z0-9+/=]+)/); if (rawB64) imageUrl = rawB64[1] }
+        if (!generatedImageBuffer) {
+            const textContent = response.candidates?.[0]?.content?.parts?.map(p => p.text).filter(Boolean).join(' ') || ''
+            console.error(`❌ [AI-Adapt] No image in Gemini response. Text: ${textContent.substring(0, 400)}`)
+            throw new Error('Gemini returned text but no image. The model may need a different prompt or the content was blocked.')
         }
 
-        if (!imageUrl) {
-            const content = data.choices?.[0]?.message?.content || ''
-            console.error(`❌ [AI-Adapt] No image in NanoBanana 2 response:`, content.substring(0, 400))
-            throw new Error('NanoBanana 2 returned response but no image found. The model may have generated text instead.')
-        }
+        // Step 4: Upload result to S3
+        const ext = generatedMimeType.includes('png') ? 'png' : 'jpg'
+        const s3Key = `canvas-adapt/${preset}/${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`
+        const finalUrl = await uploadToS3(generatedImageBuffer, s3Key, generatedMimeType)
 
-        // Upload base64 to S3 to avoid huge payloads
-        const { ensureS3Url } = await import('../utils/s3.js')
-        const finalUrl = await ensureS3Url(imageUrl, `canvas-adapt/${preset}`)
-
-        console.log(`✅ [AI-Adapt] ${preset} done in ${Date.now() - startTime}ms → ${finalUrl.substring(0, 80)}`)
+        const elapsed = Date.now() - startTime
+        console.log(`✅ [AI-Adapt] ${preset} done in ${elapsed}ms → ${finalUrl.substring(0, 80)}`)
 
         return res.json({
             success: true,
             preset,
             imageUrl: finalUrl,
             spec,
-            generationTime: Date.now() - startTime,
+            generationTime: elapsed,
         })
     } catch (err) {
         console.error('[AI-Adapt] Error:', err.message)
@@ -215,7 +184,6 @@ RULES:
     }
 })
 
-// POST /api/canvas-assets/ai-analyze — Analyze image and return TEXT description (for reverse prompting)
 router.post('/ai-analyze', protect, async (req, res) => {
     try {
 
