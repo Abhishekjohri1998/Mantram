@@ -7,7 +7,7 @@
  * Each node: (state) → updatedState
  */
 
-import { callAgent, callMultimodalAgent, loadBrandContext } from '../shared/agentUtils.js';
+import { agentUtils } from '../shared/agentUtils.js';
 import Brand from '../../models/Brand.js';
 import Product from '../../models/Product.js';
 import { inferBrandLanguage, buildLanguageDirective } from '../../utils/brandLanguage.js';
@@ -514,7 +514,7 @@ export async function artDirectorNode(state) {
     ].filter(Boolean).join('\n');
 
     // ⚡ preferFast — Art Director output is structured JSON: Gemini 2.5 Flash handles well
-    const result = await callAgent(ART_DIRECTOR_PROMPT(brandContext), userPrompt, 0.7, 4096, { preferFast: true });
+    const result = await agentUtils.callAgent(ART_DIRECTOR_PROMPT(brandContext), userPrompt, 0.7, 4096, { preferFast: true });
     console.log(`🎨 Art direction defined in ${Date.now() - startMs}ms`);
 
     return {
@@ -589,7 +589,7 @@ export async function fastCreativeDirectorNode(state) {
     ].filter(Boolean).join('\n');
 
     // ⚡ preferFast — Fast mode already implies speed priority: Gemini 2.5 Flash is ideal
-    const result = await callAgent(FAST_CREATIVE_DIRECTOR_PROMPT(brandContext), userPrompt, 0.6, 2048, { preferFast: true });
+    const result = await agentUtils.callAgent(FAST_CREATIVE_DIRECTOR_PROMPT(brandContext), userPrompt, 0.6, 2048, { preferFast: true });
     console.log(`⚡ Fast Creative Director done in ${Date.now() - startMs}ms`);
 
     return {
@@ -667,7 +667,7 @@ export async function promptEngineerNode(state) {
     ].filter(Boolean).join('\n');
 
     // ⚡ preferFast — Prompt engineering is technical transformation: Gemini sufficient
-    const result = await callAgent(PROMPT_ENGINEER_PROMPT(brandContext), userPrompt, 0.5, 4096, { preferFast: true });
+    const result = await agentUtils.callAgent(PROMPT_ENGINEER_PROMPT(brandContext), userPrompt, 0.5, 4096, { preferFast: true });
     console.log(`🔧 Prompt engineered in ${Date.now() - startMs}ms`);
 
     return {
@@ -698,7 +698,7 @@ export async function styleCriticNode(state) {
     ].join('\n');
 
     // ⚡ preferFast — Style critic is evaluation/scoring: Gemini sufficient
-    const result = await callAgent(STYLE_CRITIC_PROMPT(brandContext), userPrompt, 0.3, 4096, { preferFast: true });
+    const result = await agentUtils.callAgent(STYLE_CRITIC_PROMPT(brandContext), userPrompt, 0.3, 4096, { preferFast: true });
     console.log(`🔍 Critique complete in ${Date.now() - startMs}ms — verdict: ${result.verdict}`);
 
     // If critic says improve-first, use the improved prompt (immutable — create new object)
@@ -738,7 +738,7 @@ export async function variationGeneratorNode(state) {
     ].join('\n');
 
     // ⚡ preferFast — Variation is JSON structure generation: Gemini sufficient
-    const result = await callAgent(VARIATION_PROMPT(brandContext), userPrompt, 0.8, 4096, { preferFast: true });
+    const result = await agentUtils.callAgent(VARIATION_PROMPT(brandContext), userPrompt, 0.8, 4096, { preferFast: true });
     console.log(`🔀 ${(result.variations || []).length} variations generated in ${Date.now() - startMs}ms`);
 
     return {
@@ -874,7 +874,7 @@ export async function copywriterNode(state) {
         : COPYWRITER_PROMPT(resolvedBrandContext);
 
     // ⚡ preferFast — Copywriter produces structured JSON copy: Gemini 2.5 Flash handles well
-    const result = await callAgent(systemPrompt, userPrompt, 0.75, 8192, { preferFast: true });
+    const result = await agentUtils.callAgent(systemPrompt, userPrompt, 0.75, 8192, { preferFast: true });
     console.log(`✍️  Copywriter result keys: ${Object.keys(result || {}).join(', ')}`);
     console.log(`✍️  Copywriter done in ${Date.now() - startMs}ms — headline: "${result.headline || '?'}" | subtext: "${result.subtext || 'none'}" | cta: "${result.ctaText || 'none'}"${result.error ? ` [PARSE ERROR: ${result.error}] RAW: ${result.raw?.substring(0, 200)}` : ''}`);
     if (result.ctaText) console.log(`✍️  Copywriter CTA: "${result.ctaText}"`);
@@ -943,7 +943,7 @@ export async function visualGroundingNode(state) {
         `These images show ${mp ? `the product "${mp.title}"` : 'the brand\'s visual identity'}.`,
     ].filter(Boolean).join('\n');
 
-    const result = await callMultimodalAgent(
+    const result = await agentUtils.callMultimodalAgent(
         VISUAL_GROUNDING_PROMPT,
         userPrompt,
         imagesToAnalyze,
@@ -1000,7 +1000,7 @@ export async function postGenerationCriticNode(state) {
         `\nAnalyze the generated image (provided) against these requirements. Score it honestly.`,
     ].filter(Boolean).join('\n');
 
-    const result = await callMultimodalAgent(
+    const result = await agentUtils.callMultimodalAgent(
         POST_GENERATION_CRITIC_PROMPT,
         userPrompt,
         [imageUrl], // Send the generated image for visual analysis
@@ -1059,7 +1059,7 @@ export async function runCreativePipeline(params) {
     emit('brand-intel', 'Gathering brand intelligence...', 'working');
     // ⚡ PERF: loadBrandContext returns brand + products from Redis cache (5min TTL).
     // We pass them directly into state so brandIntelligenceNode skips redundant DB queries.
-    const { brandContext, brand: loadedBrand, products: loadedProducts } = await loadBrandContext(brandId);
+    const { brandContext, brand: loadedBrand, products: loadedProducts } = await agentUtils.loadBrandContext(brandId);
 
     let state = {
         brandId,

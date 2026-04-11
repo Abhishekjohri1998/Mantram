@@ -511,7 +511,8 @@ router.post('/agent/create', protect, requireCredits('videoGenerate'), async (re
         console.log(`   🎧 audioFileUrl: ${audioFileUrl ? audioFileUrl.substring(0, 80) : "NOT PROVIDED"} | charPhoto: ${characterPhoto ? "yes" : "no"} | charDesc: ${characterDescriptions ? "yes" : "no"}`);
 
         // ── Step 1: Load full brand context (DNA + products + images + knowledge) ──
-        const { brand, brandContext, products } = await (await import('../agents/shared/agentUtils.js')).loadBrandContext(brandId);
+        const { agentUtils } = await import('../agents/shared/agentUtils.js');
+        const { brand, brandContext, products } = await agentUtils.loadBrandContext(brandId);
 
         // ── Step 2: Load specific product if selected ──
         let productContext = '';

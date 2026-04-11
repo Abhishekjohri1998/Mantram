@@ -5,7 +5,7 @@ import { requireCredits } from '../middleware/credits.js'
 import { URL } from 'url'
 import { safeErrorMessage } from '../utils/safeError.js';
 import { uploadToS3, getSignedUrlIfNeeded } from '../utils/s3.js';
-import { callMultimodalAgent, loadBrandContext } from '../agents/shared/agentUtils.js';
+import { agentUtils } from '../agents/shared/agentUtils.js';
 import Brand from '../models/Brand.js';
 import Product from '../models/Product.js';
 const router = express.Router()
@@ -294,7 +294,7 @@ router.post('/ai-generate', protect, requireCredits('canvasGenerate'), async (re
         if (refCount > 1) {
             console.log(`🧠 MCoT Canvas: Multi-subject reference detected. Synthesizing ${refCount} images...`)
             try {
-                const synthesis = await callMultimodalAgent(
+                const synthesis = await agentUtils.callMultimodalAgent(
                     `You are an elite creative analyst. The user has provided ${refCount} reference images and wants: "${prompt}".`,
                     `For EACH attached image, output a labeled block like this:
 IMAGE 1 SUBJECT: [Describe the exact person/object — age, gender, skin tone, hair color/style, clothing, build, expression, distinguishing features]
@@ -459,7 +459,34 @@ router.post('/ai-edit', protect, requireCredits('canvasGenerate'), async (req, r
 
         const imgCount = parts.length
         
-        const editText = imgCount > 1
+        let dynamicSynthesisPrompt = ''
+        if (imgCount > 1) {
+            console.log(`🧠 MCoT Canvas: Multi-subject edit detected. Synthesizing ${imgCount} images...`)
+            try {
+                const synthesis = await agentUtils.callMultimodalAgent(
+                    `You are an elite creative analyst. The user has provided ${imgCount} reference images and wants: "${prompt}".`,
+                    `For EACH attached image, output a labeled block like this:
+IMAGE 1 SUBJECT: [Describe the exact person/object — age, gender, skin tone, hair color/style, clothing, build, expression, distinguishing features]
+IMAGE 2 SUBJECT: [Same level of detail for the second image]
+...and so on for all images.
+
+Then write:
+COMBINED SCENE: [A single paragraph describing ALL subjects together in the scene the user wants: "${prompt}". Every subject must appear with their exact appearance preserved.]
+
+Be forensically detailed about each subject's appearance so the image generator cannot hallucinate or swap them.`,
+                    [imageBase64, ...additionalImages].slice(0, 4),
+                    { temperature: 0.1, maxTokens: 1024, returnRaw: true }
+                )
+                if (synthesis && typeof synthesis === 'string') {
+                    dynamicSynthesisPrompt = synthesis.trim()
+                    console.log(`🧠 MCoT Canvas: Edit subject synthesis complete (${dynamicSynthesisPrompt.length} chars)`)
+                }
+            } catch (e) {
+                console.warn('MCoT Synthesis failed for edit payload:', e.message)
+            }
+        }
+
+        const editText = imgCount > 1 && dynamicSynthesisPrompt
             ? `CRITICAL INSTRUCTION — MULTI-SUBJECT IMAGE EDIT:
 
 You have been given ${imgCount} reference images. Each image contains a DIFFERENT subject.

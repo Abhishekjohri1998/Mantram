@@ -1253,15 +1253,15 @@ router.post('/suggest-copy', protect, async (req, res) => {
         if (!brief?.trim()) return res.status(400).json({ success: false, error: 'Brief is required' });
 
         // Load brand context (same as pipeline)
-        const { buildBrandContext } = await import('../agents/shared/agentUtils.js');
+        const { agentUtils } = await import('../agents/shared/agentUtils.js');
         const Brand = (await import('../models/Brand.js')).default;
         const brand = brandId ? await Brand.findById(brandId).lean() : null;
         const products = brand?._id ? (await (await import('../models/Product.js')).default.find({ brand: brand._id }).limit(5).lean()) : [];
-        const brandContext = brand ? buildBrandContext(brand, products) : '<brand_bible>No brand data. Use professional style.</brand_bible>';
+        const brandContext = brand ? agentUtils.buildBrandContext(brand, products) : '<brand_bible>No brand data. Use professional style.</brand_bible>';
 
         // Import and call copywriter with the brief directly
         const { COPYWRITER_PROMPT } = await import('../agents/creativeStudio/prompts.js');
-        const { callAgent } = await import('../agents/shared/agentUtils.js');
+        // agentUtils imported above
 
         const formatLabel = format || 'instagram-post';
 
@@ -1273,7 +1273,7 @@ router.post('/suggest-copy', protect, async (req, res) => {
             `Match the tone, energy, and style of the brief. Think: what would a top creative director write on this ad's typography?`,
         ].join('\n');
 
-        const result = await callAgent(COPYWRITER_PROMPT(brandContext), userPrompt, 0.7, 1024);
+        const result = await agentUtils.callAgent(COPYWRITER_PROMPT(brandContext), userPrompt, 0.7, 1024);
 
         if (result.error) {
             return res.json({ success: false, error: 'Copy generation failed', raw: result.raw });
