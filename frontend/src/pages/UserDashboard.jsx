@@ -324,11 +324,12 @@ export default function UserDashboard() {
     }, [loadSummary, loadTrends, loadAnalytics])
 
     // Redirect to onboarding if no brands found (and not loading)
+    // ONLY for non-members who have the permission to create their first brand.
     useEffect(() => {
-        if (!brandsLoading && brands && brands.length === 0) {
+        if (!brandsLoading && brands && brands.length === 0 && user?.role !== 'member') {
             navigate('/onboarding')
         }
-    }, [brands, brandsLoading, navigate])
+    }, [brands, brandsLoading, navigate, user?.role])
 
     // ── Load intel missions ──
     useEffect(() => {

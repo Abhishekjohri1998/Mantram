@@ -152,10 +152,12 @@ export default function BrandManagement() {
                         {allBrands.length} brand{allBrands.length !== 1 ? 's' : ''} · Manage your brand portfolio
                     </p>
                 </div>
-                <button onClick={() => navigate('/onboarding')}
-                    className="btn-primary py-2.5 px-5 rounded-xl text-sm cursor-pointer flex items-center gap-2 shrink-0">
-                    <span className="material-symbols-outlined text-sm">add</span>Add Brand
-                </button>
+                {user?.role !== 'member' && (
+                    <button onClick={() => navigate('/onboarding')}
+                        className="btn-primary py-2.5 px-5 rounded-xl text-sm cursor-pointer flex items-center gap-2 shrink-0">
+                        <span className="material-symbols-outlined text-sm">add</span>Add Brand
+                    </button>
+                )}
             </div>
 
             {/* Stats Row */}
@@ -348,18 +350,20 @@ export default function BrandManagement() {
                         )
                     })}
 
-                    {/* Add Brand Card */}
-                    <button onClick={() => navigate('/onboarding')}
-                        className="glass-panel rounded-2xl p-8 flex flex-col items-center justify-center gap-3 border border-dashed border-[var(--sys-border)] hover:border-primary/30 hover:bg-primary/[0.02] transition-all cursor-pointer min-h-[280px] group animate-fade-in"
-                        style={{ animationDelay: `${filteredBrands.length * 50}ms` }}>
-                        <div className="size-16 rounded-2xl bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform">
-                            <span className="material-symbols-outlined text-3xl text-primary">add</span>
-                        </div>
-                        <div className="text-center">
-                            <p className="text-sm font-bold text-[var(--sys-text)] mb-0.5">Add New Brand</p>
-                            <p className="text-xs text-[var(--sys-text-muted)]">Scan a website or brainstorm</p>
-                        </div>
-                    </button>
+                    {/* Add Brand Card - Only for Managers and above */}
+                    {user?.role !== 'member' && (
+                        <button onClick={() => navigate('/onboarding')}
+                            className="glass-panel rounded-2xl p-8 flex flex-col items-center justify-center gap-3 border border-dashed border-[var(--sys-border)] hover:border-primary/30 hover:bg-primary/[0.02] transition-all cursor-pointer min-h-[280px] group animate-fade-in"
+                            style={{ animationDelay: `${filteredBrands.length * 50}ms` }}>
+                            <div className="size-16 rounded-2xl bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                <span className="material-symbols-outlined text-3xl text-primary">add</span>
+                            </div>
+                            <div className="text-center">
+                                <p className="text-sm font-bold text-[var(--sys-text)] mb-0.5">Add New Brand</p>
+                                <p className="text-xs text-[var(--sys-text-muted)]">Scan a website or brainstorm</p>
+                            </div>
+                        </button>
+                    )}
                 </div>
             )}
 
