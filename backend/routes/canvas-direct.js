@@ -646,10 +646,18 @@ When calling create_script_block, use this structure:
 - For video ads: script scenes must include voiceover text and duration per scene
 - For voiceover: ONLY use speaker 'anushka' (female) or 'abhilash' (male). No other speakers.
 - NEVER just add plain text elements for ad requests — use the full pipeline
-- ⚠️ CRITICAL: NEVER auto-generate videos without user confirmation. When a user asks to create or animate a video, ALWAYS pause and ask them to confirm their preferred model and resolution FIRST, explaining that these impact the generation cost. Inform them that the default model is 'grok' and the default resolution is '1080p'. Only use the generate_video_clip tool AFTER they reply.`;
-
-
-
+- ⚡ VIDEO GENERATION — DEFAULT MODEL: **grok** (Grok Video by xAI). DO NOT ask for model confirmation before starting. Instead:
+  1. Call generate_video_clip immediately with model="grok" and resolution="1080p" as defaults.
+  2. In your response text BEFORE calling the tool, say: "🎬 Generating your video with **Grok** (default). Reply with a model name below to switch:"
+  3. Then offer these model options inline in your message text (user can reply to switch):
+     - **Grok** (default) — Fast & cinematic. Best for brand ads.
+     - **Kling** — High detail, great for lifestyle/realism.
+     - **Seedance** — Indian market optimized, fast renders.
+     - **Wan** — Creative/surreal visuals, best for abstract.
+     - **Hailuo** — High-fidelity, cinematic motion.
+  4. If the user replies with a model name, regenerate with that model using generate_video_clip.
+  5. NEVER block generation waiting for a model choice. Default to Grok and keep moving.
+  6. Resolution default is 1080p. If user says "4K" use resolution="4k". If on mobile/story use aspectRatio="9:16".`;
 
         // ── PRE-FLIGHT: Pull data from Brand DNA + Product catalog (NO web search) ──
         const aiRouter = getAIRouter();

@@ -632,54 +632,204 @@ export async function executeToolCall(toolCall, fc, ctx = {}, deps = {}) {
             // Extract image and prompt from scene if omitted
             if (sceneRef && ctx.scenes && ctx.scenes[sceneRef - 1]) {
                 const scene = ctx.scenes[sceneRef - 1]
-                if (!sourceImageUrl && scene.imageUrl) {
-                    sourceImageUrl = scene.imageUrl
-                }
-                if (!prompt || !prompt.trim()) {
-                    prompt = scene.visual || scene.script || ''
-                }
+                if (!sourceImageUrl && scene.imageUrl) sourceImageUrl = scene.imageUrl
+                if (!prompt || !prompt.trim()) prompt = scene.visual || scene.script || ''
             }
             
             // Backend validation requires a prompt string
             if (!prompt || !prompt.trim()) {
-                prompt = sourceImageUrl ? "Cinematic subtle motion animation, 4k resolution" : "A cinematic 4k video scene"
+                prompt = sourceImageUrl ? 'Cinematic subtle motion animation, 4k resolution' : 'A cinematic 4k video scene'
             }
 
+            const selectedModel = model || 'grok'
+            const selectedRes = resolution || '1080p'
+
             if (setFidatoMessages) {
-                setFidatoMessages(prev => [...prev, { role: 'assistant', content: `🎬 Generating video: "${prompt.substring(0, 50)}..."` }])
+                setFidatoMessages(prev => [...prev, {
+                    role: 'assistant',
+                    content: `🎬 Generating video with **${selectedModel.toUpperCase()}** at ${selectedRes}...\nPrompt: "${prompt.substring(0, 60)}${prompt.length > 60 ? '...' : ''}"\n⏳ This usually takes 1-3 minutes. I'll notify you when ready!`
+                }])
             }
+
             try {
                 const data = await canvasAssets.generateVideo({
                     prompt, duration: duration || 5,
                     aspectRatio: aspectRatio || '16:9',
                     sourceImageUrl: sourceImageUrl || '',
-                    model: model || 'grok',
-                    resolution: resolution || '1080p',
+                    model: selectedModel,
+                    resolution: selectedRes,
                 })
+
                 if (data.success && data.taskId) {
                     if (!ctx.videos) ctx.videos = {}
-                    Object.assign(ctx.videos, { [data.taskId]: { status: 'pending', url: null } })
-                    // Create video placeholder card on canvas
-                    const cardW = 320, cardH = 200, x = 60, y = 80
-                    fc.add(new fabric.Rect({
-                        left: x, top: y, width: cardW, height: cardH, rx: 12, ry: 12,
-                        fill: 'rgba(6,182,212,0.08)', stroke: 'rgba(6,182,212,0.3)', strokeWidth: 1,
-                        shadow: new fabric.Shadow({ color: 'rgba(6,182,212,0.15)', blur: 16, offsetY: 4 }),
+                    ctx.videos[data.taskId] = { status: 'pending', url: null, model: selectedModel }
+
+                    // ── Placeholder card on canvas ──
+                    const cardW = 340, cardH = 220
+                    const allObjs = fc.getObjects()
+                    const videoObjs = allObjs.filter(o => o._nodeType === 'video')
+                    const x = 60 + (videoObjs.length % 4) * (cardW + 20)
+                    const y = 80 + Math.floor(videoObjs.length / 4) * (cardH + 20)
+
+                    const placeholderBg = new fabric.Rect({
+                        left: x, top: y, width: cardW, height: cardH, rx: 14, ry: 14,
+                        fill: 'rgba(6,182,212,0.06)', stroke: 'rgba(6,182,212,0.25)', strokeWidth: 1.5,
+                        shadow: new fabric.Shadow({ color: 'rgba(6,182,212,0.12)', blur: 20, offsetY: 6 }),
                         selectable: true, evented: true,
-                        id: `video-bg-${Date.now()}`, _nodeType: 'video', _taskId: data.taskId, _provider: data.provider,
-                    }))
-                    fc.add(new fabric.Textbox(`Video generating...\nScene ${sceneRef || '?'} • ${duration || 5}s`, {
-                        left: x + 10, top: y + cardH - 40, width: cardW - 20,
-                        fontSize: 10, fontWeight: '600', fontFamily: 'Inter', fill: '#22d3ee', textAlign: 'center',
+                        id: `video-bg-${data.taskId}`, _nodeType: 'video',
+                        _taskId: data.taskId, _provider: selectedModel, _aspectRatio: aspectRatio || '16:9',
+                    })
+
+                    // Play icon in center
+                    const playIcon = new fabric.Text('▶', {
+                        left: x + cardW / 2, top: y + cardH / 2 - 20,
+                        fontSize: 32, fill: 'rgba(34,211,238,0.4)',
+                        originX: 'center', originY: 'center',
                         selectable: false, evented: false,
-                        id: `video-label-${Date.now()}`, _nodeType: 'video',
-                    }))
+                        id: `video-play-${data.taskId}`, _nodeType: 'video',
+                    })
+
+                    const statusLabel = new fabric.Textbox(
+                        `⏳ Rendering with ${selectedModel.toUpperCase()}\nScene ${sceneRef || 1} • ${duration || 5}s • ${selectedRes}`, {
+                        left: x + 12, top: y + cardH - 50, width: cardW - 24,
+                        fontSize: 10, fontWeight: '600', fontFamily: 'Inter',
+                        fill: '#22d3ee', textAlign: 'center', lineHeight: 1.5,
+                        selectable: false, evented: false,
+                        id: `video-label-${data.taskId}`, _nodeType: 'video', _taskId: data.taskId,
+                    })
+
+                    fc.add(placeholderBg)
+                    fc.add(playIcon)
+                    fc.add(statusLabel)
                     fc.requestRenderAll()
-                    return { text: `Video generation started (ID: ${data.taskId}).`, thumbnail: sourceImageUrl || null }
+
+                    // ── Background polling — auto-update canvas when video is ready ──
+                    const { API_BASE } = await import('../../../services/api')
+                    const token = localStorage.getItem('mantram_token') || ''
+
+                    const pollVideo = async () => {
+                        let retries = 72 // ~6 minutes max (every 5s)
+                        while (retries > 0) {
+                            await new Promise(r => setTimeout(r, 5000))
+                            retries--
+                            try {
+                                const resp = await fetch(`${API_BASE}/video-studio/${data.taskId}/status`, {
+                                    headers: { Authorization: `Bearer ${token}` }
+                                })
+                                if (!resp.ok) continue
+                                const statusData = await resp.json()
+
+                                if (statusData.status === 'COMPLETED' || statusData.status === 'FAILED') {
+                                    const videoUrl = statusData.generation?.videoUrl || statusData.videoUrl || null
+                                    ctx.videos[data.taskId].status = statusData.status
+                                    ctx.videos[data.taskId].url = videoUrl
+
+                                    if (statusData.status === 'COMPLETED' && videoUrl) {
+                                        // ── Update canvas: replace status label with a completed video card ──
+                                        const currentFc = fc
+                                        const bgObj = currentFc.getObjects().find(o => o.id === `video-bg-${data.taskId}`)
+                                        const labelObj = currentFc.getObjects().find(o => o.id === `video-label-${data.taskId}`)
+                                        const playObj = currentFc.getObjects().find(o => o.id === `video-play-${data.taskId}`)
+
+                                        // Update background to completed style
+                                        if (bgObj) {
+                                            bgObj.set({
+                                                fill: 'rgba(16,185,129,0.06)',
+                                                stroke: 'rgba(16,185,129,0.3)',
+                                                _videoUrl: videoUrl,
+                                            })
+                                        }
+                                        if (playObj) playObj.set({ fill: 'rgba(16,185,129,0.7)' })
+
+                                        // Update label to show done state + download hint
+                                        if (labelObj) {
+                                            labelObj.set({
+                                                text: `✅ Video Ready — ${selectedModel.toUpperCase()}\nScene ${sceneRef || 1} • ${duration || 5}s • Click to open`,
+                                                fill: '#34d399',
+                                            })
+                                        }
+
+                                        // Add video URL as a hidden attribute to bg for future use
+                                        if (bgObj) bgObj._videoUrl = videoUrl
+
+                                        // Load thumbnail via first-frame if source image available
+                                        if (sourceImageUrl) {
+                                            fabric.Image.fromURL(sourceImageUrl, img => {
+                                                if (!img || !bgObj) return
+                                                const scaleX = cardW / (img.width || 1)
+                                                const scaleY = (cardH - 50) / (img.height || 1)
+                                                const scale = Math.min(scaleX, scaleY)
+                                                img.set({
+                                                    left: bgObj.left + cardW / 2,
+                                                    top: bgObj.top + (cardH - 50) / 2,
+                                                    originX: 'center', originY: 'center',
+                                                    scaleX: scale, scaleY: scale,
+                                                    selectable: false, evented: false,
+                                                    opacity: 0.65,
+                                                    id: `video-thumb-${data.taskId}`, _nodeType: 'video',
+                                                })
+                                                currentFc.insertAt(img, currentFc.getObjects().indexOf(bgObj) + 1, false)
+                                                currentFc.requestRenderAll()
+                                            }, { crossOrigin: 'anonymous' })
+                                        }
+
+                                        currentFc.requestRenderAll()
+
+                                        // ── Push to Board Scenes for Board View ──
+                                        if (deps?.setBoardScenes) {
+                                            deps.setBoardScenes(prev => [
+                                                ...prev,
+                                                {
+                                                    type: 'video',
+                                                    id: data.taskId,
+                                                    videoUrl,
+                                                    thumbnail: sourceImageUrl || null,
+                                                    prompt: prompt.substring(0, 80),
+                                                    model: selectedModel,
+                                                    duration: duration || 5,
+                                                    sceneRef: sceneRef || null,
+                                                    status: 'done',
+                                                }
+                                            ])
+                                        }
+
+                                        // ── Notify in Fidato chat ──
+                                        if (setFidatoMessages) {
+                                            setFidatoMessages(prev => [...prev, {
+                                                role: 'assistant',
+                                                content: `✅ **Video Ready!** Scene ${sceneRef || 1} generated with ${selectedModel.toUpperCase()}.\n\n[▶ Open Video](${videoUrl})\n\nThe video card on canvas has been updated. You can right-click it to download.`,
+                                                images: [{ url: sourceImageUrl || videoUrl, isVideo: true, videoUrl }]
+                                            }])
+                                        }
+                                    } else if (statusData.status === 'FAILED') {
+                                        const labelObj2 = fc.getObjects().find(o => o.id === `video-label-${data.taskId}`)
+                                        if (labelObj2) labelObj2.set({ text: `❌ Video generation failed\nTry again with a different prompt`, fill: '#f87171' })
+                                        fc.requestRenderAll()
+                                        if (setFidatoMessages) {
+                                            setFidatoMessages(prev => [...prev, {
+                                                role: 'assistant',
+                                                content: `❌ Video for Scene ${sceneRef || 1} failed to generate. Would you like me to retry with a different prompt or model?`
+                                            }])
+                                        }
+                                    }
+                                    break // Exit polling loop
+                                }
+                            } catch (e) { console.warn('[Video Poll]', e.message) }
+                        }
+                        if (retries === 0) {
+                            const labelObj = fc.getObjects().find(o => o.id === `video-label-${data.taskId}`)
+                            if (labelObj) labelObj.set({ text: `⏰ Video timed out — please check later`, fill: '#f59e0b' })
+                            fc.requestRenderAll()
+                        }
+                    }
+
+                    pollVideo() // Run in background, don't await
+                    return { text: `🎬 Video generation started with **${selectedModel.toUpperCase()}**. A placeholder has been added to your canvas. I'll notify you when it's ready (usually 1-3 minutes).`, thumbnail: sourceImageUrl || null }
                 }
                 return `Video generation started. ${data.message || ''}`
             } catch (e) { return `Video generation failed: ${e.message}` }
         }
+
 
         case 'generate_voiceover': {
             const { text, language, speaker, speed, sceneRef } = args
