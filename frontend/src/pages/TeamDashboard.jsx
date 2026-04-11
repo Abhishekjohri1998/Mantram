@@ -219,11 +219,11 @@ export default function TeamDashboard() {
             </div>
 
             {/* Tab Bar - Scrollable on mobile */}
-            <div className="flex items-center gap-1.5 p-1.5 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] mb-8 w-full overflow-x-auto whitespace-nowrap no-scrollbar scroll-smooth relative z-10">
+            <div className="flex items-center gap-2 p-2 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] mb-8 w-full overflow-x-auto whitespace-nowrap no-scrollbar scroll-smooth relative z-10">
                 {TABS.map(t => (
                     <button key={t.id} onClick={() => setActiveTab(t.id)}
-                        className={`flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-bold transition-all cursor-pointer shrink-0 min-w-max ${activeTab === t.id ? 'bg-primary text-white shadow-lg shadow-primary/20 scale-[1.02]' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)]'}`}>
-                        <span className="material-symbols-outlined text-sm leading-none">{t.icon}</span>{t.label}
+                        className={`flex items-center gap-2.5 px-6 py-4 rounded-xl text-sm font-bold transition-all cursor-pointer shrink-0 min-w-max ${activeTab === t.id ? 'bg-primary text-white shadow-lg shadow-primary/20 scale-[1.02]' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)]'}`}>
+                        <span className="material-symbols-outlined text-[20px]">{t.icon}</span>{t.label}
                         {t.id === 'approvals' && approvalStats.pending > 0 && (
                             <span className="size-5 rounded-full bg-white/20 text-white text-[10px] font-black flex items-center justify-center border border-white/10">{approvalStats.pending}</span>
                         )}
