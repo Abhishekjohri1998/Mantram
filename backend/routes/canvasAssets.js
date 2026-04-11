@@ -1078,6 +1078,7 @@ router.post('/smart-adapt', protect, requireCredits('canvasGenerate'), async (re
 
         // ── ASSIGN SEMANTIC ROLES TO ELEMENTS ──
         // Infer role from element properties so the AI gets a labeled layer tree
+        // NOTE: Convert centered-origin positions to true top-left for correct layout
         const labeledElements = elements.map((el, i) => {
             let role = el._role || 'decoration'
             const name = (el.customName || el.name || '').toLowerCase()
@@ -1093,13 +1094,19 @@ router.post('/smart-adapt', protect, requireCredits('canvasGenerate'), async (re
                 const fontSize = el.fontSize || 24
                 if (fontSize >= 48 || name.includes('heading') || name.includes('headline') || name.includes('title')) role = 'headline'
                 else if (fontSize >= 28) role = 'subheadline'
-                else if (text.includes('₹') || text.includes('$') || name.includes('price')) role = 'price'
+                else if (text.includes('\u20b9') || text.includes('$') || name.includes('price')) role = 'price'
                 else if (name.includes('cta') || name.includes('button') || text.includes('shop') || text.includes('buy') || text.includes('order')) role = 'cta'
                 else if (name.includes('feature') || name.includes('bullet')) role = 'feature-point'
                 else if (name.includes('tagline') || name.includes('sub')) role = 'tagline'
                 else role = 'body-text'
             } else if (el.type === 'rect' || el.type === 'circle' || el.type === 'ellipse') role = 'shape'
             else if (nodeType === 'shape') role = 'shape'
+
+            // Convert centered-origin position to true top-left
+            const elW = Math.round(el.width), elH = Math.round(el.height)
+            let trueLeft = Math.round(el.left), trueTop = Math.round(el.top)
+            if (el.originX === 'center') trueLeft = trueLeft - elW / 2
+            if (el.originY === 'center') trueTop = trueTop - elH / 2
 
             return {
                 id: el.id || `el-${i}`,
@@ -1108,15 +1115,15 @@ router.post('/smart-adapt', protect, requireCredits('canvasGenerate'), async (re
                 role,
                 name: el.customName || el.name || `Layer ${i + 1}`,
                 text: el.text ? el.text.substring(0, 200) : null,
-                src: el.src ? el.src.substring(0, 100) : null,
+                src: el.src ? el.src.substring(0, 80) : null,
                 // Position and size as percentages of source canvas (portable across sizes)
-                xPct: Math.round((el.left / sourceWidth) * 1000) / 10,
-                yPct: Math.round((el.top / sourceHeight) * 1000) / 10,
-                wPct: Math.round((el.width / sourceWidth) * 1000) / 10,
-                hPct: Math.round((el.height / sourceHeight) * 1000) / 10,
+                xPct: Math.round((trueLeft / sourceWidth) * 1000) / 10,
+                yPct: Math.round((trueTop / sourceHeight) * 1000) / 10,
+                wPct: Math.round((elW / sourceWidth) * 1000) / 10,
+                hPct: Math.round((elH / sourceHeight) * 1000) / 10,
                 // Raw px values for reference
-                left: Math.round(el.left), top: Math.round(el.top),
-                width: Math.round(el.width), height: Math.round(el.height),
+                left: trueLeft, top: trueTop,
+                width: elW, height: elH,
                 fontSize: el.fontSize || null,
                 fontWeight: el.fontWeight || null,
                 fill: el.fill || null,
@@ -1196,17 +1203,47 @@ Remember: landscape formats = horizontal split, portrait = vertical stack, squar
 Return ONLY valid JSON, no explanation text outside the JSON.`
 
         const baseUrl = 'https://generativelanguage.googleapis.com/v1beta'
-        const url = `${baseUrl}/models/gemini-2.5-flash:generateContent?key=${apiKey}`
-        const resp = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contents: [{ role: 'user', parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }] }],
-                generationConfig: { temperature: 0.15, maxOutputTokens: 8192, thinkingConfig: { thinkingBudget: 1000 } },
-            }),
-        })
-        const data = await resp.json()
-        if (data.error) throw new Error(data.error.message)
+        const modelsToTry = ['gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-1.5-flash']
+        let resp, data
+
+        // Try models in order until one works
+        for (const modelName of modelsToTry) {
+            try {
+                const controller = new AbortController()
+                const timeoutId = setTimeout(() => controller.abort(), 28000) // 28s timeout
+                const url = `${baseUrl}/models/${modelName}:generateContent?key=${apiKey}`
+                console.log(`   [SmartAdapt] Trying model: ${modelName}`)
+                resp = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ role: 'user', parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }] }],
+                        generationConfig: { temperature: 0.15, maxOutputTokens: 6144 },
+                    }),
+                    signal: controller.signal,
+                })
+                clearTimeout(timeoutId)
+                data = await resp.json()
+                if (data.error) {
+                    const errMsg = data.error.message || ''
+                    if (errMsg.includes('503') || errMsg.includes('overloaded') || errMsg.includes('high demand') || resp.status === 503) {
+                        console.warn(`   [SmartAdapt] ${modelName} busy, trying next model...`)
+                        continue
+                    }
+                    throw new Error(data.error.message)
+                }
+                console.log(`   [SmartAdapt] Using ${modelName} successfully`)
+                break // Success
+            } catch (fetchErr) {
+                if (fetchErr.name === 'AbortError') {
+                    console.warn(`   [SmartAdapt] ${modelName} timed out after 28s, trying next...`)
+                    continue
+                }
+                throw fetchErr
+            }
+        }
+
+        if (!data) throw new Error('All Gemini models unavailable for SmartAdapt')
 
         // Extract text from all parts (gemini-2.5 may return thought + text parts)
         const allParts = data.candidates?.[0]?.content?.parts || []
