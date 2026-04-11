@@ -125,21 +125,30 @@ IMPORTANT: DO NOT just crop or resize — intelligently recompose the entire des
         contentParts.push({ type: 'text', text: adaptPrompt })
 
         const controller = new AbortController()
-        const timeoutId = setTimeout(() => controller.abort(), 90000)
+        const timeoutId = setTimeout(() => controller.abort(), 120000)  // 120s for NanoBanana 2
 
-        const response = await fetch('https://api.laozhang.ai/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${lzKey}`,
-            },
-            body: JSON.stringify({
-                model: lzModel,
-                messages: [{ role: 'user', content: contentParts }],
-                size: lzSize,
-            }),
-            signal: controller.signal,
-        })
+        let response
+        try {
+            response = await fetch('https://api.laozhang.ai/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${lzKey}`,
+                },
+                body: JSON.stringify({
+                    model: lzModel,
+                    messages: [{ role: 'user', content: contentParts }],
+                    size: lzSize,
+                }),
+                signal: controller.signal,
+            })
+        } catch (fetchErr) {
+            clearTimeout(timeoutId)
+            if (fetchErr.name === 'AbortError') {
+                throw new Error(`NanoBanana 2 timed out after 120s for preset ${preset}. LaoZhang may be overloaded.`)
+            }
+            throw fetchErr
+        }
         clearTimeout(timeoutId)
 
         if (!response.ok) {
