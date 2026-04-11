@@ -235,7 +235,7 @@ function buildPayload(model, { prompt, imageUrl, duration, resolution, mode, sho
 /**
  * Robust cascading poll for seedance-2.0
  */
-async function trySeedanceCascade({ prompt, imageUrl, duration, aspectRatio, generateAudio, mode, referenceImages }) {
+async function trySeedanceCascade({ prompt, imageUrl, duration, aspectRatio, generateAudio, mode, referenceImages, refAudio, refVideo }) {
     if (isLaozhangAvailable()) {
         try {
             const r = await submitLaozhangVideoGeneration({
@@ -365,6 +365,7 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
             }
             throw new Error(`Provider ${provider} unconfigured or failed.`);
         } catch (err) {
+            console.error(`🛑 Primary provider (${provider}) failed:`, err.message);
             const cascade = await trySeedanceCascade({
                 prompt: safePrompt, imageUrl: s3ImageUrl, duration,
                 aspectRatio: aspectRatio || '16:9', generateAudio, mode,

@@ -116,8 +116,35 @@ export const ensureS3Url = async (input, folder = 'video-studio/assets') => {
         console.log(`📤 ensureS3Url: Uploading base64 to S3: ${filename}`);
         return await uploadToS3(input, filename, mimeType);
     } catch (e) {
-        console.error(`❌ ensureS3Url failed: ${e.message}`);
-        return input; // Fallback to original (even if base64, might work or fail downstream)
+        console.error(`❌ ensureS3Url S3 upload failed: ${e.message}`);
+        console.log(`🔄 Falling back to freeimage.host anonymous storage...`);
+        
+        try {
+            const base64Data = input.split(",")[1];
+            if (base64Data) {
+                const formData = new FormData();
+                formData.append('source', base64Data);
+                formData.append('key', '6d207e02198a847aa98d0a2a901485a5'); // Public anonymous key
+                
+                const resp = await fetch('https://freeimage.host/api/1/upload', {
+                    method: 'POST',
+                    body: formData,
+                });
+                if (resp.ok) {
+                    const data = await resp.json();
+                    if (data?.image?.url) {
+                        console.log(`✅ FreeImage fallback successful: ${data.image.url}`);
+                        return data.image.url;
+                    }
+                } else {
+                    console.error(`❌ FreeImage fallback failed: ${await resp.text()}`);
+                }
+            }
+        } catch (fallbackErr) {
+            console.error(`❌ FreeImage fallback exception: ${fallbackErr.message}`);
+        }
+        
+        return input; // Absolute fallback to original base64
     }
 };
 

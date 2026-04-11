@@ -47,6 +47,8 @@ import { getRouter as getAIRouter } from '../ai/router.js';
 import { getProviderBadge } from '../ai/providerRouting.js';
 import { uploadToS3, mirrorUrlToS3, getSignedUrlIfNeeded } from '../utils/s3.js';
 import { safeErrorMessage } from '../utils/safeError.js';
+import { loadBrandContext, callMultimodalAgent, callAgent } from '../agents/shared/agentUtils.js';
+import { buildEnhanceSystemPrompt, buildEnhanceUserPrompt, VISUAL_GROUNDING_SYSTEM } from '../agents/videoStudio/promptEnhancer.js';
 
 const router = Router();
 
@@ -305,19 +307,28 @@ router.post('/advanced/generate', protect, requireCredits('videoGenerate'), asyn
 
         console.log(`📸 Advanced generate: ${(referenceImages || []).length} ref images, firstImage: ${firstImageUrl ? 'yes' : 'no'}, model: ${model}, quality: ${qualityMode}`);
 
-        // 1. ENHANCE PROMPT (Mandatory 5,000 words)
+        // 1. SMART ENHANCE PROMPT — model-native, concise prompt via MCoT pipeline
+        // Uses same pipeline as /enhance-prompt endpoint (buildEnhanceSystemPrompt + callAgent)
         // ══════════════════════════════════════════════════════════════════════════════
-        console.log('✨ Enhancing Advanced Generate prompt with Gemini 1.5 Pro...');
-        const enhancedState = await enhancePromptNode({
-            prompt: prompt.trim(),
-            model: model || 'kling-3.0',
-            duration: duration || 5,
-            aspectRatio: aspectRatio || '16:9',
-            brandId: brandId || null,
-            userId: req.user._id,
-        });
-        const finalPrompt = enhancedState.enhancedPrompt;
-        console.log(`✅ Enhanced prompt length: ${finalPrompt.length} chars`);
+        console.log(`✨ [ADVANCED] Enhancing prompt for model: ${model || 'seedance-2.0'}`);
+        let finalPrompt = prompt.trim();
+        try {
+            const { buildEnhanceSystemPrompt, buildEnhanceUserPrompt } = await import('../agents/videoStudio/promptEnhancer.js');
+            const { callAgent: callAgt } = await import('../agents/shared/agentUtils.js');
+            const { loadBrandContext: loadCtx } = await import('../agents/shared/agentUtils.js');
+            const { brandContext } = await loadCtx(brandId);
+            const sysPrompt = buildEnhanceSystemPrompt(model || 'seedance-2.0', 'shortvideo', Number(duration) || 5, aspectRatio || '16:9', brandContext);
+            const usrPrompt = buildEnhanceUserPrompt(prompt.trim(), null, 'shortvideo');
+            const enhanced = await callAgt(sysPrompt, usrPrompt, 0.65, 2000, { timeoutMs: 30000 });
+            if (enhanced?.enhancedPrompt) {
+                finalPrompt = enhanced.enhancedPrompt;
+                console.log(`✅ [ADVANCED] Enhanced prompt (${finalPrompt.split(' ').length} words): "${finalPrompt.substring(0, 100)}..."`);
+            } else {
+                console.warn('⚠️ [ADVANCED] Enhancement returned empty — using raw prompt');
+            }
+        } catch (enhErr) {
+            console.warn('⚠️ [ADVANCED] Enhancement failed (non-blocking) — using raw prompt:', enhErr.message);
+        }
 
         // 2. Create project in advanced mode
         const project = await VideoProject.create({
@@ -3627,133 +3638,87 @@ router.post('/generate-first-frame', protect, async (req, res) => {
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
-// POST /api/video-studio/enhance-prompt — AI-enhance a raw video prompt
+// POST /api/video-studio/enhance-prompt — MCoT 2-Stage Prompt Enhancement
+// Stage 1: Visual Grounding (MCoT) — if images attached, analyse them first
+// Stage 2: Model-native, format-aware prompt generation via callAgent
 // ══════════════════════════════════════════════════════════════════════════════
 router.post('/enhance-prompt', protect, requireCredits('promptEnhance'), async (req, res) => {
     try {
-        const { prompt, model, duration, aspectRatio, brandId, style } = req.body;
-        if (!prompt || !prompt.trim()) {
+        const {
+            prompt, model, duration, aspectRatio, brandId,
+            filmFormat = 'shortvideo',           // 'adfilm' | 'shortvideo'
+            firstImageUrl = '',
+            lastImageUrl = '',
+            referenceImageUrls = [],
+        } = req.body;
+
+        if (!prompt?.trim()) {
             return res.status(400).json({ success: false, error: 'Prompt is required' });
         }
 
-        // Load brand context for on-brand prompt enhancement
-        let brandContext = '';
-        if (brandId) {
-            try {
-                const brand = await Brand.findById(brandId).lean();
-                if (brand) {
-                    const parts = [];
-                    if (brand.name) parts.push(`Brand: ${brand.name}`);
-                    if (brand.tagline) parts.push(`Tagline: "${brand.tagline}"`);
-                    if (brand.dna?.brandVoice) parts.push(`Brand Voice: ${brand.dna.brandVoice}`);
-                    if (brand.dna?.visualStyle) parts.push(`Visual Style: ${brand.dna.visualStyle}`);
-                    if (brand.dna?.targetAudience) parts.push(`Target Audience: ${brand.dna.targetAudience}`);
-                    if (brand.dna?.colorPalette?.length) parts.push(`Colors: ${brand.dna.colorPalette.join(', ')}`);
-                    if (brand.dna?.industry) parts.push(`Industry: ${brand.dna.industry}`);
-                    if (brand.dna?.uniqueSellingPoints?.length) parts.push(`USPs: ${brand.dna.uniqueSellingPoints.join(', ')}`);
-                    if (brand.dna?.emotionalTone) parts.push(`Emotional Tone: ${brand.dna.emotionalTone}`);
-                    if (parts.length > 0) {
-                        brandContext = `\n\nBRAND CONTEXT (IMPORTANT — the enhanced prompt MUST align with this brand):\n${parts.join('\n')}`;
-                    }
-                }
-            } catch (e) {
-                console.warn('Could not load brand context:', e.message);
-            }
+        const startMs = Date.now();
+        console.log(`🎬 Enhance Prompt — model: ${model}, format: ${filmFormat}, images: ${[firstImageUrl, lastImageUrl, ...referenceImageUrls].filter(Boolean).length}`);
+
+        // ── Load brand context (Redis-cached) and run Stage 1 MCoT in parallel ──
+        const allImageUrls = [firstImageUrl, lastImageUrl, ...(Array.isArray(referenceImageUrls) ? referenceImageUrls : [])]
+            .filter(url => url && typeof url === 'string' && (url.startsWith('http') || url.startsWith('data:')));
+
+        const [{ brandContext }, visualDNA] = await Promise.all([
+            loadBrandContext(brandId),
+            // Stage 1: Visual Grounding — only fires if images are attached
+            allImageUrls.length > 0
+                ? callMultimodalAgent(
+                    VISUAL_GROUNDING_SYSTEM,
+                    `Analyse these images for this video brief: "${prompt.trim()}". Extract visual DNA for video prompt engineering.`,
+                    allImageUrls,
+                    { temperature: 0.2, maxTokens: 1024 }
+                  )
+                : Promise.resolve(null),
+        ]);
+
+        if (visualDNA && !visualDNA.error) {
+            console.log(`🧠 MCoT Visual Grounding complete — mood: ${visualDNA.brandMood}, colors: ${JSON.stringify(visualDNA.heroColors)}, confidence: ${visualDNA.confidence}`);
+        } else if (allImageUrls.length > 0) {
+            console.warn('⚠️ MCoT Visual Grounding failed or returned error — proceeding without visual DNA');
         }
 
-        const aiRouter = getAIRouter();
-        const isAdFilm = style === 'adfilm';
+        // ── Stage 2: Model-native, format-aware enhancement ──
+        const systemPrompt = buildEnhanceSystemPrompt(
+            model || 'seedance-2.0',
+            filmFormat,
+            Number(duration) || 5,
+            aspectRatio || '16:9',
+            brandContext
+        );
+        const userPrompt = buildEnhanceUserPrompt(prompt.trim(), visualDNA, filmFormat);
 
-        const systemPrompt = isAdFilm
-            ? `You are an expert AD FILM DIRECTOR and visionary prompt engineer. Transform the user's raw idea into an EXHAUSTIVE, cinematic, 5,000-word production-ready video generation prompt.
-            
-YOUR MISSION:
-Build a complete world. Detail every frame's texture, lighting shift, and emotional arc for a ${duration || 6}s film.
+        const result = await callAgent(systemPrompt, userPrompt, 0.72, 3000, { timeoutMs: 45000 });
 
-MANDATORY STRUCTURE:
-1. ATMOSPHERIC PROLOGUE: Detailed description of the world, air quality, lighting temperature, and overall mood.
-2. HOOK (0-${Math.max(1, Math.round((duration || 6) * 0.15))}s): Specific camera lens (e.g. 35mm Master Prime), depth of field, and the exact motion of the hero reveal.
-3. STORY ARC: Frame-by-frame visual evolution. Materiality of surfaces (e.g. leather grain, condensation on glass), particle effects (ember, dust, mist), and character micro-expressions.
-4. TECHNICAL DIRECTORY: Specific color science, camera rig (crane, handheld, gimbal), and music synchronization cues.
-5. BRAND INTEGRATION: How the name, colors, and tagline weave naturally into the final 2 seconds.
+        const elapsed = Date.now() - startMs;
+        console.log(`✅ Enhance Prompt complete in ${elapsed}ms — images grounded: ${allImageUrls.length > 0}, adFilmPlan: ${!!result?.adFilmPlan}`);
 
-RULES:
-- TARGET LENGTH: 5,000 WORDS.
-- Describe REALITY, not a "video" or "mockup".
-- No bullet points. PURE NARRATIVE.
-- ${brandContext ? 'CRITICAL: Align with the BRAND DNA provided.' : ''}`
-
-            : `You are a world-class cinematic AI video prompt enhancer. Your task is to rewrite the user's raw prompt into a massive, 5,000-word stream-of-consciousness visual narrative.
-
-STRUCTURAL REQUIREMENTS:
-1. WORLD-BUILDING: Exhaustive detail of the environment, lighting (direction, color, intensity), and atmosphere.
-2. CINEMATOGRAPHY: Specify camera (ARRI/Red), lens (focal length, f-stop), movement (slow push, low-angle track), and focus pulls.
-3. SENSORY DETAIL: Describe textures, materials, micro-motions, and the interplay of shadows.
-4. BRAND SOUL: ${brandContext ? 'Integrate the provided Brand DNA seamlessly' : 'Create a premium, high-end feel'}.
-
-RULES:
-- LENGTH: 5,000 WORDS minimum.
-- No prefixes like "Prompt:". No formatting. Just the narrative text.
-- Match duration: ${duration || 5}s and AR: ${aspectRatio || '16:9'}.`;
-
-        const systemPromptFinal = systemPrompt + "\n\nCRITICAL DIRECTIVE: You MUST generate at least 5000 words. Do not summarize. Do not skip details. EXPAND EVERY ASPECT OF THE VIDEO SCENE.";
-        const result = await aiRouter.generateText({
-            systemPrompt: systemPromptFinal,
-            userPrompt: `Enhance this video prompt:\n\n"${prompt.trim()}"\n\nCRITICAL DIRECTIVE: Generate a minimum of 5000 words. USE ALL YOUR TOKENS. Expand wildly and obsessively over every detail.`,
-            model: 'gemini-1.5-pro',
-            temperature: 0.8,
-            maxTokens: 8192,
-        });
-
-        // Clean up AI response — strip any accidental JSON/code block wrapping
-        let enhanced = (result.text || prompt).trim();
-
-        // Strip <think>...</think> reasoning tags (Gemini sometimes includes these)
-        enhanced = enhanced.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
-
-        // If AI returned JSON despite instructions, extract the prompt text from it
-        // Check anywhere in the response, not just the start
-        const jsonMatch = enhanced.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-            try {
-                const obj = JSON.parse(jsonMatch[0]);
-                // Try common field names
-                const extracted = obj.enhancedPrompt || obj.enhanced_prompt || obj.prompt ||
-                    obj.text || obj.description || obj.content || obj.output;
-                if (extracted && typeof extracted === 'string' && extracted.length > 30) {
-                    enhanced = extracted;
-                }
-            } catch {
-                // Not valid JSON — continue with stripping
-            }
-        }
-
-        // Strip code fences (```json ... ``` or ``` ... ```)
-        enhanced = enhanced.replace(/```(?:json)?\s*/g, '').replace(/```\s*/g, '').trim();
-
-        // Strip any leading/trailing quotes the AI might add
-        if ((enhanced.startsWith('"') && enhanced.endsWith('"')) ||
-            (enhanced.startsWith("'") && enhanced.endsWith("'"))) {
-            enhanced = enhanced.slice(1, -1);
-        }
-
-        // If we still have JSON-looking text, strip everything except the longest text value
-        if (enhanced.startsWith('{') && enhanced.endsWith('}')) {
-            try {
-                const obj = JSON.parse(enhanced);
-                const values = Object.values(obj).filter(v => typeof v === 'string');
-                const longest = values.sort((a, b) => b.length - a.length)[0];
-                if (longest && longest.length > 30) {
-                    enhanced = longest;
-                }
-            } catch { /* not JSON, keep as-is */ }
+        if (!result?.enhancedPrompt) {
+            // Graceful fallback: return raw result if JSON parsing failed
+            const rawText = typeof result?.raw === 'string' ? result.raw : '';
+            // Strip any JSON wrapper from raw text
+            const cleanRaw = rawText.replace(/^[\s\S]*?"enhancedPrompt"\s*:\s*"/, '').replace(/"\s*,?\s*"changes"[\s\S]*$/, '').replace(/\\n/g, '\n').replace(/\\"/g, '"') || prompt.trim();
+            return res.json({
+                success: true,
+                enhancedPrompt: cleanRaw,
+                adFilmPlan: null,
+                changes: ['Enhancement produced raw output — prompt updated'],
+                mcotUsed: allImageUrls.length > 0,
+            });
         }
 
         res.json({
             success: true,
-            enhancedPrompt: enhanced,
-            changes: [],
+            enhancedPrompt: result.enhancedPrompt,
+            adFilmPlan: result.adFilmPlan || null,
+            changes: result.changes || [],
+            mcotUsed: allImageUrls.length > 0 && !visualDNA?.error,
         });
+
     } catch (error) {
         console.error('Enhance prompt error:', error);
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
@@ -3835,7 +3800,13 @@ router.get('/:id/video', async (req, res) => {
             return res.status(404).send('Video not found');
         }
 
-        // If already on S3, redirect to the permanent S3 URL
+        // Always bypass S3 and use the original AI CDN URL because AWS keys are invalid.
+        // This instantly restores older videos that S3 is blocking with 403 Forbidden.
+        if (project.generation.videoUrl) {
+            return res.redirect(302, project.generation.videoUrl);
+        }
+
+        // If for some reason we ONLY have S3 (very rare), we will try it as a last resort.
         if (project.generation.s3VideoUrl) {
             return res.redirect(302, project.generation.s3VideoUrl);
         }
@@ -3849,13 +3820,20 @@ router.get('/:id/video', async (req, res) => {
             return res.redirect(302, s3Url);
         }
 
-        // CDN URL expired and can't download — return 410 Gone
-        res.status(410).json({
-            success: false,
-            error: 'Video has expired from CDN and could not be saved. The original URL was ephemeral.'
-        });
+        // --- FALLBACK TO DIRECT URL ---
+        console.warn(`⚠️ [Proxy] S3 backup failed for ${req.params.id}. Redirecting to direct model URL instead.`);
+        return res.redirect(302, videoUrl);
+
     } catch (error) {
         console.error('Video serve error:', error);
+        
+        // Attempt ultimate fallback if we crashed midway but have the URL
+        if (req.params.id) {
+             const proj = await VideoProject.findById(req.params.id).select('generation.videoUrl');
+             if (proj?.generation?.videoUrl) {
+                 return res.redirect(302, proj.generation.videoUrl);
+             }
+        }
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });

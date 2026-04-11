@@ -78,14 +78,15 @@ export async function submitLaozhangVideoGeneration({
 
     // Build message content for multimodal models
     // Seedance 2.0 and Veo often support multiple image inputs
-    if ((imageUrl && imageUrl.startsWith('http')) || referenceImages?.length > 0) {
+    let messageContent;
+    if ((imageUrl && (imageUrl.startsWith('http') || imageUrl.startsWith('data:'))) || referenceImages?.length > 0) {
         messageContent = [];
-        if (imageUrl && imageUrl.startsWith('http')) {
+        if (imageUrl && (imageUrl.startsWith('http') || imageUrl.startsWith('data:'))) {
             messageContent.push({ type: 'image_url', image_url: { url: imageUrl } });
         }
         if (referenceImages?.length > 0) {
             referenceImages.forEach(url => {
-                if (url && url.startsWith('http')) {
+                if (url && (url.startsWith('http') || url.startsWith('data:'))) {
                     messageContent.push({ type: 'image_url', image_url: { url } });
                 }
             });
