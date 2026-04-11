@@ -132,8 +132,8 @@ const CANVAS_TOOLS = [
             properties: {
                 preset: {
                     type: 'string',
-                    enum: ['ig-post', 'ig-story', 'ig-reel', 'fb-post', 'linkedin', 'yt-thumb', 'twitter', 'carousel', 'banner'],
-                    description: 'Platform preset (e.g. ig-post = 1080x1350, ig-story = 1080x1920, fb-post = 1080x1350, linkedin = 1200x1200)'
+                    enum: ['ig-post', 'ig-post-square', 'ig-story', 'ig-reel', 'fb-post', 'fb-story', 'linkedin', 'yt-thumb', 'twitter', 'whatsapp-status', 'carousel', 'pinterest', 'banner', 'banner-square'],
+                    description: 'Platform preset sizes — ig-post=1080x1350 (4:5 portrait, recommended), ig-post-square=1080x1080 (1:1), ig-story=1080x1920 (9:16), ig-reel=1080x1920, fb-post=1200x630, fb-story=1080x1920, linkedin=1200x628, yt-thumb=1280x720, twitter=1600x900, whatsapp-status=1080x1920, carousel=1080x1080, pinterest=1000x1500, banner=1920x600, banner-square=1200x1200'
                 },
             },
             required: ['preset'],
@@ -389,7 +389,7 @@ const CANVAS_TOOLS = [
                     description: 'Array of platform presets to generate for',
                     items: {
                         type: 'string',
-                        enum: ['ig-post', 'ig-story', 'ig-reel', 'fb-post', 'linkedin', 'yt-thumb', 'twitter', 'carousel', 'banner'],
+                        enum: ['ig-post', 'ig-post-square', 'ig-story', 'ig-reel', 'fb-post', 'fb-story', 'linkedin', 'yt-thumb', 'twitter', 'whatsapp-status', 'carousel', 'pinterest', 'banner', 'banner-square'],
                     },
                 },
                 headline: { type: 'string', description: 'Optional headline text to overlay on each variant' },
@@ -590,7 +590,7 @@ ${creativeMasterySections}
 
 ### For MULTI-PLATFORM CAMPAIGNS (user says "campaign", "all platforms", "multi-size", mentions multiple formats):
 1. **generate_campaign** — Generate the creative across ALL requested platform sizes in parallel
-   - Choose the appropriate presets from: ig-post, ig-story, fb-post, linkedin, yt-thumb, twitter, carousel, banner
+   - Choose the appropriate presets from: ig-post (4:5 portrait, RECOMMENDED for IG), ig-post-square (1:1), ig-story, ig-reel, fb-post, fb-story, linkedin, yt-thumb, twitter, whatsapp-status, carousel, pinterest, banner, banner-square
    - Each variant is auto-adapted for its platform's aspect ratio and composition rules
    - Write platform-appropriate headline and ctaText (punchy for IG, professional for LinkedIn, curiosity for YT)
 
@@ -1424,18 +1424,24 @@ router.post('/canvas-campaign', protect, requireCredits('creativeCampaign'), asy
         console.log(`🎯 Canvas Campaign: Generating ${presets.length} variants — "${prompt.substring(0, 60)}..."`);
         const startTime = Date.now();
 
-        // Preset dimensions map
+        // Preset dimensions map (2025 Recommended Dimensions)
         const PRESET_MAP = {
-            'ig-post':   { w: 1080, h: 1350, label: 'Instagram Post',  aspectRatio: '4:5' },
-            'ig-story':  { w: 1080, h: 1920, label: 'Instagram Story', aspectRatio: '9:16' },
-            'ig-reel':   { w: 1080, h: 1920, label: 'Instagram Reel',  aspectRatio: '9:16' },
-            'fb-post':   { w: 1080, h: 1350, label: 'Facebook Post',   aspectRatio: '4:5' },
-            'linkedin':  { w: 1200, h: 1200, label: 'LinkedIn Post',   aspectRatio: '1:1' },
-            'yt-thumb':  { w: 1280, h: 720,  label: 'YouTube Thumb',   aspectRatio: '16:9' },
-            'twitter':   { w: 1200, h: 675,  label: 'Twitter/X Post',  aspectRatio: '16:9' },
-            'carousel':  { w: 1080, h: 1080, label: 'Carousel Slide',  aspectRatio: '1:1' },
-            'banner':    { w: 1920, h: 600,  label: 'Web Banner',      aspectRatio: '16:5' },
+            'ig-post':         { w: 1080, h: 1350, label: 'Instagram Post (4:5)',   aspectRatio: '4:5' },
+            'ig-post-square':  { w: 1080, h: 1080, label: 'Instagram Square',        aspectRatio: '1:1' },
+            'ig-story':        { w: 1080, h: 1920, label: 'Instagram Story',         aspectRatio: '9:16' },
+            'ig-reel':         { w: 1080, h: 1920, label: 'Instagram Reel',          aspectRatio: '9:16' },
+            'fb-post':         { w: 1200, h: 630,  label: 'Facebook Post',           aspectRatio: '1.91:1' },
+            'fb-story':        { w: 1080, h: 1920, label: 'Facebook Story',          aspectRatio: '9:16' },
+            'linkedin':        { w: 1200, h: 628,  label: 'LinkedIn Post',           aspectRatio: '1.91:1' },
+            'yt-thumb':        { w: 1280, h: 720,  label: 'YouTube Thumbnail',       aspectRatio: '16:9' },
+            'twitter':         { w: 1600, h: 900,  label: 'Twitter/X Post',          aspectRatio: '16:9' },
+            'whatsapp-status': { w: 1080, h: 1920, label: 'WhatsApp Status',         aspectRatio: '9:16' },
+            'carousel':        { w: 1080, h: 1080, label: 'Carousel Slide',          aspectRatio: '1:1' },
+            'pinterest':       { w: 1000, h: 1500, label: 'Pinterest Pin',           aspectRatio: '2:3' },
+            'banner':          { w: 1920, h: 600,  label: 'Web Banner',              aspectRatio: '16:5' },
+            'banner-square':   { w: 1200, h: 1200, label: 'Display Ad Square',       aspectRatio: '1:1' },
         };
+
 
         // Build campaign variants with adapted prompts
         const variants = presets.map(preset => {

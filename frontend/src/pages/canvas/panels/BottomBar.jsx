@@ -12,12 +12,17 @@ const PRESET_GROUPS = [
     {
         label: 'Instagram',
         icon: 'photo_camera',
-        ids: ['ig-post', 'ig-story', 'ig-reel'],
+        ids: ['ig-post', 'ig-post-square', 'ig-story', 'ig-reel'],
+    },
+    {
+        label: 'Facebook',
+        icon: 'thumb_up',
+        ids: ['fb-post', 'fb-story'],
     },
     {
         label: 'Social',
         icon: 'public',
-        ids: ['fb-post', 'linkedin', 'twitter'],
+        ids: ['linkedin', 'twitter', 'whatsapp-status', 'pinterest'],
     },
     {
         label: 'Video',
@@ -25,9 +30,9 @@ const PRESET_GROUPS = [
         ids: ['yt-thumb'],
     },
     {
-        label: 'Other',
+        label: 'Ads & Web',
         icon: 'web',
-        ids: ['carousel', 'banner'],
+        ids: ['carousel', 'banner', 'banner-square'],
     },
 ]
 
@@ -171,15 +176,19 @@ export default function BottomBar({ onResizeCanvas, onResizeToPreset }) {
                                             onClick={() => { onResizeToPreset?.(p); setExpandedGroup(null) }}
                                             onMouseEnter={() => setHoveredPreset(p.id)}
                                             onMouseLeave={() => setHoveredPreset(null)}
-                                            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '5px 8px', fontSize: 11, textAlign: 'left', width: '100%' }}
+                                            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '6px 8px', fontSize: 11, textAlign: 'left', width: '100%' }}
                                         >
                                             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                                 <span className="material-symbols-outlined" style={{ fontSize: 13 }}>{p.icon}</span>
-                                                <span>{p.label}</span>
+                                                <div>
+                                                    <div style={{ fontWeight: 600, lineHeight: 1.2 }}>{p.label}</div>
+                                                    {p.note && <div style={{ fontSize: 9, color: '#64748b', lineHeight: 1.2 }}>{p.note}</div>}
+                                                </div>
                                             </div>
-                                            <span style={{ fontSize: 9, color: '#64748b', fontVariantNumeric: 'tabular-nums' }}>
-                                                {p.w}×{p.h}
-                                            </span>
+                                            <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                                                <div style={{ fontSize: 9, color: '#a1a1aa', fontVariantNumeric: 'tabular-nums' }}>{p.ratio || ''}</div>
+                                                <div style={{ fontSize: 9, color: '#52525b', fontVariantNumeric: 'tabular-nums' }}>{p.w}×{p.h}</div>
+                                            </div>
                                         </button>
                                     ))}
                                 </div>

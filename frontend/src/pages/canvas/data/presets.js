@@ -3,18 +3,33 @@
 // Extracted from monolithic CanvasEditor.jsx
 // ═══════════════════════════════════════════════════════════════
 
-// ── Platform Size Presets ──
+// ── Platform Size Presets (Updated 2025 Recommended Dimensions) ──
 export const PRESETS = [
-    { id: 'ig-post', label: 'IG Post', icon: 'photo_camera', w: 1080, h: 1080 },
-    { id: 'ig-story', label: 'IG Story', icon: 'smartphone', w: 1080, h: 1920 },
-    { id: 'ig-reel', label: 'IG Reel', icon: 'movie', w: 1080, h: 1920 },
-    { id: 'fb-post', label: 'FB Post', icon: 'thumb_up', w: 1200, h: 630 },
-    { id: 'linkedin', label: 'LinkedIn', icon: 'work', w: 1200, h: 627 },
-    { id: 'yt-thumb', label: 'YT Thumb', icon: 'smart_display', w: 1280, h: 720 },
-    { id: 'twitter', label: 'X / Twitter', icon: 'tag', w: 1600, h: 900 },
-    { id: 'carousel', label: 'Carousel', icon: 'view_carousel', w: 1080, h: 1350 },
-    { id: 'banner', label: 'Web Banner', icon: 'web', w: 1920, h: 600 },
+    // Instagram
+    { id: 'ig-post',        label: 'IG Post',         icon: 'photo_camera',   w: 1080, h: 1350, ratio: '4:5 Portrait',  note: 'Best for feed reach' },
+    { id: 'ig-post-square', label: 'IG Square',        icon: 'crop_square',    w: 1080, h: 1080, ratio: '1:1',           note: 'Classic square format' },
+    { id: 'ig-story',       label: 'IG Story',         icon: 'smartphone',     w: 1080, h: 1920, ratio: '9:16',          note: 'Full-screen story' },
+    { id: 'ig-reel',        label: 'IG Reel',          icon: 'movie',          w: 1080, h: 1920, ratio: '9:16',          note: 'Same as Story size' },
+    // Facebook
+    { id: 'fb-post',        label: 'FB Post',          icon: 'thumb_up',       w: 1200, h: 630,  ratio: '1.91:1',        note: 'Feed post & link preview' },
+    { id: 'fb-story',       label: 'FB Story',         icon: 'amp_stories',    w: 1080, h: 1920, ratio: '9:16',          note: 'Full-screen story' },
+    // LinkedIn
+    { id: 'linkedin',       label: 'LinkedIn',         icon: 'work',           w: 1200, h: 628,  ratio: '1.91:1',        note: 'Feed post' },
+    // YouTube
+    { id: 'yt-thumb',       label: 'YT Thumb',         icon: 'smart_display',  w: 1280, h: 720,  ratio: '16:9',          note: 'YouTube thumbnail' },
+    // Twitter / X
+    { id: 'twitter',        label: 'X / Twitter',      icon: 'tag',            w: 1600, h: 900,  ratio: '16:9',          note: 'Tweet image card' },
+    // WhatsApp
+    { id: 'whatsapp-status',label: 'WA Status',        icon: 'chat',           w: 1080, h: 1920, ratio: '9:16',          note: 'WhatsApp Status/DM' },
+    // Carousel
+    { id: 'carousel',       label: 'Carousel',         icon: 'view_carousel',  w: 1080, h: 1080, ratio: '1:1',           note: 'Multi-slide carousel' },
+    // Pinterest
+    { id: 'pinterest',      label: 'Pinterest',        icon: 'push_pin',       w: 1000, h: 1500, ratio: '2:3',           note: 'Pin (tall format)' },
+    // Banners
+    { id: 'banner',         label: 'Web Banner',       icon: 'web',            w: 1920, h: 600,  ratio: '~3.2:1',        note: 'Hero / leaderboard' },
+    { id: 'banner-square',  label: 'Display Ad',       icon: 'ad_units',       w: 1200, h: 1200, ratio: '1:1',           note: 'Google Display Network' },
 ]
+
 
 // ── Filters ──
 export const FILTERS = [
