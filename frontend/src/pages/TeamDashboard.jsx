@@ -222,7 +222,7 @@ export default function TeamDashboard() {
             <div className="flex items-center gap-1.5 p-1.5 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] mb-8 w-full overflow-x-auto whitespace-nowrap no-scrollbar scroll-smooth">
                 {TABS.map(t => (
                     <button key={t.id} onClick={() => setActiveTab(t.id)}
-                        className={`flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-bold transition-all cursor-pointer shrink-0 ${activeTab === t.id ? 'bg-primary text-white shadow-lg shadow-primary/20 scale-[1.02]' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)]'}`}>
+                        className={`flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-bold transition-all cursor-pointer shrink-0 min-w-max ${activeTab === t.id ? 'bg-primary text-white shadow-lg shadow-primary/20 scale-[1.02]' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)]'}`}>
                         <span className="material-symbols-outlined text-sm leading-none">{t.icon}</span>{t.label}
                         {t.id === 'approvals' && approvalStats.pending > 0 && (
                             <span className="size-5 rounded-full bg-white/20 text-white text-[10px] font-black flex items-center justify-center border border-white/10">{approvalStats.pending}</span>
@@ -256,7 +256,7 @@ export default function TeamDashboard() {
                                         const rc = roleColors[m.teamRole] || roleColors.member
                                         const isOwner = !m.organization || m.teamRole === 'owner'
                                         return (
-                                            <div key={m._id} className="group relative flex flex-col sm:flex-row sm:items-center gap-4 p-5 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:border-primary/30 transition-all animate-fade-in"
+                                            <div key={m._id} className="group relative flex flex-col md:grid md:grid-cols-[1fr_auto] items-stretch md:items-center gap-5 p-6 rounded-[24px] bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:border-primary/40 transition-all animate-fade-in"
                                                 style={{ animationDelay: `${i * 60}ms` }}>
                                                 <div className="flex items-center gap-4 flex-1">
                                                     <div className="size-12 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-primary text-base font-black shrink-0 shadow-inner">
@@ -277,10 +277,10 @@ export default function TeamDashboard() {
                                                     </div>
                                                 </div>
                                                 
-                                                <div className="flex items-center justify-between sm:flex-col sm:items-end gap-2 pt-4 sm:pt-0 border-t sm:border-t-0 border-[var(--sys-border)]/50">
-                                                    <div className="text-left sm:text-right">
-                                                        <p className="text-sm font-black text-[var(--sys-text)]">{m.usage?.contentGenerated || 0} prints</p>
-                                                        <p className="text-[10px] font-medium text-[var(--sys-text-muted)] uppercase tracking-tighter">
+                                                <div className="flex flex-row md:flex-col items-center md:items-end justify-between md:justify-center gap-4 pt-5 md:pt-0 border-t md:border-t-0 border-white/5">
+                                                    <div className="text-left md:text-right shrink-0">
+                                                        <p className="text-base font-black text-[var(--sys-text)]">{m.usage?.contentGenerated || 0} prints</p>
+                                                        <p className="text-[10px] font-bold text-primary/60 uppercase tracking-widest">
                                                             Active: {m.lastActive ? new Date(m.lastActive).toLocaleDateString([], { month: 'short', day: 'numeric' }) : 'Never'}
                                                         </p>
                                                     </div>
@@ -288,12 +288,12 @@ export default function TeamDashboard() {
                                                     {isOrgOwner && !isOwner && (
                                                         <div className="flex gap-2">
                                                             <button onClick={() => { setEditingMember(m); setEditAccess({ studioAccess: m.studioAccess || {}, brandAccess: m.brandAccess || [], teamRole: m.teamRole }) }}
-                                                                className="size-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-[var(--sys-text-muted)] hover:text-primary hover:bg-primary/10 hover:border-primary/20 cursor-pointer transition-all active:scale-95" title="Edit Access">
-                                                                <span className="material-symbols-outlined text-lg">tune</span>
+                                                                className="size-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-[var(--sys-text-muted)] hover:text-primary hover:bg-primary/10 hover:border-primary/20 cursor-pointer transition-all active:scale-95" title="Edit Access">
+                                                                <span className="material-symbols-outlined text-xl">tune</span>
                                                             </button>
                                                             <button onClick={() => handleRemove(m._id)}
-                                                                className="size-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-[var(--sys-text-muted)] hover:text-error hover:bg-error/10 hover:border-error/20 cursor-pointer transition-all active:scale-95" title="Remove">
-                                                                <span className="material-symbols-outlined text-lg">person_remove</span>
+                                                                className="size-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-[var(--sys-text-muted)] hover:text-error hover:bg-error/10 hover:border-error/20 cursor-pointer transition-all active:scale-95" title="Remove">
+                                                                <span className="material-symbols-outlined text-xl">person_remove</span>
                                                             </button>
                                                         </div>
                                                     )}
@@ -640,76 +640,80 @@ export default function TeamDashboard() {
                             </button>
                         </div>
 
-                        <div className="space-y-4">
-                            <div>
-                                <label className="text-xs font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-1 block">Email *</label>
-                                <input value={inviteForm.email} onChange={e => setInviteForm(f => ({ ...f, email: e.target.value }))}
-                                    placeholder="teammate@company.com"
-                                    className="w-full bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl px-4 py-2.5 text-sm text-[var(--sys-text)] placeholder-slate-500 outline-none focus:border-primary/40" />
-                            </div>
-                            <div>
-                                <label className="text-xs font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-1 block">Name</label>
-                                <input value={inviteForm.name} onChange={e => setInviteForm(f => ({ ...f, name: e.target.value }))}
-                                    placeholder="John Doe"
-                                    className="w-full bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl px-4 py-2.5 text-sm text-[var(--sys-text)] placeholder-slate-500 outline-none focus:border-primary/40" />
-                            </div>
-                            <div>
-                                <label className="text-xs font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-1 block">Role</label>
-                                <select value={inviteForm.role} onChange={e => setInviteForm(f => ({ ...f, role: e.target.value }))}
-                                    className="w-full bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl px-4 py-2.5 text-sm text-[var(--sys-text)] outline-none focus:border-primary/40">
-                                    <option value="member">Member</option>
-                                    <option value="manager">Manager</option>
-                                </select>
-                            </div>
-
-                            {/* Studio access toggles */}
-                            <div>
-                                <label className="text-xs font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-2 block">Studio Access</label>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                    {Object.entries(STUDIO_LABELS).map(([key, s]) => (
-                                        <label key={key} className="flex items-center gap-2 p-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] cursor-pointer hover:bg-[var(--sys-surface)] transition-all">
-                                            <input type="checkbox"
-                                                checked={inviteForm.studioAccess[key] !== false}
-                                                onChange={e => setInviteForm(f => ({ ...f, studioAccess: { ...f.studioAccess, [key]: e.target.checked } }))}
-                                                className="accent-primary" />
-                                            <span className="material-symbols-outlined text-sm" style={{ color: s.color }}>{s.icon}</span>
-                                            <span className="text-xs text-[var(--sys-text)]">{s.label}</span>
-                                        </label>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* Brand access */}
-                            {brands.length > 0 && (
+                        <div className="max-h-[60vh] overflow-y-auto custom-scrollbar -mx-6 px-6 py-2">
+                            <div className="space-y-5">
                                 <div>
-                                    <label className="text-xs font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-2 block">Brand Access</label>
-                                    <div className="space-y-1">
-                                        {brands.map(b => (
-                                            <label key={b._id} className="flex items-center gap-2 p-2 rounded-lg bg-[var(--sys-surface)] cursor-pointer hover:bg-[var(--sys-surface)]">
+                                    <label className="text-xs font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-2 block">Email *</label>
+                                    <input value={inviteForm.email} onChange={e => setInviteForm(f => ({ ...f, email: e.target.value }))}
+                                        placeholder="teammate@company.com"
+                                        className="w-full bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl px-4 py-3 text-sm text-[var(--sys-text)] placeholder-slate-500 outline-none focus:border-primary/40" />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-2 block">Name</label>
+                                    <input value={inviteForm.name} onChange={e => setInviteForm(f => ({ ...f, name: e.target.value }))}
+                                        placeholder="John Doe"
+                                        className="w-full bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl px-4 py-3 text-sm text-[var(--sys-text)] placeholder-slate-500 outline-none focus:border-primary/40" />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-2 block">Role</label>
+                                    <select value={inviteForm.role} onChange={e => setInviteForm(f => ({ ...f, role: e.target.value }))}
+                                        className="w-full bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl px-4 py-3 text-sm text-[var(--sys-text)] outline-none focus:border-primary/40">
+                                        <option value="member">Member</option>
+                                        <option value="manager">Manager</option>
+                                    </select>
+                                </div>
+
+                                {/* Studio access toggles */}
+                                <div>
+                                    <label className="text-xs font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-3 block">Studio Access</label>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        {Object.entries(STUDIO_LABELS).map(([key, s]) => (
+                                            <label key={key} className="flex items-center gap-3 p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] cursor-pointer hover:border-primary/30 transition-all">
                                                 <input type="checkbox"
-                                                    checked={inviteForm.brandAccess.includes(b._id)}
-                                                    onChange={e => setInviteForm(f => ({
-                                                        ...f,
-                                                        brandAccess: e.target.checked ? [...f.brandAccess, b._id] : f.brandAccess.filter(id => id !== b._id)
-                                                    }))}
-                                                    className="accent-primary" />
-                                                <span className="text-xs text-[var(--sys-text)]">{b.name}</span>
+                                                    checked={inviteForm.studioAccess[key] !== false}
+                                                    onChange={e => setInviteForm(f => ({ ...f, studioAccess: { ...f.studioAccess, [key]: e.target.checked } }))}
+                                                    className="accent-primary size-4" />
+                                                <span className="material-symbols-outlined text-base" style={{ color: s.color }}>{s.icon}</span>
+                                                <span className="text-xs font-bold text-[var(--sys-text)]">{s.label}</span>
                                             </label>
                                         ))}
                                     </div>
                                 </div>
-                            )}
 
-                            {inviteResult && (
-                                <div className={`p-3 rounded-xl text-sm ${inviteResult.error ? 'bg-[var(--sys-primary-dim)] text-primary' : 'bg-[var(--sys-primary-dim)] text-primary'}`}>
-                                    {inviteResult.error || ` Invite sent to ${inviteResult.sentTo}! They'll receive an email with a link to join your team.`}
-                                </div>
-                            )}
+                                {/* Brand access */}
+                                {brands.length > 0 && (
+                                    <div>
+                                        <label className="text-xs font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-3 block">Brand Access</label>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                            {brands.map(b => (
+                                                <label key={b._id} className="flex items-center gap-3 p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] cursor-pointer hover:border-primary/30 transition-all">
+                                                    <input type="checkbox"
+                                                        checked={inviteForm.brandAccess.includes(b._id)}
+                                                        onChange={e => setInviteForm(f => ({
+                                                            ...f,
+                                                            brandAccess: e.target.checked ? [...f.brandAccess, b._id] : f.brandAccess.filter(id => id !== b._id)
+                                                        }))}
+                                                        className="accent-primary size-4" />
+                                                    <span className="text-xs font-bold text-[var(--sys-text)] truncate">{b.name}</span>
+                                                </label>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
 
+                        {inviteResult && (
+                            <div className={`mt-5 p-4 rounded-2xl text-sm font-bold border ${inviteResult.error ? 'bg-error/10 border-error/20 text-error' : 'bg-primary/10 border-primary/20 text-primary'}`}>
+                                {inviteResult.error || `Invite sent to ${inviteResult.sentTo}! They'll receive an email with link.`}
+                            </div>
+                        )}
+
+                        <div className="mt-8">
                             <button onClick={handleInvite} disabled={inviteLoading || !inviteForm.email}
-                                className="w-full py-3 rounded-xl bg-primary text-white font-bold hover:bg-primary/90 cursor-pointer transition-all disabled:opacity-50 flex items-center justify-center gap-2">
-                                {inviteLoading ? <span className="material-symbols-outlined animate-spin text-sm">progress_activity</span> : <span className="material-symbols-outlined text-sm">send</span>}
-                                {inviteLoading ? 'Sending...' : 'Send Invite'}
+                                className="w-full py-4 rounded-2xl bg-primary text-white font-black hover:bg-primary/90 cursor-pointer transition-all disabled:opacity-50 flex items-center justify-center gap-3 shadow-xl shadow-primary/20">
+                                {inviteLoading ? <span className="material-symbols-outlined animate-spin text-lg">progress_activity</span> : <span className="material-symbols-outlined text-lg">send</span>}
+                                {inviteLoading ? 'Sending...' : 'Send Invitation'}
                             </button>
                         </div>
                     </div>
@@ -730,55 +734,59 @@ export default function TeamDashboard() {
                             </button>
                         </div>
 
-                        <div className="space-y-4">
-                            <div>
-                                <label className="text-xs font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-1 block">Team Role</label>
-                                <select value={editAccess.teamRole} onChange={e => setEditAccess(a => ({ ...a, teamRole: e.target.value }))}
-                                    className="w-full bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl px-4 py-2.5 text-sm text-[var(--sys-text)] outline-none">
-                                    <option value="member">Member</option>
-                                    <option value="manager">Manager</option>
-                                </select>
-                            </div>
-
-                            <div>
-                                <label className="text-xs font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-2 block">Studio Access</label>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                    {Object.entries(STUDIO_LABELS).map(([key, s]) => (
-                                        <label key={key} className="flex items-center gap-2 p-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] cursor-pointer hover:bg-[var(--sys-surface)]">
-                                            <input type="checkbox"
-                                                checked={editAccess.studioAccess?.[key] !== false}
-                                                onChange={e => setEditAccess(a => ({ ...a, studioAccess: { ...a.studioAccess, [key]: e.target.checked } }))}
-                                                className="accent-primary" />
-                                            <span className="material-symbols-outlined text-sm" style={{ color: s.color }}>{s.icon}</span>
-                                            <span className="text-xs text-[var(--sys-text)]">{s.label}</span>
-                                        </label>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {brands.length > 0 && (
+                        <div className="max-h-[60vh] overflow-y-auto custom-scrollbar -mx-6 px-6 py-2">
+                            <div className="space-y-5">
                                 <div>
-                                    <label className="text-xs font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-2 block">Brand Access</label>
-                                    <div className="space-y-1">
-                                        {brands.map(b => (
-                                            <label key={b._id} className="flex items-center gap-2 p-2 rounded-lg bg-[var(--sys-surface)] cursor-pointer hover:bg-[var(--sys-surface)]">
+                                    <label className="text-xs font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-2 block">Team Role</label>
+                                    <select value={editAccess.teamRole} onChange={e => setEditAccess(a => ({ ...a, teamRole: e.target.value }))}
+                                        className="w-full bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl px-4 py-3 text-sm text-[var(--sys-text)] outline-none focus:border-primary/40">
+                                        <option value="member">Member</option>
+                                        <option value="manager">Manager</option>
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="text-xs font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-3 block">Studio Access</label>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        {Object.entries(STUDIO_LABELS).map(([key, s]) => (
+                                            <label key={key} className="flex items-center gap-3 p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] cursor-pointer hover:border-primary/30 transition-all">
                                                 <input type="checkbox"
-                                                    checked={(editAccess.brandAccess || []).includes(b._id)}
-                                                    onChange={e => setEditAccess(a => ({
-                                                        ...a,
-                                                        brandAccess: e.target.checked ? [...(a.brandAccess || []), b._id] : (a.brandAccess || []).filter(id => id !== b._id)
-                                                    }))}
-                                                    className="accent-primary" />
-                                                <span className="text-xs text-[var(--sys-text)]">{b.name}</span>
+                                                    checked={editAccess.studioAccess?.[key] !== false}
+                                                    onChange={e => setEditAccess(a => ({ ...a, studioAccess: { ...a.studioAccess, [key]: e.target.checked } }))}
+                                                    className="accent-primary size-4" />
+                                                <span className="material-symbols-outlined text-base" style={{ color: s.color }}>{s.icon}</span>
+                                                <span className="text-xs font-bold text-[var(--sys-text)]">{s.label}</span>
                                             </label>
                                         ))}
                                     </div>
                                 </div>
-                            )}
 
+                                {brands.length > 0 && (
+                                    <div>
+                                        <label className="text-xs font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-3 block">Brand Access</label>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                            {brands.map(b => (
+                                                <label key={b._id} className="flex items-center gap-3 p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] cursor-pointer hover:border-primary/30 transition-all">
+                                                    <input type="checkbox"
+                                                        checked={(editAccess.brandAccess || []).includes(b._id)}
+                                                        onChange={e => setEditAccess(a => ({
+                                                            ...a,
+                                                            brandAccess: e.target.checked ? [...(a.brandAccess || []), b._id] : (a.brandAccess || []).filter(id => id !== b._id)
+                                                        }))}
+                                                        className="accent-primary size-4" />
+                                                    <span className="text-xs font-bold text-[var(--sys-text)] truncate">{b.name}</span>
+                                                </label>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="mt-8">
                             <button onClick={handleSaveAccess}
-                                className="w-full py-3 rounded-xl bg-primary text-white font-bold hover:bg-primary/90 cursor-pointer transition-all flex items-center justify-center gap-2">
-                                <span className="material-symbols-outlined text-sm">save</span>Save Changes
+                                className="w-full py-4 rounded-2xl bg-primary text-white font-black hover:bg-primary/90 cursor-pointer transition-all flex items-center justify-center gap-3 shadow-xl shadow-primary/20">
+                                <span className="material-symbols-outlined text-lg">save</span>Save Access Changes
                             </button>
                         </div>
                     </div>
