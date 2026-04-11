@@ -108,16 +108,33 @@ export function resizeToPreset(fc, preset) {
 
     const canvasW = fc.width
     const canvasH = fc.height
-    const maxW = canvasW - 80
-    const maxH = canvasH - 80
-    const scale = Math.min(maxW / preset.w, maxH / preset.h, 1)
+    const scale = Math.min((canvasW - 80) / preset.w, (canvasH - 80) / preset.h, 1)
     const displayW = Math.round(preset.w * scale)
     const displayH = Math.round(preset.h * scale)
     const artboardLeft = Math.round((canvasW - displayW) / 2)
     const artboardTop = Math.round((canvasH - displayH) / 2)
 
-    // Create or update artboard
+    // Helper: get true top-left accounting for originX/Y
+    const getTrueLeft = (obj) => {
+        const w = (obj.width || 0) * (obj.scaleX || 1)
+        const h = (obj.height || 0) * (obj.scaleY || 1)
+        let x = obj.left || 0, y = obj.top || 0
+        if (obj.originX === 'center') x -= w / 2
+        else if (obj.originX === 'right') x -= w
+        if (obj.originY === 'center') y -= h / 2
+        else if (obj.originY === 'bottom') y -= h
+        return { x, y, w, h }
+    }
+
+    // Find old artboard for relative positioning
     let artboard = fc.getObjects().find(o => o.id === 'artboard')
+    const oldAb = artboard ? getTrueLeft(artboard) : null
+    const oldAbLeft = oldAb ? oldAb.x : artboardLeft
+    const oldAbTop = oldAb ? oldAb.y : artboardTop
+    const oldAbW = artboard ? (artboard.width || displayW) : displayW
+    const oldAbH = artboard ? (artboard.height || displayH) : displayH
+
+    // Create or update artboard
     if (!artboard) {
         artboard = new fabric.Rect({
             left: artboardLeft,
@@ -125,18 +142,21 @@ export function resizeToPreset(fc, preset) {
             width: displayW,
             height: displayH,
             fill: '#ffffff',
+            stroke: 'rgba(99,102,241,0.2)',
+            strokeWidth: 1,
             rx: 4, ry: 4,
             selectable: false,
             evented: false,
             hoverCursor: 'default',
             id: 'artboard',
-            excludeFromExport: false,
-            shadow: new fabric.Shadow({ color: 'rgba(0,0,0,0.25)', blur: 30, offsetX: 0, offsetY: 4 }),
+            shadow: new fabric.Shadow({ color: 'rgba(0,0,0,0.3)', blur: 32, offsetX: 0, offsetY: 6 }),
         })
         fc.add(artboard)
         fc.sendObjectToBack(artboard)
     } else {
         artboard.set({ left: artboardLeft, top: artboardTop, width: displayW, height: displayH })
+        artboard.setCoords()
+        fc.sendObjectToBack(artboard)
     }
 
     fc._logicalScale = scale
@@ -145,16 +165,45 @@ export function resizeToPreset(fc, preset) {
     fc._artboardLeft = artboardLeft
     fc._artboardTop = artboardTop
 
-    // Resize background image to fill artboard
-    const bgImg = fc.getObjects().find(o => o.id === 'bg-image')
-    if (bgImg) {
-        const imgScale = Math.max(displayW / bgImg.width, displayH / bgImg.height)
-        bgImg.set({
-            scaleX: imgScale, scaleY: imgScale,
-            left: artboardLeft + displayW / 2,
-            top: artboardTop + displayH / 2,
-        })
-    }
+    // ── Reposition and scale all content objects relative to old artboard ──
+    const contentObjs = fc.getObjects().filter(o =>
+        o.id !== 'artboard' && !o.id?.startsWith('artboard-')
+    )
+
+    const uniformScale = Math.min(displayW / oldAbW, displayH / oldAbH)
+    const scaledW = oldAbW * uniformScale
+    const scaledH = oldAbH * uniformScale
+    const padX = (displayW - scaledW) / 2
+    const padY = (displayH - scaledH) / 2
+
+    contentObjs.forEach(obj => {
+        const { x: objLeft, y: objTop } = getTrueLeft(obj)
+        const relX = (objLeft - oldAbLeft) / oldAbW
+        const relY = (objTop - oldAbTop) / oldAbH
+        const newTrueLeft = artboardLeft + padX + relX * scaledW
+        const newTrueTop = artboardTop + padY + relY * scaledH
+        const newScaleX = (obj.scaleX || 1) * uniformScale
+        const newScaleY = (obj.scaleY || 1) * uniformScale
+        const newW = (obj.width || 0) * newScaleX
+        const newH = (obj.height || 0) * newScaleY
+
+        let finalLeft = newTrueLeft
+        let finalTop = newTrueTop
+        if (obj.originX === 'center') finalLeft = newTrueLeft + newW / 2
+        else if (obj.originX === 'right') finalLeft = newTrueLeft + newW
+        if (obj.originY === 'center') finalTop = newTrueTop + newH / 2
+        else if (obj.originY === 'bottom') finalTop = newTrueTop + newH
+
+        obj.set({ left: finalLeft, top: finalTop, scaleX: newScaleX, scaleY: newScaleY })
+
+        if ((obj.type === 'textbox' || obj.type === 'i-text' || obj.type === 'text') && obj.fontSize) {
+            obj.set({ fontSize: Math.max(8, Math.round(obj.fontSize * uniformScale)), scaleX: 1, scaleY: 1 })
+            if (obj.type === 'textbox') {
+                obj.set({ width: Math.max(20, Math.round((obj.width || 200) * uniformScale)) })
+            }
+        }
+        obj.setCoords()
+    })
 
     fc.requestRenderAll()
     return { scale, displayW, displayH }

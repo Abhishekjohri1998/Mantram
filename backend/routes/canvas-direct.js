@@ -613,6 +613,24 @@ ${creativeMasterySections}
    - Each variant is auto-adapted for its platform's aspect ratio and composition rules
    - Write platform-appropriate headline and ctaText (punchy for IG, professional for LinkedIn, curiosity for YT)
 
+### For ADAPT / RESIZE EXISTING DESIGN to platform sizes (user says "adapt this", "resize for FB", "make it work for Instagram", "size for YouTube"):
+- Use **adapt_design** with the correct preset IDs. YOU MUST map natural language to exact preset IDs:
+  - "facebook" / "fb" / "Facebook post" → **fb-post**
+  - "facebook story" → **fb-story**
+  - "instagram" / "insta" / "ig" → **ig-post** (default) — or ig-story if they say "story"
+  - "instagram story" / "ig story" / "insta story" → **ig-story**
+  - "instagram reel" / "reel" → **ig-reel**
+  - "instagram square" → **ig-post-square**
+  - "youtube" / "yt" / "YouTube thumbnail" → **yt-thumb**
+  - "linkedin" / "LinkedIn" → **linkedin**
+  - "twitter" / "X" → **twitter**
+  - "whatsapp" / "wa" / "whatsapp status" → **whatsapp-status**
+  - "pinterest" → **pinterest**
+  - "banner" → **banner**
+- NEVER ask the user which preset IDs to use — YOU map their natural language. They say "adapt for FB, insta and YT" → you call adapt_design with ["fb-post", "ig-post", "yt-thumb"].
+- If they say "resize to instagram" → use set_canvas_size with preset="ig-post".
+- NEVER respond with text asking for preset clarification. Always resolve and call the tool directly.
+
 ### For QUALITY REVIEW (after image generation):
 - Use **critique_image** to run MCoT quality analysis on any generated image
 - This returns a quality score (0-100) with breakdown by brief alignment, product accuracy, visual quality, and brand consistency
