@@ -1,0 +1,5 @@
+fix: add GlobalLoader with progress bar to all studios & sub-tabs
+
+- SeoAdvancedTools: added GlobalLoader overlay for all 9 sub-tabs (site-audit, keywords, GEO, competitors, on-page, backlinks, etc.) with per-workflow ESTIMATED_DURATIONS and LOADING_STAGES maps
+- ContentStudio: added estimatedDuration to all 6 GlobalLoader instances (image analysis 15s, product match 10s, content gen 45s, press release 45s, YouTube 60s)
+- CreativeStudio: added estimatedDuration to all 3 GlobalLoader instances (creative 30s, photoshoot 30s, template 25s)

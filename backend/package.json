@@ -6,7 +6,7 @@
     "scripts": {
         "start": "node index.js",
         "dev": "node index.js",
-        "test": "node --experimental-vm-modules backend/__tests__/test-ai.js"
+        "test": "node --experimental-vm-modules __tests__/test-ai.js"
     },
 
     "dependencies": {

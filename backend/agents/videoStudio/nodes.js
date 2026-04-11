@@ -839,6 +839,8 @@ export async function advancedGenerateNode(state) {
         aspectRatio: state.aspectRatio || '16:9',
         referenceImages: state.referenceImages || [],
         shots: state.shots || [],
+        refAudio: state.refAudio || undefined,
+        refVideo: state.refVideo || undefined,
     });
 
     return {

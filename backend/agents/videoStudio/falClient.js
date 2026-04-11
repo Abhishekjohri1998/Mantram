@@ -197,16 +197,33 @@ function getGrokApiKey() {
     return key;
 }
 
-function buildPayload(model, { prompt, imageUrl, duration, resolution, mode, shots, generateAudio }) {
+function buildPayload(model, { prompt, imageUrl, duration, resolution, mode, shots, generateAudio, refAudio, refVideo }) {
     const dur = Math.min(Math.max(duration || 5, DURATION_LIMITS[model]?.min || 3), DURATION_LIMITS[model]?.max || 15);
-    if (model === 'kling-3.0') {
-        const payload = { aspect_ratio: '16:9', negative_prompt: 'blur, distort, and low quality', cfg_scale: 0.5, generate_audio: generateAudio !== false };
+    
+    if (model === 'kling-3.0' || model === 'kling-3.0-o') {
+        const payload = { 
+            aspect_ratio: '16:9', 
+            negative_prompt: 'blur, distort, and low quality', 
+            cfg_scale: 0.5, 
+            generate_audio: generateAudio !== false 
+        };
+        
+        if (refAudio) payload.audio_url = refAudio;
+        if (refVideo) payload.video_url = refVideo;
+        
         if (shots && shots.length > 1) {
-            payload.multi_prompt = shots.map(s => ({ prompt: s.visual || s.prompt || prompt, duration: String(Math.min(Math.max(s.duration || 5, 3), 15)) }));
+            payload.multi_prompt = shots.map(s => ({ 
+                prompt: s.visual || s.prompt || prompt, 
+                duration: String(Math.min(Math.max(s.duration || 5, 3), 15)) 
+            }));
             payload.shot_type = 'customize';
-        } else { payload.prompt = prompt; payload.duration = String(dur); }
+        } else { 
+            payload.prompt = prompt; 
+            payload.duration = String(dur); 
+        }
         return payload;
     }
+    
     if (model === 'veo-3.1' || model === 'veo-3.1-fast') return { prompt, aspect_ratio: '16:9', resolution: resolution === '720p' ? '720p' : '1080p', generate_audio: generateAudio !== false, auto_fix: true };
     if (model === 'seedance-1.0') return { prompt, duration: dur >= 8 ? '10' : '5', aspect_ratio: '16:9', seed: Math.floor(Math.random() * 999999) };
     if (model === 'seedance-2.0') return { prompt, duration: String(dur), aspect_ratio: '16:9', generate_audio: generateAudio !== false, seed: Math.floor(Math.random() * 999999) };
@@ -226,6 +243,7 @@ async function trySeedanceCascade({ prompt, imageUrl, duration, aspectRatio, gen
                 duration: duration || 5, aspectRatio: aspectRatio || '16:9',
                 generateAudio: generateAudio !== false,
                 referenceImages: referenceImages || [],
+                refAudio, refVideo,
             });
             if (r?.videoUrl) {
                 console.log('✅ [Cascade] Step 1 done: LaoZhang seedance-2.0');
@@ -255,6 +273,7 @@ async function trySeedanceCascade({ prompt, imageUrl, duration, aspectRatio, gen
             imageUrl: imageUrl || null,
             duration: duration || 5,
             aspectRatio: aspectRatio || '16:9',
+            refAudio, refVideo,
         });
         if (kieResult?.taskId) {
             console.log('✅ [Cascade] Step 3 done: kie.ai');
@@ -268,6 +287,7 @@ async function trySeedanceCascade({ prompt, imageUrl, duration, aspectRatio, gen
             prompt, imageUrl: null, duration,
             aspectRatio: aspectRatio || '16:9',
             generateAudio, referenceImages: referenceImages || [], qualityMode: mode || 'fast',
+            refAudio, refVideo,
         });
         if (piResult?.taskId) {
             console.log('✅ [Cascade] Step 4 done: PiAPI');
@@ -282,14 +302,16 @@ async function trySeedanceCascade({ prompt, imageUrl, duration, aspectRatio, gen
     throw new Error('All video providers exhausted.');
 }
 
-export async function submitVideoGeneration({ model, prompt, imageUrl, duration, resolution, mode, shots, generateAudio, aspectRatio, referenceImages }) {
+export async function submitVideoGeneration({ model, prompt, imageUrl, duration, resolution, mode, shots, generateAudio, aspectRatio, referenceImages, refAudio, refVideo }) {
     if (!MODEL_AVAILABLE[model]) throw new Error(`Model '${model}' is not available.`);
 
     // Enforce provider-specific prompt length limits
     const safePrompt = truncatePrompt(prompt, model);
 
-    const [s3ImageUrl, ...s3ReferenceImages] = await Promise.all([
+    const [s3ImageUrl, s3RefAudio, s3RefVideo, ...s3ReferenceImages] = await Promise.all([
         ensureS3Url(imageUrl, 'video-studio/generations'),
+        ensureS3Url(refAudio, 'video-studio/references'),
+        ensureS3Url(refVideo, 'video-studio/references'),
         ...(referenceImages || []).map(img => ensureS3Url(img, 'video-studio/references'))
     ]);
     let activeProvider = null;
@@ -307,6 +329,7 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
                     prompt: safePrompt, imageUrl: s3ImageUrl, duration,
                     aspectRatio: aspectRatio || '16:9', qualityMode: mode || 'fast',
                     generateAudio, referenceImages: s3ReferenceImages,
+                    refAudio: s3RefAudio, refVideo: s3RefVideo,
                 });
                 return {
                     requestId: result.taskId, endpoint: 'muapi-seedance-2.0',
@@ -318,6 +341,7 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
                     prompt: safePrompt, imageUrl: s3ImageUrl, duration,
                     aspectRatio: aspectRatio || '16:9', generateAudio,
                     referenceImages: s3ReferenceImages, qualityMode: mode || 'fast',
+                    refAudio: s3RefAudio, refVideo: s3RefVideo,
                 });
                 return {
                     requestId: result.taskId, endpoint: 'piapi-seedance-2.0',
@@ -344,7 +368,8 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
             const cascade = await trySeedanceCascade({
                 prompt: safePrompt, imageUrl: s3ImageUrl, duration,
                 aspectRatio: aspectRatio || '16:9', generateAudio, mode,
-                referenceImages: s3ReferenceImages,
+                referenceImages: s3ReferenceImages, 
+                refAudio: s3RefAudio, refVideo: s3RefVideo,
             });
             return {
                 requestId: cascade.taskId || `lz-${Date.now()}`,
@@ -381,7 +406,10 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
     const endpoints = MODEL_ENDPOINTS[model];
     if (!endpoints) throw new Error(`Unknown video model: ${model}`);
     const endpoint = s3ImageUrl ? endpoints.imageToVideo : endpoints.textToVideo;
-    const payload = buildPayload(model, { prompt: safePrompt, imageUrl: s3ImageUrl, duration, resolution, mode, shots, generateAudio });
+    const payload = buildPayload(model, { 
+        prompt: safePrompt, imageUrl: s3ImageUrl, duration, resolution, 
+        mode, shots, generateAudio, refAudio: s3RefAudio, refVideo: s3RefVideo 
+    });
 
     // Pass primary image for I2V
     if (s3ImageUrl) payload.image_url = s3ImageUrl;
