@@ -139,8 +139,9 @@ export async function analysisNode({ video, brandContext }) {
     // gemini-2.5-pro video analysis can take 60-120s — wrap in AbortController
     const router = getRouter();
     let analysis;
+    // gemini-2.5-pro video analysis: typically 30-120s, can peak at 180s for long videos
     const analysisController = new AbortController();
-    const analysisTimeout = setTimeout(() => analysisController.abort(), 120_000); // 2 min cap
+    const analysisTimeout = setTimeout(() => analysisController.abort(), 180_000); // 3 min cap
 
     try {
         console.log(`🧠 [analysisNode] Sending YouTube URL to Gemini 2.5 Pro for native video analysis`);
@@ -176,7 +177,7 @@ export async function analysisNode({ video, brandContext }) {
             const fallbackResult = await callAgent(
                 PROMPTS.VIDEO_ANALYST,
                 `${videoContext}\n\n${transcriptSection}\n\nNOTE: Gemini video analysis unavailable — analyse from transcript only.`,
-                0.3, 4096, { preferFast: false }   // Use full model, not fast, for quality
+                0.3, 4096, { preferFast: false, timeoutMs: 120_000 }   // 2 min — full model on transcript can take 60-90s
             );
             console.log(`✅ [analysisNode] Transcript-only fallback complete`);
             return { analysis: fallbackResult };
@@ -202,7 +203,7 @@ export async function chapterNode({ video }) {
     const result = await callAgent(
         PROMPTS.CHAPTER_DETECTOR,
         `VIDEO DURATION: ${video.duration || 'Unknown'}\n\nTRANSCRIPT:\n${transcript.text?.substring(0, 20000)}`,
-        0.2, 2048, { preferFast: true }
+        0.2, 2048, { preferFast: true, timeoutMs: 60_000 }  // Fast model but long transcripts need 60s
     );
 
     return { chapters: result.chapters || [] };
