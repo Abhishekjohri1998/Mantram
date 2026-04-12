@@ -99,49 +99,92 @@ export function formatSeconds(secs) {
 }
 
 /**
- * Fetch YouTube video metadata via Data API v3
- * Returns: { title, description, channelTitle, publishedAt, duration, tags, categoryId, viewCount, likeCount }
+ * Fetch YouTube video metadata
+ * 
+ * Strategy (in order):
+ * 1. YouTube Data API v3 (YOUTUBE_API_KEY) — full metadata incl. stats, tags, duration
+ * 2. oEmbed API (free, no key required) — title, author, thumbnail URL
+ * 3. Basic stub with videoId only
  */
 export async function fetchVideoMetadata(videoId) {
     const apiKey = process.env.YOUTUBE_API_KEY;
 
-    if (!apiKey) {
-        console.warn('⚠️ YOUTUBE_API_KEY not set — metadata fetch skipped');
-        return { id: videoId, title: null, description: null };
+    // ── Strategy 1: YouTube Data API v3 (full metadata) ─────────────────────
+    if (apiKey) {
+        try {
+            const url = `https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails,statistics&id=${videoId}&key=${apiKey}`;
+            const res = await fetch(url);
+            const data = await res.json();
+
+            const item = data.items?.[0];
+            if (item) {
+                const snippet = item.snippet;
+                const stats = item.statistics;
+                const details = item.contentDetails;
+
+                console.log(`✅ [metadata] YouTube Data API: "${snippet.title}"`);
+                return {
+                    id: videoId,
+                    url: `https://www.youtube.com/watch?v=${videoId}`,
+                    title: snippet.title,
+                    description: snippet.description?.substring(0, 1000),
+                    channelTitle: snippet.channelTitle,
+                    channelId: snippet.channelId,
+                    publishedAt: snippet.publishedAt,
+                    thumbnailUrl: snippet.thumbnails?.maxres?.url || snippet.thumbnails?.high?.url,
+                    tags: snippet.tags || [],
+                    categoryId: snippet.categoryId,
+                    duration: details?.duration,
+                    viewCount: parseInt(stats?.viewCount || 0),
+                    likeCount: parseInt(stats?.likeCount || 0),
+                    commentCount: parseInt(stats?.commentCount || 0),
+                };
+            }
+        } catch (err) {
+            console.warn(`⚠️ [metadata] YouTube Data API failed: ${err.message} — falling back to oEmbed`);
+        }
     }
 
+    // ── Strategy 2: oEmbed (free, no API key, no quota) ─────────────────────
+    // Returns: title, author_name, thumbnail_url  — always available for public videos
     try {
-        const url = `https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails,statistics&id=${videoId}&key=${apiKey}`;
-        const res = await fetch(url);
-        const data = await res.json();
-
-        const item = data.items?.[0];
-        if (!item) return { id: videoId, title: null };
-
-        const snippet = item.snippet;
-        const stats = item.statistics;
-        const details = item.contentDetails;
-
-        return {
-            id: videoId,
-            url: `https://www.youtube.com/watch?v=${videoId}`,
-            title: snippet.title,
-            description: snippet.description?.substring(0, 1000),
-            channelTitle: snippet.channelTitle,
-            channelId: snippet.channelId,
-            publishedAt: snippet.publishedAt,
-            thumbnailUrl: snippet.thumbnails?.maxres?.url || snippet.thumbnails?.high?.url,
-            tags: snippet.tags || [],
-            categoryId: snippet.categoryId,
-            duration: details?.duration, // ISO 8601 e.g. PT12M34S
-            viewCount: parseInt(stats?.viewCount || 0),
-            likeCount: parseInt(stats?.likeCount || 0),
-            commentCount: parseInt(stats?.commentCount || 0),
-        };
+        const oembedUrl = `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`;
+        const res = await fetch(oembedUrl);
+        if (res.ok) {
+            const data = await res.json();
+            console.log(`✅ [metadata] oEmbed: "${data.title}" by ${data.author_name}`);
+            return {
+                id: videoId,
+                url: `https://www.youtube.com/watch?v=${videoId}`,
+                title: data.title,
+                description: null,
+                channelTitle: data.author_name,
+                channelId: null,
+                publishedAt: null,
+                // oEmbed thumbnail is lower-res — also try maxres directly
+                thumbnailUrl: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
+                thumbnailUrlFallback: data.thumbnail_url,
+                tags: [],
+                duration: null,
+                viewCount: 0,
+                likeCount: 0,
+                commentCount: 0,
+            };
+        }
     } catch (err) {
-        console.error('YouTube metadata fetch error:', err.message);
-        return { id: videoId, title: null };
+        console.warn(`⚠️ [metadata] oEmbed failed: ${err.message}`);
     }
+
+    // ── Strategy 3: Bare minimum stub ────────────────────────────────────────
+    console.warn(`⚠️ [metadata] All metadata sources failed for ${videoId} — using stub`);
+    return {
+        id: videoId,
+        url: `https://www.youtube.com/watch?v=${videoId}`,
+        title: null,
+        description: null,
+        channelTitle: null,
+        thumbnailUrl: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
+    };
 }
 
 /**
