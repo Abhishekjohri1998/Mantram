@@ -22,46 +22,53 @@
 const MODEL_STYLE_GUIDES = {
     'seedance-2.0': {
         name: 'Seedance 2.0',
-        maxWords: 400,
+        maxWords: 260,
         structure: `
-SEEDANCE 2.0 — UNIVERSAL DIRECTOR (BILINGUAL JSON):
+SEEDANCE 2.0 — DIRECTORIAL PROMPTING (Official Best Practices):
 
-You are a scene direction API that outputs structured JSON.
-You handle all scene types: Action, General, and Dialogue. 
-You MUST output a JSON array containing exactly two objects: an English prompt and a native Chinese (ZH) rewrite.
+You are a film director writing a production-ready scene prompt for Seedance 2.0.
+Seedance works best with DIRECTORIAL prompts: tell the model WHAT to show, HOW to film it, and WHEN things happen.
 
-INVENTORY & ROUTER RULES:
-- Action (Pursuit, Duel, Impact): Camera tracks movement. Duel must alternate dominance.
-- General (Journey, Atmosphere, Reveal): Camera tracks passage of time or space.
-- Dialogue (Confrontation, Interrogation, Negotiation): Camera crosses axis on power shift.
+PROMPT STRUCTURE (follow this order):
+1. SUBJECT: Who/what is in the scene. Be specific — describe appearance, clothing, posture, expression. Use functional roles ("figure", "rider", "speaker") instead of age-based words (no "boy", "girl", "young").
+2. ACTION: One clear verb in present tense. Describe intensity ("speeds past" not "passes by"). Keep to ONE primary action per shot.
+3. CAMERA: Explicit framing (wide/medium/close-up/extreme close-up) + movement (dolly-in, orbit, pan, handheld, tracking). Include focal length feel when relevant ("compressed 85mm", "wide 24mm").
+4. STYLE: At least one style keyword (cinematic, documentary, photorealistic, moody, ethereal). Describe lighting (golden hour, dramatic side-light, soft diffused). Set atmosphere.
+5. CONSTRAINTS: Brief consistency notes ("maintain facial consistency", "stable framing").
 
-ENGINE CONSTRAINTS:
-- No age markers allowed (*boy, girl, young, 少女, 男孩*, etc). Use functional roles: "figure", "rider", "speaker".
-- Double contrast cuts: Every cut must change both shot size and camera mode.
-- Inserts must be sub-second detail shots with a named subject (causally motivated).
+TIMELINE MARKERS (use for sequences longer than 5s):
+Structure events with time codes:
+  [0s] Wide establishing shot of the scene.
+  [3s] Medium shot — subject begins action.
+  [8s] Close-up — emotional beat or product reveal.
+  [12s] Pull-back to reveal full context.
 
-OUTPUT FORMAT (CRITICAL):
-Your "enhancedPrompt" field MUST be a strict JSON string representing an array of exactly two objects:
-'[{"lang":"en","prompt":"Style & Mood: ... Dynamic Description: ... Static Description: ... Audio: ..."},{"lang":"zh","prompt":"..."}]'
+@TAG REFERENCE RULES (when reference images are provided):
+- Give every @image a SPECIFIC JOB. Never just list them.
+- GOOD: "@image1 as character reference — the figure wears the same outfit and hairstyle. @image2 as environment mood reference — match this color palette and lighting."
+- BAD: "@image1 @image2 create video."
+- If an image is a product, describe how the product appears in the scene.
 
-Prompt structure inline labels: Style & Mood, Narrative Summary, Dynamic Description, Static Description, Audio.
+QUALITY SUFFIX (always append at the end):
+End every prompt with: "4K ultra HD, cinematic detail, sharp clarity, natural textures, stable picture."
 
-LANGUAGE RULES:
-- ZH is a native director's rewrite (max 1800 chars).
-- CRITICAL: NO CHINESE TEXT OVERLAYS OR VOICEOVERS. Inside both EN and ZH prompts, any spoken words, text overlays, floating text, or Brand CTAs MUST remain strictly in English (or the language specified by the user's brand/context). Never translate spoken dialogue or on-screen text into Chinese. `,
+WORD COUNT: 100–260 words. Quality drops sharply above 260 words.
+TENSE: Always present tense.
+AVOID: Conflicting instructions (fast-paced + slow-motion), multiple complex actions in one shot, vague adjectives without visual specifics. `,
     },
 
     'seedance-1.0': {
         name: 'Seedance 1.0',
-        maxWords: 350,
+        maxWords: 150,
         structure: `
-SEEDANCE 1.0 — CONCISE DIRECTOR (BILINGUAL JSON):
+SEEDANCE 1.0 — CONCISE DIRECTORIAL PROMPT:
 
-Same JSON array format as Seedance 2.0:
-'[{"lang":"en","prompt":"Style & Mood: ... Dynamic Description: ... Static Description: ..."},{"lang":"zh","prompt":"..."}]'
+Same directorial style as Seedance 2.0 but shorter (80–150 words max).
+Subject + Action + Camera + Style. One clear scene, one camera movement.
+End with: "4K, cinematic, sharp detail, stable picture."
 
-Keep the English and Chinese descriptions under 150 words each. Write one clear, steady camera intention instead of multiple cuts.
-CRITICAL: No age markers. Any text overlays or voiceovers MUST remain in English in the ZH prompt. `,
+TENSE: Present tense. AVOID: Age markers, conflicting directions.
+@TAG RULES: Same as Seedance 2.0 — give every reference a specific role. `,
     },
 
     'kling-3.0': {
@@ -212,7 +219,7 @@ ${brandContext ? `The brand context above is REAL — embed it deeply:
 
 RESPONSE — Return ONLY valid JSON:
 {
-  "enhancedPrompt": "The CORE MOTION PROMPT optimised for ${modelName}. For Seedance, this MUST be a JSON-parseable stringified array '[{lang:\"en\", prompt:\"...\"}, {lang:\"zh\", prompt:\"...\"}]'. Embed the Ad Film arc.",
+  "enhancedPrompt": "The CORE MOTION PROMPT optimised for ${modelName}. Write as a plain English directorial prompt following the model's structure guide above. Embed the Ad Film arc into the timeline.",
   "adFilmPlan": {
     "hook": "Exact description of the opening beat",
     "story": "The emotional narrative beat with the human truth",
@@ -230,7 +237,7 @@ RESPONSE — Return ONLY valid JSON:
 
 RESPONSE — Return ONLY valid JSON:
 {
-  "enhancedPrompt": "The production-ready, model-native prompt. Follow ${modelName}'s structure guide above exactly. For Seedance, this MUST be a JSON-parseable stringified array '[{lang:\"en\", prompt:\"...\"}, {lang:\"zh\", prompt:\"...\"}]'.",
+  "enhancedPrompt": "The production-ready, model-native prompt. Follow ${modelName}'s structure guide above exactly. Write as a plain English directorial prompt.",
   "changes": ["What was enhanced — e.g., 'Added slow orbit camera move', 'Applied brand color to lighting', 'Added material texture detail'"]
 }`;
 }
