@@ -79,12 +79,14 @@ export async function analysisNode({ video, brandContext }) {
         : `TRANSCRIPT: Not available — analyse based on title and description only.`;
 
     // Use Gemini natively via router — pass youtubeUrl as fileData for native video watching
-    // This is handled by the Gemini provider's youtubeUrl parameter (fileData injection)
+    // gemini-2.5-pro video analysis can take 60-120s — wrap in AbortController
     const router = getRouter();
     let analysis;
+    const analysisController = new AbortController();
+    const analysisTimeout = setTimeout(() => analysisController.abort(), 120_000); // 2 min cap
 
     try {
-        console.log(`🧠 [analysisNode] Sending YouTube URL to Gemini for native video analysis`);
+        console.log(`🧠 [analysisNode] Sending YouTube URL to Gemini 2.5 Pro for native video analysis`);
         const result = await router.generateText({
             systemPrompt: PROMPTS.VIDEO_ANALYST,
             userPrompt: `${videoContext}\n\nYOUTUBE URL (watch this video): ${youtubeUrl}\n\n${transcriptSection}`,
@@ -93,6 +95,7 @@ export async function analysisNode({ video, brandContext }) {
             model: 'gemini-2.5-pro',       // Best model for video understanding
             youtubeUrl: youtubeUrl,         // Triggers fileData injection in Gemini provider
         }, { provider: 'gemini' });
+        clearTimeout(analysisTimeout);
 
         const text = result.text || '';
         const cleaned = text
@@ -107,6 +110,7 @@ export async function analysisNode({ video, brandContext }) {
             throw new Error('No JSON in Gemini response');
         }
     } catch (err) {
+        clearTimeout(analysisTimeout);
         console.warn(`⚠️ [analysisNode] Gemini video analysis failed: ${err.message}. Falling back to transcript-only.`);
 
         // Fallback: text-only analysis using transcript
@@ -184,7 +188,7 @@ export async function seoNode({ video, analysis, chapters, brandContext }) {
     const result = await callAgent(
         PROMPTS.SEO_COPYWRITER,
         userPrompt,
-        0.7, 3000, { provider: 'claude' }  // Claude for best copywriting; falls back to Gemini automatically via router
+        0.7, 3000, { provider: 'claude', timeoutMs: 60_000 }  // Claude copywriting ~20-25s; 60s cap
     );
 
     return { seo: result };
@@ -216,7 +220,7 @@ export async function brandCriticNode({ video, analysis, brandContext }) {
     const result = await callAgent(
         PROMPTS.BRAND_CRITIC,
         userPrompt,
-        0.3, 2048, { preferFast: true }
+        0.3, 2048, { preferFast: true, timeoutMs: 45_000 }  // Fast Gemini; 45s cap
     );
 
     return { brandAlignment: result };
