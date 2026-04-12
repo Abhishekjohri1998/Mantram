@@ -80,11 +80,7 @@ const CreateToolsPanel = memo(({
                 <div className="grid grid-cols-2 gap-1">
                     {creativeTypes.map(ct => (
                         <button key={ct.id} onClick={() => setSelectedType(ct.id)}
-                            className={`px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
-                                selectedType === ct.id
-                                ? 'bg-[var(--sys-text)] text-[var(--sys-bg)] border border-[var(--sys-text)] shadow-sm'
-                                : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] border border-[var(--sys-border)] hover:bg-[var(--sys-bg)]'
-                            }`}>
+                            className={`studio-btn-pill flex items-center gap-1.5 ${selectedType === ct.id ? 'active' : ''}`}>
                             <span className="material-symbols-outlined text-xs">{ct.icon}</span>
                             <span className="truncate">{ct.label}</span>
                         </button>
@@ -235,15 +231,11 @@ const CreateToolsPanel = memo(({
                         <button key={shot.id}
                             onClick={() => setSelectedShot(prev => prev === shot.id ? null : shot.id)}
                             title={shot.description}
-                            className={`relative px-2 py-2 rounded-lg text-[10px] font-semibold transition-all cursor-pointer flex flex-col items-center gap-0.5 group ${
-                                selectedShot === shot.id
-                                ? 'border text-[var(--sys-text)] shadow-lg'
-                                : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] border border-[var(--sys-border)] hover:border-[var(--sys-border)] hover:bg-[var(--sys-surface)]'
-                            }`}
+                            className={`studio-btn-pill flex flex-col items-center gap-0.5 group ${selectedShot === shot.id ? 'active' : ''}`}
                             style={selectedShot === shot.id ? {
-                                backgroundColor: `${shot.color}18`,
-                                borderColor: `${shot.color}50`,
-                                color: shot.color,
+                                backgroundColor: `var(--sys-primary-dim)`,
+                                borderColor: `var(--sys-primary)`,
+                                color: `var(--sys-primary)`,
                             } : {}}
                         >
                             <span className="text-base leading-none">{shot.emoji}</span>
@@ -276,7 +268,7 @@ const CreateToolsPanel = memo(({
                         </div>
                     </div>
                     <button onClick={() => setGenerateCopy(!generateCopy)}
-                        className={`w-9 h-5 rounded-full transition-all cursor-pointer flex-shrink-0 ${generateCopy ? 'bg-violet-500' : 'bg-[var(--sys-surface)]'}`}>
+                        className={`w-9 h-5 rounded-full transition-all cursor-pointer flex-shrink-0 ${generateCopy ? 'bg-[var(--sys-primary)]' : 'bg-[var(--sys-surface)]'}`}>
                         <div className={`w-3.5 h-3.5 rounded-full bg-white shadow transition-transform ${generateCopy ? 'translate-x-4.5' : 'translate-x-0.5'}`} />
                     </button>
                 </div>
@@ -433,7 +425,7 @@ const CreateToolsPanel = memo(({
                 <div className="flex items-center gap-2">
                     <CreditTooltipWrapper action="creative">
                         <button onClick={handleGenerate} disabled={!prompt.trim() || !activeBrand || activeGenerations.length >= 3}
-                            className="btn-primary flex-1 py-3 rounded-xl font-bold cursor-pointer transition-all">
+                            className="studio-btn-primary flex-1">
                             {activeGenerations.length > 0 ? (
                                 <><span className="material-symbols-outlined animate-spin text-sm">progress_activity</span> Generating...</>
                             ) : (
@@ -441,7 +433,7 @@ const CreateToolsPanel = memo(({
                             )}
                         </button>
                     </CreditTooltipWrapper>
-                    <button onClick={() => setShowAdvanced(!showAdvanced)} className={`p-3 rounded-xl transition-all border ${showAdvanced ? 'bg-[var(--sys-surface)] border-[var(--sys-border)] text-[var(--sys-text)]' : 'bg-[var(--sys-surface)] border-[var(--sys-border)] text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]'}`}>
+                    <button onClick={() => setShowAdvanced(!showAdvanced)} className={`studio-action-btn-sm ${showAdvanced ? 'active' : ''}`}>
                         <span className="material-symbols-outlined text-sm">tune</span>
                     </button>
                     <button onClick={() => {
@@ -450,7 +442,7 @@ const CreateToolsPanel = memo(({
                                 .then(res => setProductsList(res.products || []))
                         }
                         setShowProductPicker(true)
-                    }} className="p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text-muted)] hover:text-cyan-400 transition-all cursor-pointer">
+                    }} className="studio-action-btn-sm">
                         <span className="material-symbols-outlined text-sm">inventory_2</span>
                     </button>
                 </div>

@@ -27,11 +27,7 @@ const GalleryPanel = memo(({
                     {['All', 'Social', 'Product', 'Promo', 'Quote', 'Event'].map(cat => (
                         <button key={cat}
                             onClick={() => setGalleryFilter(cat)}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer border ${
-                                galleryFilter === cat
-                                    ? 'bg-primary/15 text-primary border-primary/25'
-                                    : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] border-transparent hover:border-[var(--sys-border)]'
-                            }`}
+                            className={`studio-btn-pill ${galleryFilter === cat ? 'active' : ''}`}
                         >
                             {cat}
                         </button>
@@ -126,7 +122,7 @@ const GalleryPanel = memo(({
                     </div>
                     <div className="flex items-center gap-1.5 pt-2 border-t border-[var(--sys-border)]">
                         <button onClick={() => handleFeedback('accept')}
-                            className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${feedbackState === 'accepted' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'text-[var(--sys-text-muted)] hover:text-emerald-400 hover:bg-emerald-400/10'}`}>
+                            className={`studio-btn-pill ${feedbackState === 'accepted' ? 'active' : ''}`}>
                             <span className="material-symbols-outlined text-sm">{feedbackState === 'accepted' ? 'check_circle' : 'check'}</span>
                             {feedbackState === 'accepted' ? 'Accepted' : 'Accept'}
                         </button>
@@ -348,19 +344,18 @@ const GalleryPanel = memo(({
                                             
                                             <div className="flex flex-wrap items-center gap-2 mt-6">
                                                 <button onClick={(e) => { e.stopPropagation(); setDesignBaseImage(group.items[0].imageUrl); setPrompt(group.promptText); }} 
-                                                        className="px-3 py-1.5 bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-lg text-[11px] font-bold text-[var(--sys-text)] flex items-center gap-1.5 hover:bg-[var(--sys-bg)] transition-colors">
+                                                        className="studio-btn-secondary">
                                                     <span className="material-symbols-outlined text-[14px]">refresh</span> Reuse
                                                 </button>
                                                 <button onClick={(e) => { e.stopPropagation(); handleDownloadImage(group.items[0].imageUrl, `creative-${gIdx}.png`) }} 
-                                                        className="px-3 py-1.5 bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-lg text-[11px] font-bold text-[var(--sys-text)] flex items-center gap-1.5 hover:bg-[var(--sys-bg)] transition-colors">
+                                                        className="studio-btn-secondary">
                                                     <span className="material-symbols-outlined text-[14px]">content_copy</span> Copy
                                                 </button>
                                                 
                                                 <div className="flex-1" />
                                                 
                                                 <button onClick={() => setZoomImage(group.items[0].imageUrl)}
-                                                        className="px-3 py-1.5 bg-[var(--sys-primary-dim)] border border-[var(--sys-border)] text-primary rounded-lg text-[11px] font-bold flex items-center gap-2 hover:bg-[var(--sys-surface)] transition-colors text-right relative overflow-hidden">
-                                                    <span className="absolute inset-0 bg-primary/5 opacity-0 hover:opacity-100 transition-opacity"></span>
+                                                        className="studio-btn-primary py-1.5 text-[11px]">
                                                     <span className="material-symbols-outlined text-[14px]">north_east</span> View Actions
                                                 </button>
                                             </div>

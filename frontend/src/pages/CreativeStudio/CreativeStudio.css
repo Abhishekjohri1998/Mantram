@@ -1,0 +1,315 @@
+/* ══════════════════════════════════════════════════════════════════════════════
+   MANTRAM CREATIVE STUDIO — CENTRALIZED STYLE SYSTEM
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+/* ── Split Layout ── */
+.creative-split {
+  display: flex;
+  flex-direction: row-reverse;
+  align-items: flex-start;
+  gap: 1.5rem;
+  position: relative;
+  padding-bottom: 2rem;
+}
+
+.creative-tools-panel {
+  flex-shrink: 0;
+  width: 336px;
+  display: flex;
+  flex-direction: column;
+  position: sticky;
+  top: 7.75rem;
+  height: calc(100vh - 11.75rem);
+  max-height: calc(100vh - 11.75rem);
+  background: var(--sys-surface);
+  border: 1px solid var(--sys-border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.creative-tools-panel-body {
+  flex: 1 1 0%;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: var(--sys-border) transparent;
+}
+
+.creative-tools-panel-footer {
+  flex-shrink: 0;
+  padding: 0;
+  background: var(--sys-bg);
+  border-top: 1px solid var(--sys-border);
+  overflow: visible;
+}
+
+.creative-gallery { 
+  flex-grow: 1; 
+  min-width: 0; 
+  padding: 0; 
+}
+
+/* ── Floating Tray & Settings ── */
+.floating-prompt-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.625rem 0.875rem 0.75rem;
+}
+
+.floating-setting-btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  border: 1px solid var(--sys-border);
+  background: var(--sys-surface);
+  color: var(--sys-text-muted);
+  transition: all 0.2s ease;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.floating-setting-btn:hover { background: var(--sys-border); color: var(--sys-text); }
+.floating-setting-btn.active {
+  background: var(--sys-primary-dim);
+  color: var(--sys-primary);
+  border-color: var(--sys-primary);
+}
+
+.floating-tray {
+  padding: 0.875rem 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  animation: traySlideUp 0.18s ease-out forwards;
+  overflow: hidden;
+}
+
+@keyframes traySlideUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Generation Cards ── */
+.generation-card {
+  backdrop-filter: blur(24px);
+  background-color: rgba(44, 43, 50, 0.4);
+  border: 1px solid rgba(72, 71, 76, 0.2);
+  border-radius: 0.75rem;
+  padding: 1rem;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+}
+
+.generation-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border: 1px solid transparent;
+  border-top-color: rgba(255, 255, 255, 0.1);
+  border-radius: inherit;
+}
+
+.generation-card:hover {
+  background-color: rgba(44, 43, 50, 0.6);
+  border-color: rgba(255, 77, 0, 0.3);
+  box-shadow: 0 0 15px -2px rgba(255, 77, 0, 0.15);
+}
+
+.generation-card--new {
+  border-color: rgba(255, 77, 0, 0.4);
+  box-shadow: 0 0 20px rgba(255, 77, 0, 0.15);
+  animation: cardHighlight 2s ease-out;
+}
+
+@keyframes cardHighlight {
+  0% { border-color: rgba(255, 77, 0, 0.6); box-shadow: 0 0 30px rgba(255, 77, 0, 0.25); transform: scale(1.01); }
+  100% { border-color: rgba(255, 77, 0, 0.3); box-shadow: 0 0 15px rgba(255, 77, 0, 0.1); transform: scale(1); }
+}
+
+/* ── Standardized Studio Buttons (Orange Theme) ── */
+
+/* Primary Action: Solid Orange */
+.studio-btn-primary {
+  background: var(--sys-primary);
+  color: #ffffff;
+  font-weight: 700;
+  padding: 0.75rem 1.5rem;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(255, 77, 0, 0.2);
+}
+
+.studio-btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(255, 77, 0, 0.3);
+  opacity: 0.95;
+}
+
+.studio-btn-primary:active {
+  transform: translateY(0);
+}
+
+.studio-btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Secondary Action: Outlined or Dimmed Orange */
+.studio-btn-secondary {
+  background: var(--sys-surface);
+  color: var(--sys-text);
+  border: 1px solid var(--sys-border);
+  padding: 0.625rem 1.25rem;
+  border-radius: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all 0.2s ease;
+}
+
+.studio-btn-secondary:hover {
+  border-color: var(--sys-primary);
+  color: var(--sys-primary);
+  background: var(--sys-primary-dim);
+}
+
+/* Toggle / Item Button: Orange Highlight when Active */
+.studio-btn-pill {
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  border: 1px solid var(--sys-border);
+  background: var(--sys-surface);
+  color: var(--sys-text-muted);
+}
+
+.studio-btn-pill:hover:not(.active) {
+  background: var(--sys-bg);
+  color: var(--sys-text);
+  border-color: var(--sys-text-muted);
+}
+
+.studio-btn-pill.active {
+  background: var(--sys-primary-dim);
+  color: var(--sys-primary);
+  border-color: var(--sys-primary);
+  box-shadow: 0 0 10px rgba(255, 77, 0, 0.1);
+}
+
+/* Ghost Action: subtle orange on hover */
+.studio-btn-ghost {
+  background: transparent;
+  color: var(--sys-text-muted);
+  padding: 0.5rem;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.studio-btn-ghost:hover {
+  background: var(--sys-primary-dim);
+  color: var(--sys-primary);
+}
+
+/* Small square action buttons (like history buttons) */
+.studio-action-btn-sm {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: var(--sys-surface);
+  color: var(--sys-text-muted);
+  border: 1px solid var(--sys-border);
+  transition: all 0.2s ease;
+}
+
+.studio-action-btn-sm:hover {
+  border-color: var(--sys-primary);
+  color: var(--sys-primary);
+  background: var(--sys-primary-dim);
+}
+
+.studio-action-btn-sm .material-symbols-outlined {
+  font-size: 18px !important;
+}
+
+/* ── Studio Navigation ── */
+.studio-nav-pill {
+  background: var(--sys-primary-dim) !important;
+  color: var(--sys-primary) !important;
+  border: 1px solid var(--sys-primary) !important;
+  box-shadow: 0 0 12px rgba(255, 77, 0, 0.15);
+}
+
+.studio-nav-tab-inactive {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--sys-text-muted);
+}
+
+.studio-nav-tab-inactive:hover {
+  background: var(--sys-surface-hover);
+  color: var(--sys-text);
+  border-color: var(--sys-border);
+}
+
+/* ── Gallery Tools ── */
+.gallery-cat-pill {
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--sys-text-muted);
+}
+
+.gallery-cat-pill:hover {
+  color: var(--sys-text);
+  background: var(--sys-surface-hover);
+}
+
+.gallery-cat-pill.active {
+  background: var(--sys-primary-dim);
+  color: var(--sys-primary);
+  border-color: var(--sys-primary);
+}
+
+/* Mobile Overrides */
+@media (max-width: 1024px) {
+  .creative-split {
+    flex-direction: column-reverse; /* tools on top */
+  }
+  .creative-tools-panel {
+    width: 100%;
+    position: static;
+    height: auto;
+    max-height: none;
+  }
+  .creative-tools-panel-body {
+    min-height: 0;
+    max-height: 50vh;
+  }
+}
