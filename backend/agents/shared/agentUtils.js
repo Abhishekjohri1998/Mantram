@@ -44,8 +44,10 @@ export async function callAgent(systemPrompt, userPrompt, temperature = 0.7, max
     const safeSystem = systemPrompt.length > MAX_INPUT_CHARS ? systemPrompt.substring(0, MAX_INPUT_CHARS) + '... [truncated]' : systemPrompt;
     const safeUser = userPrompt.length > MAX_INPUT_CHARS ? userPrompt.substring(0, MAX_INPUT_CHARS) + '... [truncated]' : userPrompt;
 
-    // Per-agent hard timeout (30s default) — prevents one slow LLM response from blocking the pipeline
-    const AGENT_TIMEOUT_MS = options.timeoutMs || 30_000;
+    // Per-agent hard timeout — safety net to prevent one slow LLM from blocking the pipeline
+    // Default: 90s (was 30s — too low for Claude Sonnet ~20-25s + Gemini 2.5 Pro ~40-90s)
+    // Override per-call with options.timeoutMs (e.g. timeoutMs: 120_000 for heavy analysis)
+    const AGENT_TIMEOUT_MS = options.timeoutMs || 90_000;
     let timeoutHandle;
     const timeoutPromise = new Promise((_, reject) => {
         timeoutHandle = setTimeout(() => reject(new Error(`callAgent timeout after ${AGENT_TIMEOUT_MS}ms`)), AGENT_TIMEOUT_MS);
