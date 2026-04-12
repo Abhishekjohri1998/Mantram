@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import DashboardLayout from '../components/DashboardLayout'
 import SEOHead from '../components/SEOHead'
-import { useAuth } from '../context/AuthContext'
 import { useBrand } from '../context/BrandContext'
 
 const API_BASE = import.meta.env.VITE_API_URL || `${window.location.origin}/api`
@@ -296,7 +295,6 @@ function ProjectDetail({ project }) {
 
 // ── Main Page Component ────────────────────────────────────────────────────
 export default function YouTubeStudio() {
-    const { user } = useAuth()
     const { activeBrand } = useBrand()
 
     const [tab, setTab] = useState('analyse')
@@ -339,12 +337,19 @@ export default function YouTubeStudio() {
 
     function startPolling(id) {
         if (pollRef.current[id]) return
+        let attempts = 0
         pollRef.current[id] = setInterval(async () => {
+            attempts++
+            // Stop polling after 3 minutes (45 attempts × 4s) — safety cap
+            if (attempts > 45) {
+                clearInterval(pollRef.current[id])
+                delete pollRef.current[id]
+                return
+            }
             try {
                 const d = await api(`/youtube-studio/${id}`)
                 const proj = d.project
                 setActiveProject(proj)
-                // Update in list
                 setProjects(prev => prev.map(p => p._id === id ? { ...p, status: proj.status, metadata: proj.metadata } : p))
                 if (proj.status === 'done' || proj.status === 'failed') {
                     clearInterval(pollRef.current[id])
@@ -371,10 +376,9 @@ export default function YouTubeStudio() {
                 body: JSON.stringify({ urls: rawUrls, brandId: activeBrand?._id }),
             })
             const newProjects = d.projects || []
-            setProjects(prev => [...newProjects, ...prev])
             setUrlInput('')
 
-            // Open the first project and poll
+            // Open the first project and navigate to result tab
             if (newProjects.length === 1) {
                 setActiveProject({ _id: newProjects[0]._id, videoId: newProjects[0].videoId, status: 'processing' })
                 setTab('result')
@@ -384,6 +388,7 @@ export default function YouTubeStudio() {
                 newProjects.forEach(p => startPolling(p._id))
             }
 
+            // Reload project list once (don't duplicate state)
             await loadProjects()
         } catch (e) {
             setError(e.message)

@@ -80,7 +80,8 @@ export async function fetchTranscript(videoId, preferredLang = 'en') {
 export function formatTranscriptText(segments) {
     if (!segments?.length) return '';
     return segments.map(s => {
-        const time = formatSeconds(s.start);
+        // youtube-transcript v1.3+ returns offset in milliseconds
+        const time = formatSeconds((s.offset ?? s.start ?? 0) / 1000);
         return `[${time}] ${s.text}`;
     }).join('\n');
 }
