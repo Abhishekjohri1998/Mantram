@@ -24,7 +24,9 @@ const ThumbnailTemplateSchema = new mongoose.Schema({
     emoji:       { type: String, default: 'palette' }, // Material Symbols icon name (kept as 'emoji' for backward compat)
     icon:        { type: String, default: 'palette' }, // Material Symbols icon name
 
-    previewUrl:  String,                           // Generated preview image URL
+    previewUrl:        String, // Generated preview image URL
+    referenceImageUrl: String, // Style reference image for NanoBanana 2 / Flux prompting
+
 
     // Classification (what this template is for)
     tags:   [String],  // Free-form tags: "sunday-special", "cricket-show", "product-launch" etc.

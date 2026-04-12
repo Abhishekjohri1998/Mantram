@@ -663,10 +663,21 @@ export default function YouTubeStudio() {
     const [projects, setProjects] = useState([])
     const [activeProject, setActiveProject] = useState(null)
     const [loadingProject, setLoadingProject] = useState(false)
-    const [activeTemplate, setActiveTemplate] = useState(null) // Selected thumbnail template
+    const [channels, setChannels] = useState([])
+    const [selectedChannelId, setSelectedChannelId] = useState('')
     const pollRef = useRef({})
 
-    useEffect(() => { loadProjects() }, [])
+    useEffect(() => { loadProjects(); loadChannels() }, [])
+
+    async function loadChannels() {
+        try {
+            const d = await api('/yt-studio-settings/channel-configs')
+            const ch = d.channels || []
+            setChannels(ch)
+            const def = ch.find(c => c.isDefault) || ch[0]
+            if (def) setSelectedChannelId(def._id)
+        } catch {}
+    }
 
     async function loadProjects() {
         try {
@@ -719,7 +730,7 @@ export default function YouTubeStudio() {
         try {
             const d = await api('/youtube-studio/analyse', {
                 method: 'POST',
-                body: JSON.stringify({ urls: rawUrls, brandId: activeBrand?._id }),
+                body: JSON.stringify({ urls: rawUrls, brandId: activeBrand?._id, channelConfigId: selectedChannelId }),
             })
             const newProjects = d.projects || []
             setUrlInput('')
@@ -776,6 +787,19 @@ export default function YouTubeStudio() {
                     </div>
 
                     <div style={{ background: 'var(--sys-surface)', border: '1px solid var(--sys-border)', borderRadius: 16, padding: 20, marginBottom: 20 }}>
+                        {channels.length > 0 && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20, padding: '10px 14px', background: 'var(--sys-primary)08', borderRadius: 10, border: '1px solid var(--sys-primary)22' }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--sys-primary)' }}>tv</span>
+                                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--sys-primary)' }}>Target Channel:</span>
+                                <select value={selectedChannelId} onChange={e => setSelectedChannelId(e.target.value)}
+                                    style={{ flex: 1, padding: '8px 12px', borderRadius: 8, border: '1px solid var(--sys-border)', background: 'var(--sys-bg)', color: 'var(--sys-text)', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                                    {channels.map(c => (
+                                        <option key={c._id} value={c._id}>{c.channelName} {c.isDefault ? '(Default)' : ''}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
+
                         <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--sys-text-muted)', display: 'block', marginBottom: 8 }}>
                             YouTube URL(s) — one per line, up to 10
                         </label>
