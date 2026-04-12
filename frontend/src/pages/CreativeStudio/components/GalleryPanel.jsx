@@ -91,7 +91,7 @@ const GalleryPanel = memo(({
                         <p className="studio-compact-prompt-text text-xs text-[var(--sys-text-muted)] line-clamp-1 leading-relaxed">
                             {prompt || 'Generated creative'}
                         </p>
-                        <div className="studio-prompt-actions opacity-0 group-hover/prompt:opacity-100">
+                        <div className="studio-prompt-actions">
                             <button onClick={() => { navigator.clipboard.writeText(prompt); setFeedbackToast?.('Prompt copied to clipboard') }}
                                 className="studio-prompt-action-btn" title="Copy Prompt">
                                 <span className="material-symbols-outlined">content_copy</span>
@@ -345,7 +345,7 @@ const GalleryPanel = memo(({
                                                 <p className="studio-compact-prompt-text text-[13px] text-[var(--sys-text-muted)] font-medium line-clamp-1 leading-relaxed">
                                                     {group.promptText}
                                                 </p>
-                                                <div className="studio-prompt-actions opacity-0 group-hover/prompt:opacity-100">
+                                                <div className="studio-prompt-actions">
                                                     <button onClick={() => { navigator.clipboard.writeText(group.promptText); setFeedbackToast?.('Prompt copied to clipboard') }}
                                                         className="studio-prompt-action-btn" title="Copy Prompt">
                                                         <span className="material-symbols-outlined">content_copy</span>
@@ -402,7 +402,7 @@ const GalleryPanel = memo(({
                                                 <p className="studio-compact-prompt-text text-xs text-[var(--sys-text)] line-clamp-1 leading-relaxed">
                                                     {item._prompt || item.prompt}
                                                 </p>
-                                                <div className="studio-prompt-actions opacity-0 group-hover/prompt:opacity-100">
+                                                <div className="studio-prompt-actions">
                                                     <button onClick={() => { navigator.clipboard.writeText(item._prompt || item.prompt); setFeedbackToast?.('Prompt copied to clipboard') }}
                                                         className="studio-prompt-action-btn" title="Copy Prompt">
                                                         <span className="material-symbols-outlined">content_copy</span>
@@ -437,7 +437,7 @@ const GalleryPanel = memo(({
                             <p className="studio-compact-prompt-text text-xs text-[var(--sys-text-muted)] line-clamp-1 leading-relaxed text-left">
                                 {img.prompt || img.title}
                             </p>
-                            <div className="studio-prompt-actions opacity-0 group-hover/prompt:opacity-100">
+                            <div className="studio-prompt-actions">
                                 <button onClick={() => { navigator.clipboard.writeText(img.prompt || img.title); setFeedbackToast?.('Prompt copied to clipboard') }}
                                     className="studio-prompt-action-btn" title="Copy Prompt">
                                     <span className="material-symbols-outlined">content_copy</span>
