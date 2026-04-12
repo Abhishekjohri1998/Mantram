@@ -3,21 +3,23 @@
  *
  * Mounted at: /api/youtube-studio/settings
  *
- * Provides:
- *   - Channel config CRUD
- *   - Thumbnail template CRUD
- *   - Starter template seeding (pre-built templates)
+ * IMPORTANT: Static paths (/channel-configs, /templates/seed-starters) MUST
+ * be registered BEFORE wildcard paths (/:id) to prevent Express from swallowing them.
  *
  * Route map:
- *   GET    /channel-config             — Get this user's channel config
- *   PUT    /channel-config             — Save / update channel config
+ *   GET    /channel-configs              — List all channels for this user
+ *   POST   /channel-configs              — Create a new channel config
+ *   PUT    /channel-configs/:id          — Update a channel config
+ *   DELETE /channel-configs/:id          — Delete a channel config
+ *   POST   /channel-configs/:id/default  — Set as default channel
  *
- *   GET    /templates                  — List user's templates + starters
- *   POST   /templates                  — Create new template
- *   PUT    /templates/:id             — Update template
- *   DELETE /templates/:id             — Delete template
- *   POST   /templates/:id/set-default — Set as default template
- *   POST   /templates/seed-starters   — Seed pre-built starter templates for this user
+ *   POST   /templates/seed-starters     — Seed pre-built starter templates (STATIC — must be first)
+ *   GET    /templates                   — List user's templates
+ *   POST   /templates                   — Create new template
+ *   PUT    /templates/:id               — Update template
+ *   DELETE /templates/:id               — Delete template
+ *   POST   /templates/:id/set-default   — Set as default template
+ *   POST   /templates/:id/clone         — Clone a starter template
  */
 
 import express from 'express';
@@ -27,15 +29,13 @@ import YoutubeChannelConfig from '../models/YoutubeChannelConfig.js';
 
 const router = express.Router();
 
-// ── STARTER TEMPLATE DEFINITIONS ────────────────────────────────────────────
-// These are pre-built templates seeded per user on first access.
-// Change only the visual/language fields — not _id (those are generated fresh).
+// ── STARTER TEMPLATE DEFINITIONS ─────────────────────────────────────────────
 
 const STARTER_TEMPLATES = [
     {
         name: 'Bollywood Drama',
         description: 'Rich cinematic tones for drama, reality-tv and entertainment channels. Deep reds and gold.',
-        emoji: '🎬',
+        icon: 'theaters',
         tags: ['drama', 'entertainment', 'hindi', 'reality-tv'],
         classification: { theme: 'drama', language: 'hindi' },
         visual: {
@@ -50,7 +50,7 @@ const STARTER_TEMPLATES = [
     {
         name: 'Music Hype',
         description: 'High-energy dark backgrounds with neon accents. Perfect for music videos, live concerts, artist profiles.',
-        emoji: '🎵',
+        icon: 'queue_music',
         tags: ['music', 'artist', 'concert', 'hindi-music', 'pop'],
         classification: { theme: 'music', language: 'hinglish' },
         visual: {
@@ -65,7 +65,7 @@ const STARTER_TEMPLATES = [
     {
         name: 'News & Commentary',
         description: 'Professional, authoritative style for news, politics, and current affairs channels.',
-        emoji: '📰',
+        icon: 'breaking_news',
         tags: ['news', 'politics', 'commentary', 'currentaffairs'],
         classification: { theme: 'news', language: 'hindi' },
         visual: {
@@ -80,7 +80,7 @@ const STARTER_TEMPLATES = [
     {
         name: 'Education & Tutorial',
         description: 'Clean, trust-building style for educational content. Great for EdTech, tutorials, skill channels.',
-        emoji: '🎓',
+        icon: 'school',
         tags: ['education', 'tutorial', 'edtech', 'skills', 'learning'],
         classification: { theme: 'education', language: 'english' },
         visual: {
@@ -95,7 +95,7 @@ const STARTER_TEMPLATES = [
     {
         name: 'Lifestyle & Vlog',
         description: 'Warm, authentic, personal. For lifestyle, travel, food, and daily vlog channels.',
-        emoji: '🌅',
+        icon: 'explore',
         tags: ['lifestyle', 'vlog', 'travel', 'food', 'daily'],
         classification: { theme: 'lifestyle', language: 'english' },
         visual: {
@@ -110,7 +110,7 @@ const STARTER_TEMPLATES = [
     {
         name: 'Reality TV Shock',
         description: 'High-contrast drama for reality TV, prank videos, challenge formats and shocking reveals.',
-        emoji: '😱',
+        icon: 'live_tv',
         tags: ['reality-tv', 'prank', 'challenge', 'shocking', 'viral'],
         classification: { theme: 'reality-tv', language: 'hinglish' },
         visual: {
@@ -125,7 +125,7 @@ const STARTER_TEMPLATES = [
     {
         name: 'Tech & Review',
         description: 'Minimal dark glass aesthetic for tech reviews, gadget unboxings, and digital content.',
-        emoji: '💻',
+        icon: 'devices',
         tags: ['tech', 'gadget', 'review', 'unboxing', 'digital'],
         classification: { theme: 'tech', language: 'english' },
         visual: {
@@ -140,7 +140,7 @@ const STARTER_TEMPLATES = [
     {
         name: 'Sports & Action',
         description: 'Dynamic, explosive energy for sports highlights, cricket, football, fitness channels.',
-        emoji: '⚡',
+        icon: 'sports_soccer',
         tags: ['sports', 'cricket', 'football', 'fitness', 'action', 'highlights'],
         classification: { theme: 'sports', language: 'hindi' },
         visual: {
@@ -155,7 +155,7 @@ const STARTER_TEMPLATES = [
     {
         name: 'Devotional & Spiritual',
         description: 'Sacred and serene aesthetic for devotional, religious, and spiritual channels.',
-        emoji: '🙏',
+        icon: 'self_improvement',
         tags: ['devotional', 'spiritual', 'religion', 'bhakti', 'mantra'],
         classification: { theme: 'devotional', language: 'hindi' },
         visual: {
@@ -170,7 +170,7 @@ const STARTER_TEMPLATES = [
     {
         name: 'Finance & Business',
         description: 'Professional, premium feel for stock market, business, invest, and finance channels.',
-        emoji: '📈',
+        icon: 'trending_up',
         tags: ['finance', 'business', 'stock-market', 'investment', 'money'],
         classification: { theme: 'finance', language: 'english' },
         visual: {
@@ -184,48 +184,107 @@ const STARTER_TEMPLATES = [
     },
 ];
 
-// ── Channel Config ───────────────────────────────────────────────────────────
+// ── Channel Config — MULTI-CHANNEL ───────────────────────────────────────────
 
-// GET /channel-config
-router.get('/channel-config', protect, async (req, res) => {
+// GET /channel-configs — list all channels for this user
+router.get('/channel-configs', protect, async (req, res) => {
     try {
-        const query = {
-            userId: req.user._id,
-            ...(req.query.brandId ? { brandId: req.query.brandId } : {}),
-        };
-        let config = await YoutubeChannelConfig.findOne(query).populate('defaultTemplateId', 'name emoji visual classification');
-        if (!config) config = {}; // Return empty if not set up yet
-        res.json({ success: true, config });
+        const channels = await YoutubeChannelConfig.find({ userId: req.user._id })
+            .populate('defaultTemplateId', 'name icon visual classification')
+            .sort({ isDefault: -1, createdAt: 1 });
+        res.json({ success: true, channels });
     } catch (err) {
         res.status(500).json({ success: false, error: err.message });
     }
 });
 
-// PUT /channel-config
-router.put('/channel-config', protect, async (req, res) => {
+// POST /channel-configs — create new channel
+router.post('/channel-configs', protect, async (req, res) => {
     try {
-        const query = {
+        const internalId = `channel-${Date.now()}`;
+        const channel = await YoutubeChannelConfig.create({
+            ...req.body,
             userId: req.user._id,
-            ...(req.body.brandId ? { brandId: req.body.brandId } : {}),
-        };
+            internalId,
+            isDefault: false,
+        });
+        res.json({ success: true, channel });
+    } catch (err) {
+        res.status(400).json({ success: false, error: err.message });
+    }
+});
+
+// PUT /channel-configs/:id — update a channel
+router.put('/channel-configs/:id', protect, async (req, res) => {
+    try {
         const update = { ...req.body };
-        delete update.userId; // Prevent override
-
-        const config = await YoutubeChannelConfig.findOneAndUpdate(
-            query,
+        delete update.userId;
+        delete update.internalId;
+        const channel = await YoutubeChannelConfig.findOneAndUpdate(
+            { _id: req.params.id, userId: req.user._id },
             { $set: update },
-            { new: true, upsert: true, runValidators: true }
-        ).populate('defaultTemplateId', 'name emoji visual classification');
+            { new: true, runValidators: true }
+        ).populate('defaultTemplateId', 'name icon visual classification');
+        if (!channel) return res.status(404).json({ success: false, error: 'Channel not found' });
+        res.json({ success: true, channel });
+    } catch (err) {
+        res.status(400).json({ success: false, error: err.message });
+    }
+});
 
-        res.json({ success: true, config });
+// DELETE /channel-configs/:id — delete a channel
+router.delete('/channel-configs/:id', protect, async (req, res) => {
+    try {
+        await YoutubeChannelConfig.deleteOne({ _id: req.params.id, userId: req.user._id });
+        res.json({ success: true });
     } catch (err) {
         res.status(500).json({ success: false, error: err.message });
     }
 });
 
-// ── Templates ────────────────────────────────────────────────────────────────
+// POST /channel-configs/:id/default — set as default channel
+router.post('/channel-configs/:id/default', protect, async (req, res) => {
+    try {
+        await YoutubeChannelConfig.updateMany(
+            { userId: req.user._id },
+            { $set: { isDefault: false } }
+        );
+        const channel = await YoutubeChannelConfig.findOneAndUpdate(
+            { _id: req.params.id, userId: req.user._id },
+            { $set: { isDefault: true } },
+            { new: true }
+        );
+        if (!channel) return res.status(404).json({ success: false, error: 'Channel not found' });
+        res.json({ success: true, channel });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
 
-// GET /templates — list all (user's own + starters)
+// ── Templates — STATIC routes MUST come before /:id wildcard ─────────────────
+
+// POST /templates/seed-starters — STATIC — seed 10 pre-built starters
+router.post('/templates/seed-starters', protect, async (req, res) => {
+    try {
+        const existing = await ThumbnailTemplate.find({ userId: req.user._id, isStarter: true });
+        const existingNames = new Set(existing.map(t => t.name));
+
+        const toInsert = STARTER_TEMPLATES
+            .filter(t => !existingNames.has(t.name))
+            .map(t => ({ ...t, userId: req.user._id, isStarter: true }));
+
+        if (toInsert.length > 0) {
+            await ThumbnailTemplate.insertMany(toInsert);
+        }
+
+        const allStarters = await ThumbnailTemplate.find({ userId: req.user._id, isStarter: true }).sort({ name: 1 });
+        res.json({ success: true, seeded: toInsert.length, templates: allStarters });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// GET /templates — list all
 router.get('/templates', protect, async (req, res) => {
     try {
         const { theme, language, search } = req.query;
@@ -258,6 +317,45 @@ router.post('/templates', protect, async (req, res) => {
     }
 });
 
+// POST /templates/:id/set-default — MUST be before PUT /:id
+router.post('/templates/:id/set-default', protect, async (req, res) => {
+    try {
+        await ThumbnailTemplate.updateMany(
+            { userId: req.user._id, isDefault: true },
+            { $set: { isDefault: false } }
+        );
+        const tpl = await ThumbnailTemplate.findOneAndUpdate(
+            { _id: req.params.id, userId: req.user._id },
+            { $set: { isDefault: true } },
+            { new: true }
+        );
+        if (!tpl) return res.status(404).json({ success: false, error: 'Template not found' });
+        res.json({ success: true, template: tpl });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// POST /templates/:id/clone
+router.post('/templates/:id/clone', protect, async (req, res) => {
+    try {
+        const source = await ThumbnailTemplate.findById(req.params.id);
+        if (!source) return res.status(404).json({ success: false, error: 'Template not found' });
+        const clone = new ThumbnailTemplate({
+            ...source.toObject(),
+            _id: undefined,
+            userId: req.user._id,
+            name: `${source.name} (My Version)`,
+            isStarter: false, isDefault: false, isArchived: false,
+            usageCount: 0,
+        });
+        await clone.save();
+        res.json({ success: true, template: clone });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
 // PUT /templates/:id — update
 router.put('/templates/:id', protect, async (req, res) => {
     try {
@@ -273,85 +371,15 @@ router.put('/templates/:id', protect, async (req, res) => {
     }
 });
 
-// DELETE /templates/:id — archive (soft delete)
+// DELETE /templates/:id — archive
 router.delete('/templates/:id', protect, async (req, res) => {
     try {
         const tpl = await ThumbnailTemplate.findOne({ _id: req.params.id, userId: req.user._id });
         if (!tpl) return res.status(404).json({ success: false, error: 'Template not found' });
-        if (tpl.isStarter) return res.status(400).json({ success: false, error: 'Cannot delete a starter template — clone it first' });
+        if (tpl.isStarter) return res.status(400).json({ success: false, error: 'Cannot delete a starter template — clone it first to customise' });
         tpl.isArchived = true;
         await tpl.save();
         res.json({ success: true });
-    } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
-    }
-});
-
-// POST /templates/:id/set-default — set as user default
-router.post('/templates/:id/set-default', protect, async (req, res) => {
-    try {
-        // Clear any existing default for this user/brand
-        await ThumbnailTemplate.updateMany(
-            { userId: req.user._id, isDefault: true },
-            { $set: { isDefault: false } }
-        );
-        const tpl = await ThumbnailTemplate.findOneAndUpdate(
-            { _id: req.params.id, userId: req.user._id },
-            { $set: { isDefault: true } },
-            { new: true }
-        );
-        if (!tpl) return res.status(404).json({ success: false, error: 'Template not found' });
-
-        // Also save as defaultTemplateId in channel config
-        await YoutubeChannelConfig.findOneAndUpdate(
-            { userId: req.user._id },
-            { $set: { defaultTemplateId: tpl._id } },
-            { upsert: true }
-        );
-
-        res.json({ success: true, template: tpl });
-    } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
-    }
-});
-
-// POST /templates/:id/clone — clone a starter into the user's own templates
-router.post('/templates/:id/clone', protect, async (req, res) => {
-    try {
-        const source = await ThumbnailTemplate.findById(req.params.id);
-        if (!source) return res.status(404).json({ success: false, error: 'Template not found' });
-        const clone = new ThumbnailTemplate({
-            ...source.toObject(),
-            _id: undefined,
-            userId: req.user._id,
-            brandId: req.body.brandId || source.brandId,
-            name: `${source.name} (My Version)`,
-            isStarter: false, isDefault: false, isArchived: false,
-            usageCount: 0, previewUrl: source.previewUrl,
-        });
-        await clone.save();
-        res.json({ success: true, template: clone });
-    } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
-    }
-});
-
-// POST /templates/seed-starters — seed pre-built starters for this user (called on first settings open)
-router.post('/templates/seed-starters', protect, async (req, res) => {
-    try {
-        const existing = await ThumbnailTemplate.find({ userId: req.user._id, isStarter: true });
-        const existingNames = new Set(existing.map(t => t.name));
-
-        const toInsert = STARTER_TEMPLATES
-            .filter(t => !existingNames.has(t.name))
-            .map(t => ({ ...t, userId: req.user._id, isStarter: true }));
-
-        if (toInsert.length > 0) {
-            await ThumbnailTemplate.insertMany(toInsert);
-        }
-
-        const allStarters = await ThumbnailTemplate.find({ userId: req.user._id, isStarter: true }).sort({ name: 1 });
-        res.json({ success: true, seeded: toInsert.length, templates: allStarters });
     } catch (err) {
         res.status(500).json({ success: false, error: err.message });
     }
