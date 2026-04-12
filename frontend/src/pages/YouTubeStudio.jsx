@@ -58,14 +58,14 @@ function copyText(text) { return navigator.clipboard.writeText(text) }
 // ── Phase 4: SSE Progress Tracker ────────────────────────────────────────────
 
 const NODE_LABELS = {
-    transcript:          { label: 'Transcript & Metadata',   icon: 'subtitles' },
-    analysis:            { label: 'AI Video Analysis',       icon: 'psychology' },
-    chapters:            { label: 'Chapter Detection',       icon: 'list_alt' },
-    seo:                 { label: 'SEO Copywriting',         icon: 'search' },
-    brand:               { label: 'Brand Alignment',         icon: 'corporate_fare' },
-    thumbnailDirection:  { label: 'Thumbnail Concept',       icon: 'brush' },
-    thumbnailGeneration: { label: 'FLUX Thumbnail Gen',      icon: 'image' },
-    characters:          { label: 'Character Portraits',     icon: 'face' },
+    transcript:          { label: 'Transcript & Metadata',      icon: 'subtitles' },
+    analysis:            { label: 'AI Video Analysis',          icon: 'psychology' },
+    chapters:            { label: 'Chapter Detection',          icon: 'list_alt' },
+    seo:                 { label: 'SEO Copywriting (Claude)',   icon: 'search' },
+    brand:               { label: 'Brand Alignment Score',      icon: 'corporate_fare' },
+    thumbnailDirection:  { label: 'Thumbnail Concept (MCoT)',   icon: 'brush' },
+    thumbnailGeneration: { label: 'AI Thumbnail (NanoBanana 2)',icon: 'image' },
+    characters:          { label: 'Character Portraits',        icon: 'face' },
 }
 
 function PipelineProgress({ projectId, onComplete }) {
@@ -79,18 +79,21 @@ function PipelineProgress({ projectId, onComplete }) {
         esRef.current = es
 
         es.onmessage = e => {
-            const evt = JSON.parse(e.data)
-            if (evt.type === 'node') {
-                setNodes(prev => ({ ...prev, [evt.node]: { status: evt.status, message: evt.message } }))
-            } else if (evt.type === 'done') {
-                setDone(true)
-                es.close()
-                setTimeout(() => onComplete?.(), 1000)
-            } else if (evt.type === 'error') {
-                setDone(true)
-                es.close()
-                onComplete?.()
-            }
+            try {
+                const evt = JSON.parse(e.data)
+                if (evt.type === 'node') {
+                    setNodes(prev => ({ ...prev, [evt.node]: { status: evt.status, message: evt.message } }))
+                } else if (evt.type === 'done') {
+                    setDone(true)
+                    es.close()
+                    setTimeout(() => onComplete?.(), 1500)
+                } else if (evt.type === 'error') {
+                    setDone(true)
+                    es.close()
+                    onComplete?.()
+                }
+                // ignore type: 'connected' and keepalive pings
+            } catch { /* ignore malformed SSE frames */ }
         }
         es.onerror = () => { es.close(); setTimeout(() => onComplete?.(), 3000) }
 

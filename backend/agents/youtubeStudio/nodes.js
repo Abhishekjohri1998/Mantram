@@ -21,6 +21,7 @@ import {
 import { getRouter } from '../../ai/router.js';
 
 const FAL_BASE = 'https://queue.fal.run';
+// FAL_API_KEY is what's in .env — FAL_KEY is the alternate alias some clients expect
 const FAL_KEY  = () => process.env.FAL_KEY || process.env.FAL_API_KEY;
 
 /**
@@ -167,28 +168,22 @@ export async function analysisNode({ video, brandContext }) {
         }
     } catch (err) {
         clearTimeout(analysisTimeout);
-        console.warn(`⚠️ [analysisNode] Gemini video analysis failed: ${err.message}. Falling back to transcript-only.`);
+        console.error(`❌ [analysisNode] Gemini native video analysis failed: ${err.message}`);
 
-        // Fallback: text-only analysis using transcript
+        // Fallback: transcript-only analysis (still brand-aligned, just no visual understanding)
         if (transcript.available) {
-            analysis = await callAgent(
+            console.log(`⚡ [analysisNode] Falling back to transcript-only analysis...`);
+            const fallbackResult = await callAgent(
                 PROMPTS.VIDEO_ANALYST,
-                `${videoContext}\n\n${transcriptSection}`,
-                0.3, 4096, { preferFast: true }
+                `${videoContext}\n\n${transcriptSection}\n\nNOTE: Gemini video analysis unavailable — analyse from transcript only.`,
+                0.3, 4096, { preferFast: false }   // Use full model, not fast, for quality
             );
-        } else {
-            analysis = {
-                summary: metadata.description?.substring(0, 300) || 'No analysis available',
-                highlights: [],
-                characters: [],
-                keyThemes: [],
-                contentType: 'unknown',
-                emotionalArc: 'Unknown',
-                tone: 'neutral',
-                pacing: 'moderate',
-                audienceAppeal: 'General audience',
-            };
+            console.log(`✅ [analysisNode] Transcript-only fallback complete`);
+            return { analysis: fallbackResult };
         }
+
+        // No transcript + no video analysis = hard failure, propagate to pipeline
+        throw new Error(`Video analysis failed and no transcript available: ${err.message}`);
     }
 
     return { analysis };
@@ -315,7 +310,7 @@ export async function thumbnailDirectionNode({ video, analysis, seo, brandContex
     return { thumbnailDirection: result };
 }
 
-// ── 7. Thumbnail Generation Node (Phase 3 — FLUX Pro via FAL.ai) ──────────
+// ── 7. Thumbnail Generation Node (Phase 3) ────────────────────────────────
 
 /**
  * Phase 3: Thumbnail Generation
