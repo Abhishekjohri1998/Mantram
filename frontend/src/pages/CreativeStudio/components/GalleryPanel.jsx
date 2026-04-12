@@ -27,7 +27,7 @@ const GalleryPanel = memo(({
                     {['All', 'Social', 'Product', 'Promo', 'Quote', 'Event'].map(cat => (
                         <button key={cat}
                             onClick={() => setGalleryFilter(cat)}
-                            className={`studio-btn-pill ${galleryFilter === cat ? 'active' : ''}`}
+                            className={`gallery-cat-pill ${galleryFilter === cat ? 'active' : ''}`}
                         >
                             {cat}
                         </button>
@@ -36,12 +36,12 @@ const GalleryPanel = memo(({
                 <div className="flex items-center gap-1.5">
                     <div className="flex rounded-lg border border-[var(--sys-border)] overflow-hidden">
                         <button onClick={() => setViewMode('list')}
-                            className={`p-1.5 cursor-pointer transition-all ${viewMode === 'list' ? 'bg-[var(--sys-surface)] text-[var(--sys-text)]' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text-muted)]'}`} title="List view">
-                            <span className="material-symbols-outlined text-sm">view_list</span>
+                            className={`studio-action-btn-sm border-none ${viewMode === 'list' ? 'bg-[var(--sys-primary-dim)] text-[var(--sys-primary)]' : ''}`} title="List view">
+                            <span className="material-symbols-outlined">view_list</span>
                         </button>
                         <button onClick={() => setViewMode('grid')}
-                            className={`p-1.5 cursor-pointer transition-all ${viewMode === 'grid' ? 'bg-[var(--sys-surface)] text-[var(--sys-text)]' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text-muted)]'}`} title="Grid view">
-                            <span className="material-symbols-outlined text-sm">grid_view</span>
+                            className={`studio-action-btn-sm border-none ${viewMode === 'grid' ? 'bg-[var(--sys-primary-dim)] text-[var(--sys-primary)]' : ''}`} title="Grid view">
+                            <span className="material-symbols-outlined">grid_view</span>
                         </button>
                     </div>
                 </div>
@@ -51,7 +51,7 @@ const GalleryPanel = memo(({
             {aiWarnings.length > 0 && (
                 <div className="space-y-2 mb-4">
                     {aiWarnings.map((warn, i) => (
-                        <div key={i} className="p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-amber-400 text-xs flex items-center gap-2 animate-fade-in">
+                        <div key={i} className="studio-highlight-panel text-amber-500 animate-fade-in">
                             <span className="material-symbols-outlined text-sm">warning</span>
                             <span>{warn}</span>
                         </div>
@@ -72,11 +72,11 @@ const GalleryPanel = memo(({
                     {error.isRetryable && (
                         <div className="flex gap-2 mt-3 ml-7">
                             <button onClick={() => { setError(null); handleGenerate() }}
-                                className="px-4 py-1.5 text-xs font-semibold rounded-lg bg-[var(--sys-surface)] hover:bg-[var(--sys-surface)] transition text-[var(--sys-text)] border border-[var(--sys-border)]">
+                                className="studio-btn-secondary py-1 px-3 text-[10px]">
                                 🔄 Try Again
                             </button>
                             <button onClick={() => setError(null)}
-                                className="px-4 py-1.5 text-xs font-semibold rounded-lg bg-[var(--sys-surface)] hover:bg-[var(--sys-surface)] transition text-[var(--sys-text)]/60 border border-[var(--sys-border)]">
+                                className="studio-btn-ghost text-[10px]">
                                 Dismiss
                             </button>
                         </div>
@@ -112,10 +112,10 @@ const GalleryPanel = memo(({
                         )}
                     </div>
                     <div className="flex items-center gap-2 mb-3 flex-wrap">
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-primary/15 text-primary border border-primary/20">
+                        <span className="studio-badge">
                             {selectedTypeInfo?.label || 'Creative'}
                         </span>
-                        <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-[var(--sys-surface)] text-[var(--sys-text-muted)]">
+                        <span className="studio-badge-secondary">
                             {style}
                         </span>
                         <span className="text-[10px] text-[var(--sys-text-muted)]">Just now</span>
@@ -136,49 +136,49 @@ const GalleryPanel = memo(({
                                 {upscalingState ? <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span> : <span className="material-symbols-outlined text-sm">high_quality</span>}
                             </button>
                             {upscaleMenu && upscaleMenu.url === result?.imageUrl && (
-                                <div ref={upscaleMenuRef} className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-slate-800/95 backdrop-blur-xl border border-[var(--sys-border)] rounded-xl shadow-2xl p-1.5 min-w-[180px] z-50 animate-in fade-in slide-in-from-bottom-2 duration-200">
-                                    <div className="text-[10px] text-[var(--sys-text-muted)] px-2 pt-1 pb-1.5 font-semibold uppercase tracking-wider">Download Quality</div>
+                                <div ref={upscaleMenuRef} className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 studio-card p-1.5 min-w-[200px] z-50 animate-in fade-in slide-in-from-bottom-2 duration-200">
+                                    <div className="text-[10px] text-[var(--sys-text-muted)] px-2 pt-1 pb-1.5 font-bold uppercase tracking-wider">Download Quality</div>
                                     <button onClick={() => handleDownloadWithUpscale(upscaleMenu.url, upscaleMenu.filename, '1k')}
-                                        className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs text-[var(--sys-text)] hover:bg-[var(--sys-surface)] hover:text-[var(--sys-text)] transition-all cursor-pointer">
+                                        className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs hover:bg-[var(--sys-surface)] text-[var(--sys-text)] transition-all cursor-pointer">
                                         <span className="material-symbols-outlined text-sm text-[var(--sys-text-muted)]">image</span>
-                                        <div><div className="font-semibold">1K Original</div><div className="text-[10px] text-[var(--sys-text-muted)]">1024px • Instant</div></div>
+                                        <div className="text-left"><div className="font-bold">1K Original</div><div className="text-[10px] text-[var(--sys-text-muted)]">1024px • Instant</div></div>
                                     </button>
                                     <button onClick={() => handleDownloadWithUpscale(upscaleMenu.url, upscaleMenu.filename, '2k')}
                                         disabled={upscalingState === '2k'}
-                                        className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs text-[var(--sys-text)] hover:bg-emerald-500/10 hover:text-emerald-400 transition-all cursor-pointer disabled:opacity-50">
-                                        <span className="material-symbols-outlined text-sm text-emerald-500">hd</span>
-                                        <div><div className="font-semibold">2K HD{upscalingState === '2k' ? ' — Upscaling...' : ''}</div><div className="text-[10px] text-[var(--sys-text-muted)]">2048px • Free</div></div>
-                                        {upscalingState === '2k' && <span className="material-symbols-outlined text-sm animate-spin ml-auto text-emerald-400">progress_activity</span>}
+                                        className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs hover:bg-[var(--sys-primary-dim)] text-[var(--sys-text)] transition-all cursor-pointer disabled:opacity-50">
+                                        <span className="material-symbols-outlined text-sm text-[var(--sys-primary)]">hd</span>
+                                        <div className="text-left"><div className="font-bold text-[var(--sys-primary)]">2K HD{upscalingState === '2k' ? ' — Upscaling...' : ''}</div><div className="text-[10px] text-[var(--sys-text-muted)]">2048px • Free</div></div>
+                                        {upscalingState === '2k' && <span className="material-symbols-outlined text-sm animate-spin ml-auto text-[var(--sys-primary)]">progress_activity</span>}
                                     </button>
                                     <button onClick={() => handleDownloadWithUpscale(upscaleMenu.url, upscaleMenu.filename, '4k')}
                                         disabled={upscalingState === '4k'}
-                                        className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs text-[var(--sys-text)] hover:bg-[var(--sys-surface)] hover:text-amber-400 transition-all cursor-pointer disabled:opacity-50">
-                                        <span className="material-symbols-outlined text-sm text-amber-500">4k</span>
-                                        <div><div className="font-semibold">4K Ultra HD{upscalingState === '4k' ? ' — AI Upscaling...' : ''}</div><div className="text-[10px] text-[var(--sys-text-muted)]">4096px • AI Enhanced</div></div>
-                                        {upscalingState === '4k' && <span className="material-symbols-outlined text-sm animate-spin ml-auto text-amber-400">progress_activity</span>}
+                                        className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs hover:bg-[var(--sys-primary-dim)] text-[var(--sys-text)] transition-all cursor-pointer disabled:opacity-50">
+                                        <span className="material-symbols-outlined text-sm text-[var(--sys-primary)]">4k</span>
+                                        <div className="text-left"><div className="font-bold text-[var(--sys-primary)]">4K Ultra HD{upscalingState === '4k' ? ' — AI Upscaling...' : ''}</div><div className="text-[10px] text-[var(--sys-text-muted)]">4096px • AI Enhanced</div></div>
+                                        {upscalingState === '4k' && <span className="material-symbols-outlined text-sm animate-spin ml-auto text-[var(--sys-primary)]">progress_activity</span>}
                                     </button>
                                 </div>
                             )}
                         </div>
                         <button onClick={() => setPublishData({ image: result?.imageUrl, text: result?.copy?.caption || result?.title || '' })}
-                            className="p-1.5 rounded-lg text-[var(--sys-text-muted)] hover:text-[#1877F2] hover:bg-[#1877F2]/10 cursor-pointer transition-all" title="Publish">
-                            <span className="material-symbols-outlined text-sm">share</span>
+                            className="studio-action-btn-sm" title="Publish">
+                            <span className="material-symbols-outlined">share</span>
                         </button>
                         <button onClick={handleAnimateClick}
-                            className="p-1.5 rounded-lg text-[var(--sys-text-muted)] hover:text-purple-400 hover:bg-purple-400/10 cursor-pointer transition-all" title="Animate">
-                            <span className="material-symbols-outlined text-sm">animation</span>
+                            className="studio-action-btn-sm" title="Animate">
+                            <span className="material-symbols-outlined">animation</span>
                         </button>
                         <button onClick={() => {
                             if (!result?.imageUrl) return
                             const params = new URLSearchParams({ fromCreative: 'true', imageUrl: result.imageUrl })
                             navigate(`/content-studio?${params.toString()}`)
                         }}
-                            className="p-1.5 rounded-lg text-[var(--sys-text-muted)] hover:text-cyan-400 hover:bg-cyan-400/10 cursor-pointer transition-all" title="Get Caption">
-                            <span className="material-symbols-outlined text-sm">edit_note</span>
+                            className="studio-action-btn-sm" title="Get Caption">
+                            <span className="material-symbols-outlined">edit_note</span>
                         </button>
                         <button onClick={handleGenerate}
-                            className="ml-auto p-1.5 rounded-lg text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)] cursor-pointer transition-all" title="Regenerate">
-                            <span className="material-symbols-outlined text-sm">refresh</span>
+                            className="ml-auto studio-action-btn-sm" title="Regenerate">
+                            <span className="material-symbols-outlined">refresh</span>
                         </button>
                     </div>
                 </div>
@@ -187,23 +187,23 @@ const GalleryPanel = memo(({
             {/* ── Text on Image Card ── */}
             {result?.copy?.headline && (
                 <div className="studio-card p-0 mb-5 overflow-hidden border border-[var(--sys-border)] animate-in fade-in slide-in-from-bottom-3 duration-500" style={{ animationDelay: '200ms' }}>
-                    <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-violet-500/10 to-fuchsia-500/10 border-b border-[var(--sys-border)]">
-                        <div className="flex items-center gap-2">
-                            <span className="material-symbols-outlined text-sm text-violet-400">title</span>
-                            <h4 className="text-xs font-bold text-[var(--sys-text)]">Text on Image</h4>
-                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-300 border border-[var(--sys-border)]">RENDERED ON IMAGE</span>
-                        </div>
-                        <button onClick={() => {
-                            const c = result.copy;
-                            const full = [c.headline, c.subtext, c.ctaText].filter(Boolean).join('\n');
-                            navigator.clipboard.writeText(full);
-                            setCopiedField('all');
-                            setTimeout(() => setCopiedField(null), 2000);
-                        }} className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${copiedField === 'all' ? 'bg-emerald-500/20 text-emerald-400' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)]'}`}>
-                            <span className="material-symbols-outlined text-xs">{copiedField === 'all' ? 'check' : 'content_copy'}</span>
-                            {copiedField === 'all' ? 'Copied!' : 'Copy All'}
-                        </button>
+                <div className="flex items-center justify-between px-4 py-3 bg-[var(--sys-primary-dim)] border-b border-[var(--sys-border)]">
+                    <div className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-sm text-[var(--sys-primary)]">title</span>
+                        <h4 className="text-xs font-bold text-[var(--sys-text)]">Text on Image</h4>
+                        <span className="studio-badge">RENDERED ON IMAGE</span>
                     </div>
+                    <button onClick={() => {
+                        const c = result.copy;
+                        const full = [c.headline, c.subtext, c.ctaText].filter(Boolean).join('\n');
+                        navigator.clipboard.writeText(full);
+                        setCopiedField('all');
+                        setTimeout(() => setCopiedField(null), 2000);
+                    }} className={`studio-btn-pill py-1 px-3 text-[11px] ${copiedField === 'all' ? 'active' : ''}`}>
+                        <span className="material-symbols-outlined text-xs">{copiedField === 'all' ? 'check' : 'content_copy'}</span>
+                        {copiedField === 'all' ? 'Copied!' : 'Copy All'}
+                    </button>
+                </div>
 
                     <div className="mx-4 mt-4 rounded-xl bg-gradient-to-br from-slate-900/80 to-slate-800/60 border border-[var(--sys-border)] p-4 text-center space-y-1.5">
                         <p className="text-lg font-black text-[var(--sys-text)] leading-tight tracking-tight">{result.copy.headline}</p>
@@ -212,7 +212,7 @@ const GalleryPanel = memo(({
                         )}
                         {result.copy.ctaText && (
                             <div className="pt-1">
-                                <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-gradient-to-r from-violet-500 to-fuchsia-500 text-[var(--sys-text)] text-[10px] font-bold">
+                                <span className="inline-flex items-center gap-1 px-4 py-1.5 rounded-full bg-[var(--sys-primary)] text-white text-[10px] font-bold shadow-lg">
                                     {result.copy.ctaText}
                                     <span className="material-symbols-outlined text-[10px]">arrow_forward</span>
                                 </span>
@@ -247,8 +247,8 @@ const GalleryPanel = memo(({
                             <div className="group flex items-center justify-between">
                                 <div className="flex-1 min-w-0">
                                     <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-0.5">CTA Button Text</p>
-                                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-gradient-to-r from-violet-500/20 to-fuchsia-500/20 border border-[var(--sys-border)]">
-                                        <span className="text-xs font-bold text-violet-300">{result.copy.ctaText}</span>
+                                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--sys-primary-dim)] border border-[var(--sys-primary)] text-[var(--sys-primary)]">
+                                        <span className="text-xs font-bold">{result.copy.ctaText}</span>
                                     </div>
                                 </div>
                                 <button onClick={() => { navigator.clipboard.writeText(result.copy.ctaText); setCopiedField('cta'); setTimeout(() => setCopiedField(null), 1500); }}
@@ -279,7 +279,7 @@ const GalleryPanel = memo(({
                 <div className="mb-5">
                     <div className="flex items-center justify-between mb-3">
                         <h4 className="text-xs font-bold text-[var(--sys-text-muted)] uppercase tracking-wider flex items-center gap-1.5">
-                            <span className="material-symbols-outlined text-sm text-violet-400">history</span>
+                            <span className="material-symbols-outlined text-sm text-[var(--sys-primary)]">history</span>
                             Generations ({generationHistory.length})
                         </h4>
                         <button onClick={() => setGenerationHistory([])} className="text-[10px] text-[var(--sys-text-muted)] hover:text-[var(--sys-text-muted)] cursor-pointer transition-all">Clear</button>
@@ -312,7 +312,7 @@ const GalleryPanel = memo(({
                                 if (currentGroup) groupedBlocks.push(currentGroup);
 
                                 return groupedBlocks.map((group, gIdx) => (
-                                    <div key={gIdx} className="w-full bg-[var(--sys-bg)] border border-rose-500/20 shadow-[0_0_15px_rgba(225,29,72,0.05)] rounded-2xl p-1 sm:p-2 flex flex-col xl:flex-row gap-4 mb-4 animate-fade-in group/band">
+                                    <div key={gIdx} className="w-full bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:border-[var(--sys-primary)] shadow-sm rounded-2xl p-1 sm:p-2 flex flex-col xl:flex-row gap-4 mb-4 animate-fade-in group/band">
                                         
                                         {/* Left Side: Images Grid */}
                                         <div className="flex-1 flex gap-2 overflow-x-auto snap-x snap-mandatory pr-2 custom-scrollbar min-h-[300px]">
@@ -321,7 +321,7 @@ const GalleryPanel = memo(({
                                                     style={{ width: idx === 0 ? '45%' : '30%', minWidth: idx === 0 ? '300px' : '220px' }}
                                                     onClick={() => setZoomImage(item.imageUrl)}>
                                                     <img src={item.imageUrl} alt="Creative" className="w-full h-full object-cover rounded-xl shadow-md" />
-                                                    {idx === 0 && gIdx === 0 && <span className="absolute top-2 left-2 text-[8px] font-bold text-white bg-rose-500 px-1.5 py-0.5 rounded-sm shadow-sm opacity-90 uppercase tracking-widest">Latest</span>}
+                                                    {idx === 0 && gIdx === 0 && <span className="absolute top-2 left-2 text-[8px] font-bold text-white bg-[var(--sys-primary)] px-1.5 py-0.5 rounded-sm shadow-sm opacity-90 uppercase tracking-widest">Latest</span>}
                                                 </div>
                                             ))}
                                         </div>
@@ -333,7 +333,7 @@ const GalleryPanel = memo(({
                                                     {group.promptText}
                                                 </p>
                                                 <div className="flex items-center gap-3">
-                                                    <span className="px-2 py-0.5 bg-rose-500/10 text-rose-500/90 text-[10px] rounded-md font-black tracking-widest uppercase">
+                                                    <span className="studio-badge">
                                                         {group.items.length} variations
                                                     </span>
                                                     <span className="text-[10px] text-[var(--sys-text-muted)] font-bold">
@@ -344,18 +344,18 @@ const GalleryPanel = memo(({
                                             
                                             <div className="flex flex-wrap items-center gap-2 mt-6">
                                                 <button onClick={(e) => { e.stopPropagation(); setDesignBaseImage(group.items[0].imageUrl); setPrompt(group.promptText); }} 
-                                                        className="studio-btn-secondary">
+                                                        className="studio-btn-secondary py-1.5 px-3 text-[11px]">
                                                     <span className="material-symbols-outlined text-[14px]">refresh</span> Reuse
                                                 </button>
                                                 <button onClick={(e) => { e.stopPropagation(); handleDownloadImage(group.items[0].imageUrl, `creative-${gIdx}.png`) }} 
-                                                        className="studio-btn-secondary">
+                                                        className="studio-btn-secondary py-1.5 px-3 text-[11px]">
                                                     <span className="material-symbols-outlined text-[14px]">content_copy</span> Copy
                                                 </button>
                                                 
                                                 <div className="flex-1" />
                                                 
                                                 <button onClick={() => setZoomImage(group.items[0].imageUrl)}
-                                                        className="studio-btn-primary py-1.5 text-[11px]">
+                                                        className="studio-btn-primary py-1.5 px-4 text-[11px]">
                                                     <span className="material-symbols-outlined text-[14px]">north_east</span> View Actions
                                                 </button>
                                             </div>
@@ -368,7 +368,7 @@ const GalleryPanel = memo(({
                         <div className="space-y-4 max-h-[700px] overflow-y-auto pr-1">
                             {/* List grouping logic (simplified for extraction) */}
                             {generationHistory.map((item, idx) => (
-                                <div key={item._id || idx} className={`rounded-xl border ${idx === 0 ? 'border-[var(--sys-border)] bg-violet-500/[0.03]' : 'border-[var(--sys-border)] bg-[var(--sys-surface)]'} overflow-hidden p-3`}>
+                                <div key={item._id || idx} className={`studio-card mb-4 p-3 ${idx === 0 ? 'border-[var(--sys-primary)] bg-[var(--sys-primary-dim)]' : ''}`}>
                                     <div className="flex gap-3">
                                         <div className="w-24 h-24 rounded-lg overflow-hidden flex-shrink-0 cursor-pointer" onClick={() => setZoomImage(item.imageUrl)}>
                                             <img src={item.imageUrl} alt="Creative" className="w-full h-full object-cover" />
@@ -380,8 +380,8 @@ const GalleryPanel = memo(({
                                                 <span className="text-[9px] text-[var(--sys-text-muted)]">{getTimeAgo(item.createdAt)}</span>
                                             </div>
                                             <div className="flex gap-1.5">
-                                                <button onClick={() => setPrompt(item._prompt || item.prompt)} className="px-2 py-1 rounded bg-[var(--sys-surface)] text-violet-400 text-[10px] font-bold">Reuse</button>
-                                                <button onClick={() => handleDownloadImage(item.imageUrl, `creative-${idx}.png`)} className="p-1 rounded bg-[var(--sys-surface)] text-[var(--sys-text-muted)]"><span className="material-symbols-outlined text-xs">download</span></button>
+                                                <button onClick={() => setPrompt(item._prompt || item.prompt)} className="studio-btn-secondary py-1 px-2.5 text-[9px]">Reuse</button>
+                                                <button onClick={() => handleDownloadImage(item.imageUrl, `creative-${idx}.png`)} className="studio-action-btn-sm w-7 h-7"><span className="material-symbols-outlined text-xs">download</span></button>
                                             </div>
                                         </div>
                                     </div>
@@ -404,9 +404,9 @@ const GalleryPanel = memo(({
                             </div>
                         </div>
                         <div className="flex items-center gap-1.5">
-                            <button onClick={() => setPrompt(img.prompt || img.title)} className="px-2 py-1 rounded bg-[var(--sys-surface)] text-violet-400 text-[10px] font-bold">Reuse</button>
-                            <button onClick={() => handleDownloadImage(img.imageUrl || img.thumbnailUrl, 'creative.png')} className="p-1.5 rounded bg-[var(--sys-surface)] text-[var(--sys-text-muted)]"><span className="material-symbols-outlined text-sm">download</span></button>
-                            <button onClick={() => setDesignBaseImage(img.imageUrl || img.thumbnailUrl)} className="p-1.5 rounded bg-[var(--sys-surface)] text-[var(--sys-text-muted)]"><span className="material-symbols-outlined text-sm">edit</span></button>
+                            <button onClick={() => setPrompt(img.prompt || img.title)} className="studio-btn-secondary py-1 px-2.5 text-[9px]">Reuse</button>
+                            <button onClick={() => handleDownloadImage(img.imageUrl || img.thumbnailUrl, 'creative.png')} className="studio-action-btn-sm w-8 h-8"><span className="material-symbols-outlined">download</span></button>
+                            <button onClick={() => setDesignBaseImage(img.imageUrl || img.thumbnailUrl)} className="studio-action-btn-sm w-8 h-8"><span className="material-symbols-outlined">edit</span></button>
                             <span className="ml-auto text-[10px] text-[var(--sys-text-muted)]">{getTimeAgo(img.createdAt)}</span>
                         </div>
                     </div>
