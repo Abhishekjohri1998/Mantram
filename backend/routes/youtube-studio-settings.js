@@ -186,7 +186,228 @@ const STARTER_TEMPLATES = [
 
 // ── Channel Config — MULTI-CHANNEL ───────────────────────────────────────────
 
-// GET /channel-configs — list all channels for this user
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /channel-configs/extract  ← STATIC — must be BEFORE /:id
+// Paste a YouTube channel URL → fetch + AI-enrich → return pre-filled profile
+// No OAuth needed — uses public channel page + optional YouTube Data API key
+// ─────────────────────────────────────────────────────────────────────────────
+router.post('/channel-configs/extract', protect, async (req, res) => {
+    const { channelUrl: rawUrl } = req.body;
+    if (!rawUrl?.trim()) return res.status(400).json({ success: false, error: 'channelUrl is required' });
+
+    try {
+        // ── Step 1: Parse URL → extract handle or channel ID ─────────────────
+        const url = rawUrl.trim();
+        let handle = null;
+        let channelId = null;
+        let resolvedUrl = null;
+
+        // Pattern: @handle anywhere in the URL or bare @handle
+        const handleMatch = url.match(/(?:youtube\.com\/)?@([A-Za-z0-9_.-]+)/i);
+        const channelIdMatch = url.match(/youtube\.com\/channel\/(UC[A-Za-z0-9_-]{22})/i);
+        const legacyCustomMatch = url.match(/youtube\.com\/c\/([A-Za-z0-9_.-]+)/i);
+        const legacyUserMatch = url.match(/youtube\.com\/user\/([A-Za-z0-9_.-]+)/i);
+
+        if (handleMatch) {
+            handle = handleMatch[1];
+            resolvedUrl = `https://www.youtube.com/@${handle}`;
+        } else if (channelIdMatch) {
+            channelId = channelIdMatch[1];
+            resolvedUrl = `https://www.youtube.com/channel/${channelId}`;
+        } else if (legacyCustomMatch) {
+            handle = legacyCustomMatch[1];
+            resolvedUrl = `https://www.youtube.com/c/${handle}`;
+        } else if (legacyUserMatch) {
+            handle = legacyUserMatch[1];
+            resolvedUrl = `https://www.youtube.com/user/${handle}`;
+        } else if (/^[A-Za-z0-9_.-]+$/.test(url.replace('@', ''))) {
+            // Bare handle or name — treat as handle
+            handle = url.replace('@', '');
+            resolvedUrl = `https://www.youtube.com/@${handle}`;
+        } else {
+            return res.status(400).json({ success: false, error: 'Could not parse a YouTube channel URL or handle from the input' });
+        }
+
+        console.log(`🔍 [ChannelExtract] Resolving: ${resolvedUrl} (handle=${handle}, id=${channelId})`);
+
+        // ── Step 2: Fetch channel page HTML for public meta ───────────────────
+        let channelName = handle || channelId || 'Unknown Channel';
+        let logoUrl = '';
+        let description = '';
+        let country = '';
+        let subscriberCount = '';
+        let extractedChannelId = channelId || '';
+        let keywords = [];
+        let bannerUrl = '';
+
+        // Try YouTube Data API v3 first if key configured
+        const YT_API_KEY = process.env.YOUTUBE_DATA_API_KEY;
+        let apiSuccess = false;
+
+        if (YT_API_KEY) {
+            try {
+                const params = new URLSearchParams({
+                    part: 'snippet,statistics,brandingSettings',
+                    key: YT_API_KEY,
+                    maxResults: 1,
+                });
+                if (handle) params.set('forHandle', `@${handle}`);
+                else if (channelId) params.set('id', channelId);
+
+                const apiRes = await fetch(`https://www.googleapis.com/youtube/v3/channels?${params}`, {
+                    signal: AbortSignal.timeout(8000),
+                });
+                if (apiRes.ok) {
+                    const data = await apiRes.json();
+                    const item = data.items?.[0];
+                    if (item) {
+                        const sn = item.snippet;
+                        channelName = sn.title || channelName;
+                        description = sn.description || '';
+                        country = sn.country || '';
+                        logoUrl = sn.thumbnails?.high?.url || sn.thumbnails?.medium?.url || sn.thumbnails?.default?.url || '';
+                        extractedChannelId = item.id || extractedChannelId;
+                        subscriberCount = item.statistics?.subscriberCount || '';
+                        keywords = (item.brandingSettings?.channel?.keywords || '').split(' ').filter(k => k.length > 2);
+                        bannerUrl = item.brandingSettings?.image?.bannerExternalUrl || '';
+                        if (!handle && sn.customUrl) handle = sn.customUrl.replace('@', '');
+                        apiSuccess = true;
+                        console.log(`✅ [ChannelExtract] YouTube Data API success: ${channelName}`);
+                    }
+                }
+            } catch (apiErr) {
+                console.warn(`⚠️ [ChannelExtract] YouTube API failed: ${apiErr.message} — falling back to HTML scrape`);
+            }
+        }
+
+        // Fallback: HTML meta-tag scraping (no API key needed)
+        if (!apiSuccess) {
+            try {
+                const pageRes = await fetch(resolvedUrl, {
+                    signal: AbortSignal.timeout(10000),
+                    headers: {
+                        'User-Agent': 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
+                        'Accept-Language': 'en-US,en;q=0.9',
+                    },
+                });
+                if (pageRes.ok) {
+                    const html = await pageRes.text();
+
+                    // Extract og:title
+                    const titleMatch = html.match(/<meta\s+property="og:title"\s+content="([^"]+)"/i)
+                        || html.match(/<title>([^<]+)<\/title>/i);
+                    if (titleMatch) channelName = titleMatch[1].replace(/ - YouTube$/i, '').trim();
+
+                    // Extract og:image (channel avatar)
+                    const imageMatch = html.match(/<meta\s+property="og:image"\s+content="([^"]+)"/i)
+                        || html.match(/<link\s+rel="image_src"\s+href="([^"]+)"/i);
+                    if (imageMatch) logoUrl = imageMatch[1];
+
+                    // Extract description
+                    const descMatch = html.match(/<meta\s+name="description"\s+content="([^"]+)"/i)
+                        || html.match(/<meta\s+property="og:description"\s+content="([^"]+)"/i);
+                    if (descMatch) description = descMatch[1];
+
+                    // Extract canonical channel ID from canonical URL
+                    const canonicalMatch = html.match(/https?:\/\/www\.youtube\.com\/channel\/(UC[A-Za-z0-9_-]{22})/);
+                    if (canonicalMatch && !extractedChannelId) extractedChannelId = canonicalMatch[1];
+
+                    // Extract keywords from itemprop
+                    const kwMatch = html.match(/itemprop="keywords"\s+content="([^"]+)"/i);
+                    if (kwMatch) keywords = kwMatch[1].split(',').map(k => k.trim()).filter(Boolean);
+
+                    console.log(`✅ [ChannelExtract] HTML scrape success: ${channelName}`);
+                }
+            } catch (scrapeErr) {
+                console.warn(`⚠️ [ChannelExtract] HTML scrape failed: ${scrapeErr.message}`);
+            }
+        }
+
+        // ── Step 3: AI Enrichment via Gemini Flash ────────────────────────────
+        // Detect niche, language, recommend template
+        let aiSuggestions = {
+            niche: 'General',
+            titleLanguage: 'english',
+            descriptionLanguage: 'english',
+            suggestedTemplateTheme: 'general',
+            tone: '',
+            logoPlacement: 'top-right',
+        };
+
+        try {
+            const { GoogleGenerativeAI } = await import('@google/generative-ai');
+            const genai = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+            const model = genai.getGenerativeModel({ model: 'gemini-2.5-flash' });
+
+            const prompt = `Analyze this YouTube channel and return a JSON object:
+
+Channel Name: ${channelName}
+Description: ${description.substring(0, 500)}
+Country: ${country}
+Keywords: ${keywords.slice(0, 10).join(', ')}
+Subscribers: ${subscriberCount}
+
+Return ONLY this JSON object (no markdown, no explanation):
+{
+  "niche": "<one of: Drama & Entertainment | Music | News & Politics | Education & Learning | Comedy | Lifestyle & Vlog | Sports | Tech & Gadgets | Reality TV | Finance & Business | Devotional & Spiritual | Gaming | Health & Fitness | Food & Cooking | Travel | Fashion & Beauty | General>",
+  "titleLanguage": "<one of: english | hindi | hinglish | marathi | tamil | telugu | bengali | kannada | gujarati | punjabi | arabic | french | spanish | japanese>",
+  "descriptionLanguage": "<same options>",
+  "suggestedTemplateTheme": "<one of: drama | music | news | education | comedy | lifestyle | sports | tech | reality-tv | finance | devotional | general>",
+  "tone": "<2-5 word brand tone description>",
+  "logoPlacement": "<top-left | top-right | bottom-left | bottom-right>",
+  "channelLanguageSummary": "<one sentence about the channel in English>"
+}`;
+
+            const result = await model.generateContent(prompt);
+            const text = result.response.text().replace(/```json|```/g, '').trim();
+            const parsed = JSON.parse(text);
+            aiSuggestions = { ...aiSuggestions, ...parsed };
+            console.log(`✅ [ChannelExtract] AI enrichment: niche=${parsed.niche}, lang=${parsed.titleLanguage}`);
+        } catch (aiErr) {
+            console.warn(`⚠️ [ChannelExtract] AI enrichment failed: ${aiErr.message} — returning raw data`);
+
+            // Heuristic fallback: detect Devanagari/regional scripts in description
+            if (/[\u0900-\u097F]/.test(description)) aiSuggestions.titleLanguage = 'hindi';
+            else if (/[\u0B80-\u0BFF]/.test(description)) aiSuggestions.titleLanguage = 'tamil';
+            else if (/[\u0C00-\u0C7F]/.test(description)) aiSuggestions.titleLanguage = 'telugu';
+            if (country === 'IN') aiSuggestions.descriptionLanguage = aiSuggestions.titleLanguage;
+        }
+
+        // ── Step 4: Build pre-filled channel profile ──────────────────────────
+        const profile = {
+            channelName,
+            channelId: extractedChannelId,
+            channelUrl: resolvedUrl || rawUrl,
+            niche: aiSuggestions.niche,
+            logoUrl,
+            bannerUrl,
+            logoPlacement: aiSuggestions.logoPlacement,
+            defaultLanguage: {
+                title:       aiSuggestions.titleLanguage,
+                description: aiSuggestions.descriptionLanguage,
+                tags:        aiSuggestions.titleLanguage,
+                thumbnail:   aiSuggestions.titleLanguage,
+            },
+            _meta: {
+                subscriberCount,
+                suggestedTemplateTheme: aiSuggestions.suggestedTemplateTheme,
+                tone: aiSuggestions.tone,
+                channelLanguageSummary: aiSuggestions.channelLanguageSummary || '',
+                keywords: keywords.slice(0, 8),
+                country,
+                fetchMethod: apiSuccess ? 'youtube-data-api' : 'html-scrape',
+            },
+        };
+
+        res.json({ success: true, profile });
+
+    } catch (err) {
+        console.error(`❌ [ChannelExtract] Fatal:`, err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+
 router.get('/channel-configs', protect, async (req, res) => {
     try {
         const channels = await YoutubeChannelConfig.find({ userId: req.user._id })

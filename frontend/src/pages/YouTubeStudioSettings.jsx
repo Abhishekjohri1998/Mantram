@@ -210,6 +210,9 @@ function LogoUploader({ logoUrl, onChange }) {
 
 function ChannelEditor({ channel, templates, onSave, onClose }) {
     const isNew = !channel?._id
+    const [urlInput, setUrlInput] = useState('')
+    const [fetching, setFetching] = useState(false)
+    const [fetchResult, setFetchResult] = useState(null) // _meta from backend
     const [form, setForm] = useState({
         channelName: '', channelId: '', channelUrl: '', niche: '',
         logoUrl: '', logoPlacement: 'top-right',
@@ -234,6 +237,37 @@ function ChannelEditor({ channel, templates, onSave, onClose }) {
         })
     }
 
+    async function handleFetch() {
+        if (!urlInput.trim()) return
+        setFetching(true)
+        setFetchResult(null)
+        try {
+            const d = await api('/yt-studio-settings/channel-configs/extract', {
+                method: 'POST',
+                body: JSON.stringify({ channelUrl: urlInput.trim() }),
+            })
+            const p = d.profile
+            // Auto-fill the entire form
+            setForm(prev => ({
+                ...prev,
+                channelName:   p.channelName  || prev.channelName,
+                channelId:     p.channelId    || prev.channelId,
+                channelUrl:    p.channelUrl   || prev.channelUrl,
+                niche:         p.niche        || prev.niche,
+                logoUrl:       p.logoUrl      || prev.logoUrl,
+                logoPlacement: p.logoPlacement || prev.logoPlacement,
+                defaultLanguage: p.defaultLanguage || prev.defaultLanguage,
+            }))
+            setFetchResult(p._meta || {})
+            // Suggest template by theme
+            if (p._meta?.suggestedTemplateTheme) {
+                const match = templates.find(t => t.classification?.theme === p._meta.suggestedTemplateTheme)
+                if (match && !form.defaultTemplateId) set('defaultTemplateId', match._id)
+            }
+        } catch (e) { alert('Fetch failed: ' + e.message) }
+        setFetching(false)
+    }
+
     async function handleSave() {
         if (!form.channelName?.trim()) return alert('Channel name is required')
         setSaving(true)
@@ -256,13 +290,56 @@ function ChannelEditor({ channel, templates, onSave, onClose }) {
                     <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 20, color: 'var(--sys-text-muted)' }}>✕</button>
                 </div>
 
+                {/* ── Smart URL Fetch Strip ── */}
+                <div style={{ padding: '14px 16px', borderRadius: 12, border: '1px solid var(--sys-primary)33', background: 'var(--sys-primary)08', marginBottom: 20 }}>
+                    <p style={{ margin: '0 0 8px', fontSize: 12, fontWeight: 700, color: 'var(--sys-primary)', display: 'flex', alignItems: 'center', gap: 5 }}>
+                        <MIcon name="auto_awesome" size={15} color="var(--sys-primary)" />
+                        Paste YouTube Channel URL — AI fills everything automatically
+                    </p>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                        <input
+                            value={urlInput}
+                            onChange={e => setUrlInput(e.target.value)}
+                            onKeyDown={e => e.key === 'Enter' && handleFetch()}
+                            placeholder="https://youtube.com/@ZeeTV  or  @YourChannel"
+                            style={{ flex: 1, padding: '9px 12px', borderRadius: 8, border: '1px solid var(--sys-border)', background: 'var(--sys-bg)', color: 'var(--sys-text)', fontSize: 13 }}
+                        />
+                        <button onClick={handleFetch} disabled={fetching || !urlInput.trim()}
+                            style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '9px 16px', borderRadius: 8, background: 'var(--sys-primary)', color: 'white', fontWeight: 700, fontSize: 13, border: 'none', cursor: fetching ? 'wait' : 'pointer', whiteSpace: 'nowrap' }}>
+                            {fetching
+                                ? <><div style={{ width: 13, height: 13, border: '2px solid white3', borderTopColor: 'white', borderRadius: '50%', animation: 'spin .7s linear infinite' }} />Fetching...</>
+                                : <><MIcon name="travel_explore" size={15} />Fetch Details</>
+                            }
+                        </button>
+                    </div>
+
+                    {/* AI result chip */}
+                    {fetchResult && (
+                        <div style={{ marginTop: 10, padding: '8px 12px', borderRadius: 8, background: 'var(--sys-surface)', border: '1px solid var(--sys-border)', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                            {form.logoUrl && (
+                                <img src={form.logoUrl} alt="" style={{ width: 32, height: 32, borderRadius: 6, objectFit: 'contain', border: '1px solid var(--sys-border)' }} onError={e => e.target.style.display='none'} />
+                            )}
+                            <div style={{ flex: 1 }}>
+                                <p style={{ margin: 0, fontSize: 12, fontWeight: 700 }}>{form.channelName}</p>
+                                <p style={{ margin: 0, fontSize: 11, color: 'var(--sys-text-muted)' }}>
+                                    {fetchResult.channelLanguageSummary || fetchResult.tone}
+                                    {fetchResult.subscriberCount && ` · ${Number(fetchResult.subscriberCount).toLocaleString()} subscribers`}
+                                </p>
+                            </div>
+                            <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, background: '#22c55e15', color: '#22c55e', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                                ✓ Auto-filled
+                            </span>
+                        </div>
+                    )}
+                </div>
+
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                     <div style={{ gridColumn: '1 / -1' }}>
                         <Field label="Channel Name *">
                             <TextInput value={form.channelName} onChange={v => set('channelName', v)} placeholder="My YouTube Channel" maxLength={80} />
                         </Field>
                     </div>
-                    <Field label="YouTube Channel ID" hint="UCxxxxxx format — find in YouTube Studio settings">
+                    <Field label="YouTube Channel ID" hint="UCxxxxxx format — fetched automatically from URL">
                         <TextInput value={form.channelId} onChange={v => set('channelId', v)} placeholder="UCxxxxxxxxxxxxxxxxxxxxxxxx" />
                     </Field>
                     <Field label="Channel Handle / URL">
@@ -280,6 +357,7 @@ function ChannelEditor({ channel, templates, onSave, onClose }) {
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
                             <MIcon name="image" size={15} color="var(--sys-primary)" />
                             <p style={{ margin: 0, fontSize: 12, fontWeight: 700 }}>Channel Logo / Watermark</p>
+                            {fetchResult && form.logoUrl && <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 20, background: '#22c55e15', color: '#22c55e', fontWeight: 700 }}>Auto-fetched</span>}
                         </div>
                         <LogoUploader logoUrl={form.logoUrl} onChange={v => set('logoUrl', v)} />
                         <div style={{ marginTop: 10 }}>
@@ -305,6 +383,7 @@ function ChannelEditor({ channel, templates, onSave, onClose }) {
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
                             <MIcon name="language" size={15} color="var(--sys-primary)" />
                             <p style={{ margin: 0, fontSize: 12, fontWeight: 700 }}>Output Languages</p>
+                            {fetchResult && <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 20, background: '#22c55e15', color: '#22c55e', fontWeight: 700 }}>AI-detected</span>}
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                             <Field label="Title Language">
@@ -328,7 +407,7 @@ function ChannelEditor({ channel, templates, onSave, onClose }) {
 
                     {/* Default template */}
                     <div style={{ gridColumn: '1 / -1' }}>
-                        <Field label="Default Thumbnail Template" hint="Applied automatically when analysing videos on this channel">
+                        <Field label="Default Thumbnail Template" hint={fetchResult?.suggestedTemplateTheme ? `AI suggests: ${fetchResult.suggestedTemplateTheme} theme` : 'Applied automatically when analysing videos on this channel'}>
                             <Select value={form.defaultTemplateId || ''} onChange={v => set('defaultTemplateId', v)}
                                 options={[{ value: '', label: 'No default (choose per video)' }, ...templates.map(t => ({ value: t._id, label: t.name }))]} />
                         </Field>
