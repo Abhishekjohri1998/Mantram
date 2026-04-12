@@ -344,6 +344,41 @@ router.post('/:id/characters', protect, async (req, res) => {
     }
 });
 
+// ── PATCH /:id/title — Approve / edit the final title ───────────────────────
+// titleMode: 'auto'   → use original YouTube metadata.title
+// titleMode: 'manual' → use user's custom approvedTitle
+
+router.patch('/:id/title', protect, async (req, res) => {
+    try {
+        const { titleMode, approvedTitle } = req.body;
+        if (!['auto', 'manual'].includes(titleMode)) {
+            return res.status(400).json({ success: false, error: 'titleMode must be auto or manual' });
+        }
+
+        const project = await YoutubeProject.findOne({ _id: req.params.id, userId: req.user._id });
+        if (!project) return res.status(404).json({ success: false, error: 'Project not found' });
+
+        project.titleMode = titleMode;
+        if (titleMode === 'manual' && approvedTitle) {
+            project.approvedTitle = approvedTitle.trim();
+        } else if (titleMode === 'auto') {
+            project.approvedTitle = project.metadata?.title || null; // Original YouTube title
+        }
+        await project.save();
+
+        res.json({
+            success: true,
+            titleMode: project.titleMode,
+            approvedTitle: project.approvedTitle,
+            finalTitle: project.titleMode === 'auto'
+                ? (project.metadata?.title || project.approvedTitle)
+                : project.approvedTitle,
+        });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
 // ── DELETE /:id ─────────────────────────────────────────────────────────────
 
 router.delete('/:id', protect, async (req, res) => {
@@ -356,3 +391,4 @@ router.delete('/:id', protect, async (req, res) => {
 });
 
 export default router;
+
