@@ -2,12 +2,14 @@
  * YouTube Studio — Agent Nodes (MCoT Pipeline)
  * 
  * Node execution order:
- *   1. transcriptNode    → fetch captions + metadata
- *   2. analysisNode      → MCoT video intelligence (Gemini watches video)
- *   3. chapterNode       → chapter detection from transcript
- *   4. seoNode           → brand-aligned titles, description, tags
- *   5. brandCriticNode   → brand alignment scoring
- *   6. thumbnailNode     → MCoT thumbnail direction
+ *   1. transcriptNode         → fetch captions + metadata
+ *   2. analysisNode           → MCoT video intelligence (Gemini watches video)
+ *   3. chapterNode            → chapter detection from transcript
+ *   4. seoNode                → brand-aligned titles, description, tags
+ *   5. brandCriticNode        → brand alignment scoring
+ *   6. thumbnailDirectionNode → MCoT thumbnail creative direction (JSON)
+ *   7. thumbnailGenerationNode→ FLUX Pro image generation via FAL.ai
+ *   8. characterPortraitNode  → Gemini generates AI portraits from character descriptions
  */
 
 import { callAgent, callMultimodalAgent } from '../shared/agentUtils.js';
@@ -17,6 +19,60 @@ import {
     formatTranscriptText, parseIsoDuration, extractVideoId
 } from './transcriptClient.js';
 import { getRouter } from '../../ai/router.js';
+
+const FAL_BASE = 'https://queue.fal.run';
+const FAL_KEY  = () => process.env.FAL_KEY || process.env.FAL_API_KEY;
+
+/**
+ * Generic FAL.ai text-to-image call (FLUX Pro by default)
+ * Returns the first image URL from the result
+ */
+async function falGenerateImage({ prompt, imageUrl = null, width = 1280, height = 720, model = 'fal-ai/flux-pro/v1.1' }) {
+    const key = FAL_KEY();
+    if (!key) throw new Error('FAL_API_KEY not configured');
+
+    const body = {
+        prompt,
+        image_size: { width, height },
+        num_images: 1,
+        enable_safety_checker: false,
+        output_format: 'jpeg',
+    };
+    // If we have a reference image, inject as image_prompt (style/composition reference)
+    if (imageUrl) body.image_prompt = imageUrl;
+
+    // Submit job
+    const submitRes = await fetch(`${FAL_BASE}/${model}`, {
+        method: 'POST',
+        headers: { 'Authorization': `Key ${key}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+    });
+    if (!submitRes.ok) {
+        const err = await submitRes.text();
+        throw new Error(`FAL submit failed [${submitRes.status}]: ${err.substring(0, 200)}`);
+    }
+    const { request_id, response_url, status_url } = await submitRes.json();
+    const pollUrl = status_url || `${FAL_BASE}/${model}/requests/${request_id}/status`;
+    const resultUrl = response_url || `${FAL_BASE}/${model}/requests/${request_id}`;
+
+    // Poll for up to 90s
+    for (let i = 0; i < 45; i++) {
+        await new Promise(r => setTimeout(r, 2000));
+        const poll = await fetch(pollUrl, { headers: { 'Authorization': `Key ${key}` } });
+        const st = await poll.json();
+        if (st.status === 'COMPLETED' || st.images?.length) {
+            const img = (st.images || st.output?.images)?.[0];
+            return img?.url || img;
+        }
+        if (st.status === 'FAILED') throw new Error(`FAL job failed: ${JSON.stringify(st.error || st)}`);
+    }
+    // One last check at result URL
+    const final = await fetch(resultUrl, { headers: { 'Authorization': `Key ${key}` } });
+    const fd = await final.json();
+    const img = (fd.images || fd.output?.images)?.[0];
+    if (img?.url || img) return img?.url || img;
+    throw new Error('FAL generation timed out after 90s');
+}
 
 // ── 1. Transcript Node ─────────────────────────────────────────────────────
 
@@ -257,4 +313,123 @@ export async function thumbnailDirectionNode({ video, analysis, seo, brandContex
     );
 
     return { thumbnailDirection: result };
+}
+
+// ── 7. Thumbnail Generation Node (Phase 3 — FLUX Pro via FAL.ai) ──────────
+
+/**
+ * Takes the structured thumbnailDirection from node 6 and generates a real
+ * 1280×720 JPEG thumbnail using FLUX Pro on FAL.ai.
+ * Falls back to Gemini image generation if FAL.ai is unavailable.
+ */
+export async function thumbnailGenerationNode({ thumbnailDirection, video, brandContext }) {
+    if (!thumbnailDirection?.imageGenerationPrompt) {
+        console.warn('⚠️ [thumbnailGenerationNode] No imageGenerationPrompt — skipping thumbnail generation');
+        return { generatedThumbnailUrl: null, thumbnailGenerationError: 'No prompt available' };
+    }
+
+    console.log(`🎨 [thumbnailGenerationNode] Generating thumbnail via FLUX Pro`);
+
+    // Enrich FLUX prompt with brand palette and thumbnail text
+    const fullPrompt = [
+        thumbnailDirection.imageGenerationPrompt,
+        thumbnailDirection.dominantColor ? `Dominant color: ${thumbnailDirection.dominantColor}` : '',
+        `Background: ${thumbnailDirection.backgroundTreatment || 'gradient'}`,
+        `Composition: ${thumbnailDirection.composition || 'center'} subject placement`,
+        `Emotion: ${thumbnailDirection.emotion || 'curiosity'}`,
+        `Cinematic, high contrast, YouTube thumbnail style, 16:9, photorealistic`,
+    ].filter(Boolean).join('. ');
+
+    // Reference image: use existing thumbnail as style/composition reference
+    const referenceUrl = video?.metadata?.thumbnailUrl || null;
+
+    try {
+        const generatedThumbnailUrl = await falGenerateImage({
+            prompt: fullPrompt,
+            imageUrl: referenceUrl,
+            width: 1280,
+            height: 720,
+            model: 'fal-ai/flux-pro/v1.1',
+        });
+
+        console.log(`✅ [thumbnailGenerationNode] Thumbnail generated: ${generatedThumbnailUrl?.substring(0, 80)}...`);
+        return { generatedThumbnailUrl, thumbnailGenerationError: null };
+
+    } catch (err) {
+        console.warn(`⚠️ [thumbnailGenerationNode] FAL failed: ${err.message}. Trying Gemini fallback...`);
+
+        // Fallback: Gemini image generation (lower quality but always available)
+        try {
+            const router = getRouter();
+            const geminiResult = await router.generateImage({
+                prompt: fullPrompt,
+                aspectRatio: '16:9',
+            });
+            return { generatedThumbnailUrl: geminiResult.imageUrl, thumbnailGenerationError: null };
+        } catch (geminiErr) {
+            console.error(`❌ [thumbnailGenerationNode] Both FLUX and Gemini failed:`, geminiErr.message);
+            return { generatedThumbnailUrl: null, thumbnailGenerationError: err.message };
+        }
+    }
+}
+
+// ── 8. Character Portrait Node (Phase 2) ───────────────────────────────────
+
+/**
+ * Generates AI portrait images for each identified character.
+ * Uses Gemini image generation with the character description from analysis.
+ * Returns array of { label, role, portraitUrl }
+ */
+export async function characterPortraitNode({ analysis, video, brandContext }) {
+    const characters = analysis?.characters || [];
+    if (!characters.length) {
+        console.log('ℹ️ [characterPortraitNode] No characters identified — skipping');
+        return { characterPortraits: [] };
+    }
+
+    console.log(`👤 [characterPortraitNode] Generating ${characters.length} character portrait(s)`);
+
+    const router = getRouter();
+    const videoTitle = video?.metadata?.title || 'YouTube video';
+
+    // Extract brand primary color for portrait background consistency
+    const brandColorHint = brandContext?.includes('#') 
+        ? `Use brand-consistent background color tones.` 
+        : '';
+
+    const portraits = await Promise.allSettled(
+        characters.slice(0, 3).map(async (char) => {
+            const prompt = [
+                `Professional portrait of ${char.label}, a ${char.role || 'presenter'} from a YouTube video titled "${videoTitle}".`,
+                `They appear for approximately ${char.screenTimePct || 50}% of the video.`,
+                `Clean studio lighting, professional headshot style, neutral background.`,
+                `High quality, sharp focus, YouTube content creator style.`,
+                brandColorHint,
+            ].filter(Boolean).join(' ');
+
+            try {
+                const result = await router.generateImage({
+                    prompt,
+                    aspectRatio: '1:1',
+                });
+                return {
+                    label: char.label,
+                    role: char.role,
+                    firstAppearance: char.firstAppearance,
+                    screenTimePct: char.screenTimePct,
+                    portraitUrl: result.imageUrl,
+                };
+            } catch (err) {
+                console.warn(`⚠️ Portrait failed for ${char.label}: ${err.message}`);
+                return { label: char.label, role: char.role, portraitUrl: null, error: err.message };
+            }
+        })
+    );
+
+    const characterPortraits = portraits
+        .filter(r => r.status === 'fulfilled')
+        .map(r => r.value);
+
+    console.log(`✅ [characterPortraitNode] Generated ${characterPortraits.filter(p => p.portraitUrl).length}/${characters.slice(0,3).length} portraits`);
+    return { characterPortraits };
 }
