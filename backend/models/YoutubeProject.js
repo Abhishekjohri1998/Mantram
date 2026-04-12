@@ -108,7 +108,18 @@ const YoutubeProjectSchema = new mongoose.Schema({
 
     // Thumbnail
     thumbnailDirection: mongoose.Schema.Types.Mixed,
-    generatedThumbnailUrl: String,
+    generatedThumbnailUrl: String,     // Phase 3: FLUX-generated thumbnail
+
+    // Character Portraits (Phase 2)
+    characterPortraits: [{
+        label: String,
+        role: String,
+        firstAppearance: String,
+        screenTimePct: Number,
+        portraitUrl: String,           // Gemini-generated portrait image URL
+        error: String,                 // If portrait generation failed
+        _id: false,
+    }],
 
 }, { timestamps: true });
 
