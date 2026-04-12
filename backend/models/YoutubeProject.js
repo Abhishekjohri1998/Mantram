@@ -23,7 +23,9 @@ const CharacterSchema = new mongoose.Schema({
     firstAppearance: String,
     role: String,
     screenTimePct: Number,
-    imageUrl: String, // Extracted frame (Phase 2)
+    visualDescription: String,  // What they actually look like (from Gemini watching the video)
+    position: String,           // Where they appear (foreground-center, left-side, etc.)
+    imageUrl: String,           // Extracted frame (Phase 2)
 }, { _id: false });
 
 const YoutubeProjectSchema = new mongoose.Schema({
@@ -81,6 +83,12 @@ const YoutubeProjectSchema = new mongoose.Schema({
         highlights: [HighlightSchema],
         characters: [CharacterSchema],
         keyThemes: [String],
+        peakMoment: {               // The single most dramatic/share-worthy moment
+            timestamp: String,
+            title: String,
+            sceneDescription: String,
+            emotion: String,
+        },
     },
 
     // Chapters
@@ -108,7 +116,12 @@ const YoutubeProjectSchema = new mongoose.Schema({
 
     // Thumbnail
     thumbnailDirection: mongoose.Schema.Types.Mixed,
-    generatedThumbnailUrl: String,     // Phase 3: FLUX-generated thumbnail
+    generatedThumbnailUrl: String,     // Phase 3: AI-generated thumbnail
+
+    // Title Management
+    titleMode: { type: String, enum: ['auto', 'manual'], default: 'auto' },
+    approvedTitle: String,             // User-confirmed final title
+    suggestedTitles: [mongoose.Schema.Types.Mixed], // AI-generated title options
 
     // Character Portraits (Phase 2)
     characterPortraits: [{
@@ -116,7 +129,8 @@ const YoutubeProjectSchema = new mongoose.Schema({
         role: String,
         firstAppearance: String,
         screenTimePct: Number,
-        portraitUrl: String,           // Gemini-generated portrait image URL
+        visualDescription: String,
+        portraitUrl: String,           // AI-generated portrait image URL
         error: String,                 // If portrait generation failed
         _id: false,
     }],

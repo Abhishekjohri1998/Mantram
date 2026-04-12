@@ -175,10 +175,22 @@ function ProjectDetail({ project, onRefresh }) {
     const { analysis, seo, chapters, brandAlignment, thumbnailDirection, metadata, transcript,
         generatedThumbnailUrl, characterPortraits } = project
 
-    const [genLoading, setGenLoading] = useState(false)
+    const [genLoading, setGenLoading]         = useState(false)
     const [portraitLoading, setPortraitLoading] = useState(false)
-    const [localThumb, setLocalThumb] = useState(generatedThumbnailUrl)
+    const [localThumb, setLocalThumb]         = useState(generatedThumbnailUrl)
     const [localPortraits, setLocalPortraits] = useState(characterPortraits || [])
+
+    // Title management
+    const originalTitle = metadata?.title || project.videoId
+    const [titleMode, setTitleMode]       = useState(project.titleMode || 'auto')
+    const [editTitle, setEditTitle]       = useState(project.approvedTitle || project.seo?.recommendedTitle || originalTitle)
+    const [titleSaving, setTitleSaving]   = useState(false)
+    const [titleSaved, setTitleSaved]     = useState(false)
+    const [titleEditing, setTitleEditing] = useState(false)
+
+    const finalTitle = titleMode === 'auto'
+        ? originalTitle
+        : (project.approvedTitle || editTitle)
 
     // Full YouTube description formatted for copy-paste
     const exportDescription = seo ? [
@@ -209,6 +221,21 @@ function ProjectDetail({ project, onRefresh }) {
             setLocalPortraits(d.characterPortraits || [])
         } catch (e) { alert('Portrait generation failed: ' + e.message) }
         setPortraitLoading(false)
+    }
+
+    async function saveTitleMode(mode, customTitle) {
+        setTitleSaving(true)
+        try {
+            await api(`/youtube-studio/${project._id}/title`, {
+                method: 'PATCH',
+                body: JSON.stringify({ titleMode: mode, approvedTitle: customTitle }),
+            })
+            setTitleMode(mode)
+            setTitleSaved(true)
+            setTitleEditing(false)
+            setTimeout(() => setTitleSaved(false), 2500)
+        } catch (e) { alert('Failed to save title: ' + e.message) }
+        setTitleSaving(false)
     }
 
     if (project.status === 'processing' || project.status === 'analysing') {
@@ -242,7 +269,93 @@ function ProjectDetail({ project, onRefresh }) {
                 </div>
             </div>
 
-            {/* ── Phase 3: AI Thumbnail ── */}
+            {/* ── Title Management Section ── */}
+            <Section title="Video Title" icon="title" badge={titleSaved ? '✓ Saved' : (titleMode === 'auto' ? 'Auto' : 'Manual')}>
+                {/* Mode toggle */}
+                <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+                    <button onClick={() => saveTitleMode('auto', null)} disabled={titleSaving}
+                        style={{ flex: 1, padding: '8px 12px', borderRadius: 8, fontSize: 12, fontWeight: 700, border: '2px solid', cursor: 'pointer', transition: 'all .2s',
+                            borderColor: titleMode === 'auto' ? 'var(--sys-primary)' : 'var(--sys-border)',
+                            background: titleMode === 'auto' ? 'var(--sys-primary)' : 'var(--sys-surface)',
+                            color: titleMode === 'auto' ? 'white' : 'var(--sys-text)' }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 14, verticalAlign: 'middle', marginRight: 4 }}>auto_awesome</span>
+                        Auto (Original YT Title)
+                    </button>
+                    <button onClick={() => { setTitleMode('manual'); setTitleEditing(true) }} disabled={titleSaving}
+                        style={{ flex: 1, padding: '8px 12px', borderRadius: 8, fontSize: 12, fontWeight: 700, border: '2px solid', cursor: 'pointer', transition: 'all .2s',
+                            borderColor: titleMode === 'manual' ? '#f59e0b' : 'var(--sys-border)',
+                            background: titleMode === 'manual' ? '#f59e0b' : 'var(--sys-surface)',
+                            color: titleMode === 'manual' ? 'white' : 'var(--sys-text)' }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 14, verticalAlign: 'middle', marginRight: 4 }}>edit</span>
+                        Manual (Custom Title)
+                    </button>
+                </div>
+
+                {/* Current final title display */}
+                <div style={{ padding: '12px 16px', borderRadius: 10, background: 'var(--sys-surface)', border: `2px solid ${titleMode === 'auto' ? '#22c55e' : '#f59e0b'}`, marginBottom: 12 }}>
+                    <p style={{ margin: '0 0 2px', fontSize: 10, fontWeight: 700, color: titleMode === 'auto' ? '#22c55e' : '#f59e0b', textTransform: 'uppercase' }}>
+                        {titleMode === 'auto' ? '🔒 Final Title (Auto — Original YouTube)' : '✏️ Final Title (Manual)'}
+                    </p>
+                    {titleEditing && titleMode === 'manual' ? (
+                        <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+                            <input value={editTitle} onChange={e => setEditTitle(e.target.value)}
+                                style={{ flex: 1, padding: '8px 12px', borderRadius: 8, border: '1px solid var(--sys-border)', background: 'var(--sys-bg)', color: 'var(--sys-text)', fontSize: 14, fontWeight: 600 }}
+                                placeholder="Enter your custom title..." maxLength={100}
+                            />
+                            <button onClick={() => saveTitleMode('manual', editTitle)} disabled={titleSaving || !editTitle.trim()}
+                                style={{ padding: '8px 16px', borderRadius: 8, background: '#f59e0b', color: 'white', fontWeight: 700, fontSize: 13, border: 'none', cursor: 'pointer' }}>
+                                {titleSaving ? '...' : '✓ Approve'}
+                            </button>
+                        </div>
+                    ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <p style={{ margin: 0, fontSize: 15, fontWeight: 700, flex: 1 }}>{finalTitle}</p>
+                            {titleMode === 'manual' && (
+                                <button onClick={() => setTitleEditing(true)}
+                                    style={{ padding: '4px 10px', fontSize: 11, borderRadius: 6, border: '1px solid var(--sys-border)', background: 'var(--sys-surface)', cursor: 'pointer', color: 'var(--sys-text)' }}>
+                                    Edit
+                                </button>
+                            )}
+                        </div>
+                    )}
+                </div>
+
+                {/* AI Suggested Titles from SEO node */}
+                {seo?.titles?.length > 0 && titleMode === 'manual' && (
+                    <div>
+                        <p style={{ margin: '0 0 8px', fontSize: 11, fontWeight: 700, color: 'var(--sys-text-muted)' }}>AI SUGGESTED TITLES (click to use)</p>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                            {seo.titles.map((t, i) => (
+                                <button key={i} onClick={() => { setEditTitle(t.text); saveTitleMode('manual', t.text) }}
+                                    style={{ textAlign: 'left', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--sys-border)', background: 'var(--sys-surface)', cursor: 'pointer', fontSize: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                                    <span style={{ fontWeight: 600 }}>{t.text}</span>
+                                    <span style={{ color: '#22c55e', fontSize: 10, fontWeight: 700, flexShrink: 0 }}>CTR {t.ctrScore}/10</span>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )}
+            </Section>
+
+            {/* ── Peak Moment Card ── */}
+            {analysis?.peakMoment && (
+                <Section title="Peak Moment" icon="local_fire_department" badge="🔥 Thumbnail Based On This">
+                    <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+                        <div style={{ width: 48, height: 48, borderRadius: 10, background: 'linear-gradient(135deg, #ef4444, #f59e0b)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 24, color: 'white' }}>whatshot</span>
+                        </div>
+                        <div style={{ flex: 1 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                                <span style={{ fontSize: 11, fontWeight: 700, color: '#ef4444', padding: '2px 8px', borderRadius: 20, background: '#ef444420' }}>{analysis.peakMoment.timestamp}</span>
+                                <span style={{ fontSize: 11, fontWeight: 700, color: '#f59e0b', padding: '2px 8px', borderRadius: 20, background: '#f59e0b20' }}>{analysis.peakMoment.emotion}</span>
+                            </div>
+                            <p style={{ margin: '0 0 4px', fontWeight: 700, fontSize: 14 }}>{analysis.peakMoment.title}</p>
+                            <p style={{ margin: 0, fontSize: 12, color: 'var(--sys-text-muted)', lineHeight: 1.6 }}>{analysis.peakMoment.sceneDescription}</p>
+                        </div>
+                    </div>
+                </Section>
+            )}
+
             <Section title="AI Thumbnail" icon="image" badge={localThumb ? '✓' : undefined}>
                 {/* Always show the original YouTube thumbnail */}
                 {metadata?.thumbnailUrl && (
@@ -330,35 +443,57 @@ function ProjectDetail({ project, onRefresh }) {
             {/* ── Phase 2: Character Portraits ── */}
             {(analysis?.characters?.length > 0 || localPortraits.length > 0) && (
                 <Section title="Characters" icon="face" badge={analysis?.characters?.length}>
-                    <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 14 }}>
                         {analysis?.characters?.map((char, i) => {
                             const portrait = localPortraits.find(p => p.label === char.label)
                             return (
-                                <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, width: 120 }}>
+                                <div key={i} style={{ display: 'flex', gap: 14, padding: 12, borderRadius: 10, border: '1px solid var(--sys-border)', background: 'var(--sys-surface)', alignItems: 'flex-start' }}>
+                                    {/* Portrait */}
                                     {portrait?.portraitUrl ? (
                                         <img src={portrait.portraitUrl} alt={char.label}
-                                            style={{ width: 100, height: 100, borderRadius: 50, objectFit: 'cover', border: '3px solid var(--sys-primary)' }} />
+                                            style={{ width: 72, height: 72, borderRadius: 10, objectFit: 'cover', border: '2px solid var(--sys-primary)', flexShrink: 0 }} />
                                     ) : (
-                                        <div style={{ width: 100, height: 100, borderRadius: 50, background: 'var(--sys-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px dashed var(--sys-border)' }}>
-                                            <span className="material-symbols-outlined" style={{ fontSize: 36, color: 'var(--sys-text-muted)' }}>person</span>
+                                        <div style={{ width: 72, height: 72, borderRadius: 10, background: 'var(--sys-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px dashed var(--sys-border)', flexShrink: 0 }}>
+                                            <span className="material-symbols-outlined" style={{ fontSize: 28, color: 'var(--sys-text-muted)' }}>person</span>
                                         </div>
                                     )}
-                                    <p style={{ margin: 0, fontSize: 11, fontWeight: 600, textAlign: 'center' }}>{char.label}</p>
-                                    <p style={{ margin: 0, fontSize: 10, color: 'var(--sys-text-muted)', textAlign: 'center' }}>{char.role} · {char.firstAppearance}</p>
-                                    {char.screenTimePct && <Chip label={`${char.screenTimePct}% screen time`} color="#6366f1" />}
+                                    {/* Info */}
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, flexWrap: 'wrap' }}>
+                                            <div>
+                                                <p style={{ margin: '0 0 2px', fontSize: 13, fontWeight: 700 }}>{char.label}</p>
+                                                <p style={{ margin: 0, fontSize: 11, color: 'var(--sys-text-muted)' }}>{char.role} · First appears {char.firstAppearance}</p>
+                                            </div>
+                                            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                                                {char.screenTimePct && <Chip label={`${char.screenTimePct}% screen time`} color="#6366f1" />}
+                                                {char.position && <Chip label={char.position.replace(/-/g, ' ')} color="#8b5cf6" />}
+                                            </div>
+                                        </div>
+                                        {char.visualDescription && (
+                                            <p style={{ margin: '6px 0 0', fontSize: 11, color: 'var(--sys-text-muted)', lineHeight: 1.5, fontStyle: 'italic' }}>
+                                                👁 {char.visualDescription}
+                                            </p>
+                                        )}
+                                    </div>
                                 </div>
                             )
                         })}
                     </div>
-                    <button onClick={generatePortraits} disabled={portraitLoading}
-                        style={{ padding: '8px 18px', borderRadius: 8, background: portraitLoading ? 'var(--sys-border)' : 'var(--sys-primary-dim)', color: 'var(--sys-primary)', fontWeight: 600, fontSize: 12, border: 'none', cursor: portraitLoading ? 'not-allowed' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                        {portraitLoading
-                            ? <><div style={{ width: 12, height: 12, border: '2px solid currentColor', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin .8s linear infinite' }} />Generating portraits…</>
-                            : <><span className="material-symbols-outlined" style={{ fontSize: 14 }}>auto_awesome</span>{localPortraits.length ? 'Regenerate' : 'Generate'} AI Portraits</>
-                        }
-                    </button>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+                        <p style={{ margin: 0, fontSize: 11, color: 'var(--sys-text-muted)' }}>
+                            💡 Portraits use the original thumbnail as visual reference — Gemini generates based on character appearance
+                        </p>
+                        <button onClick={generatePortraits} disabled={portraitLoading}
+                            style={{ padding: '8px 18px', borderRadius: 8, background: portraitLoading ? 'var(--sys-border)' : 'var(--sys-primary-dim)', color: 'var(--sys-primary)', fontWeight: 600, fontSize: 12, border: 'none', cursor: portraitLoading ? 'not-allowed' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                            {portraitLoading
+                                ? <><div style={{ width: 12, height: 12, border: '2px solid currentColor', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin .8s linear infinite' }} />Generating portraits…</>
+                                : <><span className="material-symbols-outlined" style={{ fontSize: 14 }}>auto_awesome</span>{localPortraits.length ? 'Regenerate' : 'Generate'} AI Portraits</>
+                            }
+                        </button>
+                    </div>
                 </Section>
             )}
+
 
             {/* Summary */}
             {analysis?.summary && (

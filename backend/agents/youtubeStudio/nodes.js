@@ -278,12 +278,32 @@ export async function brandCriticNode({ video, analysis, brandContext }) {
     return { brandAlignment: result };
 }
 
-// ── 6. Thumbnail Direction Node (MCoT) ────────────────────────────────────
+// ── 6. Thumbnail Direction Node (MCoT) ─────────────────────────────────────
 
 export async function thumbnailDirectionNode({ video, analysis, seo, brandContext }) {
-    console.log(`🎨 [thumbnailDirectionNode] Creating thumbnail concept`);
+    console.log(`🎨 [thumbnailDirectionNode] Creating peak-moment thumbnail concept`);
 
     const existingThumbnail = video.metadata.thumbnailUrl;
+    const peakMoment        = analysis.peakMoment;
+    const characters        = analysis.characters || [];
+
+    const characterContext = characters.length
+        ? characters.map(c =>
+            `  - ${c.label} (${c.role}, ${c.screenTimePct}% screen time)` +
+            (c.visualDescription ? `: ${c.visualDescription}` : '') +
+            (c.position ? ` | Position: ${c.position}` : '')
+          ).join('\n')
+        : 'None identified';
+
+    const peakMomentContext = peakMoment
+        ? [
+            `PEAK MOMENT — base the thumbnail on THIS scene:`,
+            `  Timestamp: ${peakMoment.timestamp}`,
+            `  What happens: ${peakMoment.title}`,
+            `  Visual scene: ${peakMoment.sceneDescription}`,
+            `  Dominant emotion: ${peakMoment.emotion}`,
+          ].join('\n')
+        : `TOP HIGHLIGHT: ${analysis.highlights?.[0]?.title || 'Not identified'}`;
 
     const userPrompt = [
         brandContext || 'No brand context',
@@ -291,15 +311,20 @@ export async function thumbnailDirectionNode({ video, analysis, seo, brandContex
         `VIDEO TITLE: ${video.metadata.title}`,
         `SUMMARY: ${analysis.summary}`,
         `EMOTIONAL ARC: ${analysis.emotionalArc}`,
-        `MAIN CHARACTERS: ${analysis.characters?.map(c => c.label).join(', ') || 'None identified'}`,
+        '',
+        peakMomentContext,
+        '',
+        `CHARACTERS (with visual descriptions):`,
+        characterContext,
+        '',
         `KEY HIGHLIGHTS: ${analysis.highlights?.slice(0, 3).map(h => h.title).join(', ') || ''}`,
         `RECOMMENDED TITLE: ${seo?.recommendedTitle || ''}`,
         `THUMBNAIL TEXT IDEA: ${seo?.thumbnailTextSuggestion || ''}`,
         '',
-        `EXISTING THUMBNAIL URL: ${existingThumbnail || 'None'} (for visual reference only)`,
+        `ORIGINAL THUMBNAIL URL: ${existingThumbnail || 'None'} (for color/style reference)`,
     ].join('\n');
 
-    // MCoT: pass existing thumbnail if available for visual reference
+    // MCoT: pass existing thumbnail for visual reference (palette, style, characters)
     const imageUrls = existingThumbnail ? [existingThumbnail] : [];
     const result = await callMultimodalAgent(
         PROMPTS.THUMBNAIL_DIRECTOR,
@@ -310,6 +335,7 @@ export async function thumbnailDirectionNode({ video, analysis, seo, brandContex
 
     return { thumbnailDirection: result };
 }
+
 
 /**
  * Phase 3: Thumbnail Generation
@@ -538,13 +564,14 @@ Describe each visible person's exact appearance so I can generate accurate portr
                 : `${char.label}, a ${char.role || 'presenter'} in this video.`;
 
             const prompt = [
-                `Professional portrait photograph of the person described below from the YouTube video "${videoTitle}".`,
+                `Professional portrait photograph of a real person from YouTube video "${videoTitle}".`,
                 visualDesc,
+                positionHint,
                 referenceB64
-                    ? `IMPORTANT: Use the reference image provided to accurately reproduce this specific real person's appearance.`
-                      + ` Focus on their face and upper body. Do NOT invent a different person.`
+                    ? `IMPORTANT: Use the reference image provided. Reproduce EXACTLY this specific person's appearance.`
+                      + ` Do NOT invent or blend with a different person.`
                     : '',
-                `Clean studio portrait style, professional lighting, sharp focus on the face.`,
+                `Clean studio portrait style, professional lighting, sharp focus on this person's face.`,
                 `High quality, 1:1 square format, YouTube content creator headshot.`,
                 `Neutral or softly blurred background. No text or watermarks.`,
             ].filter(Boolean).join(' ');
