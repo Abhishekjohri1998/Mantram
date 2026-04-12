@@ -100,18 +100,29 @@ jobs:
             --port 22 \
             --cidr "$RUNNER_IP/32" || echo "✅ Rule may already exist, continuing..."
 
-          echo "⏳ Waiting 10s for SG rule to propagate..."
-          sleep 10
+          echo "⏳ Waiting 15s for SG rule to propagate..."
+          sleep 15
 
           echo "🔍 Verifying SSH connectivity..."
-          for i in {1..5}; do
+          REACHABLE=false
+          for i in {1..10}; do
             if nc -zv ${{ secrets.EC2_HOST }} 22 -w 5 2>/dev/null; then
               echo "✅ Port 22 is reachable"
+              REACHABLE=true
               break
             fi
-            echo "Attempt $i failed, retrying in 5s..."
+            echo "Attempt $i: Port 22 remains blocked, retrying in 5s..."
             sleep 5
           done
+
+          if [ "$REACHABLE" = false ]; then
+            echo "❌ ERROR: Port 22 is still not reachable after 10 attempts."
+            echo "🔍 Troubleshooting Tips:"
+            echo "  1. Check if EC2_HOST (${{ secrets.EC2_HOST }}) is correct."
+            echo "  2. Confirm the EC2 instance is Running."
+            echo "  3. Verify AWS_SECURITY_GROUP_ID is correct and your IAM user has permission to authorize ingress."
+            exit 1
+          fi
 
       - name: 🚀 Deploy via SSH
         uses: appleboy/ssh-action@v1.2.3
