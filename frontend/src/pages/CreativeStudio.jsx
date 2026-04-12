@@ -887,6 +887,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
     const [photoshootError, setPhotoshootError] = useState(null)
     const [photoshootSaved, setPhotoshootSaved] = useState(false)
     const [fidelity, setFidelity] = useState(80)
+    const [photoshootAction, setPhotoshootAction] = useState("generate")
     const [cameraAngle, setCameraAngle] = useState('eye-level')
     const [lens, setLens] = useState('50mm')
     const [lightingStyle, setLightingStyle] = useState('softbox')
@@ -3639,470 +3640,198 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                     </div>{/* ═══════════ END RIGHT GALLERY PANEL ═══════════ */}
 
                     {/* ═══════════ SIDEBAR COMMAND PANEL WITH SETTINGS ═══════════ */}
-                    <div className="creative-tools-panel">
-
-                        {/* ── Panel Header ── */}
-                        <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-[var(--sys-border)]">
-                            <div className="flex items-center gap-2">
-                                <div className="w-5 h-5 rounded-md bg-[var(--sys-text)] flex items-center justify-center">
-                                    <span className="material-symbols-outlined text-[var(--sys-text)]" style={{ fontSize: '12px' }}>tune</span>
-                                </div>
-                                <span className="text-[11px] font-bold text-[var(--sys-text)] uppercase tracking-widest">Settings</span>
-                            </div>
-                            <div className="flex items-center gap-1.5">
-                                {/* Tag Product */}
-                                <button onClick={() => {
-                                    if (activeBrand?._id) {
-                                        productsAPI.list({ brandId: activeBrand._id, limit: 50 }).then(res => setProductsList(res.products || [])).catch(() => {})
-                                    }
-                                    setShowProductPicker(true)
-                                }} className="flex items-center gap-1 text-[10px] text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] px-2 py-1 cursor-pointer bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-lg hover:border-[var(--sys-border)] transition-all">
-                                    <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>inventory_2</span>
-                                    {selectedProduct ? <span className="text-primary max-w-[60px] truncate">{selectedProduct.title?.split(' ')[0]}</span> : 'Tag Product'}
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* ── Active Context Chips ── */}
-                        {(fromContent || designBaseImage || selectedProduct) && (
-                            <div className="flex items-center gap-1.5 px-4 py-2 flex-wrap border-b border-[var(--sys-border)]">
-                                {fromContent && (
-                                    <div className="floating-context-chip text-primary border-primary/20">
-                                        <span className="material-symbols-outlined text-[10px]">link</span> Content Studio
-                                        <button onClick={() => setFromContent(false)} className="text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer ml-1"><span className="material-symbols-outlined text-[10px]">close</span></button>
-                                    </div>
-                                )}
-                                {designBaseImage && (
-                                    <div className="floating-context-chip text-primary border-[var(--sys-border)]">
-                                        <img src={designBaseImage} alt="" className="w-4 h-4 rounded object-cover" />
-                                        Template
-                                        <button onClick={() => setDesignBaseImage(null)} className="text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer ml-1"><span className="material-symbols-outlined text-[10px]">close</span></button>
-                                    </div>
-                                )}
-                                {selectedProduct && (
-                                    <div className="floating-context-chip text-primary border-[var(--sys-border)]">
-                                        {selectedProduct.images?.[0]?.url && <img src={selectedProduct.images[0].url} alt="" className="w-4 h-4 rounded object-cover" />}
-                                        {selectedProduct.title?.substring(0, 12)}
-                                        <button onClick={() => setSelectedProduct(null)} className="text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer ml-1"><span className="material-symbols-outlined text-[10px]">close</span></button>
-                                    </div>
-                                )}
-                                {/* AI auto-matched product from Enhance pipeline */}
-                                {agenticMatchedProduct && !selectedProduct && (
-                                    <div className="floating-context-chip text-violet-400 border-violet-500/20">
-                                        <span className="material-symbols-outlined text-[10px]">auto_awesome</span>
-                                        AI: {agenticMatchedProduct.substring(0, 14)}
-                                        <button onClick={() => setAgenticMatchedProduct(null)} className="text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer ml-1"><span className="material-symbols-outlined text-[10px]">close</span></button>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-
-                        {/* ── Model Selector Row ── */}
-                        <div className="px-4 py-2.5 border-b border-[var(--sys-border)]">
-                            <p className="text-[9px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest mb-1.5">AI Model</p>
-                            <div className="relative">
-                                <button onClick={() => setShowModelMenu(!showModelMenu)}
-                                    className="w-full flex items-center gap-2 px-3 py-2 rounded-lg border transition-all cursor-pointer"
-                                    style={{
-                                        background: `var(--sys-primary)?.color || 'var(--sys-text)'}10, transparent)`,
-                                        borderColor: `${IMAGE_MODELS.find(m => m.id === imageModel)?.color || 'var(--sys-text)'}30`,
-                                    }}>
-                                    <span className="material-symbols-outlined text-base" style={{ color: IMAGE_MODELS.find(m => m.id === imageModel)?.color || 'var(--sys-text)' }}>
-                                        {IMAGE_MODELS.find(m => m.id === imageModel)?.icon || 'auto_awesome'}
-                                    </span>
-                                    <span className="text-[12px] font-bold text-[var(--sys-text)] flex-1 text-left">{IMAGE_MODELS.find(m => m.id === imageModel)?.name || 'Select Model'}</span>
-                                    <span className="material-symbols-outlined text-[var(--sys-text-muted)]" style={{ fontSize: '16px' }}>{showModelMenu ? 'expand_less' : 'expand_more'}</span>
-                                </button>
-                                {showModelMenu && (
-                                    <div className="absolute left-0 right-0 top-full mt-1.5 glass-panel rounded-xl shadow-2xl z-50 overflow-hidden border border-[var(--sys-border)]" style={{ animation: 'fadeUp 0.15s ease-out' }}>
-                                        <div className="p-1.5 space-y-0.5 max-h-[240px] overflow-y-auto">
-                                            {IMAGE_MODELS.map(m => (
-                                                <button key={m.id} onClick={() => { setImageModel(m.id); setShowModelMenu(false) }}
-                                                    className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-all cursor-pointer group ${
-                                                        imageModel === m.id
-                                                            ? 'bg-[var(--sys-surface)] text-[var(--sys-text)]'
-                                                            : 'text-[var(--sys-text-muted)] hover:bg-[var(--sys-surface)] hover:text-[var(--sys-text)]'
-                                                    }`}>
-                                                    <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: `${m.color}18` }}>
-                                                        <span className="material-symbols-outlined" style={{ fontSize: '15px', color: m.color }}>{m.icon}</span>
-                                                    </div>
-                                                    <div className="flex-1 min-w-0">
-                                                        <div className="text-[11px] font-bold truncate">{m.name}</div>
-                                                    </div>
-                                                    {imageModel === m.id && (
-                                                        <div className="w-4 h-4 rounded-full flex items-center justify-center" style={{ background: `${m.color}25` }}>
-                                                            <span className="material-symbols-outlined" style={{ fontSize: '11px', color: m.color }}>check</span>
-                                                        </div>
-                                                    )}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* 2. Scrollable Settings Body */}
-                        <div className="creative-tools-panel-body">
-
-                            {/* Accordion: Aspect Ratio */}
-                            <div className="sidebar-accordion">
-                                <div className="sidebar-accordion-header" onClick={() => setFloatingTray(prev => prev === 'format' ? null : 'format')}>
-                                    <span className="text-[var(--sys-text)] font-bold flex items-center gap-2" style={{ fontSize: 13 }}>
-                                        <span className="material-symbols-outlined text-[var(--sys-text)]" style={{ fontSize: 20 }}>crop</span>
-                                        Format
-                                        {selectedType && (
-                                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-[var(--sys-text)] text-[var(--sys-bg)] font-bold">
-                                                {creativeTypes.find(ct => ct.id === selectedType)?.label?.split('(')[0].trim() || selectedType}
-                                            </span>
-                                        )}
-                                    </span>
-                                    <div className="flex items-center gap-1.5">
-                                        {selectedType && floatingTray !== 'format' && <div className="w-1.5 h-1.5 rounded-full bg-[var(--sys-text)]" />}
-                                        <span className="material-symbols-outlined text-[var(--sys-text-muted)]" style={{ fontSize: '16px' }}>{floatingTray === 'format' ? 'expand_less' : 'expand_more'}</span>
-                                    </div>
-                                </div>
-                                {floatingTray === 'format' && (
-                                    <div className="sidebar-accordion-body">
-                                        <div className="sidebar-grid-2">
-                                            {creativeTypes.map(ct => (
-                                                <button key={ct.id} onClick={() => { setSelectedType(ct.id); if (ct.id !== 'custom-size') setFloatingTray(null) }}
-                                                    className={`px-2 py-2.5 rounded-lg text-[10px] font-semibold transition-all cursor-pointer flex items-center justify-start gap-2 border ${
-                                                        selectedType === ct.id ? 'bg-[var(--sys-text)] text-[var(--sys-bg)] border-[var(--sys-text)] shadow-sm' : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] border border-[var(--sys-border)] hover:bg-[var(--sys-surface)]'
-                                                    }`}>
-                                                    <span className="material-symbols-outlined text-[16px] flex-shrink-0">{ct.icon}</span>
-                                                    <span className="truncate w-full text-left">{ct.label.split('(')[0].trim()}</span>
-                                                </button>
-                                            ))}
-                                        </div>
-                                        {selectedType === 'custom-size' && (
-                                            <div className="mt-2 flex items-center gap-2 bg-[var(--sys-surface)] p-2 rounded-lg border border-[var(--sys-border)] justify-center">
-                                                <input type="number" value={customWidth} onChange={e => setCustomWidth(e.target.value)} placeholder="W" min="100" className="w-16 px-2 py-1 rounded bg-[var(--sys-surface)] text-xs text-center focus:border-primary focus:outline-none text-[var(--sys-text)] font-mono" />
-                                                <span className="text-[var(--sys-text-muted)] font-bold text-xs">×</span>
-                                                <input type="number" value={customHeight} onChange={e => setCustomHeight(e.target.value)} placeholder="H" min="100" className="w-16 px-2 py-1 rounded bg-[var(--sys-surface)] text-xs text-center focus:border-primary focus:outline-none text-[var(--sys-text)] font-mono" />
-                                                <span className="text-[var(--sys-text-muted)] text-[10px]">px</span>
+                    <div className="creative-tools-panel !border-none !bg-[var(--sys-surface)]">
+                            {/* ── NEW FREEPIK SIDEBAR BODY ── */}
+                            <div className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-hide creative-tools-panel-body !flex !flex-col !h-full p-0">
+                                
+                                {/* ── Model Selector ── */}
+                                <div className="px-5 mt-3 pb-4">
+                                    <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest mb-2">Model</p>
+                                    <div className="relative">
+                                        <button onClick={() => setShowModelMenu(!showModelMenu)} className="w-full flex items-center justify-between px-3 py-3 rounded-[14px] bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:border-primary/30 hover:shadow-sm transition-all cursor-pointer group">
+                                            <div className="flex items-center gap-2.5">
+                                                <span className="material-symbols-outlined" style={{ color: IMAGE_MODELS.find(m => m.id === imageModel)?.color || 'var(--sys-text)', fontSize: '18px' }}>
+                                                    {IMAGE_MODELS.find(m => m.id === imageModel)?.icon || 'auto_awesome'}
+                                                </span>
+                                                <span className="text-[13px] font-bold text-[var(--sys-text)] group-hover:text-[var(--sys-text)] transition-colors">{IMAGE_MODELS.find(m => m.id === imageModel)?.name || 'Select Model'}</span>
+                                            </div>
+                                            <span className="material-symbols-outlined text-[var(--sys-text-muted)] group-hover:text-[var(--sys-text)]" style={{ fontSize: '18px' }}>settings</span>
+                                        </button>
+                                        {showModelMenu && (
+                                            <div className="absolute left-0 right-0 top-full mt-1.5 bg-[var(--sys-bg)] rounded-[14px] shadow-xl z-[60] border border-[var(--sys-border)] overflow-hidden">
+                                                <div className="p-1.5 space-y-0.5 max-h-[240px] overflow-y-auto">
+                                                    {IMAGE_MODELS.map(m => (
+                                                        <button key={m.id} onClick={() => { setImageModel(m.id); setShowModelMenu(false) }}
+                                                            className={"w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-left transition-all cursor-pointer group " + (imageModel === m.id ? 'bg-[var(--sys-surface)] text-[var(--sys-text)]' : 'text-[var(--sys-text-muted)] hover:bg-[var(--sys-surface)] hover:text-[var(--sys-text)]')}>
+                                                            <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: m.color + '18' }}>
+                                                                <span className="material-symbols-outlined" style={{ fontSize: '15px', color: m.color }}>{m.icon}</span>
+                                                            </div>
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="text-[11px] font-bold truncate">{m.name}</div>
+                                                            </div>
+                                                            {imageModel === m.id && (
+                                                                <div className="w-4 h-4 rounded-full flex items-center justify-center" style={{ background: m.color + '25' }}>
+                                                                    <span className="material-symbols-outlined" style={{ fontSize: '11px', color: m.color }}>check</span>
+                                                                </div>
+                                                            )}
+                                                        </button>
+                                                    ))}
+                                                </div>
                                             </div>
                                         )}
                                     </div>
-                                )}
-                            </div>
-
-                            {/* Accordion: Camera Shot */}
-                            <div className="sidebar-accordion">
-                                <div className="sidebar-accordion-header" onClick={() => setFloatingTray(prev => prev === 'camera' ? null : 'camera')}>
-                                    <span className="text-[var(--sys-text)] font-bold flex items-center gap-2" style={{ fontSize: 13 }}>
-                                        <span className="material-symbols-outlined text-[var(--sys-text)]" style={{ fontSize: 20 }}>photo_camera</span>
-                                        Camera
-                                        {selectedShot && (
-                                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-[var(--sys-text)] text-[var(--sys-bg)] font-bold">
-                                                {CAMERA_SHOT_PRESETS.find(s => s.id === selectedShot)?.label || selectedShot}
-                                            </span>
-                                        )}
-                                    </span>
-                                    <div className="flex items-center gap-1.5">
-                                        {selectedShot && floatingTray !== 'camera' && <div className="w-1.5 h-1.5 rounded-full bg-[var(--sys-surface)]" />}
-                                        <span className="material-symbols-outlined text-[var(--sys-text-muted)]" style={{ fontSize: '16px' }}>{floatingTray === 'camera' ? 'expand_less' : 'expand_more'}</span>
-                                    </div>
                                 </div>
-                                {floatingTray === 'camera' && (
-                                    <div className="sidebar-accordion-body">
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                                            {CAMERA_SHOT_PRESETS.map(shot => (
-                                                <button key={shot.id}
-                                                    onClick={() => setSelectedShot(prev => prev === shot.id ? null : shot.id)}
-                                                    title={shot.description}
-                                                    className={`studio-btn-pill !rounded-xl !p-2 flex-col !items-start !h-auto ${selectedShot === shot.id ? 'active' : ''}`}
-                                                    style={selectedShot === shot.id ? {
-                                                        backgroundColor: `${shot.color}18`,
-                                                        borderColor: `${shot.color}40`,
-                                                    } : {}}
-                                                >
-                                                    {/* Emoji badge */}
-                                                    <span className="flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center text-sm leading-none"
-                                                        style={{ backgroundColor: selectedShot === shot.id ? `${shot.color}25` : 'rgba(255,255,255,0.04)' }}>
-                                                        {shot.emoji}
-                                                    </span>
-                                                    <span className="truncate text-[10px] font-semibold leading-tight">{shot.label}</span>
-                                                    {selectedShot === shot.id && (
-                                                        <span className="absolute top-1 right-1 w-2 h-2 rounded-full"
-                                                            style={{ backgroundColor: shot.color }} />
-                                                    )}
-                                                </button>
-                                            ))}
-                                        </div>
-                                        {selectedShot && (() => {
-                                            const s = CAMERA_SHOT_PRESETS.find(x => x.id === selectedShot)
-                                            return s ? (
-                                                <div className="mt-2 px-2.5 py-2 rounded-xl text-[9px] text-[var(--sys-text-muted)] leading-relaxed"
-                                                    style={{ backgroundColor: `${s.color}0d`, borderLeft: `2px solid ${s.color}50` }}>
-                                                    {s.description}
-                                                </div>
-                                            ) : null
-                                        })()}
-                                        {selectedShot && (
-                                            <button onClick={() => setSelectedShot(null)}
-                                                className="w-full mt-1.5 text-[9px] text-[var(--sys-text-muted)] hover:text-primary transition-colors cursor-pointer flex items-center justify-center gap-0.5 py-1 font-bold">
-                                                <span className="material-symbols-outlined text-[10px]">close</span> Clear shot
+
+                                {/* ── References Dash Grid ── */}
+                                <div className="px-5 pb-4">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest">References</p>
+                                        <span className="text-[10px] text-[var(--sys-text-muted)] font-mono">{ (referenceImages.style ? 1 : 0) + characters.length }/14</span>
+                                    </div>
+                                    <div className="flex flex-wrap items-center gap-2 relative z-0">
+                                        {/* Style Block */}
+                                        {referenceImages.style ? (
+                                            <div className="relative flex-shrink-0 group w-[4.5rem] h-[4.5rem]">
+                                                <img src={referenceImages.style} className="w-full h-full rounded-2xl object-cover border border-[var(--sys-border)]" />
+                                                <button onClick={() => setReferenceImages(prev => ({ ...prev, style: null }))} className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-[var(--sys-bg)] text-[var(--sys-text)] border border-[var(--sys-border)] shadow-md flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"><span className="material-symbols-outlined text-[12px]">close</span></button>
+                                                <span className="absolute bottom-1 left-1/2 -translate-x-1/2 text-[8px] font-bold px-1.5 py-0.5 rounded bg-black/60 text-white backdrop-blur shadow-sm">Style</span>
+                                            </div>
+                                        ) : (
+                                            <button onClick={() => { setRefPickerSlot('style'); setRefPickerTab('upload') }} className="w-[4.5rem] h-[4.5rem] rounded-2xl border border-dashed border-[var(--sys-border)] bg-[var(--sys-surface)] hover:border-[var(--sys-text)] hover:shadow-sm flex flex-col items-center justify-center transition-all group flex-shrink-0 cursor-pointer text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]">
+                                                <span className="material-symbols-outlined text-[20px] mb-1">star</span>
+                                                <span className="text-[10px] font-medium leading-none">Style</span>
+                                            </button>
+                                        )}
+                                        {/* Character Blocks */}
+                                        {characters.map((char, idx) => (
+                                            <div key={idx} className="relative flex-shrink-0 group w-[4.5rem] h-[4.5rem]">
+                                                <img src={char.image} alt={char.name} className="w-full h-full rounded-2xl object-cover border border-primary/50" />
+                                                <button onClick={() => setCharacters(prev => prev.filter((_, i) => i !== idx))} className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-[var(--sys-bg)] text-[var(--sys-text)] border border-[var(--sys-border)] shadow-md flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"><span className="material-symbols-outlined text-[12px]">close</span></button>
+                                            </div>
+                                        ))}
+                                        {/* Default Add Blocks */}
+                                        {characters.length < 13 && (
+                                            <button onClick={() => { setRefPickerSlot(`character-${characters.length}`); setRefPickerTab('upload') }} className="w-[4.5rem] h-[4.5rem] rounded-2xl border border-dashed border-[var(--sys-border)] bg-[var(--sys-surface)] hover:border-[var(--sys-text)] hover:shadow-sm flex flex-col items-center justify-center transition-all group flex-shrink-0 cursor-pointer text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]">
+                                                <span className="material-symbols-outlined text-[20px] mb-1">person</span>
+                                                <span className="text-[10px] font-medium leading-none">Character</span>
+                                            </button>
+                                        )}
+                                        {characters.length < 12 && !referenceImages.style && (
+                                            <button onClick={() => { setRefPickerSlot('character-add'); setRefPickerTab('upload') }} className="w-[4.5rem] h-[4.5rem] rounded-2xl border border-dashed border-[var(--sys-border)] bg-[var(--sys-surface)] hover:border-[var(--sys-text)] hover:shadow-sm flex flex-col items-center justify-center transition-all group flex-shrink-0 cursor-pointer text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]">
+                                                <span className="material-symbols-outlined text-[20px] mb-1">add</span>
+                                                <span className="text-[10px] font-medium leading-none">Add</span>
                                             </button>
                                         )}
                                     </div>
-                                )}
-                            </div>
+                                </div>
 
-                            {/* Accordion: Character & References */}
-                            <div className="sidebar-accordion">
-                                <div className="sidebar-accordion-header" onClick={() => setFloatingTray(prev => prev === 'references' ? null : 'references')}>
-                                    <span className="text-[var(--sys-text)] font-bold flex items-center gap-2" style={{ fontSize: 13 }}>
-                                        <span className="material-symbols-outlined text-[var(--sys-text)]" style={{ fontSize: 20 }}>collections</span>
-                                        References
-                                        {(referenceImages.style || characters.length > 0) && (
-                                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-[var(--sys-text)] text-[var(--sys-bg)] font-bold">
-                                                {(referenceImages.style ? 1 : 0) + characters.length} added
-                                            </span>
-                                        )}
-                                    </span>
-                                    <div className="flex items-center gap-1.5">
-                                        {(referenceImages.style || characters.length > 0) && floatingTray !== 'references' && <div className="w-1.5 h-1.5 rounded-full bg-[var(--sys-text)]" />}
-                                        <span className="material-symbols-outlined text-[var(--sys-text-muted)]" style={{ fontSize: '16px' }}>{floatingTray === 'references' ? 'expand_less' : 'expand_more'}</span>
-                                    </div>
-                                </div>
-                                {floatingTray === 'references' && (
-                                    <div className="sidebar-accordion-body">
-                                        <div className="flex items-center gap-3 flex-wrap">
-                                            {referenceImages.style ? (
-                                                <div className="relative flex-shrink-0 group">
-                                                    <div className="w-12 h-12 rounded-lg overflow-hidden border border-[var(--sys-border)]">
-                                                        <img src={referenceImages.style} alt="Style" className="w-full h-full object-cover" />
-                                                    </div>
-                                                    <button onClick={() => setReferenceImages(prev => ({ ...prev, style: null }))}
-                                                        className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[var(--sys-surface)] text-[var(--sys-text)] text-[8px] flex items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity">×</button>
-                                                    <span className="text-[8px] text-primary font-bold text-center block mt-0.5">Style</span>
-                                                </div>
-                                            ) : (
-                                                <button onClick={() => { setRefPickerSlot('style'); setRefPickerTab('upload') }}
-                                                    className="flex-shrink-0 w-12 h-12 rounded-lg border border-dashed border-[var(--sys-border)] hover:border-[var(--sys-border)] flex flex-col items-center justify-center cursor-pointer transition-all bg-[var(--sys-surface)] group" title="Add style reference">
-                                                    <span className="material-symbols-outlined text-sm text-[var(--sys-text-muted)] group-hover:text-primary">brush</span>
-                                                    <span className="text-[8px] text-[var(--sys-text-muted)] group-hover:text-primary font-bold leading-none">Style</span>
-                                                </button>
-                                            )}
-                                            {characters.map((char, idx) => (
-                                                <div key={idx} className="relative flex-shrink-0 group">
-                                                    <div className="w-12 h-12 rounded-lg overflow-hidden border border-[var(--sys-text)]">
-                                                        <img src={char.image} alt={char.name} className="w-full h-full object-cover" />
-                                                    </div>
-                                                    <button onClick={() => setCharacters(prev => prev.filter((_, i) => i !== idx))}
-                                                        className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[var(--sys-surface)] text-[var(--sys-text)] text-[8px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">×</button>
-                                                    <input value={char.name}
-                                                        onChange={e => setCharacters(prev => prev.map((c, i) => i === idx ? { ...c, name: e.target.value } : c))}
-                                                        className="w-12 mt-0.5 text-[8px] text-center bg-transparent text-[var(--sys-bg)] outline-none font-bold truncate"
-                                                        placeholder="Name" />
-                                                </div>
-                                            ))}
-                                            {characters.length < 5 && (
-                                                <button onClick={() => { setRefPickerSlot(`character-${characters.length}`); setRefPickerTab('upload') }}
-                                                    className="flex-shrink-0 w-12 h-12 rounded-lg border border-dashed border-[var(--sys-border)] hover:border-[var(--sys-text)] flex flex-col items-center justify-center cursor-pointer transition-all bg-[var(--sys-surface)] group" title="Add character">
-                                                    <span className="material-symbols-outlined text-sm text-[var(--sys-text-muted)] group-hover:text-[var(--sys-text)]">person_add</span>
-                                                    <span className="text-[8px] text-[var(--sys-text-muted)] group-hover:text-[var(--sys-text)] font-bold leading-none">Person</span>
-                                                </button>
-                                            )}
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                            {/* Accordion: Visual Style & Setup */}
-                            <div className="sidebar-accordion">
-                                <div className="sidebar-accordion-header" onClick={() => setFloatingTray(prev => prev === 'advanced' ? null : 'advanced')}>
-                                    <span className="text-[var(--sys-text)] font-bold flex items-center gap-2" style={{ fontSize: 13 }}>
-                                        <span className="material-symbols-outlined text-[var(--sys-text)]" style={{ fontSize: 20 }}>palette</span>
-                                        Style
-                                        {style && (
-                                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-[var(--sys-text)] text-[var(--sys-bg)] font-bold capitalize">{style}</span>
-                                        )}
-                                    </span>
-                                    <div className="flex items-center gap-1.5">
-                                        {style && floatingTray !== 'advanced' && <div className="w-1.5 h-1.5 rounded-full bg-[var(--sys-surface)]" />}
-                                        <span className="material-symbols-outlined text-[var(--sys-text-muted)]" style={{ fontSize: '16px' }}>{floatingTray === 'advanced' ? 'expand_less' : 'expand_more'}</span>
-                                    </div>
-                                </div>
-                                {floatingTray === 'advanced' && (
-                                    <div className="sidebar-accordion-body space-y-4 pt-1">
-                                        <div>
-                                            <p className="text-[9px] text-[var(--sys-text-muted)] uppercase tracking-widest font-bold mb-2">Aesthetic Style</p>
-                                            <div className="sidebar-grid-2">
-                                                {styles.map(s => (
-                                                    <button key={s.id} onClick={() => setStyle(s.id)}
-                                                        className={`studio-btn-pill border-none !px-3 !py-2 !text-[10px] ${style === s.id ? 'active' : ''}`}>
-                                                        <span className="material-symbols-outlined !text-[14px]">{s.icon}</span> {s.label}
+                                {/* ── Unified Prompt Textarea (Full Height Expansion) ── */}
+                                <div className="px-5 pb-3 flex flex-col flex-grow">
+                                    <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest mb-2">Prompt</p>
+                                    <div className="flex flex-col relative bg-[var(--sys-bg)] border border-[var(--sys-border)] rounded-[16px] overflow-hidden focus-within:border-primary/50 focus-within:shadow-md transition-all flex-grow">
+                                        <textarea
+                                            value={prompt}
+                                            onChange={e => {
+                                                const val = e.target.value; setPrompt(val);
+                                                const cursor = e.target.selectionStart; const textBefore = val.substring(0, cursor); const atMatch = textBefore.match(/@(\\w*)$/);
+                                                if (atMatch && (characters.length > 0 || referenceImages.upload)) { setShowCharTags(true); setCharTagFilter(atMatch[1].toLowerCase()); } else { setShowCharTags(false); }
+                                            }}
+                                            onKeyDown={e => {
+                                                if (e.key === 'Enter' && !e.shiftKey && !showCharTags) { e.preventDefault(); handleGenerate() }
+                                                if (e.key === 'Escape') { setShowCharTags(false); setFloatingTray(null) }
+                                            }}
+                                            placeholder={activeBrand ? "Describe your image—try @ to add references" : "Select a brand first..."}
+                                            disabled={!activeBrand || activeGenerations.length >= 3}
+                                            className="w-full bg-transparent p-4 text-[14px] leading-relaxed text-[var(--sys-text)] placeholder-[var(--sys-text-muted)] outline-none resize-none flex-grow min-h-[140px]"
+                                            ref={promptTextareaRef}
+                                        />
+                                        
+                                        {/* Char Tag Auto-fill Box */}
+                                        {showCharTags && (characters.length > 0 || referenceImages.upload) && (
+                                            <div className="absolute left-2 top-2/3 mb-2 bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl shadow-xl p-2 z-[60] min-w-[200px] animate-fade-in">
+                                                <p className="text-[10px] text-[var(--sys-text-muted)]/50 mb-1.5 px-2">Tag a character</p>
+                                                {characters.filter(c => !charTagFilter || c.name.toLowerCase().includes(charTagFilter)).map((char, idx) => (
+                                                    <button key={idx} onClick={() => {
+                                                        const textarea = promptTextareaRef.current; if (!textarea) return;
+                                                        const cursor = textarea.selectionStart; const before = prompt.substring(0, cursor); const after = prompt.substring(cursor);
+                                                        const cleaned = before.replace(/@\\w*$/, ''); const tagName = char.name.replace(/\\s/g, '');
+                                                        setPrompt(cleaned + '@' + tagName + ' ' + after); setShowCharTags(false); setTimeout(() => textarea.focus(), 50);
+                                                    }} className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-black/5 transition-all text-left cursor-pointer">
+                                                        <img src={char.image} alt="" className="w-6 h-6 rounded-full object-cover border border-[var(--sys-border)]" />
+                                                        <div><p className="text-xs font-bold text-[var(--sys-text)]">@{char.name}</p></div>
                                                     </button>
                                                 ))}
                                             </div>
-                                        </div>
-                                        <div>
-                                            <p className="text-[9px] text-[var(--sys-text-muted)] uppercase tracking-widest font-bold mb-2">Speed vs Quality</p>
-                                            <div className="flex bg-[var(--sys-surface)] p-0.5 rounded-lg border border-[var(--sys-border)]">
-                                                <button onClick={() => setAgenticQuality('fast')} className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-[10px] font-bold rounded-lg cursor-pointer transition-all ${agenticQuality === 'fast' ? 'bg-[#FF4D00] text-white shadow-lg shadow-primary/20' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)]'}`}>
-                                                    <span className="material-symbols-outlined text-[14px]">bolt</span> Standard
-                                                </button>
-                                                <button onClick={() => setAgenticQuality('quality')} className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-[10px] font-bold rounded-lg cursor-pointer transition-all ${agenticQuality === 'quality' ? 'bg-[#FF4D00] text-white shadow-lg shadow-primary/20' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)]'}`}>
-                                                    <span className="material-symbols-outlined text-[14px]">target</span> Max Detail
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Accordion: Typography & Layout */}
-                            <div className="sidebar-accordion">
-                                <div className="sidebar-accordion-header" onClick={() => setFloatingTray(prev => prev === 'text' ? null : 'text')}>
-                                    <span className="text-[var(--sys-text)] font-bold flex items-center gap-2" style={{ fontSize: 13 }}>
-                                        <span className="material-symbols-outlined text-[var(--sys-text)]" style={{ fontSize: 20 }}>title</span>
-                                        Text Overlay
-                                        {(customHeadline || customCtaText) && (
-                                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-[var(--sys-text)] text-[var(--sys-bg)] font-bold">set</span>
                                         )}
-                                    </span>
-                                    <div className="flex items-center gap-2">
-                                        {(customHeadline || customCtaText) && floatingTray !== 'text' && <div className="w-1.5 h-1.5 rounded-full bg-[var(--sys-surface)]" />}
-                                        <button onClick={(e) => { e.stopPropagation(); setGenerateCopy(!generateCopy) }}
-                                            className={`w-7 h-4 rounded-full transition-all cursor-pointer flex-shrink-0 relative ${generateCopy ? 'bg-[var(--sys-surface)]' : 'bg-[var(--sys-surface)]'}`}>
-                                            <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-all ${generateCopy ? 'left-[14px]' : 'left-0.5'}`} />
-                                        </button>
-                                    </div>
-                                </div>
-                                {floatingTray === 'text' && (
-                                    <div className="sidebar-accordion-body">
-                                        <p className="text-[10px] text-[var(--sys-text-muted)] mb-3 leading-snug">Generate imagery with readable typography. Enable Ideogram or Flux for best results.</p>
-                                        <div className="space-y-2.5">
-                                            <div className="relative">
-                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-[16px] text-[var(--sys-text-muted)]">short_text</span>
-                                                <input type="text" value={customHeadline} onChange={e => setCustomHeadline(e.target.value)}
-                                                    placeholder="Headline (e.g., Sale 50% Off)" className="w-full pl-9 pr-3 py-2 text-xs rounded-lg border border-[var(--sys-border)] bg-[var(--sys-surface)] focus:border-[var(--sys-border)] outline-none text-[var(--sys-text)] transition-all shadow-inner placeholder-slate-600" />
-                                            </div>
-                                            <div className="relative">
-                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-[16px] text-[var(--sys-text-muted)]">ads_click</span>
-                                                <input type="text" value={customCtaText} onChange={e => setCustomCtaText(e.target.value)}
-                                                    placeholder="Button CTA (e.g., Shop Now)" className="w-full pl-9 pr-3 py-2 text-xs rounded-lg border border-[var(--sys-border)] bg-[var(--sys-surface)] focus:border-[var(--sys-border)] outline-none text-[var(--sys-text)] transition-all shadow-inner placeholder-slate-600" />
-                                            </div>
-                                            {!copyLoading && prompt?.trim().length > 5 && (
-                                                <button onClick={() => suggestCopy(prompt)}
-                                                    className="studio-btn-secondary w-full !text-[10px] !py-2 !rounded-lg !bg-[var(--sys-surface)] hover:!bg-[var(--sys-primary-dim)]">
-                                                    <span className="material-symbols-outlined !text-[14px]">auto_awesome</span>
-                                                    Auto-Suggest from Prompt
+
+                                        {/* Prompt AI Switch & Voice */}
+                                        <div className="px-4 py-3 flex items-center justify-between border-t border-[var(--sys-border)] bg-[var(--sys-surface)]/30">
+                                            <div className="flex items-center gap-3">
+                                                {/* Soft iOS-style Toggle */}
+                                                <button onClick={(e) => { e.stopPropagation(); setGenerateCopy(!generateCopy) }} className={"w-9 h-5 rounded-full relative transition-colors shadow-inner " + (generateCopy ? 'bg-primary' : 'bg-slate-300 dark:bg-slate-700')}>
+                                                    <div className={"absolute top-[2px] w-4 h-4 rounded-full bg-white shadow-sm transition-transform " + (generateCopy ? 'left-[18px]' : 'left-[2px]')} />
                                                 </button>
-                                            )}
+                                                <span className="text-[12px] font-bold text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer select-none" onClick={() => setGenerateCopy(!generateCopy)}>AI prompt</span>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                {prompt.trim() && (
+                                                    <button onClick={handleEnhancePrompt} disabled={enhancing || !activeBrand} className="text-primary hover:text-primary-dark transition-colors px-1 text-[11px] font-bold flex items-center gap-1 bg-primary/10 rounded-md py-1 px-2 cursor-pointer">
+                                                        <span className={"material-symbols-outlined text-[13px] " + (enhancing ? "animate-spin" : "")}>{enhancing ? 'progress_activity' : 'auto_awesome'}</span> {enhancing ? 'Enhancing' : 'Enhance'}
+                                                    </button>
+                                                )}
+                                                <VoiceInput onResult={(text) => setPrompt(prev => prev ? prev + ' ' + text : text)} size="small" />
+                                            </div>
                                         </div>
                                     </div>
-                                )}
+                                </div>
                             </div>
 
-                        </div>
-
-                        {/* 3. Bottom Pinned Controls: Prompt & Generate */}
-                        <div className="creative-tools-panel-footer">
-                            {/* Agentic Enhance Insights — shown after Enhance runs */}
-                            {feedbackToast && (
-                                <div className="flex items-center gap-1.5 mb-2 px-1 overflow-x-auto scrollbar-hide">
-                                    <span className="material-symbols-outlined text-[11px] text-primary flex-shrink-0">auto_awesome</span>
-                                    <span className="text-[9px] text-primary/80 font-medium truncate">{feedbackToast}</span>
-                                </div>
-                            )}
-                            {/* Prompt label */}
-                            <p className="text-[9px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest mb-1.5 px-1">Prompt</p>
-
-                            <div className="relative mb-2">
-                                <textarea
-                                    value={prompt}
-                                    onChange={e => {
-                                        const val = e.target.value
-                                        setPrompt(val)
-                                        e.target.style.height = 'auto'
-                                        e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px'
-                                        const cursor = e.target.selectionStart
-                                        const textBefore = val.substring(0, cursor)
-                                        const atMatch = textBefore.match(/@(\w*)$/)
-                                        if (atMatch && (characters.length > 0 || referenceImages.upload)) {
-                                            setShowCharTags(true)
-                                            setCharTagFilter(atMatch[1].toLowerCase())
-                                        } else {
-                                            setShowCharTags(false)
-                                        }
-                                    }}
-                                    onKeyDown={e => {
-                                        if (e.key === 'Enter' && !e.shiftKey && !showCharTags) { e.preventDefault(); handleGenerate() }
-                                        if (e.key === 'Escape') { setShowCharTags(false); setFloatingTray(null) }
-                                    }}
-                                    placeholder={activeBrand ? `Describe your visual for ${activeBrand.name}…` : "Create a brand first…"}
-                                    disabled={!activeBrand || activeGenerations.length >= 3}
-                                    className="input-glass w-full resize-none py-2.5 px-3 pr-[36px] text-sm leading-relaxed rounded-xl border border-[var(--sys-border)] focus:border-primary/40 text-[var(--sys-text)] placeholder-slate-600 focus:bg-[var(--sys-surface)] transition-all scrollbar-hide"
-                                    rows={2} style={{ minHeight: '72px', maxHeight: '130px' }} ref={promptTextareaRef}
-                                />
-                                
-                                {/* Char tag autocomplete */}
-                                {showCharTags && (characters.length > 0 || referenceImages.upload) && (
-                                    <div className="absolute left-0 bottom-full mb-2 glass-panel rounded-xl shadow-none p-2 z-50 min-w-[200px] animate-fade-in">
-                                        <p className="text-[10px] text-[var(--sys-text-muted)]/50 mb-1.5 px-2">Tag a character</p>
-                                        {characters
-                                            .filter(c => !charTagFilter || c.name.toLowerCase().includes(charTagFilter))
-                                            .map((char, idx) => (
-                                                <button key={idx} onClick={() => {
-                                                    const textarea = promptTextareaRef.current
-                                                    if (!textarea) return
-                                                    const cursor = textarea.selectionStart
-                                                    const before = prompt.substring(0, cursor)
-                                                    const after = prompt.substring(cursor)
-                                                    const cleaned = before.replace(/@\w*$/, '')
-                                                    const tagName = char.name.replace(/\s/g, '')
-                                                    setPrompt(cleaned + `@${tagName} ` + after)
-                                                    setShowCharTags(false)
-                                                    setTimeout(() => textarea.focus(), 50)
-                                                }}
-                                                    className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-[var(--sys-surface)] transition-all text-left cursor-pointer">
-                                                    <img src={char.image} alt="" className="w-6 h-6 rounded-full object-cover border border-[var(--sys-border)]" />
-                                                    <div>
-                                                        <p className="text-xs font-bold text-on-surface">@{char.name}</p>
-                                                        <p className="text-[9px] text-[var(--sys-text-muted)]/40">Character reference</p>
-                                                    </div>
+                            {/* ── Soft Modifiers & Generate Plinth ── */}
+                            <div className="creative-tools-panel-footer !bg-[var(--sys-bg)] !border-none px-5 pt-3 pb-5 space-y-3 z-10 border-t border-[var(--sys-border)]">
+                                {/* Modifier Pills */}
+                                <div className="flex items-center flex-wrap gap-2">
+                                    <div className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text-muted)]">
+                                        <button className="hover:text-[var(--sys-text)]"><span className="material-symbols-outlined text-[14px]">remove</span></button>
+                                        <span className="text-[13px] font-bold text-[var(--sys-text)] px-1">1</span>
+                                        <button className="hover:text-[var(--sys-text)]"><span className="material-symbols-outlined text-[14px]">add</span></button>
+                                    </div>
+                                    <div className="relative group/tray">
+                                        <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[12px] font-bold text-[var(--sys-text)] transition-all hover:border-[var(--sys-text)] cursor-pointer">
+                                            <span className="material-symbols-outlined text-[15px]">crop_landscape</span>
+                                            {selectedType ? creativeTypes.find(c => c.id === selectedType)?.label?.split('(')[0].trim() : '16:9'}
+                                        </button>
+                                        <div className="absolute bottom-full left-0 mb-3 hidden group-hover/tray:block w-[140px] bg-[var(--sys-bg)] border border-[var(--sys-border)] shadow-xl rounded-[14px] p-1.5 z-50 animate-fade-in">
+                                            {creativeTypes.map(c => (
+                                                <button key={c.id} onClick={() => setSelectedType(c.id)} className={"w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg transition-colors " + (selectedType === c.id ? "bg-[var(--sys-text)] text-[var(--sys-bg)]" : "text-[var(--sys-text)] hover:bg-[var(--sys-surface)]")}>
+                                                    <span className="material-symbols-outlined text-[16px]">{c.icon}</span><span className="text-[11px] font-bold">{c.label.split('(')[0]}</span>
                                                 </button>
                                             ))}
+                                        </div>
                                     </div>
-                                )}
-
-                                {/* Voice input */}
-                                <div className="absolute right-2 top-2">
-                                    <VoiceInput onResult={(text) => setPrompt(prev => prev ? prev + ' ' + text : text)} size="small" />
-                                </div>
-                            </div>
-
-                            {/* Prompt meta row: char count + enhance */}
-                            <div className="flex items-center justify-between mb-2.5 px-0.5">
-                                <span className={`text-[9px] font-mono tabular-nums ${prompt.length > 900 ? 'text-primary' : 'text-slate-700'}`}>
-                                    {prompt.length} · ↵ generate
-                                </span>
-                                {prompt.trim() && (
-                                    <CreditTooltipWrapper action="promptEnhance">
-                                        <button onClick={handleEnhancePrompt} disabled={enhancing || !activeBrand}
-                                            className="studio-btn-secondary !bg-[var(--sys-primary-dim)] !text-primary !border-none !px-2 !py-0.5 !text-[9px] !h-auto">
-                                            <span className={`material-symbols-outlined !text-[10px] ${enhancing ? 'animate-spin' : ''}`}>{enhancing ? 'progress_activity' : 'auto_awesome'}</span>
-                                            {enhancing ? 'Enhancing…' : 'Enhance'}
+                                    <div className="relative group/tray">
+                                        <button onClick={() => setAgenticQuality(prev => prev === 'fast' ? 'quality' : 'fast')} className="flex items-center justify-center px-3 py-1.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[12px] font-bold text-[var(--sys-text)] transition-all hover:border-[var(--sys-text)] cursor-pointer">
+                                            <span className="material-symbols-outlined text-[15px] mr-1">{agenticQuality==='fast' ? 'bolt' : 'target'}</span> {agenticQuality==='fast' ? '1K' : '2K'}
                                         </button>
-                                    </CreditTooltipWrapper>
-                                )}
+                                    </div>
+                                    <button onClick={() => setStyle(style ? null : 'modern')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[12px] font-bold text-[var(--sys-text)] transition-all hover:border-[var(--sys-text)] ml-auto">
+                                    </button>
+                                </div>
+                                {/* Big Soft Generate */}
+                                <CreditTooltipWrapper action="creative">
+                                    <button onClick={handleGenerate} disabled={!prompt.trim() || !activeBrand || activeGenerations.length >= 3}
+                                        className={"studio-btn-primary w-full !py-3.5 !rounded-2xl transition-all flex items-center justify-center gap-2 " + (prompt.trim() ? "bg-[var(--sys-text)] hover:bg-black dark:hover:bg-white text-[var(--sys-bg)]" : "bg-[var(--sys-border)] text-[var(--sys-text-muted)] outline-none")}>
+                                        {activeGenerations.length > 0 ? (
+                                            <><span className="material-symbols-outlined animate-spin text-[18px]">progress_activity</span> <span className="text-[14px] font-bold">Generating {activeGenerations.length}/3...</span></>
+                                        ) : (
+                                            <><span className="text-[14px] font-bold">Generate</span> <span className="material-symbols-outlined text-[18px]">auto_awesome</span></>
+                                        )}
+                                    </button>
+                                </CreditTooltipWrapper>
                             </div>
 
-                            <CreditTooltipWrapper action="creative">
-                                <button onClick={handleGenerate} disabled={!prompt.trim() || !activeBrand || activeGenerations.length >= 3}
-                                    className="studio-btn-primary w-full !py-3 !rounded-xl !text-sm shadow-[0_4px_20px_rgba(255,77,0,0.35)] hover:shadow-[0_6px_28px_rgba(255,77,0,0.45)]">
-                                    {activeGenerations.length > 0 ? (
-                                        <><span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span> Generating {activeGenerations.length}/3…</>
-                                    ) : (
-                                        <><span className="material-symbols-outlined text-[18px]">draw</span> Generate <CreditBadge action="creative" /></>
-                                    )}
-                                </button>
-                            </CreditTooltipWrapper>
+
                         </div>
                     </div>
-                </div>
             </>
             )}
 
@@ -4112,9 +3841,215 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
             {/* =================== AI PHOTOSHOOT MODE =================== */}
             {studioMode === 'photoshoot' && (
                 <div className="creative-split fade-up">
-                    <div className="creative-gallery">
+                                                {/* ── NEW FREEPIK SIDEBAR BODY (PHOTOSHOOT) ── */}
+                            <div className="creative-tools-panel !border-none !bg-[var(--sys-surface)]">
+                                <div className="flex items-center justify-between px-5 pt-5 pb-3">
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-5 h-5 rounded-md bg-[var(--sys-text)] flex items-center justify-center">
+                                            <span className="material-symbols-outlined text-[var(--sys-bg)]" style={{ fontSize: '12px' }}>filter_center_focus</span>
+                                        </div>
+                                        <span className="text-[11px] font-bold text-[var(--sys-text)] uppercase tracking-widest">Photoshoot Mode</span>
+                                    </div>
+                                    <button onClick={() => setPsTray(psTray === 'product' ? null : 'product')} className={"flex items-center gap-1 text-[10px] text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] px-2 py-1 cursor-pointer bg-transparent rounded-lg hover:bg-black/5 transition-all " + (productImage ? 'text-primary' : '')}>
+                                        <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>add_a_photo</span>
+                                        {productImage ? 'Change Product' : 'Add Product'}
+                                    </button>
+                                </div>
+                                <div className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-hide creative-tools-panel-body !flex !flex-col !h-full p-0">
+                                
+                                {/* ── Model Selector ── */}
+                                <div className="px-5 mt-3 pb-4">
+                                    <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest mb-2">Model</p>
+                                    <div className="relative">
+                                        <button onClick={() => setShowModelMenu(!showModelMenu)} className="w-full flex items-center justify-between px-3 py-3 rounded-[14px] bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:border-primary/30 hover:shadow-sm transition-all cursor-pointer group">
+                                            <div className="flex items-center gap-2.5">
+                                                <span className="material-symbols-outlined" style={{ color: IMAGE_MODELS.find(m => m.id === imageModel)?.color || 'var(--sys-text)', fontSize: '18px' }}>
+                                                    {IMAGE_MODELS.find(m => m.id === imageModel)?.icon || 'auto_awesome'}
+                                                </span>
+                                                <span className="text-[13px] font-bold text-[var(--sys-text)] group-hover:text-[var(--sys-text)] transition-colors">{IMAGE_MODELS.find(m => m.id === imageModel)?.name || 'Select Model'}</span>
+                                            </div>
+                                            <span className="material-symbols-outlined text-[var(--sys-text-muted)] group-hover:text-[var(--sys-text)]" style={{ fontSize: '18px' }}>expand_more</span>
+                                        </button>
+                                        {showModelMenu && (
+                                            <div className="absolute left-0 right-0 top-full mt-1.5 bg-[var(--sys-bg)] rounded-[14px] shadow-xl z-50 border border-[var(--sys-border)] overflow-hidden">
+                                                <div className="p-1.5 space-y-0.5 max-h-[240px] overflow-y-auto">
+                                                    {IMAGE_MODELS.map(m => (
+                                                        <button key={m.id} onClick={() => { setImageModel(m.id); setShowModelMenu(false) }}
+                                                            className={"w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-left transition-all cursor-pointer " + (imageModel === m.id ? 'bg-[var(--sys-surface)] text-[var(--sys-text)]' : 'text-[var(--sys-text-muted)] hover:bg-[var(--sys-surface)] hover:text-[var(--sys-text)]')}>
+                                                            <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: m.color + '18' }}>
+                                                                <span className="material-symbols-outlined" style={{ fontSize: '15px', color: m.color }}>{m.icon}</span>
+                                                            </div>
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="text-[11px] font-bold truncate">{m.name}</div>
+                                                            </div>
+                                                            {imageModel === m.id && <span className="material-symbols-outlined text-[secondary] text-[11px]">check</span>}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
 
-                    {/* Recent Photoshoots */}
+                                {/* ── Product Image ── */}
+                                <div className="px-5 pb-4">
+                                    <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest mb-2 flex items-center gap-1.5"><span className="material-symbols-outlined text-[13px]">add_a_photo</span> Product / Subject</p>
+                                    <div className="p-1 bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl relative">
+                                        {productImage ? (
+                                            <div className="relative rounded-lg overflow-hidden border border-[var(--sys-border)] h-24 group">
+                                                <img src={productImage} className="w-full h-full object-cover transition-transform group-hover:scale-105" />
+                                                <button onClick={() => {setProductImage(null); setProductFile(null)}} className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-[var(--sys-bg)]/80 hover:bg-[var(--sys-bg)] shadow-sm backdrop-blur-md flex items-center justify-center cursor-pointer transition-all"><span className="material-symbols-outlined text-[13px] text-[var(--sys-text)]">close</span></button>
+                                            </div>
+                                        ) : (
+                                            <div className="text-center p-4 border border-dashed border-[var(--sys-border)] rounded-lg hover:border-primary/50 transition-colors bg-[var(--sys-bg)]/50">
+                                                <span className="material-symbols-outlined text-[var(--sys-text-muted)] text-[22px] mb-1">add_photo_alternate</span>
+                                                <input type="file" className="block w-full text-[10px] file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-[10px] file:font-semibold file:bg-[var(--sys-text)] file:text-[var(--sys-bg)] hover:file:opacity-90 cursor-pointer text-[var(--sys-text-muted)]" accept="image/*" onChange={(e)=>{
+                                                    const file = e.target.files?.[0]; if(file){ setProductFile(file); const reader = new FileReader(); reader.onload = async(ev) => { const url = await uploadToS3(ev.target.result, 'products'); setProductImage(url); }; reader.readAsDataURL(file); }
+                                                }}/>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* ── Unified Prompt Textarea (Photoshoot Brief) ── */}
+                                <div className="px-5 pb-5">
+                                    <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest mb-2 flex items-center gap-1.5"><span className="material-symbols-outlined text-[13px]">edit_note</span> Scene Description</p>
+                                    <div className="flex flex-col relative bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl overflow-hidden focus-within:border-[var(--sys-text)] focus-within:shadow-sm transition-all group">
+                                        <textarea
+                                            value={photoshootBrief}
+                                            onChange={e => setPhotoshootBrief(e.target.value)}
+                                            onKeyDown={e => {
+                                                if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handlePhotoshoot() }
+                                            }}
+                                            placeholder="Describe your photoshoot scene... e.g. 'Luxury marble countertop, golden hour lighting'"
+                                            disabled={photoshootGenerating}
+                                            className="w-full bg-transparent p-3.5 text-[13px] leading-relaxed text-[var(--sys-text)] placeholder-[var(--sys-text-muted)] outline-none resize-none min-h-[90px]"
+                                        />
+                                        <div className="absolute right-2 bottom-2 flex items-center gap-2 opacity-50 group-focus-within:opacity-100 transition-opacity">
+                                            <VoiceInput onResult={(text) => setPhotoshootBrief(prev => prev ? prev + ' ' + text : text)} size="small" />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* ── Lighting & Camera ── */}
+                                <div className="px-5 pb-5 border-t border-[var(--sys-border)] pt-4">
+                                    <p className="text-[10px] font-bold text-[var(--sys-text)] uppercase tracking-widest mb-2.5 flex items-center gap-1.5"><span className="material-symbols-outlined text-[14px]">highlight</span> Lighting & Shot</p>
+                                    <div className="space-y-3">
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {[{id:'softbox',label:'Softbox',ms:'cloud'},{id:'natural',label:'Window',ms:'window'},{id:'golden',label:'Golden Hr',ms:'wb_twilight'},{id:'dramatic',label:'Dramatic',ms:'theater_comedy'},{id:'neon',label:'Neon',ms:'fluorescent'},{id:'rim',label:'Rim',ms:'flare'},{id:'highkey',label:'High Key',ms:'light_mode'}].map(l => (
+                                                <button key={l.id} onClick={() => setLightingStyle(l.id)} className={"studio-btn-pill !px-2.5 !py-1 !text-[10px] transition-all " + (lightingStyle === l.id ? 'bg-[var(--sys-text)] text-[var(--sys-bg)] border-[var(--sys-text)]' : 'bg-[var(--sys-surface)] border-[var(--sys-border)] text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]')}><span className="material-symbols-outlined !text-[12px]">{l.ms}</span> {l.label}</button>
+                                            ))}
+                                        </div>
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {CAMERA_SHOT_PRESETS.slice(0, 8).map(shot => (
+                                                <button key={shot.id} onClick={() => setPsSelectedShot(prev => prev === shot.id ? null : shot.id)}
+                                                    className={"studio-btn-pill !px-2.5 !py-1 !text-[10px] transition-all " + (psSelectedShot === shot.id ? 'bg-[var(--sys-bg)] border-current shadow-sm' : 'bg-[var(--sys-surface)] border-[var(--sys-border)] text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]')}
+                                                    style={psSelectedShot === shot.id ? { color: shot.color, borderColor: shot.color } : {}}>
+                                                    <span className="leading-none mr-0.5">{shot.emoji}</span> {shot.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* ── Surface & Environment ── */}
+                                <div className="px-5 pb-5 border-t border-[var(--sys-border)] pt-4">
+                                    <p className="text-[10px] font-bold text-[var(--sys-text)] uppercase tracking-widest mb-2.5 flex items-center gap-1.5"><span className="material-symbols-outlined text-[14px]">landscape</span> Surface & Set</p>
+                                    <div className="space-y-3">
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {[{id:'white',label:'White',ms:'crop_square'},{id:'marble',label:'Marble',ms:'grid_on'},{id:'stone',label:'Stone',ms:'texture'},{id:'wood',label:'Wood',ms:'park'},{id:'concrete',label:'Concrete',ms:'domain'},{id:'fabric',label:'Silk',ms:'checkroom'},{id:'podium',label:'Podium',ms:'account_balance'},{id:'glass',label:'Glass',ms:'blur_on'},{id:'sand',label:'Sand',ms:'beach_access'},{id:'foliage',label:'Foliage',ms:'eco'}].map(s => (
+                                                <button key={s.id} onClick={() => setSurface(s.id)} className={"studio-btn-pill !px-2.5 !py-1 !text-[10px] transition-all " + (surface === s.id ? 'bg-[var(--sys-text)] text-[var(--sys-bg)] border-transparent' : 'bg-[var(--sys-surface)] border-[var(--sys-border)] text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]')}><span className="material-symbols-outlined !text-[12px]">{s.ms}</span> {s.label}</button>
+                                            ))}
+                                        </div>
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {[{id:'none',label:'No Model',ms:'block'},{id:'hands',label:'Hands',ms:'pan_tool'},{id:'model-woman',label:'Woman',ms:'face_3'},{id:'model-man',label:'Man',ms:'face_6'}].map(m => (
+                                                <button key={m.id} onClick={() => setModelPresence(m.id)} className={"studio-btn-pill !px-3 !py-1 !text-[10px] transition-all " + (modelPresence === m.id ? 'bg-[var(--sys-primary-dim)] text-[var(--sys-primary)] border-[var(--sys-primary)]/30' : 'bg-[var(--sys-surface)] border-[var(--sys-border)] text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]')}><span className="material-symbols-outlined !text-[13px]">{m.ms}</span> {m.label}</button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* ── Style & References ── */}
+                                <div className="px-5 pb-5 border-t border-[var(--sys-border)] pt-4">
+                                    <div className="flex items-center justify-between mb-2.5">
+                                        <p className="text-[10px] font-bold text-[var(--sys-text)] uppercase tracking-widest flex items-center gap-1.5"><span className="material-symbols-outlined text-[14px]">palette</span> Mood & Style</p>
+                                    </div>
+                                    <div className="flex flex-wrap gap-1.5 mb-4">
+                                        {[{id:'editorial',label:'Editorial',ms:'article'},{id:'commercial',label:'Commercial',ms:'shopping_bag'},{id:'lifestyle',label:'Lifestyle',ms:'coffee'},{id:'luxury',label:'Luxury',ms:'diamond'},{id:'minimal',label:'Minimal',ms:'check_box_outline_blank'},{id:'moody',label:'Moody',ms:'dark_mode'},{id:'vibrant',label:'Vibrant',ms:'palette'}].map(m => {
+                                            const active = mood.includes(m.id)
+                                            return <button key={m.id} onClick={() => setMood(prev => active ? prev.filter(x => x !== m.id) : [...prev, m.id])} className={"studio-btn-pill !px-2.5 !py-1 !text-[10px] transition-all " + (active ? 'bg-[var(--sys-text)] border-[var(--sys-text)] text-[var(--sys-bg)]' : 'bg-[var(--sys-surface)] border-[var(--sys-border)] text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]')}><span className="material-symbols-outlined !text-[12px]">{m.ms}</span> {m.label}</button>
+                                        })}
+                                    </div>
+                                    
+                                    <div className="flex items-center justify-between mb-2">
+                                        <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest">Fidelity: {fidelity}%</p>
+                                        <span className="text-[9px] text-[var(--sys-text-muted)]">{fidelity < 30 ? 'Creative' : fidelity > 80 ? 'Exact' : 'Balanced'}</span>
+                                    </div>
+                                    <input type="range" min={0} max={100} step={5} value={fidelity} onChange={e => setFidelity(Number(e.target.value))} className="w-full h-1.5 rounded-full appearance-none cursor-pointer bg-[var(--sys-border)] accent-[var(--sys-text)] mb-4" />
+                                    
+                                    <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest mb-2 flex items-center gap-1.5"><span className="material-symbols-outlined text-[13px]">image_search</span> References</p>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        {[{key:'style',icon:'brush',label:'Style Ref'},{key:'character',icon:'face',label:'Character'}].map(ref => (
+                                            <div key={ref.key}>
+                                                {referenceImages[ref.key] ? (
+                                                    <div className="relative rounded-xl overflow-hidden aspect-video border border-[var(--sys-border)] group">
+                                                        <img src={referenceImages[ref.key]} className="w-full h-full object-cover transition-transform group-hover:scale-105" />
+                                                        <button onClick={() => setReferenceImages(prev => ({...prev,[ref.key]:null}))} className="absolute top-1 right-1 w-5 h-5 rounded-full bg-[var(--sys-bg)]/90 backdrop-blur shadow flex items-center justify-center cursor-pointer transition-all hover:bg-[var(--sys-text)] hover:text-[var(--sys-bg)]"><span className="material-symbols-outlined text-[12px]">close</span></button>
+                                                        <span className="absolute bottom-0 inset-x-0 text-center text-[9px] font-semibold bg-[var(--sys-bg)]/80 backdrop-blur py-0.5">{ref.label}</span>
+                                                    </div>
+                                                ) : (
+                                                    <button onClick={() => { setRefPickerSlot(ref.key); setRefPickerTab('upload') }} className="w-full flex flex-col items-center justify-center aspect-video rounded-xl border border-dashed border-[var(--sys-border)] hover:border-[var(--sys-text)] hover:bg-[var(--sys-surface)] cursor-pointer transition-all">
+                                                        <span className="material-symbols-outlined text-[16px] text-[var(--sys-text-muted)] mb-0.5">{ref.icon}</span>
+                                                        <span className="text-[9px] font-bold text-[var(--sys-text-muted)]">{ref.label}</span>
+                                                    </button>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                                
+                                </div>
+
+                            {/* ── Soft Modifiers & Generate Plinth ── */}
+                            <div className="creative-tools-panel-footer border-t border-[var(--sys-border)] bg-[var(--sys-surface)] p-4 shadow-[0_-10px_40px_rgba(0,0,0,0.03)] z-10 sticky bottom-0">
+                                <div className="flex items-center gap-2 mb-3">
+                                    <div className="relative group/tray">
+                                        <button className="h-8 px-2.5 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-[11px] font-bold flex items-center gap-1.5 hover:bg-black/5 hover:border-[var(--sys-text)] transition-all cursor-pointer">
+                                            <span className="material-symbols-outlined text-[15px] text-[var(--sys-text-muted)]">aspect_ratio</span>
+                                            {aspectRatio}
+                                        </button>
+                                        <div className="absolute left-0 bottom-full mb-2 w-48 opacity-0 pointer-events-none group-hover/tray:opacity-100 group-hover/tray:pointer-events-auto transition-all bg-[var(--sys-surface)] shadow-xl rounded-xl border border-[var(--sys-border)] p-2 grid grid-cols-3 gap-1 z-50">
+                                            {[{id:'1:1',icon:'crop_square'},{id:'16:9',icon:'crop_16_9'},{id:'9:16',icon:'crop_7_5'},{id:'4:5',icon:'crop_portrait'},{id:'3:4',icon:'crop_5_4'}].map(r => (
+                                                <button key={r.id} onClick={() => setAspectRatio(r.id)} className={`flex flex-col items-center justify-center gap-1 p-2 rounded-lg cursor-pointer ${aspectRatio === r.id ? 'bg-[var(--sys-text)] text-[var(--sys-bg)]' : 'hover:bg-black/5 text-[var(--sys-text)]'}`}>
+                                                    <span className="material-symbols-outlined" style={{fontSize:'18px'}}>{r.icon}</span>
+                                                    <span className="text-[9px] font-bold">{r.id}</span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    {/* Action Toggle */}
+                                    <button onClick={() => setPhotoshootAction(photoshootAction === 'generate' ? 'enhance' : 'generate')} className={"h-8 px-3 rounded-lg border text-[11px] font-bold flex items-center gap-1.5 cursor-pointer transition-all " + (photoshootAction === 'enhance' ? 'bg-indigo-50/50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800' : 'bg-[var(--sys-surface)] border-[var(--sys-border)] text-[var(--sys-text)] hover:border-[var(--sys-text)]')}>
+                                        <span className="material-symbols-outlined text-[15px]">{photoshootAction === 'enhance' ? 'auto_fix' : 'draw'}</span>
+                                        {photoshootAction === 'enhance' ? 'AI Auto-Prompt' : 'Write Prompt'}
+                                    </button>
+                                </div>
+                                {/* Big Soft Generate */}
+                                <CreditTooltipWrapper action="creative">
+                                    <button onClick={handlePhotoshoot} disabled={!photoshootBrief.trim() || !productImage || photoshootGenerating}
+                                        className={"w-full !py-3.5 !rounded-lg font-bold transition-all flex items-center justify-center gap-2 " + (photoshootBrief.trim() && productImage ? "bg-[var(--sys-text)] hover:bg-black text-[var(--sys-bg)] cursor-pointer" : "bg-[var(--sys-border)] text-[var(--sys-text-muted)] cursor-not-allowed")}>
+                                        {photoshootGenerating ? (
+                                            <><span className="material-symbols-outlined animate-spin text-[18px]">progress_activity</span> <span className="text-[14px]">Shooting Scene...</span></>
+                                        ) : (
+                                            <><span className="text-[14px]">Generate Scene</span> <span className="material-symbols-outlined text-[18px]">camera</span></>
+                                        )}
+                                    </button>
+                                </CreditTooltipWrapper>
+                            </div>
+                        </div>
+                        <div className="flex-1 w-full" /> {/* Push content to right side to match gallery flow */}
+
+                    <div className="creative-gallery pl-4 flex-1">
+                  {/* Recent Photoshoots */}
                     {(() => {
                         const recentPhotoshoots = bankImages.filter(i => i.type === 'ai-photoshoot' || i.type === 'photoshoot').slice(0, 8);
                         if (recentPhotoshoots.length === 0) return null;
@@ -4699,291 +4634,9 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                     </div>
                     </div>
 
-                    {/* ═══ SIDEBAR COMMAND PANEL ═══ */}
-                    <div className="creative-tools-panel">
-                        {/* ── Scrollable tray body ── */}
-                        <div className="creative-tools-panel-body">
 
-                        {psTray === 'product' && (
-                            <div className="floating-tray" key="ps-product-tray">
-                                <div className="flex items-center justify-between mb-2">
-                                    <span className="text-[11px] text-[var(--sys-text-muted)] uppercase tracking-widest font-bold flex items-center gap-1.5">
-                                        <span className="material-symbols-outlined text-xs text-primary">add_a_photo</span>
-                                        Product Image
-                                    </span>
-                                    <button onClick={() => setPsTray(null)} className="text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer"><span className="material-symbols-outlined text-sm">close</span></button>
-                                </div>
-                                {!productImage ? (
-                                    <div>
-                                        <div onDrop={(e) => { e.preventDefault(); const file = e.dataTransfer?.files?.[0]; if (file && file.type.startsWith('image/')) { setProductFile(file); const reader = new FileReader(); reader.onload = async (ev) => { const s3Url = await uploadToS3(ev.target.result, 'products'); setProductImage(s3Url) }; reader.readAsDataURL(file) } }} onDragOver={e => e.preventDefault()}
-                                            className="border border-dashed border-[var(--sys-border)] rounded-xl p-4 text-center hover:border-primary/40 transition-colors mb-3">
-                                            <span className="material-symbols-outlined text-2xl text-[var(--sys-text-muted)] mb-1 block">add_photo_alternate</span>
-                                            <p className="text-[var(--sys-text-muted)] text-xs">Drag & drop product image</p>
-                                        </div>
-                                        <div className="flex gap-2">
-                                            <button onClick={() => { setProductPickerTab('brand'); setProductPickerOpen(true) }} className="studio-btn-secondary flex-1 !py-2 !rounded-lg !text-[10px]">
-                                                <span className="material-symbols-outlined !text-xs !text-primary">domain</span> Brand Photos
-                                            </button>
-                                            <label className="studio-btn-secondary flex-1 !py-2 !rounded-lg !text-[10px] cursor-pointer">
-                                                <span className="material-symbols-outlined !text-xs !text-primary">upload</span> Upload
-                                                <input type="file" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file && file.type.startsWith('image/')) { setProductFile(file); const reader = new FileReader(); reader.onload = async (ev) => { const s3Url = await uploadToS3(ev.target.result, 'products'); setProductImage(s3Url) }; reader.readAsDataURL(file) } }} accept="image/*" />
-                                            </label>
-                                            <button onClick={() => { setProductPickerTab('link'); setProductPickerOpen(true) }} className="studio-btn-secondary flex-1 !py-2 !rounded-lg !text-[10px]">
-                                                <span className="material-symbols-outlined !text-xs !text-[var(--sys-text)]">link</span> Paste Link
-                                            </button>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className="flex items-center gap-3">
-                                        <img src={productImage} alt="Product" className="w-16 h-16 rounded-xl object-cover border border-[var(--sys-border)]" />
-                                        <div className="flex-1">
-                                            <p className="text-xs text-[var(--sys-text)] font-medium">{productFile?.name || 'Product image loaded'}</p>
-                                            <p className="text-[10px] text-primary">✓ Ready for photoshoot</p>
-                                        </div>
-                                        <button onClick={() => { setProductImage(null); setProductFile(null); setPhotoshootResult(null) }}
-                                            className="p-1.5 rounded-lg bg-[var(--sys-surface)] text-[var(--sys-text-muted)] hover:text-primary hover:bg-[var(--sys-primary-dim)] cursor-pointer transition-all">
-                                            <span className="material-symbols-outlined text-sm">delete</span>
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
-                        )}
 
-                        {/* ── Camera Tray (Shot + Light combined) ── */}
-                        {psTray === 'camera' && (
-                            <div className="floating-tray" key="ps-camera-tray">
-                                <div className="flex items-center justify-between mb-2">
-                                    <span className="text-[11px] text-[var(--sys-text)] uppercase tracking-widest font-bold flex items-center gap-1.5">
-                                        <span className="material-symbols-outlined text-[var(--sys-text)]" style={{ fontSize: 22 }}>photo_camera</span>
-                                        Camera & Lighting
-                                    </span>
-                                    <button onClick={() => setPsTray(null)} className="text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer"><span className="material-symbols-outlined text-sm">close</span></button>
-                                </div>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <div>
-                                        <p className="text-[10px] text-[var(--sys-text-muted)] uppercase tracking-widest font-bold mb-1.5">Camera Angle</p>
-                                        <div className="flex flex-wrap gap-1">
-                                            {[{id:'eye-level',label:'Eye Level'},{id:'hero',label:'Low Angle'},{id:'45deg',label:'3/4 View'},{id:'overhead',label:'Overhead'},{id:'macro',label:'Macro'},{id:'dutch',label:'Dutch Tilt'}].map(a => (
-                                                <button key={a.id} onClick={() => setCameraAngle(a.id)} className={`studio-btn-pill !px-2.5 !py-1 !text-[10px] border-none ${cameraAngle === a.id ? 'active' : ''}`}>{a.label}</button>
-                                            ))}
-                                        </div>
-                                        <p className="text-[10px] text-[var(--sys-text-muted)] uppercase tracking-widest font-bold mb-1.5 mt-3">Lens</p>
-                                        <div className="flex flex-wrap gap-1">
-                                            {[{id:'24mm',label:'24mm'},{id:'35mm',label:'35mm'},{id:'50mm',label:'50mm'},{id:'85mm',label:'85mm'},{id:'105mm',label:'105mm'},{id:'200mm',label:'200mm'}].map(l => (
-                                                <button key={l.id} onClick={() => setLens(l.id)} className={`studio-btn-pill !px-2.5 !py-1 !text-[10px] border-none ${lens === l.id ? 'active' : ''}`}>{l.label}</button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <p className="text-[10px] text-[var(--sys-text-muted)] uppercase tracking-widest font-bold mb-1.5">Lighting Style</p>
-                                        <div className="flex flex-wrap gap-1">
-                                            {[{id:'softbox',label:'Softbox',ms:'cloud'},{id:'natural',label:'Window',ms:'window'},{id:'golden',label:'Golden Hr',ms:'wb_twilight'},{id:'dramatic',label:'Dramatic',ms:'theater_comedy'},{id:'neon',label:'Neon',ms:'fluorescent'},{id:'rim',label:'Rim',ms:'flare'},{id:'highkey',label:'High Key',ms:'light_mode'}].map(l => (
-                                                <button key={l.id} onClick={() => setLightingStyle(l.id)} className={`studio-btn-pill !px-2.5 !py-1 !text-[10px] border-none ${lightingStyle === l.id ? 'active' : ''}`}>{l.label}</button>
-                                            ))}
-                                        </div>
-                                        <p className="text-[10px] text-[var(--sys-text-muted)] uppercase tracking-widest font-bold mb-1.5 mt-3">Camera Shot Preset</p>
-                                        <div className="flex flex-wrap gap-1">
-                                            {CAMERA_SHOT_PRESETS.slice(0, 8).map(shot => (
-                                                <button key={shot.id} onClick={() => setPsSelectedShot(prev => prev === shot.id ? null : shot.id)}
-                                                    className={`studio-btn-pill !px-2.5 !py-1 !text-[10px] border-none ${psSelectedShot === shot.id ? 'active' : ''}`}
-                                                    style={psSelectedShot === shot.id ? { backgroundColor: `${shot.color}18`, color: shot.color } : {}}>
-                                                    <span className="leading-none mr-0.5">{shot.emoji}</span> {shot.label}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* ── Scene Tray (Surface + Model + Style combined) ── */}
-                        {psTray === 'scene' && (
-                            <div className="floating-tray" key="ps-scene-tray">
-                                <div className="flex items-center justify-between mb-2">
-                                    <span className="text-[11px] text-[var(--sys-text-muted)] uppercase tracking-widest font-bold flex items-center gap-1.5">
-                                        <span className="material-symbols-outlined text-primary" style={{ fontSize: 22 }}>landscape</span>
-                                        Scene & Style
-                                    </span>
-                                    <button onClick={() => setPsTray(null)} className="text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer"><span className="material-symbols-outlined text-sm">close</span></button>
-                                </div>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                                    <div>
-                                        <p className="text-[10px] text-[var(--sys-text-muted)] uppercase tracking-widest font-bold mb-1.5">Surface</p>
-                                        <div className="flex flex-wrap gap-1">
-                                            {[{id:'white',label:'White',ms:'crop_square'},{id:'marble',label:'Marble',ms:'grid_on'},{id:'stone',label:'Stone',ms:'texture'},{id:'wood',label:'Wood',ms:'park'},{id:'concrete',label:'Concrete',ms:'domain'},{id:'fabric',label:'Silk',ms:'checkroom'},{id:'podium',label:'Podium',ms:'account_balance'},{id:'glass',label:'Glass',ms:'blur_on'},{id:'sand',label:'Sand',ms:'beach_access'},{id:'foliage',label:'Foliage',ms:'eco'}].map(s => (
-                                                <button key={s.id} onClick={() => setSurface(s.id)} className={`studio-btn-pill border-none !px-2.5 !py-1 !text-[10px] ${surface === s.id ? 'active' : ''}`}><span className="material-symbols-outlined !text-[13px]">{s.ms}</span>{s.label}</button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <p className="text-[10px] text-[var(--sys-text-muted)] uppercase tracking-widest font-bold mb-1.5">Model</p>
-                                        <div className="flex flex-wrap gap-1">
-                                            {[{id:'none',label:'None',ms:'block'},{id:'hands',label:'Hands',ms:'pan_tool'},{id:'model-woman',label:'Woman',ms:'face_3'},{id:'model-man',label:'Man',ms:'face_6'}].map(m => (
-                                                <button key={m.id} onClick={() => setModelPresence(m.id)} className={`studio-btn-pill border-none !px-2.5 !py-1 !text-[10px] ${modelPresence === m.id ? 'active' : ''}`}><span className="material-symbols-outlined !text-[13px]">{m.ms}</span>{m.label}</button>
-                                            ))}
-                                        </div>
-                                        <p className="text-[10px] text-[var(--sys-text-muted)] uppercase tracking-widest font-bold mb-1.5 mt-3">Mood <span className="text-[var(--sys-text-muted)] normal-case">(multi)</span></p>
-                                        <div className="flex flex-wrap gap-1">
-                                            {[{id:'editorial',label:'Editorial',ms:'article'},{id:'commercial',label:'Commercial',ms:'shopping_bag'},{id:'lifestyle',label:'Lifestyle',ms:'coffee'},{id:'luxury',label:'Luxury',ms:'diamond'},{id:'minimal',label:'Minimal',ms:'check_box_outline_blank'},{id:'moody',label:'Moody',ms:'dark_mode'},{id:'vibrant',label:'Vibrant',ms:'palette'}].map(m => {
-                                                const active = mood.includes(m.id)
-                                                return <button key={m.id} onClick={() => setMood(prev => active ? prev.filter(x => x !== m.id) : [...prev, m.id])} className={`studio-btn-pill border-none !px-2.5 !py-1 !text-[10px] ${active ? 'active' : ''}`}><span className="material-symbols-outlined !text-[13px]">{m.ms}</span>{m.label}</button>
-                                            })}
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <p className="text-[9px] text-[var(--sys-text-muted)] uppercase tracking-widest font-bold mb-1.5">Fidelity — <span className="text-[var(--sys-text)]">{fidelity}%</span></p>
-                                        <input type="range" min={0} max={100} step={5} value={fidelity} onChange={e => setFidelity(Number(e.target.value))}
-                                            className="w-full h-1.5 rounded-full appearance-none cursor-pointer" style={{ background: `linear-gradient(to right, var(--sys-text) ${fidelity}%, var(--sys-border) ${fidelity}%)` }} />
-                                        <div className="flex justify-between mt-1">
-                                            <span className="text-[8px] text-[var(--sys-text-muted)] flex items-center gap-0.5"><span className="material-symbols-outlined text-[8px]">palette</span> Creative</span>
-                                            <span className="text-[8px] text-[var(--sys-text-muted)] flex items-center gap-0.5"><span className="material-symbols-outlined text-[8px]">lock</span> Exact</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* ── Ratio Tray ── */}
-                        {psTray === 'ratio' && (
-                            <div className="floating-tray" key="ps-ratio-tray">
-                                <div className="flex items-center justify-between mb-2">
-                                    <span className="text-[11px] text-[var(--sys-text-muted)] uppercase tracking-widest font-bold flex items-center gap-1.5">
-                                        <span className="material-symbols-outlined text-[var(--sys-text)]" style={{ fontSize: 22 }}>aspect_ratio</span>
-                                        Aspect Ratio
-                                    </span>
-                                    <button onClick={() => setPsTray(null)} className="text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer"><span className="material-symbols-outlined text-sm">close</span></button>
-                                </div>
-                                <div className="flex gap-2 justify-center">
-                                    {[{id:'1:1',w:16,h:16,label:'1:1'},{id:'4:5',w:13,h:16,label:'4:5'},{id:'3:4',w:12,h:16,label:'3:4'},{id:'9:16',w:9,h:16,label:'9:16'},{id:'16:9',w:16,h:9,label:'16:9'},{id:'3:2',w:16,h:11,label:'3:2'}].map(r => (
-                                        <button key={r.id} onClick={() => setAspectRatio(r.id)}
-                                            className={`flex flex-col items-center gap-1 px-3 py-2 rounded-xl cursor-pointer transition-all border ${aspectRatio === r.id ? 'bg-[var(--sys-text)] border-[var(--sys-text)] text-[var(--sys-bg)] shadow-sm' : 'bg-[var(--sys-surface)] border-[var(--sys-border)] text-[var(--sys-text-muted)] hover:bg-[var(--sys-bg)] hover:text-[var(--sys-text)]'}`}>
-                                            <div className="border border-current rounded-sm" style={{ width: r.w, height: r.h }} />
-                                            <span className="text-[10px] font-bold">{r.label}</span>
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* ── References Tray ── */}
-                        {psTray === 'refs' && (
-                            <div className="floating-tray" key="ps-refs-tray">
-                                <div className="flex items-center justify-between mb-2">
-                                    <span className="text-[11px] text-[var(--sys-text-muted)] uppercase tracking-widest font-bold flex items-center gap-1.5">
-                                        <span className="material-symbols-outlined text-violet-400" style={{ fontSize: 22 }}>image_search</span>
-                                        Style & Character References
-                                    </span>
-                                    <button onClick={() => setPsTray(null)} className="text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer"><span className="material-symbols-outlined text-sm">close</span></button>
-                                </div>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                    {[{key:'style',icon:'brush',label:'Style Reference',hint:'Match this visual style'},{key:'character',icon:'face',label:'Character',hint:'Include this person/mascot'}].map(ref => (
-                                        <div key={ref.key}>
-                                            {referenceImages[ref.key] ? (
-                                                <div className="relative rounded-xl overflow-hidden aspect-video border border-primary/30">
-                                                    <img src={referenceImages[ref.key]} alt={ref.label} className="w-full h-full object-cover" />
-                                                    <button onClick={() => setReferenceImages(prev => ({...prev,[ref.key]:null}))} className="absolute top-1 right-1 p-0.5 rounded-full bg-[var(--sys-surface)] text-[var(--sys-text)] hover:bg-[var(--sys-surface)] cursor-pointer"><span className="material-symbols-outlined text-xs">close</span></button>
-                                                    <span className="absolute bottom-0 inset-x-0 text-center text-[8px] font-bold bg-[var(--sys-surface)] text-[var(--sys-text)] py-0.5">{ref.label}</span>
-                                                </div>
-                                            ) : (
-                                                <button onClick={() => { setRefPickerSlot(ref.key); setRefPickerTab('upload') }} className="w-full flex flex-col items-center justify-center aspect-video rounded-xl border border-dashed border-[var(--sys-border)] hover:border-primary/40 cursor-pointer transition-colors bg-[var(--sys-surface)] group">
-                                                    <span className="material-symbols-outlined text-lg text-[var(--sys-text-muted)] group-hover:text-primary mb-0.5">{ref.icon}</span>
-                                                    <span className="text-[10px] text-[var(--sys-text-muted)] font-medium">{ref.label}</span>
-                                                </button>
-                                            )}
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-                        </div>{/* /creative-tools-panel-body */}
-
-                        {/* ── Prompt Row (always visible footer) ── */}
-                        <div className="creative-tools-panel-footer">
-                        <div className="floating-prompt-row">
-                            {/* Setting Icons */}
-                            <div className="flex items-center gap-2 mr-1">
-                                <button onClick={() => setPsTray(psTray === 'product' ? null : 'product')}
-                                    className={`floating-setting-btn ${psTray === 'product' ? 'active' : ''}`} title="Product Image"
-                                    style={{ width: 48, height: 48, minWidth: 48, minHeight: 48 }}>
-                                    <span className="material-symbols-outlined" style={{ fontSize: 22 }}>add_a_photo</span>
-                                    {productImage && <span className="setting-dot" />}
-                                </button>
-                                <button onClick={() => setPsTray(psTray === 'camera' ? null : 'camera')}
-                                    className={`floating-setting-btn ${psTray === 'camera' ? 'active' : ''}`} title="Camera & Lighting"
-                                    style={{ width: 48, height: 48, minWidth: 48, minHeight: 48 }}>
-                                    <span className="material-symbols-outlined" style={{ fontSize: 22 }}>photo_camera</span>
-                                </button>
-                                <button onClick={() => setPsTray(psTray === 'scene' ? null : 'scene')}
-                                    className={`floating-setting-btn ${psTray === 'scene' ? 'active' : ''}`} title="Scene & Style"
-                                    style={{ width: 48, height: 48, minWidth: 48, minHeight: 48 }}>
-                                    <span className="material-symbols-outlined" style={{ fontSize: 22 }}>landscape</span>
-                                </button>
-                                <button onClick={() => setPsTray(psTray === 'ratio' ? null : 'ratio')}
-                                    className={`floating-setting-btn ${psTray === 'ratio' ? 'active' : ''}`} title="Aspect Ratio"
-                                    style={{ width: 48, height: 48, minWidth: 48, minHeight: 48 }}>
-                                    <span className="material-symbols-outlined" style={{ fontSize: 22 }}>aspect_ratio</span>
-                                </button>
-                                <button onClick={() => setPsTray(psTray === 'refs' ? null : 'refs')}
-                                    className={`floating-setting-btn ${psTray === 'refs' ? 'active' : ''}`} title="References"
-                                    style={{ width: 48, height: 48, minWidth: 48, minHeight: 48 }}>
-                                    <span className="material-symbols-outlined" style={{ fontSize: 22 }}>image_search</span>
-                                    {(referenceImages.style || referenceImages.character) && <span className="setting-dot" />}
-                                </button>
-                            </div>
-
-                            {/* Prompt */}
-                            <div className="flex-1 relative">
-                                <textarea value={photoshootBrief} onChange={e => setPhotoshootBrief(e.target.value)}
-                                    placeholder="Describe your photoshoot scene... e.g. 'Luxury marble countertop, golden hour lighting, editorial style'"
-                                    rows={1} className="w-full px-4 py-2.5 pr-20 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-sm text-[var(--sys-text)] placeholder-slate-500 focus:border-[var(--sys-text)] focus:outline-none resize-none transition-all" />
-                                <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                                    <VoiceInput onResult={(text) => setPhotoshootBrief(prev => prev ? prev + ' ' + text : text)} size="small" />
-                                </div>
-                            </div>
-
-                            {/* Model selector */}
-                            <div className="relative flex-shrink-0">
-                                <button onClick={() => setShowModelMenu(!showModelMenu)}
-                                    className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-[11px] font-bold glass-panel text-[var(--sys-text-muted)] hover:text-on-surface transition-all duration-300 cursor-pointer whitespace-nowrap">
-                                    <span className="material-symbols-outlined text-xs" style={{ color: IMAGE_MODELS.find(m => m.id === imageModel)?.color || 'var(--sys-text)' }}>
-                                        {IMAGE_MODELS.find(m => m.id === imageModel)?.icon || 'auto_awesome'}
-                                    </span>
-                                    <span className="hidden md:inline">{IMAGE_MODELS.find(m => m.id === imageModel)?.name || 'NanoBanana 2'}</span>
-                                    <span className="material-symbols-outlined text-[10px] text-[var(--sys-text-muted)]">{showModelMenu ? 'expand_less' : 'expand_more'}</span>
-                                </button>
-                                {showModelMenu && (
-                                    <div className="absolute left-0 right-0 bottom-full mb-1 glass-panel rounded-xl shadow-2xl z-50 overflow-hidden min-w-[260px]" style={{ animation: 'fadeUp 0.15s ease-out' }}>
-                                        <div className="p-1.5 space-y-0.5 max-h-[280px] overflow-y-auto">
-                                            {IMAGE_MODELS.map(m => (
-                                                <button key={m.id} onClick={() => { setImageModel(m.id); setShowModelMenu(false) }}
-                                                    className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-left transition-all cursor-pointer ${imageModel === m.id ? 'bg-[var(--sys-surface)] text-[var(--sys-text)]' : 'text-[var(--sys-text-muted)] hover:bg-[var(--sys-surface)] hover:text-[var(--sys-text)]'}`}>
-                                                    <span className="material-symbols-outlined text-sm" style={{ color: m.color }}>{m.icon}</span>
-                                                    <div className="flex-1 min-w-0">
-                                                        <span className="text-[11px] font-bold truncate block">{m.name}</span>
-                                                        <span className="text-[9px] text-[var(--sys-text-muted)] block truncate">{m.desc}</span>
-                                                    </div>
-                                                    {imageModel === m.id && <span className="material-symbols-outlined text-xs text-primary">check_circle</span>}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Generate */}
-                            <CreditTooltipWrapper action="creative">
-                                <button onClick={handlePhotoshoot} disabled={!productImage || photoshootGenerating}
-                                    className="btn-primary py-2.5 px-5 rounded-xl disabled:opacity-30 text-sm font-bold cursor-pointer flex items-center gap-2 whitespace-nowrap flex-shrink-0">
-                                    {photoshootGenerating ? (
-                                        <><span className="material-symbols-outlined animate-spin text-sm">progress_activity</span> Generating...</>
-                                    ) : (
-                                        <><span className="material-symbols-outlined text-sm">photo_camera</span> Shoot <CreditBadge action="creative" /></>
-                                    )}
-                                </button>
-                            </CreditTooltipWrapper>
-                        </div>{/* /floating-prompt-row */}
-                        </div>{/* /creative-tools-panel-footer */}
-                    </div>{/* /creative-tools-panel photoshoot */}
+                        
 
                 </div>
             )}
