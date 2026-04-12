@@ -444,51 +444,135 @@ export async function thumbnailGenerationNode({ thumbnailDirection, video, brand
 // ── 8. Character Portrait Node (Phase 2) ───────────────────────────────────
 
 /**
- * Generates AI portrait images for each identified character.
- * Uses Gemini image generation with the character description from analysis.
- * Returns array of { label, role, portraitUrl }
+ * Character Portrait Node — Phase 2
+ *
+ * Strategy: Visual Grounding via Reference Thumbnail
+ *
+ * Problem with naive approach: Generating portraits from text labels like
+ * "Male Lead Vocalist" always produces fictional hallucinated people.
+ *
+ * Correct approach:
+ * 1. Fetch the original YouTube thumbnail (contains the real characters)
+ * 2. Use Gemini Vision (callMultimodalAgent) to get a precise visual description
+ *    of each specific character from the reference image
+ * 3. Generate a clean portrait using that VISUAL description + reference inlineData
+ *    so NanoBanana 2 is grounded in the real persons appearance
+ *
+ * Result: Portraits that visually match the real people in the video
  */
 export async function characterPortraitNode({ analysis, video, brandContext }) {
-    const characters = analysis?.characters || [];
+    const characters   = analysis?.characters || [];
+    const referenceUrl = video?.metadata?.thumbnailUrl || null;
+    const videoTitle   = video?.metadata?.title || 'YouTube video';
+
     if (!characters.length) {
         console.log('ℹ️ [characterPortraitNode] No characters identified — skipping');
         return { characterPortraits: [] };
     }
 
-    console.log(`👤 [characterPortraitNode] Generating ${characters.length} character portrait(s)`);
+    console.log(`👤 [characterPortraitNode] Visual-grounded portraits for ${characters.length} character(s)`);
+    console.log(`   Reference URL: ${referenceUrl || 'none'}`);
 
     const router = getRouter();
-    const videoTitle = video?.metadata?.title || 'YouTube video';
 
-    // Extract brand primary color for portrait background consistency
-    const brandColorHint = brandContext?.includes('#') 
-        ? `Use brand-consistent background color tones.` 
-        : '';
+    // ── Pre-load reference thumbnail once (shared across all portrait requests) ─
+    let referenceB64   = null;
+    let referenceMime  = 'image/jpeg';
 
+    if (referenceUrl) {
+        try {
+            const imgRes = await fetch(referenceUrl, { signal: AbortSignal.timeout(10000) });
+            if (imgRes.ok) {
+                const buf    = await imgRes.arrayBuffer();
+                referenceB64 = Buffer.from(buf).toString('base64');
+                referenceMime = imgRes.headers.get('content-type') || 'image/jpeg';
+                console.log(`   ✅ Reference thumbnail loaded (${Math.round(buf.byteLength / 1024)}KB) — shared across portraits`);
+            }
+        } catch (err) {
+            console.warn(`   ⚠️ Could not load reference thumbnail: ${err.message}`);
+        }
+    }
+
+    // ── Step 1: Get visual descriptions for each character via Gemini Vision ──
+    // This uses the reference thumbnail to get precise visual details
+    let visualDescriptions = {};
+    if (referenceB64) {
+        try {
+            const descResult = await callMultimodalAgent(
+                `You are a character identification specialist.
+Given a YouTube video thumbnail, identify each visible person and describe their physical appearance in detail.
+For each person you can see, provide: hair color and style, approximate age, skin tone, clothing description, distinctive features.
+Return ONLY valid JSON:
+{
+  "characters": [
+    { "position": "left|center|right|foreground|background", "description": "detailed visual description" }
+  ]
+}`,
+                `Thumbnail from YouTube video: "${videoTitle}".
+The video has these characters: ${characters.map(c => `${c.label} (${c.role})`).join(', ')}.
+Describe each visible person's exact appearance so I can generate accurate portraits.`,
+                [`data:${referenceMime};base64,${referenceB64}`],
+                { temperature: 0.1, maxTokens: 1024 }
+            );
+            if (descResult?.characters) {
+                // Map descriptions by index to characters (ordered by screen position)
+                descResult.characters.forEach((desc, i) => {
+                    if (i < characters.length) {
+                        visualDescriptions[characters[i].label] = desc.description;
+                    }
+                });
+                console.log(`   ✅ Visual descriptions obtained for ${Object.keys(visualDescriptions).length} characters`);
+            }
+        } catch (err) {
+            console.warn(`   ⚠️ Visual description pass failed: ${err.message} — using label-only fallback`);
+        }
+    }
+
+    // ── Step 2: Generate portraits with visual grounding ──────────────────────
     const portraits = await Promise.allSettled(
         characters.slice(0, 3).map(async (char) => {
+
+            const visualDesc = visualDescriptions[char.label]
+                ? `Based on the reference image, this person has: ${visualDescriptions[char.label]}`
+                : `${char.label}, a ${char.role || 'presenter'} in this video.`;
+
             const prompt = [
-                `Professional portrait of ${char.label}, a ${char.role || 'presenter'} from a YouTube video titled "${videoTitle}".`,
-                `They appear for approximately ${char.screenTimePct || 50}% of the video.`,
-                `Clean studio lighting, professional headshot style, neutral background.`,
-                `High quality, sharp focus, YouTube content creator style.`,
-                brandColorHint,
+                `Professional portrait photograph of the person described below from the YouTube video "${videoTitle}".`,
+                visualDesc,
+                referenceB64
+                    ? `IMPORTANT: Use the reference image provided to accurately reproduce this specific real person's appearance.`
+                      + ` Focus on their face and upper body. Do NOT invent a different person.`
+                    : '',
+                `Clean studio portrait style, professional lighting, sharp focus on the face.`,
+                `High quality, 1:1 square format, YouTube content creator headshot.`,
+                `Neutral or softly blurred background. No text or watermarks.`,
             ].filter(Boolean).join(' ');
+
+            // Build imageParts with reference if available
+            const imageParts = referenceB64
+                ? [{
+                    inlineData: { data: referenceB64, mimeType: referenceMime },
+                    text: `Reference thumbnail: identify and portrait the "${char.label}" person shown here.`,
+                }]
+                : [];
 
             try {
                 const result = await router.generateImage({
                     prompt,
                     aspectRatio: '1:1',
+                    imageParts,
                 });
+                console.log(`   ✅ Portrait generated for: ${char.label}`);
                 return {
-                    label: char.label,
-                    role: char.role,
+                    label:           char.label,
+                    role:            char.role,
                     firstAppearance: char.firstAppearance,
-                    screenTimePct: char.screenTimePct,
-                    portraitUrl: result.imageUrl,
+                    screenTimePct:   char.screenTimePct,
+                    visualDescription: visualDescriptions[char.label] || null,
+                    portraitUrl:     result.imageUrl,
                 };
             } catch (err) {
-                console.warn(`⚠️ Portrait failed for ${char.label}: ${err.message}`);
+                console.warn(`   ⚠️ Portrait failed for ${char.label}: ${err.message}`);
                 return { label: char.label, role: char.role, portraitUrl: null, error: err.message };
             }
         })
@@ -498,6 +582,8 @@ export async function characterPortraitNode({ analysis, video, brandContext }) {
         .filter(r => r.status === 'fulfilled')
         .map(r => r.value);
 
-    console.log(`✅ [characterPortraitNode] Generated ${characterPortraits.filter(p => p.portraitUrl).length}/${characters.slice(0,3).length} portraits`);
+    const successCount = characterPortraits.filter(p => p.portraitUrl).length;
+    console.log(`✅ [characterPortraitNode] ${successCount}/${characters.slice(0,3).length} portraits generated (visually grounded)`);
     return { characterPortraits };
 }
+
