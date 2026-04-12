@@ -31,6 +31,9 @@ const CharacterSchema = new mongoose.Schema({
 const YoutubeProjectSchema = new mongoose.Schema({
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     brandId: { type: mongoose.Schema.Types.ObjectId, ref: 'Brand', index: true },
+    channelConfigId: { type: mongoose.Schema.Types.ObjectId, ref: 'YoutubeChannelConfig', index: true },
+    appliedTemplateId: { type: mongoose.Schema.Types.ObjectId, ref: 'ThumbnailTemplate' },
+
 
     // Video identity
     videoId: { type: String, required: true },

@@ -369,6 +369,7 @@ export async function thumbnailGenerationNode({ thumbnailDirection, video, brand
     // ── Template visual DNA injection ─────────────────────────────────────────
     // When a template is selected, it overrides generic direction with pre-designed style
     const tplVisual = template?.visual;
+    const templateRef = template?.referenceImageUrl;
     const templateContext = tplVisual ? [
         `TEMPLATE STYLE — "${template.name}":`,
         `  Color palette: primary ${tplVisual.primaryColor}, secondary ${tplVisual.secondaryColor}, background base ${tplVisual.backgroundColor}`,
@@ -377,27 +378,24 @@ export async function thumbnailGenerationNode({ thumbnailDirection, video, brand
         `  Mood overlay: ${tplVisual.overlayMood}`,
         `  Energy level: ${tplVisual.energyLevel}`,
         `  Title font style: ${tplVisual.titleFont}, color ${tplVisual.titleColor}, shadow ${tplVisual.titleShadow}`,
-        tplVisual.logoPlacement !== 'none'
-            ? `  Logo placement: ${tplVisual.logoPlacement} corner (${tplVisual.logoSize} size)`
-            : `  No logo watermark`,
         template.generationPromptSuffix ? `  Style directive: ${template.generationPromptSuffix}` : '',
     ].filter(Boolean).join('\n') : '';
 
     console.log(`🎨 [thumbnailGenerationNode] Reference-guided regen for "${videoTitle.substring(0, 50)}"`);
     console.log(`   Template: ${template ? template.name : 'none (using direction only)'}`);
+    console.log(`   Template Style Image: ${templateRef ? '✅' : '❌ none'}`);
     console.log(`   Characters: ${characterContext || 'none detected'}`);
     console.log(`   Text overlay: "${line1}"${line2 ? ` / "${line2}"` : ''}`);
-    console.log(`   Reference thumbnail: ${referenceUrl ? '✅' : '❌ none'}`);
+    console.log(`   Face Reference: ${referenceUrl ? '✅' : '❌ none'}`);
 
     // ── Build the reference-guided + template-styled prompt ───────────────────
     const fullPrompt = [
         `Create a high-impact YouTube thumbnail for the video: "${videoTitle}".`,
-        referenceUrl
-            ? `You are given the ORIGINAL YouTube thumbnail as a reference image.`
-              + ` KEEP the SAME real people and characters visible — maintain their exact faces,`
-              + ` expressions, and visual identity from the reference.`
-              + ` Do NOT replace or alter the people shown.`
-            : '',
+        referenceUrl && templateRef 
+            ? `You are given TWO reference images. Image 1 is the ORIGINAL FACE REFERENCE. Keep the SAME exact people, expressions, and visual identity from Image 1. Image 2 is the STYLE REFERENCE. Apply the color grading, lighting, and composition of Image 2 to the characters from Image 1.`
+            : referenceUrl 
+                ? `You are given the ORIGINAL FACE REFERENCE image. Keep the SAME exact real people, expressions, and visual identity. Do NOT replace or alter the people shown.` 
+                : '',
         characterContext,
         // Template style takes priority over generic direction
         templateContext
@@ -419,7 +417,8 @@ export async function thumbnailGenerationNode({ thumbnailDirection, video, brand
             ? `Add secondary text: "${line2}" below the main text, slightly smaller.`
             : '',
         `Output format: 16:9 YouTube thumbnail (1280×720). Mobile-readable at 320px.`,
-        `Broadcast-quality production, sharp focus on the characters, no watermarks.`,
+        `Broadcast-quality production, sharp focus on the characters.`,
+        `IMPORTANT: Do NOT attempt to draw the channel logo or add any watermarks. We will composite the real logo image later.`,
     ].filter(Boolean).join(' ');
 
     const router = getRouter();
@@ -437,13 +436,32 @@ export async function thumbnailGenerationNode({ thumbnailDirection, video, brand
                     const mimeType = imgRes.headers.get('content-type') || 'image/jpeg';
                     imageParts.push({
                         inlineData: { data: b64, mimeType },
-                        // This text is prepended to the prompt as context for the reference
-                        text: `ORIGINAL THUMBNAIL REFERENCE: Keep the same real characters/people exactly as shown.`,
+                        text: templateRef 
+                            ? `IMAGE 1 (FACE REFERENCE): Keep the exact real characters/people from this image.`
+                            : `ORIGINAL THUMBNAIL REFERENCE: Keep the same real characters/people exactly as shown.`,
                     });
-                    console.log(`   ✅ Reference thumbnail loaded (${Math.round(buf.byteLength / 1024)}KB)`);
+                    console.log(`   ✅ Face reference thumbnail loaded (${Math.round(buf.byteLength / 1024)}KB)`);
                 }
             } catch (fetchErr) {
-                console.warn(`   ⚠️ Reference thumbnail fetch failed: ${fetchErr.message}`);
+                console.warn(`   ⚠️ Face reference fetch failed: ${fetchErr.message}`);
+            }
+        }
+
+        if (templateRef) {
+            try {
+                const imgRes = await fetch(templateRef, { signal: AbortSignal.timeout(10000) });
+                if (imgRes.ok) {
+                    const buf      = await imgRes.arrayBuffer();
+                    const b64      = Buffer.from(buf).toString('base64');
+                    const mimeType = imgRes.headers.get('content-type') || 'image/jpeg';
+                    imageParts.push({
+                        inlineData: { data: b64, mimeType },
+                        text: `IMAGE 2 (STYLE REFERENCE): Apply the layout, mood, background composition, and color grading from this image to the characters in Image 1.`,
+                    });
+                    console.log(`   ✅ Template Style reference loaded (${Math.round(buf.byteLength / 1024)}KB)`);
+                }
+            } catch (fetchErr) {
+                console.warn(`   ⚠️ Template Style reference fetch failed: ${fetchErr.message}`);
             }
         }
 

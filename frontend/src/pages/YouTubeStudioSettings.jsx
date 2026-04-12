@@ -137,9 +137,9 @@ function Toggle({ value, onChange, label }) {
     )
 }
 
-// ── Logo Uploader ────────────────────────────────────────────────────────────
+// ── Image Uploader (Shared) ──────────────────────────────────────────────────
 
-function LogoUploader({ logoUrl, onChange }) {
+function ImageUploader({ imageUrl, onChange, buttonLabel = 'Upload Image', placeholder = 'Or paste image URL...' }) {
     const inputRef = useRef(null)
     const [uploading, setUploading] = useState(false)
 
@@ -172,8 +172,8 @@ function LogoUploader({ logoUrl, onChange }) {
             <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
                 {/* Preview */}
                 <div style={{ width: 64, height: 64, borderRadius: 10, border: '2px dashed var(--sys-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--sys-bg)', flexShrink: 0, overflow: 'hidden' }}>
-                    {logoUrl ? (
-                        <img src={logoUrl} alt="logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                    {imageUrl ? (
+                        <img src={imageUrl} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'contain' }}
                             onError={e => { e.target.style.display = 'none' }} />
                     ) : (
                         <MIcon name="image" size={28} color="var(--sys-text-muted)" />
@@ -185,19 +185,19 @@ function LogoUploader({ logoUrl, onChange }) {
                         <button onClick={() => inputRef.current?.click()} disabled={uploading}
                             style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 12px', borderRadius: 7, border: '1px solid var(--sys-border)', background: 'var(--sys-surface)', fontSize: 12, fontWeight: 600, cursor: uploading ? 'wait' : 'pointer', color: 'var(--sys-text)' }}>
                             <MIcon name={uploading ? 'hourglass_empty' : 'upload'} size={14} />
-                            {uploading ? 'Uploading...' : 'Upload Logo'}
+                            {uploading ? 'Uploading...' : buttonLabel}
                         </button>
-                        {logoUrl && (
+                        {imageUrl && (
                             <button onClick={() => onChange('')}
                                 style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 12px', borderRadius: 7, border: '1px solid #ef444433', background: 'transparent', fontSize: 12, fontWeight: 600, cursor: 'pointer', color: '#ef4444' }}>
                                 <MIcon name="delete" size={14} />Remove
                             </button>
                         )}
                     </div>
-                    <p style={{ margin: 0, fontSize: 11, color: 'var(--sys-text-muted)' }}>PNG, WebP, JPG · Max 5MB · Transparent PNG recommended</p>
+                    <p style={{ margin: 0, fontSize: 11, color: 'var(--sys-text-muted)' }}>PNG, WebP, JPG · Max 5MB</p>
                     {/* Or paste URL */}
-                    <input value={logoUrl || ''} onChange={e => onChange(e.target.value)}
-                        placeholder="Or paste logo URL..."
+                    <input value={imageUrl || ''} onChange={e => onChange(e.target.value)}
+                        placeholder={placeholder}
                         style={{ marginTop: 6, width: '100%', boxSizing: 'border-box', padding: '7px 10px', borderRadius: 7, border: '1px solid var(--sys-border)', background: 'var(--sys-bg)', color: 'var(--sys-text)', fontSize: 11 }} />
                 </div>
             </div>
@@ -359,7 +359,7 @@ function ChannelEditor({ channel, templates, onSave, onClose }) {
                             <p style={{ margin: 0, fontSize: 12, fontWeight: 700 }}>Channel Logo / Watermark</p>
                             {fetchResult && form.logoUrl && <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 20, background: '#22c55e15', color: '#22c55e', fontWeight: 700 }}>Auto-fetched</span>}
                         </div>
-                        <LogoUploader logoUrl={form.logoUrl} onChange={v => set('logoUrl', v)} />
+                        <ImageUploader imageUrl={form.logoUrl} onChange={v => set('logoUrl', v)} buttonLabel="Upload Logo" placeholder="Or paste logo URL..." />
                         <div style={{ marginTop: 10 }}>
                             <Field label="Logo Position on Thumbnails">
                                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -682,7 +682,16 @@ function TemplateEditor({ template, onSave, onClose }) {
                     {/* Visual */}
                     <div style={{ gridColumn: '1 / -1', borderTop: '1px solid var(--sys-border)', paddingTop: 12, display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
                         <MIcon name="palette" size={16} color="var(--sys-primary)" />
-                        <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--sys-primary)' }}>Visual Style</span>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--sys-primary)' }}>Visual Style & References</span>
+                    </div>
+
+                    <div style={{ gridColumn: '1 / -1', padding: '12px 14px', borderRadius: 10, border: '1px solid var(--sys-border)', background: 'var(--sys-bg)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5 }}>
+                            <MIcon name="photo_camera" size={15} color="var(--sys-primary)" />
+                            <p style={{ margin: 0, fontSize: 12, fontWeight: 700 }}>Style Reference Image</p>
+                        </div>
+                        <p style={{ margin: '0 0 10px', fontSize: 11, color: 'var(--sys-text-muted)' }}>Upload an image that captures the layout, lighting, and composition you want to apply to this template.</p>
+                        <ImageUploader imageUrl={form.referenceImageUrl} onChange={v => set('referenceImageUrl', v)} buttonLabel="Upload Layout Ref" placeholder="Or paste reference image URL..." />
                     </div>
 
                     <Field label="Primary Color">

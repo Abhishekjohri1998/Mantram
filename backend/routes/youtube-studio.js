@@ -42,7 +42,7 @@ function emitProgress(projectId, event) {
 // STATIC: registered FIRST
 
 router.post('/analyse', protect, async (req, res) => {
-    const { urls, url, brandId } = req.body;
+    const { urls, url, brandId, channelConfigId } = req.body;
     const urlList = Array.isArray(urls) ? urls : (url ? [url] : []);
 
     if (!urlList.length) {
@@ -70,6 +70,7 @@ router.post('/analyse', protect, async (req, res) => {
         const project = new YoutubeProject({
             userId: req.user._id,
             brandId: brandId || null,
+            channelConfigId: channelConfigId || null,
             videoId: id,
             videoUrl: `https://www.youtube.com/watch?v=${id}`,
             status: 'processing',
@@ -90,7 +91,7 @@ router.post('/analyse', protect, async (req, res) => {
         const { url: videoUrl, id } = videoIds[i];
         const project = projects[i];
 
-        runPipeline({ videoUrl, videoId: id, brandContext, brandId, project }).catch(err => {
+        runPipeline({ videoUrl, videoId: id, brandContext, brandId, channelConfigId, project }).catch(err => {
             console.error(`❌ YouTube pipeline crashed for ${id}:`, err.message);
             YoutubeProject.findByIdAndUpdate(project._id, {
                 $set: { status: 'failed', error: err.message }
@@ -174,9 +175,12 @@ router.get('/:id/progress', protect, (req, res) => {
     });
 });
 
+import YoutubeChannelConfig from '../models/YoutubeChannelConfig.js';
+import ThumbnailTemplate from '../models/ThumbnailTemplate.js';
+
 // ── Pipeline Runner (8 nodes, all phases) ─────────────────────────────────
 
-async function runPipeline({ videoUrl, videoId, brandContext, brandId, project }) {
+async function runPipeline({ videoUrl, videoId, brandContext, brandId, channelConfigId, project }) {
     const pid = project._id.toString();
     console.log(`🚀 [YouTube Pipeline] Starting 8-node pipeline for ${videoId}`);
     const startMs = Date.now();
@@ -231,10 +235,24 @@ async function runPipeline({ videoUrl, videoId, brandContext, brandId, project }
         emit('thumbnailDirection', 'done', { concept: thumbnailDirection?.concept?.substring(0, 80) });
         console.log(`✅ [Node 6] Thumbnail direction: "${thumbnailDirection?.concept?.substring(0, 60)}"`);
 
+        // ── Fetch Channel & Template Context ───────────────────────────────────
+        let template = null;
+        if (channelConfigId) {
+            try {
+                const channel = await YoutubeChannelConfig.findById(channelConfigId);
+                if (channel?.defaultTemplateId) {
+                    template = await ThumbnailTemplate.findById(channel.defaultTemplateId);
+                    project.appliedTemplateId = template._id;
+                }
+            } catch (err) {
+                console.warn(`⚠️ [runPipeline] Failed to load channel/template context: ${err.message}`);
+            }
+        }
+
         // ── Node 7: Thumbnail Generation (Phase 3 — NanoBanana 2 primary) ──
         emit('thumbnailGeneration', 'running', { message: 'Generating thumbnail (NanoBanana 2 + character reference)…' });
         const { generatedThumbnailUrl, thumbnailGenerationError } = await thumbnailGenerationNode({
-            thumbnailDirection, video, brandContext
+            thumbnailDirection, video, brandContext, template
         });
         emit('thumbnailGeneration', 'done', {
             success: !!generatedThumbnailUrl,
@@ -268,6 +286,7 @@ async function runPipeline({ videoUrl, videoId, brandContext, brandId, project }
                 chapters,
                 seo,
                 brandAlignment,
+                appliedTemplateId: project.appliedTemplateId,
                 thumbnailDirection,
                 generatedThumbnailUrl: generatedThumbnailUrl || null,
                 characterPortraits,
