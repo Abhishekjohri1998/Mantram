@@ -76,6 +76,18 @@ export async function submitLaozhangVideoGeneration({
     if (imageUrl) console.log(`   🖼️  image: ${imageUrl.substring(0, 80)}...`);
     if (referenceImages?.length > 0) console.log(`   📸 referenceImages: ${referenceImages.length} attached`);
 
+    // Extract native language if prompt is a Universal Director bilingual JSON
+    let finalPromptText = prompt;
+    try {
+        if (prompt.trim().startsWith('[') && prompt.trim().endsWith(']')) {
+            const parsed = JSON.parse(prompt);
+            if (Array.isArray(parsed) && parsed.some(p => p.lang === 'zh')) {
+                finalPromptText = parsed.find(p => p.lang === 'zh')?.prompt || prompt;
+                console.log(`   🈯 Extracted native ZH prompt for Seedance (${finalPromptText.length} chars)`);
+            }
+        }
+    } catch { /* normal string */ }
+
     // Build message content for multimodal models
     // Seedance 2.0 and Veo often support multiple image inputs
     let messageContent;
@@ -91,9 +103,9 @@ export async function submitLaozhangVideoGeneration({
                 }
             });
         }
-        messageContent.push({ type: 'text', text: prompt });
+        messageContent.push({ type: 'text', text: finalPromptText });
     } else {
-        messageContent = prompt;
+        messageContent = finalPromptText;
     }
 
     let response;

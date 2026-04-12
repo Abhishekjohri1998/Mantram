@@ -143,7 +143,18 @@ async function submitPiApiPayload(payload) {
 export async function submitPiApiVideoGeneration({ prompt, imageUrl, duration, aspectRatio, generateAudio = true, referenceImages = [], qualityMode = 'fast' }) {
     console.log(`🎞️ PiAPI received: ${referenceImages.length} ref images, imageUrl: ${imageUrl ? 'yes' : 'no'}, quality: ${qualityMode}`);
 
-    let finalPrompt = prompt;
+    let finalPromptText = prompt;
+    try {
+        if (typeof prompt === 'string' && prompt.trim().startsWith('[') && prompt.trim().endsWith(']')) {
+            const parsed = JSON.parse(prompt);
+            if (Array.isArray(parsed) && parsed.some(p => p.lang === 'zh')) {
+                finalPromptText = parsed.find(p => p.lang === 'zh')?.prompt || prompt;
+                console.log(`   🈯 Extracted native ZH prompt for PiAPI (${finalPromptText.length} chars)`);
+            }
+        }
+    } catch { /* normal string */ }
+
+    let finalPrompt = finalPromptText;
     const imageUrls = [];
 
     if (referenceImages && referenceImages.length > 0) {
@@ -211,7 +222,18 @@ export async function submitPiApiImageToVideo({ imageUrl, prompt, duration, aspe
 
     if (!hostedUrl) throw new Error('Failed to host image for I2V generation');
 
-    let finalPrompt = prompt || 'Animate this image with natural cinematic motion';
+    let finalPromptText = prompt || 'Animate this image with natural cinematic motion';
+    try {
+        if (typeof prompt === 'string' && prompt.trim().startsWith('[') && prompt.trim().endsWith(']')) {
+            const parsed = JSON.parse(prompt);
+            if (Array.isArray(parsed) && parsed.some(p => p.lang === 'zh')) {
+                finalPromptText = parsed.find(p => p.lang === 'zh')?.prompt || prompt;
+                console.log(`   🈯 Extracted native ZH prompt for PiAPI I2V (${finalPromptText.length} chars)`);
+            }
+        }
+    } catch { /* normal string */ }
+
+    let finalPrompt = finalPromptText;
     if (!finalPrompt.includes('@image1')) finalPrompt = `@image1 ${finalPrompt}`;
     finalPrompt = finalPrompt.replace(/<img>[^<]*<\/img>/g, '').trim();
     finalPrompt = truncatePrompt(finalPrompt);

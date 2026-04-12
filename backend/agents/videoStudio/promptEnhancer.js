@@ -22,60 +22,46 @@
 const MODEL_STYLE_GUIDES = {
     'seedance-2.0': {
         name: 'Seedance 2.0',
-        maxWords: 280,
+        maxWords: 400,
         structure: `
-SEEDANCE 2.0 — DIRECTOR-LEVEL PROMPT STRUCTURE (research-backed, follow exactly):
+SEEDANCE 2.0 — UNIVERSAL DIRECTOR (BILINGUAL JSON):
 
-Philosophy: Seedance rewards "director-level" prompting, not image-like description.
-Think: you are briefing a film crew, not writing a caption.
+You are a scene direction API that outputs structured JSON.
+You handle all scene types: Action, General, and Dialogue. 
+You MUST output a JSON array containing exactly two objects: an English prompt and a native Chinese (ZH) rewrite.
 
-FOUR-LAYER STRUCTURE (apply in this order):
-1. PRIMARY ACTION/SUBJECT
-   → Who/what, wardrobe, material, posture, mood in one sentence.
-   → Use precise, active verbs: "struts", "clasps", "pivots" — not "walks" or "moves"
-   → Describe action start-to-end: "lifts the bottle from marble, tilts it into golden light, sets it down with deliberate care"
-   
-2. DIALOGUE / KEY SOUND EVENT
-   → In quotes if spoken: "protagonist whispers 'feel the silence'"
-   → Or a sound cue: "metallic clink of earbuds dropping into case", "low bass rumble as engine ignites"
-   → NOTE: Seedance 2.0 has a NATIVE AUDIO ENGINE — always include at least one sound cue
+INVENTORY & ROUTER RULES:
+- Action (Pursuit, Duel, Impact): Camera tracks movement. Duel must alternate dominance.
+- General (Journey, Atmosphere, Reveal): Camera tracks passage of time or space.
+- Dialogue (Confrontation, Interrogation, Negotiation): Camera crosses axis on power shift.
 
-3. ENVIRONMENTAL / AESTHETIC CUES
-   → Lighting: "golden hour side-light", "neon-drenched rain-soaked asphalt", "clinical soft-box overhead"
-   → Material detail: "condensation on the glass", "dust motes in slanted light", "silk catching a phantom breeze"
-   → Color grade direction: "desaturated urban greys punched up with amber warmth"
+ENGINE CONSTRAINTS:
+- No age markers allowed (*boy, girl, young, 少女, 男孩*, etc). Use functional roles: "figure", "rider", "speaker".
+- Double contrast cuts: Every cut must change both shot size and camera mode.
+- Inserts must be sub-second detail shots with a named subject (causally motivated).
 
-4. CAMERA / MOTION SPECIFICATION
-   → Always name exact move: "slow push-in over 3s toward the product", "handheld tracking shot following at shoulder height"
-   → For multi-beat content, use TIMELINE PROMPTING:
-     [00:00] Wide shot: establish scene. Static camera. Lighting setup.
-     [00:02] Camera dollies slowly toward subject as action begins.
-     [00:04] Close-up on product detail. Macro. Soft golden rim light.
+OUTPUT FORMAT (CRITICAL):
+Your "enhancedPrompt" field MUST be a strict JSON string representing an array of exactly two objects:
+'[{"lang":"en","prompt":"Style & Mood: ... Dynamic Description: ... Static Description: ... Audio: ..."},{"lang":"zh","prompt":"..."}]'
 
-CAMERA VOCABULARY (Seedance understands these precisely):
-- "slow push-in over Xs" → emotional emphasis
-- "pull-back reveal over Xs" → dramatic scale
-- "slow orbit around [subject] over Xs" → 3D showcase
-- "upward tilt to reveal [sky/subject]" → inspirational scale
-- "static macro close-up on [detail]" → premium texture
-- "handheld" → documentary urgency
-- "crane rising" → epic establishing scale
-- "rack focus from [A] to [B]" → narrative pivot
+Prompt structure inline labels: Style & Mood, Narrative Summary, Dynamic Description, Static Description, Audio.
 
-QUALITY SUFFIX (always append): "4K ultra HD, rich detail, cinematic textures, stable picture, no blur"
-HARD LIMIT: Under 280 words. Every sentence = one clear directorial intention.`,
+LANGUAGE RULES:
+- ZH is a native director's rewrite (max 1800 chars).
+- CRITICAL: NO CHINESE TEXT OVERLAYS OR VOICEOVERS. Inside both EN and ZH prompts, any spoken words, text overlays, floating text, or Brand CTAs MUST remain strictly in English (or the language specified by the user's brand/context). Never translate spoken dialogue or on-screen text into Chinese. `,
     },
 
     'seedance-1.0': {
         name: 'Seedance 1.0',
-        maxWords: 150,
+        maxWords: 350,
         structure: `
-SEEDANCE 1.0 — CONCISE DIRECTOR STRUCTURE:
-Same Four-Layer approach as Seedance 2.0, but faster and simpler.
-Format: [Subject + precise action] in [environment]. "[Key sound/dialogue]". [Lighting + texture]. [One camera move: type + direction + speed].
-No timeline beats needed — keep to a single, clear shot.
-QUALITY SUFFIX: "cinematic, 4K quality, stable shot"
-HARD LIMIT: Under 150 words. One clear camera intention only.`,
+SEEDANCE 1.0 — CONCISE DIRECTOR (BILINGUAL JSON):
+
+Same JSON array format as Seedance 2.0:
+'[{"lang":"en","prompt":"Style & Mood: ... Dynamic Description: ... Static Description: ..."},{"lang":"zh","prompt":"..."}]'
+
+Keep the English and Chinese descriptions under 150 words each. Write one clear, steady camera intention instead of multiple cuts.
+CRITICAL: No age markers. Any text overlays or voiceovers MUST remain in English in the ZH prompt. `,
     },
 
     'kling-3.0': {
@@ -174,28 +160,24 @@ function getAdFilmStructureGuide(duration) {
     const revealEnd = Math.round(duration * 0.90);
 
     return `
-AD FILM STRUCTURE — Use Seedance-style TIMELINE PROMPTING for the motion prompt.
+AD FILM STRUCTURE — Embed the following Ad Film arc into your Seedance-Director prose.
 Duration: ${duration}s
 
-TIMELINE BEATS (embed these in the enhancedPrompt):
-[00:00–00:0${hookEnd}] HOOK — Arresting wide shot, no product yet. Pure emotion/problem. Static or slow push-in.
-[00:0${hookEnd}–00:0${storyEnd}] STORY — Human truth with product in use. Tracking or handheld. Sound cue of product interaction.
-[00:0${storyEnd}–00:0${revealEnd}] PRODUCT REVEAL — Hero macro shot. Brand colors in lighting. Slow orbit or push-in.
-[00:0${revealEnd}–00:0${duration}] BRAND CTA — Brand tagline moment. Fade to clean brand color. Subtle audio swell.
+Ensure your English and Chinese descriptions follow this arc:
+• ${Math.round(duration * 0.18)}s HOOK: Pure emotion/problem, arresting wide shot. No product yet.
+• ${Math.round(duration * 0.72)}s STORY: Human truth, product in use. Tracking/handheld.
+• ${Math.round(duration * 0.90)}s PRODUCT REVEAL: Brand colors in lighting. Soft macro orbit.
+• FINAL CTA: Brand logo overlay against clean brand colors.
 
 REQUIRED ELEMENTS (return in adFilmPlan JSON):
-• VO: One cinematic voiceover line matching brand voice (15 words max)
-• BGM: Music genre + tempo + emotional arc (e.g., "minimal piano builds to orchestral swell over 6s")
-• CTA: Final text overlay / brand tagline
-• AUDIO CUE: Seedance native audio description for key sound event (e.g., "satisfying click of earbuds snapping in, ambient city noise cutting to silence")
+• VO: One cinematic voiceover line matching brand voice (15 words max).
+• BGM: Music genre + tempo + emotional arc.
+• CTA: Final text overlay / brand tagline.
+• AUDIO CUE: Inline native audio description for key sound events.
 
-CRITICAL RULES:
-1. HOOK must NOT show or mention the product — build desire first
-2. STORY must show a real human moment, not abstract graphics
-3. PRODUCT REVEAL must use brand colors in the environment lighting
-4. Each beat has ONE clear Seedance camera move — no camera chaos
-5. Total motion prompt under 350 words — structured timeline beats, not a wall of text
-6. Append quality suffix to motion prompt: "4K ultra HD, rich detail, cinematic textures, stable picture"`;
+CRITICAL AD FILM BRAND INJECTION (DO NOT HALLUCINATE):
+If brand context is provided, pull the tagline and brand logo from the context explicitly. Put the tagline in the VO and on-screen text overlay at the END of the prompt.
+IMPORTANT RULE: Voiceovers, Taglines, and On-Screen text MUST remain strictly in English inside BOTH the EN and ZH prompts! Do not translate text elements into Chinese.`;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -230,12 +212,12 @@ ${brandContext ? `The brand context above is REAL — embed it deeply:
 
 RESPONSE — Return ONLY valid JSON:
 {
-  "enhancedPrompt": "The CORE MOTION PROMPT optimised for ${modelName} — this goes directly to the model. Follow the model's structure guide above. Under ${guide.maxWords} words. Embed the Ad Film timeline beats inline.",
+  "enhancedPrompt": "The CORE MOTION PROMPT optimised for ${modelName}. For Seedance, this MUST be a JSON-parseable stringified array '[{lang:\"en\", prompt:\"...\"}, {lang:\"zh\", prompt:\"...\"}]'. Embed the Ad Film arc.",
   "adFilmPlan": {
-    "hook": "[0s–Xs]: Exact description of the opening beat",
-    "story": "[Xs–Ys]: The emotional narrative beat with the human truth",
-    "productReveal": "[Ys–Zs]: The product/brand hero shot description",
-    "cta": "[Zs–${duration}s]: The closing brand moment",
+    "hook": "Exact description of the opening beat",
+    "story": "The emotional narrative beat with the human truth",
+    "productReveal": "The product/brand hero shot description",
+    "cta": "The closing brand moment",
     "voiceOver": "One cinematic VO line (15 words max) matching brand voice",
     "bgMusic": "Music genre, tempo, and emotional arc description",
     "ctaText": "Final text overlay / tagline"
@@ -248,7 +230,7 @@ RESPONSE — Return ONLY valid JSON:
 
 RESPONSE — Return ONLY valid JSON:
 {
-  "enhancedPrompt": "The production-ready, model-native prompt. Follow ${modelName}'s structure guide above exactly. Under ${guide.maxWords} words.",
+  "enhancedPrompt": "The production-ready, model-native prompt. Follow ${modelName}'s structure guide above exactly. For Seedance, this MUST be a JSON-parseable stringified array '[{lang:\"en\", prompt:\"...\"}, {lang:\"zh\", prompt:\"...\"}]'.",
   "changes": ["What was enhanced — e.g., 'Added slow orbit camera move', 'Applied brand color to lighting', 'Added material texture detail'"]
 }`;
 }

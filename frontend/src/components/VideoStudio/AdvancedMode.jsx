@@ -269,6 +269,7 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [] }
     // ── Compose form state ──
     const [model, setModel] = useState('seedance-2.0')
     const [prompt, setPrompt] = useState('')
+    const [zhPrompt, setZhPrompt] = useState('')
     const [duration, setDuration] = useState(6)
     const [aspectRatio, setAspectRatio] = useState('16:9')
     const [quality, setQuality] = useState('fast')
@@ -309,6 +310,7 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [] }
     const refVideoRef = useRef(null)
     const refAudioRef = useRef(null)
     const promptRef = useRef(null)
+    const bgRef = useRef(null)
     const observerRef = useRef(null)
 
     const m = MODELS[model] || MODELS['seedance-2.0']
@@ -341,7 +343,20 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [] }
     // Refill from initialData (storyboard → advanced handoff)
     useEffect(() => {
         if (!initialData) return
-        if (initialData.prompt) setPrompt(initialData.prompt)
+        if (initialData.prompt) {
+            let pStr = initialData.prompt;
+            try {
+                if (pStr.trim().startsWith('[')) {
+                    const parsed = JSON.parse(pStr);
+                    if (Array.isArray(parsed) && parsed.some(p => p.lang === 'en')) {
+                        pStr = parsed.find(p => p.lang === 'en').prompt;
+                        const zh = parsed.find(p => p.lang === 'zh')?.prompt;
+                        if (zh) setZhPrompt(zh);
+                    }
+                }
+            } catch { }
+            setPrompt(pStr);
+        }
         if (initialData.model && MODELS[initialData.model]) setModel(initialData.model)
         if (initialData.duration) setDuration(initialData.duration)
         if (initialData.aspectRatio) setAspectRatio(initialData.aspectRatio)
@@ -423,7 +438,20 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [] }
         reader.readAsDataURL(file)
     }
 
-    // ── Autocomplete ──
+    // ── Autocomplete & Highlighting ──
+    function renderRichPrompt(text) {
+        if (!text) return null;
+        // Split by exactly the tags we use
+        const regex = /(@image\d+|@video|@audio)/g;
+        const parts = text.split(regex);
+        return parts.map((part, i) => {
+            if (part.match(regex)) {
+                return <span key={i} style={{ color: '#3b82f6', background: 'rgba(59,130,246,0.15)', textDecoration: 'underline' }}>{part}</span>
+            }
+            return part;
+        });
+    }
+
     function handlePromptChange(e) {
         const val = e.target.value
         setPrompt(val)
@@ -477,10 +505,23 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [] }
                     referenceImageUrls: refImages.map(r => r.url).filter(Boolean),
                 }),
             })
+            let finalUI = d.enhancedPrompt || rawPrompt
+            setZhPrompt('')
+            try {
+                if (typeof finalUI === 'string' && finalUI.trim().startsWith('[')) {
+                    const parsed = JSON.parse(finalUI)
+                    if (Array.isArray(parsed) && parsed.some(p => p.lang === 'en')) {
+                        finalUI = parsed.find(p => p.lang === 'en').prompt
+                        const zh = parsed.find(p => p.lang === 'zh')?.prompt
+                        if (zh) setZhPrompt(zh)
+                    }
+                }
+            } catch { }
+
             if (m.has.multishot) {
-                const n = [...shots]; n[0].prompt = d.enhancedPrompt || rawPrompt; setShots(n)
+                const n = [...shots]; n[0].prompt = finalUI; setShots(n)
             } else {
-                setPrompt(d.enhancedPrompt || rawPrompt)
+                setPrompt(finalUI)
             }
             if (d.adFilmPlan) { setAdFilmPlan(d.adFilmPlan); setAdFilmPlanOpen(true) }
             if (d.mcotUsed) setMcotUsed(true)
@@ -495,8 +536,14 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [] }
         setLoading(true); setError('')
         const jobId = `job-${Date.now()}`
         const thumbUrl = videoMode === 'i2v' ? i2vImage?.url : firstFrame?.url
+
+        let finalSubmissionPrompt = m.has.multishot ? shots.map(s => s.prompt).join(' | ') : prompt.trim();
+        if (!m.has.multishot && zhPrompt) {
+            finalSubmissionPrompt = JSON.stringify([{ lang: 'en', prompt: finalSubmissionPrompt }, { lang: 'zh', prompt: zhPrompt }]);
+        }
+
         const newJob = {
-            id: jobId, projectId: null, prompt: m.has.multishot ? shots.map(s => s.prompt).join(' | ') : prompt.trim(),
+            id: jobId, projectId: null, prompt: finalSubmissionPrompt,
             model, duration, aspectRatio, quality, thumbUrl, progress: 3, status: 'generating', videoUrl: null, error: null,
         }
         setJobs(prev => [newJob, ...prev])
@@ -570,7 +617,19 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [] }
         const theAspect = ac.aspectRatio || '16:9'
         const theQuality = ac.qualityMode || ac.mode || 'fast'
 
-        setPrompt(thePrompt)
+        let finalUI = thePrompt
+            setZhPrompt('')
+            try {
+                if (typeof finalUI === 'string' && finalUI.trim().startsWith('[')) {
+                    const parsed = JSON.parse(finalUI)
+                    if (Array.isArray(parsed) && parsed.some(p => p.lang === 'en')) {
+                        finalUI = parsed.find(p => p.lang === 'en').prompt
+                        const zh = parsed.find(p => p.lang === 'zh')?.prompt
+                        if (zh) setZhPrompt(zh)
+                    }
+                }
+            } catch { }
+        setPrompt(finalUI)
         if (MODELS[theModel]) setModel(theModel)
         setDuration(theDuration)
         setAspectRatio(theAspect)
@@ -641,7 +700,19 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [] }
                         <div className="vm-viewer-actions">
                             <button className="vm-viewer-btn accent" onClick={() => {
                                 setModel(viewVideo.model || 'seedance-2.0')
-                                setPrompt(viewVideo.prompt || '')
+                                let finalUI = viewVideo.prompt || ''
+                                setZhPrompt('')
+                                try {
+                                    if (typeof finalUI === 'string' && finalUI.trim().startsWith('[')) {
+                                        const parsed = JSON.parse(finalUI)
+                                        if (Array.isArray(parsed) && parsed.some(p => p.lang === 'en')) {
+                                            finalUI = parsed.find(p => p.lang === 'en').prompt
+                                            const zh = parsed.find(p => p.lang === 'zh')?.prompt
+                                            if (zh) setZhPrompt(zh)
+                                        }
+                                    }
+                                } catch { }
+                                setPrompt(finalUI)
                                 setDuration(Number(viewVideo.duration) || 5)
                                 if (viewVideo.aspectRatio) setAspectRatio(viewVideo.aspectRatio)
                                 if (viewVideo.firstImageUrl) setFirstFrame({ url: viewVideo.firstImageUrl, source: 'refill' })
@@ -839,24 +910,114 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [] }
                     {/* Prompt area */}
                     <div className="vm-prompt">
                         <div className="vm-prompt-box">
-                            <textarea
-                                ref={promptRef}
+                            {/* Editor Container using CodeEditor pattern */}
+                            <div 
                                 className="vm-textarea"
-                                value={m.has.multishot ? shots[0].prompt : prompt}
-                                onChange={e => {
-                                    if (m.has.multishot) { const n = [...shots]; n[0].prompt = e.target.value; setShots(n) }
-                                    else handlePromptChange(e)
+                                style={{ 
+                                    position: 'relative', 
+                                    padding: 0, 
+                                    overflow: 'hidden',
+                                    border: 'none',
+                                    background: 'var(--sys-surface)',
+                                    borderRadius: '12px',
+                                    minHeight: '100px',
+                                    fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                                    fontSize: '14px',
+                                    lineHeight: '1.5',
                                 }}
-                                placeholder={activeBrand?.name ? `What's your ${activeBrand.name} ad about? Type @ to tag assets...` : `What's your ad about? Type @ to tag images, video, audio...`}
-                            />
+                            >
+                                {/* Visual Layer (Rich Text) */}
+                                <div
+                                    ref={bgRef}
+                                    style={{
+                                        margin: 0, border: 0, background: 'none', boxSizing: 'inherit', display: 'inherit',
+                                        fontFamily: 'inherit', fontSize: 'inherit', fontStyle: 'inherit', fontWeight: 'inherit',
+                                        letterSpacing: 'inherit', lineHeight: 'inherit', tabSize: 'inherit', textIndent: 'inherit',
+                                        textRendering: 'inherit', textTransform: 'inherit', whiteSpace: 'pre-wrap', wordBreak: 'keep-all', overflowWrap: 'break-word',
+                                        position: 'relative', pointerEvents: 'none',
+                                        padding: '16px',
+                                        color: 'var(--sys-text)',
+                                    }}
+                                >
+                                    {renderRichPrompt(m.has.multishot ? shots[0].prompt : prompt)}
+                                    <br /> {/* Ensures trailing empty line is calculable */}
+                                </div>
+                                {/* Interaction Layer (Transparent Text) */}
+                                <textarea
+                                    ref={promptRef}
+                                    spellCheck={false}
+                                    style={{
+                                        margin: 0, border: 0, background: 'none', boxSizing: 'inherit', display: 'inherit',
+                                        fontFamily: 'inherit', fontSize: 'inherit', fontStyle: 'inherit', fontWeight: 'inherit',
+                                        letterSpacing: 'inherit', lineHeight: 'inherit', tabSize: 'inherit', textIndent: 'inherit',
+                                        textRendering: 'inherit', textTransform: 'inherit', whiteSpace: 'pre-wrap', wordBreak: 'keep-all', overflowWrap: 'break-word',
+                                        position: 'absolute', top: 0, left: 0, height: '100%', width: '100%', resize: 'none',
+                                        color: 'transparent', caretColor: 'var(--sys-text)', overflow: 'hidden', WebkitTextFillColor: 'transparent',
+                                        padding: '16px',
+                                        outline: 'none',
+                                    }}
+                                    onScroll={e => { if (bgRef.current) bgRef.current.scrollTop = e.target.scrollTop; }}
+                                    value={m.has.multishot ? shots[0].prompt : prompt}
+                                    onChange={e => {
+                                        if (m.has.multishot) { const n = [...shots]; n[0].prompt = e.target.value; setShots(n) }
+                                        else handlePromptChange(e)
+                                    }}
+                                    placeholder={activeBrand?.name ? `What's your ${activeBrand.name} ad about? Type @ to tag assets...` : `What's your ad about? Type @ to tag images, video, audio...`}
+                                />
+                            </div>
                         </div>
 
                         {m.has.multishot && (
                             <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
                                 {shots.slice(1).map((s, idx) => (
-                                    <div key={idx} style={{ display: 'flex', gap: 8 }}>
-                                        <input className="vm-textarea" style={{ minHeight: '40px', flex: 1, padding: '8px 12px', background: 'var(--sys-surface-raised)', borderRadius: 8, border: '1px solid var(--sys-border)' }} value={s.prompt} onChange={(e) => { const n = [...shots]; n[idx + 1].prompt = e.target.value; setShots(n) }} placeholder={`Shot ${idx + 2} Prompt`} />
-                                        <button className="vm-config-trigger" style={{ color: 'var(--sys-error)' }} onClick={() => setShots(shots.filter((_, i) => i !== idx + 1))}><span className="material-symbols-outlined">delete</span></button>
+                                    <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'stretch' }}>
+                                        <div 
+                                            style={{ 
+                                                position: 'relative', 
+                                                flex: 1,
+                                                padding: 0, 
+                                                overflow: 'hidden',
+                                                border: '1px solid var(--sys-border)',
+                                                background: 'var(--sys-surface-raised)',
+                                                borderRadius: '8px',
+                                                minHeight: '40px',
+                                                fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                                                fontSize: '14px',
+                                                lineHeight: '1.5',
+                                            }}
+                                        >
+                                            <div
+                                                style={{
+                                                    margin: 0, border: 0, background: 'none', boxSizing: 'inherit', display: 'inherit',
+                                                    fontFamily: 'inherit', fontSize: 'inherit', fontStyle: 'inherit', fontWeight: 'inherit',
+                                                    letterSpacing: 'inherit', lineHeight: 'inherit', tabSize: 'inherit', textIndent: 'inherit',
+                                                    textRendering: 'inherit', textTransform: 'inherit', whiteSpace: 'pre-wrap', wordBreak: 'keep-all', overflowWrap: 'break-word',
+                                                    position: 'relative', pointerEvents: 'none',
+                                                    padding: '12px 16px',
+                                                    color: 'var(--sys-text)',
+                                                }}
+                                            >
+                                                {renderRichPrompt(s.prompt)}
+                                                <br />
+                                            </div>
+                                            <textarea
+                                                spellCheck={false}
+                                                style={{
+                                                    margin: 0, border: 0, background: 'none', boxSizing: 'inherit', display: 'inherit',
+                                                    fontFamily: 'inherit', fontSize: 'inherit', fontStyle: 'inherit', fontWeight: 'inherit',
+                                                    letterSpacing: 'inherit', lineHeight: 'inherit', tabSize: 'inherit', textIndent: 'inherit',
+                                                    textRendering: 'inherit', textTransform: 'inherit', whiteSpace: 'pre-wrap', wordBreak: 'keep-all', overflowWrap: 'break-word',
+                                                    position: 'absolute', top: 0, left: 0, height: '100%', width: '100%', resize: 'none',
+                                                    color: 'transparent', caretColor: 'var(--sys-text)', overflow: 'hidden', WebkitTextFillColor: 'transparent',
+                                                    padding: '12px 16px',
+                                                    outline: 'none',
+                                                }}
+                                                value={s.prompt}
+                                                onChange={(e) => { const n = [...shots]; n[idx + 1].prompt = e.target.value; setShots(n) }}
+                                                placeholder={`Shot ${idx + 2} Prompt`}
+                                            />
+                                        </div>
+                                        <button className="vm-config-trigger" style={{ color: 'var(--sys-error)', marginTop: '4px' }} onClick={() => setShots(shots.filter((_, i) => i !== idx + 1))}><span className="material-symbols-outlined">delete</span></button>
                                     </div>
                                 ))}
                                 {shots.length < 6 && <button className="vm-btn-icon-label" style={{ alignSelf: 'flex-start' }} onClick={() => setShots([...shots, { prompt: '' }])}><span className="material-symbols-outlined" style={{ fontSize: 16 }}>add</span> Add Shot</button>}

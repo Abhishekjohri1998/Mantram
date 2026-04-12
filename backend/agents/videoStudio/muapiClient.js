@@ -111,8 +111,20 @@ export async function submitMuApiVideoGeneration({
 }) {
     if (!prompt?.trim()) throw new Error('Prompt is required for MuAPI Seedance 2.0');
 
+    // Extract native language if prompt is a Universal Director bilingual JSON
+    let finalPromptText = prompt.trim();
+    try {
+        if (finalPromptText.startsWith('[') && finalPromptText.endsWith(']')) {
+            const parsed = JSON.parse(finalPromptText);
+            if (Array.isArray(parsed) && parsed.some(p => p.lang === 'zh')) {
+                finalPromptText = parsed.find(p => p.lang === 'zh')?.prompt || finalPromptText;
+                console.log(`   🈯 Extracted native ZH prompt for MuAPI (${finalPromptText.length} chars)`);
+            }
+        }
+    } catch { /* normal string */ }
+
     const payload = {
-        prompt: prompt.trim(),
+        prompt: finalPromptText,
         duration: mapDuration(duration),
         aspect_ratio: mapAspectRatio(aspectRatio),
         quality: mapQuality(qualityMode),
@@ -137,7 +149,7 @@ export async function submitMuApiVideoGeneration({
         console.log(`📸 [MuAPI] Final images_list (${imagesList.length} total):`, imagesList.map(u => u.substring(0, 60)));
 
         // Prompt Auto-Tagging & Hard Length Guard (4,000 chars)
-        let finalPrompt = prompt.trim();
+        let finalPrompt = finalPromptText;
         if (finalPrompt.length > 4000) {
             console.warn(`🛑 MuAPI prompt exceeds 4,000 chars (${finalPrompt.length}). Truncating for technical compatibility.`);
             finalPrompt = finalPrompt.substring(0, 4000);
