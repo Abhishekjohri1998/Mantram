@@ -318,60 +318,99 @@ export async function thumbnailDirectionNode({ video, analysis, seo, brandContex
 // ── 7. Thumbnail Generation Node (Phase 3 — FLUX Pro via FAL.ai) ──────────
 
 /**
- * Takes the structured thumbnailDirection from node 6 and generates a real
- * 1280×720 JPEG thumbnail using FLUX Pro on FAL.ai.
- * Falls back to Gemini image generation if FAL.ai is unavailable.
+ * Phase 3: Thumbnail Generation
+ * 
+ * Model Strategy:
+ * PRIMARY  — NanoBanana 2 (Gemini 3.1 Flash Image)
+ *   → Accepts the real YouTube thumbnail as an imagePart reference
+ *   → Gemini SEES the character face and generates accordingly
+ *   → Follows brand color hex codes and copywriting instructions precisely
+ *   → ~8-12s response time
+ *
+ * FALLBACK — FLUX Pro via FAL.ai
+ *   → Higher photorealistic quality for cinematic backgrounds
+ *   → image_prompt is a loose style ref (not face-locked)
+ *   → ~25-30s response time
  */
 export async function thumbnailGenerationNode({ thumbnailDirection, video, brandContext }) {
     if (!thumbnailDirection?.imageGenerationPrompt) {
-        console.warn('⚠️ [thumbnailGenerationNode] No imageGenerationPrompt — skipping thumbnail generation');
+        console.warn('⚠️ [thumbnailGenerationNode] No imageGenerationPrompt — skipping');
         return { generatedThumbnailUrl: null, thumbnailGenerationError: 'No prompt available' };
     }
 
-    console.log(`🎨 [thumbnailGenerationNode] Generating thumbnail via FLUX Pro`);
+    console.log(`🎨 [thumbnailGenerationNode] Generating thumbnail — NanoBanana 2 (primary)`);
 
-    // Enrich FLUX prompt with brand palette and thumbnail text
+    // Build enriched prompt: brand color, text overlay, composition, emotion
     const fullPrompt = [
         thumbnailDirection.imageGenerationPrompt,
-        thumbnailDirection.dominantColor ? `Dominant color: ${thumbnailDirection.dominantColor}` : '',
-        `Background: ${thumbnailDirection.backgroundTreatment || 'gradient'}`,
+        thumbnailDirection.dominantColor
+            ? `Use ${thumbnailDirection.dominantColor} as the dominant brand color`
+            : '',
         `Composition: ${thumbnailDirection.composition || 'center'} subject placement`,
-        `Emotion: ${thumbnailDirection.emotion || 'curiosity'}`,
-        `Cinematic, high contrast, YouTube thumbnail style, 16:9, photorealistic`,
+        `Emotion: ${thumbnailDirection.emotion || 'curiosity'} expression on the main subject`,
+        `Background treatment: ${thumbnailDirection.backgroundTreatment || 'gradient'}`,
+        thumbnailDirection.textOverlay?.line1
+            ? `Text overlay: "${thumbnailDirection.textOverlay.line1}" in ${thumbnailDirection.textOverlay.style || 'bold'} style`
+            : '',
+        `YouTube thumbnail format: 16:9, high contrast, mobile-readable at 320px, cinematic quality`,
+        `Do NOT add any watermarks or logos unless specifically requested`,
     ].filter(Boolean).join('. ');
 
-    // Reference image: use existing thumbnail as style/composition reference
+    const router = getRouter();
     const referenceUrl = video?.metadata?.thumbnailUrl || null;
 
+    // ── Primary: NanoBanana 2 with character reference image ──────────────────
     try {
-        const generatedThumbnailUrl = await falGenerateImage({
+        // Fetch the existing YouTube thumbnail and pass as imagePart
+        // Gemini will SEE the character and generate a consistent new composition
+        const imageParts = [];
+        if (referenceUrl) {
+            try {
+                const imgRes = await fetch(referenceUrl);
+                if (imgRes.ok) {
+                    const buf = await imgRes.arrayBuffer();
+                    const b64 = Buffer.from(buf).toString('base64');
+                    const mimeType = imgRes.headers.get('content-type') || 'image/jpeg';
+                    imageParts.push({
+                        inlineData: { data: b64, mimeType },
+                        text: 'Reference image: use the main character from this thumbnail in your composition.'
+                    });
+                }
+            } catch (fetchErr) {
+                console.warn(`⚠️ [thumbnailGenerationNode] Could not fetch reference thumbnail: ${fetchErr.message}`);
+            }
+        }
+
+        const result = await router.generateImage({
             prompt: fullPrompt,
-            imageUrl: referenceUrl,
-            width: 1280,
-            height: 720,
-            model: 'fal-ai/flux-pro/v1.1',
+            aspectRatio: '16:9',
+            imageParts,
         });
 
-        console.log(`✅ [thumbnailGenerationNode] Thumbnail generated: ${generatedThumbnailUrl?.substring(0, 80)}...`);
-        return { generatedThumbnailUrl, thumbnailGenerationError: null };
+        console.log(`✅ [thumbnailGenerationNode] NanoBanana 2 thumbnail generated`);
+        return { generatedThumbnailUrl: result.imageUrl, thumbnailGenerationError: null };
 
-    } catch (err) {
-        console.warn(`⚠️ [thumbnailGenerationNode] FAL failed: ${err.message}. Trying Gemini fallback...`);
+    } catch (primaryErr) {
+        console.warn(`⚠️ [thumbnailGenerationNode] NanoBanana 2 failed: ${primaryErr.message}. Falling back to FLUX Pro...`);
 
-        // Fallback: Gemini image generation (lower quality but always available)
+        // ── Fallback: FLUX Pro (cinematic photorealism, no face lock) ────────
         try {
-            const router = getRouter();
-            const geminiResult = await router.generateImage({
+            const generatedThumbnailUrl = await falGenerateImage({
                 prompt: fullPrompt,
-                aspectRatio: '16:9',
+                imageUrl: referenceUrl,   // Loose style reference in FLUX
+                width: 1280,
+                height: 720,
+                model: 'fal-ai/flux-pro/v1.1',
             });
-            return { generatedThumbnailUrl: geminiResult.imageUrl, thumbnailGenerationError: null };
-        } catch (geminiErr) {
-            console.error(`❌ [thumbnailGenerationNode] Both FLUX and Gemini failed:`, geminiErr.message);
-            return { generatedThumbnailUrl: null, thumbnailGenerationError: err.message };
+            console.log(`✅ [thumbnailGenerationNode] FLUX Pro fallback succeeded`);
+            return { generatedThumbnailUrl, thumbnailGenerationError: null };
+        } catch (fluxErr) {
+            console.error(`❌ [thumbnailGenerationNode] Both NanoBanana 2 and FLUX failed`);
+            return { generatedThumbnailUrl: null, thumbnailGenerationError: primaryErr.message };
         }
     }
 }
+
 
 // ── 8. Character Portrait Node (Phase 2) ───────────────────────────────────
 
