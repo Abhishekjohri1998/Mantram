@@ -170,7 +170,7 @@ async function runPipeline({ videoUrl, videoId, brandContext, brandId, project }
         emit('thumbnailDirection', 'done', { concept: thumbnailDirection?.concept?.substring(0, 80) });
 
         // ── Node 7: Thumbnail Generation (Phase 3 — FLUX Pro) ─────────────
-        emit('thumbnailGeneration', 'running', { message: 'Generating thumbnail with FLUX Pro…' });
+        emit('thumbnailGeneration', 'running', { message: 'Generating thumbnail with NanoBanana 2 (multimodal)…' });
         const { generatedThumbnailUrl, thumbnailGenerationError } = await thumbnailGenerationNode({
             thumbnailDirection, video, brandContext
         });
