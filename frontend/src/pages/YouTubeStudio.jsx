@@ -242,15 +242,51 @@ function ProjectDetail({ project, onRefresh }) {
                 </div>
             </div>
 
-            {/* ── Phase 3: Generated Thumbnail ── */}
-            <Section title="AI Thumbnail" icon="image" badge={localThumb ? '✓' : 'Generate'}>
+            {/* ── Phase 3: AI Thumbnail ── */}
+            <Section title="AI Thumbnail" icon="image" badge={localThumb ? '✓' : undefined}>
+                {/* Always show the original YouTube thumbnail */}
+                {metadata?.thumbnailUrl && (
+                    <div style={{ marginBottom: 14 }}>
+                        <p style={{ margin: '0 0 6px', fontSize: 11, fontWeight: 700, color: 'var(--sys-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                            Original YouTube Thumbnail
+                        </p>
+                        <img src={metadata.thumbnailUrl} alt="Original thumbnail"
+                            style={{ width: '100%', maxWidth: 640, height: 'auto', borderRadius: 8, border: '1px solid var(--sys-border)', display: 'block' }}
+                            onError={e => e.target.style.display = 'none'}
+                        />
+                    </div>
+                )}
+
+                {/* AI Background */}
                 {localThumb ? (
                     <div>
-                        <img src={localThumb} alt="Generated thumbnail" style={{ width: '100%', maxWidth: 640, height: 'auto', borderRadius: 10, border: '1px solid var(--sys-border)', display: 'block', marginBottom: 12 }} />
+                        <p style={{ margin: '0 0 6px', fontSize: 11, fontWeight: 700, color: 'var(--sys-primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                            AI Background (NanoBanana 2) — no person, brand-aligned scene
+                        </p>
+                        <img src={localThumb} alt="AI background"
+                            style={{ width: '100%', maxWidth: 640, height: 'auto', borderRadius: 8, border: '2px solid var(--sys-primary)', display: 'block', marginBottom: 12 }} />
+
+                        {/* Text overlay suggestion — shown as copyable text, NOT rendered in image */}
+                        {thumbnailDirection?.textOverlay?.line1 && (
+                            <div style={{ padding: '10px 14px', borderRadius: 8, background: 'var(--sys-surface)', border: '1px solid var(--sys-border)', marginBottom: 12 }}>
+                                <p style={{ margin: '0 0 4px', fontSize: 11, fontWeight: 700, color: 'var(--sys-text-muted)' }}>SUGGESTED TEXT OVERLAY (add manually in Canva/PS)</p>
+                                <p style={{ margin: 0, fontSize: 18, fontWeight: 900, letterSpacing: '-0.5px' }}>
+                                    {thumbnailDirection.textOverlay.line1}
+                                    {thumbnailDirection.textOverlay.line2 && <><br /><span style={{ fontSize: 14, fontWeight: 700, opacity: 0.8 }}>{thumbnailDirection.textOverlay.line2}</span></>}
+                                </p>
+                                {thumbnailDirection.dominantColor && (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
+                                        <div style={{ width: 16, height: 16, borderRadius: 4, background: thumbnailDirection.dominantColor, border: '1px solid var(--sys-border)' }} />
+                                        <span style={{ fontSize: 11, color: 'var(--sys-text-muted)' }}>{thumbnailDirection.dominantColor}</span>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
                         <div style={{ display: 'flex', gap: 8 }}>
-                            <a href={localThumb} download="thumbnail.jpg" target="_blank" rel="noreferrer"
+                            <a href={localThumb} download="ai-background.jpg" target="_blank" rel="noreferrer"
                                 style={{ flex: 1, padding: '10px', borderRadius: 8, background: 'var(--sys-primary)', color: 'white', fontSize: 13, fontWeight: 600, border: 'none', cursor: 'pointer', textAlign: 'center', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>download</span> Download (1280×720)
+                                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>download</span> Download Background
                             </a>
                             <button onClick={regenerateThumbnail} disabled={genLoading}
                                 style={{ padding: '10px 16px', borderRadius: 8, background: 'var(--sys-surface)', color: 'var(--sys-text)', fontSize: 13, fontWeight: 600, border: '1px solid var(--sys-border)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -258,17 +294,21 @@ function ProjectDetail({ project, onRefresh }) {
                                 Regenerate
                             </button>
                         </div>
+                        <p style={{ margin: '8px 0 0', fontSize: 11, color: 'var(--sys-text-muted)' }}>
+                            💡 Composite this background with your original thumbnail in Canva, Photoshop, or use as-is
+                        </p>
                     </div>
                 ) : (
-                    <div style={{ textAlign: 'center', padding: '20px 0' }}>
+                    <div style={{ textAlign: 'center', padding: '12px 0' }}>
                         {thumbnailDirection && (
                             <div style={{ padding: 14, borderRadius: 10, background: 'var(--sys-surface)', border: '1px solid var(--sys-border)', marginBottom: 16, textAlign: 'left' }}>
-                                <p style={{ margin: '0 0 8px', fontSize: 12, fontWeight: 700, color: 'var(--sys-text-muted)' }}>CREATIVE BRIEF</p>
-                                <p style={{ margin: 0, fontSize: 13, lineHeight: 1.6 }}>{thumbnailDirection.concept}</p>
+                                <p style={{ margin: '0 0 6px', fontSize: 11, fontWeight: 700, color: 'var(--sys-text-muted)' }}>CREATIVE BRIEF</p>
+                                <p style={{ margin: '0 0 10px', fontSize: 13, lineHeight: 1.6 }}>{thumbnailDirection.concept}</p>
                                 {thumbnailDirection.textOverlay?.line1 && (
-                                    <div style={{ marginTop: 10, padding: '10px 16px', borderRadius: 8, background: (thumbnailDirection.dominantColor || '#3b82f6') + '20', border: `1px solid ${(thumbnailDirection.dominantColor || '#3b82f6')}40`, textAlign: 'center' }}>
-                                        <p style={{ margin: 0, fontSize: 20, fontWeight: 900, color: thumbnailDirection.textOverlay.color || 'white' }}>{thumbnailDirection.textOverlay.line1}</p>
-                                        {thumbnailDirection.textOverlay.line2 && <p style={{ margin: '2px 0 0', fontSize: 13, fontWeight: 700, color: thumbnailDirection.textOverlay.color || 'white', opacity: 0.85 }}>{thumbnailDirection.textOverlay.line2}</p>}
+                                    <div style={{ padding: '10px 16px', borderRadius: 8, background: (thumbnailDirection.dominantColor || '#3b82f6') + '20', border: `1px solid ${(thumbnailDirection.dominantColor || '#3b82f6')}40`, textAlign: 'center' }}>
+                                        <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: 'var(--sys-text-muted)', marginBottom: 4 }}>TEXT OVERLAY SUGGESTION</p>
+                                        <p style={{ margin: 0, fontSize: 20, fontWeight: 900 }}>{thumbnailDirection.textOverlay.line1}</p>
+                                        {thumbnailDirection.textOverlay.line2 && <p style={{ margin: '2px 0 0', fontSize: 13, fontWeight: 700, opacity: 0.85 }}>{thumbnailDirection.textOverlay.line2}</p>}
                                     </div>
                                 )}
                             </div>
@@ -276,11 +316,13 @@ function ProjectDetail({ project, onRefresh }) {
                         <button onClick={regenerateThumbnail} disabled={genLoading}
                             style={{ padding: '12px 28px', borderRadius: 10, background: genLoading ? 'var(--sys-border)' : 'linear-gradient(135deg, #ff0000, #cc0000)', color: 'white', fontWeight: 700, fontSize: 14, border: 'none', cursor: genLoading ? 'not-allowed' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                             {genLoading
-                                ? <><div style={{ width: 16, height: 16, border: '2px solid white', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin .8s linear infinite' }} />Generating with FLUX Pro…</>
-                                : <><span className="material-symbols-outlined" style={{ fontSize: 18 }}>auto_awesome</span>Generate AI Thumbnail</>
+                                ? <><div style={{ width: 16, height: 16, border: '2px solid white', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin .8s linear infinite' }} />Generating…</>
+                                : <><span className="material-symbols-outlined" style={{ fontSize: 18 }}>auto_awesome</span>Generate AI Background</>
                             }
                         </button>
-                        <p style={{ margin: '8px 0 0', fontSize: 11, color: 'var(--sys-text-muted)' }}>Uses FLUX Pro (fal.ai) · ~20-30 seconds</p>
+                        <p style={{ margin: '8px 0 0', fontSize: 11, color: 'var(--sys-text-muted)' }}>
+                            Generates a brand-aligned background scene (no fictional characters) · NanoBanana 2 · ~10s
+                        </p>
                     </div>
                 )}
             </Section>
