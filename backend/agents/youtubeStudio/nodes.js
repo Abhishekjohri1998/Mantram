@@ -62,8 +62,11 @@ async function falGenerateImage({ prompt, imageUrl = null, width = 1280, height 
         const poll = await fetch(pollUrl, { headers: { 'Authorization': `Key ${key}` } });
         const st = await poll.json();
         if (st.status === 'COMPLETED' || st.images?.length) {
-            const img = (st.images || st.output?.images)?.[0];
-            return img?.url || img;
+            if (st.images || st.output?.images) {
+                const img = (st.images || st.output?.images)?.[0];
+                return img?.url || img;
+            }
+            break; // Break the poll loop, fetch the actual result below
         }
         if (st.status === 'FAILED') throw new Error(`FAL job failed: ${JSON.stringify(st.error || st)}`);
     }
@@ -338,174 +341,280 @@ export async function thumbnailDirectionNode({ video, analysis, seo, brandContex
 
 
 /**
- * Phase 3: Thumbnail Generation
+ * Phase 3: Thumbnail Generation — 2-Step MCoT Pipeline
  *
- * Strategy: Reference-Guided Regeneration
- *   1. Fetch the real YouTube thumbnail (which has the actual characters)
- *   2. Pass it as inlineData reference to NanoBanana 2
- *   3. Prompt: "Keep the SAME people, restyle background, add title text"
- *   4. This preserves character identity through visual grounding, not fabrication
+ * ARCHITECTURE (matching Creative Studio ai-adapt):
  *
- * Model Strategy:
- *   PRIMARY  — NanoBanana 2 (Gemini 3.1 Flash Image)
- *              Reference image → character-consistent + styled output
- *   FALLBACK — FLUX Pro via FAL.ai (photorealistic, no reference face-lock)
+ * Step A — MCoT Analysis: Gemini 2.5 Flash analyzes the template reference image and extracts
+ *   structured broadcast design DNA: lower-third bar, logo position, color palette,
+ *   layout structure, text style, overall aesthetic.
+ *
+ * Step B — Generation: NanoBanana 2 generates a FRESH dramatic scene from:
+ *   - Character descriptions from video analysis (NOT YouTube thumbnail restyle)
+ *   - Peak moment / key scene from video intelligence
+ *   - Template aesthetic (colors, mood, composition) from Step A
+ *   - Explicit lower-third bar + brand logo reconstruction
+ *   - Template reference image as Style Guide inline (not face reference)
+ *
+ * The YouTube thumbnail is NOT used as a face reference — it's often a generic
+ * auto-generated still. Instead, we use character visual descriptions from the
+ * analysis to generate characters de-novo in the show's visual style.
+ *
+ * Models: PRIMARY = gemini-3.1-flash-image-preview via @google/genai SDK
+ *         FALLBACK = fal-ai/flux-pro/v1.1
  */
-export async function thumbnailGenerationNode({ thumbnailDirection, video, brandContext, template }) {
-    const videoTitle   = video?.metadata?.title        || '';
-    const referenceUrl = video?.metadata?.thumbnailUrl || null;
-    const characters   = video?.analysis?.characters  || [];
+export async function thumbnailGenerationNode({ thumbnailDirection, video, brandContext, template, characterPortraits = [] }) {
+    const videoTitle    = video?.metadata?.title       || '';
+    const characters    = video?.analysis?.characters  || [];
+    const peakMoment    = video?.analysis?.peakMoment  || null;
 
-    // ── Build text overlay from direction ──────────────────────────────────────
+    // ── Text overlay ────────────────────────────────────────────────────────────
     const line1 = thumbnailDirection?.textOverlay?.line1
         || (videoTitle ? videoTitle.split(' ').slice(0, 5).join(' ').toUpperCase() : '');
     const line2 = thumbnailDirection?.textOverlay?.line2 || '';
 
-    // ── Character context with visual descriptions ─────────────────────────────
-    const characterContext = characters.length
-        ? `The video features: ${characters.map(c => c.label + (c.visualDescription ? ` (${c.visualDescription})` : '')).join('; ')}.`
+    // ── Character details — the FOUNDATION of the image scene ──────────────────
+    // Rich visual descriptions drive character appearance since we don't restyle the YT thumbnail
+    const leadCharacter = characters[0] || null;
+    const characterList = characters.length
+        ? characters.map(c =>
+            `${c.role ? `[${c.role}] ` : ''}${c.label}${c.visualDescription ? ': ' + c.visualDescription : ''}${c.position ? ` — screen position: ${c.position.replace(/-/g, ' ')}` : ''}`
+          ).join('\n  ')
         : '';
 
-    // ── Template visual DNA injection ─────────────────────────────────────────
-    // When a template is selected, it overrides generic direction with pre-designed style
-    const tplVisual = template?.visual;
+    // ── Peak moment — the SCENE we want to capture ─────────────────────────────
+    const peakScene = thumbnailDirection?.peakMomentUsed
+        || peakMoment?.sceneDescription
+        || thumbnailDirection?.imageGenerationPrompt
+        || `dramatic scene from "${videoTitle}"`;
+
+    const peakEmotion = peakMoment?.emotion || thumbnailDirection?.emotion || 'dramatic';
+
+    // ── Brand context ────────────────────────────────────────────────────────────
+    const brandSnippet = brandContext ? brandContext.substring(0, 200) : '';
+
+    // ── Template stored DNA ──────────────────────────────────────────────────────
+    const tplVisual   = template?.visual;
     const templateRef = template?.referenceImageUrl;
-    const templateContext = tplVisual ? [
-        `TEMPLATE STYLE — "${template.name}":`,
-        `  Color palette: primary ${tplVisual.primaryColor}, secondary ${tplVisual.secondaryColor}, background base ${tplVisual.backgroundColor}`,
-        `  Background style: ${tplVisual.backgroundStyle}`,
-        `  Composition: ${tplVisual.composition}`,
-        `  Mood overlay: ${tplVisual.overlayMood}`,
-        `  Energy level: ${tplVisual.energyLevel}`,
-        `  Title font style: ${tplVisual.titleFont}, color ${tplVisual.titleColor}, shadow ${tplVisual.titleShadow}`,
-        template.generationPromptSuffix ? `  Style directive: ${template.generationPromptSuffix}` : '',
-    ].filter(Boolean).join('\n') : '';
 
-    console.log(`🎨 [thumbnailGenerationNode] Reference-guided regen for "${videoTitle.substring(0, 50)}"`);
-    console.log(`   Template: ${template ? template.name : 'none (using direction only)'}`);
-    console.log(`   Template Style Image: ${templateRef ? '✅' : '❌ none'}`);
-    console.log(`   Characters: ${characterContext || 'none detected'}`);
-    console.log(`   Text overlay: "${line1}"${line2 ? ` / "${line2}"` : ''}`);
-    console.log(`   Face Reference: ${referenceUrl ? '✅' : '❌ none'}`);
+    const baseTemplateStyle = tplVisual ? [
+        `Colors: primary ${tplVisual.primaryColor}, secondary ${tplVisual.secondaryColor}, bg ${tplVisual.backgroundColor}`,
+        `Mood: ${tplVisual.backgroundStyle}, ${tplVisual.overlayMood}, energy: ${tplVisual.energyLevel}`,
+        `Text: ${tplVisual.titleFont} font, ${tplVisual.titleColor} color, ${tplVisual.titleShadow} shadow`,
+        template.generationPromptSuffix ? template.generationPromptSuffix : '',
+    ].filter(Boolean).join('. ') : '';
 
-    // ── Build the reference-guided + template-styled prompt ───────────────────
-    const fullPrompt = [
-        `Create a high-impact YouTube thumbnail for the video: "${videoTitle}".`,
-        referenceUrl && templateRef 
-            ? `You are given TWO reference images. Image 1 is the ORIGINAL FACE REFERENCE. Keep the SAME exact people, expressions, and visual identity from Image 1. Image 2 is the STYLE REFERENCE. Apply the color grading, lighting, and composition of Image 2 to the characters from Image 1.`
-            : referenceUrl 
-                ? `You are given the ORIGINAL FACE REFERENCE image. Keep the SAME exact real people, expressions, and visual identity. Do NOT replace or alter the people shown.` 
-                : '',
-        characterContext,
-        // Template style takes priority over generic direction
-        templateContext
-            ? templateContext
-            : [
-                thumbnailDirection?.imageGenerationPrompt
-                    ? `Scene direction: ${thumbnailDirection.imageGenerationPrompt}`
-                    : '',
-                `Composition: ${thumbnailDirection?.composition || 'center'} subject placement, high contrast.`,
-                `Mood: ${thumbnailDirection?.emotion || 'curiosity'}, energetic.`,
-                thumbnailDirection?.dominantColor ? `Brand accent color: ${thumbnailDirection.dominantColor}.` : '',
-                `Background treatment: ${thumbnailDirection?.backgroundTreatment || 'dramatic-scene'}.`,
-              ].filter(Boolean).join(' '),
-        `Make the background more dramatic, cinematic, and eye-catching than the reference.`,
-        line1
-            ? `Add BOLD text overlay: "${line1}" in large ${tplVisual?.titleColor || 'white'} bold text with ${tplVisual?.titleShadow === 'outlined' ? 'thick black outline' : 'strong dark shadow'}.`
-            : '',
-        line2
-            ? `Add secondary text: "${line2}" below the main text, slightly smaller.`
-            : '',
-        `Output format: 16:9 YouTube thumbnail (1280×720). Mobile-readable at 320px.`,
-        `Broadcast-quality production, sharp focus on the characters.`,
-        `IMPORTANT: Do NOT attempt to draw the channel logo or add any watermarks. We will composite the real logo image later.`,
-    ].filter(Boolean).join(' ');
+    const directionStyle = !template ? [
+        thumbnailDirection?.imageGenerationPrompt || '',
+        `Mood: ${thumbnailDirection?.emotion || 'dramatic'}`,
+        thumbnailDirection?.dominantColor ? `Color: ${thumbnailDirection.dominantColor}` : '',
+    ].filter(Boolean).join('. ') : '';
 
-    const router = getRouter();
+    console.log(`\n🎨 [thumbnailGenerationNode] 2-Step MCoT — FRESH SCENE GENERATION`);
+    console.log(`   Video: "${videoTitle.substring(0, 60)}"`);
+    console.log(`   Template: ${template ? `"${template.name}" | ref: ${templateRef ? '✅' : '❌ none'} | directive: ${template.generationPromptSuffix ? '✅' : '⚠️  EMPTY'}` : 'none'}`);
+    console.log(`   Characters: ${characters.length} — ${leadCharacter?.label || 'none'}`);
+    console.log(`   Peak scene: ${peakScene.substring(0, 80)}`);
+    console.log(`   Text overlays: "${line1}"${line2 ? ` / "${line2}"` : ''}`);
+    console.log(`   🚫 NOT using YouTube thumbnail as face ref — generating fresh scene from character descriptions`);
 
-    // ── Strategy 1: NanoBanana 2 with reference image (character consistency) ──
-    try {
-        const imageParts = [];
+    const geminiKey = process.env.GEMINI_IMAGE_API_KEY || process.env.GEMINI_API_KEY;
+    if (!geminiKey) throw new Error('GEMINI_IMAGE_API_KEY not configured');
 
-        if (referenceUrl) {
-            try {
-                const imgRes = await fetch(referenceUrl, { signal: AbortSignal.timeout(10000) });
-                if (imgRes.ok) {
-                    const buf      = await imgRes.arrayBuffer();
-                    const b64      = Buffer.from(buf).toString('base64');
-                    const mimeType = imgRes.headers.get('content-type') || 'image/jpeg';
-                    imageParts.push({
-                        inlineData: { data: b64, mimeType },
-                        text: templateRef 
-                            ? `IMAGE 1 (FACE REFERENCE): Keep the exact real characters/people from this image.`
-                            : `ORIGINAL THUMBNAIL REFERENCE: Keep the same real characters/people exactly as shown.`,
-                    });
-                    console.log(`   ✅ Face reference thumbnail loaded (${Math.round(buf.byteLength / 1024)}KB)`);
-                }
-            } catch (fetchErr) {
-                console.warn(`   ⚠️ Face reference fetch failed: ${fetchErr.message}`);
-            }
-        }
-
-        if (templateRef) {
-            try {
-                const imgRes = await fetch(templateRef, { signal: AbortSignal.timeout(10000) });
-                if (imgRes.ok) {
-                    const buf      = await imgRes.arrayBuffer();
-                    const b64      = Buffer.from(buf).toString('base64');
-                    const mimeType = imgRes.headers.get('content-type') || 'image/jpeg';
-                    imageParts.push({
-                        inlineData: { data: b64, mimeType },
-                        text: `IMAGE 2 (STYLE REFERENCE): Apply the layout, mood, background composition, and color grading from this image to the characters in Image 1.`,
-                    });
-                    console.log(`   ✅ Template Style reference loaded (${Math.round(buf.byteLength / 1024)}KB)`);
-                }
-            } catch (fetchErr) {
-                console.warn(`   ⚠️ Template Style reference fetch failed: ${fetchErr.message}`);
-            }
-        }
-
-        const result = await router.generateImage({
-            prompt: fullPrompt,
-            aspectRatio: '16:9',
-            imageParts,
-        });
-
-        console.log(`✅ [thumbnailGenerationNode] NanoBanana 2 succeeded — characters + title rendered`);
-        return { generatedThumbnailUrl: result.imageUrl, thumbnailGenerationError: null };
-
-    } catch (primaryErr) {
-        console.warn(`⚠️ [thumbnailGenerationNode] NanoBanana 2 failed: ${primaryErr.message} — trying FLUX Pro`);
-
-        // ── Strategy 2: FLUX Pro (image-to-image style transfer) ──────────────
+    // ── Helper: fetch any URL as inline image data ───────────────────────────────
+    async function fetchInline(url, label) {
         try {
-            const fluxPrompt = [
-                `YouTube thumbnail for "${videoTitle}".`,
-                characterContext,
-                thumbnailDirection?.imageGenerationPrompt || 'dramatic cinematic scene',
-                line1 ? `Text overlay: "${line1}"` : '',
-                line2 ? `Subtitle: "${line2}"` : '',
-                thumbnailDirection?.dominantColor ? `Color: ${thumbnailDirection.dominantColor}` : '',
-                `High contrast, professional, photorealistic, 16:9`,
-            ].filter(Boolean).join('. ');
-
-            const generatedThumbnailUrl = await falGenerateImage({
-                prompt:   fluxPrompt,
-                imageUrl: referenceUrl,  // image-to-image reference for style/character transfer
-                width:    1280,
-                height:   720,
-                model:    'fal-ai/flux-pro/v1.1',
-            });
-
-            console.log(`✅ [thumbnailGenerationNode] FLUX Pro fallback succeeded`);
-            return { generatedThumbnailUrl, thumbnailGenerationError: null };
-
-        } catch (fluxErr) {
-            console.error(`❌ [thumbnailGenerationNode] Both providers failed. Primary: ${primaryErr.message}`);
-            return { generatedThumbnailUrl: null, thumbnailGenerationError: primaryErr.message };
+            const res = await fetch(url, { signal: AbortSignal.timeout(12000) });
+            if (!res.ok) { console.warn(`   ⚠️ ${label}: HTTP ${res.status}`); return null; }
+            const buf = await res.arrayBuffer();
+            const mimeType = res.headers.get('content-type')?.split(';')[0] || 'image/jpeg';
+            console.log(`   ✅ ${label} (${Math.round(buf.byteLength / 1024)}KB)`);
+            return { inlineData: { data: Buffer.from(buf).toString('base64'), mimeType } };
+        } catch (e) {
+            console.warn(`   ⚠️ ${label} failed: ${e.message}`);
+            return null;
         }
     }
+
+    // ── Load template reference image (style guide, NOT face reference) ──────────
+    const templateRefPart = templateRef ? await fetchInline(templateRef, 'Template style reference') : null;
+
+    // ── Load character portrait as face anchor (if previously generated) ─────────
+    // characterPortraits are generated by Node 8 (characterPortraitNode) using the YT thumbnail
+    // They are AI-generated portraits grounded to the real characters — much better face ref
+    const leadPortraitUrl = characterPortraits?.find(p => p.portraitUrl && !p.error)?.portraitUrl || null;
+    const leadPortraitPart = leadPortraitUrl ? await fetchInline(leadPortraitUrl, 'Lead character portrait') : null;
+    console.log(`   Lead portrait anchor: ${leadPortraitPart ? '✅' : '❌ none (generating characters from text descriptions)'}`);
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // STEP A — MCoT: Deep analysis of the template reference image
+    //   Extract the broadcast design DNA that must be RECONSTRUCTED in the output:
+    //   lower-third bar, logo position, color palette, layout, text style,
+    //   decorative elements, overall production aesthetic
+    // ═══════════════════════════════════════════════════════════════════════════
+    let ta = {};  // template analysis result
+    if (templateRefPart) {
+        console.log(`   🔍 Step A: Analyzing template image for broadcast DNA...`);
+        const t0 = Date.now();
+        try {
+            const analyzeResp = await fetch(
+                `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`,
+                {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{
+                            role: 'user',
+                            parts: [
+                                templateRefPart,
+                                { text: `Analyze this Indian TV broadcast / YouTube show thumbnail. Extract EVERY visual element that must be RECONSTRUCTED when making a new thumbnail in the same style.
+
+Return ONLY a JSON object, no markdown:
+{
+  "showName": "exact name of show visible",
+  "lowerThird": "describe the lower-third bar EXACTLY — height proportion, background color/gradient, text color, font weight, position",
+  "colorPalette": ["#hex1","#hex2","#hex3"],
+  "mainSubjectPosition": "where the main character stands — e.g. 'left-center', 'full-frame center', 'right side'",
+  "backgroundScene": "describe the background — outdoor woodland/trees, indoor set, studio, etc.",
+  "textStyle": "describe font weight, color, shadow, stroke used for any on-screen text",
+  "overallAesthetic": "2-sentence description of the production quality, cultural style, and mood",
+  "reconstructionInstruction": "Step-by-step instruction for an image generator to recreate this EXACT broadcast template format with new characters. Be very specific about the lower-third bar and character positioning."
+}` }
+                            ]
+                        }],
+                        generationConfig: { temperature: 0.1, maxOutputTokens: 1200 },
+                    }),
+                    signal: AbortSignal.timeout(35000),
+                }
+            );
+            const d = await analyzeResp.json();
+            const raw = d.candidates?.[0]?.content?.parts?.map(p => p.text).filter(Boolean).join('') || '';
+            const match = raw.replace(/```json\s*/g,'').replace(/```\s*/g,'').trim().match(/\{[\s\S]*\}/);
+            if (match) {
+                ta = JSON.parse(match[0]);
+                console.log(`   ✅ Step A (${Date.now()-t0}ms): show="${ta.showName}", lower-third="${ta.lowerThird?.substring(0,60)}"`);
+            } else {
+                console.warn(`   ⚠️ Step A failed to parse JSON. Raw: ${raw.substring(0, 100)}...`);
+            }
+        } catch (e) {
+            console.warn(`   ⚠️ Step A failed: ${e.message} — using stored template DNA`);
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // STEP B — Build the generation prompt
+    //
+    // Goal: Generate a FRESH scene showing the show's characters in the peak moment,
+    //       styled exactly like the template (same lower-third, same logo position,
+    //       same color palette, same broadcast production quality).
+    //       Do NOT restyle the YouTube cover — generate new content.
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    // Template style block (MCoT-analyzed takes priority)
+    const templateStyleBlock = [
+        `=== TEMPLATE "${template?.name || 'Show Template'}" — RECREATE THIS BROADCAST FORMAT EXACTLY ===`,
+        ta.overallAesthetic  ? `Aesthetic: ${ta.overallAesthetic}` : (baseTemplateStyle || directionStyle),
+        ta.colorPalette?.length ? `Color palette: ${ta.colorPalette.join(', ')}` : '',
+        ta.backgroundScene   ? `Background scene type: ${ta.backgroundScene}` : '',
+        ta.mainSubjectPosition ? `Subject placement: ${ta.mainSubjectPosition}` : '',
+        ta.textStyle         ? `Text style: ${ta.textStyle}` : '',
+        template?.generationPromptSuffix ? `\nSHOW STYLE DIRECTIVE: ${template.generationPromptSuffix}` : '',
+    ].filter(Boolean).join('\n');
+
+    // Lower-third — the key broadcast element to rebuild (Logos are explicitly omitted)
+    const broadcastElementsBlock = [
+        // Lower-third title bar (the most visible template element)
+        ta.lowerThird
+            ? `\nLOWER-THIRD TITLE BAR (CRITICAL): ${ta.lowerThird}. This bar MUST be present in the output.`
+            : '\nLOWER-THIRD TITLE BAR: Add a dark gradient bar at the bottom of the image (occupying roughly the bottom 15% of height), containing the episode title text.',
+        // Text inside the lower third
+        line1
+            ? `Text inside lower-third bar: "${line1}" — ${ta.textStyle || 'bold, white/light colored text, centered or left-aligned'}.`
+            : '',
+        line2 ? `Additional text: "${line2}"` : '',
+        // Reconstruction instruction from MCoT
+        ta.reconstructionInstruction ? `\nRECONSTRUCTION GUIDE: ${ta.reconstructionInstruction}` : '',
+    ].filter(Boolean).join('\n');
+
+    // How to describe the character(s) to generate
+    const characterGenerationBlock = leadPortraitPart
+        ? `CHARACTER: Use the provided reference portrait image for the lead character's exact appearance. Place them in the scene as the focal subject.`
+        : (characterList
+            ? `CHARACTERS TO GENERATE (from AI video analysis — create these people from scratch matching these descriptions):\n  ${characterList}`
+            : 'Generate the show\'s lead character(s) appropriate to the show style and scene.');
+
+    // Build the master generation prompt
+    const fullPrompt = [
+        `Create a professional Indian TV drama YouTube thumbnail (1280×720, 16:9).`,
+        `Video title: "${videoTitle}"`,
+        `Show: "${ta.showName || template?.name || 'Indian TV drama'}"`,
+
+        `\n=== WHAT TO GENERATE (GRAPHIC DESIGN + PHOTOGRAPHY) ===`,
+        `You are generating a final YouTube thumbnail asset. First, create a FRESH, cinematically lit dramatic scene showing the characters. Second, you MUST composite the required broadcast graphic elements (specifically the lower-third title bar) directly onto the image. This is a broadcast graphic, not just a raw photograph.`,
+
+        `\nKEY SCENE TO DEPICT:`,
+        peakScene,
+        `Emotional tone: ${peakEmotion}`,
+
+        `\n${characterGenerationBlock}`,
+
+        `\n${templateStyleBlock}`,
+
+        `\n=== BROADCAST OVERLAY ELEMENTS (MUST INCLUDE) ===`,
+        broadcastElementsBlock,
+
+        brandSnippet ? `\nBrand context: ${brandSnippet}` : '',
+
+        `\n=== HARD RULES ===`,
+        `- Aspect ratio: 16:9, 1280×720px`,
+        `- The lower-third title bar with text IS MANDATORY — include it`,
+        `- DO NOT GENERATE ANY BRAND LOGO OR CHANNEL LOGO. Logos will cause hallucinations. Leave space where logos would go; the real brand logo will be overlaid digitally later.`,
+        `- Characters must be ${ta.mainSubjectPosition || 'prominently featured'} in the frame`,
+        `- DO NOT include any fictional logos or watermarks`,
+        `- Broadcast quality: sharp, vibrant, cinematic lighting`,
+        `- Style reference image is provided — match its layout structure, NOT its specific scene`,
+    ].filter(Boolean).join('\n');
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Execute Image Generation (NanoBanana 2 / Gemini 3.1 Native)
+    // ═══════════════════════════════════════════════════════════════════════════
+    console.log(`   🚀 [nanobanana2-native] Executing 16:9 graphic composite with Gemini...`);
+    try {
+        const genPrompt = [
+            `You are generating a highly polished YouTube thumbnail graphic asset. First, create a freshly lit dramatic scene. Second, you MUST composite the required broadcast graphic elements (specifically the lower-third title bar) directly onto the image.`,
+            `Indian TV drama YouTube thumbnail (16:9) for "${videoTitle}". Show: "${ta.showName || template?.name || 'Indian TV show'}".`,
+            peakScene,
+            characterList ? `Characters to include: ${characterList.substring(0, 300)}` : '',
+            ta.reconstructionInstruction || template?.generationPromptSuffix || directionStyle,
+            ta.colorPalette ? `Color palette: ${ta.colorPalette.join(', ')}` : '',
+            ta.lowerThird ? `LOWER-THIRD TITLE BAR (CRITICAL): ${ta.lowerThird}. This MUST be included at the bottom with exact text: "${line1}"` : `Text at bottom: "${line1}"`,
+            `DO NOT GENERATE ANY BRAND OR CHANNEL LOGOS. Leave empty space where they go.`,
+            `High contrast, professional, photorealistic cinematic lighting, 16:9 landscape.`,
+        ].filter(Boolean).join('. ');
+
+        // Using native GeminiProvider via getRouter() which correctly applies REST imageConfig for 16:9
+        const router = getRouter();
+        const result = await router.generateImage({
+            prompt: genPrompt,
+            aspectRatio: '16:9',
+            imageParts: [
+                ...(leadPortraitPart  ? [leadPortraitPart]  : []),
+                ...(templateRefPart   ? [templateRefPart]   : []),
+            ],
+        });
+        
+        const finalUrl = typeof result === 'string' ? result : result.imageUrl;
+        
+        console.log(`✅ [thumbnailGenerationNode] Success — 16:9 scene generated natively`);
+        return { generatedThumbnailUrl: finalUrl, thumbnailGenerationError: null };
+    } catch (err) {
+        console.warn(`❌ [thumbnailGenerationNode] Gemini image gen failed: ${err.message}`);
+        return { generatedThumbnailUrl: null, thumbnailGenerationError: err.message };
+    }
 }
+
+
+
 
 // ── 8. Character Portrait Node (Phase 2) ───────────────────────────────────
 
@@ -601,6 +710,11 @@ Describe each visible person's exact appearance so I can generate accurate portr
             const visualDesc = visualDescriptions[char.label]
                 ? `Based on the reference image, this person has: ${visualDescriptions[char.label]}`
                 : `${char.label}, a ${char.role || 'presenter'} in this video.`;
+
+            // Hint about where in the frame the person appears
+            const positionHint = char.position
+                ? `They are typically positioned: ${char.position.replace(/-/g, ' ')}.`
+                : '';
 
             const prompt = [
                 `Professional portrait photograph of a real person from YouTube video "${videoTitle}".`,

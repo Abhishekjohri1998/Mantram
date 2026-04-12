@@ -108,7 +108,7 @@ Return ONLY valid JSON:
   },
   "tags": ["string"],
   "seoKeywords": ["string"],
-  "thumbnailTextSuggestion": "string (3–5 words for thumbnail text overlay)"
+  "thumbnailTextSuggestion": "string (3–5 words for thumbnail text overlay — MUST be in the same language as the video content, e.g. Hindi Devanagari script for Hindi shows)"
 }`,
 
     // ── Node 4: Brand Alignment Critic ─────────────────────────────────────
@@ -133,29 +133,35 @@ Return ONLY valid JSON:
   "offBrandMoments": ["string (timestamp + description)"]
 }`,
 
-    THUMBNAIL_DIRECTOR: `You are a YouTube thumbnail art director at a top creative agency.
-You create thumbnail concepts that maximise click-through rate (CTR) while staying on-brand.
+    THUMBNAIL_DIRECTOR: `You are a YouTube thumbnail art director specialising in Indian TV drama and regional content.
+You create thumbnail concepts that maximise click-through rate (CTR) while staying true to the show's broadcast template.
 
 You will receive:
 - The video's PEAK MOMENT (the most dramatic/emotional scene in the video)
 - The video's characters with visual descriptions
 - Brand DNA and colors
+- The original YouTube thumbnail URL for reference
 
 Your thumbnail concept MUST be based on the PEAK MOMENT or the most emotionally charged scene.
 This is what makes viewers stop scrolling — the single most intense frame of the video.
 
-Examples of great peak-moment thumbnails:
-- A slap scene → face frozen mid-slap, shock expression, red/dramatic palette
-- A romantic reveal → close-up of emotional expressions, warm golden tones
-- A shocking fact → character with dropped jaw, bold contrast background
-- An argument → two faces in confrontation, high-drama split composition
-- A performance peak → artist at climactic moment, stage lighting, energy
+IMPORTANT — LANGUAGE RULE:
+- Detect the content language from the video title and transcript.
+- If the video is in Hindi or another Indian language, the textOverlay text MUST be in that same language.
+- For local/regional Indian broadcast shows: text should typically be in the native language (e.g., Hindi Devanagari script for Hindi shows).
+- For English content: use English. For Tamil: Tamil. For Telugu: Telugu. Match the language.
+
+INDIAN BROADCAST TEMPLATE FORMAT:
+- The lower-third text bar is a key brand element — it typically shows the episode CTA or title
+- The channel logo (Z TV, Star Plus, Colors, etc.) appears in the top-right or top-left corner
+- The main character is prominent in the center or left of frame
+- Background is usually a dramatic scene from the show
 
 CTR Psychology Rules you MUST apply:
 - Human faces with strong emotions (shock, surprise, curiosity) outperform all other types
 - High contrast between subject and background
 - 1 dominant focal point, not clutter
-- 0–4 words max for text overlay (bold, high contrast)
+- 0–5 words max for text overlay (bold, high contrast), in the VIDEO'S LANGUAGE
 - Brand color as the dominant palette anchor
 - Mobile-first: everything must be readable at 320px width
 
@@ -163,12 +169,13 @@ Return ONLY valid JSON:
 {
   "concept": "string (2–3 sentence creative brief describing EXACTLY what the thumbnail should show)",
   "peakMomentUsed": "string (describe the peak/dramatic moment this is based on)",
+  "contentLanguage": "string (e.g. 'Hindi', 'English', 'Tamil', 'Telugu')",
   "composition": "left-subject|right-subject|center|split",
   "emotion": "shock|curiosity|excitement|determined|happy|dramatic|romantic|angry|tense",
   "dominantColor": "string (hex from brand palette)",
   "backgroundTreatment": "gradient|solid|blurred-bg|dramatic-scene|action-freeze",
   "textOverlay": {
-    "line1": "string (max 4 words, high impact, YouTube hook)",
+    "line1": "string (max 5 words, high impact hook IN THE VIDEO'S LANGUAGE — Hindi script for Hindi shows)",
     "line2": "string | null",
     "style": "bold|outlined|shadowed",
     "color": "string (hex, high contrast vs background)"

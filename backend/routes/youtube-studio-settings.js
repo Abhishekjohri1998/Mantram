@@ -412,6 +412,7 @@ router.get('/channel-configs', protect, async (req, res) => {
     try {
         const channels = await YoutubeChannelConfig.find({ userId: req.user._id })
             .populate('defaultTemplateId', 'name icon visual classification')
+            .populate('shows.templateId', 'name icon visual classification')
             .sort({ isDefault: -1, createdAt: 1 });
         res.json({ success: true, channels });
     } catch (err) {
@@ -450,7 +451,8 @@ router.put('/channel-configs/:id', protect, async (req, res) => {
             { _id: req.params.id, userId: req.user._id },
             { $set: update },
             { new: true, runValidators: true }
-        ).populate('defaultTemplateId', 'name icon visual classification');
+        ).populate('defaultTemplateId', 'name icon visual classification')
+         .populate('shows.templateId', 'name icon visual classification');
         if (!channel) return res.status(404).json({ success: false, error: 'Channel not found' });
         res.json({ success: true, channel });
     } catch (err) {

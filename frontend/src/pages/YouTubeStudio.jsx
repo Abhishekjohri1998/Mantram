@@ -170,6 +170,98 @@ function ProjectCard({ project, onOpen }) {
     )
 }
 
+// ── Show Template Picker ──────────────────────────────────────────────────────
+// Used in ProjectDetail to select which show's template to apply for thumbnail regen.
+
+function ShowTemplatePicker({ channelShows, templates, selectedShowId, selectedTemplateId, onShowSelect, onTemplateSelect }) {
+    const [showOther, setShowOther] = useState(false)
+
+    // Get template details for a show
+    const getShowTemplate = (show) => templates.find(t => t._id === (show.templateId?._id || show.templateId))
+
+    const hasShows = channelShows.length > 0
+
+    return (
+        <div style={{ background: 'var(--sys-surface)', borderRadius: 10, border: '1px solid var(--sys-border)', overflow: 'hidden' }}>
+            {/* Header */}
+            <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--sys-border)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--sys-primary)' }}>palette</span>
+                <span style={{ fontSize: 12, fontWeight: 700 }}>Thumbnail Style</span>
+                {(selectedShowId || selectedTemplateId) && (
+                    <button onClick={() => { onShowSelect(''); onTemplateSelect('') }}
+                        style={{ marginLeft: 'auto', fontSize: 10, padding: '2px 8px', borderRadius: 6, border: '1px solid var(--sys-border)', background: 'transparent', color: 'var(--sys-text-muted)', cursor: 'pointer' }}>
+                        Clear
+                    </button>
+                )}
+            </div>
+
+            <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {/* Shows */}
+                {hasShows && (
+                    <div>
+                        <p style={{ margin: '0 0 8px', fontSize: 11, fontWeight: 700, color: 'var(--sys-text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Shows on this Channel</p>
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                            {channelShows.map(show => {
+                                const tpl = getShowTemplate(show)
+                                const isActive = selectedShowId === show.showId
+                                return (
+                                    <button key={show.showId} onClick={() => onShowSelect(isActive ? '' : show.showId)}
+                                        style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '7px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: `2px solid ${isActive ? 'var(--sys-primary)' : 'var(--sys-border)'}`, background: isActive ? 'var(--sys-primary)' : 'var(--sys-bg)', color: isActive ? 'white' : 'var(--sys-text)', transition: 'all .15s' }}>
+                                        {/* Template color dot */}
+                                        <div style={{ width: 10, height: 10, borderRadius: '50%', background: tpl?.visual?.primaryColor || '#888', flexShrink: 0 }} />
+                                        <span className="material-symbols-outlined" style={{ fontSize: 13 }}>{show.showIcon || 'live_tv'}</span>
+                                        {show.showName}
+                                        {tpl && <span style={{ fontSize: 9, opacity: 0.8 }}>· {tpl.name}</span>}
+                                    </button>
+                                )
+                            })}
+                        </div>
+                    </div>
+                )}
+
+                {/* Other templates toggle */}
+                <div>
+                    <button onClick={() => setShowOther(p => !p)}
+                        style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--sys-text-muted)', background: 'transparent', border: 'none', cursor: 'pointer', padding: 0, fontWeight: 600 }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 14 }}>{showOther ? 'expand_less' : 'expand_more'}</span>
+                        {hasShows ? 'Other Templates' : 'Select Template'}
+                        {selectedTemplateId && !selectedShowId && (
+                            <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 10, background: 'var(--sys-primary)', color: 'white', fontWeight: 700 }}>Active</span>
+                        )}
+                    </button>
+                    {(showOther || !hasShows) && (
+                        <div style={{ marginTop: 8, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                            <button onClick={() => onTemplateSelect('')}
+                                style={{ padding: '5px 10px', borderRadius: 8, fontSize: 11, fontWeight: 600, border: `1.5px solid ${!selectedTemplateId && !selectedShowId ? 'var(--sys-primary)' : 'var(--sys-border)'}`, background: !selectedTemplateId && !selectedShowId ? 'var(--sys-primary)' : 'var(--sys-bg)', color: !selectedTemplateId && !selectedShowId ? 'white' : 'var(--sys-text)', cursor: 'pointer' }}>
+                                Default Style
+                            </button>
+                            {templates.map(t => {
+                                const isActive = selectedTemplateId === t._id && !selectedShowId
+                                return (
+                                    <button key={t._id} onClick={() => onTemplateSelect(isActive ? '' : t._id)}
+                                        style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer', border: `1.5px solid ${isActive ? 'var(--sys-primary)' : 'var(--sys-border)'}`, background: isActive ? 'var(--sys-primary)' : 'var(--sys-bg)', color: isActive ? 'white' : 'var(--sys-text)', transition: 'all .15s' }}>
+                                        <div style={{ width: 8, height: 8, borderRadius: '50%', background: t.visual?.primaryColor || '#888', flexShrink: 0 }} />
+                                        {t.name}
+                                    </button>
+                                )
+                            })}
+                        </div>
+                    )}
+                </div>
+
+                {/* Active selection summary */}
+                {(selectedShowId || selectedTemplateId) && (
+                    <div style={{ padding: '6px 10px', borderRadius: 6, background: 'var(--sys-primary)10', border: '1px solid var(--sys-primary)30', fontSize: 11, color: 'var(--sys-primary)', fontWeight: 600 }}>
+                        ✓ {selectedShowId
+                            ? `Show: ${channelShows.find(s => s.showId === selectedShowId)?.showName || selectedShowId} — theme applied on generation`
+                            : `Template: ${templates.find(t => t._id === selectedTemplateId)?.name || selectedTemplateId}`}
+                    </div>
+                )}
+            </div>
+        </div>
+    )
+}
+
 // ── Project Detail View ───────────────────────────────────────────────────────
 
 function ProjectDetail({ project, onRefresh }) {
@@ -180,15 +272,33 @@ function ProjectDetail({ project, onRefresh }) {
     const [selectedTemplateId, setSelectedTemplateId] = useState(project.appliedTemplateId || '')
 
     useEffect(() => {
-        api('/yt-studio-settings/templates/channel/all')
+        api('/yt-studio-settings/templates')
             .then(d => { if (d.templates) setTemplates(d.templates) })
-            .catch(err => console.error(err))
+            .catch(err => console.error('Template load failed:', err))
     }, [])
 
     const [genLoading, setGenLoading]         = useState(false)
     const [portraitLoading, setPortraitLoading] = useState(false)
     const [localThumb, setLocalThumb]         = useState(generatedThumbnailUrl)
     const [localPortraits, setLocalPortraits] = useState(characterPortraits || [])
+    const [selectedShowId, setSelectedShowId] = useState(project.showId || '')
+    const [channelShows, setChannelShows]     = useState([])
+
+    // Editable text overlay state
+    const [editLine1, setEditLine1] = useState(thumbnailDirection?.textOverlay?.line1 || '')
+    const [editLine2, setEditLine2] = useState(thumbnailDirection?.textOverlay?.line2 || '')
+
+    // Load channel's shows list so we can display them in the Show Template Picker
+    useEffect(() => {
+        if (project.channelConfigId) {
+            api('/yt-studio-settings/channel-configs')
+                .then(d => {
+                    const ch = (d.channels || []).find(c => c._id === project.channelConfigId)
+                    setChannelShows(ch?.shows || [])
+                })
+                .catch(() => {})
+        }
+    }, [project.channelConfigId])
 
     // Title management
     const originalTitle = metadata?.title || project.videoId
@@ -218,9 +328,13 @@ function ProjectDetail({ project, onRefresh }) {
     async function regenerateThumbnail() {
         setGenLoading(true)
         try {
-            const d = await api(`/youtube-studio/${project._id}/thumbnail`, { 
+            const body = { customTextOverlay: { line1: editLine1, line2: editLine2 } }
+            // Prefer showId resolution (lets backend pick show's template)
+            if (selectedShowId) body.showId = selectedShowId
+            else if (selectedTemplateId) body.templateId = selectedTemplateId
+            const d = await api(`/youtube-studio/${project._id}/thumbnail`, {
                 method: 'POST',
-                body: JSON.stringify({ templateId: selectedTemplateId })
+                body: JSON.stringify(body)
             })
             if (d.generatedThumbnailUrl) setLocalThumb(d.generatedThumbnailUrl)
             else alert('Thumbnail generation returned undefined URL. Provider error.')
@@ -393,35 +507,46 @@ function ProjectDetail({ project, onRefresh }) {
                         <img src={localThumb} alt="AI thumbnail"
                             style={{ width: '100%', maxWidth: 640, height: 'auto', borderRadius: 8, border: '2px solid var(--sys-primary)', display: 'block', marginBottom: 12 }} />
 
-                        {/* Text overlay suggestion — shown as copyable text, NOT rendered in image */}
+                        {/* Editable Text Overlay */}
                         {thumbnailDirection?.textOverlay?.line1 && (
-                            <div style={{ padding: '10px 14px', borderRadius: 8, background: 'var(--sys-surface)', border: '1px solid var(--sys-border)', marginBottom: 12 }}>
-                                <p style={{ margin: '0 0 4px', fontSize: 11, fontWeight: 700, color: 'var(--sys-text-muted)' }}>SUGGESTED TEXT OVERLAY (add manually in Canva/PS)</p>
-                                <p style={{ margin: 0, fontSize: 18, fontWeight: 900, letterSpacing: '-0.5px' }}>
-                                    {thumbnailDirection.textOverlay.line1}
-                                    {thumbnailDirection.textOverlay.line2 && <><br /><span style={{ fontSize: 14, fontWeight: 700, opacity: 0.8 }}>{thumbnailDirection.textOverlay.line2}</span></>}
-                                </p>
-                                {thumbnailDirection.dominantColor && (
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
-                                        <div style={{ width: 16, height: 16, borderRadius: 4, background: thumbnailDirection.dominantColor, border: '1px solid var(--sys-border)' }} />
-                                        <span style={{ fontSize: 11, color: 'var(--sys-text-muted)' }}>{thumbnailDirection.dominantColor}</span>
-                                    </div>
-                                )}
+                            <div style={{ padding: '12px 14px', borderRadius: 8, background: 'var(--sys-surface)', border: '1px solid var(--sys-border)', marginBottom: 12 }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                                    <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: 'var(--sys-text-muted)' }}>MCoT EXTRACTED TEXT (Editable for AI Overlay)</p>
+                                    {thumbnailDirection.dominantColor && (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                            <div style={{ width: 14, height: 14, borderRadius: 4, background: thumbnailDirection.dominantColor, border: '1px solid var(--sys-border)' }} />
+                                            <span style={{ fontSize: 10, color: 'var(--sys-text-muted)' }}>{thumbnailDirection.dominantColor}</span>
+                                        </div>
+                                    )}
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                    <input 
+                                        value={editLine1} 
+                                        onChange={e => setEditLine1(e.target.value)} 
+                                        placeholder="Line 1 (e.g. Episode Title)" 
+                                        style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--sys-border)', background: 'var(--sys-bg)', color: 'var(--sys-text)', fontSize: 14, fontWeight: 700, outline: 'none', boxSizing: 'border-box' }} 
+                                    />
+                                    {thumbnailDirection.textOverlay.line2 && (
+                                        <input 
+                                            value={editLine2} 
+                                            onChange={e => setEditLine2(e.target.value)} 
+                                            placeholder="Line 2 (Optional)" 
+                                            style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--sys-border)', background: 'var(--sys-bg)', color: 'var(--sys-text)', fontSize: 12, fontWeight: 600, outline: 'none', boxSizing: 'border-box' }} 
+                                        />
+                                    )}
+                                </div>
                             </div>
                         )}
 
                         <div style={{ display: 'flex', gap: 8, flexDirection: 'column' }}>
-                            <div style={{ display: 'flex', gap: 10, alignItems: 'center', background: 'var(--sys-surface)', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--sys-border)' }}>
-                                <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--sys-text-muted)' }}>palette</span>
-                                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--sys-text)' }}>Apply Show Template:</span>
-                                <select value={selectedTemplateId} onChange={e => setSelectedTemplateId(e.target.value)}
-                                    style={{ flex: 1, padding: '6px 12px', borderRadius: 6, border: '1px solid var(--sys-border)', background: 'var(--sys-bg)', color: 'var(--sys-text)', fontSize: 13, cursor: 'pointer' }}>
-                                    <option value="">No Template (Base Style)</option>
-                                    {templates.map(t => (
-                                        <option key={t._id} value={t._id}>{t.name} (Theme: {t.classification?.theme})</option>
-                                    ))}
-                                </select>
-                            </div>
+                            <ShowTemplatePicker
+                                channelShows={channelShows}
+                                templates={templates}
+                                selectedShowId={selectedShowId}
+                                selectedTemplateId={selectedTemplateId}
+                                onShowSelect={sid => { setSelectedShowId(sid); setSelectedTemplateId('') }}
+                                onTemplateSelect={tid => { setSelectedTemplateId(tid); setSelectedShowId('') }}
+                            />
 
                             <div style={{ display: 'flex', gap: 8 }}>
                                 <a href={localThumb} download="ai-thumbnail.jpg" target="_blank" rel="noreferrer"
@@ -455,17 +580,14 @@ function ProjectDetail({ project, onRefresh }) {
                             </div>
                         )}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                            <div style={{ display: 'flex', gap: 10, alignItems: 'center', background: 'var(--sys-surface)', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--sys-border)' }}>
-                                <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--sys-text-muted)' }}>palette</span>
-                                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--sys-text)' }}>Apply Show Template:</span>
-                                <select value={selectedTemplateId} onChange={e => setSelectedTemplateId(e.target.value)}
-                                    style={{ flex: 1, padding: '6px 12px', borderRadius: 6, border: '1px solid var(--sys-border)', background: 'var(--sys-bg)', color: 'var(--sys-text)', fontSize: 13, cursor: 'pointer' }}>
-                                    <option value="">No Template (Base Style)</option>
-                                    {templates.map(t => (
-                                        <option key={t._id} value={t._id}>{t.name} (Theme: {t.classification?.theme})</option>
-                                    ))}
-                                </select>
-                            </div>
+                            <ShowTemplatePicker
+                                channelShows={channelShows}
+                                templates={templates}
+                                selectedShowId={selectedShowId}
+                                selectedTemplateId={selectedTemplateId}
+                                onShowSelect={sid => { setSelectedShowId(sid); setSelectedTemplateId('') }}
+                                onTemplateSelect={tid => { setSelectedTemplateId(tid); setSelectedShowId('') }}
+                            />
                             <button onClick={regenerateThumbnail} disabled={genLoading}
                                 style={{ padding: '12px 28px', borderRadius: 10, background: genLoading ? 'var(--sys-border)' : 'linear-gradient(135deg, #ff0000, #cc0000)', color: 'white', fontWeight: 700, fontSize: 14, border: 'none', cursor: genLoading ? 'not-allowed' : 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
                                 {genLoading
@@ -703,10 +825,14 @@ export default function YouTubeStudio() {
     const [projects, setProjects] = useState([])
     const [activeProject, setActiveProject] = useState(null)
     const [loadingProject, setLoadingProject] = useState(false)
-    const [activeTemplate, setActiveTemplate] = useState(null) // Restored this state
+    const [activeTemplate, setActiveTemplate] = useState(null)
     const [channels, setChannels] = useState([])
     const [selectedChannelId, setSelectedChannelId] = useState('')
+    const [selectedShowId, setSelectedShowId] = useState('')  // for analyse tab
     const pollRef = useRef({})
+
+    // Derived: shows for the currently selected channel
+    const selectedChannelShows = channels.find(c => c._id === selectedChannelId)?.shows || []
 
     useEffect(() => { loadProjects(); loadChannels() }, [])
 
@@ -771,7 +897,12 @@ export default function YouTubeStudio() {
         try {
             const d = await api('/youtube-studio/analyse', {
                 method: 'POST',
-                body: JSON.stringify({ urls: rawUrls, brandId: activeBrand?._id, channelConfigId: selectedChannelId }),
+                body: JSON.stringify({
+                    urls: rawUrls,
+                    brandId: activeBrand?._id,
+                    channelConfigId: selectedChannelId,
+                    showId: selectedShowId || null,
+                }),
             })
             const newProjects = d.projects || []
             setUrlInput('')
@@ -829,15 +960,51 @@ export default function YouTubeStudio() {
 
                     <div style={{ background: 'var(--sys-surface)', border: '1px solid var(--sys-border)', borderRadius: 16, padding: 20, marginBottom: 20 }}>
                         {channels.length > 0 && (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20, padding: '10px 14px', background: 'var(--sys-primary)08', borderRadius: 10, border: '1px solid var(--sys-primary)22' }}>
-                                <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--sys-primary)' }}>tv</span>
-                                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--sys-primary)' }}>Target Channel:</span>
-                                <select value={selectedChannelId} onChange={e => setSelectedChannelId(e.target.value)}
-                                    style={{ flex: 1, padding: '8px 12px', borderRadius: 8, border: '1px solid var(--sys-border)', background: 'var(--sys-bg)', color: 'var(--sys-text)', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
-                                    {channels.map(c => (
-                                        <option key={c._id} value={c._id}>{c.channelName} {c.isDefault ? '(Default)' : ''}</option>
-                                    ))}
-                                </select>
+                            <div style={{ marginBottom: 16 }}>
+                                {/* Channel selector */}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: selectedChannelShows.length ? 10 : 0, padding: '10px 14px', background: 'var(--sys-primary)08', borderRadius: 10, border: '1px solid var(--sys-primary)22' }}>
+                                    <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--sys-primary)' }}>tv</span>
+                                    <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--sys-primary)' }}>Channel:</span>
+                                    <select value={selectedChannelId} onChange={e => { setSelectedChannelId(e.target.value); setSelectedShowId('') }}
+                                        style={{ flex: 1, padding: '8px 12px', borderRadius: 8, border: '1px solid var(--sys-border)', background: 'var(--sys-bg)', color: 'var(--sys-text)', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                                        {channels.map(c => (
+                                            <option key={c._id} value={c._id}>{c.channelName} {c.isDefault ? '(Default)' : ''}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                {/* Show selector — only if this channel has shows */}
+                                {selectedChannelShows.length > 0 && (
+                                    <div style={{ padding: '10px 14px', background: 'var(--sys-surface)', borderRadius: 10, border: '1px solid var(--sys-border)' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                                            <span className="material-symbols-outlined" style={{ fontSize: 14, color: 'var(--sys-text-muted)' }}>live_tv</span>
+                                            <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--sys-text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Show (optional)</span>
+                                            {selectedShowId && (
+                                                <button onClick={() => setSelectedShowId('')}
+                                                    style={{ marginLeft: 'auto', fontSize: 10, padding: '1px 7px', borderRadius: 6, border: '1px solid var(--sys-border)', background: 'transparent', color: 'var(--sys-text-muted)', cursor: 'pointer' }}>
+                                                    Clear
+                                                </button>
+                                            )}
+                                        </div>
+                                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                                            {selectedChannelShows.map(show => {
+                                                const isActive = selectedShowId === show.showId
+                                                return (
+                                                    <button key={show.showId} onClick={() => setSelectedShowId(isActive ? '' : show.showId)}
+                                                        style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: `2px solid ${isActive ? 'var(--sys-primary)' : 'var(--sys-border)'}`, background: isActive ? 'var(--sys-primary)' : 'var(--sys-bg)', color: isActive ? 'white' : 'var(--sys-text)', transition: 'all .15s' }}>
+                                                        <span className="material-symbols-outlined" style={{ fontSize: 13 }}>{show.showIcon || 'live_tv'}</span>
+                                                        {show.showName}
+                                                    </button>
+                                                )
+                                            })}
+                                        </div>
+                                        {selectedShowId && (
+                                            <p style={{ margin: '6px 0 0', fontSize: 10, color: 'var(--sys-primary)', fontWeight: 600 }}>
+                                                ✓ Thumbnail will use the <strong>{selectedChannelShows.find(s => s.showId === selectedShowId)?.showName}</strong> show template
+                                            </p>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         )}
 

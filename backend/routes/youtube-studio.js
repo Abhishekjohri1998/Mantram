@@ -42,7 +42,7 @@ function emitProgress(projectId, event) {
 // STATIC: registered FIRST
 
 router.post('/analyse', protect, async (req, res) => {
-    const { urls, url, brandId, channelConfigId } = req.body;
+    const { urls, url, brandId, channelConfigId, showId } = req.body;
     const urlList = Array.isArray(urls) ? urls : (url ? [url] : []);
 
     if (!urlList.length) {
@@ -71,6 +71,7 @@ router.post('/analyse', protect, async (req, res) => {
             userId: req.user._id,
             brandId: brandId || null,
             channelConfigId: channelConfigId || null,
+            showId: showId || null,
             videoId: id,
             videoUrl: `https://www.youtube.com/watch?v=${id}`,
             status: 'processing',
@@ -91,7 +92,7 @@ router.post('/analyse', protect, async (req, res) => {
         const { url: videoUrl, id } = videoIds[i];
         const project = projects[i];
 
-        runPipeline({ videoUrl, videoId: id, brandContext, brandId, channelConfigId, project }).catch(err => {
+        runPipeline({ videoUrl, videoId: id, brandContext, brandId, channelConfigId, showId, project }).catch(err => {
             console.error(`❌ YouTube pipeline crashed for ${id}:`, err.message);
             YoutubeProject.findByIdAndUpdate(project._id, {
                 $set: { status: 'failed', error: err.message }
@@ -180,7 +181,7 @@ import ThumbnailTemplate from '../models/ThumbnailTemplate.js';
 
 // ── Pipeline Runner (8 nodes, all phases) ─────────────────────────────────
 
-async function runPipeline({ videoUrl, videoId, brandContext, brandId, channelConfigId, project }) {
+async function runPipeline({ videoUrl, videoId, brandContext, brandId, channelConfigId, showId, project }) {
     const pid = project._id.toString();
     console.log(`🚀 [YouTube Pipeline] Starting 8-node pipeline for ${videoId}`);
     const startMs = Date.now();
@@ -235,36 +236,56 @@ async function runPipeline({ videoUrl, videoId, brandContext, brandId, channelCo
         emit('thumbnailDirection', 'done', { concept: thumbnailDirection?.concept?.substring(0, 80) });
         console.log(`✅ [Node 6] Thumbnail direction: "${thumbnailDirection?.concept?.substring(0, 60)}"`);
 
-        // ── Fetch Channel & Template Context ───────────────────────────────────
+        // ── Fetch Channel & Template Context ─────────────────────────────────────
+        // Priority: (1) show-level templateId > (2) channel defaultTemplateId
         let template = null;
+        let appliedShowName = null;
         if (channelConfigId) {
             try {
-                const channel = await YoutubeChannelConfig.findById(channelConfigId);
-                if (channel?.defaultTemplateId) {
-                    template = await ThumbnailTemplate.findById(channel.defaultTemplateId);
-                    project.appliedTemplateId = template._id;
+                const channel = await YoutubeChannelConfig.findById(channelConfigId)
+                    .populate('shows.templateId', 'name icon visual classification generationPromptSuffix referenceImageUrl');
+
+                // Try show-level template first
+                if (showId && channel?.shows?.length) {
+                    const show = channel.shows.find(s => s.showId === showId);
+                    if (show?.templateId) {
+                        template = show.templateId; // already populated
+                        appliedShowName = show.showName;
+                        console.log(`   🎬 [runPipeline] Show template resolved: "${show.showName}" → ${template.name}`);
+                    }
                 }
+
+                // Fallback to channel default template
+                if (!template && channel?.defaultTemplateId) {
+                    template = await ThumbnailTemplate.findById(channel.defaultTemplateId);
+                    console.log(`   🎨 [runPipeline] Channel default template: ${template?.name}`);
+                }
+
+                if (appliedShowName) project.appliedShowName = appliedShowName;
+                if (template) project.appliedTemplateId = template._id;
             } catch (err) {
                 console.warn(`⚠️ [runPipeline] Failed to load channel/template context: ${err.message}`);
             }
         }
 
-        // ── Node 7: Thumbnail Generation (Phase 3 — NanoBanana 2 primary) ──
-        emit('thumbnailGeneration', 'running', { message: 'Generating thumbnail (NanoBanana 2 + character reference)…' });
+        // ── Node 7: Character Portraits (Phase 2 — generated FIRST to anchor thumbnail) ──
+        // Portraits must run before thumbnail generation so they can serve as face references
+        emit('characters', 'running', { message: 'Generating AI character portraits (face reference for thumbnail)…' });
+        const { characterPortraits } = await characterPortraitNode({ analysis, video, brandContext });
+        emit('characters', 'done', { count: characterPortraits.filter(p => p.portraitUrl).length });
+        console.log(`✅ [Node 7] Portraits: ${characterPortraits.filter(p => p.portraitUrl).length}/${analysis.characters?.length || 0}`);
+
+        // ── Node 8: Thumbnail Generation (Phase 3 — uses portraits as face anchors) ──
+        emit('thumbnailGeneration', 'running', { message: 'Generating thumbnail (fresh scene from template + character descriptions)…' });
         const { generatedThumbnailUrl, thumbnailGenerationError } = await thumbnailGenerationNode({
-            thumbnailDirection, video, brandContext, template
+            thumbnailDirection, video, brandContext, template,
+            characterPortraits,   // ✅ Pass portraits so lead portrait is used as face anchor
         });
         emit('thumbnailGeneration', 'done', {
             success: !!generatedThumbnailUrl,
             error: thumbnailGenerationError,
         });
-        console.log(`✅ [Node 7] Thumbnail: ${generatedThumbnailUrl ? 'generated' : `failed — ${thumbnailGenerationError}`}`);
-
-        // ── Node 8: Character Portraits (Phase 2 — NanoBanana 2) ───────────
-        emit('characters', 'running', { message: 'Generating AI character portraits…' });
-        const { characterPortraits } = await characterPortraitNode({ analysis, video, brandContext });
-        emit('characters', 'done', { count: characterPortraits.filter(p => p.portraitUrl).length });
-        console.log(`✅ [Node 8] Portraits: ${characterPortraits.filter(p => p.portraitUrl).length}/${analysis.characters?.length || 0}`);
+        console.log(`✅ [Node 8] Thumbnail: ${generatedThumbnailUrl ? 'generated' : `failed — ${thumbnailGenerationError}`}`);
 
         // ── Persist all results ────────────────────────────────────────────
         const elapsed = Math.round((Date.now() - startMs) / 1000);
@@ -287,6 +308,8 @@ async function runPipeline({ videoUrl, videoId, brandContext, brandId, channelCo
                 seo,
                 brandAlignment,
                 appliedTemplateId: project.appliedTemplateId,
+                showId: showId || null,
+                appliedShowName: project.appliedShowName || null,
                 thumbnailDirection,
                 generatedThumbnailUrl: generatedThumbnailUrl || null,
                 characterPortraits,
@@ -306,10 +329,6 @@ async function runPipeline({ videoUrl, videoId, brandContext, brandId, channelCo
     }
 }
 
-// ── POST /:id/thumbnail — Phase 3: Regenerate thumbnail ────────────────────
-
-
-
 router.post('/:id/thumbnail', protect, async (req, res) => {
     try {
         const project = await YoutubeProject.findOne({ _id: req.params.id, userId: req.user._id });
@@ -318,11 +337,31 @@ router.post('/:id/thumbnail', protect, async (req, res) => {
             return res.status(400).json({ success: false, error: 'Run analysis first to get thumbnail direction' });
         }
 
-        const { templateId } = req.body;
+        const { templateId, showId, customTextOverlay } = req.body;
         let template = null;
+        let currentDirection = project.thumbnailDirection;
+
+        // Apply any manual edits to the text overlay before generating
+        if (customTextOverlay && currentDirection?.textOverlay) {
+            if (customTextOverlay.line1 !== undefined) currentDirection.textOverlay.line1 = customTextOverlay.line1;
+            if (customTextOverlay.line2 !== undefined) currentDirection.textOverlay.line2 = customTextOverlay.line2;
+            await project.updateOne({ $set: { thumbnailDirection: currentDirection } });
+        }
+
+        // Priority: explicit templateId > showId from channel > project's stored template
         if (templateId) {
             template = await ThumbnailTemplate.findById(templateId);
             if (template) await project.updateOne({ $set: { appliedTemplateId: template._id } });
+        } else if (showId && project.channelConfigId) {
+            // Resolve via channel show
+            const channel = await YoutubeChannelConfig.findById(project.channelConfigId)
+                .populate('shows.templateId', 'name icon visual classification generationPromptSuffix referenceImageUrl');
+            const show = channel?.shows?.find(s => s.showId === showId);
+            if (show?.templateId) {
+                template = show.templateId;
+                await project.updateOne({ $set: { appliedTemplateId: template._id, showId, appliedShowName: show.showName } });
+                console.log(`   🎬 [thumbnail regen] Show template: "${show.showName}" → ${template.name}`);
+            }
         } else if (project.appliedTemplateId) {
             template = await ThumbnailTemplate.findById(project.appliedTemplateId);
         }
@@ -330,10 +369,14 @@ router.post('/:id/thumbnail', protect, async (req, res) => {
         const { brandContext } = await loadBrandContext(project.brandId?.toString()).catch(() => ({ brandContext: null }));
 
         const { generatedThumbnailUrl, thumbnailGenerationError } = await thumbnailGenerationNode({
-            thumbnailDirection: project.thumbnailDirection,
-            video: { metadata: project.metadata },
+            thumbnailDirection: currentDirection,
+            video: {
+                metadata: project.metadata,
+                analysis:  project.analysis,   // characters, peakMoment, emotionalArc
+            },
             brandContext,
             template,
+            characterPortraits: project.characterPortraits || [],  // ✅ Use stored portraits as face anchors
         });
 
         if (generatedThumbnailUrl) {

@@ -33,6 +33,8 @@ const YoutubeProjectSchema = new mongoose.Schema({
     brandId: { type: mongoose.Schema.Types.ObjectId, ref: 'Brand', index: true },
     channelConfigId: { type: mongoose.Schema.Types.ObjectId, ref: 'YoutubeChannelConfig', index: true },
     appliedTemplateId: { type: mongoose.Schema.Types.ObjectId, ref: 'ThumbnailTemplate' },
+    showId:            { type: String, default: null },   // internalId of the show this project belongs to
+    appliedShowName:   { type: String, default: null },   // display name (e.g. "Saru") for quick reference
 
 
     // Video identity

@@ -206,6 +206,153 @@ function ImageUploader({ imageUrl, onChange, buttonLabel = 'Upload Image', place
     )
 }
 
+// ── Shows Manager (inside Channel Editor) ────────────────────────────────────
+// Manages the list of named shows for a channel, each with its own template
+
+const SHOW_ICONS = [
+    'live_tv', 'theaters', 'movie', 'tv', 'star', 'mic', 'sports_soccer', 'music_note',
+    'queue_music', 'school', 'breaking_news', 'explore', 'diamond', 'local_fire_department',
+]
+
+function ShowsManager({ shows, templates, onChange }) {
+    const [addingShow, setAddingShow] = useState(false)
+    const [editingIdx, setEditingIdx] = useState(null)
+    const [draft, setDraft] = useState({ showName: '', showIcon: 'live_tv', templateId: '', language: '', description: '' })
+
+    function openAdd() {
+        setDraft({ showName: '', showIcon: 'live_tv', templateId: '', language: '', description: '' })
+        setAddingShow(true)
+        setEditingIdx(null)
+    }
+
+    function openEdit(idx) {
+        setDraft({ ...shows[idx] })
+        setEditingIdx(idx)
+        setAddingShow(false)
+    }
+
+    function handleSaveDraft() {
+        if (!draft.showName.trim()) return alert('Show name is required')
+        if (addingShow) {
+            onChange([...shows, { ...draft, showId: `show-${Date.now()}` }])
+        } else {
+            const updated = shows.map((s, i) => i === editingIdx ? { ...s, ...draft } : s)
+            onChange(updated)
+        }
+        setAddingShow(false)
+        setEditingIdx(null)
+    }
+
+    function handleDelete(idx) {
+        if (!confirm(`Remove show "${shows[idx].showName}"?`)) return
+        onChange(shows.filter((_, i) => i !== idx))
+    }
+
+    const isEditorOpen = addingShow || editingIdx !== null
+
+    return (
+        <div style={{ gridColumn: '1 / -1', padding: '12px 14px', borderRadius: 10, border: '1px solid var(--sys-border)', background: 'var(--sys-bg)', marginBottom: 4 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: shows.length ? 10 : 0 }}>
+                <MIcon name="tv" size={15} color="var(--sys-primary)" />
+                <p style={{ margin: 0, fontSize: 12, fontWeight: 700, flex: 1 }}>Shows / Series</p>
+                <p style={{ margin: 0, fontSize: 11, color: 'var(--sys-text-muted)', flex: 1 }}>Each show can have its own thumbnail theme</p>
+                {!isEditorOpen && (
+                    <button onClick={openAdd}
+                        style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', borderRadius: 7, fontSize: 11, fontWeight: 700, border: '1px solid var(--sys-primary)', color: 'var(--sys-primary)', background: 'transparent', cursor: 'pointer' }}>
+                        <MIcon name="add" size={13} />Add Show
+                    </button>
+                )}
+            </div>
+
+            {/* Show list */}
+            {shows.length > 0 && !isEditorOpen && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 6 }}>
+                    {shows.map((show, idx) => {
+                        const tpl = templates.find(t => t._id === show.templateId)
+                        return (
+                            <div key={show.showId || idx} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 8, background: 'var(--sys-surface)', border: '1px solid var(--sys-border)' }}>
+                                {/* Color swatch from template */}
+                                <div style={{ width: 28, height: 28, borderRadius: 6, background: tpl?.visual?.primaryColor || 'var(--sys-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                    <MIcon name={show.showIcon || 'live_tv'} size={14} color="white" />
+                                </div>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                    <p style={{ margin: 0, fontSize: 12, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{show.showName}</p>
+                                    <p style={{ margin: 0, fontSize: 10, color: 'var(--sys-text-muted)' }}>
+                                        {tpl ? `🎨 ${tpl.name}` : 'No template set'}
+                                        {show.language && ` · ${show.language}`}
+                                    </p>
+                                </div>
+                                <div style={{ display: 'flex', gap: 4 }}>
+                                    <button onClick={() => openEdit(idx)}
+                                        style={{ padding: '4px 8px', borderRadius: 6, fontSize: 10, fontWeight: 600, border: '1px solid var(--sys-border)', color: 'var(--sys-text)', background: 'transparent', cursor: 'pointer' }}>
+                                        <MIcon name="edit" size={11} />
+                                    </button>
+                                    <button onClick={() => handleDelete(idx)}
+                                        style={{ padding: '4px 8px', borderRadius: 6, fontSize: 10, fontWeight: 600, border: '1px solid #ef444433', color: '#ef4444', background: 'transparent', cursor: 'pointer' }}>
+                                        <MIcon name="delete" size={11} />
+                                    </button>
+                                </div>
+                            </div>
+                        )
+                    })}
+                </div>
+            )}
+
+            {/* Inline editor for add/edit */}
+            {isEditorOpen && (
+                <div style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid var(--sys-primary)44', background: 'var(--sys-surface)', marginTop: 8 }}>
+                    <p style={{ margin: '0 0 10px', fontSize: 11, fontWeight: 700, color: 'var(--sys-primary)' }}>
+                        {addingShow ? '+ New Show' : `Editing "${shows[editingIdx]?.showName}"`}
+                    </p>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                        <div style={{ gridColumn: '1 / -1' }}>
+                            <Field label="Show Name *">
+                                <TextInput value={draft.showName} onChange={v => setDraft(p => ({ ...p, showName: v }))} placeholder="e.g. Saru, Vasudha, Tech Talk" maxLength={60} />
+                            </Field>
+                        </div>
+                        <Field label="Thumbnail Template">
+                            <Select value={draft.templateId || ''} onChange={v => setDraft(p => ({ ...p, templateId: v }))}
+                                options={[{ value: '', label: 'No template (use channel default)' }, ...templates.map(t => ({ value: t._id, label: t.name }))]} />
+                        </Field>
+                        <Field label="Language Override">
+                            <Select value={draft.language || ''} onChange={v => setDraft(p => ({ ...p, language: v }))}
+                                options={[{ value: '', label: 'Use channel default' }, ...LANGUAGES.map(l => ({ value: l.value, label: l.label }))]} />
+                        </Field>
+                        <div style={{ gridColumn: '1 / -1' }}>
+                            <Field label="Icon">
+                                <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                                    {SHOW_ICONS.map(ic => (
+                                        <button key={ic} onClick={() => setDraft(p => ({ ...p, showIcon: ic }))}
+                                            style={{ width: 30, height: 30, borderRadius: 7, border: `2px solid ${draft.showIcon === ic ? 'var(--sys-primary)' : 'var(--sys-border)'}`, background: draft.showIcon === ic ? 'var(--sys-primary)15' : 'var(--sys-bg)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                            <MIcon name={ic} size={14} color={draft.showIcon === ic ? 'var(--sys-primary)' : 'var(--sys-text-muted)'} />
+                                        </button>
+                                    ))}
+                                </div>
+                            </Field>
+                        </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                        <button onClick={() => { setAddingShow(false); setEditingIdx(null) }}
+                            style={{ flex: 1, padding: '8px', borderRadius: 8, border: '1px solid var(--sys-border)', background: 'var(--sys-bg)', color: 'var(--sys-text)', fontWeight: 600, fontSize: 12, cursor: 'pointer' }}>
+                            Cancel
+                        </button>
+                        <button onClick={handleSaveDraft}
+                            style={{ flex: 2, padding: '8px', borderRadius: 8, border: 'none', background: 'var(--sys-primary)', color: 'white', fontWeight: 700, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
+                            <MIcon name="save" size={14} />{addingShow ? 'Add Show' : 'Save Changes'}
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {shows.length === 0 && !isEditorOpen && (
+                <p style={{ margin: '6px 0 0', fontSize: 11, color: 'var(--sys-text-muted)', textAlign: 'center', padding: '8px 0' }}>
+                    No shows yet — add your shows/series so they each get their own thumbnail theme
+                </p>
+            )}
+        </div>
+    )
+}
+
 // ── Channel Editor Modal ──────────────────────────────────────────────────────
 
 function ChannelEditor({ channel, templates, onSave, onClose }) {
@@ -407,11 +554,18 @@ function ChannelEditor({ channel, templates, onSave, onClose }) {
 
                     {/* Default template */}
                     <div style={{ gridColumn: '1 / -1' }}>
-                        <Field label="Default Thumbnail Template" hint={fetchResult?.suggestedTemplateTheme ? `AI suggests: ${fetchResult.suggestedTemplateTheme} theme` : 'Applied automatically when analysing videos on this channel'}>
+                        <Field label="Default Thumbnail Template" hint={fetchResult?.suggestedTemplateTheme ? `AI suggests: ${fetchResult.suggestedTemplateTheme} theme` : 'Applied automatically for videos not tied to a specific show'}>
                             <Select value={form.defaultTemplateId || ''} onChange={v => set('defaultTemplateId', v)}
                                 options={[{ value: '', label: 'No default (choose per video)' }, ...templates.map(t => ({ value: t._id, label: t.name }))]} />
                         </Field>
                     </div>
+
+                    {/* ── Shows Manager ── */}
+                    <ShowsManager
+                        shows={form.shows || []}
+                        templates={templates}
+                        onChange={v => set('shows', v)}
+                    />
 
                     {/* Preferences */}
                     <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: 8 }}>

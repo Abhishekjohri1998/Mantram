@@ -66,6 +66,21 @@ const YoutubeChannelConfigSchema = new mongoose.Schema({
         hashtagCount:    { type: Number, default: 5 },
     },
 
+    /**
+     * Shows — named series/programmes within this channel.
+     * Each show can have its own thumbnail template, language, and icon.
+     * e.g. "Saru" → Bollywood Drama template, "Vasudha" → Lifestyle template
+     */
+    shows: [{
+        showId:      { type: String, required: true },  // stable internal ID e.g. "show-1713500000000"
+        showName:    { type: String, required: true, trim: true }, // "Saru", "Vasudha"
+        showIcon:    { type: String, default: 'live_tv' }, // Material Symbols icon
+        description: { type: String, trim: true },
+        templateId:  { type: mongoose.Schema.Types.ObjectId, ref: 'ThumbnailTemplate' }, // show thumbnail theme
+        language:    { type: String, default: '' }, // language override (blank = use channel default)
+        _id: false,
+    }],
+
 }, { timestamps: true });
 
 // Unique per user+internalId (allows multiple channels)
