@@ -8,7 +8,7 @@
  */
 
 import express from 'express';
-import { authenticateToken } from '../middleware/auth.js';
+import { protect } from '../middleware/auth.js';
 import { loadBrandContext } from '../agents/shared/agentUtils.js';
 import {
     transcriptNode, analysisNode, chapterNode,
@@ -21,7 +21,7 @@ const router = express.Router();
 
 // ── POST /analyse — Main pipeline ──────────────────────────────────────────
 
-router.post('/analyse', authenticateToken, async (req, res) => {
+router.post('/analyse', protect, async (req, res) => {
     const { urls, url, brandId } = req.body;
     const urlList = Array.isArray(urls) ? urls : (url ? [url] : []);
 
@@ -49,7 +49,7 @@ router.post('/analyse', authenticateToken, async (req, res) => {
     // Create project records immediately so user sees them in the UI
     const projects = await Promise.all(videoIds.map(async ({ url: videoUrl, id }) => {
         const project = new YoutubeProject({
-            userId: req.user.id,
+            userId: req.user._id,
             brandId: brandId || null,
             videoId: id,
             videoUrl: `https://www.youtube.com/watch?v=${id}`,
@@ -140,10 +140,10 @@ async function runPipeline({ videoUrl, videoId, brandContext, brandId, project }
 
 // ── GET /projects ──────────────────────────────────────────────────────────
 
-router.get('/projects', authenticateToken, async (req, res) => {
+router.get('/projects', protect, async (req, res) => {
     try {
         const { brandId, limit = 20 } = req.query;
-        const query = { userId: req.user.id };
+        const query = { userId: req.user._id };
         if (brandId) query.brandId = brandId;
 
         const projects = await YoutubeProject.find(query)
@@ -160,11 +160,11 @@ router.get('/projects', authenticateToken, async (req, res) => {
 
 // ── GET /:id ───────────────────────────────────────────────────────────────
 
-router.get('/:id', authenticateToken, async (req, res) => {
+router.get('/:id', protect, async (req, res) => {
     try {
         const project = await YoutubeProject.findOne({
             _id: req.params.id,
-            userId: req.user.id,
+            userId: req.user._id,
         }).lean();
 
         if (!project) return res.status(404).json({ success: false, error: 'Project not found' });
@@ -176,9 +176,9 @@ router.get('/:id', authenticateToken, async (req, res) => {
 
 // ── POST /:id/thumbnail — Generate AI thumbnail ────────────────────────────
 
-router.post('/:id/thumbnail', authenticateToken, async (req, res) => {
+router.post('/:id/thumbnail', protect, async (req, res) => {
     try {
-        const project = await YoutubeProject.findOne({ _id: req.params.id, userId: req.user.id });
+        const project = await YoutubeProject.findOne({ _id: req.params.id, userId: req.user._id });
         if (!project) return res.status(404).json({ success: false, error: 'Project not found' });
         if (!project.thumbnailDirection) return res.status(400).json({ success: false, error: 'Run analysis first' });
 
@@ -192,9 +192,9 @@ router.post('/:id/thumbnail', authenticateToken, async (req, res) => {
 
 // ── DELETE /:id ────────────────────────────────────────────────────────────
 
-router.delete('/:id', authenticateToken, async (req, res) => {
+router.delete('/:id', protect, async (req, res) => {
     try {
-        await YoutubeProject.deleteOne({ _id: req.params.id, userId: req.user.id });
+        await YoutubeProject.deleteOne({ _id: req.params.id, userId: req.user._id });
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ success: false, error: err.message });

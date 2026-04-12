@@ -15,11 +15,19 @@ export class GeminiProvider extends BaseProvider {
         this.imageApiKey = config.imageApiKey || this.apiKey;
     }
 
-    async generateText({ systemPrompt, userPrompt, temperature = 0.7, maxTokens = 2048, model, images = [] }) {
+    async generateText({ systemPrompt, userPrompt, temperature = 0.7, maxTokens = 2048, model, images = [], youtubeUrl = null }) {
         const modelId = model || this.config.defaultModel || 'gemini-3-flash-preview';
         const url = `${this.baseUrl}/models/${modelId}:generateContent?key=${this.apiKey}`;
         
-        const parts = [{ text: `${systemPrompt}\n\n${userPrompt}` }];
+        // Native YouTube URL support — inject as fileData part so Gemini watches the video
+        // Per Google AI docs: fileData with video/mp4 mimeType + youtube URL triggers native video understanding
+        const parts = [];
+        if (youtubeUrl) {
+            parts.push({ fileData: { mimeType: 'video/mp4', fileUri: youtubeUrl } });
+            console.log(`🎬 [Gemini] Native YouTube video analysis: ${youtubeUrl}`);
+        }
+        parts.push({ text: `${systemPrompt}\n\n${userPrompt}` });
+
 
         // Attach base64 or URL images to Gemini payload
         if (images && images.length > 0) {

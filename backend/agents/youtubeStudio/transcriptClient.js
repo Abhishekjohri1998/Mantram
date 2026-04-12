@@ -6,7 +6,7 @@
  * 2. Fallback: Gemini native YouTube URL analysis (no transcript needed — Gemini watches the video)
  */
 
-import { YoutubeTranscript } from 'youtube-transcript';
+import { YoutubeTranscript } from 'youtube-transcript/dist/youtube-transcript.esm.js';
 
 /**
  * Extract video ID from YouTube URL in any format:

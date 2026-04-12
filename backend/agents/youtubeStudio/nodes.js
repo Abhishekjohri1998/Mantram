@@ -10,7 +10,7 @@
  *   6. thumbnailNode     → MCoT thumbnail direction
  */
 
-import { callAgent, callAgentText, callMultimodalAgent } from '../shared/agentUtils.js';
+import { callAgent, callMultimodalAgent } from '../shared/agentUtils.js';
 import { PROMPTS } from './prompts.js';
 import {
     fetchTranscript, fetchVideoMetadata,
@@ -78,8 +78,8 @@ export async function analysisNode({ video, brandContext }) {
         ? `TRANSCRIPT (timestamped):\n${transcript.text?.substring(0, 15000)}${transcript.text?.length > 15000 ? '\n... [transcript truncated for context]' : ''}`
         : `TRANSCRIPT: Not available — analyse based on title and description only.`;
 
-    // Use Gemini natively — pass YouTube URL directly as multimodal input
-    // This lets Gemini WATCH the video, not just read the transcript
+    // Use Gemini natively via router — pass youtubeUrl as fileData for native video watching
+    // This is handled by the Gemini provider's youtubeUrl parameter (fileData injection)
     const router = getRouter();
     let analysis;
 
@@ -90,8 +90,8 @@ export async function analysisNode({ video, brandContext }) {
             userPrompt: `${videoContext}\n\nYOUTUBE URL (watch this video): ${youtubeUrl}\n\n${transcriptSection}`,
             temperature: 0.3,
             maxTokens: 4096,
-            // Gemini router will handle the YouTube URL natively via fileData
-            youtubeUrl: youtubeUrl,
+            model: 'gemini-2.5-pro',       // Best model for video understanding
+            youtubeUrl: youtubeUrl,         // Triggers fileData injection in Gemini provider
         }, { provider: 'gemini' });
 
         const text = result.text || '';
@@ -184,7 +184,7 @@ export async function seoNode({ video, analysis, chapters, brandContext }) {
     const result = await callAgent(
         PROMPTS.SEO_COPYWRITER,
         userPrompt,
-        0.7, 3000, { provider: 'claude' }  // Claude for best copywriting
+        0.7, 3000, { provider: 'claude' }  // Claude for best copywriting; falls back to Gemini automatically via router
     );
 
     return { seo: result };
