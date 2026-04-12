@@ -26,25 +26,25 @@ const CreateToolsPanel = memo(({
 
             {/* Content-linked banner */}
             {fromContent && (
-                <div className="flex items-center gap-3 p-3 rounded-xl bg-primary/10 border border-primary/20 mb-4">
-                    <span className="material-symbols-outlined text-primary">link</span>
+                <div className="studio-highlight-panel">
+                    <span className="material-symbols-outlined text-[var(--sys-primary)]">link</span>
                     <div className="flex-1">
                         <p className="text-sm font-bold text-[var(--sys-text)]">Linked to Content Studio</p>
                         <p className="text-sm text-[var(--sys-text-muted)]">Image will match your content in {activeBrand?.name}'s brand style</p>
                     </div>
-                    <button onClick={() => setFromContent(false)} className="text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer">
+                    <button onClick={() => setFromContent(false)} className="studio-btn-ghost">
                         <span className="material-symbols-outlined text-sm">close</span>
                     </button>
                 </div>
             )}
             {designBaseImage && (
-                <div className="flex items-center gap-3 p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] mb-4">
+                <div className="studio-card flex items-center gap-3 p-3 mb-4">
                     <img src={designBaseImage} alt="Base" className="w-10 h-10 rounded-lg object-cover" />
                     <div className="flex-1">
                         <p className="text-sm font-bold text-[var(--sys-text)]">✏️ Editing image as template</p>
                         <p className="text-sm text-[var(--sys-text-muted)]">Describe what to change — layout, characters & products will be preserved</p>
                     </div>
-                    <button onClick={() => setDesignBaseImage(null)} className="text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer">
+                    <button onClick={() => setDesignBaseImage(null)} className="studio-btn-ghost">
                         <span className="material-symbols-outlined text-sm">close</span>
                     </button>
                 </div>
@@ -52,15 +52,15 @@ const CreateToolsPanel = memo(({
 
             {/* Product Selection Banner */}
             {selectedProduct && (
-                <div className="flex items-center gap-3 mb-4 p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                <div className="studio-card flex items-center gap-3 mb-4 p-3">
                     {selectedProduct.images?.[0]?.url && (
                         <img src={selectedProduct.images[0].url} alt="" className="w-10 h-10 rounded-lg object-cover" />
                     )}
                     <div className="flex-1 min-w-0">
                         <p className="text-sm font-bold text-[var(--sys-text)] truncate">{selectedProduct.title}</p>
-                        <p className="text-sm text-cyan-400">Product selected — will be featured in creative</p>
+                        <p className="text-sm text-[var(--sys-primary)]">Product selected — will be featured in creative</p>
                     </div>
-                    <button onClick={() => setSelectedProduct(null)} className="text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer">
+                    <button onClick={() => setSelectedProduct(null)} className="studio-btn-ghost">
                         <span className="material-symbols-outlined text-sm">close</span>
                     </button>
                 </div>
@@ -89,19 +89,19 @@ const CreateToolsPanel = memo(({
 
                 {/* ── Custom Size Inputs ── */}
                 {selectedType === 'custom-size' && (
-                    <div className="mt-2 p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                    <div className="studio-card mt-2 p-3">
                         <div className="flex items-center gap-2 mb-2">
-                            <span className="material-symbols-outlined text-xs text-emerald-400">straighten</span>
+                            <span className="material-symbols-outlined text-xs text-[var(--sys-primary)]">straighten</span>
                             <span className="text-[10px] text-[var(--sys-text-muted)] font-bold uppercase tracking-wider">Custom Dimensions (px)</span>
                         </div>
                         <div className="flex items-center gap-2">
                             <input type="number" value={customWidth} onChange={e => setCustomWidth(e.target.value)}
                                 placeholder="Width" min="100" max="4096"
-                                className="flex-1 px-3 py-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-xs text-[var(--sys-text)] focus:border-primary focus:outline-none text-center" />
+                                className="studio-input-glass text-center" />
                             <span className="text-[var(--sys-text-muted)] text-xs font-bold">×</span>
                             <input type="number" value={customHeight} onChange={e => setCustomHeight(e.target.value)}
                                 placeholder="Height" min="100" max="4096"
-                                className="flex-1 px-3 py-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-xs text-[var(--sys-text)] focus:border-primary focus:outline-none text-center" />
+                                className="studio-input-glass text-center" />
                         </div>
                         {customWidth && customHeight && (() => {
                             const w = parseInt(customWidth), h = parseInt(customHeight)
@@ -149,13 +149,13 @@ const CreateToolsPanel = memo(({
                                 <img src={referenceImages.style} alt="Style" className="w-full h-full object-cover" />
                             </div>
                             <button onClick={() => setReferenceImages(prev => ({ ...prev, style: null }))}
-                                className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-500 text-[var(--sys-text)] text-[8px] flex items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity">×</button>
+                                className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[var(--sys-primary)] text-white text-[8px] flex items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity">×</button>
                         </div>
                     ) : (
                         <button onClick={() => { setRefPickerSlot('style'); setRefPickerTab('upload') }}
-                            className="flex-shrink-0 w-10 h-10 rounded-lg border border-dashed border-[var(--sys-border)] hover:border-[var(--sys-border)] flex flex-col items-center justify-center cursor-pointer transition-all bg-[var(--sys-surface)] group" title="Add style reference">
-                            <span className="material-symbols-outlined text-sm text-[var(--sys-text-muted)] group-hover:text-amber-400">brush</span>
-                            <span className="text-[7px] text-[var(--sys-text-muted)] group-hover:text-amber-400 font-bold leading-none">Style</span>
+                            className="studio-drop-zone group" title="Add style reference">
+                            <span className="material-symbols-outlined text-sm text-[var(--sys-text-muted)] group-hover:text-[var(--sys-primary)]">brush</span>
+                            <span className="text-[7px] text-[var(--sys-text-muted)] group-hover:text-[var(--sys-primary)] font-bold leading-none">Style</span>
                         </button>
                     )}
 
@@ -177,9 +177,9 @@ const CreateToolsPanel = memo(({
                     ))}
                     {characters.length < 5 && (
                         <button onClick={() => { setRefPickerSlot(`character-${characters.length}`); setRefPickerTab('upload') }}
-                            className="flex-shrink-0 w-10 h-10 rounded-lg border border-dashed border-[var(--sys-border)] hover:border-[var(--sys-border)] flex flex-col items-center justify-center cursor-pointer transition-all bg-[var(--sys-surface)] group" title="Add character">
-                            <span className="material-symbols-outlined text-sm text-[var(--sys-text-muted)] group-hover:text-violet-400">person_add</span>
-                            <span className="text-[7px] text-[var(--sys-text-muted)] group-hover:text-violet-400 font-bold leading-none">Person</span>
+                            className="studio-drop-zone group" title="Add character">
+                            <span className="material-symbols-outlined text-sm text-[var(--sys-text-muted)] group-hover:text-[var(--sys-primary)]">person_add</span>
+                            <span className="text-[7px] text-[var(--sys-text-muted)] group-hover:text-[var(--sys-primary)] font-bold leading-none">Person</span>
                         </button>
                     )}
 
@@ -190,17 +190,17 @@ const CreateToolsPanel = memo(({
                                 <img src={referenceImages.upload} alt="Ref" className="w-full h-full object-cover" />
                             </div>
                             <button onClick={() => setReferenceImages(prev => ({ ...prev, upload: null }))}
-                                className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-500 text-[var(--sys-text)] text-[8px] flex items-center justify-center cursor-pointer z-10 opacity-0 group-hover:opacity-100 transition-opacity">×</button>
+                                className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[var(--sys-primary)] text-white text-[8px] flex items-center justify-center cursor-pointer z-10 opacity-0 group-hover:opacity-100 transition-opacity">×</button>
                             <button onClick={() => { setCharacters(prev => [...prev, { name: `Character ${prev.length + 1}`, image: referenceImages.upload }]); setReferenceImages(prev => ({ ...prev, upload: null })) }}
-                                className="absolute -bottom-1 -left-1 w-4 h-4 rounded-full bg-violet-500 text-[var(--sys-text)] text-[8px] flex items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity z-10" title="Use as Character">
+                                className="absolute -bottom-1 -left-1 w-4 h-4 rounded-full bg-[var(--sys-primary)] text-white text-[8px] flex items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity z-10" title="Use as Character">
                                 <span className="material-symbols-outlined text-[8px]">person_add</span>
                             </button>
                         </div>
                     ) : (
                         <button onClick={() => { setRefPickerSlot('upload'); setRefPickerTab('upload') }}
-                            className="flex-shrink-0 w-10 h-10 rounded-lg border border-dashed border-[var(--sys-border)] hover:border-[var(--sys-border)] flex flex-col items-center justify-center cursor-pointer transition-all bg-[var(--sys-surface)] group" title="Upload reference image">
-                            <span className="material-symbols-outlined text-sm text-[var(--sys-text-muted)] group-hover:text-cyan-400">add_photo_alternate</span>
-                            <span className="text-[7px] text-[var(--sys-text-muted)] group-hover:text-cyan-400 font-bold leading-none">Upload</span>
+                            className="studio-drop-zone group" title="Upload reference image">
+                            <span className="material-symbols-outlined text-sm text-[var(--sys-text-muted)] group-hover:text-[var(--sys-primary)]">add_photo_alternate</span>
+                            <span className="text-[7px] text-[var(--sys-text-muted)] group-hover:text-[var(--sys-primary)] font-bold leading-none">Upload</span>
                         </button>
                     )}
                 </div>
@@ -232,18 +232,12 @@ const CreateToolsPanel = memo(({
                             onClick={() => setSelectedShot(prev => prev === shot.id ? null : shot.id)}
                             title={shot.description}
                             className={`studio-btn-pill flex flex-col items-center gap-0.5 group ${selectedShot === shot.id ? 'active' : ''}`}
-                            style={selectedShot === shot.id ? {
-                                backgroundColor: `var(--sys-primary-dim)`,
-                                borderColor: `var(--sys-primary)`,
-                                color: `var(--sys-primary)`,
-                            } : {}}
                         >
                             <span className="text-base leading-none">{shot.emoji}</span>
                             <span className="leading-tight text-center">{shot.label}</span>
                             {selectedShot === shot.id && (
-                                <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full flex items-center justify-center"
-                                    style={{ backgroundColor: shot.color }}>
-                                    <span className="material-symbols-outlined text-[var(--sys-text)]" style={{ fontSize: '8px' }}>check</span>
+                                <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full flex items-center justify-center bg-[var(--sys-primary)] shadow-sm">
+                                    <span className="material-symbols-outlined text-white" style={{ fontSize: '8px' }}>check</span>
                                 </span>
                             )}
                         </button>
@@ -252,11 +246,11 @@ const CreateToolsPanel = memo(({
             </div>
 
             {/* ── Add Text to Image Toggle ── */}
-            <div className={`rounded-xl mb-3 border transition-all overflow-hidden ${generateCopy ? 'bg-[var(--sys-surface)] border-[var(--sys-border)]' : 'bg-[var(--sys-surface)] border-[var(--sys-border)]'}`}>
+            <div className={`studio-card mb-3 transition-all ${generateCopy ? 'border-[var(--sys-primary)] bg-[var(--sys-primary-dim)]' : ''}`}>
                 <div className="flex items-center justify-between px-3 py-2">
                     <div className="flex items-center gap-2.5">
-                        <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${generateCopy ? 'bg-violet-500/20' : 'bg-[var(--sys-surface)]'}`}>
-                            <span className={`material-symbols-outlined text-sm ${generateCopy ? 'text-violet-400' : 'text-[var(--sys-text-muted)]'}`}>title</span>
+                        <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${generateCopy ? 'bg-[var(--sys-primary)]/10' : 'bg-[var(--sys-surface)]'}`}>
+                            <span className={`material-symbols-outlined text-sm ${generateCopy ? 'text-[var(--sys-primary)]' : 'text-[var(--sys-text-muted)]'}`}>title</span>
                         </div>
                         <div>
                             <p className="text-xs font-bold text-[var(--sys-text)] leading-tight">Add Text to Image</p>
@@ -267,21 +261,21 @@ const CreateToolsPanel = memo(({
                             </p>
                         </div>
                     </div>
-                    <button onClick={() => setGenerateCopy(!generateCopy)}
-                        className={`w-9 h-5 rounded-full transition-all cursor-pointer flex-shrink-0 ${generateCopy ? 'bg-[var(--sys-primary)]' : 'bg-[var(--sys-surface)]'}`}>
-                        <div className={`w-3.5 h-3.5 rounded-full bg-white shadow transition-transform ${generateCopy ? 'translate-x-4.5' : 'translate-x-0.5'}`} />
-                    </button>
+                    <div onClick={() => setGenerateCopy(!generateCopy)}
+                        className={`studio-toggle ${generateCopy ? 'active' : 'inactive'}`}>
+                        <div className="studio-toggle-knob shadow-sm" />
+                    </div>
                 </div>
 
                 {generateCopy && (
                     <div className="px-3 pb-3 border-t border-[var(--sys-border)] pt-2.5 space-y-2">
                         <div className="flex items-center justify-between">
                             {copyLoading ? (
-                                <span className="flex items-center gap-1.5 text-[10px] text-violet-400 animate-pulse">
+                                <span className="flex items-center gap-1.5 text-[10px] text-[var(--sys-primary)] animate-studio-pulse">
                                     Agent is reading your brief...
                                 </span>
                             ) : copyIsAiSuggested ? (
-                                <span className="flex items-center gap-1 text-[10px] text-violet-300">
+                                <span className="flex items-center gap-1 text-[10px] text-[var(--sys-primary)]">
                                     <span className="material-symbols-outlined text-[9px]">auto_awesome</span>
                                     AI suggested — edit freely
                                 </span>
@@ -302,7 +296,7 @@ const CreateToolsPanel = memo(({
                             onChange={e => { setCustomHeadline(e.target.value); setCopyIsAiSuggested(false) }}
                             maxLength={40}
                             placeholder="Headline (AI will generate from brief)"
-                            className="w-full px-3 py-1.5 text-xs rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] focus:outline-none"
+                            className="studio-input-glass"
                         />
                         <input
                             type="text"
@@ -310,7 +304,7 @@ const CreateToolsPanel = memo(({
                             onChange={e => { setCustomCtaText(e.target.value); setCopyIsAiSuggested(false) }}
                             maxLength={20}
                             placeholder="CTA button (e.g. Shop Now)"
-                            className="w-full px-3 py-1.5 text-xs rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] focus:outline-none"
+                            className="studio-input-glass"
                         />
                         {copyRationale && !copyLoading && (
                             <p className="text-[9px] text-[var(--sys-text-muted)] italic flex items-start gap-1 pt-0.5">
@@ -386,7 +380,7 @@ const CreateToolsPanel = memo(({
                     {prompt.trim() && (
                         <CreditTooltipWrapper action="promptEnhance">
                             <button onClick={handleEnhancePrompt} disabled={enhancing || !activeBrand}
-                                className={`pointer-events-auto flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all ${enhancing ? 'bg-amber-500/20 text-amber-400' : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] hover:text-amber-400'}`}>
+                                className={`pointer-events-auto studio-btn-pill py-1 px-2.5 text-[10px] ${enhancing ? 'active' : ''}`}>
                                 <span className={`material-symbols-outlined text-xs ${enhancing ? 'animate-spin' : ''}`}>{enhancing ? 'progress_activity' : 'auto_awesome'}</span>
                                 {enhancing ? 'Enhancing...' : 'Enhance'}
                             </button>
@@ -457,9 +451,9 @@ const CreateToolsPanel = memo(({
                     </div>
                     <div className="flex items-center justify-between py-2 border-b border-[var(--sys-border)]">
                         <p className="text-[10px] text-[var(--sys-text-muted)] font-bold uppercase tracking-wider">AI Quality</p>
-                        <div className="flex gap-1 bg-[var(--sys-surface)] rounded-lg p-0.5">
+                        <div className="flex gap-1 bg-[var(--sys-bg)] rounded-lg p-0.5">
                             {['fast', 'quality'].map(q => (
-                                <button key={q} onClick={() => setAgenticQuality(q)} className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all ${agenticQuality === q ? 'bg-amber-500/20 text-amber-400 shadow-sm' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]'}`}>
+                                <button key={q} onClick={() => setAgenticQuality(q)} className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all ${agenticQuality === q ? 'bg-[var(--sys-primary)] text-white shadow-sm' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]'}`}>
                                     {q.toUpperCase()}
                                 </button>
                             ))}
@@ -497,7 +491,7 @@ const CreateToolsPanel = memo(({
                             const built = activeQuickTemplate.buildPrompt(activeBrand, templateFields)
                             setPrompt(built)
                             setActiveQuickTemplate(null)
-                        }} className="btn-primary w-full py-2 text-xs font-bold mt-2">
+                        }} className="studio-btn-primary w-full py-2 text-xs">
                             Apply to Prompt
                         </button>
                     </div>
