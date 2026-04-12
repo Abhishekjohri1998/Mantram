@@ -351,7 +351,7 @@ export async function thumbnailDirectionNode({ video, analysis, seo, brandContex
  *              Reference image → character-consistent + styled output
  *   FALLBACK — FLUX Pro via FAL.ai (photorealistic, no reference face-lock)
  */
-export async function thumbnailGenerationNode({ thumbnailDirection, video, brandContext }) {
+export async function thumbnailGenerationNode({ thumbnailDirection, video, brandContext, template }) {
     const videoTitle   = video?.metadata?.title        || '';
     const referenceUrl = video?.metadata?.thumbnailUrl || null;
     const characters   = video?.analysis?.characters  || [];
@@ -361,17 +361,35 @@ export async function thumbnailGenerationNode({ thumbnailDirection, video, brand
         || (videoTitle ? videoTitle.split(' ').slice(0, 5).join(' ').toUpperCase() : '');
     const line2 = thumbnailDirection?.textOverlay?.line2 || '';
 
-    // ── Character context ──────────────────────────────────────────────────────
+    // ── Character context with visual descriptions ─────────────────────────────
     const characterContext = characters.length
-        ? `The video features: ${characters.map(c => c.label).join(', ')}.`
+        ? `The video features: ${characters.map(c => c.label + (c.visualDescription ? ` (${c.visualDescription})` : '')).join('; ')}.`
         : '';
 
+    // ── Template visual DNA injection ─────────────────────────────────────────
+    // When a template is selected, it overrides generic direction with pre-designed style
+    const tplVisual = template?.visual;
+    const templateContext = tplVisual ? [
+        `TEMPLATE STYLE — "${template.name}":`,
+        `  Color palette: primary ${tplVisual.primaryColor}, secondary ${tplVisual.secondaryColor}, background base ${tplVisual.backgroundColor}`,
+        `  Background style: ${tplVisual.backgroundStyle}`,
+        `  Composition: ${tplVisual.composition}`,
+        `  Mood overlay: ${tplVisual.overlayMood}`,
+        `  Energy level: ${tplVisual.energyLevel}`,
+        `  Title font style: ${tplVisual.titleFont}, color ${tplVisual.titleColor}, shadow ${tplVisual.titleShadow}`,
+        tplVisual.logoPlacement !== 'none'
+            ? `  Logo placement: ${tplVisual.logoPlacement} corner (${tplVisual.logoSize} size)`
+            : `  No logo watermark`,
+        template.generationPromptSuffix ? `  Style directive: ${template.generationPromptSuffix}` : '',
+    ].filter(Boolean).join('\n') : '';
+
     console.log(`🎨 [thumbnailGenerationNode] Reference-guided regen for "${videoTitle.substring(0, 50)}"`);
+    console.log(`   Template: ${template ? template.name : 'none (using direction only)'}`);
     console.log(`   Characters: ${characterContext || 'none detected'}`);
     console.log(`   Text overlay: "${line1}"${line2 ? ` / "${line2}"` : ''}`);
     console.log(`   Reference thumbnail: ${referenceUrl ? '✅' : '❌ none'}`);
 
-    // ── Build the reference-guided prompt ─────────────────────────────────────
+    // ── Build the reference-guided + template-styled prompt ───────────────────
     const fullPrompt = [
         `Create a high-impact YouTube thumbnail for the video: "${videoTitle}".`,
         referenceUrl
@@ -381,18 +399,21 @@ export async function thumbnailGenerationNode({ thumbnailDirection, video, brand
               + ` Do NOT replace or alter the people shown.`
             : '',
         characterContext,
-        thumbnailDirection?.imageGenerationPrompt
-            ? `Scene direction: ${thumbnailDirection.imageGenerationPrompt}`
-            : '',
+        // Template style takes priority over generic direction
+        templateContext
+            ? templateContext
+            : [
+                thumbnailDirection?.imageGenerationPrompt
+                    ? `Scene direction: ${thumbnailDirection.imageGenerationPrompt}`
+                    : '',
+                `Composition: ${thumbnailDirection?.composition || 'center'} subject placement, high contrast.`,
+                `Mood: ${thumbnailDirection?.emotion || 'curiosity'}, energetic.`,
+                thumbnailDirection?.dominantColor ? `Brand accent color: ${thumbnailDirection.dominantColor}.` : '',
+                `Background treatment: ${thumbnailDirection?.backgroundTreatment || 'dramatic-scene'}.`,
+              ].filter(Boolean).join(' '),
         `Make the background more dramatic, cinematic, and eye-catching than the reference.`,
-        `Composition: ${thumbnailDirection?.composition || 'center'} subject placement, high contrast.`,
-        `Mood: ${thumbnailDirection?.emotion || 'curiosity'}, energetic, scroll-stopping.`,
-        thumbnailDirection?.dominantColor
-            ? `Brand accent color: ${thumbnailDirection.dominantColor}.`
-            : '',
-        `Background treatment: ${thumbnailDirection?.backgroundTreatment || 'dramatic-scene'}.`,
         line1
-            ? `Add BOLD text overlay at the top or left: "${line1}" in large white bold text with strong dark outline/shadow.`
+            ? `Add BOLD text overlay: "${line1}" in large ${tplVisual?.titleColor || 'white'} bold text with ${tplVisual?.titleShadow === 'outlined' ? 'thick black outline' : 'strong dark shadow'}.`
             : '',
         line2
             ? `Add secondary text: "${line2}" below the main text, slightly smaller.`
