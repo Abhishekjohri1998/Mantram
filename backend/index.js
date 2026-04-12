@@ -300,7 +300,9 @@ app.use('/api/routing-rules', routingRulesRoutes);
 app.use('/api/canvas-assets', canvasAssetsRoutes);
 app.use('/api/agent-command', agentCommandRoutes);
 app.use('/api/video-studio', videoStudioRoutes);
-app.use('/api/youtube-studio/settings', youtubeStudioSettingsRoutes); // MUST be before /:id wildcard
+app.use('/api/youtube-studio/settings', youtubeStudioSettingsRoutes); // Legacy path kept
+app.use('/api/yt-studio-settings', youtubeStudioSettingsRoutes);      // Non-overlapping path (active)
+
 app.use('/api/youtube-studio', youtubeStudioRoutes);
 
 app.use('/api/content/agentic', contentAgenticRoutes);

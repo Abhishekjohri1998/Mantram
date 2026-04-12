@@ -238,8 +238,8 @@ function ChannelEditor({ channel, templates, onSave, onClose }) {
         if (!form.channelName?.trim()) return alert('Channel name is required')
         setSaving(true)
         try {
-            if (isNew) await api('/youtube-studio/settings/channel-configs', { method: 'POST', body: JSON.stringify(form) })
-            else await api(`/youtube-studio/settings/channel-configs/${channel._id}`, { method: 'PUT', body: JSON.stringify(form) })
+            if (isNew) await api('/yt-studio-settings/channel-configs', { method: 'POST', body: JSON.stringify(form) })
+            else await api(`/yt-studio-settings/channel-configs/${channel._id}`, { method: 'PUT', body: JSON.stringify(form) })
             onSave()
         } catch (e) { alert('Save failed: ' + e.message) }
         setSaving(false)
@@ -541,8 +541,8 @@ function TemplateEditor({ template, onSave, onClose }) {
         setSaving(true)
         try {
             const payload = { ...form, tags: form.tags.split(',').map(t => t.trim()).filter(Boolean) }
-            if (isNew) await api('/youtube-studio/settings/templates', { method: 'POST', body: JSON.stringify(payload) })
-            else await api(`/youtube-studio/settings/templates/${template._id}`, { method: 'PUT', body: JSON.stringify(payload) })
+            if (isNew) await api('/yt-studio-settings/templates', { method: 'POST', body: JSON.stringify(payload) })
+            else await api(`/yt-studio-settings/templates/${template._id}`, { method: 'PUT', body: JSON.stringify(payload) })
             onSave()
         } catch (e) { alert('Save failed: ' + e.message) }
         setSaving(false)
@@ -703,8 +703,8 @@ export default function YouTubeStudioSettings({ brandId, onTemplateSelect, activ
         setLoading(true)
         try {
             const [{ channels: ch }, { templates: tmpl }] = await Promise.all([
-                api('/youtube-studio/settings/channel-configs'),
-                api('/youtube-studio/settings/templates'),
+                api('/yt-studio-settings/channel-configs'),
+                api('/yt-studio-settings/templates'),
             ])
             setChannels(ch || [])
             setTemplates(tmpl || [])
@@ -717,7 +717,7 @@ export default function YouTubeStudioSettings({ brandId, onTemplateSelect, activ
     async function seedStarters() {
         setSeeding(true)
         try {
-            await api('/youtube-studio/settings/templates/seed-starters', { method: 'POST' })
+            await api('/yt-studio-settings/templates/seed-starters', { method: 'POST' })
             await loadData()
         } catch (e) { alert('Seed failed: ' + e.message) }
         setSeeding(false)
@@ -725,21 +725,21 @@ export default function YouTubeStudioSettings({ brandId, onTemplateSelect, activ
 
     async function handleSetDefaultChannel(id) {
         try {
-            await api(`/youtube-studio/settings/channel-configs/${id}/default`, { method: 'POST' })
+            await api(`/yt-studio-settings/channel-configs/${id}/default`, { method: 'POST' })
             await loadData()
         } catch (e) { alert(e.message) }
     }
 
     async function handleDeleteChannel(id) {
         try {
-            await api(`/youtube-studio/settings/channel-configs/${id}`, { method: 'DELETE' })
+            await api(`/yt-studio-settings/channel-configs/${id}`, { method: 'DELETE' })
             await loadData()
         } catch (e) { alert(e.message) }
     }
 
     async function handleSetDefaultTemplate(id) {
         try {
-            await api(`/youtube-studio/settings/templates/${id}/set-default`, { method: 'POST' })
+            await api(`/yt-studio-settings/templates/${id}/set-default`, { method: 'POST' })
             await loadData()
         } catch (e) { alert(e.message) }
     }
@@ -747,14 +747,14 @@ export default function YouTubeStudioSettings({ brandId, onTemplateSelect, activ
     async function handleDeleteTemplate(id) {
         if (!confirm('Archive this template?')) return
         try {
-            await api(`/youtube-studio/settings/templates/${id}`, { method: 'DELETE' })
+            await api(`/yt-studio-settings/templates/${id}`, { method: 'DELETE' })
             await loadData()
         } catch (e) { alert(e.message) }
     }
 
     async function handleCloneTemplate(id) {
         try {
-            await api(`/youtube-studio/settings/templates/${id}/clone`, { method: 'POST', body: JSON.stringify({ brandId }) })
+            await api(`/yt-studio-settings/templates/${id}/clone`, { method: 'POST', body: JSON.stringify({ brandId }) })
             await loadData()
         } catch (e) { alert(e.message) }
     }
