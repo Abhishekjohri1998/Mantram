@@ -948,9 +948,7 @@ async function geminiImageGenerate(promptText, imageParts = [], temperature = 0.
         };
 
         // Apply Keep-Alive dispatcher if using native Node 18+ undici fetch
-        if (typeof global.fetch !== 'undefined' && keepAliveAgent) {
-            fetchOptions.dispatcher = keepAliveAgent;
-        }
+        // Logic removed: keepAliveAgent was not defined in this scope.
 
         const resp = await fetch(url, fetchOptions);
 
