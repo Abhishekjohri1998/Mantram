@@ -87,9 +87,21 @@ const GalleryPanel = memo(({
             {/* ── Current Result ── */}
             {result && activeGenerations.length === 0 && (
                 <div className="generation-card generation-card--new mb-5">
-                    <p className="text-xs text-[var(--sys-text-muted)] mb-2.5 line-clamp-2 leading-relaxed">
-                        {prompt || 'Generated creative'}
-                    </p>
+                    <div className="studio-compact-prompt-container mb-2.5 group/prompt">
+                        <p className="studio-compact-prompt-text text-xs text-[var(--sys-text-muted)] line-clamp-1 leading-relaxed">
+                            {prompt || 'Generated creative'}
+                        </p>
+                        <div className="studio-prompt-actions opacity-0 group-hover/prompt:opacity-100">
+                            <button onClick={() => { navigator.clipboard.writeText(prompt); setFeedbackToast?.('Prompt copied to clipboard') }}
+                                className="studio-prompt-action-btn" title="Copy Prompt">
+                                <span className="material-symbols-outlined">content_copy</span>
+                            </button>
+                            <button onClick={() => setPrompt(prompt)}
+                                className="studio-prompt-action-btn" title="Reuse Prompt">
+                                <span className="material-symbols-outlined">refresh</span>
+                            </button>
+                        </div>
+                    </div>
                     <div className="relative rounded-xl overflow-hidden border border-[var(--sys-border)] bg-[var(--sys-bg)] cursor-pointer group mb-3"
                         style={{ maxHeight: '500px' }}
                         onClick={() => result.imageUrl && setZoomImage(result.imageUrl)}>
@@ -329,9 +341,21 @@ const GalleryPanel = memo(({
                                         {/* Right Side: Text & Actions Box */}
                                         <div className="w-full xl:w-[350px] p-2 xl:p-4 flex flex-col justify-between flex-shrink-0">
                                             <div>
-                                                <p className="text-[13px] text-[var(--sys-text)] font-medium leading-relaxed mb-4" style={{ color: 'var(--sys-text-muted)' }}>
+                                            <div className="studio-compact-prompt-container mb-4 group/prompt">
+                                                <p className="studio-compact-prompt-text text-[13px] text-[var(--sys-text-muted)] font-medium line-clamp-1 leading-relaxed">
                                                     {group.promptText}
                                                 </p>
+                                                <div className="studio-prompt-actions opacity-0 group-hover/prompt:opacity-100">
+                                                    <button onClick={() => { navigator.clipboard.writeText(group.promptText); setFeedbackToast?.('Prompt copied to clipboard') }}
+                                                        className="studio-prompt-action-btn" title="Copy Prompt">
+                                                        <span className="material-symbols-outlined">content_copy</span>
+                                                    </button>
+                                                    <button onClick={() => setPrompt(group.promptText)}
+                                                        className="studio-prompt-action-btn" title="Reuse Prompt">
+                                                        <span className="material-symbols-outlined">refresh</span>
+                                                    </button>
+                                                </div>
+                                            </div>
                                                 <div className="flex items-center gap-3">
                                                     <span className="studio-badge">
                                                         {group.items.length} variations
@@ -343,13 +367,13 @@ const GalleryPanel = memo(({
                                             </div>
                                             
                                             <div className="flex flex-wrap items-center gap-2 mt-6">
-                                                <button onClick={(e) => { e.stopPropagation(); setDesignBaseImage(group.items[0].imageUrl); setPrompt(group.promptText); }} 
+                                                <button onClick={() => setZoomImage(group.items[0].imageUrl)}
                                                         className="studio-btn-secondary py-1.5 px-3 text-[11px]">
-                                                    <span className="material-symbols-outlined text-[14px]">refresh</span> Reuse
+                                                    <span className="material-symbols-outlined text-[14px]">open_in_full</span> View Full
                                                 </button>
                                                 <button onClick={(e) => { e.stopPropagation(); handleDownloadImage(group.items[0].imageUrl, `creative-${gIdx}.png`) }} 
                                                         className="studio-btn-secondary py-1.5 px-3 text-[11px]">
-                                                    <span className="material-symbols-outlined text-[14px]">content_copy</span> Copy
+                                                    <span className="material-symbols-outlined text-[14px]">download</span> Download
                                                 </button>
                                                 
                                                 <div className="flex-1" />
@@ -374,13 +398,26 @@ const GalleryPanel = memo(({
                                             <img src={item.imageUrl} alt="Creative" className="w-full h-full object-cover" />
                                         </div>
                                         <div className="flex-1 min-w-0 text-left">
-                                            <p className="text-xs text-[var(--sys-text)] mb-2 leading-relaxed line-clamp-2">{item._prompt || item.prompt}</p>
+                                            <div className="studio-compact-prompt-container mb-2 group/prompt">
+                                                <p className="studio-compact-prompt-text text-xs text-[var(--sys-text)] line-clamp-1 leading-relaxed">
+                                                    {item._prompt || item.prompt}
+                                                </p>
+                                                <div className="studio-prompt-actions opacity-0 group-hover/prompt:opacity-100">
+                                                    <button onClick={() => { navigator.clipboard.writeText(item._prompt || item.prompt); setFeedbackToast?.('Prompt copied to clipboard') }}
+                                                        className="studio-prompt-action-btn" title="Copy Prompt">
+                                                        <span className="material-symbols-outlined">content_copy</span>
+                                                    </button>
+                                                    <button onClick={() => setPrompt(item._prompt || item.prompt)}
+                                                        className="studio-prompt-action-btn" title="Reuse Prompt">
+                                                        <span className="material-symbols-outlined">refresh</span>
+                                                    </button>
+                                                </div>
+                                            </div>
                                             <div className="flex gap-2 flex-wrap mb-2">
                                                 {item.aspectRatio && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[var(--sys-surface)] text-[var(--sys-text-muted)]">{item.aspectRatio}</span>}
                                                 <span className="text-[9px] text-[var(--sys-text-muted)]">{getTimeAgo(item.createdAt)}</span>
                                             </div>
                                             <div className="flex gap-1.5">
-                                                <button onClick={() => setPrompt(item._prompt || item.prompt)} className="studio-btn-secondary py-1 px-2.5 text-[9px]">Reuse</button>
                                                 <button onClick={() => handleDownloadImage(item.imageUrl, `creative-${idx}.png`)} className="studio-action-btn-sm w-7 h-7"><span className="material-symbols-outlined text-xs">download</span></button>
                                             </div>
                                         </div>
@@ -396,7 +433,21 @@ const GalleryPanel = memo(({
             <div className="space-y-4">
                 {bankImages.filter(img => img.source === 'ai-generated' || img.category === 'generated' || img.type !== 'uploaded').map(img => (
                     <div key={img._id} className="generation-card p-3">
-                        <p className="text-xs text-[var(--sys-text-muted)] mb-2 line-clamp-2 leading-relaxed text-left">{img.prompt || img.title}</p>
+                        <div className="studio-compact-prompt-container mb-2 group/prompt">
+                            <p className="studio-compact-prompt-text text-xs text-[var(--sys-text-muted)] line-clamp-1 leading-relaxed text-left">
+                                {img.prompt || img.title}
+                            </p>
+                            <div className="studio-prompt-actions opacity-0 group-hover/prompt:opacity-100">
+                                <button onClick={() => { navigator.clipboard.writeText(img.prompt || img.title); setFeedbackToast?.('Prompt copied to clipboard') }}
+                                    className="studio-prompt-action-btn" title="Copy Prompt">
+                                    <span className="material-symbols-outlined">content_copy</span>
+                                </button>
+                                <button onClick={() => setPrompt(img.prompt || img.title)}
+                                    className="studio-prompt-action-btn" title="Reuse Prompt">
+                                    <span className="material-symbols-outlined">refresh</span>
+                                </button>
+                            </div>
+                        </div>
                         <div className="relative rounded-xl overflow-hidden border border-[var(--sys-border)] bg-[var(--sys-bg)] cursor-pointer group mb-2.5" onClick={() => setZoomImage(img.imageUrl || img.thumbnailUrl)}>
                             <img src={img.imageUrl || img.thumbnailUrl} alt="Generated" className="w-full object-cover" style={{ maxHeight: '300px' }} />
                             <div className="absolute inset-0 bg-[var(--sys-bg)] group-hover:bg-[var(--sys-bg)] transition-all flex items-center justify-center opacity-0 group-hover:opacity-100">
@@ -404,7 +455,6 @@ const GalleryPanel = memo(({
                             </div>
                         </div>
                         <div className="flex items-center gap-1.5">
-                            <button onClick={() => setPrompt(img.prompt || img.title)} className="studio-btn-secondary py-1 px-2.5 text-[9px]">Reuse</button>
                             <button onClick={() => handleDownloadImage(img.imageUrl || img.thumbnailUrl, 'creative.png')} className="studio-action-btn-sm w-8 h-8"><span className="material-symbols-outlined">download</span></button>
                             <button onClick={() => setDesignBaseImage(img.imageUrl || img.thumbnailUrl)} className="studio-action-btn-sm w-8 h-8"><span className="material-symbols-outlined">edit</span></button>
                             <span className="ml-auto text-[10px] text-[var(--sys-text-muted)]">{getTimeAgo(img.createdAt)}</span>

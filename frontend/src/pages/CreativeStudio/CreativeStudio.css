@@ -452,3 +452,48 @@
   50% { opacity: 0.6; color: rgba(255, 77, 0, 0.5); }
 }
 
+/* ── Compact Prompt UI ── */
+.studio-compact-prompt-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.studio-compact-prompt-text {
+  flex: 1;
+  min-width: 0;
+  font-weight: 500;
+  transition: color 0.2s ease;
+}
+
+.studio-prompt-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: opacity 0.2s ease;
+}
+
+.studio-prompt-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  color: var(--sys-text-muted);
+  background: transparent;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  border: none;
+}
+
+.studio-prompt-action-btn:hover {
+  color: var(--sys-primary);
+  background: var(--sys-primary-dim);
+}
+
+.studio-prompt-action-btn .material-symbols-outlined {
+  font-size: 16px;
+}
+
