@@ -308,7 +308,7 @@ async function runPipeline({ videoUrl, videoId, brandContext, brandId, channelCo
 
 // ── POST /:id/thumbnail — Phase 3: Regenerate thumbnail ────────────────────
 
-const ThumbnailTemplate = require('../models/ThumbnailTemplate');
+
 
 router.post('/:id/thumbnail', protect, async (req, res) => {
     try {
