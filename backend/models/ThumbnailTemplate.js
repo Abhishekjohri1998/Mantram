@@ -21,7 +21,9 @@ const ThumbnailTemplateSchema = new mongoose.Schema({
     // Identity
     name:        { type: String, required: true, trim: true },
     description: { type: String, trim: true },
-    emoji:       { type: String, default: '🎨' }, // Quick visual identifier
+    emoji:       { type: String, default: 'palette' }, // Material Symbols icon name (kept as 'emoji' for backward compat)
+    icon:        { type: String, default: 'palette' }, // Material Symbols icon name
+
     previewUrl:  String,                           // Generated preview image URL
 
     // Classification (what this template is for)

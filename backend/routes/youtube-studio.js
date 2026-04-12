@@ -124,7 +124,7 @@ router.get('/projects', protect, async (req, res) => {
 // GET /:id — Get single project
 router.get('/:id', protect, async (req, res) => {
     // Guard against Express matching static-looking IDs
-    if (req.params.id === 'projects' || req.params.id === 'analyse') {
+    if (req.params.id === 'projects' || req.params.id === 'analyse' || req.params.id === 'settings') {
         return res.status(404).json({ success: false, error: 'Route not found' });
     }
     try {

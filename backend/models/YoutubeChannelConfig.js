@@ -1,11 +1,12 @@
 /**
  * YoutubeChannelConfig — Mongoose Model
  *
- * Per-user (per-brand) YouTube channel configuration.
- * Stores channel identity, default language preferences, logo settings,
- * and pointer to the active thumbnail template.
+ * Multi-channel support: one document per channel per user.
+ * A user can configure multiple YouTube channels, each with its own
+ * identity, logo, language preferences, and default thumbnail template.
  *
- * One config per brand (brand-scoped), or one per user if no brand selected.
+ * Indexed on { userId, internalId } — internalId is a slug or UUID generated
+ * client-side so users can have N channels without needing ytChannelId.
  */
 
 import mongoose from 'mongoose';
@@ -14,14 +15,19 @@ const YoutubeChannelConfigSchema = new mongoose.Schema({
     userId:  { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     brandId: { type: mongoose.Schema.Types.ObjectId, ref: 'Brand', index: true },
 
+    // Internal identifier (slug) — allows multiple channels per user
+    // Generated as `channel-${Date.now()}` or user-provided slug
+    internalId: { type: String, required: true, trim: true },
+
     // Channel identity
-    channelName: { type: String, trim: true },
+    channelName: { type: String, trim: true, required: true },
     channelId:   { type: String, trim: true },  // YouTube channel ID (UCxxxxxx)
-    channelUrl:  { type: String, trim: true },
-    niche:       { type: String, trim: true },  // "Tech", "Entertainment", "News" etc.
+    channelUrl:  { type: String, trim: true },   // youtube.com/@handle
+    niche:       { type: String, trim: true },   // "Tech", "Entertainment", etc.
+    isDefault:   { type: Boolean, default: false }, // Default channel for new analyses
 
     // Logo
-    logoUrl:       { type: String, trim: true },  // URL of channel logo/watermark
+    logoUrl:       { type: String, trim: true },   // S3 URL of channel logo/watermark
     logoPlacement: {
         type: String,
         enum: ['top-left', 'top-right', 'bottom-left', 'bottom-right', 'none'],
@@ -33,7 +39,7 @@ const YoutubeChannelConfigSchema = new mongoose.Schema({
         title:       { type: String, default: 'english' },
         description: { type: String, default: 'english' },
         tags:        { type: String, default: 'english' },
-        thumbnail:   { type: String, default: 'english' }, // Text overlay on thumbnail
+        thumbnail:   { type: String, default: 'english' },
     },
 
     // Active template
@@ -41,9 +47,8 @@ const YoutubeChannelConfigSchema = new mongoose.Schema({
 
     // Title preferences
     titlePreferences: {
-        defaultMode: { type: String, enum: ['auto', 'manual'], default: 'auto' }, // auto = original YT title
-        maxLength:   { type: Number, default: 65 },   // YouTube recommended
-        addEmoji:    { type: Boolean, default: false },
+        defaultMode: { type: String, enum: ['auto', 'manual'], default: 'auto' },
+        maxLength:   { type: Number, default: 65 },
         style:       { type: String, enum: ['curiosity', 'number', 'how-to', 'bold-claim', 'auto'], default: 'auto' },
     },
 
@@ -63,8 +68,8 @@ const YoutubeChannelConfigSchema = new mongoose.Schema({
 
 }, { timestamps: true });
 
-// One config per user+brand combination
-YoutubeChannelConfigSchema.index({ userId: 1, brandId: 1 }, { unique: true, sparse: true });
-YoutubeChannelConfigSchema.index({ userId: 1 });
+// Unique per user+internalId (allows multiple channels)
+YoutubeChannelConfigSchema.index({ userId: 1, internalId: 1 }, { unique: true });
+YoutubeChannelConfigSchema.index({ userId: 1, isDefault: 1 });
 
 export default mongoose.model('YoutubeChannelConfig', YoutubeChannelConfigSchema);

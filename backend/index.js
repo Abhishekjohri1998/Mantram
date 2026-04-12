@@ -300,8 +300,8 @@ app.use('/api/routing-rules', routingRulesRoutes);
 app.use('/api/canvas-assets', canvasAssetsRoutes);
 app.use('/api/agent-command', agentCommandRoutes);
 app.use('/api/video-studio', videoStudioRoutes);
+app.use('/api/youtube-studio/settings', youtubeStudioSettingsRoutes); // MUST be before /:id wildcard
 app.use('/api/youtube-studio', youtubeStudioRoutes);
-app.use('/api/youtube-studio/settings', youtubeStudioSettingsRoutes);
 
 app.use('/api/content/agentic', contentAgenticRoutes);
 app.use('/api/creatives/agentic', creativeAgenticRoutes);
