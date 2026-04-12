@@ -3569,7 +3569,7 @@ function BlogEditorView({ content, activeBrand, onNewContent, onGenerateImage })
 // ============================================================================
 
 
-function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating, activeBrand, onCreateVisual, accepted, onRefine, contentFeedback, imageUrl, onABTest, abTestData, abTestLoading }) {
+function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating, activeBrand, onCreateVisual, accepted, onRefine, contentFeedback, imageUrl, onABTest, abTestData, abTestLoading, generatingVisualPrompt, onGenerateVisual, inlineVisualUrl, inlineVisualActive, inlineVisualProgress }) {
     const [copied, setCopied] = useState(false)
     const [editing, setEditing] = useState(false)
     const [editContent, setEditContent] = useState(result?.content || '')
@@ -3643,6 +3643,30 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
                     <p className="text-sm text-[var(--sys-text-muted)] mt-2">Your content has been saved to history. What would you like to do next?</p>
                 </div>
 
+                {/* Generated Visual Result / Progress */}
+                {(inlineVisualActive || inlineVisualUrl) && (
+                    <div className="mb-6 rounded-2xl overflow-hidden glass-panel border border-[var(--sys-border)] relative w-full flex items-center justify-center bg-[var(--sys-surface)] min-h-[300px]">
+                        {inlineVisualUrl ? (
+                            <>
+                                <img src={inlineVisualUrl} alt="Generated visual preview" className="w-full h-auto object-cover max-h-[500px]" />
+                                <button onClick={onGenerateVisual} disabled={generatingVisualPrompt}
+                                        className="absolute top-4 right-4 bg-black/60 hover:bg-black/80 text-white rounded-full p-2 backdrop-blur-md transition-all cursor-pointer shadow-lg disabled:opacity-50">
+                                    <span className={`material-symbols-outlined text-sm block ${generatingVisualPrompt ? 'animate-spin' : ''}`}>{generatingVisualPrompt ? 'progress_activity' : 'refresh'}</span>
+                                </button>
+                            </>
+                        ) : (
+                            <div className="flex flex-col items-center justify-center p-12 text-center text-primary">
+                                <span className="material-symbols-outlined text-4xl animate-spin mb-4">progress_activity</span>
+                                <div className="w-48 h-1.5 bg-primary/20 rounded-full overflow-hidden mt-2">
+                                    <div className="h-full bg-primary transition-all duration-300" style={{ width: `${inlineVisualProgress}%` }}></div>
+                                </div>
+                                <h4 className="text-sm font-bold mt-4">Generating Visual...</h4>
+                                <p className="text-[10px] opacity-70 mt-1">This usually takes 15-30s</p>
+                            </div>
+                        )}
+                    </div>
+                )}
+
                 <div className="glass-panel rounded-2xl p-6 mb-6">
                     <div className="flex items-center gap-2 mb-3">
                         <span className="text-sm text-primary font-bold bg-[var(--sys-primary-dim)] px-2.5 py-1 rounded-lg">✓ Approved</span>
@@ -3653,14 +3677,16 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-                    <button onClick={onCreateVisual}
-                        className="glass-panel rounded-2xl p-5 hover:bg-[var(--sys-surface)] hover:border-primary/30 transition-all cursor-pointer text-left group border border-[var(--sys-border)]">
-                        <div className="size-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary mb-3 group-hover:scale-110 transition-transform">
-                            <span className="material-symbols-outlined text-2xl">image</span>
-                        </div>
-                        <h4 className="text-base font-bold text-[var(--sys-text)] mb-1">Create Matching Visual</h4>
-                        <p className="text-[11px] text-[var(--sys-text-muted)]">Generate an image that matches this content in Creative Studio</p>
-                    </button>
+                    {!(inlineVisualActive || inlineVisualUrl) && (
+                        <button onClick={onGenerateVisual} disabled={generatingVisualPrompt}
+                            className="glass-panel rounded-2xl p-5 hover:bg-[var(--sys-surface)] hover:border-primary/30 transition-all cursor-pointer text-left group border border-[var(--sys-border)]">
+                            <div className="size-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary mb-3 group-hover:scale-110 transition-transform">
+                                <span className={`material-symbols-outlined text-2xl ${generatingVisualPrompt ? 'animate-spin' : ''}`}>{generatingVisualPrompt ? 'progress_activity' : 'image'}</span>
+                            </div>
+                            <h4 className="text-base font-bold text-[var(--sys-text)] mb-1">Create Matching Visual</h4>
+                            <p className="text-[11px] text-[var(--sys-text-muted)]">Generate an image that matches this content</p>
+                        </button>
+                    )}
                     <button onClick={() => { navigator.clipboard.writeText(stripMarkdown(result.content)); setCopied(true); setTimeout(() => setCopied(false), 2000) }}
                         className="glass-panel rounded-2xl p-5 hover:bg-[var(--sys-surface)] hover:border-[var(--sys-border)] transition-all cursor-pointer text-left group border border-[var(--sys-border)]">
                         <div className="size-12 rounded-xl bg-[var(--sys-primary-dim)] flex items-center justify-center text-primary mb-3 group-hover:scale-110 transition-transform">
@@ -3740,7 +3766,7 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
                     isOpen={showPublish}
                     onClose={() => setShowPublish(false)}
                     defaultText={result?.content || ''}
-                    defaultImage={null}
+                    defaultImage={inlineVisualUrl || null}
                     brandId={activeBrand?._id}
                 />
             </div>
@@ -3850,6 +3876,30 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
                 </div>
             )}
 
+            {/* Generated Visual Result / Progress (Unaccepted View) */}
+            {(inlineVisualActive || inlineVisualUrl) && (
+                <div className="mb-6 mt-4 rounded-2xl overflow-hidden glass-panel border border-[var(--sys-border)] relative w-full flex items-center justify-center bg-[var(--sys-surface)] min-h-[300px]">
+                    {inlineVisualUrl ? (
+                        <>
+                            <img src={inlineVisualUrl} alt="Generated visual preview" className="w-full h-auto object-cover max-h-[500px]" />
+                            <button onClick={onGenerateVisual} disabled={generatingVisualPrompt}
+                                    className="absolute top-4 right-4 bg-black/60 hover:bg-black/80 text-white rounded-full p-2 backdrop-blur-md transition-all cursor-pointer shadow-lg disabled:opacity-50">
+                                <span className={`material-symbols-outlined text-sm block ${generatingVisualPrompt ? 'animate-spin' : ''}`}>{generatingVisualPrompt ? 'progress_activity' : 'refresh'}</span>
+                            </button>
+                        </>
+                    ) : (
+                        <div className="flex flex-col items-center justify-center p-12 text-center text-primary">
+                            <span className="material-symbols-outlined text-4xl animate-spin mb-4">progress_activity</span>
+                            <div className="w-48 h-1.5 bg-primary/20 rounded-full overflow-hidden mt-2">
+                                <div className="h-full bg-primary transition-all duration-300" style={{ width: `${inlineVisualProgress}%` }}></div>
+                            </div>
+                            <h4 className="text-sm font-bold mt-4">Generating Visual...</h4>
+                            <p className="text-[10px] opacity-70 mt-1">This usually takes 15-30s</p>
+                        </div>
+                    )}
+                </div>
+            )}
+
             {/* Actions */}
             <div className="flex gap-3 mb-4">
                 <button onClick={handleCopy}
@@ -3868,10 +3918,13 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
                         <span className="material-symbols-outlined text-lg">check</span> Accept & Save
                     </button>
                 )}
-                <button onClick={onCreateVisual}
-                    className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold glass-panel text-primary hover:bg-primary/10 transition-all cursor-pointer border border-primary/20">
-                    <span className="material-symbols-outlined text-lg">image</span> Create Visual
-                </button>
+                {!(inlineVisualActive || inlineVisualUrl) && (
+                    <button onClick={onGenerateVisual} disabled={generatingVisualPrompt}
+                        className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold glass-panel text-primary hover:bg-primary/10 transition-all cursor-pointer border border-primary/20">
+                        <span className={`material-symbols-outlined text-lg ${generatingVisualPrompt ? 'animate-spin' : ''}`}>{generatingVisualPrompt ? 'progress_activity' : 'image'}</span>
+                        {generatingVisualPrompt ? 'Generating...' : 'Create Visual'}
+                    </button>
+                )}
                 <button onClick={() => setShowPublish(true)}
                     className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold bg-[#1877F2]/10 text-[#1877F2] hover:bg-[#1877F2]/20 transition-all cursor-pointer border border-[#1877F2]/30">
                     <span className="material-symbols-outlined text-lg">share</span> Publish
@@ -3889,7 +3942,7 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
                 isOpen={showPublish}
                 onClose={() => setShowPublish(false)}
                 defaultText={result?.content || ''}
-                defaultImage={imageUrl}
+                defaultImage={inlineVisualUrl || imageUrl}
                 brandId={activeBrand?._id}
             />
 
@@ -4176,6 +4229,10 @@ export default function ContentStudio() {
     const [error, setError] = useState(null)
     const [prefilledOccasion, setPrefilledOccasion] = useState(null)
     const [accepted, setAccepted] = useState(false)
+    const [generatingVisualPrompt, setGeneratingVisualPrompt] = useState(false)
+    const [inlineVisualActive, setInlineVisualActive] = useState(false)
+    const [inlineVisualProgress, setInlineVisualProgress] = useState(0)
+    const [inlineVisualUrl, setInlineVisualUrl] = useState(null)
     const [showHistory, setShowHistory] = useState(false)
     const [photoshootImage, setPhotoshootImage] = useState(null)
     const [modelOverride, setModelOverride] = useState('auto')
@@ -4512,15 +4569,115 @@ export default function ContentStudio() {
         }
     }
 
-    const handleCreateVisual = () => {
-        // Navigate to Creative Studio with content context
-        const contentSummary = result?.content?.substring(0, 200) || ''
-        const params = new URLSearchParams({
-            fromContent: 'true',
-            prompt: `Create a visual for: ${contentSummary}`,
-            type: goal || 'social',
-        })
-        navigate(`/creative-studio?${params.toString()}`)
+    const handleCreateVisual = async () => {
+        if (!result?.content) return;
+        setGeneratingVisualPrompt(true);
+        setInlineVisualActive(true);
+        setInlineVisualUrl(null);
+        setInlineVisualProgress(10);
+        
+        try {
+            // STEP 1: Generate Visual Prompt via Agentic Engine
+            const brandIdentityStr = activeBrand ? `Brand Name: ${activeBrand.name}. Target Audience: ${activeBrand.dna?.audience?.demographic || ''} ${activeBrand.dna?.audience?.psychographic || ''}` : '';
+            const data = await contentAPI.generateVisualPrompt({
+                brief: context?.details || '',
+                content: result.content,
+                type: goal || 'social',
+                brandContext: brandIdentityStr
+            });
+            let visualPrompt = data.prompt || result.content.substring(0, 200);
+            
+            // INJECT BRAND DNA
+            const brandColors = activeBrand?.dna?.colors?.map(c => c.hex).join(', ') || ''
+            const brandName = activeBrand?.name || ''
+            const personality = activeBrand?.dna?.voice?.personality || ''
+
+            if (brandName) visualPrompt += `. Brand: ${brandName}.`
+            if (personality) visualPrompt += ` Style: ${personality}.`
+            if (brandColors) visualPrompt += ` Use brand colors: ${brandColors}.`
+
+            setInlineVisualProgress(30);
+
+            // STEP 2: Trigger Generation directly using creativesAPI
+            const jobData = await creativesAPI.createJob({
+                brandId: activeBrand?._id,
+                type: 'instagram-post', // Valid enum type
+                prompt: visualPrompt,
+                options: {
+                    dimensions: '1080x1080',
+                    model: 'nanobanana-2',
+                }
+            });
+
+            if (jobData?.success && jobData?.jobId) {
+                const localJobId = jobData.jobId;
+                
+                // STEP 3: Poll until completion
+                const pollInterval = setInterval(async () => {
+                    try {
+                        const pollData = await creativesAPI.pollJob(localJobId);
+                        if (!pollData?.success) return;
+                        const job = pollData.job;
+                        
+                        setInlineVisualProgress(Math.max(40, job.progress || 0));
+                        
+                        if (job.status === 'completed') {
+                            clearInterval(pollInterval);
+                            const finalUrl = job.result?.creative?.imageUrl || job.imageUrl;
+                            const creativeId = job.result?.creative?._id;
+                            
+                            if (finalUrl) {
+                                setInlineVisualUrl(finalUrl);
+                                setInlineVisualProgress(100);
+                                setGeneratingVisualPrompt(false);
+                                setInlineVisualActive(false);
+                            } else if (creativeId) {
+                                // S3 Upload pending — wait explicitly just like Creative Studio
+                                let retries = 0;
+                                const waitForS3 = setInterval(async () => {
+                                    retries++;
+                                    if (retries > 12) {
+                                        clearInterval(waitForS3);
+                                        setGeneratingVisualPrompt(false);
+                                        setInlineVisualActive(false);
+                                        return;
+                                    }
+                                    try {
+                                        const repoll = await creativesAPI.pollJob(localJobId);
+                                        const freshJob = repoll?.job;
+                                        const freshUrl = freshJob?.result?.creative?.imageUrl || freshJob?.imageUrl;
+                                        if (freshUrl) {
+                                            clearInterval(waitForS3);
+                                            setInlineVisualUrl(freshUrl);
+                                            setInlineVisualProgress(100);
+                                            setGeneratingVisualPrompt(false);
+                                            setInlineVisualActive(false);
+                                        }
+                                    } catch (err) { /* ignore single poll failure */ }
+                                }, 5000);
+                            } else {
+                                setGeneratingVisualPrompt(false);
+                                setInlineVisualActive(false);
+                            }
+                        } else if (job.status === 'failed') {
+                            clearInterval(pollInterval);
+                            console.error('Inline visual job failed');
+                            setGeneratingVisualPrompt(false);
+                            setInlineVisualActive(false);
+                        }
+                    } catch (e) {
+                         console.error('Inline Visual Poll error:', e);
+                    }
+                }, 3000);
+            } else {
+                setGeneratingVisualPrompt(false);
+                setInlineVisualActive(false);
+            }
+        } catch (err) {
+            console.error('Failed to generate visual inline:', err);
+            setGeneratingVisualPrompt(false);
+            setInlineVisualActive(false);
+        }
     }
 
 
@@ -4974,17 +5131,22 @@ SPOKESPERSON QUOTES:`
                     result={result}
                     activeBrand={activeBrand}
                     generating={generating}
+                    generatingVisualPrompt={generatingVisualPrompt}
                     accepted={accepted}
                     imageUrl={null}
                     onRegenerate={handleRegenerate}
                     onFeedback={handleFeedback}
                     onNewContent={resetAll}
+                    onGenerateVisual={handleCreateVisual}
                     onCreateVisual={handleCreateVisual}
                     onRefine={handleRefine}
                     contentFeedback={contentFeedback}
                     onABTest={handleABTest}
                     abTestData={abTestData}
                     abTestLoading={abTestLoading}
+                    inlineVisualUrl={inlineVisualUrl}
+                    inlineVisualActive={inlineVisualActive}
+                    inlineVisualProgress={inlineVisualProgress}
                 />
             )}
 

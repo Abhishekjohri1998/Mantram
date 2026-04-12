@@ -160,6 +160,81 @@ Response format:
     }
 });
 
+// ══════════════════════════════════════════════════════════════════════════════
+// POST /api/content/agentic/visual-prompt — Generate an image prompt from content
+// ══════════════════════════════════════════════════════════════════════════════
+router.post('/visual-prompt', protect, async (req, res) => {
+    try {
+        const { brief, content, type, brandContext } = req.body;
+        if (!content?.trim()) {
+            return res.status(400).json({ success: false, error: 'Content is required to generate a visual prompt.' });
+        }
+
+        const grokKey = process.env.GROK_API_KEY || process.env.XAI_API_KEY;
+        const useGrok = !!grokKey;
+        
+        let visualPrompt = '';
+        const systemInstruction = `You are a world-class Art Director. Read this marketing copy and Brand Context, then output a highly descriptive, cinematic, purely visual image generation prompt.
+CRITICAL RULES:
+1. Do NOT include any text, typography, or UI elements.
+2. DO describe the physical scene, subject, lighting, mood, color palette, and camera angle.
+3. Crucially, the subjects and environment MUST align precisely with the provided Brand Context / Target Audience (e.g., ensure culturally appropriate demographics, age, and lifestyle are vividly described).
+4. Keep it under 60 words.
+5. Output ONLY the raw prompt text, nothing else.`;
+
+        const userInstruction = `Brief: ${brief || 'N/A'}\nType: ${type || 'social'}${brandContext ? `\nBrand Context: ${brandContext}` : ''}\nCopy:\n"${content}"\n\nPrompt:`;
+
+        try {
+            if (useGrok) {
+                const resp = await fetch('https://api.x.ai/v1/chat/completions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${grokKey}` },
+                    body: JSON.stringify({
+                        model: 'grok-3-mini-fast',
+                        messages: [
+                            { role: 'system', content: systemInstruction },
+                            { role: 'user', content: userInstruction }
+                        ],
+                        temperature: 0.6,
+                        max_tokens: 300,
+                    }),
+                    signal: AbortSignal.timeout(6000),
+                });
+                
+                if (!resp.ok) {
+                    throw new Error(`Grok API Error: ${resp.status}`);
+                }
+                
+                const data = await resp.json();
+                visualPrompt = data.choices?.[0]?.message?.content || '';
+            } else {
+                throw new Error('Grok key missing, fallback to Gemini');
+            }
+        } catch (genErr) {
+            console.warn('Visual prompt Grok path failed, using Gemini:', genErr.message);
+            const { callAgentText } = await import('../agents/shared/agentUtils.js');
+            visualPrompt = await callAgentText(systemInstruction, userInstruction, 0.6, 300);
+        }
+
+        // Clean up any <think> tags or markdown formatting
+        if (typeof visualPrompt !== 'string') {
+             visualPrompt = String(visualPrompt);
+        }
+        visualPrompt = visualPrompt.replace(/<think>[\s\S]*?<\/think>/gi, '').replace(/\*+/g, '').replace(/^"|"$/g, '').trim();
+
+        if (!visualPrompt) {
+            visualPrompt = content.substring(0, 200);
+        }
+
+        res.json({ success: true, prompt: visualPrompt });
+    } catch (err) {
+        console.warn('Visual prompt generation totally failed:', err.message);
+        // Fallback to exact previous behavior without "Create a visual for" so it doesn't double up
+        const fallback = req.body.content?.substring(0, 200) || 'Creative marketing visual';
+        res.json({ success: true, prompt: fallback });
+    }
+});
+
 // Regex fallback for intent parsing (original SmartInput logic)
 function regexFallback(input) {
     const lower = input.toLowerCase();

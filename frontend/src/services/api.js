@@ -186,6 +186,7 @@ export const content = {
     blogAssist: (data) => apiFetch('/content/agentic/assist', { method: 'POST', body: JSON.stringify(data) }),
     blogPublishWebsite: (id) => apiFetch(`/content/agentic/blog/${id}/publish-website`, { method: 'POST' }),
     parseIntent: (input) => apiFetch('/content/agentic/parse-intent', { method: 'POST', body: JSON.stringify({ input }) }),
+    generateVisualPrompt: (data) => apiFetch('/content/agentic/visual-prompt', { method: 'POST', body: JSON.stringify(data) }),
     list: (params = {}) => {
         const query = new URLSearchParams(params).toString();
         return apiFetch(`/content?${query}`);
