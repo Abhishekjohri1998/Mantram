@@ -308,6 +308,8 @@ async function runPipeline({ videoUrl, videoId, brandContext, brandId, channelCo
 
 // ── POST /:id/thumbnail — Phase 3: Regenerate thumbnail ────────────────────
 
+const ThumbnailTemplate = require('../models/ThumbnailTemplate');
+
 router.post('/:id/thumbnail', protect, async (req, res) => {
     try {
         const project = await YoutubeProject.findOne({ _id: req.params.id, userId: req.user._id });
@@ -316,12 +318,22 @@ router.post('/:id/thumbnail', protect, async (req, res) => {
             return res.status(400).json({ success: false, error: 'Run analysis first to get thumbnail direction' });
         }
 
+        const { templateId } = req.body;
+        let template = null;
+        if (templateId) {
+            template = await ThumbnailTemplate.findById(templateId);
+            if (template) await project.updateOne({ $set: { appliedTemplateId: template._id } });
+        } else if (project.appliedTemplateId) {
+            template = await ThumbnailTemplate.findById(project.appliedTemplateId);
+        }
+
         const { brandContext } = await loadBrandContext(project.brandId?.toString()).catch(() => ({ brandContext: null }));
 
         const { generatedThumbnailUrl, thumbnailGenerationError } = await thumbnailGenerationNode({
             thumbnailDirection: project.thumbnailDirection,
             video: { metadata: project.metadata },
             brandContext,
+            template,
         });
 
         if (generatedThumbnailUrl) {
