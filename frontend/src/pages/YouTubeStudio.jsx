@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import DashboardLayout from '../components/DashboardLayout'
 import SEOHead from '../components/SEOHead'
 import { useBrand } from '../context/BrandContext'
+import YouTubeStudioSettings from './YouTubeStudioSettings'
 
 const API_BASE = import.meta.env.VITE_API_URL || `${window.location.origin}/api`
 
@@ -662,6 +663,7 @@ export default function YouTubeStudio() {
     const [projects, setProjects] = useState([])
     const [activeProject, setActiveProject] = useState(null)
     const [loadingProject, setLoadingProject] = useState(false)
+    const [activeTemplate, setActiveTemplate] = useState(null) // Selected thumbnail template
     const pollRef = useRef({})
 
     useEffect(() => { loadProjects() }, [])
@@ -746,11 +748,15 @@ export default function YouTubeStudio() {
                         { id: 'analyse', icon: 'link', label: 'Analyse' },
                         { id: 'result', icon: 'analytics', label: 'Result', disabled: !activeProject },
                         { id: 'history', icon: 'history', label: `History (${projects.length})` },
+                        { id: 'settings', icon: 'tune', label: 'Settings' },
                     ].map(t => (
                         <button key={t.id} disabled={t.disabled} onClick={() => setTab(t.id)}
                             className={`flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-300 cursor-pointer ${tab === t.id ? 'studio-nav-pill text-[var(--sys-text)] font-bold' : 'studio-nav-tab-inactive'} ${t.disabled ? 'opacity-40 pointer-events-none' : ''}`}>
                             <span className={`material-symbols-outlined ${tab === t.id ? 'text-lg' : 'text-base opacity-70'}`}>{t.icon}</span>
                             {t.label}
+                            {t.id === 'settings' && activeTemplate && (
+                                <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 10, background: '#22c55e', color: 'white', fontWeight: 700, marginLeft: 2 }}>Template Active</span>
+                            )}
                         </button>
                     ))}
                 </div>
@@ -852,6 +858,38 @@ export default function YouTubeStudio() {
                             {projects.map(p => <ProjectCard key={p._id} project={p} onOpen={openProject} />)}
                         </div>
                     )}
+                </div>
+            )}
+
+            {/* ── Settings Tab ── */}
+            {tab === 'settings' && (
+                <div style={{ maxWidth: 860, margin: '0 auto' }}>
+                    {/* Active template banner */}
+                    {activeTemplate && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderRadius: 12, background: '#22c55e15', border: '1px solid #22c55e33', marginBottom: 20 }}>
+                            <span style={{ fontSize: 24 }}>{activeTemplate.emoji}</span>
+                            <div style={{ flex: 1 }}>
+                                <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#22c55e' }}>
+                                    Active Template: {activeTemplate.name}
+                                </p>
+                                <p style={{ margin: 0, fontSize: 11, color: 'var(--sys-text-muted)' }}>
+                                    {activeTemplate.classification?.theme} · {activeTemplate.classification?.language} · Visual style will be applied to all new thumbnails
+                                </p>
+                            </div>
+                            <button onClick={() => setActiveTemplate(null)}
+                                style={{ padding: '5px 12px', borderRadius: 8, fontSize: 11, fontWeight: 700, border: '1px solid #ef444444', background: 'transparent', color: '#ef4444', cursor: 'pointer' }}>
+                                Clear
+                            </button>
+                        </div>
+                    )}
+                    <YouTubeStudioSettings
+                        brandId={activeBrand?._id}
+                        activeTemplateId={activeTemplate?._id}
+                        onTemplateSelect={(template) => {
+                            setActiveTemplate(template)
+                            // Show brief confirmation
+                        }}
+                    />
                 </div>
             )}
 
