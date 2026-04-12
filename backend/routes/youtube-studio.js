@@ -2,12 +2,15 @@
  * YouTube Studio — Backend Route (All 4 Phases)
  * 
  * POST /api/youtube-studio/analyse           — Start full 8-node pipeline
- * GET  /api/youtube-studio/:id/progress      — SSE real-time progress stream (Phase 4)
- * GET  /api/youtube-studio/projects          — List all projects
+ * GET  /api/youtube-studio/projects          — List all projects  ← MUST be before /:id
  * GET  /api/youtube-studio/:id              — Get single project
+ * GET  /api/youtube-studio/:id/progress      — SSE real-time progress stream (Phase 4)
  * POST /api/youtube-studio/:id/thumbnail     — Regenerate AI thumbnail (Phase 3)
  * POST /api/youtube-studio/:id/characters    — Generate character portraits (Phase 2)
  * DELETE /api/youtube-studio/:id            — Delete project
+ * 
+ * IMPORTANT: Static paths (/analyse, /projects) MUST be registered before wildcard
+ * paths (/:id, /:id/progress) to prevent Express matching /projects as /:id.
  */
 
 import express from 'express';
@@ -36,6 +39,7 @@ function emitProgress(projectId, event) {
 }
 
 // ── POST /analyse — Main 8-node pipeline ───────────────────────────────────
+// STATIC: registered FIRST
 
 router.post('/analyse', protect, async (req, res) => {
     const { urls, url, brandId } = req.body;
@@ -58,10 +62,10 @@ router.post('/analyse', protect, async (req, res) => {
         });
     }
 
-    // Load brand context (Redis-cached)
+    // Load brand context (Redis-cached via UPSTASH_REDIS_REST_URL)
     const { brandContext } = await loadBrandContext(brandId).catch(() => ({ brandContext: null }));
 
-    // Create project records immediately so UI shows them right away
+    // Create project records immediately so UI shows them
     const projects = await Promise.all(videoIds.map(async ({ url: videoUrl, id }) => {
         const project = new YoutubeProject({
             userId: req.user._id,
@@ -95,8 +99,48 @@ router.post('/analyse', protect, async (req, res) => {
     }
 });
 
-// ── SSE: GET /:id/progress — Phase 4 real-time progress streaming ───────────
+// ── GET /projects — STATIC path, must be registered BEFORE /:id ─────────────
 
+router.get('/projects', protect, async (req, res) => {
+    try {
+        const { brandId, limit = 20 } = req.query;
+        const query = { userId: req.user._id };
+        if (brandId) query.brandId = brandId;
+
+        const projects = await YoutubeProject.find(query)
+            .select('-transcript.fullText -transcript.segments')
+            .sort({ createdAt: -1 })
+            .limit(parseInt(limit))
+            .lean();
+
+        res.json({ success: true, projects });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// ── WILDCARD routes — registered AFTER all static paths ─────────────────────
+
+// GET /:id — Get single project
+router.get('/:id', protect, async (req, res) => {
+    // Guard against Express matching static-looking IDs
+    if (req.params.id === 'projects' || req.params.id === 'analyse') {
+        return res.status(404).json({ success: false, error: 'Route not found' });
+    }
+    try {
+        const project = await YoutubeProject.findOne({
+            _id: req.params.id,
+            userId: req.user._id,
+        }).lean();
+
+        if (!project) return res.status(404).json({ success: false, error: 'Project not found' });
+        res.json({ success: true, project });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// GET /:id/progress — SSE real-time progress stream (Phase 4)
 router.get('/:id/progress', protect, (req, res) => {
     const { id } = req.params;
 
@@ -114,8 +158,14 @@ router.get('/:id/progress', protect, (req, res) => {
     // Send initial heartbeat
     res.write(`data: ${JSON.stringify({ type: 'connected', projectId: id })}\n\n`);
 
+    // Keepalive ping every 20s (prevents proxy timeout)
+    const keepalive = setInterval(() => {
+        try { res.write(`: ping\n\n`); } catch { clearInterval(keepalive); }
+    }, 20_000);
+
     // Cleanup on disconnect
     req.on('close', () => {
+        clearInterval(keepalive);
         const clients = sseClients.get(id);
         if (clients) {
             clients.delete(res);
@@ -124,11 +174,11 @@ router.get('/:id/progress', protect, (req, res) => {
     });
 });
 
-// ── Pipeline Runner (8 nodes) ──────────────────────────────────────────────
+// ── Pipeline Runner (8 nodes, all phases) ─────────────────────────────────
 
 async function runPipeline({ videoUrl, videoId, brandContext, brandId, project }) {
     const pid = project._id.toString();
-    console.log(`🚀 YouTube pipeline starting for ${videoId} (8 nodes)`);
+    console.log(`🚀 [YouTube Pipeline] Starting 8-node pipeline for ${videoId}`);
     const startMs = Date.now();
 
     const emit = (node, status, data = {}) => emitProgress(pid, { type: 'node', node, status, ...data });
@@ -139,38 +189,50 @@ async function runPipeline({ videoUrl, videoId, brandContext, brandId, project }
         const { transcript, metadata, duration, youtubeUrl } = await transcriptNode({ videoId, videoUrl });
         await project.updateOne({ $set: { metadata, 'transcript.available': transcript.available, status: 'analysing' } });
         emit('transcript', 'done', { transcriptAvailable: transcript.available, title: metadata.title });
+        console.log(`✅ [Node 1] Transcript: available=${transcript.available}, title="${metadata.title}"`);
 
         const video = { videoId, youtubeUrl, metadata, transcript, duration };
 
         // ── Nodes 2 & 3 in parallel: Analysis + Chapters ──────────────────
-        emit('analysis', 'running', { message: 'Gemini is watching the video…' });
-        emit('chapters', 'running', { message: 'Detecting chapters…' });
+        emit('analysis', 'running', { message: 'Gemini 2.5 Pro watching the video…' });
+        emit('chapters', 'running', { message: 'Detecting chapters from transcript…' });
 
-        const [{ analysis }, { chapters }] = await Promise.all([
+        const [analysisRes, chaptersRes] = await Promise.all([
             analysisNode({ video, brandContext }),
             chapterNode({ video }),
         ]);
-        emit('analysis', 'done', { summary: analysis.summary?.substring(0, 100) });
+        const { analysis } = analysisRes;
+        const { chapters } = chaptersRes;
+
+        emit('analysis', 'done', { summary: analysis.summary?.substring(0, 100), characters: analysis.characters?.length });
         emit('chapters', 'done', { count: chapters.length });
+        console.log(`✅ [Node 2] Analysis: ${analysis.contentType}, ${analysis.characters?.length} characters`);
+        console.log(`✅ [Node 3] Chapters: ${chapters.length} detected`);
 
         // ── Nodes 4 & 5 in parallel: SEO + Brand Critic ───────────────────
-        emit('seo', 'running', { message: 'Writing brand-aligned SEO copy…' });
+        emit('seo', 'running', { message: 'Claude writing brand-aligned SEO copy…' });
         emit('brand', 'running', { message: 'Scoring brand alignment…' });
 
-        const [{ seo }, { brandAlignment }] = await Promise.all([
+        const [seoRes, brandRes] = await Promise.all([
             seoNode({ video, analysis, chapters, brandContext }),
             brandCriticNode({ video, analysis, brandContext }),
         ]);
+        const { seo } = seoRes;
+        const { brandAlignment } = brandRes;
+
         emit('seo', 'done', { recommendedTitle: seo?.recommendedTitle });
         emit('brand', 'done', { score: brandAlignment?.overallScore });
+        console.log(`✅ [Node 4] SEO: title="${seo?.recommendedTitle}"`);
+        console.log(`✅ [Node 5] Brand: score=${brandAlignment?.overallScore}`);
 
-        // ── Node 6: Thumbnail Direction ────────────────────────────────────
-        emit('thumbnailDirection', 'running', { message: 'Creating thumbnail concept…' });
+        // ── Node 6: Thumbnail Direction (MCoT — multimodal) ────────────────
+        emit('thumbnailDirection', 'running', { message: 'Creating thumbnail concept (MCoT)…' });
         const { thumbnailDirection } = await thumbnailDirectionNode({ video, analysis, seo, brandContext });
         emit('thumbnailDirection', 'done', { concept: thumbnailDirection?.concept?.substring(0, 80) });
+        console.log(`✅ [Node 6] Thumbnail direction: "${thumbnailDirection?.concept?.substring(0, 60)}"`);
 
-        // ── Node 7: Thumbnail Generation (Phase 3 — FLUX Pro) ─────────────
-        emit('thumbnailGeneration', 'running', { message: 'Generating thumbnail with NanoBanana 2 (multimodal)…' });
+        // ── Node 7: Thumbnail Generation (Phase 3 — NanoBanana 2 primary) ──
+        emit('thumbnailGeneration', 'running', { message: 'Generating thumbnail (NanoBanana 2 + character reference)…' });
         const { generatedThumbnailUrl, thumbnailGenerationError } = await thumbnailGenerationNode({
             thumbnailDirection, video, brandContext
         });
@@ -178,15 +240,17 @@ async function runPipeline({ videoUrl, videoId, brandContext, brandId, project }
             success: !!generatedThumbnailUrl,
             error: thumbnailGenerationError,
         });
+        console.log(`✅ [Node 7] Thumbnail: ${generatedThumbnailUrl ? 'generated' : `failed — ${thumbnailGenerationError}`}`);
 
-        // ── Node 8: Character Portraits (Phase 2) ──────────────────────────
-        emit('characters', 'running', { message: 'Generating character portraits…' });
+        // ── Node 8: Character Portraits (Phase 2 — NanoBanana 2) ───────────
+        emit('characters', 'running', { message: 'Generating AI character portraits…' });
         const { characterPortraits } = await characterPortraitNode({ analysis, video, brandContext });
-        emit('characters', 'done', { count: characterPortraits.length });
+        emit('characters', 'done', { count: characterPortraits.filter(p => p.portraitUrl).length });
+        console.log(`✅ [Node 8] Portraits: ${characterPortraits.filter(p => p.portraitUrl).length}/${analysis.characters?.length || 0}`);
 
-        // ── Save all results ───────────────────────────────────────────────
+        // ── Persist all results ────────────────────────────────────────────
         const elapsed = Math.round((Date.now() - startMs) / 1000);
-        console.log(`✅ YouTube pipeline complete for ${videoId} in ${elapsed}s`);
+        console.log(`\n🏁 [YouTube Pipeline] Complete for ${videoId} in ${elapsed}s`);
 
         await project.updateOne({
             $set: {
@@ -216,48 +280,12 @@ async function runPipeline({ videoUrl, videoId, brandContext, brandId, project }
         emitProgress(pid, { type: 'done', elapsed, videoId });
 
     } catch (err) {
-        console.error(`❌ YouTube pipeline error for ${videoId}:`, err);
+        console.error(`❌ [YouTube Pipeline] Fatal error for ${videoId}:`, err);
         await project.updateOne({ $set: { status: 'failed', error: err.message } });
         emitProgress(pid, { type: 'error', error: err.message });
         throw err;
     }
 }
-
-// ── GET /projects ───────────────────────────────────────────────────────────
-
-router.get('/projects', protect, async (req, res) => {
-    try {
-        const { brandId, limit = 20 } = req.query;
-        const query = { userId: req.user._id };
-        if (brandId) query.brandId = brandId;
-
-        const projects = await YoutubeProject.find(query)
-            .select('-transcript.fullText -transcript.segments')
-            .sort({ createdAt: -1 })
-            .limit(parseInt(limit))
-            .lean();
-
-        res.json({ success: true, projects });
-    } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
-    }
-});
-
-// ── GET /:id ────────────────────────────────────────────────────────────────
-
-router.get('/:id', protect, async (req, res) => {
-    try {
-        const project = await YoutubeProject.findOne({
-            _id: req.params.id,
-            userId: req.user._id,
-        }).lean();
-
-        if (!project) return res.status(404).json({ success: false, error: 'Project not found' });
-        res.json({ success: true, project });
-    } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
-    }
-});
 
 // ── POST /:id/thumbnail — Phase 3: Regenerate thumbnail ────────────────────
 
@@ -265,7 +293,9 @@ router.post('/:id/thumbnail', protect, async (req, res) => {
     try {
         const project = await YoutubeProject.findOne({ _id: req.params.id, userId: req.user._id });
         if (!project) return res.status(404).json({ success: false, error: 'Project not found' });
-        if (!project.thumbnailDirection) return res.status(400).json({ success: false, error: 'Run analysis first to get thumbnail direction' });
+        if (!project.thumbnailDirection) {
+            return res.status(400).json({ success: false, error: 'Run analysis first to get thumbnail direction' });
+        }
 
         const { brandContext } = await loadBrandContext(project.brandId?.toString()).catch(() => ({ brandContext: null }));
 
