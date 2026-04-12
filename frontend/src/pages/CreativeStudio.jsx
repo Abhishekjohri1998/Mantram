@@ -9,6 +9,7 @@ import VoiceInput from '../components/VoiceInput'
 import PublishModal from '../components/PublishModal'
 import GlobalLoader from '../components/GlobalLoader'
 import MaskingCanvas from '../components/MaskingCanvas'
+import './CreativeStudio/CreativeStudio.css'
 
 // ── Helper: Time Ago ──
 
@@ -2363,11 +2364,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 {['All', 'Social', 'Product', 'Promo', 'Quote', 'Event'].map(cat => (
                                     <button key={cat}
                                         onClick={() => setGalleryFilter(cat)}
-                                        className={`px-2.5 py-1 rounded text-[11px] font-medium transition-all cursor-pointer ${
-                                            galleryFilter === cat
-                                                ? 'bg-[var(--sys-text)] text-[var(--sys-bg)]'
-                                                : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]'
-                                        }`}
+                                        className={`gallery-cat-pill ${galleryFilter === cat ? 'active' : ''}`}
                                         aria-label={`Filter gallery by ${cat}`}
                                     >
                                         {cat}
@@ -2377,22 +2374,22 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                         </div>
                         <div className="flex items-center gap-2">
                             {generationHistory.length > 0 && (
-                                <button onClick={() => setGenerationHistory([])} className="text-[10px] text-[var(--sys-text-muted)] hover:text-primary cursor-pointer transition-all">Clear</button>
+                                <button onClick={() => setGenerationHistory([])} className="studio-btn-ghost text-[10px] py-1 border-none">Clear</button>
                             )}
                             <div className="flex rounded-md border border-[var(--sys-border)] overflow-hidden">
                                 <button onClick={() => setViewMode('list')}
-                                    className={`p-1 cursor-pointer transition-all ${viewMode === 'list' ? 'bg-[var(--sys-surface)] text-[var(--sys-text)]' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text-muted)]'}`} 
+                                    className={`studio-action-btn-sm ${viewMode === 'list' ? 'bg-[var(--sys-primary-dim)] text-primary border-primary/30' : ''}`} 
                                     title="List view"
                                     aria-label="Switch to list view"
                                 >
-                                    <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>view_list</span>
+                                    <span className="material-symbols-outlined">view_list</span>
                                 </button>
                                 <button onClick={() => setViewMode('grid')}
-                                    className={`p-1 cursor-pointer transition-all ${viewMode === 'grid' ? 'bg-[var(--sys-surface)] text-[var(--sys-text)]' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text-muted)]'}`} 
+                                    className={`studio-action-btn-sm ${viewMode === 'grid' ? 'bg-[var(--sys-primary-dim)] text-primary border-primary/30' : ''}`} 
                                     title="Grid view"
                                     aria-label="Switch to grid view"
                                 >
-                                    <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>grid_view</span>
+                                    <span className="material-symbols-outlined">grid_view</span>
                                 </button>
                             </div>
                         </div>
@@ -2414,7 +2411,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                         <span className="text-xs text-[var(--sys-text)] flex-1">{bgTasks.length} generation{bgTasks.length > 1 ? 's' : ''} running in background</span>
                         {bgTasks.map(t => (
                             <button key={t.mode} onClick={() => setStudioMode(t.mode)}
-                                className="text-xs px-2.5 py-1 rounded-lg bg-[var(--sys-surface)] hover:bg-[var(--sys-surface)] text-[var(--sys-text)] flex items-center gap-1 cursor-pointer transition-all">
+                                className="studio-btn-secondary py-1 px-2.5 text-xs">
                                 <span className="material-symbols-outlined text-xs">{t.icon}</span>
                                 {t.label}
                             </button>
@@ -2446,7 +2443,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                     <span className="material-symbols-outlined text-[#FF4D00]">animation</span> Cinematic Animation
                                                 </h3>
                                                 <button onClick={() => { if (!animateGenerating) { setShowAnimatePanel(false); setAnimateModalOpen(false); } }}
-                                                    className="w-8 h-8 rounded-full bg-[var(--sys-surface-hover)] flex items-center justify-center text-[var(--sys-text-muted)] hover:text-[#FF4D00] transition-colors cursor-pointer border border-transparent">
+                                                    className="studio-action-btn-sm">
                                                     <span className="material-symbols-outlined text-sm">close</span>
                                                 </button>
                                             </div>
@@ -2477,7 +2474,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                     </div>
                                                 </div>
                                                 <button onClick={() => { if (!animateGenerating) { setShowAnimatePanel(false); setAnimateModalOpen(false); } }}
-                                                    className="w-10 h-10 rounded-full bg-[var(--sys-surface-hover)] flex items-center justify-center text-[var(--sys-text-muted)] hover:text-[#FF4D00] transition-colors cursor-pointer border border-transparent hover:border-[#FF4D00]/30 hover:bg-[#FF4D00]/10">
+                                                    className="studio-action-btn-sm w-10 h-10">
                                                     <span className="material-symbols-outlined text-sm">close</span>
                                                 </button>
                                             </div>
@@ -2579,20 +2576,16 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                     <div className="flex gap-3">
                                                         <button onClick={handleAnimateGenerate}
                                                             disabled={animateGenerating || animateAnalyzing || !animatePrompt.trim() || !animateImageRef.current}
-                                                            className={`flex-1 py-3.5 rounded-xl text-[13px] font-bold flex items-center justify-center gap-2 cursor-pointer transition-all uppercase tracking-wider ${
-                                                                animateGenerating || animateAnalyzing || !animatePrompt.trim() || !animateImageRef.current
-                                                                    ? 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] border border-[var(--sys-border)] opacity-60 cursor-not-allowed'
-                                                                    : 'bg-[#FF4D00] text-white hover:bg-[#FF6A00] shadow-[0_0_20px_rgba(255,77,0,0.3)] hover:shadow-[0_0_25px_rgba(255,77,0,0.4)] hover:-translate-y-0.5'
-                                                            }`}>
+                                                            className="studio-btn-primary flex-1">
                                                             {animateGenerating ? (
-                                                                <><div className="w-4 h-4 border-2 border-white/80 border-t-transparent rounded-full animate-spin" /> Rendering Sequence...</>
+                                                                <><div className="w-4 h-4 border-2 border-white/80 border-t-transparent rounded-full animate-spin" /> Rendering...</>
                                                             ) : (
                                                                 <><span className="material-symbols-outlined text-[18px]">play_circle</span> Initialize Render</>
                                                             )}
                                                         </button>
                                                         <button onClick={() => { if (!animateGenerating) { setShowAnimatePanel(false); setAnimateModalOpen(false); } }}
                                                                 disabled={animateGenerating}
-                                                                className={`px-4 py-3.5 rounded-xl border border-[var(--sys-border)] bg-[var(--sys-surface)] hover:bg-[var(--sys-surface-hover)] text-[var(--sys-text)] transition-colors ${animateGenerating ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`} title="Cancel">
+                                                                className="studio-btn-secondary">
                                                                 Cancel
                                                         </button>
                                                     </div>
@@ -2605,14 +2598,14 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                             <div className="absolute top-3 left-3 bg-emerald-500/90 backdrop-blur-md px-2.5 py-1 rounded text-[10px] font-bold text-white tracking-widest uppercase border border-white/20 flex items-center gap-1.5 shadow-lg"><span className="material-symbols-outlined text-[12px]">check_circle</span> Render Complete</div>
                                                         </div>
                                                         <div className="p-4 bg-[var(--sys-surface)] border-t border-[var(--sys-border)] flex items-center justify-between gap-3">
-                                                            <a href={animateVideoUrl} download="animated-creative.mp4"
-                                                                className="flex-1 block py-2.5 rounded-xl bg-emerald-500 text-white text-[13px] font-bold text-center hover:bg-emerald-600 transition-colors uppercase tracking-wider flex items-center justify-center gap-2">
-                                                                <span className="material-symbols-outlined text-[18px]">cloud_download</span>
-                                                                Save High-Res Video
-                                                            </a>
-                                                            <button onClick={() => { setAnimateVideoUrl(null); setAnimateProgress(0); setAnimateGenerating(false); }} className="w-10 h-10 flex items-center justify-center rounded-xl bg-[var(--sys-surface-hover)] border border-[var(--sys-border)] text-[var(--sys-text)] hover:text-primary transition-colors cursor-pointer" title="Discard & try again">
-                                                                <span className="material-symbols-outlined text-sm">refresh</span>
-                                                            </button>
+                                                        <a href={animateVideoUrl} download="animated-creative.mp4"
+                                                            className="studio-btn-primary flex-1">
+                                                            <span className="material-symbols-outlined text-[18px]">cloud_download</span>
+                                                            Save Video
+                                                        </a>
+                                                        <button onClick={() => { setAnimateVideoUrl(null); setAnimateProgress(0); setAnimateGenerating(false); }} className="studio-action-btn-sm w-10 h-10" title="Discard & try again">
+                                                            <span className="material-symbols-outlined text-sm">refresh</span>
+                                                        </button>
                                                         </div>
                                                     </div>
                                                 )}
@@ -2637,7 +2630,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                     <span className="material-symbols-outlined text-violet-400">auto_fix_high</span> Gemini Edit
                                                 </h3>
                                                 <button onClick={() => { if (!editGenerating) setShowEditPanel(false) }}
-                                                    className="w-8 h-8 rounded-full bg-[var(--sys-surface-hover)] flex items-center justify-center text-[var(--sys-text-muted)] hover:text-violet-400 transition-colors cursor-pointer border border-transparent">
+                                                    className="studio-action-btn-sm">
                                                     <span className="material-symbols-outlined text-sm">close</span>
                                                 </button>
                                             </div>
@@ -2663,8 +2656,8 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                     {editHistory.length > 0 ? `After ${editHistory.length} Edit${editHistory.length > 1 ? 's' : ''}` : 'Source Image'}
                                                 </div>
                                                 {editSourceImageUrl && (
-                                                    <button onClick={() => setIsMaskingMode(!isMaskingMode)} className={`absolute top-3 right-3 px-2.5 py-1 rounded text-[10px] font-bold tracking-widest uppercase border flex items-center gap-1.5 transition-colors z-10 ${isMaskingMode ? 'bg-violet-500 text-white border-violet-400' : 'bg-black/60 backdrop-blur-md text-white border-white/10 hover:bg-black/80'}`}>
-                                                        <span className="material-symbols-outlined text-[14px]">{isMaskingMode ? 'brush' : 'brush'}</span>
+                                                    <button onClick={() => setIsMaskingMode(!isMaskingMode)} className={`absolute top-3 right-3 px-2.5 py-1 rounded-lg text-[10px] font-bold tracking-widest uppercase border flex items-center gap-1.5 transition-all z-10 ${isMaskingMode ? 'bg-[#FF4D00] text-white border-[#FF4D00]' : 'bg-black/60 backdrop-blur-md text-white border-white/10'}`}>
+                                                        <span className="material-symbols-outlined text-[14px]">brush</span>
                                                         {isMaskingMode ? 'Exit Masking' : 'Draw Mask'}
                                                     </button>
                                                 )}
@@ -2682,7 +2675,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                                 <span className="text-[10px] font-bold text-violet-400 w-5 text-center shrink-0">{i + 1}</span>
                                                                 <span className="text-[10px] text-[var(--sys-text-muted)] truncate flex-1">{h.prompt}</span>
                                                                 <button onClick={() => { editImageRef.current = h.resultImageUrl; setEditSourceImageUrl(h.resultImageUrl); setEditResult(null); setEditHistory(prev => prev.slice(0, i + 1)) }}
-                                                                    className="text-[9px] text-violet-400 hover:text-violet-300 cursor-pointer shrink-0 font-bold" title="Revert to this version">
+                                                                    className="text-[9px] text-[#FF4D00] hover:text-[#FF6A00] cursor-pointer shrink-0 font-bold" title="Revert to this version">
                                                                     Revert
                                                                 </button>
                                                             </div>
@@ -2705,7 +2698,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                     </div>
                                                 </div>
                                                 <button onClick={() => { if (!editGenerating) setShowEditPanel(false) }}
-                                                    className="w-10 h-10 rounded-full bg-[var(--sys-surface-hover)] flex items-center justify-center text-[var(--sys-text-muted)] hover:text-violet-400 transition-colors cursor-pointer border border-transparent hover:border-violet-500/30 hover:bg-violet-500/10">
+                                                    className="studio-action-btn-sm w-10 h-10">
                                                     <span className="material-symbols-outlined text-sm">close</span>
                                                 </button>
                                             </div>
@@ -2717,7 +2710,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                     {['Remove the background', 'Make it more vibrant', 'Add cinematic lighting', 'Make it look like a product photo', 'Add a subtle gradient overlay', 'Make it black and white', 'Enhance the colors'].map(suggestion => (
                                                         <button key={suggestion}
                                                             onClick={() => setEditPromptText(suggestion)}
-                                                            className="px-2.5 py-1 rounded-lg text-[10px] font-medium bg-violet-500/10 text-violet-300 hover:bg-violet-500/25 hover:text-violet-200 border border-violet-500/20 cursor-pointer transition-all">
+                                                            className="gallery-cat-pill border-none">
                                                             {suggestion}
                                                         </button>
                                                     ))}
@@ -2759,23 +2752,23 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                             <span className="material-symbols-outlined text-sm">open_in_full</span>
                                                         </button>
                                                     </div>
-                                                    <div className="p-3 bg-[var(--sys-surface)] border-t border-[var(--sys-border)] flex items-center justify-between gap-2">
-                                                        <div className="flex gap-2">
+                                                    <div className="p-3 bg-[var(--sys-surface)] border-t border-[var(--sys-border)] flex items-center justify-between gap-2 overflow-x-auto scrollbar-hide">
+                                                        <div className="flex gap-2 shrink-0">
                                                             <button onClick={() => handleDownloadImage(editResult.imageUrl, 'gemini-edit.png')}
-                                                                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-500 text-white text-[12px] font-bold hover:bg-emerald-600 transition-colors uppercase tracking-wider cursor-pointer">
+                                                                className="studio-btn-primary py-1.5 px-3 text-[11px] h-9">
                                                                 <span className="material-symbols-outlined text-[14px]">cloud_download</span> Download
                                                             </button>
                                                             <button onClick={async () => { try { await creativesAPI.uploadToBank({ imageUrl: editResult.imageUrl, brandId: activeBrand?._id, title: 'Gemini Edited — ' + (editPromptText.slice(0, 40) || 'Edit') }); setFeedbackToast('Saved to Image Bank!'); setTimeout(() => setFeedbackToast(''), 2500) } catch(e) { console.error(e) } }}
-                                                                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[var(--sys-primary-dim)] hover:opacity-80 text-primary text-[12px] font-bold border border-[var(--sys-border)] transition-colors cursor-pointer uppercase tracking-wider">
+                                                                className="studio-btn-secondary py-1.5 px-3 text-[11px] h-9">
                                                                 <span className="material-symbols-outlined text-[14px]">save</span> Save
                                                             </button>
                                                             <button onClick={() => { setPublishData({ image: editResult.imageUrl, text: '' }) }}
-                                                                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#1877F2]/20 hover:bg-[#1877F2]/40 text-[12px] font-bold text-[#1877F2] border border-[#1877F2]/30 transition-colors cursor-pointer">
+                                                                className="studio-btn-secondary py-1.5 px-3 text-[11px] h-9">
                                                                 <span className="material-symbols-outlined text-[14px]">send</span> Share
                                                             </button>
                                                         </div>
                                                         <button onClick={() => handleAnimateClick({ imageUrl: editResult.imageUrl })}
-                                                            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#FF4D00]/10 hover:bg-[#FF4D00]/20 text-[12px] font-bold text-[#FF4D00] border border-[#FF4D00]/20 transition-colors cursor-pointer">
+                                                            className="studio-btn-secondary py-1.5 px-3 text-[11px] h-9 shrink-0">
                                                             <span className="material-symbols-outlined text-[14px]">animation</span> Animate
                                                         </button>
                                                     </div>
@@ -2786,20 +2779,15 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                             <div className="flex gap-3">
                                                 <button onClick={handleEditGenerate}
                                                     disabled={editGenerating || !editPromptText.trim() || !editImageRef.current}
-                                                    className={`flex-1 py-3.5 rounded-xl text-[13px] font-bold flex items-center justify-center gap-2 cursor-pointer transition-all uppercase tracking-wider ${
-                                                        editGenerating || !editPromptText.trim() || !editImageRef.current
-                                                            ? 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] border border-[var(--sys-border)] opacity-60 cursor-not-allowed'
-                                                            : 'bg-violet-600 text-white hover:bg-violet-500 shadow-[0_0_20px_rgba(139,92,246,0.3)] hover:shadow-[0_0_25px_rgba(139,92,246,0.5)] hover:-translate-y-0.5'
-                                                    }`}>
+                                                    className="studio-btn-primary flex-1">
                                                     {editGenerating ? (
-                                                        <><div className="w-4 h-4 border-2 border-white/80 border-t-transparent rounded-full animate-spin" /> Applying Edit...</>
+                                                        <><div className="w-4 h-4 border-2 border-white/80 border-t-transparent rounded-full animate-spin" /> Applying...</>
                                                     ) : (
                                                         <><span className="material-symbols-outlined text-[18px]">auto_fix_high</span> {editHistory.length > 0 ? 'Apply Next Edit' : 'Apply Edit'}</>
                                                     )}
                                                 </button>
                                                 {editHistory.length > 0 && (
                                                     <button onClick={() => {
-                                                        // Reset to original image
                                                         const origUrl = editHistory[0].sourceImageUrl
                                                         editImageRef.current = origUrl
                                                         setEditSourceImageUrl(origUrl)
@@ -2808,13 +2796,13 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                         setEditPromptText('')
                                                     }}
                                                         disabled={editGenerating}
-                                                        className="px-4 py-3.5 rounded-xl border border-[var(--sys-border)] bg-[var(--sys-surface)] hover:bg-[var(--sys-surface-hover)] text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] transition-all text-[12px] font-bold cursor-pointer" title="Reset to original">
+                                                        className="studio-btn-secondary px-3" title="Reset to original">
                                                         <span className="material-symbols-outlined text-sm">restart_alt</span>
                                                     </button>
                                                 )}
                                                 <button onClick={() => { if (!editGenerating) setShowEditPanel(false) }}
                                                     disabled={editGenerating}
-                                                    className={`px-4 py-3.5 rounded-xl border border-[var(--sys-border)] bg-[var(--sys-surface)] hover:bg-[var(--sys-surface-hover)] text-[var(--sys-text)] transition-colors text-[12px] font-bold ${editGenerating ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
+                                                    className="studio-btn-secondary px-4">
                                                     Cancel
                                                 </button>
                                             </div>
@@ -2849,11 +2837,11 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 {error.isRetryable && (
                                     <div className="flex gap-2 mt-3 ml-7">
                                         <button onClick={() => { setError(null); handleGenerate() }}
-                                            className="px-4 py-1.5 text-xs font-semibold rounded-lg bg-[var(--sys-surface)] hover:bg-[var(--sys-surface)] transition text-[var(--sys-text)] border border-[var(--sys-border)]">
+                                            className="studio-btn-pill active px-4 py-1.5 border-none">
                                             🔄 Try Again
                                         </button>
                                         <button onClick={() => setError(null)}
-                                            className="px-4 py-1.5 text-xs font-semibold rounded-lg bg-[var(--sys-surface)] hover:bg-[var(--sys-surface)] transition text-[var(--sys-text-muted)] border border-[var(--sys-border)]">
+                                            className="studio-btn-pill px-4 py-1.5 border-none">
                                             Dismiss
                                         </button>
                                     </div>
@@ -2913,7 +2901,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 </div>
 
                                 {/* Action Bar (Streamlined) */}
-                                <div className="flex items-center gap-1.5 pt-3 border-t border-[var(--sys-border)]">
+                                <div className="flex items-center gap-1.5 pt-3 border-t border-[var(--sys-border)] overflow-x-auto scrollbar-hide">
                                     <button onClick={() => { 
                                         setPrompt(prompt || result.prompt || result.title || ''); 
                                         if (result.model) setImageModel(result.model);
@@ -2923,41 +2911,41 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                         }
                                         if (result.style) setStyle(result.style);
                                     }}
-                                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)] cursor-pointer transition-all">
+                                        className="studio-btn-pill flex items-center gap-1 shrink-0">
                                         <span className="material-symbols-outlined text-sm">history</span>
                                         Reuse Settings
                                     </button>
                                     <button onClick={() => { navigator.clipboard.writeText(prompt); setFeedbackToast('Prompt copied!'); setTimeout(() => setFeedbackToast(''), 2000); }}
-                                        className="hidden sm:flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)] cursor-pointer transition-all">
+                                        className="studio-btn-pill hidden sm:flex items-center gap-1 shrink-0">
                                         <span className="material-symbols-outlined text-sm">content_copy</span>
                                         Copy
                                     </button>
 
                                     {/* Action items on the right side */}
-                                    <div className="flex items-center gap-1.5 ml-auto">
+                                    <div className="flex items-center gap-1.5 ml-auto shrink-0">
                                         <button onClick={async () => {
                                             try { await creativesAPI.uploadToBank({ imageUrl: result.imageUrl, brandId: activeBrand?._id, title: result.title || 'Creative' }); setFeedbackToast('Saved to Image Bank!'); setTimeout(() => setFeedbackToast(''), 2500) } catch(e) { console.error(e) }
                                         }}
-                                            className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[11px] font-bold text-primary bg-[var(--sys-primary-dim)] hover:opacity-80 transition-colors cursor-pointer border border-[var(--sys-border)]" title="Save to Image Bank">
-                                            <span className="material-symbols-outlined text-[14px]">save</span>
+                                            className="studio-action-btn-sm" title="Save to Image Bank">
+                                            <span className="material-symbols-outlined">save</span>
                                         </button>
                                         <button onClick={() => handleDownloadImage(result.imageUrl, `${result.title || 'creative'}.png`)}
-                                            className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[11px] font-bold text-[var(--sys-text)] bg-[var(--sys-surface)] hover:bg-[var(--sys-surface-hover)] transition-colors cursor-pointer border border-[var(--sys-border)]" title="Download">
-                                            <span className="material-symbols-outlined text-[14px]">download</span>
+                                            className="studio-action-btn-sm" title="Download">
+                                            <span className="material-symbols-outlined">download</span>
                                         </button>
                                         <button onClick={() => result.imageUrl && handleOpenEditPanel(result.imageUrl, result.title || 'Creative')}
-                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-violet-300 hover:text-white hover:bg-violet-600 cursor-pointer transition-all border border-violet-500/30 bg-violet-500/10">
+                                            className="studio-btn-pill active px-3 flex items-center gap-1.5 py-1.5 border-none">
                                             <span className="material-symbols-outlined text-sm">auto_fix_high</span>
                                             Edit
                                         </button>
                                         <button onClick={() => handleAnimateClick(result)}
-                                            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-[var(--sys-bg)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-text)] cursor-pointer transition-all border border-[var(--sys-text)] bg-[var(--sys-text)]">
+                                            className="studio-btn-primary py-1.5 px-3 h-8 text-[11px] hidden sm:flex">
                                             <span className="material-symbols-outlined text-sm">animation</span>
                                             Animate
                                         </button>
                                         <button onClick={() => result.imageUrl && setZoomImage(result.imageUrl)}
-                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-violet-300 hover:text-[var(--sys-text)] hover:bg-violet-500/20 cursor-pointer transition-all border border-violet-500/20 bg-violet-500/10">
-                                            <span className="material-symbols-outlined text-sm">open_in_full</span>
+                                            className="studio-action-btn-sm" title="Expand">
+                                            <span className="material-symbols-outlined">zoom_in</span>
                                         </button>
                                     </div>
                                 </div>
@@ -2980,7 +2968,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                         navigator.clipboard.writeText(full);
                                         setCopiedField('all');
                                         setTimeout(() => setCopiedField(null), 2000);
-                                    }} className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${copiedField === 'all' ? 'bg-[var(--sys-primary-dim)] text-primary' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)]'}`}>
+                                    }} className="studio-btn-pill text-[11px] py-1 border-none flex items-center gap-1">
                                         <span className="material-symbols-outlined text-xs">{copiedField === 'all' ? 'check' : 'content_copy'}</span>
                                         {copiedField === 'all' ? 'Copied!' : 'Copy All'}
                                     </button>
@@ -3014,7 +3002,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                             <p className="text-sm font-bold text-[var(--sys-text)]">{result.copy.headline}</p>
                                         </div>
                                         <button onClick={() => { navigator.clipboard.writeText(result.copy.headline); setCopiedField('headline'); setTimeout(() => setCopiedField(null), 1500); }}
-                                            className={`ml-3 opacity-0 group-hover:opacity-100 transition-all text-[10px] px-1.5 py-0.5 rounded cursor-pointer ${copiedField === 'headline' ? 'text-primary' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]'}`}>
+                                            className={`ml-3 opacity-0 group-hover:opacity-100 transition-all text-[10px] px-2 py-0.5 rounded cursor-pointer font-bold ${copiedField === 'headline' ? 'text-primary' : 'text-[var(--sys-text-muted)] hover:text-primary'}`}>
                                             {copiedField === 'headline' ? '✓' : 'Copy'}
                                         </button>
                                     </div>
@@ -3095,20 +3083,16 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                     <p className="text-[9px] text-[var(--sys-text-muted)] line-clamp-2 mb-2 leading-tight">{item._prompt || 'AI Generated'}</p>
                                                     <div className="mt-1 flex flex-wrap items-center gap-1">
                                                         <button onClick={(e) => { e.stopPropagation(); setZoomImage(item.imageUrl); }}
-                                                            className="flex items-center gap-1 px-1.5 py-1 rounded bg-[var(--sys-surface)] hover:bg-[var(--sys-surface)] text-[9px] text-[var(--sys-text)] font-medium transition-all border border-[var(--sys-border)]" title="Expand Image">
-                                                            <span className="material-symbols-outlined text-[10px]">open_in_full</span>
+                                                            className="studio-action-btn-sm !w-7 !h-7" title="Expand Image">
+                                                            <span className="material-symbols-outlined !text-[14px]">zoom_in</span>
                                                         </button>
                                                         <button onClick={(e) => { e.stopPropagation(); handleOpenEditPanel(item.imageUrl, 'Creative'); }}
-                                                            className="flex items-center gap-1 px-1.5 py-1 rounded bg-violet-500/20 hover:bg-violet-500/40 text-[9px] text-violet-200 font-medium transition-all border border-violet-500/30" title="Edit in AI Canvas">
-                                                            <span className="material-symbols-outlined text-[10px]">auto_fix_high</span> Canvas
+                                                            className="studio-btn-pill !text-[9px] !px-2 !py-1 active border-none" title="Edit in AI Canvas">
+                                                            <span className="material-symbols-outlined !text-[12px]">auto_fix_high</span> Edit
                                                         </button>
                                                         <button onClick={(e) => { e.stopPropagation(); handleAnimateClick(item); }}
-                                                            className="flex items-center gap-1 px-1.5 py-1 rounded bg-[var(--sys-text)] hover:bg-[var(--sys-text)] text-[9px] text-[#FFeedd] font-medium transition-all border border-[var(--sys-text)]" title="Animate via Grok">
-                                                            <span className="material-symbols-outlined text-[10px]">animation</span> Animate
-                                                        </button>
-                                                        <button onClick={(e) => { e.stopPropagation(); setPublishData({ image: item.imageUrl, text: '' }); }}
-                                                            className="flex items-center gap-1 px-1.5 py-1 rounded bg-[#1877F2]/20 hover:bg-[#1877F2]/40 text-[9px] border-[var(--sys-border)] font-medium transition-all border border-[#1877F2]/30" title="Publish to Content Studio">
-                                                            <span className="material-symbols-outlined text-[10px]">send</span> Share
+                                                            className="studio-btn-pill !text-[9px] !px-2 !py-1 active border-none" title="Animate">
+                                                            <span className="material-symbols-outlined !text-[12px]">animation</span> Animate
                                                         </button>
                                                     </div>
                                                 </div>
@@ -3171,13 +3155,13 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                                 {/* Hover Ribbon Actions inside Image */}
                                                                 <div className="absolute inset-0 bg-black/40 backdrop-blur-md transition-all opacity-0 group-hover/img:opacity-100 flex flex-col items-center justify-center pointer-events-none group-hover/img:pointer-events-auto">
                                                                     <div className="flex bg-[var(--sys-surface)]/95 backdrop-blur-xl rounded-xl shadow-2xl border border-[var(--sys-border)] overflow-hidden scale-95 group-hover/img:scale-100 transition-transform">
-                                                                        <button onClick={(e) => { e.stopPropagation(); setZoomImage(item.imageUrl); }} className="px-4 py-2 hover:bg-[var(--sys-surface-hover)] text-[var(--sys-text)] font-semibold text-xs border-r border-[var(--sys-border)] transition-colors">
+                                                                        <button onClick={(e) => { e.stopPropagation(); setZoomImage(item.imageUrl); }} className="px-4 py-2 hover:bg-[#FF4D00]/10 text-[var(--sys-text)] hover:text-primary font-semibold text-xs border-r border-[var(--sys-border)] transition-colors">
                                                                             View
                                                                         </button>
-                                                                        <button onClick={(e) => { e.stopPropagation(); handleOpenEditPanel(item.imageUrl, 'Creative'); }} className="px-4 py-2 hover:bg-[var(--sys-surface-hover)] text-[var(--sys-text)] font-semibold text-xs border-r border-[var(--sys-border)] transition-colors">
+                                                                        <button onClick={(e) => { e.stopPropagation(); handleOpenEditPanel(item.imageUrl, 'Creative'); }} className="px-4 py-2 hover:bg-[#FF4D00]/10 text-[var(--sys-text)] hover:text-primary font-semibold text-xs border-r border-[var(--sys-border)] transition-colors">
                                                                             Edit
                                                                         </button>
-                                                                        <button onClick={(e) => { e.stopPropagation(); handleAnimateClick(item); }} className="px-4 py-2 hover:bg-[var(--sys-surface-hover)] text-[var(--sys-text)] font-semibold text-xs transition-colors">
+                                                                        <button onClick={(e) => { e.stopPropagation(); handleAnimateClick(item); }} className="px-4 py-2 hover:bg-[#FF4D00]/10 text-[var(--sys-text)] hover:text-primary font-semibold text-xs transition-colors">
                                                                             Animate
                                                                         </button>
                                                                     </div>
@@ -3190,11 +3174,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                             {group.items[0]?.aiMeta?.mcotReasoning && (
                                                                 <button
                                                                     onClick={() => setExpandedReasoning(expandedReasoning === (group.items[0]._id || `g${gIdx}`) ? null : (group.items[0]._id || `g${gIdx}`))}
-                                                                    className={`flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer border ${
-                                                                        expandedReasoning === (group.items[0]._id || `g${gIdx}`)
-                                                                            ? 'bg-[var(--sys-text)] text-[var(--sys-bg)] border-[var(--sys-text)]'
-                                                                            : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] border-[var(--sys-border)] hover:border-[var(--sys-text)]'
-                                                                    }`}
+                                                                    className={`studio-btn-pill border-none flex items-center gap-1.5 mt-2 px-2.5 py-1 ${expandedReasoning === (group.items[0]._id || `g${gIdx}`) ? 'active' : ''}`}
                                                                 >
                                                                     <span className="material-symbols-outlined text-xs" style={{ fontSize: '12px' }}>psychology</span>
                                                                     {expandedReasoning === (group.items[0]._id || `g${gIdx}`) ? 'Hide Reasoning' : 'Thinking Mode'}
@@ -3436,11 +3416,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                         {img.aiMeta?.mcotReasoning && (
                                             <button
                                                 onClick={() => setExpandedReasoning(expandedReasoning === img._id ? null : img._id)}
-                                                className={`flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer border ${
-                                                    expandedReasoning === img._id
-                                                        ? 'bg-[var(--sys-text)] text-[var(--sys-bg)] border-[var(--sys-text)]'
-                                                        : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] border-[var(--sys-border)] hover:border-[var(--sys-text)]'
-                                                }`}
+                                                className={`studio-btn-pill border-none flex items-center gap-1.5 mt-2 px-2.5 py-1 ${expandedReasoning === img._id ? 'active' : ''}`}
                                             >
                                                 <span className="material-symbols-outlined text-xs" style={{ fontSize: '12px' }}>psychology</span>
                                                 {expandedReasoning === img._id ? 'Hide Reasoning' : 'Thinking Mode'}
@@ -3651,7 +3627,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                             if (chip.template && chip.template.fields?.length > 0) { setActiveQuickTemplate(chip.template); setTemplateFields({}); }
                                             else if (chip.prompt) setPrompt(chip.prompt);
                                         }}
-                                            className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-[13px] font-semibold transition-all cursor-pointer border border-[var(--sys-border)] bg-[var(--sys-surface)] hover:bg-[var(--sys-surface-hover)] hover:border-[var(--sys-border-hover)] hover:-translate-y-0.5 shadow-sm">
+                                            className="studio-btn-secondary hover:-translate-y-0.5 shadow-sm !rounded-xl !py-2.5">
                                             <span className="material-symbols-outlined text-[16px]" style={{ color: chip.color }}>{chip.icon}</span>
                                             <span className="text-[var(--sys-text)]">{chip.label}</span>
                                         </button>
@@ -3835,11 +3811,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                 <button key={shot.id}
                                                     onClick={() => setSelectedShot(prev => prev === shot.id ? null : shot.id)}
                                                     title={shot.description}
-                                                    className={`relative flex items-center gap-2 px-2.5 py-2 rounded-xl text-left transition-all cursor-pointer border ${
-                                                        selectedShot === shot.id
-                                                            ? 'text-[var(--sys-text)] border-transparent'
-                                                            : 'bg-[var(--sys-surface)] border-[var(--sys-border)] text-[var(--sys-text-muted)] hover:bg-[var(--sys-surface)] hover:text-[var(--sys-text)] hover:border-[var(--sys-border)]'
-                                                    }`}
+                                                    className={`studio-btn-pill !rounded-xl !p-2 flex-col !items-start !h-auto ${selectedShot === shot.id ? 'active' : ''}`}
                                                     style={selectedShot === shot.id ? {
                                                         backgroundColor: `${shot.color}18`,
                                                         borderColor: `${shot.color}40`,
@@ -3869,7 +3841,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                         })()}
                                         {selectedShot && (
                                             <button onClick={() => setSelectedShot(null)}
-                                                className="w-full mt-1.5 text-[9px] text-[var(--sys-text-muted)] hover:text-primary transition-colors cursor-pointer flex items-center justify-center gap-0.5 py-1">
+                                                className="w-full mt-1.5 text-[9px] text-[var(--sys-text-muted)] hover:text-primary transition-colors cursor-pointer flex items-center justify-center gap-0.5 py-1 font-bold">
                                                 <span className="material-symbols-outlined text-[10px]">close</span> Clear shot
                                             </button>
                                         )}
@@ -3959,10 +3931,8 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                             <div className="sidebar-grid-2">
                                                 {styles.map(s => (
                                                     <button key={s.id} onClick={() => setStyle(s.id)}
-                                                        className={`flex items-center gap-1.5 px-2 py-2 rounded-md text-[10px] font-bold transition-all cursor-pointer border ${
-                                                            style === s.id ? 'bg-[var(--sys-text)] text-[var(--sys-bg)] border-[var(--sys-text)]' : 'border-transparent text-[var(--sys-text-muted)] hover:bg-[var(--sys-surface)]'
-                                                        }`}>
-                                                        <span className="material-symbols-outlined text-[14px]">{s.icon}</span> {s.label}
+                                                        className={`studio-btn-pill border-none !px-3 !py-2 !text-[10px] ${style === s.id ? 'active' : ''}`}>
+                                                        <span className="material-symbols-outlined !text-[14px]">{s.icon}</span> {s.label}
                                                     </button>
                                                 ))}
                                             </div>
@@ -3970,10 +3940,10 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                         <div>
                                             <p className="text-[9px] text-[var(--sys-text-muted)] uppercase tracking-widest font-bold mb-2">Speed vs Quality</p>
                                             <div className="flex bg-[var(--sys-surface)] p-0.5 rounded-lg border border-[var(--sys-border)]">
-                                                <button onClick={() => setAgenticQuality('fast')} className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-[10px] font-bold rounded cursor-pointer ${agenticQuality === 'fast' ? 'bg-[var(--sys-text)] text-[var(--sys-bg)] shadow-sm' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]'}`}>
+                                                <button onClick={() => setAgenticQuality('fast')} className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-[10px] font-bold rounded-lg cursor-pointer transition-all ${agenticQuality === 'fast' ? 'bg-[#FF4D00] text-white shadow-lg shadow-primary/20' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)]'}`}>
                                                     <span className="material-symbols-outlined text-[14px]">bolt</span> Standard
                                                 </button>
-                                                <button onClick={() => setAgenticQuality('quality')} className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-[10px] font-bold rounded cursor-pointer ${agenticQuality === 'quality' ? 'bg-[var(--sys-text)] text-[var(--sys-bg)] shadow-sm' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]'}`}>
+                                                <button onClick={() => setAgenticQuality('quality')} className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-[10px] font-bold rounded-lg cursor-pointer transition-all ${agenticQuality === 'quality' ? 'bg-[#FF4D00] text-white shadow-lg shadow-primary/20' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)]'}`}>
                                                     <span className="material-symbols-outlined text-[14px]">target</span> Max Detail
                                                 </button>
                                             </div>
@@ -4016,8 +3986,8 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                             </div>
                                             {!copyLoading && prompt?.trim().length > 5 && (
                                                 <button onClick={() => suggestCopy(prompt)}
-                                                    className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-[10px] text-[var(--sys-text)] hover:text-primary font-bold bg-[var(--sys-surface)] hover:bg-[var(--sys-primary-dim)] transition-all cursor-pointer border border-[var(--sys-border)]">
-                                                    <span className="material-symbols-outlined text-[14px]">auto_awesome</span>
+                                                    className="studio-btn-secondary w-full !text-[10px] !py-2 !rounded-lg !bg-[var(--sys-surface)] hover:!bg-[var(--sys-primary-dim)]">
+                                                    <span className="material-symbols-outlined !text-[14px]">auto_awesome</span>
                                                     Auto-Suggest from Prompt
                                                 </button>
                                             )}
@@ -4112,8 +4082,8 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 {prompt.trim() && (
                                     <CreditTooltipWrapper action="promptEnhance">
                                         <button onClick={handleEnhancePrompt} disabled={enhancing || !activeBrand}
-                                            className="flex items-center gap-1 px-2 py-0.5 rounded text-[9px] font-bold cursor-pointer bg-[var(--sys-primary-dim)] hover:bg-[var(--sys-primary-dim)] text-primary hover:text-primary transition-all border border-[var(--sys-border)]">
-                                            <span className={`material-symbols-outlined text-[10px] ${enhancing ? 'animate-spin' : ''}`}>{enhancing ? 'progress_activity' : 'auto_awesome'}</span>
+                                            className="studio-btn-secondary !bg-[var(--sys-primary-dim)] !text-primary !border-none !px-2 !py-0.5 !text-[9px] !h-auto">
+                                            <span className={`material-symbols-outlined !text-[10px] ${enhancing ? 'animate-spin' : ''}`}>{enhancing ? 'progress_activity' : 'auto_awesome'}</span>
                                             {enhancing ? 'Enhancing…' : 'Enhance'}
                                         </button>
                                     </CreditTooltipWrapper>
@@ -4122,8 +4092,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
 
                             <CreditTooltipWrapper action="creative">
                                 <button onClick={handleGenerate} disabled={!prompt.trim() || !activeBrand || activeGenerations.length >= 3}
-                                    className="w-full btn-primary py-3 rounded-xl disabled:opacity-30 text-sm font-bold cursor-pointer flex items-center justify-center gap-2 shadow-[0_4px_20px_rgba(255,77,0,0.35)] hover:shadow-[0_6px_28px_rgba(255,77,0,0.45)] transition-all relative overflow-hidden group border border-[var(--sys-text)]">
-                                    <div className="absolute inset-0 bg-black/60 border border-[var(--sys-border)] translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-700" />
+                                    className="studio-btn-primary w-full !py-3 !rounded-xl !text-sm shadow-[0_4px_20px_rgba(255,77,0,0.35)] hover:shadow-[0_6px_28px_rgba(255,77,0,0.45)]">
                                     {activeGenerations.length > 0 ? (
                                         <><span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span> Generating {activeGenerations.length}/3…</>
                                     ) : (
@@ -4244,7 +4213,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                         <div key={g.label} className="flex flex-wrap gap-1">
                                                             {g.chips.map(chip => (
                                                                 <button key={chip} onClick={() => setEditPromptText(chip)}
-                                                                    className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-violet-500/10 text-violet-300 hover:bg-violet-500/25 border border-violet-500/20 cursor-pointer transition-all">{chip}</button>
+                                                                    className="studio-btn-pill !text-[10px] !px-2 !py-0.5 !bg-violet-500/10 !text-violet-300 !border-violet-500/20 active:!bg-violet-500/25">{chip}</button>
                                                             ))}
                                                         </div>
                                                     ))}
@@ -4277,20 +4246,20 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                     </div>
                                                     <div className="p-2.5 bg-[var(--sys-surface)] border-t border-[var(--sys-border)] flex items-center gap-2">
                                                         <button onClick={() => handleDownloadImage(editResult.imageUrl, 'gemini-photoshoot-edit.png')}
-                                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500 text-white text-[11px] font-bold hover:bg-emerald-600 transition-colors cursor-pointer">
-                                                            <span className="material-symbols-outlined text-[12px]">cloud_download</span> Download
+                                                            className="studio-btn-primary !bg-emerald-500 hover:!bg-emerald-600 !text-white !py-1.5 !px-3 !text-[11px] !rounded-xl !border-none shadow-none">
+                                                            <span className="material-symbols-outlined !text-[12px]">cloud_download</span> Download
                                                         </button>
                                                         <button onClick={async () => { try { await creativesAPI.uploadToBank({ imageUrl: editResult.imageUrl, brandId: activeBrand?._id, title: 'Gemini Edited Photoshoot' }); setFeedbackToast('Saved to Image Bank!'); setTimeout(() => setFeedbackToast(''), 2500) } catch(e) { console.error(e) } }}
-                                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--sys-primary-dim)] text-primary text-[11px] font-bold border border-[var(--sys-border)] hover:opacity-80 transition-colors cursor-pointer">
-                                                            <span className="material-symbols-outlined text-[12px]">save</span> Save
+                                                            className="studio-btn-secondary !bg-[var(--sys-primary-dim)] !text-primary !py-1.5 !px-3 !text-[11px] !rounded-xl !border-[var(--sys-border)]">
+                                                            <span className="material-symbols-outlined !text-[12px]">save</span> Save
                                                         </button>
                                                         <button onClick={() => { setPublishData({ image: editResult.imageUrl, text: '' }) }}
-                                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#1877F2]/10 hover:bg-[#1877F2]/30 text-[11px] font-bold text-[#1877F2] border border-[#1877F2]/20 transition-colors cursor-pointer">
-                                                            <span className="material-symbols-outlined text-[12px]">send</span> Share
+                                                            className="studio-btn-secondary !bg-[#1877F2]/10 hover:!bg-[#1877F2]/30 !text-[#1877F2] !py-1.5 !px-3 !text-[11px] !rounded-xl !border-[#1877F2]/20">
+                                                            <span className="material-symbols-outlined !text-[12px]">send</span> Share
                                                         </button>
                                                         <button onClick={() => { setShowEditPanel(false); setPhotoshootResult(prev => prev ? { ...prev, imageUrl: editResult.imageUrl } : prev) }}
-                                                            className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-violet-500/10 hover:bg-violet-500/20 text-[11px] font-bold text-violet-300 border border-violet-500/20 transition-colors cursor-pointer">
-                                                            <span className="material-symbols-outlined text-[12px]">check</span> Use This
+                                                            className="ml-auto studio-btn-pill !py-1.5 !px-3 !text-[11px] !rounded-xl active active:!bg-violet-500/20 !text-violet-300 !border-violet-500/20">
+                                                            <span className="material-symbols-outlined !text-[12px]">check</span> Use This
                                                         </button>
                                                     </div>
                                                 </div>
@@ -4345,8 +4314,8 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                             { id: 'link', icon: 'link', label: 'Paste Link', color: 'text-[var(--sys-text)]' },
                                         ].map(tab => (
                                             <button key={tab.id} onClick={() => setProductPickerTab(tab.id)}
-                                                className={`flex-1 py-2.5 text-xs font-medium flex items-center justify-center gap-1.5 transition-all cursor-pointer ${productPickerTab === tab.id ? `${tab.color} border-b-2 border-current bg-[var(--sys-surface)]` : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]'}`}>
-                                                <span className="material-symbols-outlined text-sm">{tab.icon}</span>
+                                                className={`flex-1 py-3 text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer border-b-2 ${productPickerTab === tab.id ? `text-primary border-primary bg-primary/5` : 'text-[var(--sys-text-muted)] border-transparent hover:text-[var(--sys-text)]'}`}>
+                                                <span className="material-symbols-outlined !text-base">{tab.icon}</span>
                                                 {tab.label}
                                             </button>
                                         ))}
@@ -4463,7 +4432,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                         }
                                                     }}
                                                         disabled={!productLinkUrl.trim()}
-                                                        className="px-5 py-2.5 btn-primary rounded-xl text-sm disabled:opacity-30 cursor-pointer">
+                                                        className="studio-btn-primary !px-5 !py-2.5 !rounded-xl !shadow-none">
                                                         Use
                                                     </button>
                                                 </div>
@@ -4514,21 +4483,19 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
 
                                     <div className="flex gap-2 flex-wrap">
                                         <a href={photoshootResult.imageUrl} download="ai-photoshoot.png"
-                                            className="btn-primary py-2.5 px-5 rounded-xl text-xs font-bold">
-                                            <span className="material-symbols-outlined text-sm">download</span>
+                                            className="studio-btn-primary !py-2.5 !px-5 !rounded-xl !text-xs !shadow-lg shadow-primary/30">
+                                            <span className="material-symbols-outlined !text-sm">download</span>
                                             Download
                                         </a>
                                         <button onClick={() => { setPhotoshootResult(null); setPhotoshootSaved(false); teardownPsMaskCanvas(); setPsEditMode(false) }}
-                                            className="py-2.5 px-5 rounded-xl text-xs font-bold glass-panel text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer">
-                                            <span className="material-symbols-outlined text-sm">refresh</span>
+                                            className="studio-btn-secondary !py-2.5 !px-5 !rounded-xl !text-xs">
+                                            <span className="material-symbols-outlined !text-sm">refresh</span>
                                             Regenerate
                                         </button>
                                         {/* AI Edit Toggle */}
                                         <button onClick={() => { setPsEditMode(!psEditMode); if (psEditMode) { teardownPsMaskCanvas(); setPsMaskMode(false) } }}
-                                            className={`py-2.5 px-5 rounded-xl text-xs font-bold cursor-pointer transition-all ${psEditMode
-                                                ? 'bg-[var(--sys-text)] text-[var(--sys-bg)] border-[var(--sys-text)] shadow-sm'
-                                                : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-bg)] border border-[var(--sys-border)]'}`}>
-                                            <span className="material-symbols-outlined text-sm">auto_fix_high</span>
+                                            className={`studio-btn-pill !py-2.5 !px-5 !rounded-xl !text-xs border-none ${psEditMode ? 'active' : ''}`}>
+                                            <span className="material-symbols-outlined !text-sm">auto_fix_high</span>
                                             {psEditMode ? 'Close AI Editor' : 'Edit with AI'}
                                         </button>
                                         <button onClick={() => {
@@ -4536,13 +4503,13 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                             setStudioMode('create')
                                             setPrompt(`Create a ${selectedType} design using this product photoshoot image. Brand: ${activeBrand?.name}. Make it platform-ready.`)
                                         }}
-                                            className="py-2.5 px-5 rounded-xl text-xs font-bold bg-primary/10 text-primary hover:bg-primary/20 cursor-pointer">
-                                            <span className="material-symbols-outlined text-sm">palette</span>
+                                            className="studio-btn-secondary !bg-primary/10 !text-primary !border-none !py-2.5 !px-5 !rounded-xl !text-xs hover:!bg-primary/20">
+                                            <span className="material-symbols-outlined !text-sm">palette</span>
                                             Use in Design Studio
                                         </button>
                                         <button onClick={() => setPublishData({ image: photoshootResult.imageUrl, text: '' })}
-                                            className="py-2.5 px-5 rounded-xl text-xs font-bold bg-[#1877F2]/10 text-[#1877F2] hover:bg-[#1877F2]/20 cursor-pointer">
-                                            <span className="material-symbols-outlined text-sm">share</span>
+                                            className="studio-btn-secondary !bg-[#1877F2]/10 !text-[#1877F2] !border-none !py-2.5 !px-5 !rounded-xl !text-xs hover:!bg-[#1877F2]/20">
+                                            <span className="material-symbols-outlined !text-sm">share</span>
                                             Publish
                                         </button>
                                         <button onClick={() => { setStudioMode('imagebank'); loadImageBank() }}
@@ -4651,12 +4618,11 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
 
                                             {/* Submit & Error */}
                                             <button onClick={handlePsEdit} disabled={psEditLoading}
-                                                className="btn-primary w-full py-3 rounded-xl text-sm font-bold disabled:opacity-30 justify-center"
-                                                style={{ background: 'var(--sys-primary)' }}>
+                                                className="studio-btn-primary w-full !py-3 !rounded-xl !text-sm !shadow-none">
                                                 {psEditLoading ? (
-                                                    <><span className="material-symbols-outlined animate-spin text-sm">progress_activity</span> Processing...</>
+                                                    <><span className="material-symbols-outlined animate-spin !text-sm">progress_activity</span> Processing...</>
                                                 ) : (
-                                                    <><span className="material-symbols-outlined text-sm">auto_fix_high</span> Apply AI Edit</>
+                                                    <><span className="material-symbols-outlined !text-sm">auto_fix_high</span> Apply AI Edit</>
                                                 )}
                                             </button>
                                             {psEditError && (
@@ -4707,16 +4673,16 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                     {/* Quick Actions Hover Dock */}
                                                     <div className="flex flex-wrap items-center justify-end gap-1 w-full mt-auto">
                                                         <button onClick={(e) => { e.stopPropagation(); setPhotoshootResult(item); }}
-                                                            className="flex items-center gap-1 px-1.5 py-1 rounded bg-[var(--sys-surface)] hover:bg-[var(--sys-surface)] text-[9px] text-[var(--sys-text)] font-medium transition-all border border-[var(--sys-border)]" title="Expand Image">
-                                                            <span className="material-symbols-outlined text-[10px]">open_in_full</span>
+                                                            className="studio-action-btn-sm !w-7 !h-7" title="Expand Image">
+                                                            <span className="material-symbols-outlined !text-[14px]">zoom_in</span>
                                                         </button>
                                                         <button onClick={(e) => { e.stopPropagation(); handleOpenEditPanel(item.imageUrl, item._brief || item.description || 'Photoshoot'); }}
-                                                            className="flex items-center gap-1 px-1.5 py-1 rounded bg-violet-500/20 hover:bg-violet-500/40 text-[9px] text-violet-200 font-medium transition-all border border-violet-500/30" title="Edit with Gemini AI">
-                                                            <span className="material-symbols-outlined text-[10px]">auto_fix_high</span> Edit
+                                                            className="studio-btn-pill !text-[9px] !px-2 !py-1 active border-none" title="Edit with Gemini AI">
+                                                            <span className="material-symbols-outlined !text-[12px]">auto_fix_high</span> Edit
                                                         </button>
                                                         <button onClick={(e) => { e.stopPropagation(); handleAnimateClick({ imageUrl: item.imageUrl }); }}
-                                                            className="flex items-center gap-1 px-1.5 py-1 rounded bg-[var(--sys-text)] hover:bg-[var(--sys-text)] text-[9px] text-[#FFeedd] font-medium transition-all border border-[var(--sys-text)]" title="Animate via Grok">
-                                                            <span className="material-symbols-outlined text-[10px]">animation</span> Animate
+                                                            className="studio-btn-pill !text-[9px] !px-2 !py-1 active border-none" title="Animate via Grok">
+                                                            <span className="material-symbols-outlined !text-[12px]">animation</span> Animate
                                                         </button>
                                                         <button onClick={(e) => { e.stopPropagation(); setPublishData({ image: item.imageUrl, text: '' }) }}
                                                             className="flex items-center gap-1 px-1.5 py-1 rounded bg-[#1877F2]/20 hover:bg-[#1877F2]/40 text-[9px] border-[var(--sys-border)] font-medium transition-all border border-[#1877F2]/30" title="Publish to Content Studio">
@@ -4755,15 +4721,15 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                             <p className="text-[var(--sys-text-muted)] text-xs">Drag & drop product image</p>
                                         </div>
                                         <div className="flex gap-2">
-                                            <button onClick={() => { setProductPickerTab('brand'); setProductPickerOpen(true) }} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:border-[var(--sys-border)] text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] text-[10px] font-semibold cursor-pointer transition-all">
-                                                <span className="material-symbols-outlined text-xs text-primary">domain</span> Brand Photos
+                                            <button onClick={() => { setProductPickerTab('brand'); setProductPickerOpen(true) }} className="studio-btn-secondary flex-1 !py-2 !rounded-lg !text-[10px]">
+                                                <span className="material-symbols-outlined !text-xs !text-primary">domain</span> Brand Photos
                                             </button>
-                                            <label className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:border-primary/40 text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] text-[10px] font-semibold cursor-pointer transition-all">
-                                                <span className="material-symbols-outlined text-xs text-primary">upload</span> Upload
+                                            <label className="studio-btn-secondary flex-1 !py-2 !rounded-lg !text-[10px] cursor-pointer">
+                                                <span className="material-symbols-outlined !text-xs !text-primary">upload</span> Upload
                                                 <input type="file" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file && file.type.startsWith('image/')) { setProductFile(file); const reader = new FileReader(); reader.onload = async (ev) => { const s3Url = await uploadToS3(ev.target.result, 'products'); setProductImage(s3Url) }; reader.readAsDataURL(file) } }} accept="image/*" />
                                             </label>
-                                            <button onClick={() => { setProductPickerTab('link'); setProductPickerOpen(true) }} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:border-[var(--sys-text)] text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] text-[10px] font-semibold cursor-pointer transition-all">
-                                                <span className="material-symbols-outlined text-xs text-[var(--sys-text)]">link</span> Paste Link
+                                            <button onClick={() => { setProductPickerTab('link'); setProductPickerOpen(true) }} className="studio-btn-secondary flex-1 !py-2 !rounded-lg !text-[10px]">
+                                                <span className="material-symbols-outlined !text-xs !text-[var(--sys-text)]">link</span> Paste Link
                                             </button>
                                         </div>
                                     </div>
@@ -4798,13 +4764,13 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                         <p className="text-[10px] text-[var(--sys-text-muted)] uppercase tracking-widest font-bold mb-1.5">Camera Angle</p>
                                         <div className="flex flex-wrap gap-1">
                                             {[{id:'eye-level',label:'Eye Level'},{id:'hero',label:'Low Angle'},{id:'45deg',label:'3/4 View'},{id:'overhead',label:'Overhead'},{id:'macro',label:'Macro'},{id:'dutch',label:'Dutch Tilt'}].map(a => (
-                                                <button key={a.id} onClick={() => setCameraAngle(a.id)} className={`px-2.5 py-1 rounded-full text-[10px] font-medium transition-all cursor-pointer border ${cameraAngle === a.id ? 'bg-[var(--sys-text)] border-[var(--sys-text)] text-[var(--sys-bg)] shadow-sm' : 'bg-[var(--sys-surface)] border-[var(--sys-border)] text-[var(--sys-text-muted)] hover:bg-[var(--sys-bg)] hover:text-[var(--sys-text)]'}`}>{a.label}</button>
+                                                <button key={a.id} onClick={() => setCameraAngle(a.id)} className={`studio-btn-pill !px-2.5 !py-1 !text-[10px] border-none ${cameraAngle === a.id ? 'active' : ''}`}>{a.label}</button>
                                             ))}
                                         </div>
                                         <p className="text-[10px] text-[var(--sys-text-muted)] uppercase tracking-widest font-bold mb-1.5 mt-3">Lens</p>
                                         <div className="flex flex-wrap gap-1">
                                             {[{id:'24mm',label:'24mm'},{id:'35mm',label:'35mm'},{id:'50mm',label:'50mm'},{id:'85mm',label:'85mm'},{id:'105mm',label:'105mm'},{id:'200mm',label:'200mm'}].map(l => (
-                                                <button key={l.id} onClick={() => setLens(l.id)} className={`px-2.5 py-1 rounded-full text-[10px] font-medium transition-all cursor-pointer border ${lens === l.id ? 'bg-[var(--sys-text)] border-[var(--sys-text)] text-[var(--sys-bg)] shadow-sm' : 'bg-[var(--sys-surface)] border-[var(--sys-border)] text-[var(--sys-text-muted)] hover:bg-[var(--sys-bg)] hover:text-[var(--sys-text)]'}`}>{l.label}</button>
+                                                <button key={l.id} onClick={() => setLens(l.id)} className={`studio-btn-pill !px-2.5 !py-1 !text-[10px] border-none ${lens === l.id ? 'active' : ''}`}>{l.label}</button>
                                             ))}
                                         </div>
                                     </div>
@@ -4812,15 +4778,15 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                         <p className="text-[10px] text-[var(--sys-text-muted)] uppercase tracking-widest font-bold mb-1.5">Lighting Style</p>
                                         <div className="flex flex-wrap gap-1">
                                             {[{id:'softbox',label:'Softbox',ms:'cloud'},{id:'natural',label:'Window',ms:'window'},{id:'golden',label:'Golden Hr',ms:'wb_twilight'},{id:'dramatic',label:'Dramatic',ms:'theater_comedy'},{id:'neon',label:'Neon',ms:'fluorescent'},{id:'rim',label:'Rim',ms:'flare'},{id:'highkey',label:'High Key',ms:'light_mode'}].map(l => (
-                                                <button key={l.id} onClick={() => setLightingStyle(l.id)} className={`px-2.5 py-1 rounded-full text-[10px] font-medium transition-all cursor-pointer border ${lightingStyle === l.id ? 'bg-yellow-500/20 border-yellow-500/50 text-yellow-300' : 'bg-[var(--sys-surface)] border-[var(--sys-border)] text-[var(--sys-text-muted)] hover:bg-[var(--sys-surface)]'}`}>{l.label}</button>
+                                                <button key={l.id} onClick={() => setLightingStyle(l.id)} className={`studio-btn-pill !px-2.5 !py-1 !text-[10px] border-none ${lightingStyle === l.id ? 'active' : ''}`}>{l.label}</button>
                                             ))}
                                         </div>
                                         <p className="text-[10px] text-[var(--sys-text-muted)] uppercase tracking-widest font-bold mb-1.5 mt-3">Camera Shot Preset</p>
                                         <div className="flex flex-wrap gap-1">
                                             {CAMERA_SHOT_PRESETS.slice(0, 8).map(shot => (
                                                 <button key={shot.id} onClick={() => setPsSelectedShot(prev => prev === shot.id ? null : shot.id)}
-                                                    className={`px-2.5 py-1 rounded-full text-[10px] font-medium transition-all cursor-pointer border ${psSelectedShot === shot.id ? 'border text-[var(--sys-text)]' : 'bg-[var(--sys-surface)] border-[var(--sys-border)] text-[var(--sys-text-muted)] hover:bg-[var(--sys-surface)]'}`}
-                                                    style={psSelectedShot === shot.id ? { backgroundColor: `${shot.color}18`, borderColor: `${shot.color}50`, color: shot.color } : {}}>
+                                                    className={`studio-btn-pill !px-2.5 !py-1 !text-[10px] border-none ${psSelectedShot === shot.id ? 'active' : ''}`}
+                                                    style={psSelectedShot === shot.id ? { backgroundColor: `${shot.color}18`, color: shot.color } : {}}>
                                                     <span className="leading-none mr-0.5">{shot.emoji}</span> {shot.label}
                                                 </button>
                                             ))}
@@ -4845,7 +4811,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                         <p className="text-[10px] text-[var(--sys-text-muted)] uppercase tracking-widest font-bold mb-1.5">Surface</p>
                                         <div className="flex flex-wrap gap-1">
                                             {[{id:'white',label:'White',ms:'crop_square'},{id:'marble',label:'Marble',ms:'grid_on'},{id:'stone',label:'Stone',ms:'texture'},{id:'wood',label:'Wood',ms:'park'},{id:'concrete',label:'Concrete',ms:'domain'},{id:'fabric',label:'Silk',ms:'checkroom'},{id:'podium',label:'Podium',ms:'account_balance'},{id:'glass',label:'Glass',ms:'blur_on'},{id:'sand',label:'Sand',ms:'beach_access'},{id:'foliage',label:'Foliage',ms:'eco'}].map(s => (
-                                                <button key={s.id} onClick={() => setSurface(s.id)} className={`px-2.5 py-1 rounded-full text-[10px] font-medium transition-all cursor-pointer border flex items-center gap-1 ${surface === s.id ? 'bg-[var(--sys-text)] text-[var(--sys-bg)] border-[var(--sys-text)] shadow-sm' : 'bg-[var(--sys-surface)] border-[var(--sys-border)] text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-bg)]'}`}><span className="material-symbols-outlined" style={{fontSize:13}}>{s.ms}</span>{s.label}</button>
+                                                <button key={s.id} onClick={() => setSurface(s.id)} className={`studio-btn-pill border-none !px-2.5 !py-1 !text-[10px] ${surface === s.id ? 'active' : ''}`}><span className="material-symbols-outlined !text-[13px]">{s.ms}</span>{s.label}</button>
                                             ))}
                                         </div>
                                     </div>
@@ -4853,14 +4819,14 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                         <p className="text-[10px] text-[var(--sys-text-muted)] uppercase tracking-widest font-bold mb-1.5">Model</p>
                                         <div className="flex flex-wrap gap-1">
                                             {[{id:'none',label:'None',ms:'block'},{id:'hands',label:'Hands',ms:'pan_tool'},{id:'model-woman',label:'Woman',ms:'face_3'},{id:'model-man',label:'Man',ms:'face_6'}].map(m => (
-                                                <button key={m.id} onClick={() => setModelPresence(m.id)} className={`px-2.5 py-1 rounded-full text-[10px] font-medium transition-all cursor-pointer border flex items-center gap-1 ${modelPresence === m.id ? 'bg-[var(--sys-text)] text-[var(--sys-bg)] border-[var(--sys-text)] shadow-sm' : 'bg-[var(--sys-surface)] border-[var(--sys-border)] text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-bg)]'}`}><span className="material-symbols-outlined" style={{fontSize:13}}>{m.ms}</span>{m.label}</button>
+                                                <button key={m.id} onClick={() => setModelPresence(m.id)} className={`studio-btn-pill border-none !px-2.5 !py-1 !text-[10px] ${modelPresence === m.id ? 'active' : ''}`}><span className="material-symbols-outlined !text-[13px]">{m.ms}</span>{m.label}</button>
                                             ))}
                                         </div>
                                         <p className="text-[10px] text-[var(--sys-text-muted)] uppercase tracking-widest font-bold mb-1.5 mt-3">Mood <span className="text-[var(--sys-text-muted)] normal-case">(multi)</span></p>
                                         <div className="flex flex-wrap gap-1">
                                             {[{id:'editorial',label:'Editorial',ms:'article'},{id:'commercial',label:'Commercial',ms:'shopping_bag'},{id:'lifestyle',label:'Lifestyle',ms:'coffee'},{id:'luxury',label:'Luxury',ms:'diamond'},{id:'minimal',label:'Minimal',ms:'check_box_outline_blank'},{id:'moody',label:'Moody',ms:'dark_mode'},{id:'vibrant',label:'Vibrant',ms:'palette'}].map(m => {
                                                 const active = mood.includes(m.id)
-                                                return <button key={m.id} onClick={() => setMood(prev => active ? prev.filter(x => x !== m.id) : [...prev, m.id])} className={`px-2.5 py-1 rounded-full text-[10px] font-medium transition-all cursor-pointer border flex items-center gap-1 ${active ? 'bg-[var(--sys-text)] text-[var(--sys-bg)] border-[var(--sys-text)] shadow-sm' : 'bg-[var(--sys-surface)] border-[var(--sys-border)] text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-bg)]'}`}><span className="material-symbols-outlined" style={{fontSize:13}}>{m.ms}</span>{m.label}</button>
+                                                return <button key={m.id} onClick={() => setMood(prev => active ? prev.filter(x => x !== m.id) : [...prev, m.id])} className={`studio-btn-pill border-none !px-2.5 !py-1 !text-[10px] ${active ? 'active' : ''}`}><span className="material-symbols-outlined !text-[13px]">{m.ms}</span>{m.label}</button>
                                             })}
                                         </div>
                                     </div>
@@ -5054,7 +5020,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 </h3>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2">
                                     {[{id:'2d-flat',l:'2D Flat'},{id:'3d-render',l:'3D Rendered'},{id:'isometric',l:'Isometric'},{id:'hand-drawn',l:'Hand-drawn'},{id:'neon',l:'Neon Glow'},{id:'metallic',l:'Metallic'},{id:'gradient',l:'Gradient'},{id:'pixel',l:'Pixel Art'}].map(s=>(
-                                        <button key={s.id} onClick={()=>setClgStyle(s.id)} className={`px-2 py-1.5 rounded-lg text-[11px] font-medium border transition-all cursor-pointer ${clgStyle===s.id?'border-[var(--sys-text)] bg-[var(--sys-text)] text-[var(--sys-text)]':'border-[var(--sys-border)] bg-[var(--sys-surface)] text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]'}`}>{s.l}</button>
+                                        <button key={s.id} onClick={()=>setClgStyle(s.id)} className={`studio-btn-pill border-none !px-2 !py-1.5 !text-[11px] ${clgStyle===s.id?'active':''}`}>{s.l}</button>
                                     ))}
                                 </div>
                             </div>
@@ -5066,7 +5032,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 </h3>
                                 <div className="flex flex-wrap gap-1.5">
                                     {['Diwali','Christmas','New Year','Valentine\'s','Summer Sale','Eid','Independence Day','Black Friday','Anniversary','Flash Sale','Launch','Custom'].map(o=>(
-                                        <button key={o} onClick={()=>setClgOccasion(o)} className={`px-2.5 py-1 rounded-lg text-[11px] font-medium border transition-all cursor-pointer ${clgOccasion===o?'border-[var(--sys-border)] bg-[var(--sys-primary-dim)] text-[var(--sys-text)]':'border-[var(--sys-border)] bg-[var(--sys-surface)] text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]'}`}>{o}</button>
+                                        <button key={o} onClick={()=>setClgOccasion(o)} className={`studio-btn-pill border-none !px-2.5 !py-1 !text-[11px] ${clgOccasion===o?'active':''}`}>{o}</button>
                                     ))}
                                 </div>
                             </div>
@@ -5078,7 +5044,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 </h3>
                                 <div className="flex flex-wrap gap-1.5">
                                     {[{id:'sparkles',l:'Sparkles',ms:'auto_awesome'},{id:'fireworks',l:'Fireworks',ms:'celebration'},{id:'shopping',l:'Shopping',ms:'shopping_bag'},{id:'hearts',l:'Hearts',ms:'favorite'},{id:'stars',l:'Stars',ms:'star'},{id:'trophy',l:'Trophy',ms:'emoji_events'},{id:'gift',l:'Gift',ms:'redeem'},{id:'fire',l:'Fire',ms:'local_fire_department'},{id:'ribbon',l:'Ribbon',ms:'card_giftcard'},{id:'none',l:'None',ms:'block'}].map(i=>(
-                                        <button key={i.id} onClick={()=>setClgIcon(i.id==='none'?'':i.id)} className={`px-2 py-1 rounded-lg text-[11px] font-medium border transition-all cursor-pointer flex items-center gap-1 ${clgIcon===i.id||(i.id==='none'&&!clgIcon)?'border-[var(--sys-border)] bg-[var(--sys-primary-dim)] text-[var(--sys-text)]':'border-[var(--sys-border)] bg-[var(--sys-surface)] text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]'}`}><span className="material-symbols-outlined text-[11px]">{i.ms}</span>{i.l}</button>
+                                        <button key={i.id} onClick={()=>setClgIcon(i.id==='none'?'':i.id)} className={`studio-btn-pill border-none !px-2 !py-1 !text-[11px] ${clgIcon===i.id||(i.id==='none'&&!clgIcon)?'active':''}`}><span className="material-symbols-outlined !text-[11px]">{i.ms}</span>{i.l}</button>
                                     ))}
                                 </div>
                             </div>
@@ -5088,8 +5054,8 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 <div>
                                     <h3 className="font-bold text-[var(--sys-text)] text-sm flex items-center gap-2 mb-2"><span className="material-symbols-outlined text-primary text-lg">format_color_fill</span>Colors</h3>
                                     <div className="flex gap-2 mb-2">
-                                        <button onClick={()=>setClgColorMode('brand')} className={`px-3 py-1 rounded-lg text-xs font-medium border transition-all cursor-pointer ${clgColorMode==='brand'?'border-[var(--sys-border)] bg-[var(--sys-primary-dim)] text-[var(--sys-text)]':'border-[var(--sys-border)] text-[var(--sys-text-muted)]'}`}>Brand Colors</button>
-                                        <button onClick={()=>setClgColorMode('custom')} className={`px-3 py-1 rounded-lg text-xs font-medium border transition-all cursor-pointer ${clgColorMode==='custom'?'border-[var(--sys-border)] bg-[var(--sys-primary-dim)] text-[var(--sys-text)]':'border-[var(--sys-border)] text-[var(--sys-text-muted)]'}`}>Custom</button>
+                                        <button onClick={()=>setClgColorMode('brand')} className={`studio-btn-pill border-none !px-3 !py-1 !text-xs ${clgColorMode==='brand'?'active':''}`}>Brand Colors</button>
+                                        <button onClick={()=>setClgColorMode('custom')} className={`studio-btn-pill border-none !px-3 !py-1 !text-xs ${clgColorMode==='custom'?'active':''}`}>Custom</button>
                                     </div>
                                     {clgColorMode==='custom'&&<input type="text" value={clgCustomColors} onChange={e=>setClgCustomColors(e.target.value)} placeholder="#FFD700, #FF4500" className="w-full px-3 py-1.5 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-xs focus:outline-none focus:border-[var(--sys-border)]" />}
                                     {clgColorMode==='brand'&&activeBrand?.dna?.colors?.length>0&&<div className="flex gap-1">{activeBrand.dna.colors.slice(0,6).map((c,i)=><div key={i} className="w-6 h-6 rounded-full border border-[var(--sys-border)]" title={c} style={{backgroundColor:c}} />)}</div>}
@@ -5124,41 +5090,41 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             </div>
 
                             {/* Generate */}
-                            <button disabled={!clgText||clgLoading} onClick={async()=>{
-                                setClgLoading(true);setClgError('');
-                                try{
-                                    const brandColors=clgColorMode==='brand'&&activeBrand?.dna?.colors?.length?activeBrand.dna.colors.map(c=>typeof c==='string'?c:c.hex||c.name||'').filter(Boolean).join(', '):clgCustomColors;
-                                    const v=clgResults.length+1;
-                                    const prompt=`Generate a CAMPAIGN LOGO / EVENT BADGE design.\n\nTEXT: "${clgText}"\nSTYLE: ${clgStyle||'modern'}\n${clgOccasion?`OCCASION: ${clgOccasion}\n`:''}${clgIcon?`ICON ELEMENTS: Include ${clgIcon} visual elements\n`:''}COLORS: Use ${brandColors||'vibrant, eye-catching colors'}\nBACKGROUND: ${clgBg==='transparent'?'transparent/alpha background (PNG-ready)':clgBg}\nSHAPE: ${clgShape}\n${clgEnhance?`STYLE KEYWORDS: ${clgEnhance}\n`:''}VARIANT: ${v} — create a unique, visually distinctive design\n\nCRITICAL RULES:\n- This is a LOGO/BADGE, not a poster — keep it compact and icon-like\n- The text "${clgText}" must be clearly readable and be the HERO element\n- Use professional typography — bold, impactful lettering\n- Make it suitable for use as a campaign identifier across marketing materials\n- ${clgBg==='transparent'?'Ensure the background is fully transparent':'Fill the background as specified'}\n- Do NOT add placeholder text or watermarks`;
-                                    const res=await creativesAPI.generate({prompt,brandId:activeBrand?._id,type:'campaign-logo',options:{aspectRatio:'1:1',style:'logo',imageModel}}, { timeout: 180000 });
-                                    if (res.warnings?.length > 0) {
-                                        setAiWarnings(prev => [...new Set([...prev, ...res.warnings])]);
-                                    }
-                                    const url=res.creative?.imageUrl||res.imageUrl;
-                                    if(url)setClgResults(prev=>[...prev,url]);
-                                    else setClgError({
-                                        message: 'No image returned — try again',
-                                        isProviderError: false
-                                    });
-                                }catch(err){
-                                    console.error('❌ Logo generation error:', err);
-                                    setClgError({
-                                        message: err.message,
-                                        isProviderError: err.isProviderError,
-                                        provider: err.provider
-                                    });
-                                } finally {
-                                    setClgLoading(false);
-                                }
-                            }}
-                            className="w-full py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:from-amber-400 hover:to-orange-400 text-[var(--sys-text)] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-                        >
-                            {clgLoading ? (
-                                <><span className="material-symbols-outlined animate-spin text-lg">progress_activity</span>Generating Logo...</>
-                            ) : (
-                                <><span className="material-symbols-outlined text-lg">auto_awesome</span>{clgResults.length > 0 ? 'Generate Another Variant' : 'Generate Campaign Logo'}<span className="text-xs opacity-60 ml-1">~₹0.25</span></>
-                            )}
-                        </button>
+                             <button disabled={!clgText||clgLoading} onClick={async()=>{
+                                 setClgLoading(true);setClgError('');
+                                 try{
+                                     const brandColors=clgColorMode==='brand'&&activeBrand?.dna?.colors?.length?activeBrand.dna.colors.map(c=>typeof c==='string'?c:c.hex||c.name||'').filter(Boolean).join(', '):clgCustomColors;
+                                     const v=clgResults.length+1;
+                                     const prompt=`Generate a CAMPAIGN LOGO / EVENT BADGE design.\n\nTEXT: "${clgText}"\nSTYLE: ${clgStyle||'modern'}\n${clgOccasion?`OCCASION: ${clgOccasion}\n`:''}${clgIcon?`ICON ELEMENTS: Include ${clgIcon} visual elements\n`:''}COLORS: Use ${brandColors||'vibrant, eye-catching colors'}\nBACKGROUND: ${clgBg==='transparent'?'transparent/alpha background (PNG-ready)':clgBg}\nSHAPE: ${clgShape}\n${clgEnhance?`STYLE KEYWORDS: ${clgEnhance}\n`:''}VARIANT: ${v} — create a unique, visually distinctive design\n\nCRITICAL RULES:\n- This is a LOGO/BADGE, not a poster — keep it compact and icon-like\n- The text "${clgText}" must be clearly readable and be the HERO element\n- Use professional typography — bold, impactful lettering\n- Make it suitable for use as a campaign identifier across marketing materials\n- ${clgBg==='transparent'?'Ensure the background is fully transparent':'Fill the background as specified'}\n- Do NOT add placeholder text or watermarks`;
+                                     const res=await creativesAPI.generate({prompt,brandId:activeBrand?._id,type:'campaign-logo',options:{aspectRatio:'1:1',style:'logo',imageModel}}, { timeout: 180000 });
+                                     if (res.warnings?.length > 0) {
+                                         setAiWarnings(prev => [...new Set([...prev, ...res.warnings])]);
+                                     }
+                                     const url=res.creative?.imageUrl||res.imageUrl;
+                                     if(url)setClgResults(prev=>[...prev,url]);
+                                     else setClgError({
+                                         message: 'No image returned — try again',
+                                         isProviderError: false
+                                     });
+                                 }catch(err){
+                                     console.error('❌ Logo generation error:', err);
+                                     setClgError({
+                                         message: err.message,
+                                         isProviderError: err.isProviderError,
+                                         provider: err.provider
+                                     });
+                                 } finally {
+                                     setClgLoading(false);
+                                 }
+                             }}
+                             className="studio-btn-primary w-full !py-3 !rounded-xl !text-sm"
+                         >
+                             {clgLoading ? (
+                                 <><span className="material-symbols-outlined animate-spin !text-lg">progress_activity</span> Generating Logo...</>
+                             ) : (
+                                 <><span className="material-symbols-outlined !text-lg">auto_awesome</span>{clgResults.length > 0 ? 'Generate Another Variant' : 'Generate Campaign Logo'}<span className="text-[10px] opacity-60 ml-1">~₹0.25</span></>
+                             )}
+                         </button>
 
                             {clgLoading&&<div className="w-full bg-[var(--sys-surface)] rounded-full h-1 mt-4"><div className="bg-[var(--sys-surface)] border border-[var(--sys-border)] h-1 rounded-full animate-pulse shadow-[0_0_10px_rgba(245,158,11,0.3)]" style={{width:'100%'}}/></div>}
 
@@ -5476,10 +5442,8 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                 { id: '2:3', label: 'Tall', icon: 'view_agenda' },
                                             ].map(f => (
                                                 <button key={f.id} onClick={() => setCarouselSlideFormat(f.id)}
-                                                    className={`px-2 py-2 rounded-lg text-[10px] font-semibold transition-all cursor-pointer flex flex-col items-center gap-0.5 ${
-                                                        carouselSlideFormat === f.id ? 'bg-[var(--sys-surface)] text-[var(--sys-primary)] border border-[var(--sys-border)]' : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] border border-[var(--sys-border)] hover:text-[var(--sys-text)]'
-                                                    }`}>
-                                                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>{f.icon}</span>
+                                                    className={`studio-btn-pill border-none !py-2 !rounded-lg !text-[10px] flex-col !h-auto ${carouselSlideFormat === f.id ? 'active' : ''}`}>
+                                                    <span className="material-symbols-outlined !text-[16px]">{f.icon}</span>
                                                     {f.label}
                                                 </button>
                                             ))}
@@ -5490,9 +5454,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                         <div className="flex gap-1.5">
                                             {[2, 3, 4, 5].map(n => (
                                                 <button key={n} onClick={() => { setCarouselSlides(n); setCarouselProductImages(prev => { const a = [...prev]; a.length = n; return a.fill(null, prev.length) }) }}
-                                                    className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                                                        carouselSlides === n ? 'bg-[var(--sys-surface)] text-[var(--sys-primary)] border border-[var(--sys-border)]' : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] border border-[var(--sys-border)] hover:text-[var(--sys-text)]'
-                                                    }`}>{n}</button>
+                                                    className={`studio-btn-pill border-none flex-1 !py-2 !rounded-lg !text-xs ${carouselSlides === n ? 'active' : ''}`}>{n}</button>
                                             ))}
                                         </div>
                                     </div>
@@ -5527,11 +5489,9 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                         { id: 'none',          label: 'None',     msIcon: 'block',            color: '#64748b' },
                                     ].map(g => (
                                         <button key={g.id} onClick={() => setCarouselGenre(g.id)} title={g.label}
-                                            className={`py-2.5 px-1.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer flex flex-col items-center gap-1 ${
-                                                carouselGenre === g.id ? 'border shadow-md' : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] border border-[var(--sys-border)] hover:bg-[var(--sys-surface)]'
-                                            }`}
-                                            style={carouselGenre === g.id ? { backgroundColor: `${g.color}20`, borderColor: `${g.color}50`, color: g.color } : {}}>
-                                            <span className="material-symbols-outlined" style={{ fontSize: '22px', lineHeight: 1 }}>{g.msIcon}</span>
+                                            className={`studio-btn-pill border-none !py-2.5 !px-1.5 !rounded-lg !text-[10px] flex-col !h-auto ${carouselGenre === g.id ? 'active' : ''}`}
+                                            style={carouselGenre === g.id ? { backgroundColor: `${g.color}15`, color: g.color } : {}}>
+                                            <span className="material-symbols-outlined !text-[22px]">{g.msIcon}</span>
                                             <span className="leading-none">{g.label}</span>
                                         </button>
                                     ))}
@@ -5559,11 +5519,9 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                         { id: 'tech',    label: 'Tech',    icon: 'devices',       color: '#06b6d4' },
                                     ].map(s => (
                                         <button key={s.id} onClick={() => setCarouselStyle(s.id)}
-                                            className={`px-2.5 py-2.5 rounded-lg text-[11px] font-semibold transition-all cursor-pointer flex flex-col items-center gap-1 ${
-                                                carouselStyle === s.id ? 'text-[var(--sys-text)] border shadow-md' : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] border border-[var(--sys-border)] hover:bg-[var(--sys-surface)]'
-                                            }`}
-                                            style={carouselStyle === s.id ? { backgroundColor: `${s.color}18`, borderColor: `${s.color}50`, color: s.color } : {}}>
-                                            <span className="material-symbols-outlined" style={{fontSize:'18px'}}>{s.icon}</span>
+                                            className={`studio-btn-pill border-none !px-2.5 !py-2.5 !rounded-lg !text-[11px] flex-col !h-auto ${carouselStyle === s.id ? 'active' : ''}`}
+                                            style={carouselStyle === s.id ? { backgroundColor: `${s.color}15`, color: s.color } : {}}>
+                                            <span className="material-symbols-outlined !text-[18px]">{s.icon}</span>
                                             {s.label}
                                         </button>
                                     ))}
@@ -5656,14 +5614,14 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             </div>
 
                             {/* Generate */}
-                            <button onClick={handleCarouselGenerate} disabled={!carouselPrompt.trim() || !activeBrand || carouselGenerating}
-                                className="btn-primary py-2.5 px-5 rounded-xl disabled:opacity-30 text-sm font-bold cursor-pointer flex items-center gap-2 whitespace-nowrap flex-shrink-0">
-                                {carouselGenerating ? (
-                                    <><span className="material-symbols-outlined animate-spin text-sm">progress_activity</span> Generating...</>
-                                ) : (
-                                    <><span className="material-symbols-outlined text-sm">view_carousel</span> Generate</>
-                                )}
-                            </button>
+                             <button onClick={handleCarouselGenerate} disabled={!carouselPrompt.trim() || !activeBrand || carouselGenerating}
+                                 className="studio-btn-primary py-2.5 px-5 !rounded-xl !text-sm flex-shrink-0">
+                                 {carouselGenerating ? (
+                                     <><span className="material-symbols-outlined animate-spin !text-sm">progress_activity</span> Generating...</>
+                                 ) : (
+                                     <><span className="material-symbols-outlined !text-sm">view_carousel</span> Generate</>
+                                 )}
+                             </button>
                         </div>{/* /floating-prompt-row */}
                         </div>{/* /creative-tools-panel-footer */}
                     </div>{/* /creative-tools-panel carousel */}
@@ -5784,26 +5742,25 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                     {(campProductIntel?.trendingFeatures||[]).map((f,i)=>{
                                                         const matchCount=(f.matchingProductIds||[]).length;
                                                         return(
-                                                            <button key={i} onClick={()=>{
-                                                                setCampKeyword(f.feature);
-                                                                if(!campName) setCampName(`${f.feature} Campaign`);
-                                                                // Auto-select matching products
-                                                                if(matchCount>0){
-                                                                    const matchedProds=(f.matchingProductIds||[]).map(id=>{
-                                                                        const pd=campIntelProducts[id];
-                                                                        if(!pd) return null;
-                                                                        return{productId:id,title:pd.title,image:pd.image,features:pd.features,price:pd.price,source:'catalog'};
-                                                                    }).filter(Boolean);
-                                                                    setCampProducts(matchedProds);
-                                                                }
-                                                            }} className={`group relative px-3 py-2 rounded-xl text-xs font-medium border transition-all cursor-pointer ${campKeyword===f.feature?'border-[var(--sys-border)] bg-[var(--sys-primary-dim)] text-[var(--sys-text)] ':'border-[var(--sys-border)] text-[var(--sys-text)] hover:border-[var(--sys-border)] hover:bg-[var(--sys-primary-dim)]'}`}>
-                                                                <div className="flex items-center gap-1.5">
-                                                                    <span className="text-primary text-[10px]"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">local_fire_department</span>{f.trendScore||'—'}</span>
-                                                                    <span>{f.feature}</span>
-                                                                    {matchCount>0&&<span className="text-[9px] bg-[var(--sys-text)] text-[var(--sys-bg)] px-1.5 py-0.5 rounded-full font-bold">{matchCount} product{matchCount>1?'s':''}</span>}
-                                                                </div>
-                                                                {f.whyTrending&&<p className="text-[9px] text-[var(--sys-text-muted)] mt-0.5 text-left max-w-[200px] line-clamp-1">{f.whyTrending}</p>}
-                                                            </button>
+                                                             <button key={i} onClick={()=>{
+                                                                 setCampKeyword(f.feature);
+                                                                 if(!campName) setCampName(`${f.feature} Campaign`);
+                                                                 // Auto-select matching products
+                                                                 if(matchCount>0){
+                                                                     const matchedProds=(f.matchingProductIds||[]).map(id=>{
+                                                                         const pd=campIntelProducts[id];
+                                                                         if(!pd) return null;
+                                                                         return{productId:id,title:pd.title,image:pd.image,features:pd.features,price:pd.price,source:'catalog'};
+                                                                     }).filter(Boolean);
+                                                                     setCampProducts(matchedProds);
+                                                                 }
+                                                             }} className={`studio-btn-pill !px-3 !py-2 border-none !rounded-xl !text-xs ${campKeyword===f.feature?'active':''}`}>
+                                                                 <div className="flex items-center gap-1.5">
+                                                                     <span className="text-primary text-[10px]"><span className="material-symbols-outlined !text-lg !align-middle !mr-1 !-mt-0.5">local_fire_department</span>{f.trendScore||'—'}</span>
+                                                                     <span>{f.feature}</span>
+                                                                     {matchCount>0&&<span className="text-[9px] bg-primary/20 text-primary px-1.5 py-0.5 rounded-full font-bold">{matchCount}</span>}
+                                                                 </div>
+                                                             </button>
                                                         )
                                                     })}
                                                 </div>
