@@ -312,69 +312,90 @@ export async function thumbnailDirectionNode({ video, analysis, seo, brandContex
 
 /**
  * Phase 3: Thumbnail Generation
- * 
- * Generates a STYLIZED BACKGROUND/SCENE that complements the video.
- * 
- * WHY NO CHARACTER: AI image generators cannot reliably reproduce real people
- * from reference images without IP-Adapter face-locking. Generating a "character"
- * always produces a fictional hallucinated person — which confuses and misleads.
- * The real YouTube thumbnail (with the actual person) is shown alongside this in
- * the UI. Users can composite them in Canva/Photoshop or use the AI background.
- * 
- * WHY NO TEXT OVERLAY: Image gen models hallucinate/duplicate text. Text is a
- * canvas-layer concern. The thumbnailDirection.textOverlay data is shown to the
- * user in the UI for manual application.
- * 
+ *
+ * Strategy: Reference-Guided Regeneration
+ *   1. Fetch the real YouTube thumbnail (which has the actual characters)
+ *   2. Pass it as inlineData reference to NanoBanana 2
+ *   3. Prompt: "Keep the SAME people, restyle background, add title text"
+ *   4. This preserves character identity through visual grounding, not fabrication
+ *
  * Model Strategy:
- * PRIMARY  — NanoBanana 2 (Gemini 3.1 Flash Image, ~8-12s)
- * FALLBACK — FLUX Pro via FAL.ai (~25-30s)
+ *   PRIMARY  — NanoBanana 2 (Gemini 3.1 Flash Image)
+ *              Reference image → character-consistent + styled output
+ *   FALLBACK — FLUX Pro via FAL.ai (photorealistic, no reference face-lock)
  */
 export async function thumbnailGenerationNode({ thumbnailDirection, video, brandContext }) {
-    if (!thumbnailDirection?.imageGenerationPrompt) {
-        console.warn('⚠️ [thumbnailGenerationNode] No imageGenerationPrompt — skipping');
-        return { generatedThumbnailUrl: null, thumbnailGenerationError: 'No prompt available' };
-    }
+    const videoTitle   = video?.metadata?.title        || '';
+    const referenceUrl = video?.metadata?.thumbnailUrl || null;
+    const characters   = video?.analysis?.characters  || [];
 
-    console.log(`🎨 [thumbnailGenerationNode] Generating background — NanoBanana 2 (primary)`);
+    // ── Build text overlay from direction ──────────────────────────────────────
+    const line1 = thumbnailDirection?.textOverlay?.line1
+        || (videoTitle ? videoTitle.split(' ').slice(0, 5).join(' ').toUpperCase() : '');
+    const line2 = thumbnailDirection?.textOverlay?.line2 || '';
 
-    // Build scene/background-only prompt — NO characters, NO text rendering
-    // The imageGenerationPrompt from THUMBNAIL_DIRECTOR already says "NOT the character"
+    // ── Character context ──────────────────────────────────────────────────────
+    const characterContext = characters.length
+        ? `The video features: ${characters.map(c => c.label).join(', ')}.`
+        : '';
+
+    console.log(`🎨 [thumbnailGenerationNode] Reference-guided regen for "${videoTitle.substring(0, 50)}"`);
+    console.log(`   Characters: ${characterContext || 'none detected'}`);
+    console.log(`   Text overlay: "${line1}"${line2 ? ` / "${line2}"` : ''}`);
+    console.log(`   Reference thumbnail: ${referenceUrl ? '✅' : '❌ none'}`);
+
+    // ── Build the reference-guided prompt ─────────────────────────────────────
     const fullPrompt = [
-        thumbnailDirection.imageGenerationPrompt,
-        `CRITICAL: NO human faces, NO people, NO fictional characters in this image.`,
-        `This is a BACKGROUND/SCENE only — the real person from the video will be composited separately.`,
-        thumbnailDirection.dominantColor
-            ? `Dominant brand color: ${thumbnailDirection.dominantColor}`
+        `Create a high-impact YouTube thumbnail for the video: "${videoTitle}".`,
+        referenceUrl
+            ? `You are given the ORIGINAL YouTube thumbnail as a reference image.`
+              + ` KEEP the SAME real people and characters visible — maintain their exact faces,`
+              + ` expressions, and visual identity from the reference.`
+              + ` Do NOT replace or alter the people shown.`
             : '',
-        `Background treatment: ${thumbnailDirection.backgroundTreatment || 'dramatic-scene'}`,
-        `Emotion/mood: ${thumbnailDirection.emotion || 'curiosity'}`,
-        `DO NOT render any text, words, letters, or typography in the image.`,
-        `YouTube thumbnail format: 16:9 cinematic, high contrast, mobile-friendly at 320px.`,
-        `Ultra high quality, photorealistic lighting, professional production.`,
+        characterContext,
+        thumbnailDirection?.imageGenerationPrompt
+            ? `Scene direction: ${thumbnailDirection.imageGenerationPrompt}`
+            : '',
+        `Make the background more dramatic, cinematic, and eye-catching than the reference.`,
+        `Composition: ${thumbnailDirection?.composition || 'center'} subject placement, high contrast.`,
+        `Mood: ${thumbnailDirection?.emotion || 'curiosity'}, energetic, scroll-stopping.`,
+        thumbnailDirection?.dominantColor
+            ? `Brand accent color: ${thumbnailDirection.dominantColor}.`
+            : '',
+        `Background treatment: ${thumbnailDirection?.backgroundTreatment || 'dramatic-scene'}.`,
+        line1
+            ? `Add BOLD text overlay at the top or left: "${line1}" in large white bold text with strong dark outline/shadow.`
+            : '',
+        line2
+            ? `Add secondary text: "${line2}" below the main text, slightly smaller.`
+            : '',
+        `Output format: 16:9 YouTube thumbnail (1280×720). Mobile-readable at 320px.`,
+        `Broadcast-quality production, sharp focus on the characters, no watermarks.`,
     ].filter(Boolean).join(' ');
 
     const router = getRouter();
-    const referenceUrl = video?.metadata?.thumbnailUrl || null;
 
-    // ── Primary: NanoBanana 2 ─────────────────────────────────────────────────
+    // ── Strategy 1: NanoBanana 2 with reference image (character consistency) ──
     try {
-        // Pass reference thumbnail so Gemini understands the video's visual language
-        // explicitly NOT to recreate the person — just the scene aesthetic
         const imageParts = [];
+
         if (referenceUrl) {
             try {
-                const imgRes = await fetch(referenceUrl, { signal: AbortSignal.timeout(8000) });
+                const imgRes = await fetch(referenceUrl, { signal: AbortSignal.timeout(10000) });
                 if (imgRes.ok) {
-                    const buf = await imgRes.arrayBuffer();
-                    const b64 = Buffer.from(buf).toString('base64');
+                    const buf      = await imgRes.arrayBuffer();
+                    const b64      = Buffer.from(buf).toString('base64');
                     const mimeType = imgRes.headers.get('content-type') || 'image/jpeg';
                     imageParts.push({
                         inlineData: { data: b64, mimeType },
-                        text: 'Visual reference for color palette, mood, and aesthetic ONLY. Do NOT reproduce any people from this image.',
+                        // This text is prepended to the prompt as context for the reference
+                        text: `ORIGINAL THUMBNAIL REFERENCE: Keep the same real characters/people exactly as shown.`,
                     });
+                    console.log(`   ✅ Reference thumbnail loaded (${Math.round(buf.byteLength / 1024)}KB)`);
                 }
             } catch (fetchErr) {
-                console.warn(`⚠️ [thumbnailGenerationNode] Reference thumbnail fetch failed: ${fetchErr.message}`);
+                console.warn(`   ⚠️ Reference thumbnail fetch failed: ${fetchErr.message}`);
             }
         }
 
@@ -384,32 +405,37 @@ export async function thumbnailGenerationNode({ thumbnailDirection, video, brand
             imageParts,
         });
 
-        console.log(`✅ [thumbnailGenerationNode] NanoBanana 2 background generated`);
+        console.log(`✅ [thumbnailGenerationNode] NanoBanana 2 succeeded — characters + title rendered`);
         return { generatedThumbnailUrl: result.imageUrl, thumbnailGenerationError: null };
 
     } catch (primaryErr) {
         console.warn(`⚠️ [thumbnailGenerationNode] NanoBanana 2 failed: ${primaryErr.message} — trying FLUX Pro`);
 
-        // ── Fallback: FLUX Pro (no face-lock, background-only works well) ──────
+        // ── Strategy 2: FLUX Pro (image-to-image style transfer) ──────────────
         try {
             const fluxPrompt = [
-                thumbnailDirection.imageGenerationPrompt,
-                'cinematic background scene only, no people, no text, no typography,',
-                thumbnailDirection.dominantColor ? `color palette: ${thumbnailDirection.dominantColor},` : '',
-                'YouTube thumbnail background, high contrast, professional production, ultra detailed',
-            ].filter(Boolean).join(' ');
+                `YouTube thumbnail for "${videoTitle}".`,
+                characterContext,
+                thumbnailDirection?.imageGenerationPrompt || 'dramatic cinematic scene',
+                line1 ? `Text overlay: "${line1}"` : '',
+                line2 ? `Subtitle: "${line2}"` : '',
+                thumbnailDirection?.dominantColor ? `Color: ${thumbnailDirection.dominantColor}` : '',
+                `High contrast, professional, photorealistic, 16:9`,
+            ].filter(Boolean).join('. ');
 
             const generatedThumbnailUrl = await falGenerateImage({
-                prompt: fluxPrompt,
-                imageUrl: null,     // No reference for FLUX — it handles backgrounds better without one
-                width: 1280,
-                height: 720,
-                model: 'fal-ai/flux-pro/v1.1',
+                prompt:   fluxPrompt,
+                imageUrl: referenceUrl,  // image-to-image reference for style/character transfer
+                width:    1280,
+                height:   720,
+                model:    'fal-ai/flux-pro/v1.1',
             });
+
             console.log(`✅ [thumbnailGenerationNode] FLUX Pro fallback succeeded`);
             return { generatedThumbnailUrl, thumbnailGenerationError: null };
+
         } catch (fluxErr) {
-            console.error(`❌ [thumbnailGenerationNode] Both providers failed: NanoBanana2=${primaryErr.message}`);
+            console.error(`❌ [thumbnailGenerationNode] Both providers failed. Primary: ${primaryErr.message}`);
             return { generatedThumbnailUrl: null, thumbnailGenerationError: primaryErr.message };
         }
     }
