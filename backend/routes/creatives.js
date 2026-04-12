@@ -1517,23 +1517,6 @@ router.post('/generate', protect, requireStudio('creativeStudio'), requireCredit
     }
 });
 
-// ══════════════════════════════════════════════════════════════════════════════
-// POST /api/creatives/lifestyle-mockup — Optimized Mockup Generation
-// ══════════════════════════════════════════════════════════════════════════════
-router.post('/lifestyle-mockup', protect, requireStudio('creativeStudio'), requireCredits('creative'), async (req, res) => {
-    try {
-        const result = await internalGenerateCreative({
-            body: { ...req.body, type: 'lifestyle-mockup' },
-            user: req.user,
-            creditsDeducted: req.creditsDeducted
-        });
-        res.json(result);
-    } catch (error) {
-        console.error('❌ /lifestyle-mockup error:', error);
-        res.status(500).json({ success: false, error: safeErrorMessage(error) });
-    }
-});
-
 // GET /api/creatives
 router.get('/', protect, async (req, res) => {
     try {
@@ -1831,7 +1814,7 @@ router.post('/virtual-tryon', protect, requireStudio('creativeStudio'), requireC
                 garment_image_url: garmentUrl,
             };
 
-            console.log(`👗 Submitting to fal.ai: ${endpoint}`);
+            console.log(`👗 Submitting to fal.ai: ${endpoint} with human_image: ${personUrl.substring(0, 60)}...`);
             const response = await fetch(`${FAL_QUEUE_URL}/${endpoint}`, {
                 method: 'POST',
                 headers: {

@@ -131,7 +131,10 @@ export async function callAgent(systemPrompt, userPrompt, temperature = 0.7, max
                 }
 
                 // Truncation recovery for known important keys
-                const expectedKeys = ['primaryPrompt', 'engineeringNotes', 'creativeDirection', 'suggestedHeadline', 'analysis', 'headline'];
+                const expectedKeys = [
+                    'primaryPrompt', 'engineeringNotes', 'creativeDirection', 'suggestedHeadline', 'analysis', 'headline',
+                    'verdict', 'overallScore', 'critiqueNotes', 'issues'
+                ];
                 for (const key of expectedKeys.filter(k => !obj[k])) {
                     const truncatedMatch = fieldExtract.match(new RegExp(`"${key}"\\s*:\\s*"([\\s\\S]*)$`, 'i'));
                     if (truncatedMatch) {
@@ -433,14 +436,44 @@ export async function callMultimodalAgent(systemPrompt, userPrompt, imageUrls = 
                 try { return JSON.parse(jsonMatch[0]); } catch (_) { /* try next */ }
             }
             
-            // Strategy 3: Try to fix common JSON issues (trailing commas, missing quotes)
-            if (jsonMatch) {
-                const fixedJson = jsonMatch[0]
-                    .replace(/,\s*([\]}])/g, '$1')  // Remove trailing commas
-                    .replace(/([{,]\s*)(\w+)\s*:/g, '$1"$2":');  // Quote unquoted keys
-                try { return JSON.parse(fixedJson); } catch (_) { /* give up */ }
+            // Strategy 4: Field-by-field regex extraction (last resort for long/truncated JSON)
+            const fieldExtract = (jsonMatch?.[0] || cleaned);
+            if (fieldExtract) {
+                try {
+                    const obj = {};
+                    const stringPairs = fieldExtract.matchAll(/"(\w+)"\s*:\s*"([\s\S]*?)(?<!\\)"(?=\s*[,}\n])/g);
+                    for (const [, key, val] of stringPairs) {
+                        if (!obj[key]) obj[key] = val.replace(/\\n/g, '\n').replace(/\\"/g, '"');
+                    }
+
+                    // Truncation recovery for known important keys
+                    const expectedKeys = [
+                        'primaryPrompt', 'engineeringNotes', 'creativeDirection', 'suggestedHeadline', 'analysis', 'headline',
+                        'verdict', 'overallScore', 'critiqueNotes', 'issues'
+                    ];
+                    for (const key of expectedKeys.filter(k => !obj[k])) {
+                        const truncatedMatch = fieldExtract.match(new RegExp(`"${key}"\\s*:\\s*"([\\s\\S]*)$`, 'i'));
+                        if (truncatedMatch) {
+                            let val = truncatedMatch[1].trim().replace(/["\s,}]*$/, '');
+                            obj[key] = val.replace(/\\n/g, '\n').replace(/\\"/g, '"');
+                        }
+                    }
+
+                    // Extract numeric scores (often truncated)
+                    const scoreMatch = fieldExtract.match(/"overallScore"\s*:\s*(\d+)/i);
+                    if (scoreMatch && !obj.overallScore) obj.overallScore = parseInt(scoreMatch[1]);
+
+                    // Extract array fields
+                    const arrayPairs = fieldExtract.matchAll(/"(\w+)"\s*:\s*\[([\s\S]*?)\]/g);
+                    for (const [, key, val] of arrayPairs) {
+                        if (!obj[key]) {
+                            obj[key] = val.match(/"([^"]+)"/g)?.map(s => s.replace(/"/g, '')) || [];
+                        }
+                    }
+                    if (Object.keys(obj).length > 0) return obj;
+                } catch (_) { /* fall through */ }
             }
-            
+
             console.warn('🧠 MCoT: Could not parse JSON from response. Raw text (first 300 chars):', cleaned.substring(0, 300));
         } catch (parseErr) {
             console.warn('🧠 MCoT: JSON parse exception:', parseErr.message, 'Raw text:', text.substring(0, 200));
