@@ -422,9 +422,12 @@ router.get('/channel-configs', protect, async (req, res) => {
 // POST /channel-configs — create new channel
 router.post('/channel-configs', protect, async (req, res) => {
     try {
+        const payload = { ...req.body };
+        if (payload.defaultTemplateId === '') payload.defaultTemplateId = null;
+
         const internalId = `channel-${Date.now()}`;
         const channel = await YoutubeChannelConfig.create({
-            ...req.body,
+            ...payload,
             userId: req.user._id,
             internalId,
             isDefault: false,
@@ -439,6 +442,8 @@ router.post('/channel-configs', protect, async (req, res) => {
 router.put('/channel-configs/:id', protect, async (req, res) => {
     try {
         const update = { ...req.body };
+        if (update.defaultTemplateId === '') update.defaultTemplateId = null;
+        
         delete update.userId;
         delete update.internalId;
         const channel = await YoutubeChannelConfig.findOneAndUpdate(
