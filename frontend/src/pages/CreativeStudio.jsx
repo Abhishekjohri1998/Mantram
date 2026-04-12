@@ -2431,8 +2431,8 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
 
                         {/* ═══ NATIVE ANIMATE WORKSPACE (MAIN UI) ═══ */}
                         {showAnimatePanel && (
-                            <div className="mb-6 studio-card border-[#FF4D00]/30 shadow-lg shadow-[#FF4D00]/5 bg-[var(--sys-surface)] overflow-hidden animate-fade-in relative">
-                                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#FF4D00] to-violet-500" />
+                            <div className="mb-6 studio-card border-primary/30 shadow-lg shadow-primary/5 bg-[var(--sys-surface)] overflow-hidden animate-fade-in relative">
+                                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary to-primary-dim" />
                                 <div className="p-5 sm:p-6 xl:p-8">
                                     <div className="flex flex-col xl:flex-row gap-6 xl:gap-8">
                                         
@@ -2440,7 +2440,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                         <div className="w-full xl:w-[40%] flex flex-col gap-3 shrink-0">
                                             <div className="flex items-center justify-between xl:hidden">
                                                 <h3 className="text-sm font-bold text-[var(--sys-text)] flex items-center gap-2">
-                                                    <span className="material-symbols-outlined text-[#FF4D00]">animation</span> Cinematic Animation
+                                                    <span className="material-symbols-outlined text-primary">animation</span> Cinematic Animation
                                                 </h3>
                                                 <button onClick={() => { if (!animateGenerating) { setShowAnimatePanel(false); setAnimateModalOpen(false); } }}
                                                     className="studio-action-btn-sm">
@@ -2457,7 +2457,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                         <span className="text-xs">No image selected</span>
                                                     </div>
                                                 )}
-                                                <div className="absolute top-3 left-3 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded text-[10px] font-bold text-white tracking-widest uppercase border border-white/10 flex items-center gap-1.5"><span className="material-symbols-outlined text-[12px] text-[#FF4D00]">photo_library</span> Source Image</div>
+                                                <div className="absolute top-3 left-3 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded text-[10px] font-bold text-white tracking-widest uppercase border border-white/10 flex items-center gap-1.5"><span className="material-symbols-outlined text-[12px] text-primary">photo_library</span> Source Image</div>
                                             </div>
                                         </div>
 
@@ -2465,8 +2465,8 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                         <div className="flex-1 flex flex-col min-w-0">
                                             <div className="hidden xl:flex items-center justify-between mb-6 pb-4 border-b border-[var(--sys-border)]">
                                                 <div className="flex items-center gap-3">
-                                                    <div className="w-10 h-10 rounded-xl bg-[#FF4D00]/10 flex items-center justify-center border border-[#FF4D00]/20">
-                                                        <span className="material-symbols-outlined text-[#FF4D00]">animation</span>
+                                                    <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20">
+                                                        <span className="material-symbols-outlined text-primary">animation</span>
                                                     </div>
                                                     <div>
                                                         <h3 className="text-base font-bold text-[var(--sys-text)] leading-tight">Animation Workspace</h3>
@@ -2485,17 +2485,17 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                 <div className="sm:col-span-2">
                                                     <label className="text-[11px] font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-2 flex justify-between">
                                                         <span>Motion Visual Script</span>
-                                                        <span className="text-[#FF4D00] flex items-center gap-1"><span className="material-symbols-outlined text-[12px]">auto_awesome</span> Grounded</span>
+                                                        <span className="text-primary flex items-center gap-1"><span className="material-symbols-outlined text-[12px]">auto_awesome</span> Grounded</span>
                                                     </label>
                                                     {animateAnalyzing ? (
                                                         <div className="w-full py-4 px-4 rounded-xl border border-[var(--sys-border)] bg-[var(--sys-surface)] flex items-center gap-3 text-sm font-medium text-[var(--sys-text)] shadow-inner">
-                                                            <div className="w-5 h-5 border-2 border-[#FF4D00] border-t-transparent rounded-full animate-spin" />
+                                                            <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
                                                             Analyzing scene & writing motion instructions...
                                                         </div>
                                                     ) : (
                                                         <textarea value={animatePrompt} onChange={e => setAnimatePrompt(e.target.value)}
                                                             placeholder="Describe the cinematic motion you want..."
-                                                            className="input-glass w-full py-3.5 px-4 text-[13px] resize-none focus:border-[#FF4D00] min-h-[100px] shadow-inner font-medium text-[var(--sys-text)] bg-[var(--sys-bg)]" rows={3} />
+                                                            className="input-glass w-full py-3.5 px-4 text-[13px] resize-none focus:border-primary min-h-[100px] shadow-inner font-medium text-[var(--sys-text)] bg-[var(--sys-bg)]" rows={3} />
                                                     )}
                                                 </div>
 
@@ -7767,11 +7767,11 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                 </div>
                                             )}
                                             <div className="absolute top-2 left-2 bg-black/60 backdrop-blur-md px-2 py-0.5 rounded text-[9px] font-bold text-white uppercase border border-white/10 flex items-center gap-1 z-10">
-                                                <span className="material-symbols-outlined text-[10px] text-violet-400">photo_library</span>
+                                                <span className="material-symbols-outlined text-[10px] text-primary">photo_library</span>
                                                 {editHistory.length > 0 ? `v${editHistory.length + 1}` : 'Original'}
                                             </div>
                                             {editSourceImageUrl && (
-                                                <button onClick={() => setIsMaskingMode(!isMaskingMode)} className={`absolute top-2 right-2 px-2 py-0.5 rounded text-[9px] font-bold tracking-widest uppercase border flex items-center gap-1 transition-colors z-10 ${isMaskingMode ? 'bg-violet-500 text-white border-violet-400' : 'bg-black/60 backdrop-blur-md text-white border-white/10 hover:bg-black/80'}`}>
+                                                <button onClick={() => setIsMaskingMode(!isMaskingMode)} className={`absolute top-2 right-2 px-2 py-0.5 rounded text-[9px] font-bold tracking-widest uppercase border flex items-center gap-1 transition-colors z-10 ${isMaskingMode ? 'bg-primary text-white border-primary/40' : 'bg-black/60 backdrop-blur-md text-white border-white/10 hover:bg-black/80'}`}>
                                                     <span className="material-symbols-outlined text-[12px]">{isMaskingMode ? 'brush' : 'brush'}</span>
                                                     {isMaskingMode ? 'Exit Masking' : 'Draw Mask'}
                                                 </button>
@@ -7780,11 +7780,11 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                         {editHistory.length > 0 && (
                                             <div className="space-y-1">
                                                 {editHistory.slice(-3).map((h, i) => (
-                                                    <div key={i} className="flex items-center gap-2 p-1.5 rounded-lg bg-violet-500/5 border border-violet-500/10">
-                                                        <span className="text-[9px] font-bold text-violet-400 w-4 text-center shrink-0">{editHistory.length - 3 + i + 1}</span>
+                                                    <div key={i} className="flex items-center gap-2 p-1.5 rounded-lg bg-primary/5 border border-primary/10">
+                                                        <span className="text-[9px] font-bold text-primary w-4 text-center shrink-0">{editHistory.length - 3 + i + 1}</span>
                                                         <span className="text-[9px] text-[var(--sys-text-muted)] truncate flex-1">{h.prompt}</span>
                                                         <button onClick={() => { editImageRef.current = h.resultImageUrl; setEditSourceImageUrl(h.resultImageUrl); setEditResult(null); setEditHistory(prev => prev.slice(0, editHistory.length - 3 + i + 1)) }}
-                                                            className="text-[9px] text-violet-400 hover:text-violet-300 cursor-pointer font-bold shrink-0">Revert</button>
+                                                            className="text-[9px] text-primary hover:text-primary-light cursor-pointer font-bold shrink-0">Revert</button>
                                                     </div>
                                                 ))}
                                             </div>
@@ -7808,7 +7808,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                         <div className="flex flex-wrap gap-1">
                                                             {g.chips.map(chip => (
                                                                 <button key={chip} onClick={() => setEditPromptText(chip)}
-                                                                    className="px-2 py-0.5 rounded-md text-[9px] font-medium bg-violet-500/10 text-violet-300 hover:bg-violet-500/25 border border-violet-500/20 cursor-pointer transition-all">{chip}</button>
+                                                                    className="px-2 py-0.5 rounded-md text-[9px] font-medium bg-primary/10 text-primary-light hover:bg-primary/20 border border-primary/20 cursor-pointer transition-all">{chip}</button>
                                                             ))}
                                                         </div>
                                                     </div>
@@ -7818,12 +7818,12 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                         <div className="flex-1">
                                             <label className="text-[11px] font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-2 flex justify-between">
                                                 <span>Edit Instruction</span>
-                                                <span className="text-violet-400 flex items-center gap-1"><span className="material-symbols-outlined text-[12px]">auto_awesome</span> Gemini Flash</span>
+                                                <span className="text-primary flex items-center gap-1"><span className="material-symbols-outlined text-[12px]">auto_awesome</span> Gemini Flash</span>
                                             </label>
                                             <textarea value={editPromptText} onChange={e => setEditPromptText(e.target.value)}
                                                 onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !editGenerating) handleEditGenerate() }}
                                                 placeholder="Describe how to edit this image... e.g. 'Remove the background', 'Make colors more vibrant', 'Add cinematic lighting'"
-                                                className="input-glass w-full py-3.5 px-4 text-[13px] resize-none focus:border-violet-500 min-h-[100px] bg-[var(--sys-bg)]" rows={3} />
+                                                className="input-glass w-full py-3.5 px-4 text-[13px] resize-none focus:border-primary min-h-[100px] bg-[var(--sys-bg)]" rows={3} />
                                             <p className="text-[9px] text-[var(--sys-text-muted)] mt-1">⌘+Enter to apply · Edits build on each other for multi-step refinement</p>
                                         </div>
                                         {editError && (
@@ -7834,10 +7834,10 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                             </div>
                                         )}
                                         {editResult && (
-                                            <div className="rounded-xl overflow-hidden border border-emerald-500/30 bg-emerald-500/5">
+                                            <div className="rounded-xl overflow-hidden border border-primary/30 bg-primary/5">
                                                 <div className="relative">
                                                     <img src={editResult.imageUrl} alt="Edited" className="w-full max-h-[280px] object-contain bg-black/20 cursor-pointer" onClick={() => setZoomImage(editResult.imageUrl)} />
-                                                    <div className="absolute top-2 left-2 bg-emerald-500/80 px-2 py-0.5 rounded text-[9px] font-bold text-white uppercase flex items-center gap-1">
+                                                    <div className="absolute top-2 left-2 bg-primary/90 px-2 py-0.5 rounded text-[9px] font-bold text-white uppercase flex items-center gap-1">
                                                         <span className="material-symbols-outlined text-[10px]">check_circle</span> Edit Applied
                                                     </div>
                                                     <button onClick={() => setZoomImage(editResult.imageUrl)} className="absolute top-2 right-2 bg-black/60 hover:bg-black/80 p-1.5 rounded-lg text-white transition-all cursor-pointer">
@@ -7846,7 +7846,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                 </div>
                                                 <div className="p-2.5 bg-[var(--sys-surface)] border-t border-[var(--sys-border)] flex items-center flex-wrap gap-2">
                                                     <button onClick={() => handleDownloadImage(editResult.imageUrl, 'gemini-edited.png')}
-                                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500 text-white text-[11px] font-bold hover:bg-emerald-600 transition-colors cursor-pointer">
+                                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary text-white text-[11px] font-bold hover:bg-primary/90 transition-colors cursor-pointer">
                                                         <span className="material-symbols-outlined text-[12px]">cloud_download</span> Download
                                                     </button>
                                                     <button onClick={async () => {
@@ -7859,7 +7859,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                         <span className="material-symbols-outlined text-[12px]">save</span> Save to Bank
                                                     </button>
                                                     <button onClick={() => handleAnimateClick({ imageUrl: editResult.imageUrl })}
-                                                        className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#FF4D00]/10 hover:bg-[#FF4D00]/20 text-[11px] font-bold text-[#FF4D00] border border-[#FF4D00]/20 transition-colors cursor-pointer">
+                                                        className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary/10 hover:bg-primary/20 text-[11px] font-bold text-primary border border-primary/20 transition-colors cursor-pointer">
                                                         <span className="material-symbols-outlined text-[12px]">animation</span> Animate
                                                     </button>
                                                 </div>
@@ -7871,7 +7871,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                 className={`flex-1 py-3 rounded-xl text-[12px] font-bold flex items-center justify-center gap-2 cursor-pointer transition-all uppercase tracking-wider ${
                                                     editGenerating || !editPromptText.trim() || !editImageRef.current
                                                         ? 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] border border-[var(--sys-border)] opacity-60 cursor-not-allowed'
-                                                        : 'bg-violet-600 text-white hover:bg-violet-500 shadow-[0_0_20px_rgba(139,92,246,0.3)]'
+                                                        : 'bg-primary text-white hover:bg-primary/90 shadow-[0_0_20px_rgba(255,77,0,0.3)]'
                                                 }`}>
                                                 {editGenerating ? (
                                                     <><div className="w-4 h-4 border-2 border-white/80 border-t-transparent rounded-full animate-spin" /> Applying Edit...</>
@@ -8129,7 +8129,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                     handleOpenEditPanel(img.imageUrl, img.title || 'Image Bank')
                                                     setStudioMode('imagebank')
                                                 }}
-                                                    className="p-1.5 rounded-lg text-violet-400 hover:text-violet-200 hover:bg-violet-500/20 transition-all cursor-pointer"
+                                                    className="p-1.5 rounded-lg text-primary hover:text-primary-light hover:bg-primary/10 transition-all cursor-pointer"
                                                     title="Edit with Gemini AI">
                                                     <span className="material-symbols-outlined text-base">auto_fix_high</span>
                                                 </button>
@@ -8194,7 +8194,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                         <span className="material-symbols-outlined text-xs">download</span>
                                                     </button>
                                                     <button onClick={(e) => { e.stopPropagation(); handleOpenEditPanel(img.imageUrl, img.title || 'Image Bank'); setStudioMode('imagebank') }}
-                                                        className="p-1.5 rounded-lg bg-violet-500/20 text-violet-300 hover:bg-violet-500/40 transition-all cursor-pointer" title="Edit with Gemini AI">
+                                                        className="p-1.5 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-all cursor-pointer" title="Edit with Gemini AI">
                                                         <span className="material-symbols-outlined text-xs">auto_fix_high</span>
                                                     </button>
                                                     <button onClick={async (e) => {
@@ -8356,13 +8356,13 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                         <div className="absolute -bottom-16 left-1/2 -translate-x-1/2 flex items-center gap-1.5 p-1.5 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] shadow-2xl z-20 animate-in slide-in-from-bottom-4 duration-300">
                             <button onClick={(e) => { e.stopPropagation(); handleOpenEditPanel(zoomImage, 'Creative'); setZoomImage(null); }}
                                 className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-[var(--sys-text)] hover:bg-[var(--sys-surface-hover)] cursor-pointer transition-all whitespace-nowrap">
-                                <span className="material-symbols-outlined text-[18px] text-violet-500">auto_fix_high</span>
+                                <span className="material-symbols-outlined text-[18px] text-primary">auto_fix_high</span>
                                 Edit with Gemini
                             </button>
                             <div className="w-px h-6 bg-[var(--sys-border)]" />
                             <button onClick={(e) => { e.stopPropagation(); handleAnimateClick({ imageUrl: zoomImage }); setZoomImage(null); }}
                                 className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-[var(--sys-text)] hover:bg-[var(--sys-surface-hover)] cursor-pointer transition-all whitespace-nowrap">
-                                <span className="material-symbols-outlined text-[18px] text-[#FF4D00]">animation</span>
+                                <span className="material-symbols-outlined text-[18px] text-primary">animation</span>
                                 Animate
                             </button>
                             <div className="w-px h-6 bg-[var(--sys-border)]" />
@@ -8898,7 +8898,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                         finally { setVtoLoading(false) }
                                     }}
                                     className="w-full py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2
-                                        bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:from-[#FF4D00] hover:to-[#FF7A00] text-[var(--sys-text)]
+                                        bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/20
                                         disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer">
                                     {vtoLoading ? (
                                         <><span className="material-symbols-outlined animate-spin text-lg">progress_activity</span> Generating Preview...</>
@@ -8950,7 +8950,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                             }
                                         }}
                                         className="w-full py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2
-                                            bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:from-[#FF4D00] hover:to-[#FF7A00] text-[var(--sys-text)]
+                                            bg-primary text-white hover:bg-primary/90 shadow-lg shadow-primary/20
                                             disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer">
                                         {vtoHdLoading ? (
                                             <><span className="material-symbols-outlined animate-spin text-lg">progress_activity</span> Rendering HD... ~30s</>
@@ -9490,7 +9490,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                 <span className="material-symbols-outlined text-lg">download</span>Download
                                             </button>
                                             <button onClick={() => handleOpenEditPanel(mockupResult, 'Lifestyle Mockup')}
-                                                className="flex-1 py-2.5 rounded-xl bg-violet-500/10 hover:bg-violet-500/20 text-violet-300 hover:text-violet-200 text-sm font-medium flex items-center justify-center gap-2 transition-all cursor-pointer" title="AI Edit">
+                                                className="flex-1 py-2.5 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary-light hover:text-primary text-sm font-medium flex items-center justify-center gap-2 transition-all cursor-pointer" title="AI Edit">
                                                 <span className="material-symbols-outlined text-lg">auto_fix_high</span>AI Canvas
                                             </button>
                                             <button onClick={() => { setMockupResult(null); setMockupScenePrompt('') }}

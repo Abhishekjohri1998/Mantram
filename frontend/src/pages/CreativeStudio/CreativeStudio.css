@@ -313,3 +313,142 @@
     max-height: 50vh;
   }
 }
+
+/* ── Consolidated Component Classes (Unified Orange Theme) ── */
+
+.studio-card {
+  background: var(--sys-surface);
+  border: 1px solid var(--sys-border);
+  border-radius: 12px;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+.studio-card--hover:hover {
+  border-color: var(--sys-primary);
+  background: var(--sys-primary-dim);
+}
+
+.studio-highlight-panel {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border-radius: 12px;
+  background: var(--sys-primary-dim);
+  border: 1px solid rgba(255, 77, 0, 0.2);
+  margin-bottom: 1rem;
+}
+
+.studio-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: var(--sys-primary-dim);
+  color: var(--sys-primary);
+  border: 1px solid rgba(255, 77, 0, 0.2);
+}
+
+.studio-badge-secondary {
+  background: var(--sys-surface);
+  color: var(--sys-text-muted);
+  border: 1px solid var(--sys-border);
+}
+
+.studio-toggle {
+  width: 36px;
+  height: 20px;
+  border-radius: 999px;
+  position: relative;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.studio-toggle.active {
+  background: var(--sys-primary);
+}
+
+.studio-toggle.inactive {
+  background: var(--sys-border);
+}
+
+.studio-toggle-knob {
+  width: 14px;
+  height: 14px;
+  background: #ffffff;
+  border-radius: 50%;
+  position: absolute;
+  top: 3px;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.studio-toggle.active .studio-toggle-knob {
+  left: 19px;
+}
+
+.studio-toggle.inactive .studio-toggle-knob {
+  left: 3px;
+}
+
+.studio-drop-zone {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  border: 1px dashed var(--sys-border);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: var(--sys-surface);
+}
+
+.studio-drop-zone:hover {
+  border-color: var(--sys-primary);
+  background: var(--sys-primary-dim);
+}
+
+.studio-drop-zone:hover span {
+  color: var(--sys-primary);
+}
+
+.studio-input-glass {
+  width: 100%;
+  padding: 0.375rem 0.75rem;
+  border-radius: 8px;
+  background: var(--sys-surface);
+  border: 1px solid var(--sys-border);
+  color: var(--sys-text);
+  font-size: 0.75rem;
+  transition: all 0.2s ease;
+}
+
+.studio-input-glass:focus {
+  outline: none;
+  border-color: var(--sys-primary);
+  background: var(--sys-primary-dim);
+}
+
+/* ── Specific Utility Overrides ── */
+.text-studio-primary { color: var(--sys-primary) !important; }
+.bg-studio-primary-dim { background: var(--sys-primary-dim) !important; }
+.border-studio-primary { border-color: rgba(255, 77, 0, 0.2) !important; }
+
+/* Animation Overrides (Unify with Orange) */
+.animate-studio-pulse {
+  animation: studioPulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes studioPulse {
+  0%, 100% { opacity: 1; color: var(--sys-primary); }
+  50% { opacity: 0.6; color: rgba(255, 77, 0, 0.5); }
+}
+

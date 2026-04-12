@@ -7,7 +7,7 @@ const StudioNavItem = memo(({ id, activeId, icon, label, onClick }) => {
             onClick={() => onClick(id)}
             className={`flex items-center gap-3 rounded-2xl px-5 py-3 text-sm font-bold transition-all duration-300 ${
                 isActive 
-                ? 'bg-[var(--sys-surface)] text-black shadow-lg shadow-none' 
+                ? 'bg-primary/10 text-primary border border-primary/20 shadow-none' 
                 : 'text-[var(--sys-text-muted)] hover:bg-[var(--sys-surface)] hover:text-[var(--sys-text)]'
             }`}
         >
