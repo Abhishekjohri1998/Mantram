@@ -176,6 +176,15 @@ function ProjectDetail({ project, onRefresh }) {
     const { analysis, seo, chapters, brandAlignment, thumbnailDirection, metadata, transcript,
         generatedThumbnailUrl, characterPortraits } = project
 
+    const [templates, setTemplates] = useState([])
+    const [selectedTemplateId, setSelectedTemplateId] = useState(project.appliedTemplateId || '')
+
+    useEffect(() => {
+        api('/yt-studio-settings/templates/channel/all')
+            .then(d => { if (d.templates) setTemplates(d.templates) })
+            .catch(err => console.error(err))
+    }, [])
+
     const [genLoading, setGenLoading]         = useState(false)
     const [portraitLoading, setPortraitLoading] = useState(false)
     const [localThumb, setLocalThumb]         = useState(generatedThumbnailUrl)
@@ -209,8 +218,12 @@ function ProjectDetail({ project, onRefresh }) {
     async function regenerateThumbnail() {
         setGenLoading(true)
         try {
-            const d = await api(`/youtube-studio/${project._id}/thumbnail`, { method: 'POST' })
+            const d = await api(`/youtube-studio/${project._id}/thumbnail`, { 
+                method: 'POST',
+                body: JSON.stringify({ templateId: selectedTemplateId })
+            })
             if (d.generatedThumbnailUrl) setLocalThumb(d.generatedThumbnailUrl)
+            else alert('Thumbnail generation returned undefined URL. Provider error.')
         } catch (e) { alert('Thumbnail generation failed: ' + e.message) }
         setGenLoading(false)
     }
@@ -397,16 +410,30 @@ function ProjectDetail({ project, onRefresh }) {
                             </div>
                         )}
 
-                        <div style={{ display: 'flex', gap: 8 }}>
-                            <a href={localThumb} download="ai-thumbnail.jpg" target="_blank" rel="noreferrer"
-                                style={{ flex: 1, padding: '10px', borderRadius: 8, background: 'var(--sys-primary)', color: 'white', fontSize: 13, fontWeight: 600, border: 'none', cursor: 'pointer', textAlign: 'center', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>download</span> Download Thumbnail
-                            </a>
-                            <button onClick={regenerateThumbnail} disabled={genLoading}
-                                style={{ padding: '10px 16px', borderRadius: 8, background: 'var(--sys-surface)', color: 'var(--sys-text)', fontSize: 13, fontWeight: 600, border: '1px solid var(--sys-border)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
-                                {genLoading ? <div style={{ width: 14, height: 14, border: '2px solid currentColor', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin .8s linear infinite' }} /> : <span className="material-symbols-outlined" style={{ fontSize: 16 }}>refresh</span>}
-                                Regenerate
-                            </button>
+                        <div style={{ display: 'flex', gap: 8, flexDirection: 'column' }}>
+                            <div style={{ display: 'flex', gap: 10, alignItems: 'center', background: 'var(--sys-surface)', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--sys-border)' }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--sys-text-muted)' }}>palette</span>
+                                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--sys-text)' }}>Apply Show Template:</span>
+                                <select value={selectedTemplateId} onChange={e => setSelectedTemplateId(e.target.value)}
+                                    style={{ flex: 1, padding: '6px 12px', borderRadius: 6, border: '1px solid var(--sys-border)', background: 'var(--sys-bg)', color: 'var(--sys-text)', fontSize: 13, cursor: 'pointer' }}>
+                                    <option value="">No Template (Base Style)</option>
+                                    {templates.map(t => (
+                                        <option key={t._id} value={t._id}>{t.name} (Theme: {t.classification?.theme})</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div style={{ display: 'flex', gap: 8 }}>
+                                <a href={localThumb} download="ai-thumbnail.jpg" target="_blank" rel="noreferrer"
+                                    style={{ flex: 1, padding: '10px', borderRadius: 8, background: 'var(--sys-primary)', color: 'white', fontSize: 13, fontWeight: 600, border: 'none', cursor: 'pointer', textAlign: 'center', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>download</span> Download Thumbnail
+                                </a>
+                                <button onClick={regenerateThumbnail} disabled={genLoading}
+                                    style={{ padding: '10px 16px', borderRadius: 8, background: 'var(--sys-surface)', color: 'var(--sys-text)', fontSize: 13, fontWeight: 600, border: '1px solid var(--sys-border)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                    {genLoading ? <div style={{ width: 14, height: 14, border: '2px solid currentColor', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin .8s linear infinite' }} /> : <span className="material-symbols-outlined" style={{ fontSize: 16 }}>refresh</span>}
+                                    Regenerate
+                                </button>
+                            </div>
                         </div>
                         <p style={{ margin: '8px 0 0', fontSize: 11, color: 'var(--sys-text-muted)' }}>
                             💡 Generated using the original thumbnail as reference — characters are preserved from the real video
@@ -427,13 +454,26 @@ function ProjectDetail({ project, onRefresh }) {
                                 )}
                             </div>
                         )}
-                        <button onClick={regenerateThumbnail} disabled={genLoading}
-                            style={{ padding: '12px 28px', borderRadius: 10, background: genLoading ? 'var(--sys-border)' : 'linear-gradient(135deg, #ff0000, #cc0000)', color: 'white', fontWeight: 700, fontSize: 14, border: 'none', cursor: genLoading ? 'not-allowed' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-                            {genLoading
-                                ? <><div style={{ width: 16, height: 16, border: '2px solid white', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin .8s linear infinite' }} />Generating…</>
-                                : <><span className="material-symbols-outlined" style={{ fontSize: 18 }}>auto_awesome</span>Generate AI Thumbnail</>
-                            }
-                        </button>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                            <div style={{ display: 'flex', gap: 10, alignItems: 'center', background: 'var(--sys-surface)', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--sys-border)' }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--sys-text-muted)' }}>palette</span>
+                                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--sys-text)' }}>Apply Show Template:</span>
+                                <select value={selectedTemplateId} onChange={e => setSelectedTemplateId(e.target.value)}
+                                    style={{ flex: 1, padding: '6px 12px', borderRadius: 6, border: '1px solid var(--sys-border)', background: 'var(--sys-bg)', color: 'var(--sys-text)', fontSize: 13, cursor: 'pointer' }}>
+                                    <option value="">No Template (Base Style)</option>
+                                    {templates.map(t => (
+                                        <option key={t._id} value={t._id}>{t.name} (Theme: {t.classification?.theme})</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <button onClick={regenerateThumbnail} disabled={genLoading}
+                                style={{ padding: '12px 28px', borderRadius: 10, background: genLoading ? 'var(--sys-border)' : 'linear-gradient(135deg, #ff0000, #cc0000)', color: 'white', fontWeight: 700, fontSize: 14, border: 'none', cursor: genLoading ? 'not-allowed' : 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                                {genLoading
+                                    ? <><div style={{ width: 16, height: 16, border: '2px solid white', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin .8s linear infinite' }} />Generating…</>
+                                    : <><span className="material-symbols-outlined" style={{ fontSize: 18 }}>auto_awesome</span>Generate AI Thumbnail</>
+                                }
+                            </button>
+                        </div>
                         <p style={{ margin: '8px 0 0', fontSize: 11, color: 'var(--sys-text-muted)' }}>
                             Uses real video characters + title · NanoBanana 2 reference-guided · ~10-15s
                         </p>
