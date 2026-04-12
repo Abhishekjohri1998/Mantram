@@ -43,6 +43,7 @@ const Insights = lazy(() => import('./pages/Insights'))
 const SuperAdminDashboard = lazy(() => import('./pages/SuperAdminDashboard'))
 const CreditsPage = lazy(() => import('./pages/CreditsPage'))
 const VideoStudio = lazy(() => import('./pages/VideoStudio'))
+const YouTubeStudio = lazy(() => import('./pages/YouTubeStudio'))
 const PerformanceMarketing = lazy(() => import('./pages/PerformanceMarketing'))
 const D2CAnalytics = lazy(() => import('./pages/D2CAnalytics'))
 const FunnelStudio = lazy(() => import('./pages/FunnelStudio'))
@@ -133,6 +134,7 @@ function App() {
                     <Route path="/creative-studio" element={<ProtectedRoute><CreativeStudio /></ProtectedRoute>} />
                     <Route path="/ai-canvas" element={<ProtectedRoute><CanvasEditor /></ProtectedRoute>} />  {/* Now using modular CanvasShell */}
                     <Route path="/video-studio" element={<ProtectedRoute><VideoStudio /></ProtectedRoute>} />
+                    <Route path="/youtube-studio" element={<ProtectedRoute><YouTubeStudio /></ProtectedRoute>} />
                     <Route path="/performance-marketing" element={<ProtectedRoute><PerformanceMarketing /></ProtectedRoute>} />
                     <Route path="/d2c-analytics" element={<ProtectedRoute><D2CAnalytics /></ProtectedRoute>} />
                     <Route path="/integrations" element={<ProtectedRoute><Integrations /></ProtectedRoute>} />
