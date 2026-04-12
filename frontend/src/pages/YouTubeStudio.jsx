@@ -261,9 +261,9 @@ function ProjectDetail({ project, onRefresh }) {
                 {localThumb ? (
                     <div>
                         <p style={{ margin: '0 0 6px', fontSize: 11, fontWeight: 700, color: 'var(--sys-primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                            AI Background (NanoBanana 2) — no person, brand-aligned scene
+                            AI Thumbnail (NanoBanana 2) — lead characters + title from video
                         </p>
-                        <img src={localThumb} alt="AI background"
+                        <img src={localThumb} alt="AI thumbnail"
                             style={{ width: '100%', maxWidth: 640, height: 'auto', borderRadius: 8, border: '2px solid var(--sys-primary)', display: 'block', marginBottom: 12 }} />
 
                         {/* Text overlay suggestion — shown as copyable text, NOT rendered in image */}
@@ -284,9 +284,9 @@ function ProjectDetail({ project, onRefresh }) {
                         )}
 
                         <div style={{ display: 'flex', gap: 8 }}>
-                            <a href={localThumb} download="ai-background.jpg" target="_blank" rel="noreferrer"
+                            <a href={localThumb} download="ai-thumbnail.jpg" target="_blank" rel="noreferrer"
                                 style={{ flex: 1, padding: '10px', borderRadius: 8, background: 'var(--sys-primary)', color: 'white', fontSize: 13, fontWeight: 600, border: 'none', cursor: 'pointer', textAlign: 'center', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>download</span> Download Background
+                                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>download</span> Download Thumbnail
                             </a>
                             <button onClick={regenerateThumbnail} disabled={genLoading}
                                 style={{ padding: '10px 16px', borderRadius: 8, background: 'var(--sys-surface)', color: 'var(--sys-text)', fontSize: 13, fontWeight: 600, border: '1px solid var(--sys-border)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -295,7 +295,7 @@ function ProjectDetail({ project, onRefresh }) {
                             </button>
                         </div>
                         <p style={{ margin: '8px 0 0', fontSize: 11, color: 'var(--sys-text-muted)' }}>
-                            💡 Composite this background with your original thumbnail in Canva, Photoshop, or use as-is
+                            💡 Generated using the original thumbnail as reference — characters are preserved from the real video
                         </p>
                     </div>
                 ) : (
@@ -317,11 +317,11 @@ function ProjectDetail({ project, onRefresh }) {
                             style={{ padding: '12px 28px', borderRadius: 10, background: genLoading ? 'var(--sys-border)' : 'linear-gradient(135deg, #ff0000, #cc0000)', color: 'white', fontWeight: 700, fontSize: 14, border: 'none', cursor: genLoading ? 'not-allowed' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                             {genLoading
                                 ? <><div style={{ width: 16, height: 16, border: '2px solid white', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin .8s linear infinite' }} />Generating…</>
-                                : <><span className="material-symbols-outlined" style={{ fontSize: 18 }}>auto_awesome</span>Generate AI Background</>
+                                : <><span className="material-symbols-outlined" style={{ fontSize: 18 }}>auto_awesome</span>Generate AI Thumbnail</>
                             }
                         </button>
                         <p style={{ margin: '8px 0 0', fontSize: 11, color: 'var(--sys-text-muted)' }}>
-                            Generates a brand-aligned background scene (no fictional characters) · NanoBanana 2 · ~10s
+                            Uses real video characters + title · NanoBanana 2 reference-guided · ~10-15s
                         </p>
                     </div>
                 )}
