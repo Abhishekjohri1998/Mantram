@@ -588,7 +588,7 @@ function TemplateCard({ template, isActive, onSelect, onEdit, onClone, onDelete,
 function TemplateEditor({ template, onSave, onClose }) {
     const isNew = !template?._id
     const [form, setForm] = useState({
-        name: '', icon: 'palette', description: '', tags: '',
+        name: '', icon: 'palette', description: '',
         classification: { theme: 'general', language: 'english', showName: '', channel: '' },
         visual: {
             primaryColor: '#FF0000', secondaryColor: '#FFFFFF', backgroundColor: '#000000',

@@ -663,6 +663,7 @@ export default function YouTubeStudio() {
     const [projects, setProjects] = useState([])
     const [activeProject, setActiveProject] = useState(null)
     const [loadingProject, setLoadingProject] = useState(false)
+    const [activeTemplate, setActiveTemplate] = useState(null) // Restored this state
     const [channels, setChannels] = useState([])
     const [selectedChannelId, setSelectedChannelId] = useState('')
     const pollRef = useRef({})
