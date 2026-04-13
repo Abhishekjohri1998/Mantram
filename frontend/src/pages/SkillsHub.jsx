@@ -78,18 +78,37 @@ function prettyKey(key) {
         .trim()
 }
 
+// ── Shared Image Helpers ──
+const normalizeImageUrl = (url) => {
+    if (!url) return '';
+    if (url.startsWith('https://') || url.startsWith('http://') || url.startsWith('data:')) return url;
+    
+    // If it starts with /api/, we need to resolve it against API_BASE
+    // But we must be careful not to double-prepend /api if API_BASE already includes it
+    if (url.startsWith('/api/')) {
+        return `${API_BASE}${url.substring(4)}`;
+    }
+    
+    // Generic relative path
+    if (url.startsWith('/')) {
+        return `${API_BASE}${url}`;
+    }
+    
+    return url;
+};
+
 // ── Recursive value renderer ──
 function RenderValue({ value, depth = 0 }) {
     if (value === null || value === undefined) return null
 
     // String
     if (typeof value === 'string') {
-        // AI detection for image URLs in structured output
+// AI detection for image URLs in structured output
         const isImageUrl = (value.startsWith('http') && (value.includes('s3.amazonaws.com') || value.includes('mantram-assets'))) || 
                            (value.startsWith('/api/creatives/') && value.includes('/image'));
         
         if (isImageUrl) {
-            const normalized = value.startsWith('/') ? `${API_BASE}${value}` : value;
+            const normalized = normalizeImageUrl(value);
             return (
                 <div className="mt-2 rounded-lg overflow-hidden border border-[var(--sys-border)] max-w-xs group relative bg-[var(--sys-surface)]">
                     <img src={normalized} alt="Embedded preview" className="w-full h-auto block" />
@@ -243,13 +262,7 @@ function ImageResults({ images = [] }) {
         }
     };
 
-    const normalizeImageUrl = (url) => {
-        if (!url) return '';
-        if (url.startsWith('https://') || url.startsWith('http://') || url.startsWith('data:')) return url;
-        if (url.startsWith('/api/')) return `${API_BASE}${url.substring(4)}`;
-        if (url.startsWith('/')) return `${API_BASE}${url}`;
-        return url;
-    };
+    // normalizeImageUrl moved to shared scope above
 
     return (
         <div>
