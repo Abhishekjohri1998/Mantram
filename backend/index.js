@@ -78,17 +78,18 @@ const app = express();
 // ── CORS CONFIGURATION ────────────────────────────────────────
 const isOriginAllowed = (origin) => {
     if (!origin) return true;
-    const cleanOrigin = origin.toLowerCase().trim().replace(/\/$/, '');
+    // Normalize: lowercase, trim, remove trailing slash, remove standard ports for cleaner matching
+    const cleanOrigin = origin.toLowerCase().trim().replace(/\/$/, '').replace(/:(443|80)$/, '');
     
     // Check hardcoded origins
-    if (HARDCODED_ORIGINS.some(ao => cleanOrigin === ao.toLowerCase().replace(/\/$/, ''))) return true;
+    if (HARDCODED_ORIGINS.some(ao => cleanOrigin === ao.toLowerCase().replace(/\/$/, '').replace(/:(443|80)$/, ''))) return true;
     
     // Check environment origins
-    const envOrigins = (config.frontendUrl || []).map(u => u.toLowerCase().replace(/\/$/, ''));
+    const envOrigins = (config.frontendUrl || []).map(u => u.toLowerCase().replace(/\/$/, '').replace(/:(443|80)$/, ''));
     if (envOrigins.includes(cleanOrigin)) return true;
     
-    // Domain-based allowance (mantram.ai subdomains)
-    if (cleanOrigin.endsWith('mantram.ai') || cleanOrigin.includes('localhost')) return true;
+    // Domain-based allowance (mantram.ai and its subdomains)
+    if (cleanOrigin.endsWith('mantram.ai') || cleanOrigin.includes('localhost') || cleanOrigin.includes('127.0.0.1')) return true;
     if (/\.mantram\.ai$/.test(cleanOrigin)) return true;
     
     return false;
@@ -109,7 +110,35 @@ const corsOptions = {
     maxAge: 86400, // Cache preflight for 24h
 };
 
-// Apply CORS at the absolute top of the middleware stack
+// ── BRUTE-FORCE CORS INTERCEPTOR ──────────────────────────────
+// This runs BEFORE the cors() middleware to ensure trusted origins
+// always get the necessary headers, especially for preflight (OPTIONS).
+app.use((req, res, next) => {
+    const origin = req.headers.origin;
+    if (origin) {
+        if (isOriginAllowed(origin)) {
+            res.setHeader('Access-Control-Allow-Origin', origin);
+            res.setHeader('Access-Control-Allow-Credentials', 'true');
+            res.setHeader('Vary', 'Origin');
+
+            // Fail-safe preflight response
+            if (req.method === 'OPTIONS') {
+                res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+                res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Requested-With,Accept,Origin,Cache-Control,Pragma');
+                res.setHeader('Access-Control-Max-Age', '86400');
+                return res.sendStatus(204); 
+            }
+        } else {
+            // Log rejection for production diagnostics
+            if (!req.path.includes('health')) {
+                console.warn(`[CORS] Rejected Origin: "${origin}" on path: ${req.path}`);
+            }
+        }
+    }
+    next();
+});
+
+// Apply standard CORS package as a secondary layer
 app.use(cors(corsOptions));
 
 // Trust proxy for rate limiting behind Nginx
@@ -348,6 +377,7 @@ app.use((err, req, res, next) => {
     if (origin && isOriginAllowed(origin)) {
         res.setHeader('Access-Control-Allow-Origin', origin);
         res.setHeader('Access-Control-Allow-Credentials', 'true');
+        res.setHeader('Vary', 'Origin');
     }
 
     
