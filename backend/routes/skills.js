@@ -412,9 +412,9 @@ router.post('/:id/execute', protect, requireCredits('content'), async (req, res)
             userInputText = skill.inputFields.map(field => {
                 const value = inputs[field.name];
                 if (!value && field.required) throw new Error(`Missing required input: ${field.label}`);
-                // Don't include image data in text prompt — too large
+                // Include image URL in text context so AI planner knows about it
                 if (field.type === 'image_upload' || field.type === 'image_library') {
-                    return value ? `${field.label}: [Image provided]` : '';
+                    return value ? `${field.label}: [Reference image uploaded — URL: ${value}]` : '';
                 }
                 return value ? `${field.label}: ${value}` : '';
             }).filter(Boolean).join('\n');
@@ -441,72 +441,253 @@ router.post('/:id/execute', protect, requireCredits('content'), async (req, res)
         };
 
         // ── EXECUTION ROUTER ─────────────────────────────────────────────────
-        // For non-text skills, run through MCP tool pipeline first
+        // Intelligent auto-dispatch: even when users don't configure MCP actions,
+        // the engine automatically routes to the correct studio based on skillType.
         let mcpResults = [];
         let aiOutput = null;
         const skillType = skill.skillType || 'text_output';
 
-        if (skillType === 'generate_image' || skillType === 'generate_video' || skillType === 'create_content' || skillType === 'orchestrate') {
-            console.log(`⚡ Skills MCP: executing skill type=${skillType}, actions=${skill.mcpActions?.length || 0}`);
+        // ── Collect reference images from user inputs ──────────────────────
+        const referenceImages = [];
+        if (inputs && skill.inputFields?.length > 0) {
+            for (const field of skill.inputFields) {
+                if ((field.type === 'image_upload' || field.type === 'image_library') && inputs[field.name]) {
+                    referenceImages.push(inputs[field.name]);
+                }
+            }
+        }
 
-            // Step 1: If the skill has instructions, let AI plan the execution params
-            if (skill.instructions && skill.mcpActions?.length > 0) {
-                const planSystemPrompt = [
-                    `You are an AI execution planner for the "${skill.name}" skill.`,
-                    'Your job is to generate the exact parameters for each MCP tool call based on the user inputs and brand context.',
+        if (skillType === 'generate_image' || skillType === 'generate_video' || skillType === 'create_content' || skillType === 'orchestrate') {
+            console.log(`⚡ Skills MCP: executing skill type=${skillType}, actions=${skill.mcpActions?.length || 0}, refImages=${referenceImages.length}`);
+
+            const hasMcpActions = skill.mcpActions?.length > 0;
+
+            // ═══════════════════════════════════════════════════════════════════
+            // AUTO-DISPATCH: When user creates a skill with a type but NO MCP
+            // actions configured, we auto-construct the right tool call.
+            // This is the KEY fix that makes Skills truly executable out of the box.
+            // ═══════════════════════════════════════════════════════════════════
+            if (!hasMcpActions) {
+                console.log(`🤖 Skills Auto-Dispatch: No MCP actions configured — auto-routing for skillType=${skillType}`);
+
+                // Step 1: Use AI to translate skill instructions + user inputs into an actionable prompt
+                const autoDispatchSystemPrompt = [
+                    `You are an AI execution engine for the "${skill.name}" skill.`,
+                    `Your job is to produce the EXACT output parameters needed to execute this skill.`,
                     '',
                     '=== SKILL INSTRUCTIONS ===',
                     skill.instructions,
                     '',
                     brandContext ? `=== BRAND CONTEXT ===\n${brandContext}` : '',
                     dateContext,
-                    marketCtx || '',
-                    festivalContext || '',
                     '',
                     'USER INPUTS:',
-                    userInputText || '(no inputs provided)',
+                    userInputText || '(no specific inputs)',
+                    referenceImages.length > 0 ? `\nREFERENCE IMAGES PROVIDED: ${referenceImages.length} image(s). The user wants output that is visually similar or inspired by these references.` : '',
                     '',
-                    'MCP TOOLS TO INVOKE:',
-                    (skill.mcpActions || []).map((a, i) => `${i + 1}. ${a.tool} — ${a.label || ''}`).join('\n'),
+                    skillType === 'generate_image' ? [
+                        'You MUST produce a JSON response with this EXACT shape:',
+                        '{',
+                        '  "prompt": "A detailed, production-quality image generation prompt based on the skill instructions and user inputs. Be specific about style, composition, colors, lighting, subject, mood, aspect ratio. If reference images were provided, describe their visual style and instruct the generator to create something in that same style.",',
+                        '  "style": "photorealistic | illustration | 3d-render | flat-design | watercolor | cinematic",',
+                        '  "size": "1:1 | 16:9 | 9:16 | 4:5 | 3:2",',
+                        referenceImages.length > 0 ? '  "referenceNote": "Brief description of the reference image style that the new image should match",' : '',
+                        '  "summary": "One sentence describing what will be generated"',
+                        '}',
+                    ].filter(Boolean).join('\n') : '',
+                    skillType === 'generate_video' ? [
+                        'You MUST produce a JSON response with this EXACT shape:',
+                        '{',
+                        '  "prompt": "A detailed video generation prompt.",',
+                        '  "duration": 5,',
+                        '  "aspectRatio": "16:9",',
+                        '  "summary": "One sentence describing the video"',
+                        '}',
+                    ].join('\n') : '',
+                    skillType === 'create_content' ? [
+                        'You MUST produce a JSON response with this EXACT shape:',
+                        '{',
+                        '  "content": "The full generated content text (can be long).",',
+                        '  "title": "Content title",',
+                        '  "platform": "instagram | linkedin | twitter | blog | email",',
+                        '  "summary": "One sentence summary"',
+                        '}',
+                    ].join('\n') : '',
+                    skillType === 'orchestrate' ? [
+                        'You MUST produce a JSON response with this EXACT shape:',
+                        '{',
+                        '  "imagePrompt": "A detailed image generation prompt (if visual output needed).",',
+                        '  "content": "Generated text/content (if text output needed).",',
+                        '  "title": "Output title",',
+                        '  "summary": "One sentence describing what was produced"',
+                        '}',
+                    ].join('\n') : '',
                     '',
-                    'Return ONLY valid JSON with this exact shape:',
-                    '{',
-                    '  "toolParams": [',
-                    '    { "tool": "<tool_id>", "params": { ... } }',
-                    '  ],',
-                    '  "summary": "One sentence describing what will be generated"',
-                    '}',
-                    'For generate_image tools, "params.prompt" must be a complete, high-quality image generation prompt incorporating brand identity.',
-                    'For create_content tools, "params.content" must be the full content array or text.',
+                    'Return ONLY valid JSON. Do NOT describe a UI. Do NOT describe what a tool would look like.',
+                    'ACTUALLY PRODUCE the creative output based on the instructions.',
                 ].filter(Boolean).join('\n');
 
-                const planUserPrompt = `Plan the execution for these user inputs:\n${userInputText || '(no inputs)'}`;
+                const autoDispatchUserPrompt = `Execute this skill NOW with these inputs:\n${userInputText || '(use skill defaults)'}`;
 
                 try {
-                    const planResult = await aiCall(planSystemPrompt, planUserPrompt, { json: true, temperature: 0.4, maxTokens: 2048 });
-                    const plan = parseJSON(planResult);
-                    aiOutput = { summary: plan.summary };
+                    const adResult = await aiCall(autoDispatchSystemPrompt, autoDispatchUserPrompt, { json: true, temperature: skill.temperature || 0.6, maxTokens: 2048 });
+                    const plan = parseJSON(adResult);
+                    aiOutput = { summary: plan.summary || `Executed ${skill.name}` };
 
-                    // Use AI-planned params, merged with static params if available
-                    for (let i = 0; i < (skill.mcpActions || []).length; i++) {
-                        const action = skill.mcpActions[i];
-                        const plannedAction = (plan.toolParams || [])[i];
-                        const baseParams = interpolate(action.params || {}, { ...inputs, brand: brand?.name, market: targetMarkets[0] });
-                        const mergedParams = { ...baseParams, ...(plannedAction?.params || {}) };
-
+                    // Auto-dispatch to the correct tool
+                    if (skillType === 'generate_image' && plan.prompt) {
                         try {
-                            const toolResult = await executeTool(action.tool, mergedParams, mcpContext);
-                            mcpResults.push({ tool: action.tool, label: action.label || action.tool, result: toolResult, success: true });
+                            const toolParams = {
+                                prompt: plan.prompt,
+                                style: plan.style || 'photorealistic',
+                                size: plan.size || '1:1',
+                            };
+                            // Pass reference images if the user uploaded any
+                            if (referenceImages.length > 0) {
+                                toolParams.referenceImages = referenceImages;
+                            }
+                            const toolResult = await executeTool('creative_studio.generate_image', toolParams, mcpContext);
+                            mcpResults.push({ tool: 'creative_studio.generate_image', label: 'Generate Image', result: toolResult, success: true });
                         } catch (toolErr) {
-                            console.error(`MCP tool ${action.tool} failed:`, toolErr.message);
-                            if (!action.optional) throw toolErr;
-                            mcpResults.push({ tool: action.tool, label: action.label || action.tool, error: toolErr.message, success: false });
+                            console.error(`Auto-dispatch generate_image failed:`, toolErr.message);
+                            mcpResults.push({ tool: 'creative_studio.generate_image', label: 'Generate Image', error: toolErr.message, success: false });
+                        }
+                    } else if (skillType === 'generate_video' && plan.prompt) {
+                        try {
+                            const toolResult = await executeTool('video_studio.queue_generation', {
+                                prompt: plan.prompt,
+                                duration: plan.duration || 5,
+                                aspectRatio: plan.aspectRatio || '16:9',
+                            }, mcpContext);
+                            mcpResults.push({ tool: 'video_studio.queue_generation', label: 'Generate Video', result: toolResult, success: true });
+                        } catch (toolErr) {
+                            console.error(`Auto-dispatch queue_generation failed:`, toolErr.message);
+                            mcpResults.push({ tool: 'video_studio.queue_generation', label: 'Generate Video', error: toolErr.message, success: false });
+                        }
+                    } else if (skillType === 'create_content' && plan.content) {
+                        try {
+                            const toolResult = await executeTool('content_studio.save_draft', {
+                                content: plan.content,
+                                title: plan.title || skill.name,
+                                platform: plan.platform || '',
+                            }, mcpContext);
+                            mcpResults.push({ tool: 'content_studio.save_draft', label: 'Save Content', result: toolResult, success: true });
+                            aiOutput = { content: plan.content, title: plan.title, ...aiOutput };
+                        } catch (toolErr) {
+                            console.error(`Auto-dispatch save_draft failed:`, toolErr.message);
+                            // Still return the content even if save failed
+                            aiOutput = { content: plan.content, title: plan.title, ...aiOutput };
+                        }
+                    } else if (skillType === 'orchestrate') {
+                        // Orchestrate: try both image + content if provided
+                        if (plan.imagePrompt) {
+                            try {
+                                const toolParams = { prompt: plan.imagePrompt, style: plan.style || 'photorealistic', size: plan.size || '1:1' };
+                                if (referenceImages.length > 0) toolParams.referenceImages = referenceImages;
+                                const toolResult = await executeTool('creative_studio.generate_image', toolParams, mcpContext);
+                                mcpResults.push({ tool: 'creative_studio.generate_image', label: 'Generate Image', result: toolResult, success: true });
+                            } catch (toolErr) {
+                                mcpResults.push({ tool: 'creative_studio.generate_image', label: 'Generate Image', error: toolErr.message, success: false });
+                            }
+                        }
+                        if (plan.content) {
+                            try {
+                                const toolResult = await executeTool('content_studio.save_draft', {
+                                    content: plan.content, title: plan.title || skill.name,
+                                }, mcpContext);
+                                mcpResults.push({ tool: 'content_studio.save_draft', label: 'Save Content', result: toolResult, success: true });
+                            } catch (toolErr) {
+                                mcpResults.push({ tool: 'content_studio.save_draft', label: 'Save Content', error: toolErr.message, success: false });
+                            }
+                        }
+                        aiOutput = { content: plan.content, title: plan.title, ...aiOutput };
+                    }
+                } catch (autoErr) {
+                    console.error(`Auto-dispatch planning failed:`, autoErr.message);
+                    // Fall through to text execution as last resort
+                }
+            }
+
+            // ═══════════════════════════════════════════════════════════════════
+            // MANUAL MCP DISPATCH: User explicitly configured tool actions
+            // ═══════════════════════════════════════════════════════════════════
+            if (hasMcpActions) {
+                // Step 1: If the skill has instructions, let AI plan the execution params
+                if (skill.instructions) {
+                    const planSystemPrompt = [
+                        `You are an AI execution planner for the "${skill.name}" skill.`,
+                        'Your job is to generate the exact parameters for each MCP tool call based on the user inputs and brand context.',
+                        '',
+                        '=== SKILL INSTRUCTIONS ===',
+                        skill.instructions,
+                        '',
+                        brandContext ? `=== BRAND CONTEXT ===\n${brandContext}` : '',
+                        dateContext,
+                        marketCtx || '',
+                        festivalContext || '',
+                        '',
+                        'USER INPUTS:',
+                        userInputText || '(no inputs provided)',
+                        referenceImages.length > 0 ? `\nREFERENCE IMAGES: ${referenceImages.length} image(s) provided by user.` : '',
+                        '',
+                        'MCP TOOLS TO INVOKE:',
+                        (skill.mcpActions || []).map((a, i) => `${i + 1}. ${a.tool} — ${a.label || ''}`).join('\n'),
+                        '',
+                        'Return ONLY valid JSON with this exact shape:',
+                        '{',
+                        '  "toolParams": [',
+                        '    { "tool": "<tool_id>", "params": { ... } }',
+                        '  ],',
+                        '  "summary": "One sentence describing what will be generated"',
+                        '}',
+                        'For generate_image tools, "params.prompt" must be a complete, high-quality image generation prompt incorporating brand identity.',
+                        'For create_content tools, "params.content" must be the full content array or text.',
+                        'Do NOT describe a UI. PRODUCE the actual creative output parameters.',
+                    ].filter(Boolean).join('\n');
+
+                    const planUserPrompt = `Plan the execution for these user inputs:\n${userInputText || '(no inputs)'}`;
+
+                    try {
+                        const planResult = await aiCall(planSystemPrompt, planUserPrompt, { json: true, temperature: 0.4, maxTokens: 2048 });
+                        const plan = parseJSON(planResult);
+                        aiOutput = { summary: plan.summary };
+
+                        // Use AI-planned params, merged with static params if available
+                        for (let i = 0; i < (skill.mcpActions || []).length; i++) {
+                            const action = skill.mcpActions[i];
+                            const plannedAction = (plan.toolParams || [])[i];
+                            const baseParams = interpolate(action.params || {}, { ...inputs, brand: brand?.name, market: targetMarkets[0] });
+                            const mergedParams = { ...baseParams, ...(plannedAction?.params || {}) };
+                            // Inject reference images for image tools
+                            if (action.tool.includes('generate_image') && referenceImages.length > 0 && !mergedParams.referenceImages) {
+                                mergedParams.referenceImages = referenceImages;
+                            }
+
+                            try {
+                                const toolResult = await executeTool(action.tool, mergedParams, mcpContext);
+                                mcpResults.push({ tool: action.tool, label: action.label || action.tool, result: toolResult, success: true });
+                            } catch (toolErr) {
+                                console.error(`MCP tool ${action.tool} failed:`, toolErr.message);
+                                if (!action.optional) throw toolErr;
+                                mcpResults.push({ tool: action.tool, label: action.label || action.tool, error: toolErr.message, success: false });
+                            }
+                        }
+                    } catch (planErr) {
+                        console.warn(`MCP planning failed, falling back to direct tool params: ${planErr.message}`);
+                        for (const action of (skill.mcpActions || [])) {
+                            const params = interpolate(action.params || {}, { ...inputs, brand: brand?.name });
+                            try {
+                                const toolResult = await executeTool(action.tool, params, mcpContext);
+                                mcpResults.push({ tool: action.tool, label: action.label || action.tool, result: toolResult, success: true });
+                            } catch (toolErr) {
+                                if (!action.optional) throw toolErr;
+                                mcpResults.push({ tool: action.tool, label: action.label || action.tool, error: toolErr.message, success: false });
+                            }
                         }
                     }
-                } catch (planErr) {
-                    console.warn(`MCP planning failed, falling back to direct tool params: ${planErr.message}`);
-                    // Fallback: run tools with static interpolated params only
-                    for (const action of (skill.mcpActions || [])) {
+                } else {
+                    // No instructions — run tools with static params
+                    for (const action of skill.mcpActions) {
                         const params = interpolate(action.params || {}, { ...inputs, brand: brand?.name });
                         try {
                             const toolResult = await executeTool(action.tool, params, mcpContext);
@@ -517,23 +698,17 @@ router.post('/:id/execute', protect, requireCredits('content'), async (req, res)
                         }
                     }
                 }
-            } else if (skill.mcpActions?.length > 0) {
-                // No AI planning — run tools with static params
-                for (const action of skill.mcpActions) {
-                    const params = interpolate(action.params || {}, { ...inputs, brand: brand?.name });
-                    try {
-                        const toolResult = await executeTool(action.tool, params, mcpContext);
-                        mcpResults.push({ tool: action.tool, label: action.label || action.tool, result: toolResult, success: true });
-                    } catch (toolErr) {
-                        if (!action.optional) throw toolErr;
-                        mcpResults.push({ tool: action.tool, label: action.label || action.tool, error: toolErr.message, success: false });
-                    }
-                }
             }
         }
 
-        // ── Standard AI text execution (always runs for text_output; also for enriching MCP results) ──
-        if (skillType === 'text_output' || skillType === 'create_content') {
+        // ── Standard AI text execution ───────────────────────────────────────
+        // Runs for text_output (always), create_content (supplementary),
+        // or as fallback when auto-dispatch produced no MCP results.
+        const needsTextExec = skillType === 'text_output'
+            || (skillType === 'create_content' && !aiOutput?.content)
+            || (mcpResults.length === 0 && !aiOutput);
+
+        if (needsTextExec) {
             const isJson = skill.outputFormat === 'json' || skill.outputFormat === 'structured';
             const systemPrompt = [
                 skill.systemPrompt || `You are an expert AI assistant executing the "${skill.name}" skill.`,
@@ -552,6 +727,7 @@ router.post('/:id/execute', protect, requireCredits('content'), async (req, res)
                 '2. MARKET: Adapt all content to the specified target markets.',
                 '3. LANGUAGE: Generate content in the language appropriate for the target market.',
                 '4. CULTURAL: Respect cultural sensitivities of each target market.',
+                '5. PRODUCE REAL OUTPUT: Generate the actual deliverable content. Do NOT describe what a tool or UI would look like. PRODUCE the content itself.',
                 '',
                 isJson ? 'Respond in valid JSON format.' : skill.outputFormat === 'html' ? 'Respond in clean HTML.' : 'Respond in well-formatted Markdown.',
             ].filter(Boolean).join('\n');

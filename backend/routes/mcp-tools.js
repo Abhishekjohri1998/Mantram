@@ -52,7 +52,7 @@ const TOOLS = {
 
     // ── 1. Generate Image ─────────────────────────────────────────────────────
     'creative_studio.generate_image': async (params, ctx) => {
-        const { prompt, style, size = '1:1', count = 1, platform } = params;
+        const { prompt, style, size = '1:1', count = 1, platform, referenceImages } = params;
         if (!prompt) throw new Error('generate_image: prompt is required');
 
         const payload = {
@@ -63,6 +63,12 @@ const TOOLS = {
             source: 'skill_execution',
             skillExecutionId: ctx.executionId,
         };
+
+        // Forward reference images for style-matching generation
+        if (referenceImages?.length > 0) {
+            payload.referenceImages = referenceImages;
+            payload.prompt = `${prompt}\n\nIMPORTANT: Use the provided reference image(s) as visual style guidance. The generated image should match the same artistic style, color palette, composition approach, and visual mood as the reference(s).`;
+        }
 
         // Call the internal creatives generate API
         const baseUrl = process.env.INTERNAL_API_URL || `http://localhost:${process.env.PORT || 3001}`;
@@ -83,7 +89,7 @@ const TOOLS = {
         }
 
         const images = data.images || (data.imageUrl ? [{ url: data.imageUrl }] : []);
-        console.log(`✅ MCP generate_image: ${images.length} image(s) generated`);
+        console.log(`✅ MCP generate_image: ${images.length} image(s) generated${referenceImages?.length ? ` (with ${referenceImages.length} reference(s))` : ''}`);
         return { type: 'images', images, count: images.length };
     },
 
