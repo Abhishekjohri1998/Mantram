@@ -84,11 +84,14 @@ const TOOLS = {
         });
 
         const data = await resp.json();
-        if (!data.success && !data.imageUrl && !data.images) {
+        if (!data.success && !data.imageUrl && !data.images && !data.creative?.imageUrl) {
             throw new Error(`Image generation failed: ${data.error || 'Unknown error'}`);
         }
 
-        const images = data.images || (data.imageUrl ? [{ url: data.imageUrl }] : []);
+        // The /api/creatives/generate endpoint returns { success, creative: { imageUrl } }
+        // NOT { imageUrl } at the top level. Handle all response formats:
+        const imageUrl = data.imageUrl || data.creative?.imageUrl;
+        const images = data.images || (imageUrl ? [{ url: imageUrl, id: data.creative?._id }] : []);
         console.log(`✅ MCP generate_image: ${images.length} image(s) generated${referenceImages?.length ? ` (with ${referenceImages.length} reference(s))` : ''}`);
         return { type: 'images', images, count: images.length };
     },
