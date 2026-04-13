@@ -445,7 +445,7 @@ router.post('/:id/execute', protect, requireCredits('content'), async (req, res)
         // the engine automatically routes to the correct studio based on skillType.
         let mcpResults = [];
         let aiOutput = null;
-        const skillType = skill.skillType || 'text_output';
+        let skillType = skill.skillType || 'text_output';
 
         // ── Collect reference images from user inputs ──────────────────────
         const referenceImages = [];
@@ -454,6 +454,46 @@ router.post('/:id/execute', protect, requireCredits('content'), async (req, res)
                 if ((field.type === 'image_upload' || field.type === 'image_library') && inputs[field.name]) {
                     referenceImages.push(inputs[field.name]);
                 }
+            }
+        }
+
+        // ── AUTO-DETECT skill type from instructions & inputs ──────────────
+        // If the user created a skill with type=text_output but the instructions
+        // or input fields clearly indicate they want image/video/content generation,
+        // auto-upgrade the skillType so it routes to the correct pipeline.
+        if (skillType === 'text_output') {
+            const instructionsLower = (skill.instructions || '').toLowerCase();
+            const hasImageInputs = referenceImages.length > 0;
+            const hasImageFields = skill.inputFields?.some(f => f.type === 'image_upload' || f.type === 'image_library');
+
+            // Detect image generation intent
+            const imageKeywords = ['generate image', 'create image', 'new image', 'similar image', 'generate similar',
+                'image generation', 'create visual', 'generate visual', 'design image', 'produce image',
+                'reference image', 'style transfer', 'image template', 'generate photo', 'create photo',
+                'similar type of image', 'brand creative', 'product image', 'ad creative', 'banner image',
+                'social media image', 'thumbnail', 'generate artwork', 'ai image'];
+            const looksLikeImageSkill = imageKeywords.some(kw => instructionsLower.includes(kw))
+                || (hasImageInputs || hasImageFields);
+
+            // Detect video generation intent
+            const videoKeywords = ['generate video', 'create video', 'video generation', 'produce video',
+                'video ad', 'video content', 'motion graphic', 'animate'];
+            const looksLikeVideoSkill = videoKeywords.some(kw => instructionsLower.includes(kw));
+
+            // Detect content + save intent
+            const contentKeywords = ['save to content', 'create and save', 'auto-save', 'save as draft',
+                'publish to', 'schedule post', 'content calendar'];
+            const looksLikeContentSkill = contentKeywords.some(kw => instructionsLower.includes(kw));
+
+            if (looksLikeImageSkill) {
+                console.log(`🔄 Skills Auto-Detect: Upgrading skillType from text_output → generate_image (detected from instructions/inputs)`);
+                skillType = 'generate_image';
+            } else if (looksLikeVideoSkill) {
+                console.log(`🔄 Skills Auto-Detect: Upgrading skillType from text_output → generate_video`);
+                skillType = 'generate_video';
+            } else if (looksLikeContentSkill) {
+                console.log(`🔄 Skills Auto-Detect: Upgrading skillType from text_output → create_content`);
+                skillType = 'create_content';
             }
         }
 
@@ -720,21 +760,22 @@ router.post('/:id/execute', protect, requireCredits('content'), async (req, res)
                 '=== SKILL INSTRUCTIONS ===',
                 skill.instructions,
                 '',
-                brandContext ? `=== BRAND CONTEXT ===\n${brandContext}\nTarget Markets: ${targetMarkets.join(', ')}` : `Target Markets: ${targetMarkets.join(', ')}`,
+                brandContext ? `=== BRAND CONTEXT ===\n${brandContext}\nPrimary Market: ${targetMarkets[0] || 'IN'}` : `Primary Market: ${targetMarkets[0] || 'IN'}`,
                 '',
                 'CRITICAL RULES:',
                 '1. DATES: Use ONLY verified dates from the festival calendar above. NEVER guess or hallucinate dates.',
-                '2. MARKET: Adapt all content to the specified target markets.',
-                '3. LANGUAGE: Generate content in the language appropriate for the target market.',
-                '4. CULTURAL: Respect cultural sensitivities of each target market.',
-                '5. PRODUCE REAL OUTPUT: Generate the actual deliverable content. Do NOT describe what a tool or UI would look like. PRODUCE the content itself.',
+                '2. LANGUAGE: Generate content ONLY in English or Hinglish unless the user explicitly requests another language. Do NOT auto-generate Arabic, Thai, or other languages unless told to.',
+                '3. NEVER FABRICATE URLs: Do NOT invent image URLs, product URLs, or any links. If you need to reference the brand website, use the actual website from brand context.',
+                '4. PRODUCE REAL OUTPUT: Generate the actual deliverable content. Do NOT describe what a tool or UI would look like. Do NOT describe upload flows, file pickers, or image processing steps.',
+                '5. FOCUS: Respond ONLY with the content the skill instructions ask for. Do NOT add unrelated sections like "Cultural References", "Edge Cases", "Gallery Access", or "Help Section".',
+                '6. NO FAKE IMAGES: You CANNOT generate images. If the skill asks for image generation, produce a detailed image prompt that describes the desired output instead. Do NOT output fake image filenames.',
                 '',
                 isJson ? 'Respond in valid JSON format.' : skill.outputFormat === 'html' ? 'Respond in clean HTML.' : 'Respond in well-formatted Markdown.',
             ].filter(Boolean).join('\n');
 
             const userPrompt = userInputText
-                ? `Execute this skill with the following inputs:\n\n${userInputText}\n\nTarget Markets: ${targetMarkets.join(', ')}. Today: ${now.toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' })}. Use ONLY verified dates.`
-                : `Execute this skill for the brand context provided. Target Markets: ${targetMarkets.join(', ')}. Today: ${now.toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' })}.`;
+                ? `Execute this skill with the following inputs:\n\n${userInputText}\n\nToday: ${now.toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' })}. Use ONLY verified dates. Respond in English unless the user inputs specify otherwise.`
+                : `Execute this skill for the brand context provided. Today: ${now.toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' })}. Respond in English.`;
 
             const elapsed = Date.now() - (req.startTime || Date.now());
             const remainingBudget = Math.max(300000, 600000 - elapsed);
