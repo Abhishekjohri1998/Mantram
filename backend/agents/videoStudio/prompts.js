@@ -309,8 +309,13 @@ export const PROMPT_ENHANCER_PROMPT = (brandContext = '', styleMemory = '', mode
 
   const SEEDANCE_GUIDE = `
 SEEDANCE 2.0 PROMPT STRUCTURE (research-backed — follow this exactly):
-Format: [Subject/Character doing Action] in [Specific Environment], [Visual Style], [Camera Movement], [Lighting & Mood]
-End with: "4K, ultra HD, rich cinematic detail, stable picture"
+1. Single Shot Video: [Subject/Character doing Action] in [Specific Environment], [Visual Style], [Camera Movement], [Lighting & Mood]
+2. Multi-Shot/Cut Video: If the user describes multiple actions or requests specific cuts (e.g., "cut every 1.5s"), you MUST use timeline prompting.
+   Format: 
+   [0s–1.5s]: Shot 1 description with camera action
+   [1.5s–3s]: Shot 2 description with camera action
+   [3s–4.5s]: Shot 3 description...
+CRITICAL: Mathematically calculate the timestamps based on the user's requested cut frequency.
 
 CAMERA LANGUAGE (use these exact terms):
 - slow push-in (over Xs) → emotional emphasis, product reveal
@@ -323,12 +328,7 @@ CAMERA LANGUAGE (use these exact terms):
 - crane rising → establishing scene, epic scale
 - static macro close-up → product texture, detail, premium quality
 
-TIMELINE PROMPTING for multi-beat content:
-[0s–3s]: Wide establishing shot description
-[3s–8s]: Mid-shot with key action
-[8s–15s]: Close-up or payoff moment
-
-QUALITY SUFFIX (always include): "4K, ultra HD, cinematic textures, rich detail, stable picture"`;
+QUALITY SUFFIX (always include at the end): "4K, ultra HD, cinematic textures, rich detail, stable picture"`;
 
   const KLING_GUIDE = `
 KLING 3.0 PROMPT STRUCTURE:
@@ -376,11 +376,11 @@ RULES:
 1. ADD vivid visual specifics: lighting setup, camera movement (with speed), composition, colour palette.
 2. ADD cinematic language specific to the target model (see guide above).
 3. ADD motion cues: describe what moves, how fast, in what direction.
-4. KEEP the original intent — enhance, don't replace what the user wants.
-5. REMOVE text overlay requests — AI models can't render text well.
-6. Stay under 300 words — models de-weight very long prompts.
+4. STRICT PRESERVATION: CRITICAL: Never drop actions, specific times, or cut instructions provided by the user. If they request a cut every X seconds, you MUST calculate the timeline and include every beat they mentioned.
+5. KEEP the original intent — enhance, don't replace what the user wants.
+6. REMOVE text overlay requests — AI models can't render text well.
 7. Write in present tense, as if describing what plays on screen right now.
-8. For Seedance: follow the [Subject+Action]+[Environment]+[Style]+[Camera]+[Lighting] structure exactly.
+8. For single-shot Seedance: follow the [Subject+Action]+[Environment]+[Style] exactly. For multi-shot Seedance: STRICTLY use the [Xs-Ys] timeline syntax.
 
 RESPONSE FORMAT — respond with ONLY valid JSON:
 {

@@ -37,11 +37,14 @@ PROMPT STRUCTURE (follow this order):
 5. CONSTRAINTS: Brief consistency notes ("maintain facial consistency", "stable framing").
 
 TIMELINE MARKERS (use for sequences longer than 5s):
-Structure events with time codes:
-  [0s] Wide establishing shot of the scene.
-  [3s] Medium shot — subject begins action.
-  [8s] Close-up — emotional beat or product reveal.
-  [12s] Pull-back to reveal full context.
+Structure events with time codes or time ranges:
+  0-3s: Wide establishing shot of the scene.
+  3-5s: Medium shot — subject begins action.
+  5-7s: Close-up — emotional beat or product reveal.
+CRITICAL: If the user requests specific cut timings (e.g., "cut every 1.5 sec") or provides an explicit timeline, you MUST strictly follow their instruction by generating a precise second-by-second timeline (e.g. 0-1.5s, 1.5-3s, 3-4.5s) containing all their requested actions. DO NOT skip or condense their requested shots.
+
+AUDIO / VOICEOVER:
+If the user requests voiceover or specific audio, describe the sound inline within the scene description or at the end. (e.g., "Deep menacing voiceover: 'Begin...'", "Sound of heavy breathing").
 
 @TAG REFERENCE RULES (when reference images are provided):
 - Give every @image a SPECIFIC JOB. Never just list them.
@@ -219,7 +222,7 @@ ${brandContext ? `The brand context above is REAL — embed it deeply:
 
 RESPONSE — Return ONLY valid JSON:
 {
-  "enhancedPrompt": "The CORE MOTION PROMPT optimised for ${modelName}. Write as a plain English directorial prompt following the model's structure guide above. Embed the Ad Film arc into the timeline.",
+  "enhancedPrompt": "The CORE MOTION PROMPT optimised for ${modelName}. Write as a plain English directorial prompt following the model's structure guide above. Embed the Ad Film arc into the timeline. CRITICAL: Any voiceover, dialogue, or audio instructions must be explicitly written inside this enhancedPrompt as well (e.g. 'Audio: Deep voiceover saying: X'). Do NOT just leave it in the adFilmPlan.",
   "adFilmPlan": {
     "hook": "Exact description of the opening beat",
     "story": "The emotional narrative beat with the human truth",
@@ -280,6 +283,11 @@ Remember: HOOK should NOT show the product — build desire first. STORY should 
 OUTPUT TYPE: Single optimised video prompt
 Transform this brief into one production-ready prompt following the model structure guide exactly.`;
     }
+
+    userPrompt += `
+
+CRITICAL PRESERVATION RULE: 
+If the user brief explicitly defines specific timings, custom shot sequences, rapid cuts (like "cut every X sec"), explicit character actions, voiceovers, dialogues, or precise timecodes (e.g. 0-3s, 5-7s), you MUST strictly preserve and integrate ALL of these details into the enhanced timeline. Do NOT collapse their complex sequence into a single generic shot or ignore their timings/audio. The final enhanced prompt must structurally honor every detailed action, precise cut/timestamp strategy, and audio/voiceover request exactly as defined by the user.`;
 
     return userPrompt;
 }

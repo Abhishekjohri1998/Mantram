@@ -3764,24 +3764,44 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                             </div>
                                         )}
 
-                                        {/* Prompt AI Switch & Voice */}
+                                        {/* Original Enhance Prompt Button & Voice */}
                                         <div className="px-4 py-3 flex items-center justify-between border-t border-[var(--sys-border)] bg-[var(--sys-surface)]/30">
                                             <div className="flex items-center gap-3">
-                                                {/* Soft iOS-style Toggle */}
-                                                <button onClick={(e) => { e.stopPropagation(); setGenerateCopy(!generateCopy) }} className={"w-9 h-5 rounded-full relative transition-colors shadow-inner " + (generateCopy ? 'bg-primary' : 'bg-slate-300 dark:bg-slate-700')}>
+                                                {/* Text Overlay Toggle for Generation */}
+                                                <button onClick={(e) => { e.stopPropagation(); setGenerateCopy(!generateCopy) }} className={"w-9 h-5 rounded-full relative transition-colors shadow-inner " + (generateCopy ? 'bg-primary' : 'bg-slate-300 dark:bg-slate-700')} title="Add Text Overlay">
                                                     <div className={"absolute top-[2px] w-4 h-4 rounded-full bg-white shadow-sm transition-transform " + (generateCopy ? 'left-[18px]' : 'left-[2px]')} />
                                                 </button>
-                                                <span className="text-[12px] font-bold text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer select-none" onClick={() => setGenerateCopy(!generateCopy)}>AI prompt</span>
+                                                <span className="text-[12px] font-bold text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer select-none" onClick={() => setGenerateCopy(!generateCopy)}>Add Text to Image (Copy)</span>
                                             </div>
-                                            <div className="flex items-center gap-2">
-                                                {prompt.trim() && (
-                                                    <button onClick={handleEnhancePrompt} disabled={enhancing || !activeBrand} className="text-primary hover:text-primary-dark transition-colors px-1 text-[11px] font-bold flex items-center gap-1 bg-primary/10 rounded-md py-1 px-2 cursor-pointer">
-                                                        <span className={"material-symbols-outlined text-[13px] " + (enhancing ? "animate-spin" : "")}>{enhancing ? 'progress_activity' : 'auto_awesome'}</span> {enhancing ? 'Enhancing' : 'Enhance'}
-                                                    </button>
-                                                )}
+                                            <div className="flex items-center gap-1.5">
+                                                <button onClick={handleEnhancePrompt} disabled={!prompt.trim() || enhancing || !activeBrand} className={"flex items-center gap-1 bg-[var(--sys-primary)]/10 text-[var(--sys-primary)] hover:bg-[var(--sys-primary)] hover:text-white transition-all py-1.5 px-3 rounded-full text-[11px] font-bold cursor-pointer " + (!prompt.trim() ? "opacity-50 grayscale cursor-not-allowed" : "shadow-sm")} title="Enhance prompt with Brand DNA" >
+                                                    <span className={"material-symbols-outlined text-[14px] " + (enhancing ? "animate-spin" : "")}>{enhancing ? 'progress_activity' : 'auto_awesome'}</span>
+                                                    {enhancing ? 'Enhancing...' : 'Enhance'}
+                                                </button>
                                                 <VoiceInput onResult={(text) => setPrompt(prev => prev ? prev + ' ' + text : text)} size="small" />
                                             </div>
                                         </div>
+                                        {/* Dynamic Text Overlay Controls */}
+                                        {generateCopy && (
+                                            <div className="px-4 py-3 border-t border-[var(--sys-border)] bg-[var(--sys-bg)] space-y-2">
+                                                <div className="flex items-center justify-between">
+                                                    {copyLoading ? (
+                                                        <span className="flex items-center gap-1.5 text-[10px] text-[var(--sys-primary)] animate-pulse">Agent is writing your copy...</span>
+                                                    ) : copyIsAiSuggested ? (
+                                                        <span className="flex items-center gap-1 text-[10px] text-[var(--sys-primary)]"><span className="material-symbols-outlined text-[9px]">auto_awesome</span> AI suggested — edit freely</span>
+                                                    ) : (
+                                                        <span className="text-[10px] text-[var(--sys-text-muted)]">Customize overlay text (or let AI write it)</span>
+                                                    )}
+                                                    {!copyLoading && prompt?.trim().length > 5 && (
+                                                        <button onClick={() => suggestCopy(prompt)} className="flex items-center gap-0.5 text-[10px] text-[var(--sys-text-muted)] hover:text-[var(--sys-primary)] transition-colors cursor-pointer">
+                                                            <span className="material-symbols-outlined text-[10px]">refresh</span> Generate Copy
+                                                        </button>
+                                                    )}
+                                                </div>
+                                                <input type="text" value={customHeadline} onChange={e => { setCustomHeadline(e.target.value); setCopyIsAiSuggested(false) }} maxLength={40} placeholder="Headline (AI overrides if left blank)" className="w-full bg-[var(--sys-surface)] text-[var(--sys-text)] p-2 rounded-lg text-xs outline-none border border-[var(--sys-border)] focus:border-[var(--sys-primary)]/50" />
+                                                <input type="text" value={customCtaText} onChange={e => { setCustomCtaText(e.target.value); setCopyIsAiSuggested(false) }} maxLength={20} placeholder="CTA Button (e.g. Shop Now)" className="w-full bg-[var(--sys-surface)] text-[var(--sys-text)] p-2 rounded-lg text-xs outline-none border border-[var(--sys-border)] focus:border-[var(--sys-primary)]/50" />
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -3790,22 +3810,28 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             <div className="creative-tools-panel-footer !bg-[var(--sys-bg)] !border-none px-5 pt-3 pb-5 space-y-3 z-10 border-t border-[var(--sys-border)]">
                                 {/* Modifier Pills */}
                                 <div className="flex items-center flex-wrap gap-2">
-                                    <div className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text-muted)]">
-                                        <button className="hover:text-[var(--sys-text)]"><span className="material-symbols-outlined text-[14px]">remove</span></button>
-                                        <span className="text-[13px] font-bold text-[var(--sys-text)] px-1">1</span>
-                                        <button className="hover:text-[var(--sys-text)]"><span className="material-symbols-outlined text-[14px]">add</span></button>
-                                    </div>
                                     <div className="relative group/tray">
                                         <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[12px] font-bold text-[var(--sys-text)] transition-all hover:border-[var(--sys-text)] cursor-pointer">
                                             <span className="material-symbols-outlined text-[15px]">crop_landscape</span>
                                             {selectedType ? creativeTypes.find(c => c.id === selectedType)?.label?.split('(')[0].trim() : '16:9'}
                                         </button>
-                                        <div className="absolute bottom-full left-0 mb-3 hidden group-hover/tray:block w-[140px] bg-[var(--sys-bg)] border border-[var(--sys-border)] shadow-xl rounded-[14px] p-1.5 z-50 animate-fade-in">
+                                        <div className="absolute bottom-full left-0 mb-3 hidden group-hover/tray:block w-[180px] bg-[var(--sys-bg)] border border-[var(--sys-border)] shadow-xl rounded-[14px] p-1.5 z-50 animate-fade-in text-left">
                                             {creativeTypes.map(c => (
                                                 <button key={c.id} onClick={() => setSelectedType(c.id)} className={"w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg transition-colors " + (selectedType === c.id ? "bg-[var(--sys-text)] text-[var(--sys-bg)]" : "text-[var(--sys-text)] hover:bg-[var(--sys-surface)]")}>
-                                                    <span className="material-symbols-outlined text-[16px]">{c.icon}</span><span className="text-[11px] font-bold">{c.label.split('(')[0]}</span>
+                                                    <span className="material-symbols-outlined text-[16px]">{c.icon}</span>
+                                                    <div className="flex flex-col text-left">
+                                                        <span className="text-[11px] font-bold">{c.label.split('(')[0]}</span>
+                                                        <span className="text-[9px] opacity-70">{c.aspectRatio}</span>
+                                                    </div>
                                                 </button>
                                             ))}
+                                            {selectedType === 'custom-size' && (
+                                                <div className="pt-2 pb-1 px-2 border-t border-[var(--sys-border)] mt-1 flex items-center gap-1">
+                                                    <input type="number" placeholder="W" value={customWidth} onChange={(e) => setCustomWidth(e.target.value)} className="w-[45%] text-[10px] p-1 bg-black/10 rounded border border-black/20 text-center text-black font-mono outline-none" />
+                                                    <span className="text-[10px] text-gray-500">×</span>
+                                                    <input type="number" placeholder="H" value={customHeight} onChange={(e) => setCustomHeight(e.target.value)} className="w-[45%] text-[10px] p-1 bg-black/10 rounded border border-black/20 text-center text-black font-mono outline-none" />
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                     <div className="relative group/tray">
