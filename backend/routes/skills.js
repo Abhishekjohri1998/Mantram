@@ -704,12 +704,147 @@ router.post('/:id/execute', protect, requireCredits('content'), async (req, res)
 });
 
 
+// ============================================================================
+// PHASE 3: ANALYTICS — GET /api/skills/analytics/summary
+// ============================================================================
+
+router.get('/analytics/summary', protect, async (req, res) => {
+    try {
+        const { brandId } = req.query;
+        const query = { user: req.user._id };
+        if (brandId) query.brand = brandId;
+
+        // Pull all executions for this user
+        const executions = await SkillExecution.find(query)
+            .sort({ createdAt: -1 })
+            .limit(500)
+            .lean();
+
+        const totalRuns = executions.length;
+
+        // Credit usage: sum estimatedCreditCost from associated skills at execution time
+        // We track skillType + mcpResults per execution
+        const CREDIT_MAP = {
+            text_output: 1, create_content: 2, generate_image: 5,
+            generate_video: 35, orchestrate: 10,
+        };
+        const creditsUsed = executions.reduce((sum, e) => {
+            return sum + (CREDIT_MAP[e.skillType] || 1);
+        }, 0);
+
+        // Avg quality rating (from rated executions)
+        const rated = executions.filter(e => e.rating);
+        const avgRating = rated.length
+            ? +(rated.reduce((s, e) => s + e.rating, 0) / rated.length).toFixed(1)
+            : null;
+
+        // Time saved estimate (30 min per run is industry average for AI-assisted tasks)
+        const minutesSaved = totalRuns * 30;
+
+        // Top skills by usage
+        const skillCounter = {};
+        const skillNames = {};
+        const skillTypes = {};
+        for (const e of executions) {
+            const id = String(e.skill);
+            skillCounter[id] = (skillCounter[id] || 0) + 1;
+            skillNames[id] = e.skillName;
+            skillTypes[id] = e.skillType || 'text_output';
+        }
+        const topSkills = Object.entries(skillCounter)
+            .sort(([, a], [, b]) => b - a)
+            .slice(0, 6)
+            .map(([id, count]) => ({ id, name: skillNames[id], count, type: skillTypes[id] }));
+
+        // Skill type breakdown
+        const typeBreakdown = {};
+        for (const e of executions) {
+            const t = e.skillType || 'text_output';
+            typeBreakdown[t] = (typeBreakdown[t] || 0) + 1;
+        }
+
+        // Recent 7 days trend (runs per day)
+        const trend = [];
+        for (let i = 6; i >= 0; i--) {
+            const d = new Date();
+            d.setDate(d.getDate() - i);
+            const dayStr = d.toISOString().split('T')[0];
+            const count = executions.filter(e => e.createdAt.toISOString().split('T')[0] === dayStr).length;
+            trend.push({ date: dayStr, runs: count });
+        }
+
+        res.json({
+            success: true,
+            summary: {
+                totalRuns,
+                creditsUsed,
+                avgRating,
+                minutesSaved,
+                topSkills,
+                typeBreakdown,
+                trend,
+            },
+        });
+    } catch (error) {
+        console.error('Analytics summary error:', error.message);
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+
+// ============================================================================
+// PHASE 3: ANALYTICS HISTORY — GET /api/skills/analytics/history
+// ============================================================================
+
+router.get('/analytics/history', protect, async (req, res) => {
+    try {
+        const { brandId, page = 1, limit = 20 } = req.query;
+        const query = { user: req.user._id };
+        if (brandId) query.brand = brandId;
+
+        const skip = (parseInt(page) - 1) * parseInt(limit);
+        const [executions, total] = await Promise.all([
+            SkillExecution.find(query)
+                .sort({ createdAt: -1 })
+                .skip(skip)
+                .limit(parseInt(limit))
+                .lean(),
+            SkillExecution.countDocuments(query),
+        ]);
+
+        res.json({
+            success: true,
+            executions: executions.map(e => ({
+                _id: e._id,
+                skillId: e.skill,
+                skillName: e.skillName,
+                skillType: e.skillType || 'text_output',
+                skillIcon: e.skillIcon,
+                skillColor: e.skillColor,
+                status: e.status,
+                rating: e.rating,
+                mcpToolCount: e.mcpResults?.length || 0,
+                hasChain: !!e.chainResult,
+                hasVideo: !!e.videoJob?.projectId,
+                createdAt: e.createdAt,
+            })),
+            total,
+            page: parseInt(page),
+            totalPages: Math.ceil(total / parseInt(limit)),
+        });
+    } catch (error) {
+        console.error('Analytics history error:', error.message);
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
 
 // ============================================================================
 // CREDIT COST PREVIEW — Show cost before executing
 // ============================================================================
 
 router.get('/:id/credit-cost', protect, async (req, res) => {
+
     try {
         const skill = await Skill.findOne({
             _id: req.params.id,

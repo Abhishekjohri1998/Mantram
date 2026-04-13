@@ -457,6 +457,22 @@ export default function SkillsHub() {
     const [loadingMarketplace, setLoadingMarketplace] = useState(false)
     const [installingSkill, setInstallingSkill] = useState(null)
     const [activeTab, setActiveTab] = useState('mine') // mine | marketplace
+    const [analytics, setAnalytics] = useState(null)
+    const [analyticsLoading, setAnalyticsLoading] = useState(false)
+    const [analyticsHistory, setAnalyticsHistory] = useState([])
+
+    const loadAnalytics = useCallback(async () => {
+        setAnalyticsLoading(true)
+        try {
+            const [summary, history] = await Promise.all([
+                skillsAPI.analyticsSummary(activeBrand?._id),
+                skillsAPI.analyticsHistory({ brandId: activeBrand?._id, limit: 15 }),
+            ])
+            if (summary.success) setAnalytics(summary.summary)
+            if (history.success) setAnalyticsHistory(history.executions || [])
+        } catch { /* silent */ }
+        finally { setAnalyticsLoading(false) }
+    }, [activeBrand?._id])
 
     // Load skills + active skills
     useEffect(() => {
@@ -726,12 +742,14 @@ export default function SkillsHub() {
                         { id: 'browse', icon: 'auto_awesome', label: 'Skills Library' },
                         { id: 'build', icon: 'add_circle', label: 'Create Skill' },
                         { id: 'history', icon: 'history', label: 'Run History' },
+                        { id: 'analytics', icon: 'bar_chart', label: 'Analytics' },
                         { id: 'help', icon: 'menu_book', label: 'Guide' },
                     ].map(tab => (
                         <button key={tab.id}
                             onClick={() => {
                                 setView(tab.id)
                                 if (tab.id === 'history') { loadExecutionHistory() }
+                                if (tab.id === 'analytics') { loadAnalytics() }
                             }}
                             className={`flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-300 cursor-pointer ${view === tab.id ? 'studio-nav-pill text-[var(--sys-text)] font-bold' : 'studio-nav-tab-inactive'}`}>
                             <span className={`material-symbols-outlined ${view === tab.id ? 'text-lg' : 'text-base opacity-70'}`}>{tab.icon}</span>
@@ -1503,8 +1521,204 @@ export default function SkillsHub() {
                     </div>
                 )}
 
+                {/* ═══ ANALYTICS VIEW ═══ */}
+                {view === 'analytics' && (
+                    <div className="animate-fade-in space-y-6">
+                        {/* Header */}
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <h2 className="text-xl font-bold text-[var(--sys-text)]">Skills Analytics</h2>
+                                <p className="text-xs text-[var(--sys-text-muted)] mt-1">Track your AI-powered creative output and time saved</p>
+                            </div>
+                            <button onClick={loadAnalytics} disabled={analyticsLoading}
+                                className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-xs font-bold text-[var(--sys-text-muted)] cursor-pointer hover:text-primary transition-all disabled:opacity-40">
+                                <span className={`material-symbols-outlined text-sm ${analyticsLoading ? 'animate-spin' : ''}`}>refresh</span>
+                                Refresh
+                            </button>
+                        </div>
+
+                        {analyticsLoading ? (
+                            <div className="flex items-center justify-center py-20 text-[var(--sys-text-muted)]">
+                                <span className="material-symbols-outlined text-2xl animate-spin mr-3">progress_activity</span>
+                                Loading analytics…
+                            </div>
+                        ) : analytics ? (
+                            <>
+                                {/* Summary Tiles */}
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                    {[
+                                        { label: 'Total Runs', value: analytics.totalRuns, icon: 'bolt', color: '#8b5cf6', suffix: '' },
+                                        { label: 'Credits Used', value: analytics.creditsUsed, icon: 'toll', color: '#f59e0b', suffix: ' cr' },
+                                        { label: 'Time Saved', value: analytics.minutesSaved >= 60 ? Math.floor(analytics.minutesSaved / 60) : analytics.minutesSaved, icon: 'schedule', color: '#10b981', suffix: analytics.minutesSaved >= 60 ? ' hrs' : ' min' },
+                                        { label: 'Avg Quality', value: analytics.avgRating || '—', icon: 'star', color: '#f59e0b', suffix: analytics.avgRating ? '/5' : '' },
+                                    ].map(tile => (
+                                        <div key={tile.label} className="glass-panel rounded-2xl p-4 flex flex-col gap-2">
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: `${tile.color}20` }}>
+                                                    <span className="material-symbols-outlined text-base" style={{ color: tile.color }}>{tile.icon}</span>
+                                                </div>
+                                                <p className="text-[11px] text-[var(--sys-text-muted)] font-bold uppercase">{tile.label}</p>
+                                            </div>
+                                            <p className="text-3xl font-black text-[var(--sys-text)]">
+                                                {tile.value}<span className="text-sm font-bold text-[var(--sys-text-muted)]">{tile.suffix}</span>
+                                            </p>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    {/* 7-Day Activity Trend (Pure CSS bar chart) */}
+                                    <div className="glass-panel rounded-2xl p-5">
+                                        <p className="text-sm font-bold text-[var(--sys-text)] mb-4 flex items-center gap-2">
+                                            <span className="material-symbols-outlined text-primary text-base">show_chart</span>
+                                            7-Day Activity
+                                        </p>
+                                        {analytics.trend && analytics.trend.length > 0 ? (
+                                            <div className="flex items-end gap-2 h-28">
+                                                {(() => {
+                                                    const maxRuns = Math.max(...analytics.trend.map(d => d.runs), 1)
+                                                    return analytics.trend.map((day, i) => {
+                                                        const height = Math.max(4, (day.runs / maxRuns) * 100)
+                                                        const dayLabel = new Date(day.date + 'T12:00:00').toLocaleDateString('en-IN', { weekday: 'short' })
+                                                        return (
+                                                            <div key={i} className="flex-1 flex flex-col items-center gap-1 group">
+                                                                <span className={`text-[9px] text-[var(--sys-text-muted)] opacity-0 group-hover:opacity-100 transition-all font-bold`}>
+                                                                    {day.runs}
+                                                                </span>
+                                                                <div className="w-full rounded-t-lg transition-all duration-500"
+                                                                    style={{ height: `${height}%`, background: day.runs > 0 ? 'linear-gradient(180deg, var(--sys-primary), #FF7A00)' : 'var(--sys-border)', minHeight: 4 }} />
+                                                                <span className="text-[9px] text-[var(--sys-text-muted)] font-bold">{dayLabel}</span>
+                                                            </div>
+                                                        )
+                                                    })
+                                                })()}
+                                            </div>
+                                        ) : <p className="text-sm text-[var(--sys-text-muted)] text-center py-8">No runs yet this week</p>}
+                                    </div>
+
+                                    {/* Skill Type Breakdown */}
+                                    <div className="glass-panel rounded-2xl p-5">
+                                        <p className="text-sm font-bold text-[var(--sys-text)] mb-4 flex items-center gap-2">
+                                            <span className="material-symbols-outlined text-primary text-base">pie_chart</span>
+                                            Output Types
+                                        </p>
+                                        <div className="space-y-2.5">
+                                            {Object.entries(analytics.typeBreakdown || {}).sort(([, a], [, b]) => b - a).map(([type, count]) => {
+                                                const meta = SKILL_TYPE_META[type] || { label: type, color: '#6b7280', bg: 'rgba(107,114,128,0.12)', icon: 'auto_awesome' }
+                                                const pct = Math.round((count / analytics.totalRuns) * 100)
+                                                return (
+                                                    <div key={type}>
+                                                        <div className="flex items-center justify-between mb-1">
+                                                            <div className="flex items-center gap-1.5">
+                                                                <span className="material-symbols-outlined text-xs" style={{ color: meta.color }}>{meta.icon}</span>
+                                                                <span className="text-xs font-bold text-[var(--sys-text)]">{meta.label}</span>
+                                                            </div>
+                                                            <span className="text-xs text-[var(--sys-text-muted)] font-bold">{count} <span className="opacity-60">({pct}%)</span></span>
+                                                        </div>
+                                                        <div className="w-full bg-[var(--sys-surface)] rounded-full h-1.5 overflow-hidden">
+                                                            <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, background: meta.color }} />
+                                                        </div>
+                                                    </div>
+                                                )
+                                            })}
+                                            {(!analytics.typeBreakdown || Object.keys(analytics.typeBreakdown).length === 0) && (
+                                                <p className="text-sm text-[var(--sys-text-muted)] text-center py-6">Run skills to see breakdown</p>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Top Skills */}
+                                {analytics.topSkills?.length > 0 && (
+                                    <div className="glass-panel rounded-2xl p-5">
+                                        <p className="text-sm font-bold text-[var(--sys-text)] mb-4 flex items-center gap-2">
+                                            <span className="material-symbols-outlined text-primary text-base">emoji_events</span>
+                                            Most Used Skills
+                                        </p>
+                                        <div className="divide-y divide-[var(--sys-border)]">
+                                            {analytics.topSkills.map((skill, i) => {
+                                                const meta = SKILL_TYPE_META[skill.type] || SKILL_TYPE_META.text_output
+                                                return (
+                                                    <div key={skill.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
+                                                        <span className="text-sm font-black text-[var(--sys-text-muted)] w-5 text-right">{i + 1}</span>
+                                                        <div className="w-8 h-8 rounded-xl flex-shrink-0 flex items-center justify-center" style={{ background: meta.bg }}>
+                                                            <span className="material-symbols-outlined text-base" style={{ color: meta.color }}>{meta.icon}</span>
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className="text-sm font-bold text-[var(--sys-text)] truncate">{skill.name}</p>
+                                                            <p className="text-[10px] text-[var(--sys-text-muted)]">{meta.label}</p>
+                                                        </div>
+                                                        <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg" style={{ background: meta.bg }}>
+                                                            <span className="material-symbols-outlined text-xs" style={{ color: meta.color }}>bolt</span>
+                                                            <span className="text-xs font-black" style={{ color: meta.color }}>{skill.count}×</span>
+                                                        </div>
+                                                    </div>
+                                                )
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Recent Execution Log */}
+                                {analyticsHistory.length > 0 && (
+                                    <div className="glass-panel rounded-2xl p-5">
+                                        <p className="text-sm font-bold text-[var(--sys-text)] mb-4 flex items-center gap-2">
+                                            <span className="material-symbols-outlined text-primary text-base">history</span>
+                                            Recent Executions
+                                        </p>
+                                        <div className="divide-y divide-[var(--sys-border)]">
+                                            {analyticsHistory.map(exec => {
+                                                const meta = SKILL_TYPE_META[exec.skillType] || SKILL_TYPE_META.text_output
+                                                const CREDIT_MAP = { text_output: 1, create_content: 2, generate_image: 5, generate_video: 35, orchestrate: 10 }
+                                                const credits = CREDIT_MAP[exec.skillType] || 1
+                                                return (
+                                                    <div key={exec._id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
+                                                        <div className="w-8 h-8 rounded-xl flex-shrink-0 flex items-center justify-center" style={{ background: meta.bg }}>
+                                                            <span className="material-symbols-outlined text-base" style={{ color: meta.color }}>{exec.skillIcon || meta.icon}</span>
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className="text-xs font-bold text-[var(--sys-text)] truncate">{exec.skillName}</p>
+                                                            <p className="text-[10px] text-[var(--sys-text-muted)]">
+                                                                {new Date(exec.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                                            </p>
+                                                        </div>
+                                                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                                                            {exec.hasChain && (
+                                                                <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold bg-violet-500/10 text-violet-400">Chain</span>
+                                                            )}
+                                                            {exec.hasVideo && (
+                                                                <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold bg-amber-500/10 text-amber-400">Video</span>
+                                                            )}
+                                                            {exec.rating && (
+                                                                <span className="text-[9px] flex items-center gap-0.5 text-amber-400">
+                                                                    <span className="material-symbols-outlined" style={{ fontSize: 10 }}>star</span>
+                                                                    {exec.rating}
+                                                                </span>
+                                                            )}
+                                                            <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold" style={{ background: `${meta.color}15`, color: meta.color }}>
+                                                                {credits} cr
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                )
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
+                            </>
+                        ) : (
+                            <div className="flex flex-col items-center justify-center py-20 text-[var(--sys-text-muted)] gap-3">
+                                <span className="material-symbols-outlined text-4xl opacity-30">bar_chart</span>
+                                <p className="text-sm">No data yet — run some skills to see your analytics!</p>
+                                <button onClick={() => setView('browse')} className="btn-primary px-5 py-2 rounded-xl text-sm cursor-pointer">Explore Skills</button>
+                            </div>
+                        )}
+                    </div>
+                )}
+
                 {/* ═══ BUILD SKILL VIEW ═══ */}
                 {view === 'build' && (
+
                     <div className="animate-fade-in">
                         <button onClick={goHome} className="flex items-center gap-2 text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] text-sm font-bold mb-6 cursor-pointer transition-all">
                             <span className="material-symbols-outlined text-sm">arrow_back</span> Back to Skills

@@ -905,6 +905,15 @@ export const skills = {
     },
     // Phase 2: Manual chain trigger
     chain: (skillId, data) => apiFetch(`/skills/${skillId}/chain`, { method: 'POST', body: JSON.stringify(data) }),
+    // Phase 3: Analytics
+    analyticsSummary: (brandId) => {
+        const params = brandId ? `?brandId=${brandId}` : '';
+        return apiFetch(`/skills/analytics/summary${params}`);
+    },
+    analyticsHistory: (params = {}) => {
+        const query = new URLSearchParams(params).toString();
+        return apiFetch(`/skills/analytics/history?${query}`);
+    },
 };
 
 // ============ MCP Tools API ============

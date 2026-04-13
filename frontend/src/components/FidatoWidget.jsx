@@ -105,12 +105,18 @@ export default function FidatoWidget() {
 
         try {
             const res = await fidatoAPI.chat(msg, brandId)
-            setMessages(prev => [...prev, { role: 'assistant', content: res.reply }])
+            // Phase 3: if backend executed a skill, add a special skill card message
+            const msgs = [{ role: 'assistant', content: res.reply }]
+            if (res.skillResult) {
+                msgs.push({ role: 'skill_card', skillResult: res.skillResult })
+            }
+            setMessages(prev => [...prev, ...msgs])
         } catch {
             setMessages(prev => [...prev, { role: 'assistant', content: 'oops, something went wrong! try again? 😊' }])
         }
         setLoading(false)
     }
+
 
     const clearChat = async () => {
         try { await fidatoAPI.clear() } catch { /* */ }
@@ -322,15 +328,35 @@ export default function FidatoWidget() {
                                         <span className="material-symbols-outlined text-xs">support_agent</span>
                                     </div>
                                 )}
-                                <div className={`max-w-[80%] px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed ${m.role === 'user'
-                                    ? 'bg-[var(--sys-text)] text-[var(--sys-bg)] rounded-br-sm border border-[var(--sys-border)]'
-                                    : 'bg-[var(--sys-surface)] text-[var(--sys-text)] rounded-bl-sm border border-[var(--sys-border)]'
-                                    }`}
-                                    style={{ whiteSpace: 'pre-wrap' }}>
-                                    {m.content}
-                                </div>
+                                {/* Phase 3: Skill result card */}
+                                {m.role === 'skill_card' ? (
+                                    <div className="flex-1 rounded-2xl overflow-hidden border border-emerald-500/20 bg-emerald-500/5 p-3">
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <span className="material-symbols-outlined text-sm text-emerald-400">auto_awesome</span>
+                                            <span className="text-xs font-bold text-emerald-400">Skill Executed</span>
+                                        </div>
+                                        <p className="text-sm font-bold text-[var(--sys-text)] mb-1">{m.skillResult.skillName}</p>
+                                        <div className="flex items-center gap-2 mt-2">
+                                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 font-bold">
+                                                {m.skillResult.skillType?.replace(/_/g, ' ') || 'text'}
+                                            </span>
+                                            <a href="/skills" className="text-[10px] text-primary hover:underline font-bold ml-auto">
+                                                View in Skills Hub →
+                                            </a>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className={`max-w-[80%] px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed ${m.role === 'user'
+                                        ? 'bg-[var(--sys-text)] text-[var(--sys-bg)] rounded-br-sm border border-[var(--sys-border)]'
+                                        : 'bg-[var(--sys-surface)] text-[var(--sys-text)] rounded-bl-sm border border-[var(--sys-border)]'
+                                        }`}
+                                        style={{ whiteSpace: 'pre-wrap' }}>
+                                        {m.content}
+                                    </div>
+                                )}
                             </div>
                         ))}
+
                         {loading && (
                             <div className="flex gap-2.5">
                                 <div className="size-7 rounded-full shrink-0 flex items-center justify-center text-[var(--sys-text)] text-xs"

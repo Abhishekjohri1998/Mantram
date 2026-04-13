@@ -11,8 +11,10 @@ import { getRouter } from '../ai/router.js';
 import { agentUtils } from '../agents/shared/agentUtils.js';
 import { loadActiveSkillInstructions } from '../utils/skillHelpers.js';
 import User from '../models/User.js';
+import Skill from '../models/Skill.js';
 import { safeErrorMessage } from '../utils/safeError.js';
 import redis from '../utils/redisClient.js';
+import fetch from 'node-fetch';
 
 const router = Router();
 
@@ -89,11 +91,35 @@ You are the DEDICATED BRAND MANAGER of the user's currently selected brand (prov
 9. SEO Studio — Website audit, Google Analytics/Search Console
 10. Performance Studio — Meta & Google Ads integration
 11. D2C Studio — Shopify analytics, Product Velocity, Geo Radar
+12. Skills Hub — User-defined executable mini-tools (agentic skills)
+    → Skills can generate images, videos, full campaign packs, or text content
+    → Skills are reusable, brand-aware, and powered by MCP tools
+    → Prebuilt skills include: Festival Campaign Planner, Product Hero Shot, 60s Brand Video Ad, Product Launch Pack, 30-Day Content Calendar, and more
+    → Users can build custom skills in the Skill Builder
+    → IMPORTANT: If the user asks you to run, execute, or use a skill, you CAN do it — just ask them which skill they want and any required inputs, then execute it for them!
 
 ### Brand DNA — Extracts colors, fonts, voice, personality, content style, products, images
 ### Team Management — Roles (Owner/Manager/Member), per-studio and per-brand access
 ### Credits — Each AI generation costs credits, varies by studio
 ### Subscription Plans — Starter (3 brands), Professional (10), Enterprise (50)
+
+## Skills Awareness (KEY CAPABILITY — READ THIS)
+You can EXECUTE skills on behalf of the user. When they say things like:
+→ "run my Product Hero Shot skill"
+→ "use the Festival Campaign skill for Diwali"
+→ "execute my 30-Day Content Calendar"
+→ "can you run the brand ad skill?"
+
+You SHOULD:
+1. Confirm which skill they want if ambiguous
+2. Ask for any required inputs they haven't provided
+3. Tell them you're running it
+4. The system will auto-execute it and show results
+
+When a user is working on something that MATCHES a skill they have, PROACTIVELY suggest it! e.g.:
+→ User asks about festival campaign content → suggest their Festival Campaign Kit skill
+→ User wants a product image → suggest Product Hero Shot skill
+→ User wants social posts for next month → suggest 30-Day Content Calendar skill
 
 ## Boundary Rules
 → You answer questions about the user's brand, marketing strategy, branding, AND Mantram AI platform.
@@ -148,6 +174,106 @@ router.post('/chat', protect, async (req, res) => {
 
         // Load persistent conversation history from Redis (30-day memory)
         const history = await getMemory(userId);
+
+        // ── Phase 3: Skill Intent Detection ──────────────────────────────────
+        // Detect patterns like "run my X skill", "execute X skill", "use my X"
+        const skillIntentPattern = /(?:run|execute|use|trigger|fire|start|launch)\s+(?:my\s+)?["']?([\w\s\d-]+?)["']?\s+skill/i;
+        const skillIntentMatch = message.match(skillIntentPattern);
+        let skillResult = null;
+
+        if (skillIntentMatch) {
+            const requestedName = skillIntentMatch[1].trim();
+            try {
+                // Fuzzy match skill name (case-insensitive, partial)
+                const userSkills = await Skill.find({
+                    status: 'active',
+                    $or: [
+                        { user: req.user._id },
+                        { isPrebuilt: true },
+                        { visibility: 'mantram_users' },
+                    ],
+                    name: { $regex: requestedName.split(' ').map(w => `(?=.*${w})`).join(''), $options: 'i' },
+                }).limit(3).lean();
+
+                if (userSkills.length === 1) {
+                    const matchedSkill = userSkills[0];
+                    console.log(`🎯 Fidato: executing skill "${matchedSkill.name}" from intent "${requestedName}"`);
+
+                    // Extract any inputs from the message (key: value patterns or natural language)
+                    const extractedInputs = {};
+                    for (const field of matchedSkill.inputFields || []) {
+                        // Look for field name or label in message
+                        const fieldPatterns = [
+                            new RegExp(`${field.name}\\s*[:=]\\s*([^,\\n]+)`, 'i'),
+                            new RegExp(`${field.label}\\s*[:=]\\s*([^,\\n]+)`, 'i'),
+                            new RegExp(`for\\s+([\\w\\s]+)`, 'i'), // "for Diwali"
+                        ];
+                        for (const p of fieldPatterns) {
+                            const m = message.match(p);
+                            if (m) { extractedInputs[field.name] = m[1].trim(); break; }
+                        }
+                    }
+
+                    // Execute the skill via internal API
+                    const baseUrl = process.env.INTERNAL_API_URL || `http://localhost:${process.env.PORT || 3001}`;
+                    const execResp = await fetch(`${baseUrl}/api/skills/${matchedSkill._id}/execute`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': req.headers.authorization,
+                        },
+                        body: JSON.stringify({ inputs: extractedInputs, brandId }),
+                        signal: AbortSignal.timeout(120000),
+                    });
+
+                    if (execResp.ok) {
+                        const execData = await execResp.json();
+                        if (execData.success) {
+                            skillResult = {
+                                skillId: String(matchedSkill._id),
+                                skillName: matchedSkill.name,
+                                skillType: matchedSkill.skillType,
+                                skillIcon: matchedSkill.icon,
+                                executionId: execData.executionId,
+                                output: execData.output,
+                                mcpResults: execData.mcpResults || [],
+                                videoJob: execData.videoJob,
+                                chainResult: execData.chainResult,
+                            };
+                        }
+                    }
+                } else if (userSkills.length > 1) {
+                    // Multiple matches — include disambiguation in message context
+                    history.push({ role: 'user', content: message });
+                    history.push({ role: 'system', content: `[SYSTEM: User wants to run a skill matching "${requestedName}". Multiple matches found: ${userSkills.map(s => s.name).join(', ')}. Ask them which one they mean.]` });
+                    await saveMemory(userId, history);
+                }
+            } catch (skillErr) {
+                console.warn('Fidato: skill execution failed (non-fatal):', skillErr.message);
+            }
+        }
+
+        // If skill ran successfully, short-circuit with a skill-aware response
+        if (skillResult) {
+            const outputSummary = skillResult.output
+                ? (skillResult.output.summary || skillResult.output.theme || skillResult.output.content ||
+                   Object.values(skillResult.output).find(v => typeof v === 'string') || 'done!')
+                : 'done!';
+            const truncatedSummary = String(outputSummary).substring(0, 300);
+
+            // Still push to history for context continuity
+            const confirmReply = `done! ✅ ran the ${skillResult.skillName} skill for you!
+
+here's a quick summary of what came out: ${truncatedSummary}${truncatedSummary.length >= 300 ? '...' : ''}
+
+check the full output in Skills Hub — it's all saved there for you! 🙌`;
+
+            history.push({ role: 'user', content: message });
+            history.push({ role: 'assistant', content: confirmReply });
+            await saveMemory(userId, history);
+
+            return res.json({ reply: confirmReply, name: 'Fidato', skillResult });
+        }
 
         // Add user message
         history.push({ role: 'user', content: message });
