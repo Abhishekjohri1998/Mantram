@@ -5126,8 +5126,8 @@ SPOKESPERSON QUOTES:`
                 brandId={activeBrand?._id}
                 visible={showHistory}
                 onToggle={() => setShowHistory(false)}
-                onSelect={handleHistorySelect}
             />
+            </div>
         </DashboardLayout>
     )
 }
