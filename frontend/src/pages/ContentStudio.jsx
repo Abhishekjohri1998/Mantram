@@ -2575,7 +2575,17 @@ function SmartBlogWriter({ activeBrand, onBack, onGenerateImage }) {
                 if (isHero) setHeroImageUrl(result.imageUrl)
                 else updateSection(idx, 'imageUrl', result.imageUrl)
                 if (result.imageRatio || ratio) {
-                    if (!isHero) updateSection(idx, 'imageRatio', result.aspectRatio ||    return (
+                    if (!isHero) updateSection(idx, 'imageRatio', result.aspectRatio || ratio)
+                }
+            }
+        } catch (err) {
+            console.error('Failed to generate image:', err)
+        } finally {
+            setGeneratingImage(null)
+        }
+    }
+
+    return (
         <div className="cs-blog-canvas">
             {/* Header */}
             <header className="cs-header flex items-center justify-between mb-10 pb-4 border-b border-[var(--sys-border)]">
