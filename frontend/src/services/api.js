@@ -898,6 +898,13 @@ export const skills = {
     installSkill: (id) => apiFetch(`/skills/${id}/install`, { method: 'POST' }),
     publishSkill: (id) => apiFetch(`/skills/${id}/publish`, { method: 'POST' }),
     unpublishSkill: (id) => apiFetch(`/skills/${id}/unpublish`, { method: 'POST' }),
+    // Phase 2: Video status polling
+    videoStatus: (skillId, projectId, executionId) => {
+        const params = new URLSearchParams({ projectId, ...(executionId ? { executionId } : {}) });
+        return apiFetch(`/skills/${skillId}/video-status?${params}`);
+    },
+    // Phase 2: Manual chain trigger
+    chain: (skillId, data) => apiFetch(`/skills/${skillId}/chain`, { method: 'POST', body: JSON.stringify(data) }),
 };
 
 // ============ MCP Tools API ============

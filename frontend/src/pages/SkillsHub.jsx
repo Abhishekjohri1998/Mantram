@@ -226,6 +226,184 @@ function ImageResults({ images = [] }) {
     )
 }
 
+// ── Phase 2: Video Job Status Polling Card ──
+function VideoJobStatus({ skillId, projectId, executionId, model }) {
+    const [status, setStatus] = useState('queued')    // queued | processing | completed | failed
+    const [videoUrl, setVideoUrl] = useState(null)
+    const [message, setMessage] = useState('Video queued — generating in Video Studio…')
+    const [pollCount, setPollCount] = useState(0)
+    const intervalRef = useRef(null)
+
+    useEffect(() => {
+        if (!projectId || !skillId) return
+        const poll = async () => {
+            try {
+                const d = await skillsAPI.videoStatus(skillId, projectId, executionId)
+                setStatus(d.status)
+                setMessage(d.message)
+                if (d.videoUrl) setVideoUrl(d.videoUrl)
+                setPollCount(c => c + 1)
+                if (d.status === 'completed' || d.status === 'failed') {
+                    clearInterval(intervalRef.current)
+                }
+            } catch { /* silent */ }
+        }
+        poll() // immediate first poll
+        intervalRef.current = setInterval(poll, 6000)
+        // Auto-stop after 5 minutes
+        const maxTimer = setTimeout(() => clearInterval(intervalRef.current), 300000)
+        return () => { clearInterval(intervalRef.current); clearTimeout(maxTimer) }
+    }, [projectId, skillId])
+
+    const statusColor = { queued: '#f59e0b', processing: '#06b6d4', completed: '#10b981', failed: '#ef4444' }[status]
+    const statusIcon  = { queued: 'schedule', processing: 'progress_activity', completed: 'play_circle', failed: 'error' }[status]
+
+    return (
+        <div className="rounded-2xl border overflow-hidden" style={{ borderColor: `${statusColor}30` }}>
+            {/* Header */}
+            <div className="flex items-center gap-3 p-4" style={{ background: `${statusColor}12` }}>
+                <span className={`material-symbols-outlined text-xl ${status === 'processing' ? 'animate-spin' : ''}`}
+                    style={{ color: statusColor }}>{statusIcon}</span>
+                <div className="flex-1">
+                    <p className="text-sm font-bold text-[var(--sys-text)]">
+                        {status === 'completed' ? 'Video Ready!' : status === 'failed' ? 'Generation Failed' : 'Generating Video…'}
+                    </p>
+                    <p className="text-[11px] text-[var(--sys-text-muted)] mt-0.5">{message}</p>
+                </div>
+                {(status === 'queued' || status === 'processing') && (
+                    <span className="text-[10px] text-[var(--sys-text-muted)] bg-[var(--sys-surface)] px-2 py-1 rounded-lg font-mono">
+                        ~{Math.max(0, 60 - pollCount * 6)}s
+                    </span>
+                )}
+            </div>
+
+            {/* Video Player (when done) */}
+            {status === 'completed' && videoUrl && (
+                <div className="p-4 flex flex-col items-center gap-3">
+                    <video src={videoUrl} controls className="w-full rounded-xl max-h-64 bg-black" />
+                    <div className="flex gap-2 w-full">
+                        <a href={videoUrl} target="_blank" rel="noopener noreferrer"
+                            className="flex-1 py-2 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-xs font-bold text-center text-[var(--sys-text)] hover:bg-[var(--sys-bg)] transition-all">
+                            Open in Video Studio
+                        </a>
+                        <a href={videoUrl} download="skill-video.mp4"
+                            className="flex-1 py-2 rounded-xl btn-primary text-xs font-bold text-center cursor-pointer transition-all">
+                            Download
+                        </a>
+                    </div>
+                </div>
+            )}
+
+            {/* Processing animation */}
+            {(status === 'queued' || status === 'processing') && (
+                <div className="p-4 flex items-center justify-center gap-2">
+                    <div className="w-full bg-[var(--sys-surface)] rounded-full h-1.5 overflow-hidden">
+                        <div className="h-full rounded-full animate-pulse" style={{ background: statusColor, width: `${Math.min(95, pollCount * 8)}%`, transition: 'width 1s ease' }} />
+                    </div>
+                </div>
+            )}
+
+            {/* Model badge */}
+            {model && (
+                <div className="px-4 pb-3 flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-xs text-[var(--sys-text-muted)]">smart_display</span>
+                    <span className="text-[10px] text-[var(--sys-text-muted)] font-mono">{model}</span>
+                </div>
+            )}
+        </div>
+    )
+}
+
+// ── Phase 2: Visual MCP Tool Selector ──
+function MCPToolSelector({ value = [], onChange }) {
+    const [tools, setTools] = useState([])
+    const [loading, setLoading] = useState(true)
+
+    useEffect(() => {
+        mcpTools.list()
+            .then(d => { if (d.success) setTools(d.tools || []) })
+            .catch(() => {})
+            .finally(() => setLoading(false))
+    }, [])
+
+    const isAdded = (toolId) => value.some(a => a.tool === toolId)
+
+    const addTool = (tool) => {
+        if (isAdded(tool.id)) return
+        onChange([...value, { tool: tool.id, label: tool.label, params: {} }])
+    }
+
+    const removeTool = (toolId) => onChange(value.filter(a => a.tool !== toolId))
+
+    const categoryColor = { creative: '#06b6d4', content: '#10b981', video: '#f59e0b', brand: '#8b5cf6' }
+
+    if (loading) return (
+        <div className="flex items-center gap-2 py-4 text-[var(--sys-text-muted)] text-sm">
+            <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>Loading tools…
+        </div>
+    )
+
+    return (
+        <div className="space-y-3">
+            {/* Available tools */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {tools.map(tool => {
+                    const added = isAdded(tool.id)
+                    const color = categoryColor[tool.category] || '#8b5cf6'
+                    return (
+                        <div key={tool.id}
+                            className={`p-3 rounded-xl border cursor-pointer transition-all flex items-start gap-3 ${added
+                                ? 'border-2 opacity-60 cursor-default'
+                                : 'border border-[var(--sys-border)] bg-[var(--sys-surface)] hover:border-[var(--sys-text-muted)]'
+                            }`}
+                            style={added ? { borderColor: color, background: `${color}10` } : {}}
+                            onClick={() => !added && addTool(tool)}>
+                            <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                                style={{ background: `${color}20` }}>
+                                <span className="material-symbols-outlined text-base" style={{ color }}>{tool.icon}</span>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <p className="text-xs font-bold text-[var(--sys-text)] truncate">{tool.label}</p>
+                                <p className="text-[10px] text-[var(--sys-text-muted)] mt-0.5 line-clamp-1">{tool.description}</p>
+                                {tool.creditCost > 0 && (
+                                    <span className="inline-flex items-center gap-0.5 text-[9px] mt-1 px-1.5 py-0.5 rounded-full font-bold"
+                                        style={{ background: `${color}15`, color }}>
+                                        <span className="material-symbols-outlined" style={{ fontSize: 9 }}>toll</span>
+                                        {tool.creditCost} cr
+                                    </span>
+                                )}
+                            </div>
+                            {added
+                                ? <span className="material-symbols-outlined text-sm flex-shrink-0" style={{ color }}>check_circle</span>
+                                : <span className="material-symbols-outlined text-sm flex-shrink-0 text-[var(--sys-text-muted)]">add_circle</span>}
+                        </div>
+                    )
+                })}
+            </div>
+
+            {/* Added actions (ordered list) */}
+            {value.length > 0 && (
+                <div className="space-y-2 mt-2">
+                    <p className="text-xs font-bold text-[var(--sys-text-muted)] uppercase">Execution Order</p>
+                    {value.map((action, i) => (
+                        <div key={action.tool} className="flex items-center gap-2 p-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                            <span className="text-[10px] font-mono font-bold text-[var(--sys-text-muted)] w-4">{i + 1}.</span>
+                            <span className="material-symbols-outlined text-sm text-[var(--sys-text-muted)]">
+                                {tools.find(t => t.id === action.tool)?.icon || 'settings'}
+                            </span>
+                            <span className="flex-1 text-xs text-[var(--sys-text)] font-medium">{action.label}</span>
+                            <button onClick={() => removeTool(action.tool)}
+                                className="material-symbols-outlined text-sm text-[var(--sys-text-muted)] hover:text-red-400 cursor-pointer transition-all">
+                                close
+                            </button>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    )
+}
+
 // ── Main Component ──
 export default function SkillsHub() {
     const { activeBrand } = useBrand()
@@ -248,7 +426,7 @@ export default function SkillsHub() {
     const [rating, setRating] = useState(0)
 
     // Build state
-    const [buildForm, setBuildForm] = useState({ name: '', description: '', instructions: '', category: 'general', tags: '', icon: 'auto_awesome', color: 'violet', temperature: 0.7, outputFormat: 'structured', inputFields: [], skillType: 'text_output' })
+    const [buildForm, setBuildForm] = useState({ name: '', description: '', instructions: '', category: 'general', tags: '', icon: 'auto_awesome', color: 'violet', temperature: 0.7, outputFormat: 'structured', inputFields: [], skillType: 'text_output', mcpActions: [] })
     const [aiPrompt, setAiPrompt] = useState('')
     const [generating, setGenerating] = useState(false)
     const [enhancingInstructions, setEnhancingInstructions] = useState(false)
@@ -476,7 +654,7 @@ export default function SkillsHub() {
 
     // ── Create skill ──
     const createSkill = async () => {
-        const { name, description, instructions, category, tags, icon, color, temperature, outputFormat, inputFields, skillType } = buildForm
+        const { name, description, instructions, category, tags, icon, color, temperature, outputFormat, inputFields, skillType, mcpActions } = buildForm
         if (!name.trim() || !description.trim() || !instructions.trim()) { setError({ message: 'Name, description, and instructions are required', isProviderError: false }); return }
         setLoading(true); setError('')
         try {
@@ -486,10 +664,12 @@ export default function SkillsHub() {
                 icon, color, temperature: parseFloat(temperature) || 0.7,
                 outputFormat, inputFields,
                 skillType: skillType || 'text_output',
+                mcpActions: mcpActions || [],
             })
-            if (data.success) { loadSkills(); setView('browse'); setBuildForm({ name: '', description: '', instructions: '', category: 'general', tags: '', icon: 'auto_awesome', color: 'violet', temperature: 0.7, outputFormat: 'structured', inputFields: [], skillType: 'text_output' }) }
+            if (data.success) { loadSkills(); setView('browse'); setBuildForm({ name: '', description: '', instructions: '', category: 'general', tags: '', icon: 'auto_awesome', color: 'violet', temperature: 0.7, outputFormat: 'structured', inputFields: [], skillType: 'text_output', mcpActions: [] }) }
         } catch (e) { setError({ message: e.message, isProviderError: e.isProviderError, provider: e.provider }) }
         finally { setLoading(false) }
+
     }
 
     // ── AI Generate skill ──
@@ -1092,6 +1272,12 @@ export default function SkillsHub() {
                                 <div className="flex items-center justify-between mb-4">
                                     <h3 className="text-base font-bold text-[var(--sys-text)] flex items-center gap-2">
                                         <span className="material-symbols-outlined text-primary text-sm">check_circle</span> Result
+                                        {result.skillType && SKILL_TYPE_META[result.skillType] && (
+                                            <span className="text-[10px] px-2 py-0.5 rounded-full font-bold"
+                                                style={{ background: SKILL_TYPE_META[result.skillType].bg, color: SKILL_TYPE_META[result.skillType].color }}>
+                                                {SKILL_TYPE_META[result.skillType].label}
+                                            </span>
+                                        )}
                                     </h3>
                                     <div className="flex items-center gap-1">
                                         <span className="text-xs text-[var(--sys-text-muted)] mr-2">Rate:</span>
@@ -1110,6 +1296,18 @@ export default function SkillsHub() {
                                         <span className="material-symbols-outlined text-primary text-sm">check_circle</span>
                                         <span className="text-xs text-[var(--sys-primary)] font-bold">{routeSuccess.message}</span>
                                         <a href="/content-studio" className="ml-auto text-xs text-primary hover:underline font-bold">Open Content Studio →</a>
+                                    </div>
+                                )}
+
+                                {/* Phase 2: Video Job Status Card */}
+                                {result.skillType === 'generate_video' && result.videoJob?.projectId && (
+                                    <div className="mb-4">
+                                        <VideoJobStatus
+                                            skillId={result.skillId}
+                                            projectId={result.videoJob.projectId}
+                                            executionId={result.executionId}
+                                            model={result.videoJob.model}
+                                        />
                                     </div>
                                 )}
 
@@ -1151,19 +1349,53 @@ export default function SkillsHub() {
                                     </div>
                                 )}
 
-                                {/* Actions — Output Routing (Model B) */}
+                                {/* Phase 2: Chained Skill Result */}
+                                {result.chainResult && (
+                                    <details className="mt-4 group">
+                                        <summary className="flex items-center gap-2 cursor-pointer p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] select-none">
+                                            <span className="material-symbols-outlined text-sm text-primary">account_tree</span>
+                                            <span className="text-xs font-bold text-[var(--sys-text)]">
+                                                Chained: {result.chainSkillName || result.chainResult.skillName}
+                                            </span>
+                                            <span className="ml-auto material-symbols-outlined text-sm text-[var(--sys-text-muted)] group-open:rotate-180 transition-transform">
+                                                expand_more
+                                            </span>
+                                        </summary>
+                                        <div className="mt-2 p-4 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                                            <ResultRenderer output={result.chainResult.output} outputFormat="structured" />
+                                            {result.chainResult.mcpResults?.length > 0 && (
+                                                <div className="mt-3 text-[10px] text-[var(--sys-text-muted)] flex items-center gap-1">
+                                                    <span className="material-symbols-outlined" style={{ fontSize: 11 }}>check_circle</span>
+                                                    {result.chainResult.mcpResults.filter(r => r.success).length} tool(s) executed
+                                                </div>
+                                            )}
+                                        </div>
+                                    </details>
+                                )}
+
+                                {/* Actions row */}
                                 <div className="flex flex-wrap gap-3 mt-6 pt-4 border-t border-[var(--sys-border)]">
-                                    {/* Primary: Route to Content Studio */}
-                                    {result.executionId && (
+                                    {/* Save to Content Studio */}
+                                    {result.executionId && result.skillType !== 'generate_video' && (
                                         <button
                                             onClick={() => routeToContentStudio(result.executionId)}
                                             disabled={routing === result.executionId || (routeSuccess && routeSuccess.executionId === result.executionId)}
-                                            className="px-5 py-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] border border-primary/20 text-primary text-sm font-bold hover:from-primary/25 hover:to-[#FF7A00]/20 cursor-pointer transition-all flex items-center gap-2 disabled:opacity-40">
+                                            className="px-5 py-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] border border-primary/20 text-primary text-sm font-bold cursor-pointer transition-all flex items-center gap-2 disabled:opacity-40">
                                             {routing === result.executionId
                                                 ? <><span className="material-symbols-outlined text-sm animate-spin">progress_activity</span> Saving...</>
                                                 : (routeSuccess && routeSuccess.executionId === result.executionId)
                                                     ? <><span className="material-symbols-outlined text-sm">check</span> Saved to Content Studio</>
                                                     : <><span className="material-symbols-outlined text-sm">inbox</span> Save to Content Studio</>}
+                                        </button>
+                                    )}
+                                    {/* Phase 2: Publish to Marketplace */}
+                                    {selectedSkill && !selectedSkill.isPrebuilt && !selectedSkill.isPublished && (
+                                        <button onClick={async () => {
+                                            try { await skillsAPI.publishSkill(selectedSkill._id); loadSkills() } catch {}
+                                        }}
+                                            className="px-4 py-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-sm font-bold text-[var(--sys-text-muted)] cursor-pointer hover:text-emerald-400 hover:border-emerald-400/30 transition-all flex items-center gap-2">
+                                            <span className="material-symbols-outlined text-sm">storefront</span>
+                                            Share to Marketplace
                                         </button>
                                     )}
                                     <button onClick={() => { setResult(null); setInputs({}); setRouteSuccess(null) }}
@@ -1181,6 +1413,7 @@ export default function SkillsHub() {
                                 </div>
                             </div>
                         )}
+
                     </div>
                 )}
 
@@ -1427,6 +1660,21 @@ export default function SkillsHub() {
                                     </div>
                                 ))}
                             </div>
+
+
+                            {/* Phase 2: MCP Actions Builder — Visual Tool Selector */}
+                            {['generate_image', 'generate_video', 'create_content', 'orchestrate'].includes(buildForm.skillType) && (
+                                <div>
+                                    <label className="text-xs text-[var(--sys-text-muted)] font-bold mb-2 block">
+                                        MCP Actions
+                                        <span className="text-[var(--sys-text-muted)] font-normal"> — which tools will this skill invoke?</span>
+                                    </label>
+                                    <MCPToolSelector
+                                        value={buildForm.mcpActions || []}
+                                        onChange={(actions) => setBuildForm({ ...buildForm, mcpActions: actions })}
+                                    />
+                                </div>
+                            )}
 
                             <button onClick={createSkill} disabled={loading}
                                 className="w-full py-3 px-6 rounded-xl bg-primary text-white text-sm font-bold hover:bg-primary-light cursor-pointer transition-all flex items-center justify-center gap-2 shadow-none disabled:opacity-50">

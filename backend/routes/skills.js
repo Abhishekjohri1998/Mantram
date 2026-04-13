@@ -580,6 +580,15 @@ router.post('/:id/execute', protect, requireCredits('content'), async (req, res)
 
         // ── Save execution to history ─────────────────────────────────────────
         let execution;
+
+        // Extract videoJob data if this was a video skill
+        const videoJobData = mcpResults.find(r => r.tool === 'video_studio.queue_generation' && r.success);
+        const videoJob = videoJobData ? {
+            projectId: videoJobData.result?.projectId,
+            model: videoJobData.result?.model,
+            status: 'queued',
+        } : undefined;
+
         try {
             execution = await SkillExecution.create({
                 user: req.user._id,
@@ -595,9 +604,84 @@ router.post('/:id/execute', protect, requireCredits('content'), async (req, res)
                 mcpResults,
                 skillType,
                 status: 'completed',
+                ...(videoJob ? { videoJob } : {}),
             });
         } catch (histErr) {
             console.warn('Failed to save skill execution history:', histErr.message);
+        }
+
+        // ── Phase 2: Skill Chaining ───────────────────────────────────────────
+        let chainResult = null;
+        let chainSkillName = null;
+        if (skill.chainSkillId) {
+            try {
+                const chainSkill = await Skill.findOne({
+                    _id: skill.chainSkillId,
+                    status: 'active',
+                }).lean();
+
+                if (chainSkill) {
+                    chainSkillName = chainSkill.name;
+
+                    // Map output keys → chain skill input fields using chainInputMap
+                    const chainInputs = {};
+                    const inputMap = skill.chainInputMap ? Object.fromEntries(skill.chainInputMap) : {};
+                    const flatOutput = typeof aiOutput === 'object' ? aiOutput : {};
+
+                    if (Object.keys(inputMap).length > 0) {
+                        // Use explicit mapping
+                        for (const [outputKey, inputFieldName] of Object.entries(inputMap)) {
+                            const value = flatOutput[outputKey];
+                            if (value !== undefined) {
+                                chainInputs[inputFieldName] = typeof value === 'string' ? value : JSON.stringify(value);
+                            }
+                        }
+                    } else {
+                        // No explicit mapping — inject primary output summary as "brief"
+                        const summary = flatOutput.summary || flatOutput.content || flatOutput.theme ||
+                            Object.values(flatOutput).find(v => typeof v === 'string') || '';
+                        if (summary) chainInputs.brief = summary;
+                    }
+
+                    console.log(`🔗 Chaining to skill: ${chainSkill.name}, inputs:`, JSON.stringify(chainInputs).substring(0, 200));
+
+                    // Call internal execute for the chain skill (reuse same user/brand context)
+                    const baseUrl = process.env.INTERNAL_API_URL || `http://localhost:${process.env.PORT || 3001}`;
+                    const chainResp = await fetch(`${baseUrl}/api/skills/${skill.chainSkillId}/execute`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${req.headers.authorization?.split(' ')[1]}`,
+                        },
+                        body: JSON.stringify({ inputs: chainInputs, brandId }),
+                        signal: AbortSignal.timeout(180000),
+                    });
+
+                    if (chainResp.ok) {
+                        const chainData = await chainResp.json();
+                        if (chainData.success) {
+                            chainResult = {
+                                skillName: chainSkill.name,
+                                skillId: chainSkill._id,
+                                executionId: chainData.executionId,
+                                output: chainData.output,
+                                mcpResults: chainData.mcpResults || [],
+                                skillType: chainData.skillType,
+                            };
+
+                            // Update execution with chain info
+                            if (execution) {
+                                execution.chainSkillName = chainSkill.name;
+                                execution.chainResult = chainResult;
+                                if (chainData.executionId) execution.chainExecutionId = chainData.executionId;
+                                await execution.save();
+                            }
+                        }
+                    }
+                }
+            } catch (chainErr) {
+                console.warn(`⚠️ Skill chaining failed (non-fatal): ${chainErr.message}`);
+            }
         }
 
         res.json({
@@ -609,6 +693,8 @@ router.post('/:id/execute', protect, requireCredits('content'), async (req, res)
             output,
             outputFormat: skill.outputFormat,
             mcpResults,
+            ...(videoJob ? { videoJob } : {}),
+            ...(chainResult ? { chainResult, chainSkillName } : {}),
             suggestedNextSkills: skill.suggestedNextSkills,
         });
     } catch (error) {
@@ -616,6 +702,7 @@ router.post('/:id/execute', protect, requireCredits('content'), async (req, res)
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
+
 
 
 // ============================================================================
@@ -1115,6 +1202,123 @@ router.post('/executions/:executionId/route', protect, async (req, res) => {
     }
 });
 
+
+
+// ============================================================================
+// PHASE 2: VIDEO STATUS POLLING — GET /api/skills/:id/video-status
+// ============================================================================
+// Polls the Video Studio for the queued job and updates the SkillExecution record.
+// Frontend polls this every 5s after a generate_video skill run.
+
+router.get('/:id/video-status', protect, async (req, res) => {
+    try {
+        const { executionId, projectId } = req.query;
+        if (!projectId) return res.status(400).json({ success: false, error: 'projectId is required' });
+
+        // Poll Video Studio
+        const baseUrl = process.env.INTERNAL_API_URL || `http://localhost:${process.env.PORT || 3001}`;
+        const pollResp = await fetch(`${baseUrl}/api/video-studio/${projectId}/status`, {
+            headers: { Authorization: req.headers.authorization },
+        });
+
+        if (!pollResp.ok) {
+            return res.json({ success: true, status: 'queued', message: 'Still processing...' });
+        }
+
+        const pollData = await pollResp.json();
+        const project = pollData.project || pollData;
+
+        const genStatus = project.generation?.status || project.status || 'processing';
+        const videoUrl   = project.generation?.videoUrl || project.finalVideoUrl || '';
+        const thumbnail  = project.generation?.thumbnail || project.thumbnail || '';
+
+        // Map Video Studio status → simplified status
+        let status = 'processing';
+        if (genStatus === 'completed' || genStatus === 'done' || videoUrl) status = 'completed';
+        else if (genStatus === 'failed' || genStatus === 'error') status = 'failed';
+        else if (genStatus === 'queued' || genStatus === 'pending') status = 'queued';
+
+        // Persist into SkillExecution if executionId provided
+        if (executionId && (status === 'completed' || status === 'failed')) {
+            try {
+                await SkillExecution.findByIdAndUpdate(executionId, {
+                    'videoJob.status': status,
+                    'videoJob.videoUrl': videoUrl,
+                    'videoJob.thumbnail': thumbnail,
+                    'videoJob.polledAt': new Date(),
+                });
+            } catch { /* non-fatal */ }
+        }
+
+        res.json({
+            success: true,
+            status,
+            videoUrl:   videoUrl || null,
+            thumbnail:  thumbnail || null,
+            projectId,
+            message: status === 'completed'
+                ? 'Video ready!'
+                : status === 'failed'
+                    ? 'Generation failed — check Video Studio for details'
+                    : 'Still generating… check back in a few seconds',
+        });
+    } catch (error) {
+        console.error('Video status poll error:', error.message);
+        res.json({ success: true, status: 'processing', message: 'Still processing...' });
+    }
+});
+
+
+// ============================================================================
+// PHASE 2: MANUAL CHAIN TRIGGER — POST /api/skills/:id/chain
+// ============================================================================
+// Manually triggers the configured chain skill for a given execution.
+
+router.post('/:id/chain', protect, async (req, res) => {
+    try {
+        const { executionId, brandId } = req.body;
+        const skill = await Skill.findOne({ _id: req.params.id }).populate('chainSkillId');
+        if (!skill) return res.status(404).json({ success: false, error: 'Skill not found' });
+        if (!skill.chainSkillId) return res.status(400).json({ success: false, error: 'This skill has no chain configured' });
+
+        // Get primary output from SkillExecution
+        let chainInputs = {};
+        if (executionId) {
+            const exec = await SkillExecution.findById(executionId).lean();
+            if (exec?.output) {
+                const flatOutput = exec.output;
+                const inputMap = skill.chainInputMap ? Object.fromEntries(skill.chainInputMap) : {};
+                if (Object.keys(inputMap).length > 0) {
+                    for (const [outKey, inField] of Object.entries(inputMap)) {
+                        const val = flatOutput[outKey];
+                        if (val !== undefined) chainInputs[inField] = typeof val === 'string' ? val : JSON.stringify(val);
+                    }
+                } else {
+                    const summary = flatOutput.summary || flatOutput.content || flatOutput.theme ||
+                        Object.values(flatOutput).find(v => typeof v === 'string') || '';
+                    if (summary) chainInputs.brief = summary;
+                }
+            }
+        }
+
+        const baseUrl = process.env.INTERNAL_API_URL || `http://localhost:${process.env.PORT || 3001}`;
+        const chainResp = await fetch(`${baseUrl}/api/skills/${skill.chainSkillId._id}/execute`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: req.headers.authorization,
+            },
+            body: JSON.stringify({ inputs: chainInputs, brandId }),
+            signal: AbortSignal.timeout(180000),
+        });
+
+        const chainData = await chainResp.json();
+        res.json({ success: chainData.success, chainSkillName: skill.chainSkillId.name, result: chainData });
+    } catch (error) {
+        console.error('Chain skill error:', error.message);
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
 
 
 export default router;

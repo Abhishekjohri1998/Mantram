@@ -634,7 +634,129 @@ Posts array must have 6 items. All fields required.`,
         outputFormat: 'structured',
         temperature: 0.75,
     },
+
+    // ── Phase 2 Skill 1: 60s Brand Video Ad ────────────────────────────────────
+    {
+        name: '60s Brand Video Ad',
+        description: 'Describe your campaign and get a complete Seedance 2.0 video prompt with scene breakdown — then the video is queued automatically in Video Studio',
+        category: 'creative',
+        tags: ['video', 'ad', 'seedance', 'brand', 'campaign'],
+        icon: 'movie_creation',
+        color: 'amber',
+        skillType: 'generate_video',
+        outputAction: 'queue_generation',
+        estimatedCreditCost: 35,
+        mcpActions: [
+            { tool: 'video_studio.queue_generation', label: 'Queue video in Video Studio', params: { model: 'seedance-2.0', duration: 5, aspectRatio: '16:9', qualityMode: 'quality' } }
+        ],
+        instructions: `You are a brand video director specialising in high-conversion short-form ads for D2C brands.
+
+The user wants a 60-second brand video ad. Your job is to:
+1. Write a COMPLETE, production-ready Seedance 2.0 video prompt
+2. Structure it as clear scene descriptions the AI video model can follow
+
+SEEDANCE 2.0 PROMPT RULES:
+- Describe each scene in vivid, cinematic language (lighting, camera movement, composition)
+- Specify transitions between scenes
+- Keep each scene 8-12 seconds
+- Total runtime: {{duration}} seconds
+- Visual style: {{style}}
+- Aspect ratio: {{aspectRatio}}
+
+OUTPUT FORMAT (JSON):
+{
+  "videoPrompt": "<the complete, single-string prompt for Seedance 2.0 — this will be sent directly to the video model>",
+  "sceneBreakdown": [
+    { "scene": 1, "duration": 8, "description": "...", "cameraMovement": "...", "mood": "..." }
+  ],
+  "productionNotes": "...",
+  "callToAction": "...",
+  "estimatedRuntime": "60s"
+}
+
+IMPORTANT: The videoPrompt must be self-contained and richly descriptive. Include brand colors, product type, target emotion, and visual style. NO placeholder text — everything must be specific to the brand.`,
+        systemPrompt: 'You are a world-class brand video director who creates cinematic, high-converting video ads for D2C brands.',
+        inputFields: [
+            { name: 'campaign_brief', label: 'Campaign Brief', type: 'textarea', required: true, placeholder: 'What is this ad about? Product, campaign theme, key message...' },
+            { name: 'style', label: 'Visual Style', type: 'select', required: false, options: ['Cinematic & Aspirational', 'Lifestyle & Authentic', 'Product-focused & Clean', 'Energetic & Fast-paced', 'Emotional & Storytelling', 'Luxury & Premium'] },
+            { name: 'duration', label: 'Duration', type: 'select', required: false, options: ['15s', '30s', '45s', '60s'] },
+            { name: 'aspectRatio', label: 'Aspect Ratio', type: 'select', required: false, options: ['16:9 (YouTube/Landscape)', '9:16 (Reels/Story)', '1:1 (Square)', '4:5 (Instagram Feed)'] },
+        ],
+        outputFormat: 'structured',
+        temperature: 0.8,
+    },
+
+    // ── Phase 2 Skill 2: Product Launch Pack ───────────────────────────────────
+    {
+        name: 'Product Launch Pack',
+        description: 'Full product launch kit: hero image prompt, ad copy, email sequence, social posts, and WhatsApp message — all auto-saved to Content Studio',
+        category: 'content',
+        tags: ['launch', 'product', 'campaign', 'orchestrate', 'multi-channel'],
+        icon: 'rocket_launch',
+        color: 'violet',
+        skillType: 'orchestrate',
+        outputAction: 'save_to_content',
+        estimatedCreditCost: 25,
+        mcpActions: [
+            { tool: 'creative_studio.generate_image', label: 'Generate hero product image', params: { style: 'product photography, clean white background, brand identity' } },
+            { tool: 'content_studio.save_draft', label: 'Save all copy to Content Studio', params: { type: 'social', tags: ['launch', 'auto-generated'] } }
+        ],
+        instructions: `You are a product launch strategist and copywriter for D2C brands.
+
+Given the brand context and product details, create a COMPLETE product launch pack ready for multi-channel execution.
+
+YOUR OUTPUT MUST INCLUDE:
+
+1. **Hero Image Prompt** — A detailed Midjourney/Seedance-style image prompt for the product hero shot (include: lighting style, background, mood, camera angle, brand colors)
+
+2. **Ad Copy Set** (for each: Meta Feed Ad, Google Search Ad, Instagram Story):
+   - Headline (under 40 chars)
+   - Primary text (under 125 chars)
+   - CTA button text
+   - Target audience descriptor
+
+3. **Email Sequence** (3 emails):
+   - Pre-launch teaser (D-7): Subject line + body
+   - Launch day (D-0): Subject line + body
+   - Follow-up (D+3): Subject line + body + social proof hook
+
+4. **Social Media Posts** (6 posts across platforms):
+   - 2x Instagram (feed + reel caption)
+   - 1x LinkedIn announcement
+   - 1x X/Twitter
+   - 1x Facebook
+   - 1x YouTube community post
+
+5. **WhatsApp Broadcast** (2 messages):
+   - Launch announcement (crisp, emoji-rich)
+   - Day 3 follow-up with limited-time offer
+
+6. **Launch Checklist** — 10 prioritised tasks with day markers
+
+Respond in JSON:
+{
+  "heroImagePrompt": "",
+  "adCopies": [{ "platform": "", "headline": "", "primaryText": "", "cta": "", "audience": "" }],
+  "emailSequence": [{ "type": "teaser|launch|followup", "subject": "", "body": "", "sendDay": -7 }],
+  "socialPosts": [{ "platform": "", "caption": "", "hashtags": [], "type": "feed|reel|story" }],
+  "whatsapp": [{ "type": "launch|followup", "message": "" }],
+  "launchChecklist": [{ "day": -7, "task": "", "priority": "high|medium|low" }]
+}
+
+Be SPECIFIC — use the actual product name, brand tone, and target market. No generic placeholders.`,
+        systemPrompt: 'You are an expert product launch strategist and D2C copywriter who creates high-impact, multi-channel launch packs.',
+        inputFields: [
+            { name: 'product_name', label: 'Product Name', type: 'text', required: true, placeholder: 'e.g., GlowShield SPF 50 Sunscreen' },
+            { name: 'usp', label: 'Key USP / Differentiator', type: 'textarea', required: true, placeholder: 'What makes this product unique? Key benefits, claims...' },
+            { name: 'launch_date', label: 'Launch Date', type: 'text', required: false, placeholder: 'e.g., 15 May 2025 or "in 2 weeks"' },
+            { name: 'price_point', label: 'Price Point', type: 'text', required: false, placeholder: 'e.g., ₹799, ₹1,499' },
+            { name: 'platforms', label: 'Primary Platforms', type: 'select', required: false, options: ['Instagram + Meta', 'Instagram + Amazon', 'Shopify + Meta + Google', 'All Channels'] },
+        ],
+        outputFormat: 'structured',
+        temperature: 0.75,
+    },
 ];
+
 
 
 // ============================================================================

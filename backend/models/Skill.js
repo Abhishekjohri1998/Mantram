@@ -81,6 +81,9 @@ const skillSchema = new mongoose.Schema({
 
     // Reference to next skill in a chain
     chainSkillId: { type: mongoose.Schema.Types.ObjectId, ref: 'Skill' },
+    // Maps output keys of this skill → input field names of the chained skill
+    // e.g. { "campaignTheme": "theme", "adCopy": "brief" }
+    chainInputMap: { type: Map, of: String, default: {} },
 
     // ── Credit Cost Estimate ──────────────────────────────────────────────────
     // Shown upfront before execution so user knows the cost.

@@ -36,6 +36,25 @@ const skillExecutionSchema = new mongoose.Schema({
     // Status
     status: { type: String, enum: ['completed', 'failed', 'routed'], default: 'completed' },
 
+    // Phase 2: Video job tracking (for generate_video skills)
+    videoJob: {
+        projectId: { type: String },
+        model: { type: String },
+        status: { type: String, enum: ['queued', 'processing', 'completed', 'failed'], default: 'queued' },
+        videoUrl: { type: String },
+        thumbnail: { type: String },
+        polledAt: { type: Date },
+    },
+
+    // Phase 2: Skill chaining
+    chainResult: { type: mongoose.Schema.Types.Mixed },
+    chainSkillName: { type: String },
+    chainExecutionId: { type: mongoose.Schema.Types.ObjectId },
+
+    // Phase 2: MCP results snapshot
+    mcpResults: [{ type: mongoose.Schema.Types.Mixed }],
+    skillType: { type: String },
+
 }, { timestamps: true });
 
 // Indexes
