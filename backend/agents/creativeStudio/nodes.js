@@ -908,6 +908,11 @@ export async function visualGroundingNode(state) {
     const intel = state.brandIntel || {};
     const imagesToAnalyze = [];
 
+    // Priority 0: Explicit reference images from prompt/skill payload (highest signal)
+    if (state.refImageUrls?.length > 0) {
+        imagesToAnalyze.push(...state.refImageUrls.slice(0, 3));
+    }
+
     // Priority 1: Matched product images (most important for anti-hallucination)
     if (mp?.images?.length > 0) {
         imagesToAnalyze.push(...mp.images.slice(0, 3));
@@ -1046,7 +1051,7 @@ export async function postGenerationCriticNode(state) {
  * @returns {object} { finalPrompt, artDirection, engineeredPrompt, styleCritique, brandIntel, copy? }
  */
 export async function runCreativePipeline(params) {
-    const { brandId, brief, format, aspectRatio, style, imageModel, mode = 'fast', generateCopy = false, customCopy = null, onProgress } = params;
+    const { brandId, brief, format, aspectRatio, style, imageModel, refImageUrls, mode = 'fast', generateCopy = false, customCopy = null, onProgress } = params;
     const pipelineStart = Date.now();
     const hasCustomCopy = customCopy?.headline || customCopy?.ctaText;
     console.log(`\n══════════ AGENTIC CREATIVE PIPELINE (${mode.toUpperCase()}${generateCopy ? ' + COPY' : ''}${hasCustomCopy ? ' [CUSTOM TEXT]' : ''}) ══════════`);
@@ -1071,6 +1076,7 @@ export async function runCreativePipeline(params) {
         aspectRatio: aspectRatio || '1:1',
         style: style || '',
         imageModel: imageModel || 'nanobanana-2',
+        refImageUrls: refImageUrls || [],
     };
 
     // Node 0: Brand Intelligence (DB-only, ~50ms — now ~0ms on cache hit)
