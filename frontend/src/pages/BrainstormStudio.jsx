@@ -645,8 +645,21 @@ export default function BrainstormStudio() {
     const history = messages
       .filter(m => m.id !== 'welcome')
       .slice(-12)
-      .map(m => ({ role: m.role, content: m.content || '' }))
+      .map(m => {
+        let richContent = m.content || ''
+        if (m.ideasPayload) {
+          const concepts = m.ideasPayload.filmConcepts || m.ideasPayload.campaignConcepts || []
+          if (concepts.length > 0) {
+            richContent += `\n[Generated Ideas: ${concepts.map(c => c.title).join(', ')}]`
+          }
+        }
+        if (m.screenplayPayload) {
+          richContent += `\n[Generated Screenplay: ${m.screenplayPayload.title}]`
+        }
+        return { role: m.role, content: richContent }
+      })
       .concat([{ role: 'user', content: msg }])
+
 
     setStreaming(true)
     setReasoningSteps([])
