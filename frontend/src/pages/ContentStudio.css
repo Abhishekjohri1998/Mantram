@@ -84,6 +84,7 @@
 @media (min-width: 1024px) {
   .cs-grid-adaptive--wide {
     grid-template-columns: repeat(4, 1fr);
+    gap: var(--cs-gap-md);
   }
 }
 
@@ -106,6 +107,16 @@
 .cs-subtitle {
   font-size: 0.875rem;
   color: var(--sys-text-muted);
+}
+
+.cs-btn-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background: var(--sys-bg);
+  border: 1px solid var(--sys-border);
+  transition: all 0.3s ease;
 }
 
 /* ── Standardized Buttons ── */

@@ -21,7 +21,7 @@ const GOALS = [
     {
         id: 'promote', icon: 'campaign', label: 'Promote Something',
         desc: 'Product, service, offer, sale, or discount',
-        glow: 'glow-amber', iconColor: 'text-primary', accent: '#F59E0B',
+        glow: 'cs-glow-amber', iconColor: 'text-primary', accent: '#F59E0B',
         subTypes: [
             { id: 'product', icon: 'inventory_2', label: 'Product Push' },
             { id: 'service', icon: 'handyman', label: 'Service Highlight' },
@@ -34,7 +34,7 @@ const GOALS = [
     {
         id: 'celebrate', icon: 'celebration', label: 'Celebrate Something',
         desc: 'Festival, occasion, milestone, or trending event',
-        glow: 'glow-pink', iconColor: 'text-[#FF7A00]', accent: '#EC4899',
+        glow: 'cs-glow-amber', iconColor: 'text-primary', accent: '#EC4899',
         subTypes: [
             { id: 'festival', icon: 'auto_awesome', label: 'Festival' },
             { id: 'national_day', icon: 'flag', label: 'National / World Day' },
@@ -47,7 +47,7 @@ const GOALS = [
     {
         id: 'launch', icon: 'rocket_launch', label: 'Launch Something',
         desc: 'New product, store, campaign, or announcement',
-        glow: 'glow-blue', iconColor: 'text-[#FF4D00]', accent: '#3B82F6',
+        glow: 'cs-glow-amber', iconColor: 'text-primary', accent: '#3B82F6',
         subTypes: [
             { id: 'product_launch', icon: 'new_releases', label: 'Product Launch' },
             { id: 'store_launch', icon: 'store', label: 'Store Launch' },
@@ -60,7 +60,7 @@ const GOALS = [
     {
         id: 'educate', icon: 'school', label: 'Educate / Inform',
         desc: 'Blog, SEO article, thought leadership, how-to guide',
-        glow: 'glow-emerald', iconColor: 'text-primary', accent: '#10B981',
+        glow: 'cs-glow-amber', iconColor: 'text-primary', accent: '#10B981',
         subTypes: [
             { id: 'seo_blog', icon: 'search', label: 'SEO Blog Article' },
             { id: 'thought_leader', icon: 'psychology', label: 'Thought Leadership' },
@@ -73,7 +73,7 @@ const GOALS = [
     {
         id: 'brand', icon: 'diamond', label: 'Build Brand',
         desc: 'Brand story, about us, website copy, taglines',
-        glow: 'glow-violet', iconColor: 'text-[#FF4D00]', accent: '#8B5CF6',
+        glow: 'cs-glow-amber', iconColor: 'text-primary', accent: '#8B5CF6',
         subTypes: [
             { id: 'about_us', icon: 'info', label: 'About Us' },
             { id: 'brand_story', icon: 'auto_stories', label: 'Brand Story' },
@@ -86,7 +86,7 @@ const GOALS = [
     {
         id: 'blog', icon: 'edit_note', label: 'Write Blog / Article',
         desc: 'Long-form blogs, SEO articles, listicles, pillar content',
-        glow: 'glow-teal', iconColor: 'text-primary', accent: '#14B8A6',
+        glow: 'cs-glow-amber', iconColor: 'text-primary', accent: '#14B8A6',
         subTypes: [
             { id: 'seo_blog', icon: 'search', label: 'SEO Blog Article' },
             { id: 'long_form', icon: 'article', label: 'Long-form Article' },
@@ -99,13 +99,13 @@ const GOALS = [
     {
         id: 'custom_blog', icon: 'draw', label: 'Write It Yourself',
         desc: 'Smart writing pad with AI synonyms, grammar check and image generation',
-        glow: 'glow-violet', iconColor: 'text-violet-400', accent: '#8B5CF6',
+        glow: 'cs-glow-amber', iconColor: 'text-primary', accent: '#8B5CF6',
         subTypes: [],
     },
     {
         id: 'press_release', icon: 'newspaper', label: 'Write Press Release',
         desc: 'Professional PR for launches, announcements, events',
-        glow: 'glow-rose', iconColor: 'text-primary', accent: '#F43F5E',
+        glow: 'cs-glow-amber', iconColor: 'text-primary', accent: '#F43F5E',
         subTypes: [
             { id: 'product_pr', icon: 'new_releases', label: 'Product / Service Launch' },
             { id: 'partnership_pr', icon: 'handshake', label: 'Partnership / Collaboration' },
@@ -120,7 +120,7 @@ const GOALS = [
     {
         id: 'product_content', icon: 'shopping_bag', label: 'Write Product Content',
         desc: 'Platform-specific product descriptions, listings & pages',
-        glow: 'glow-cyan', iconColor: 'text-primary', accent: '#06B6D4',
+        glow: 'cs-glow-amber', iconColor: 'text-primary', accent: '#06B6D4',
         subTypes: [
             { id: 'amazon', icon: 'shopping_cart', label: 'Amazon Listing' },
             { id: 'flipkart', icon: 'storefront', label: 'Flipkart Listing' },
@@ -134,7 +134,7 @@ const GOALS = [
     {
         id: 'youtube_content', icon: 'smart_display', label: 'YouTube Content',
         desc: 'Scripts, titles, descriptions, tags for Videos & Shorts',
-        glow: 'glow-red', iconColor: 'text-primary', accent: '#FF0000',
+        glow: 'cs-glow-amber', iconColor: 'text-primary', accent: '#FF0000',
         subTypes: [
             { id: 'youtube_seo', icon: 'rocket_launch', label: 'Publish Optimizer', desc: 'Title, description, tags & keywords — SEO only, no script' },
             { id: 'video_script', icon: 'movie', label: 'Video Script', desc: 'Full script + all metadata' },
@@ -266,13 +266,13 @@ function StepGoal({ onSelect }) {
         <div data-wt="goal-grid" className="cs-grid-adaptive cs-grid-adaptive--wide">
             {GOALS.map((g, i) => (
                 <button key={g.id} onClick={() => onSelect(g.id)}
-                    className={`cs-glass-card cs-card-interactive cs-animate-fade cs-delay-${(i % 3) + 1} group`}
+                    className="cs-glass-card cs-card-interactive text-center cs-animate-fade group"
                     style={{ animationDelay: `${i * 60}ms` }}>
-                    <div className={`cs-btn-icon !w-12 !h-12 ${g.glow} mb-4 group-hover:scale-110 transition-transform duration-300`}>
-                        <span className={`material-symbols-outlined ${g.iconColor} text-lg`}>{g.icon}</span>
+                    <div className={`cs-btn-icon mx-auto !w-14 !h-14 ${g.glow} mb-6 group-hover:scale-110 transition-transform duration-300`}>
+                        <span className={`material-symbols-outlined ${g.iconColor} text-2xl`}>{g.icon}</span>
                     </div>
-                    <h3 className="text-base font-bold text-[var(--sys-text)] mb-1">{g.label}</h3>
-                    <p className="cs-subtitle">{g.desc}</p>
+                    <h3 className="text-base font-bold text-[var(--sys-text)] mb-2">{g.label}</h3>
+                    <p className="cs-subtitle leading-relaxed">{g.desc}</p>
                 </button>
             ))}
         </div>
