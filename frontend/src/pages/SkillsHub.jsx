@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import SEOHead from '../components/SEOHead'
 import { useBrand } from '../context/BrandContext'
 import DashboardLayout from '../components/DashboardLayout'
-import { skills as skillsAPI, creatives as creativesAPI, mcpTools } from '../services/api'
+import { skills as skillsAPI, creatives as creativesAPI, mcpTools, API_BASE, getCorsUrl } from '../services/api'
 
 // ── Skill Type Metadata (Phase 1) ──
 const SKILL_TYPE_META = {
@@ -78,12 +78,47 @@ function prettyKey(key) {
         .trim()
 }
 
+// ── Shared Image Helpers ──
+const normalizeImageUrl = (url) => {
+    if (!url) return '';
+    if (url.startsWith('https://') || url.startsWith('http://') || url.startsWith('data:')) return url;
+    
+    // If it starts with /api/, we need to resolve it against API_BASE
+    // But we must be careful not to double-prepend /api if API_BASE already includes it
+    if (url.startsWith('/api/')) {
+        return `${API_BASE}${url.substring(4)}`;
+    }
+    
+    // Generic relative path
+    if (url.startsWith('/')) {
+        return `${API_BASE}${url}`;
+    }
+    
+    return url;
+};
+
 // ── Recursive value renderer ──
 function RenderValue({ value, depth = 0 }) {
     if (value === null || value === undefined) return null
 
     // String
     if (typeof value === 'string') {
+// AI detection for image URLs in structured output
+        const isImageUrl = (value.startsWith('http') && (value.includes('s3.amazonaws.com') || value.includes('mantram-assets'))) || 
+                           (value.startsWith('/api/creatives/') && value.includes('/image'));
+        
+        if (isImageUrl) {
+            const normalized = normalizeImageUrl(value);
+            return (
+                <div className="mt-2 rounded-lg overflow-hidden border border-[var(--sys-border)] max-w-xs group relative bg-[var(--sys-surface)]">
+                    <img src={normalized} alt="Embedded preview" className="w-full h-auto block" />
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <a href={normalized} target="_blank" rel="noopener noreferrer" className="text-[10px] bg-white text-black px-2 py-1 rounded font-bold">View Full</a>
+                    </div>
+                </div>
+            );
+        }
+
         return <p className="text-sm text-[var(--sys-text-muted)] whitespace-pre-wrap leading-relaxed"><FormatText text={value} /></p>
     }
 
@@ -193,6 +228,42 @@ function ResultRenderer({ output, outputFormat }) {
 // ── MCP Image Results Renderer ──
 function ImageResults({ images = [] }) {
     if (!images.length) return null
+
+    const handleDownload = async (url, filename, e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        // Ensure we have a valid absolute URL for fetching
+        let downloadUrl = url;
+        if (url.startsWith('/api/')) {
+            downloadUrl = `${API_BASE}${url.substring(4)}`;
+        } else if (url.startsWith('/')) {
+            downloadUrl = `${API_BASE}${url}`;
+        }
+        
+        // Use CORS proxy if it's an S3 URL
+        downloadUrl = getCorsUrl(downloadUrl);
+
+        try {
+            const response = await fetch(downloadUrl);
+            const blob = await response.blob();
+            const blobUrl = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = blobUrl;
+            link.download = filename || 'generated-image.jpg';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(blobUrl);
+        } catch (error) {
+            console.error('Download failed:', error);
+            // Fallback to direct absolute link if fetch fails
+            window.open(downloadUrl, '_blank');
+        }
+    };
+
+    // normalizeImageUrl moved to shared scope above
+
     return (
         <div>
             <p className="text-xs font-bold text-primary uppercase mb-3 flex items-center gap-1.5">
@@ -200,27 +271,32 @@ function ImageResults({ images = [] }) {
                 Generated Images ({images.length})
             </p>
             <div className="grid grid-cols-2 gap-3">
-                {images.map((img, i) => (
-                    <div key={i} className="relative group rounded-xl overflow-hidden border border-[var(--sys-border)] aspect-square bg-[var(--sys-surface)]">
-                        {img.url ? (
-                            <img src={img.url} alt={`Generated ${i+1}`} className="w-full h-full object-cover" />
-                        ) : (
-                            <div className="w-full h-full flex items-center justify-center">
-                                <span className="material-symbols-outlined text-4xl text-[var(--sys-text-muted)]">image</span>
-                            </div>
-                        )}
-                        {img.url && (
-                            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center gap-2">
-                                <a href={img.url} target="_blank" rel="noopener noreferrer"
-                                    className="px-3 py-1.5 bg-white/20 rounded-lg text-white text-xs font-bold hover:bg-white/30 transition-all"
-                                    onClick={e => e.stopPropagation()}>Open</a>
-                                <a href={img.url} download={`skill-image-${i+1}.jpg`}
-                                    className="px-3 py-1.5 bg-primary/80 rounded-lg text-white text-xs font-bold hover:bg-primary transition-all"
-                                    onClick={e => e.stopPropagation()}>Download</a>
-                            </div>
-                        )}
-                    </div>
-                ))}
+                {images.map((img, i) => {
+                    const displayUrl = normalizeImageUrl(img.url);
+                    return (
+                        <div key={i} className="relative group rounded-xl overflow-hidden border border-[var(--sys-border)] aspect-square bg-[var(--sys-surface)]">
+                            {displayUrl ? (
+                                <img src={displayUrl} alt={`Generated ${i+1}`} className="w-full h-full object-cover" />
+                            ) : (
+                                <div className="w-full h-full flex items-center justify-center">
+                                    <span className="material-symbols-outlined text-4xl text-[var(--sys-text-muted)]">image</span>
+                                </div>
+                            )}
+                            {displayUrl && (
+                                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center gap-2">
+                                    <a href={displayUrl} target="_blank" rel="noopener noreferrer"
+                                        className="px-3 py-1.5 bg-white/20 rounded-lg text-white text-xs font-bold hover:bg-white/30 transition-all"
+                                        onClick={e => e.stopPropagation()}>Open</a>
+                                    <button
+                                        onClick={e => handleDownload(img.url, `skill-image-${i+1}.jpg`, e)}
+                                        className="px-3 py-1.5 bg-primary/80 rounded-lg text-white text-xs font-bold hover:bg-primary transition-all cursor-pointer">
+                                        Download
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    );
+                })}
             </div>
         </div>
     )
@@ -621,6 +697,18 @@ export default function SkillsHub() {
     // ── Execute skill (with credit cost awareness) ──
     const executeSkill = async () => {
         if (!selectedSkill) return
+
+        // ── Validation ──────────────────────────────────────────────────────
+        if (selectedSkill.inputFields?.length > 0) {
+            for (const field of selectedSkill.inputFields) {
+                if (field.required && !inputs[field.name]) {
+                    setError({ message: `Please fill in the required field: ${field.label}`, isProviderError: false });
+                    // Scroll to error if needed or provide visual feedback
+                    return;
+                }
+            }
+        }
+
         setExecuting(true); setResult(null); setError('')
 
         const skillType = selectedSkill.skillType || 'text_output'

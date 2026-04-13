@@ -125,12 +125,13 @@ const videoProjectSchema = new mongoose.Schema({
         falEndpoint: { type: String, default: '' },
         falStatusUrl: { type: String, default: '' },
         falResultUrl: { type: String, default: '' },
-        provider: { type: String, enum: ['fal', 'grok', 'kie', 'heygen', 'piapi'], default: 'fal' },
+        provider: { type: String, enum: ['fal', 'grok', 'kie', 'heygen', 'piapi', 'muapi', 'laozhang'], default: 'fal' },
         videoUrl: { type: String, default: '' },
         s3VideoUrl: { type: String, default: '' },
         thumbnailUrl: { type: String, default: '' },
         audioUrl: { type: String, default: '' },
         progress: { type: Number, default: 0 },  // 0-100
+        isWatermarkRemoved: { type: Boolean, default: false }, // For two-step providers like PiAPI
         startedAt: { type: Date },
         completedAt: { type: Date },
         error: { type: String, default: '' },

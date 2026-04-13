@@ -1,6 +1,6 @@
 import { memo } from 'react'
 
-const GalleryItem = memo(({ item, onZoom, onDownload, onDownloadHD, onDownload4K, onHistorySelect, isLatest, upscaleMenu, setUpscaleMenu, upscalingState, expandedReasoning, setExpandedReasoning, getTimeAgo }) => {
+const GalleryItem = memo(({ item, onZoom, onDownload, onDownloadHD, onDownload4K, onHistorySelect, isLatest, upscaleMenu, setUpscaleMenu, upscalingState, expandedReasoning, setExpandedReasoning, getTimeAgo, onReuse }) => {
     return (
         <div className={`group relative overflow-hidden rounded-2xl border transition-all duration-300 ${isLatest ? 'border-[var(--sys-border)] bg-[var(--sys-surface)] shadow-lg shadow-none' : 'border-[var(--sys-border)] bg-[var(--sys-surface)] hover:border-[var(--sys-border)]'}`}>
             <div className="aspect-[4/5] relative cursor-zoom-in overflow-hidden" onClick={() => onZoom(item.imageUrl)}>
@@ -19,7 +19,21 @@ const GalleryItem = memo(({ item, onZoom, onDownload, onDownloadHD, onDownload4K
                     <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--sys-text-muted)]">{getTimeAgo(item._timestamp || item.createdAt)}</span>
                     <span className="rounded-full bg-[var(--sys-surface)] px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest text-[var(--sys-text-muted)]">{item.type || 'creative'}</span>
                 </div>
-                <p className="line-clamp-2 text-xs leading-relaxed text-[var(--sys-text)]">{item._prompt || item.prompt}</p>
+                <div className="studio-compact-prompt-container mb-1 group/prompt">
+                    <p className="studio-compact-prompt-text text-xs leading-relaxed text-[var(--sys-text)]" title={item._prompt || item.prompt}>
+                        {item._prompt || item.prompt}
+                    </p>
+                    <div className="studio-prompt-actions">
+                        <button onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(item._prompt || item.prompt) }}
+                            className="studio-prompt-action-btn" title="Copy Prompt">
+                            <span className="material-symbols-outlined">content_copy</span>
+                        </button>
+                        <button onClick={(e) => { e.stopPropagation(); onReuse?.(item._prompt || item.prompt) }}
+                            className="studio-prompt-action-btn" title="Reuse Prompt">
+                            <span className="material-symbols-outlined">refresh</span>
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     );

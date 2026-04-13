@@ -763,7 +763,7 @@ async function falImageGenerate(promptText, endpoint, aspectRatio = '1:1', custo
     console.log(`\n══════ FAL.AI IMAGE GENERATION ══════`);
     console.log(`🎨 Endpoint: ${endpoint}`);
     console.log(`📐 Size: ${imgSize.width}x${imgSize.height} (${aspectRatio})`);
-    console.log(`📝 Prompt (first 200 chars): ${promptText.substring(0, 200)}...`);
+    console.log(`📝 Prompt (first 200 chars): ${(promptText || '').toString().substring(0, 200)}...`);
 
     // Submit to fal.ai queue
     const submitResp = await fetch(`https://queue.fal.run/${endpoint}`, {
@@ -1617,7 +1617,7 @@ router.post('/save-to-bank', protect, async (req, res) => {
             user: req.user._id,
             brand: brandId,
             type: source || 'other',
-            title: title || prompt?.substring(0, 80) || 'AI Generated Image',
+            title: title || (prompt || '').toString().substring(0, 80) || 'AI Generated Image',
             prompt: prompt || '',
             imageUrl: finalImageUrl,
             thumbnailUrl: finalImageUrl,

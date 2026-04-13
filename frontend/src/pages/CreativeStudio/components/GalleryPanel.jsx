@@ -88,7 +88,7 @@ const GalleryPanel = memo(({
             {result && activeGenerations.length === 0 && (
                 <div className="generation-card generation-card--new mb-5">
                     <div className="studio-compact-prompt-container mb-2.5 group/prompt">
-                        <p className="studio-compact-prompt-text text-xs text-[var(--sys-text-muted)]">
+                        <p className="studio-compact-prompt-text text-xs text-[var(--sys-text-muted)]" title={prompt || 'Generated creative'}>
                             {prompt || 'Generated creative'}
                         </p>
                         <div className="studio-prompt-actions">
@@ -96,7 +96,7 @@ const GalleryPanel = memo(({
                                 className="studio-prompt-action-btn" title="Copy Prompt">
                                 <span className="material-symbols-outlined">content_copy</span>
                             </button>
-                            <button onClick={() => setPrompt(prompt)}
+                            <button onClick={() => { setPrompt(prompt); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
                                 className="studio-prompt-action-btn" title="Reuse Prompt">
                                 <span className="material-symbols-outlined">refresh</span>
                             </button>
@@ -342,7 +342,7 @@ const GalleryPanel = memo(({
                                         <div className="w-full xl:w-[350px] p-2 xl:p-4 flex flex-col justify-between flex-shrink-0">
                                             <div>
                                             <div className="studio-compact-prompt-container mb-4 group/prompt">
-                                                <p className="studio-compact-prompt-text text-[13px] text-[var(--sys-text-muted)] font-medium">
+                                                <p className="studio-compact-prompt-text text-xs text-[var(--sys-text-muted)] font-medium" title={group.promptText}>
                                                     {group.promptText}
                                                 </p>
                                                 <div className="studio-prompt-actions">
@@ -350,7 +350,7 @@ const GalleryPanel = memo(({
                                                         className="studio-prompt-action-btn" title="Copy Prompt">
                                                         <span className="material-symbols-outlined">content_copy</span>
                                                     </button>
-                                                    <button onClick={() => setPrompt(group.promptText)}
+                                                    <button onClick={() => { setPrompt(group.promptText); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
                                                         className="studio-prompt-action-btn" title="Reuse Prompt">
                                                         <span className="material-symbols-outlined">refresh</span>
                                                     </button>
@@ -399,7 +399,7 @@ const GalleryPanel = memo(({
                                         </div>
                                         <div className="flex-1 min-w-0 text-left">
                                             <div className="studio-compact-prompt-container mb-2 group/prompt">
-                                                <p className="studio-compact-prompt-text text-xs text-[var(--sys-text)]">
+                                                <p className="studio-compact-prompt-text text-xs text-[var(--sys-text-muted)]" title={item._prompt || item.prompt}>
                                                     {item._prompt || item.prompt}
                                                 </p>
                                                 <div className="studio-prompt-actions">
@@ -407,7 +407,7 @@ const GalleryPanel = memo(({
                                                         className="studio-prompt-action-btn" title="Copy Prompt">
                                                         <span className="material-symbols-outlined">content_copy</span>
                                                     </button>
-                                                    <button onClick={() => setPrompt(item._prompt || item.prompt)}
+                                                    <button onClick={() => { setPrompt(item._prompt || item.prompt); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
                                                         className="studio-prompt-action-btn" title="Reuse Prompt">
                                                         <span className="material-symbols-outlined">refresh</span>
                                                     </button>
@@ -434,7 +434,7 @@ const GalleryPanel = memo(({
                 {bankImages.filter(img => img.source === 'ai-generated' || img.category === 'generated' || img.type !== 'uploaded').map(img => (
                     <div key={img._id} className="generation-card p-3">
                         <div className="studio-compact-prompt-container mb-2 group/prompt">
-                            <p className="studio-compact-prompt-text text-xs text-[var(--sys-text-muted)]">
+                            <p className="studio-compact-prompt-text text-xs text-[var(--sys-text-muted)]" title={img.prompt || img.title}>
                                 {img.prompt || img.title}
                             </p>
                             <div className="studio-prompt-actions">
@@ -442,7 +442,7 @@ const GalleryPanel = memo(({
                                     className="studio-prompt-action-btn" title="Copy Prompt">
                                     <span className="material-symbols-outlined">content_copy</span>
                                 </button>
-                                <button onClick={() => setPrompt(img.prompt || img.title)}
+                                <button onClick={() => { setPrompt(img.prompt || img.title); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
                                     className="studio-prompt-action-btn" title="Reuse Prompt">
                                     <span className="material-symbols-outlined">refresh</span>
                                 </button>

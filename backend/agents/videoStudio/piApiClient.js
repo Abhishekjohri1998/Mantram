@@ -199,7 +199,26 @@ export async function submitPiApiVideoGeneration({ prompt, imageUrl, duration, a
 
     const payload = { model: 'seedance', task_type: taskType, input: taskInput };
     const taskId = await submitPiApiPayload(payload);
-    return { taskId, provider: 'piapi', model: 'seedance-2.0', _payload: payload };
+    return { taskId, provider: 'piapi', model: 'seedance-2.0', _payload: payload, type: 'generation' };
+}
+
+/**
+ * Trigger dedicated watermark removal task for a generated video
+ */
+export async function submitPiApiWatermarkRemoval(videoUrl) {
+    if (!videoUrl) throw new Error('Video URL is required for watermark removal');
+    console.log(`🧹 PiAPI: Requesting watermark removal for ${videoUrl.substring(0, 80)}...`);
+
+    const payload = {
+        model: 'seedance', // Generic for removal
+        task_type: 'remove-watermark',
+        input: {
+            video_url: videoUrl,
+        }
+    };
+
+    const taskId = await submitPiApiPayload(payload);
+    return { taskId, provider: 'piapi', type: 'remove-watermark' };
 }
 
 export async function resubmitPiApiTask(storedPayload) {
@@ -248,7 +267,7 @@ export async function submitPiApiImageToVideo({ imageUrl, prompt, duration, aspe
     };
 
     const taskId = await submitPiApiPayload(payload);
-    return { taskId, provider: 'piapi', model: 'seedance-2.0', mode: 'i2v', _payload: payload };
+    return { taskId, provider: 'piapi', model: 'seedance-2.0', mode: 'i2v', _payload: payload, type: 'generation' };
 }
 
 export async function submitPiApiVideoExtend({ parentTaskId, prompt, duration, qualityMode = 'fast' }) {
@@ -258,7 +277,7 @@ export async function submitPiApiVideoExtend({ parentTaskId, prompt, duration, q
     const taskType = qualityMode === 'quality' ? 'seedance-2-preview' : 'seedance-2-fast-preview';
     const payload = { model: 'seedance', task_type: taskType, input: { prompt: prompt || '', duration: dur, parent_task_id: parentTaskId, no_watermark: true } };
     const taskId = await submitPiApiPayload(payload);
-    return { taskId, provider: 'piapi', model: 'seedance-2.0', mode: 'extend', _payload: payload, parentTaskId };
+    return { taskId, provider: 'piapi', model: 'seedance-2.0', mode: 'extend', _payload: payload, parentTaskId, type: 'generation' };
 }
 
 export async function getPiApiGenerationStatus(taskId) {

@@ -26,7 +26,7 @@ import {
 } from './prompts.js';
 import { estimateCost, submitVideoGeneration, getGenerationStatus, getGrokGenerationStatus, MODEL_CAPABILITIES } from './falClient.js';
 import { getKieGenerationStatus } from './kieClient.js';
-import { getPiApiGenerationStatus, resubmitPiApiTask, uploadImageToHostedUrl } from './piApiClient.js';
+import { getPiApiGenerationStatus, resubmitPiApiTask, uploadImageToHostedUrl, submitPiApiWatermarkRemoval } from './piApiClient.js';
 import { getMuApiGenerationStatus, resubmitMuApiTask } from './muapiClient.js';
 
 import { getPastProjects } from './selfLearning.js';
@@ -517,6 +517,30 @@ export async function pollGenerationStatus(state) {
     } else if (state.generation?.provider === 'piapi') {
         // PiAPI polling — Seedance 2.0 (when PiAPI is active provider)
         statusResult = await getPiApiGenerationStatus(state.generation.falRequestId);
+
+        // 🧹 WATERMARK REMOVAL CASCADE:
+        // If generation is complete but we haven't removed the watermark yet, trigger the removal task
+        if (statusResult.status === 'COMPLETED' && !state.generation.isWatermarkRemoved) {
+            console.log(`✨ PiAPI: Video generation done (${statusResult.videoUrl.substring(0, 60)}...). Starting watermark removal...`);
+            try {
+                const unwatermark = await submitPiApiWatermarkRemoval(statusResult.videoUrl);
+                return {
+                    ...state,
+                    generation: {
+                        ...state.generation,
+                        falRequestId: unwatermark.taskId,
+                        isWatermarkRemoved: true,
+                        progress: 95, // Stay in progress for the removal step
+                        error: '',
+                    },
+                    status: state.status || 'generating', // Keep in generating/advanced-generating
+                };
+            } catch (err) {
+                console.warn(`⚠️ PiAPI: Automatic watermark removal failed: ${err.message}. Proceeding with watermarked video.`);
+                // Fall through to proceed with the watermarked video if removal task submission fails
+            }
+        }
+
         // AUTO-RETRY: PiAPI intermittently fails with "failed to process task" (code 10000)
         // Automatically resubmit up to 2 times using the stored payload
         if (statusResult.status === 'FAILED' && statusResult.retryable && state.generation._piApiPayload) {

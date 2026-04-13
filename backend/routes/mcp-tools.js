@@ -19,7 +19,9 @@ import { Router } from 'express';
 import { protect } from '../middleware/auth.js';
 import Brand from '../models/Brand.js';
 import Creative from '../models/Creative.js';
+import { internalGenerateCreative } from './creatives.js';
 import Content from '../models/Content.js';
+
 import { safeErrorMessage } from '../utils/safeError.js';
 import fetch from 'node-fetch';
 
@@ -52,8 +54,14 @@ const TOOLS = {
 
     // ── 1. Generate Image ─────────────────────────────────────────────────────
     'creative_studio.generate_image': async (params, ctx) => {
-        const { prompt, style, size = '1:1', count = 1, platform, referenceImages } = params;
+        let { prompt, style, size = '1:1', count = 1, platform, referenceImages } = params;
         if (!prompt) throw new Error('generate_image: prompt is required');
+
+        // Normalize prompt to handle cases where it might be an object
+        if (typeof prompt === 'object') {
+            console.log('📦 MCP generate_image: Normalizing object prompt to string');
+            prompt = prompt.text || prompt.brief || prompt.prompt || prompt.description || JSON.stringify(prompt);
+        }
 
         // ── Process reference images ──────────────────────────────────────
         // User uploads arrive as base64 data URLs. The Gemini generation
@@ -117,33 +125,37 @@ const TOOLS = {
             refImageUrls: processedRefUrls,
         };
 
-        // Call the internal creatives generate API
-        const baseUrl = process.env.INTERNAL_API_URL || `http://localhost:${process.env.PORT || 3001}`;
-        const resp = await fetch(`${baseUrl}/api/creatives/generate`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${ctx.internalToken}`,
-                'x-skill-execution': 'true',
-            },
-            body: JSON.stringify(payload),
-            signal: AbortSignal.timeout(180000), // 3 min timeout for image gen
+        // Call the internal creative generation pipeline directly.
+        // This is synchronous, ensuring the skill waits for the image to be ready.
+        const data = await internalGenerateCreative({
+            body: payload,
+            user: ctx.user,
+            creditsDeducted: 0,
+            jobId: `skill-${ctx.executionId || Date.now()}`,
         });
 
-        const data = await resp.json();
-        if (!data.success && !data.imageUrl && !data.images && !data.creative?.imageUrl) {
-            throw new Error(`Image generation failed: ${data.error || 'Unknown error'}`);
+        if (!data?.success && !data?.imageUrl && !data?.images && !data?.creative?.imageUrl) {
+            throw new Error(`Image generation failed: ${data?.error || 'Unknown error'}`);
         }
 
-        // The /api/creatives/generate returns { success, creative: { imageUrl, _id } }
-        // The imageUrl might be base64 (S3 upload is async), an S3 path, or an HTTP URL.
+        // The internalGenerateCreative returns { success, creative: { imageUrl, _id } }
         let imageUrl = data.imageUrl || data.creative?.imageUrl;
         const creativeId = data.creative?._id;
 
+
         // If imageUrl is base64, use the proxy endpoint so frontend can display it
         if (imageUrl?.startsWith('data:image/') && creativeId) {
-            const proxyBase = process.env.INTERNAL_API_URL || `http://localhost:${process.env.PORT || 3001}`;
-            imageUrl = `${proxyBase}/api/creatives/${creativeId}/image`;
+            // Use relative path for frontend consumption to avoid localhost leak in production
+            const internalUrl = process.env.INTERNAL_API_URL || '';
+            const isLocal = !internalUrl || internalUrl.includes('localhost') || internalUrl.includes('127.0.0.1');
+            
+            if (isLocal) {
+                // Return relative path for the frontend to resolve
+                imageUrl = `/api/creatives/${creativeId}/image`;
+            } else {
+                // Use the configured internal URL if it's external (e.g. cross-server)
+                imageUrl = `${internalUrl.replace(/\/$/, '')}/api/creatives/${creativeId}/image`;
+            }
         }
 
         // If imageUrl is an S3 path, sign it
