@@ -4981,238 +4981,185 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                     </div>
 
                     {/* ═══ SIDEBAR COMMAND PANEL ═══ */}
-                    <div className="creative-tools-panel">
-                        {/* ── Scrollable tray body ── */}
-                        <div className="creative-tools-panel-body">
-
-                        {/* ── Scene Tray (Prompt + Theme Inspiration) ── */}
-                        {carouselTray === 'scene' && (
-                            <div className="floating-tray" key="car-scene-tray">
-                                <div className="flex items-center justify-between mb-2">
-                                    <span className="text-[11px] text-[var(--sys-text-muted)] uppercase tracking-widest font-bold flex items-center gap-1.5">
-                                        <span className="material-symbols-outlined text-[var(--sys-primary)]" style={{ fontSize: 22 }}>landscape</span>
-                                        Background Scene
-                                    </span>
-                                    <div className="flex items-center gap-2">
-                                        {/* Theme inspiration inline */}
-                                        {carouselThemeImage ? (
-                                            <div className="flex items-center gap-1.5">
-                                                <div className="relative group">
-                                                    <img src={carouselThemeImage} alt="Theme ref" className="w-7 h-7 rounded-lg object-cover border border-[var(--sys-text)] cursor-pointer"
-                                                        onClick={() => { setCarouselThemeImage(null); setCarouselThemeAnalysis(null); setCarouselThemeError(null); }} title="Click to remove" />
-                                                    {carouselAnalyzing && <div className="absolute inset-0 bg-black/60 rounded-lg flex items-center justify-center"><span className="material-symbols-outlined text-[var(--sys-text)] text-[12px] animate-spin">progress_activity</span></div>}
-                                                    {carouselThemeAnalysis && !carouselAnalyzing && <div className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-[var(--sys-surface)] border border-black flex items-center justify-center"><span className="material-symbols-outlined text-[var(--sys-text)]" style={{fontSize:'8px'}}>check</span></div>}
-                                                </div>
-                                                {carouselAnalyzing ? (
-                                                    <span className="text-[9px] font-semibold text-[var(--sys-text)] animate-pulse">Analyzing...</span>
-                                                ) : carouselThemeAnalysis ? (
-                                                    <span className="text-[9px] font-semibold text-primary">DNA ✓</span>
-                                                ) : null}
-                                            </div>
-                                        ) : (
-                                            <label className="flex items-center gap-1 px-2 py-1 rounded-lg border border-dashed border-[var(--sys-text)] hover:border-[var(--sys-text)] bg-[var(--sys-text-muted)] cursor-pointer transition-all text-[9px] font-semibold text-[var(--sys-text)]">
-                                                <span className="material-symbols-outlined" style={{fontSize:'12px'}}>add_photo_alternate</span>
-                                                Inspo
-                                                <input type="file" accept="image/*" className="hidden" onChange={async e => {
-                                                    const file = e.target.files?.[0]
-                                                    if (!file) return
-                                                    setCarouselThemeError(null)
-                                                    const dataUrl = await new Promise(resolve => {
-                                                        const img = new Image()
-                                                        const objectUrl = URL.createObjectURL(file)
-                                                        img.onload = () => {
-                                                            URL.revokeObjectURL(objectUrl)
-                                                            const MAX = 800
-                                                            let { width, height } = img
-                                                            if (width > MAX || height > MAX) {
-                                                                if (width > height) { height = Math.round(height * MAX / width); width = MAX; }
-                                                                else { width = Math.round(width * MAX / height); height = MAX; }
-                                                            }
-                                                            const canvas = document.createElement('canvas')
-                                                            canvas.width = width; canvas.height = height
-                                                            canvas.getContext('2d').drawImage(img, 0, 0, width, height)
-                                                            resolve(canvas.toDataURL('image/jpeg', 0.82))
-                                                        }
-                                                        img.src = objectUrl
-                                                    })
-                                                    setCarouselThemeImage(dataUrl)
-                                                    setCarouselThemeAnalysis(null)
-                                                    setCarouselAnalyzing(true)
-                                                    try {
-                                                        const res = await creativesAPI.analyzeCarouselTheme({ themeImageUrl: dataUrl, brandId: activeBrand?._id, slideCount: carouselSlides })
-                                                        if (res.success && res.theme) {
-                                                            setCarouselThemeAnalysis(res.theme)
-                                                            if (res.theme.panoramicPrompt) setCarouselPrompt(res.theme.panoramicPrompt)
-                                                            if (res.theme.suggestedStyle) setCarouselStyle(res.theme.suggestedStyle)
-                                                            if (res.theme.genre) setCarouselGenre(res.theme.genre)
-                                                        } else { setCarouselThemeError('Analysis failed — click Analyze to retry') }
-                                                    } catch (err) { setCarouselThemeError(err.message || 'Analysis failed') }
-                                                    setCarouselAnalyzing(false)
-                                                }} />
-                                            </label>
-                                        )}
-                                        <button onClick={() => setCarouselTray(null)} className="text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer"><span className="material-symbols-outlined text-sm">close</span></button>
-                                    </div>
-                                </div>
-                                {/* Analysis result badge */}
-                                {carouselThemeAnalysis && (
-                                    <div className="mb-2 p-2 rounded-lg bg-[var(--sys-text-muted)] border border-[var(--sys-text)] flex items-center gap-2 flex-wrap">
-                                        <span className="material-symbols-outlined text-primary" style={{fontSize:'12px'}}>check_circle</span>
-                                        <span className="text-[9px] text-primary font-semibold">Visual DNA extracted</span>
-                                        {carouselThemeAnalysis.genre && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-[var(--sys-surface)] text-[var(--sys-primary)] capitalize">{carouselThemeAnalysis.genre}</span>}
-                                        {carouselThemeAnalysis.mood && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-[var(--sys-text)] text-[var(--sys-bg)] capitalize">✦ {carouselThemeAnalysis.mood}</span>}
-                                        {carouselThemeAnalysis.colorPalette?.length > 0 && (
-                                            <div className="flex gap-0.5 ml-auto">{carouselThemeAnalysis.colorPalette.slice(0,5).map((c,i) => <div key={i} className="w-3 h-3 rounded-full border border-[var(--sys-border)]" style={{backgroundColor:c}} />)}</div>
-                                        )}
-                                    </div>
-                                )}
-                                {carouselThemeError && !carouselAnalyzing && (
-                                    <div className="mb-2 flex items-center gap-1 text-[9px] text-primary"><span className="material-symbols-outlined" style={{fontSize:'11px'}}>error</span>{carouselThemeError}</div>
-                                )}
+                    <div className="creative-tools-panel !border-none !bg-[var(--sys-surface)]">
+                        {/* ── NEW FREEPIK SIDEBAR BODY ── */}
+                        <div className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-hide creative-tools-panel-body !flex !flex-col !h-full p-0">
+                                
+                            <div className="px-5 mt-3 pb-2 flex items-center justify-between">
+                                <h3 className="font-bold text-[var(--sys-text)] text-sm flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-[var(--sys-primary)]">view_carousel</span> Carousel Studio
+                                </h3>
                             </div>
-                        )}
 
-                        {/* ── Format Tray (Slide Format + Count) ── */}
-                        {carouselTray === 'format' && (
-                            <div className="floating-tray" key="car-format-tray">
-                                <div className="flex items-center justify-between mb-2">
-                                    <span className="text-[11px] text-[var(--sys-text-muted)] uppercase tracking-widest font-bold flex items-center gap-1.5">
-                                        <span className="material-symbols-outlined text-[var(--sys-primary)]" style={{ fontSize: 22 }}>aspect_ratio</span>
-                                        Slide Format & Count
-                                    </span>
-                                    <button onClick={() => setCarouselTray(null)} className="text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer"><span className="material-symbols-outlined text-sm">close</span></button>
+                            {/* ── Model Selector ── */}
+                            <div className="px-5 mt-3 pb-4">
+                                <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest mb-2">Model</p>
+                                <div className="relative">
+                                    <button onClick={() => setShowModelMenu(!showModelMenu)} className="w-full flex items-center justify-between px-3 py-3 rounded-[14px] bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:border-primary/30 hover:shadow-sm transition-all cursor-pointer group">
+                                        <div className="flex items-center gap-2.5">
+                                            <span className="material-symbols-outlined" style={{ color: IMAGE_MODELS.find(m => m.id === imageModel)?.color || 'var(--sys-text)', fontSize: '18px' }}>
+                                                {IMAGE_MODELS.find(m => m.id === imageModel)?.icon || 'auto_awesome'}
+                                            </span>
+                                            <span className="text-[13px] font-bold text-[var(--sys-text)] group-hover:text-[var(--sys-text)] transition-colors">{IMAGE_MODELS.find(m => m.id === imageModel)?.name || 'Select Model'}</span>
+                                        </div>
+                                        <span className="material-symbols-outlined text-[var(--sys-text-muted)] group-hover:text-[var(--sys-text)]" style={{ fontSize: '18px' }}>settings</span>
+                                    </button>
+                                    {showModelMenu && (
+                                        <div className="absolute left-0 right-0 top-full mt-1.5 bg-[var(--sys-bg)] rounded-[14px] shadow-xl z-[60] border border-[var(--sys-border)] overflow-hidden">
+                                            <div className="p-1.5 space-y-0.5 max-h-[240px] overflow-y-auto">
+                                                {IMAGE_MODELS.map(m => (
+                                                    <button key={m.id} onClick={() => { setImageModel(m.id); setShowModelMenu(false) }}
+                                                        className={"w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-left transition-all cursor-pointer group " + (imageModel === m.id ? 'bg-[var(--sys-surface)] text-[var(--sys-text)]' : 'text-[var(--sys-text-muted)] hover:bg-[var(--sys-surface)] hover:text-[var(--sys-text)]')}>
+                                                        <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: m.color + '18' }}>
+                                                            <span className="material-symbols-outlined" style={{ fontSize: '15px', color: m.color }}>{m.icon}</span>
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="text-[11px] font-bold truncate">{m.name}</div>
+                                                        </div>
+                                                        {imageModel === m.id && (
+                                                            <div className="w-4 h-4 rounded-full flex items-center justify-center" style={{ background: m.color + '25' }}>
+                                                                <span className="material-symbols-outlined" style={{ fontSize: '11px', color: m.color }}>check</span>
+                                                            </div>
+                                                        )}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                    <div>
-                                        <span className="text-[9px] text-[var(--sys-text-muted)] uppercase tracking-wider font-bold mb-1.5 block">Format</span>
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1">
-                                            {[
-                                                { id: '1:1', label: 'Square', icon: 'crop_square' },
-                                                { id: '4:5', label: 'Portrait', icon: 'crop_portrait' },
-                                                { id: '9:16', label: 'Story', icon: 'smartphone' },
-                                                { id: '16:9', label: 'Wide', icon: 'crop_landscape' },
-                                                { id: '3:4', label: 'Classic', icon: 'photo' },
-                                                { id: '2:3', label: 'Tall', icon: 'view_agenda' },
-                                            ].map(f => (
-                                                <button key={f.id} onClick={() => setCarouselSlideFormat(f.id)}
-                                                    className={`studio-btn-pill border-none !py-2 !rounded-lg !text-[10px] flex-col !h-auto ${carouselSlideFormat === f.id ? 'active' : ''}`}>
-                                                    <span className="material-symbols-outlined !text-[16px]">{f.icon}</span>
-                                                    {f.label}
+                            </div>
+
+                            {/* ── Slide Format & Count ── */}
+                            <div className="px-5 pb-4">
+                                <div className="flex items-center justify-between mb-2">
+                                    <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest">Layout & Slides</p>
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    {/* Format */}
+                                    <div className="relative group/tray z-[60]">
+                                        <button className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[12px] font-bold text-[var(--sys-text)] transition-all hover:border-[var(--sys-text)] cursor-pointer">
+                                            <span className="flex items-center gap-1.5"><span className="material-symbols-outlined text-[15px]">crop_landscape</span>{carouselSlideFormat || '1:1'}</span>
+                                            <span className="material-symbols-outlined text-[14px] text-[var(--sys-text-muted)]">expand_more</span>
+                                        </button>
+                                        <div className="absolute top-full left-0 mt-1.5 hidden group-hover/tray:block w-[140px] bg-[var(--sys-bg)] border border-[var(--sys-border)] shadow-xl rounded-[14px] p-1.5 animate-fade-in">
+                                            {[ { id: '1:1', label: 'Square', icon: 'crop_square' }, { id: '4:5', label: 'Portrait', icon: 'crop_portrait' }, { id: '9:16', label: 'Story', icon: 'smartphone' }, { id: '16:9', label: 'Wide', icon: 'crop_landscape' }, { id: '3:4', label: 'Classic', icon: 'photo' } ].map(f => (
+                                                <button key={f.id} onClick={() => setCarouselSlideFormat(f.id)} className={"w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg transition-colors " + (carouselSlideFormat === f.id ? "bg-[var(--sys-text)] text-[var(--sys-bg)]" : "text-[var(--sys-text)] hover:bg-[var(--sys-surface)]")}>
+                                                    <span className="material-symbols-outlined text-[16px]">{f.icon}</span><span className="text-[11px] font-bold">{f.label} ({f.id})</span>
                                                 </button>
                                             ))}
                                         </div>
                                     </div>
-                                    <div>
-                                        <span className="text-[9px] text-[var(--sys-text-muted)] uppercase tracking-wider font-bold mb-1.5 block">Slides</span>
-                                        <div className="flex gap-1.5">
-                                            {[2, 3, 4, 5].map(n => (
-                                                <button key={n} onClick={() => { setCarouselSlides(n); setCarouselProductImages(prev => { const a = [...prev]; a.length = n; return a.fill(null, prev.length) }) }}
-                                                    className={`studio-btn-pill border-none flex-1 !py-2 !rounded-lg !text-xs ${carouselSlides === n ? 'active' : ''}`}>{n}</button>
+                                    {/* Slides Count */}
+                                    <div className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text-muted)]">
+                                        <button disabled={carouselSlides <= 2} onClick={() => setCarouselSlides(Math.max(2, carouselSlides - 1))} className="hover:text-[var(--sys-text)] disabled:opacity-30 cursor-pointer"><span className="material-symbols-outlined text-[14px]">remove</span></button>
+                                        <span className="text-[13px] font-bold text-[var(--sys-text)] px-1 flex-1 text-center">{carouselSlides} Slides</span>
+                                        <button disabled={carouselSlides >= 5} onClick={() => setCarouselSlides(Math.min(5, carouselSlides + 1))} className="hover:text-[var(--sys-text)] disabled:opacity-30 cursor-pointer"><span className="material-symbols-outlined text-[14px]">add</span></button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* ── Background Scene Description ── */}
+                            <div className="px-5 pb-3 flex flex-col flex-grow">
+                                <div className="flex items-center justify-between mb-2">
+                                    <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest">Background Scene</p>
+                                </div>
+                                <div className="flex flex-col relative bg-[var(--sys-bg)] border border-[var(--sys-border)] rounded-[16px] overflow-hidden focus-within:border-primary/50 focus-within:shadow-md transition-all flex-grow min-h-[160px]">
+                                    <textarea
+                                        value={carouselPrompt}
+                                        onChange={e => setCarouselPrompt(e.target.value)}
+                                        placeholder="Describe the background scene... e.g. Luxurious marble countertop"
+                                        className="w-full bg-transparent p-4 text-[14px] leading-relaxed text-[var(--sys-text)] placeholder-[var(--sys-text-muted)] outline-none resize-none flex-grow"
+                                        onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleCarouselGenerate() } }}
+                                    />
+                                    
+                                    {/* Theme/DNA analyzer inside the textarea footer */}
+                                    <div className="px-3 py-2 flex items-center justify-between border-t border-[var(--sys-border)] bg-[var(--sys-surface)]/30">
+                                        <span className="text-[10px] text-[var(--sys-text-muted)] uppercase font-semibold">Visual DNA Insight</span>
+                                        {carouselThemeImage ? (
+                                            <div className="flex items-center gap-1.5">
+                                                <div className="relative group/dna">
+                                                    <img src={carouselThemeImage} alt="Theme" className="w-6 h-6 rounded-md object-cover border border-[var(--sys-text)] cursor-pointer" onClick={() => { setCarouselThemeImage(null); setCarouselThemeAnalysis(null); setCarouselThemeError(null); }} />
+                                                    {carouselAnalyzing && <div className="absolute inset-0 bg-black/60 rounded-md flex items-center justify-center"><span className="material-symbols-outlined text-[var(--sys-text)] text-[10px] animate-spin">progress_activity</span></div>}
+                                                    {carouselThemeAnalysis && !carouselAnalyzing && <div className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-[var(--sys-surface)] border border-black flex items-center justify-center"><span className="material-symbols-outlined text-[var(--sys-text)]" style={{fontSize:'8px'}}>check</span></div>}
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <label className="flex items-center gap-1 px-2 py-1 rounded-md bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:border-[var(--sys-text)] cursor-pointer transition-colors text-[9px] font-bold text-[var(--sys-text)]">
+                                                <span className="material-symbols-outlined" style={{fontSize:'12px'}}>add_photo_alternate</span>
+                                                Extract DNA
+                                                <input type="file" accept="image/*" className="hidden" onChange={async e => {
+                                                    const file = e.target.files?.[0]; if (!file) return; setCarouselThemeError(null);
+                                                    const dataUrl = await new Promise(resolve => {
+                                                        const img = new Image(); const objectUrl = URL.createObjectURL(file);
+                                                        img.onload = () => { URL.revokeObjectURL(objectUrl); const MAX = 800; let { width, height } = img;
+                                                        if (width > MAX || height > MAX) { if (width > height) { height = Math.round(height * MAX / width); width = MAX; } else { width = Math.round(width * MAX / height); height = MAX; } }
+                                                        const canvas = document.createElement('canvas'); canvas.width = width; canvas.height = height; canvas.getContext('2d').drawImage(img, 0, 0, width, height); resolve(canvas.toDataURL('image/jpeg', 0.82)) }
+                                                        img.src = objectUrl;
+                                                    });
+                                                    setCarouselThemeImage(dataUrl); setCarouselThemeAnalysis(null); setCarouselAnalyzing(true);
+                                                    try { const res = await creativesAPI.analyzeCarouselTheme({ themeImageUrl: dataUrl, brandId: activeBrand?._id, slideCount: carouselSlides });
+                                                    if (res.success && res.theme) { setCarouselThemeAnalysis(res.theme); if (res.theme.panoramicPrompt) setCarouselPrompt(res.theme.panoramicPrompt); if (res.theme.suggestedStyle) setCarouselStyle(res.theme.suggestedStyle); if (res.theme.genre) setCarouselGenre(res.theme.genre); } else { setCarouselThemeError('Analysis failed'); }
+                                                    } catch (err) { setCarouselThemeError(err.message || 'Analysis failed'); } setCarouselAnalyzing(false);
+                                                }} />
+                                            </label>
+                                        )}
+                                    </div>
+                                </div>
+                                {carouselThemeError && <div className="mt-1 flex items-center gap-1 text-[9px] text-primary"><span className="material-symbols-outlined text-[10px]">error</span>{carouselThemeError}</div>}
+                            </div>
+
+                            {/* ── Visual Target Settings ── */}
+                            <div className="px-5 pb-4">
+                                <div className="flex items-center gap-2">
+                                    <div className="relative group/tray flex-1 z-[50]">
+                                        <p className="text-[9px] text-[var(--sys-text-muted)] uppercase tracking-wider font-bold mb-1.5 block">Genre/Mood</p>
+                                        <button className="w-full flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[11px] font-bold text-[var(--sys-text)] transition-all hover:border-[var(--sys-text)] cursor-pointer">
+                                            <span className="material-symbols-outlined text-[14px]">movie</span>
+                                            <span className="flex-1 text-left truncate capitalize">{carouselGenre || 'None'}</span>
+                                        </button>
+                                        <div className="absolute bottom-full left-0 mb-1.5 hidden group-hover/tray:grid grid-cols-2 gap-1 w-[200px] bg-[var(--sys-bg)] border border-[var(--sys-border)] shadow-xl rounded-[14px] p-2 z-[70]">
+                                            {['drama', 'thriller', 'romance', 'sci-fi', 'fantasy', 'documentary', 'noir', 'action', 'comedy', 'horror', 'fashion-editorial', 'none'].map(g => (
+                                                <button key={g} onClick={() => setCarouselGenre(g)} className={"col-span-1 px-2.5 py-1.5 rounded-lg text-left text-[10px] font-bold capitalize transition-colors " + (carouselGenre === g ? "bg-[var(--sys-text)] text-[var(--sys-bg)]" : "text-[var(--sys-text)] hover:bg-[var(--sys-surface)]")}>{g.replace('-',' ')}</button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div className="relative group/tray flex-1 z-[50]">
+                                        <p className="text-[9px] text-[var(--sys-text-muted)] uppercase tracking-wider font-bold mb-1.5 block">Style</p>
+                                        <button className="w-full flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[11px] font-bold text-[var(--sys-text)] transition-all hover:border-[var(--sys-text)] cursor-pointer">
+                                            <span className="material-symbols-outlined text-[14px]">palette</span>
+                                            <span className="flex-1 text-left truncate capitalize">{carouselStyle || 'Modern'}</span>
+                                        </button>
+                                        <div className="absolute bottom-full left-0 mb-1.5 hidden group-hover/tray:grid grid-cols-2 gap-1 w-[200px] bg-[var(--sys-bg)] border border-[var(--sys-border)] shadow-xl rounded-[14px] p-2 z-[70]">
+                                            {['modern','minimal','vibrant','luxury','nature','tech'].map(s => (
+                                                <button key={s} onClick={() => setCarouselStyle(s)} className={"col-span-1 px-2.5 py-1.5 rounded-lg text-left text-[10px] font-bold capitalize transition-colors " + (carouselStyle === s ? "bg-[var(--sys-text)] text-[var(--sys-bg)]" : "text-[var(--sys-text)] hover:bg-[var(--sys-surface)]")}>{s}</button>
                                             ))}
                                         </div>
                                     </div>
                                 </div>
                             </div>
-                        )}
-
-                        {/* ── Genre Tray ── */}
-                        {carouselTray === 'genre' && (
-                            <div className="floating-tray" key="car-genre-tray">
+                            
+                            {/* ── Products Tray ── */}
+                            <div className="px-5 pb-6">
                                 <div className="flex items-center justify-between mb-2">
-                                    <span className="text-[11px] text-[var(--sys-text-muted)] uppercase tracking-widest font-bold flex items-center gap-1.5">
-                                        <span className="material-symbols-outlined text-[var(--sys-primary)]" style={{ fontSize: 22 }}>movie</span>
-                                        Genre / Mood
-                                        {carouselThemeAnalysis?.genre && <span className="text-[8px] text-[var(--sys-text)] font-semibold px-1.5 py-0.5 rounded-full bg-[var(--sys-text)] border border-[var(--sys-text)]">AI detected</span>}
-                                    </span>
-                                    <button onClick={() => setCarouselTray(null)} className="text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer"><span className="material-symbols-outlined text-sm">close</span></button>
+                                    <span className="text-[10px] text-[var(--sys-text-muted)] uppercase tracking-widest font-bold flex items-center gap-1.5">Products to Composite</span>
                                 </div>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-1">
-                                    {[
-                                        { id: 'drama',         label: 'Drama',    msIcon: 'theater_comedy',   color: '#dc2626' },
-                                        { id: 'thriller',      label: 'Thriller', msIcon: 'experiment',       color: '#7c3aed' },
-                                        { id: 'romance',       label: 'Romance',  msIcon: 'favorite',         color: '#ec4899' },
-                                        { id: 'sci-fi',        label: 'Sci-Fi',   msIcon: 'rocket_launch',    color: '#06b6d4' },
-                                        { id: 'fantasy',       label: 'Fantasy',  msIcon: 'auto_awesome',     color: '#a855f7' },
-                                        { id: 'documentary',   label: 'Docu',     msIcon: 'video_camera_back', color: '#78716c' },
-                                        { id: 'noir',          label: 'Noir',     msIcon: 'contrast',         color: '#334155' },
-                                        { id: 'action',        label: 'Action',   msIcon: 'local_fire_department', color: '#ef4444' },
-                                        { id: 'comedy',        label: 'Comedy',   msIcon: 'mood',             color: '#facc15' },
-                                        { id: 'horror',        label: 'Horror',   msIcon: 'dark_mode',        color: '#1e293b' },
-                                        { id: 'fashion-editorial', label: 'Fashion', msIcon: 'styler',        color: '#f59e0b' },
-                                        { id: 'none',          label: 'None',     msIcon: 'block',            color: '#64748b' },
-                                    ].map(g => (
-                                        <button key={g.id} onClick={() => setCarouselGenre(g.id)} title={g.label}
-                                            className={`studio-btn-pill border-none !py-2.5 !px-1.5 !rounded-lg !text-[10px] flex-col !h-auto ${carouselGenre === g.id ? 'active' : ''}`}
-                                            style={carouselGenre === g.id ? { backgroundColor: `${g.color}15`, color: g.color } : {}}>
-                                            <span className="material-symbols-outlined !text-[22px]">{g.msIcon}</span>
-                                            <span className="leading-none">{g.label}</span>
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* ── Style Tray ── */}
-                        {carouselTray === 'style' && (
-                            <div className="floating-tray" key="car-style-tray">
-                                <div className="flex items-center justify-between mb-2">
-                                    <span className="text-[11px] text-[var(--sys-text-muted)] uppercase tracking-widest font-bold flex items-center gap-1.5">
-                                        <span className="material-symbols-outlined text-[var(--sys-primary)]" style={{ fontSize: 22 }}>palette</span>
-                                        Visual Style
-                                    </span>
-                                    <button onClick={() => setCarouselTray(null)} className="text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer"><span className="material-symbols-outlined text-sm">close</span></button>
-                                </div>
-                                <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-6 gap-1.5">
-                                    {[
-                                        { id: 'modern',  label: 'Modern',  icon: 'auto_awesome', color: '#f97316' },
-                                        { id: 'minimal', label: 'Minimal', icon: 'crop_square',  color: '#64748b' },
-                                        { id: 'vibrant', label: 'Vibrant', icon: 'palette',       color: '#ec4899' },
-                                        { id: 'luxury',  label: 'Luxury',  icon: 'diamond',       color: '#f59e0b' },
-                                        { id: 'nature',  label: 'Nature',  icon: 'park',          color: '#22c55e' },
-                                        { id: 'tech',    label: 'Tech',    icon: 'devices',       color: '#06b6d4' },
-                                    ].map(s => (
-                                        <button key={s.id} onClick={() => setCarouselStyle(s.id)}
-                                            className={`studio-btn-pill border-none !px-2.5 !py-2.5 !rounded-lg !text-[11px] flex-col !h-auto ${carouselStyle === s.id ? 'active' : ''}`}
-                                            style={carouselStyle === s.id ? { backgroundColor: `${s.color}15`, color: s.color } : {}}>
-                                            <span className="material-symbols-outlined !text-[18px]">{s.icon}</span>
-                                            {s.label}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* ── Products Tray ── */}
-                        {carouselTray === 'products' && (
-                            <div className="floating-tray" key="car-products-tray">
-                                <div className="flex items-center justify-between mb-2">
-                                    <span className="text-[11px] text-[var(--sys-text-muted)] uppercase tracking-widest font-bold flex items-center gap-1.5">
-                                        <span className="material-symbols-outlined text-[var(--sys-primary)]" style={{ fontSize: 22 }}>shopping_bag</span>
-                                        Product Images (Optional)
-                                    </span>
-                                    <button onClick={() => setCarouselTray(null)} className="text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer"><span className="material-symbols-outlined text-sm">close</span></button>
-                                </div>
-                                <p className="text-[9px] text-[var(--sys-text-muted)] mb-2">Add product images to overlay on each carousel panel</p>
-                                <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-2">
-                                    {Array.from({ length: carouselSlides }).map((_, i) => (
+                                <div className="grid grid-cols-5 gap-2">
+                                    {Array.from({ length: Math.min(5, carouselSlides) }).map((_, i) => (
                                         <div key={i} className="relative">
-                                            <span className="absolute -top-1 -left-1 z-10 w-4 h-4 rounded-full bg-[var(--sys-surface)] text-[var(--sys-text)] text-[8px] font-bold flex items-center justify-center">{i + 1}</span>
+                                            <span className="absolute -top-1 -left-1 z-10 w-3 h-3 rounded-full bg-[var(--sys-text)] text-[var(--sys-bg)] text-[7px] font-bold flex items-center justify-center">{i + 1}</span>
                                             {carouselProductImages[i] ? (
-                                                <div className="relative group">
-                                                    <img src={carouselProductImages[i]} alt={`Slide ${i + 1}`} className="w-full aspect-square rounded-lg object-cover border border-[var(--sys-border)]" />
+                                                <div className="relative group w-full aspect-square">
+                                                    <img src={carouselProductImages[i]} alt={`Slide ${i + 1}`} className="w-full h-full rounded-lg object-cover border border-[var(--sys-border)]" />
                                                     <button onClick={() => setCarouselProductImages(prev => { const a = [...prev]; a[i] = null; return a })}
-                                                        className="absolute top-0 right-0 w-5 h-5 rounded-full bg-[var(--sys-surface)] text-[var(--sys-text)] text-[10px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">×</button>
+                                                        className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-[10px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">×</button>
                                                 </div>
                                             ) : (
-                                                <label className="w-full aspect-square rounded-lg border border-dashed border-[var(--sys-border)] hover:border-[var(--sys-border)] flex flex-col items-center justify-center cursor-pointer bg-[var(--sys-surface)] transition-all">
-                                                    <span className="material-symbols-outlined text-[var(--sys-text-muted)] text-lg">add_photo_alternate</span>
-                                                    <span className="text-[8px] text-[var(--sys-text-muted)] mt-0.5">Slide {i + 1}</span>
+                                                <label className="w-full aspect-square rounded-lg border border-dashed border-[var(--sys-border)] hover:border-[var(--sys-text)] flex flex-col items-center justify-center cursor-pointer bg-[var(--sys-surface)] transition-all">
+                                                    <span className="material-symbols-outlined text-[var(--sys-text-muted)] text-[14px]">add_photo_alternate</span>
                                                     <input type="file" accept="image/*" className="hidden" onChange={async e => {
-                                                        const file = e.target.files?.[0]
-                                                        if (!file) return
-                                                        const reader = new FileReader()
+                                                        const file = e.target.files?.[0]; if (!file) return; const reader = new FileReader();
                                                         reader.onload = () => setCarouselProductImages(prev => { const a = [...prev]; a[i] = reader.result; return a })
-                                                        reader.readAsDataURL(file)
+                                                        reader.readAsDataURL(file);
                                                     }} />
                                                 </label>
                                             )}
@@ -5220,63 +5167,21 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     ))}
                                 </div>
                             </div>
-                        )}
                         </div>{/* /creative-tools-panel-body */}
 
-                        {/* ── Icon Row + Prompt + Generate (always-visible footer) ── */}
-                        <div className="creative-tools-panel-footer">
-                        <div className="floating-prompt-row">
-                            {/* Tray toggle icons */}
-                            <div className="flex items-center gap-2 mr-1">
-                                {[
-                                    { key: 'scene',    icon: 'landscape',     tip: 'Background Scene' },
-                                    { key: 'format',   icon: 'aspect_ratio',  tip: 'Format & Slides' },
-                                    { key: 'genre',    icon: 'movie',         tip: 'Genre / Mood' },
-                                    { key: 'style',    icon: 'palette',       tip: 'Visual Style' },
-                                    { key: 'products', icon: 'shopping_bag',  tip: 'Product Images' },
-                                ].map(t => (
-                                    <button key={t.key} title={t.tip}
-                                        onClick={() => setCarouselTray(carouselTray === t.key ? null : t.key)}
-                                        className={`floating-setting-btn ${carouselTray === t.key ? 'active' : ''}`}
-                                        style={{ width: 48, height: 48, minWidth: 48, minHeight: 48 }}>
-                                        <span className="material-symbols-outlined" style={{ fontSize: 22 }}>{t.icon}</span>
-                                    </button>
-                                ))}
-                            </div>
-
-                            {/* Prompt */}
-                            <div className="flex-1 relative">
-                                <textarea 
-                                    value={carouselPrompt}
-                                    onChange={e => setCarouselPrompt(e.target.value)}
-                                    placeholder="Describe the background scene... e.g. 'Luxurious marble countertop with soft golden lighting'"
-                                    rows={1}
-                                    className="w-full px-4 py-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-sm text-[var(--sys-text)] placeholder-slate-600 focus:border-[var(--sys-border)] focus:outline-none resize-none"
-                                    onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleCarouselGenerate() } }}
-                                />
-                            </div>
-
-                            {/* Model selector */}
-                            <div className="relative">
-                                <button onClick={() => setShowModelMenu(!showModelMenu)}
-                                    className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-xs font-medium text-[var(--sys-text)] hover:bg-[var(--sys-surface)] cursor-pointer transition-all whitespace-nowrap">
-                                    <span className="material-symbols-outlined text-sm text-[var(--sys-primary)]">auto_awesome</span>
-                                    {IMAGE_MODELS.find(m => m.id === imageModel)?.name || 'Model'}
-                                    <span className="material-symbols-outlined text-xs text-[var(--sys-text-muted)]">expand_more</span>
+                        {/* ── Soft Generate Plinth ── */}
+                        <div className="creative-tools-panel-footer !bg-[var(--sys-bg)] !border-none px-5 pt-3 pb-5 space-y-3 z-10 border-t border-[var(--sys-border)] shadow-[0_-10px_40px_rgba(0,0,0,0.03)] sticky bottom-0">
+                            <CreditTooltipWrapper action="creative">
+                                <button onClick={handleCarouselGenerate} disabled={!carouselPrompt.trim() || !activeBrand || carouselGenerating}
+                                    className={"studio-btn-primary w-full !py-3.5 !rounded-2xl transition-all flex items-center justify-center gap-2 " + (carouselPrompt.trim() && !carouselGenerating ? "bg-[var(--sys-text)] hover:bg-black dark:hover:bg-white text-[var(--sys-bg)] shadow-[0_2px_10px_rgba(255,153,128,0.2)] cursor-pointer" : "bg-[var(--sys-border)] text-[var(--sys-text-muted)] outline-none")}>
+                                    {carouselGenerating ? (
+                                        <><span className="material-symbols-outlined animate-spin text-[18px]">progress_activity</span> <span className="text-[14px] font-bold">Generating...</span></>
+                                    ) : (
+                                        <><span className="text-[14px] font-bold">Generate Carousel</span> <span className="material-symbols-outlined text-[18px]">view_carousel</span></>
+                                    )}
                                 </button>
-                            </div>
-
-                            {/* Generate */}
-                             <button onClick={handleCarouselGenerate} disabled={!carouselPrompt.trim() || !activeBrand || carouselGenerating}
-                                 className="studio-btn-primary py-2.5 px-5 !rounded-xl !text-sm flex-shrink-0">
-                                 {carouselGenerating ? (
-                                     <><span className="material-symbols-outlined animate-spin !text-sm">progress_activity</span> Generating...</>
-                                 ) : (
-                                     <><span className="material-symbols-outlined !text-sm">view_carousel</span> Generate</>
-                                 )}
-                             </button>
-                        </div>{/* /floating-prompt-row */}
-                        </div>{/* /creative-tools-panel-footer */}
+                            </CreditTooltipWrapper>
+                        </div>
                     </div>{/* /creative-tools-panel carousel */}
                 </div>
             )}

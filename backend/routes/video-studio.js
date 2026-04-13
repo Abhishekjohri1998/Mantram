@@ -1885,9 +1885,9 @@ router.post('/ugc/minimax-tts', protect, async (req, res) => {
         const requestId = submitData.request_id;
         console.log(`  → Queued: requestId=${requestId}`);
 
-        // Poll for completion (up to 60s)
+        // Poll for completion (up to 120s)
         let result = null;
-        for (let i = 0; i < 20; i++) {
+        for (let i = 0; i < 40; i++) {
             await new Promise(r => setTimeout(r, 3000));
             const statusResp = await fetch(
                 `${FAL_QUEUE_URL}/fal-ai/minimax/requests/${requestId}/status`,
@@ -2966,7 +2966,7 @@ router.post('/:id/voiceover-preview', protect, async (req, res) => {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify(payload),
-                signal: AbortSignal.timeout(30000),
+                signal: AbortSignal.timeout(60000),
             });
 
             if (!submitResp.ok) {
@@ -2977,9 +2977,9 @@ router.post('/:id/voiceover-preview', protect, async (req, res) => {
             const submitData = await submitResp.json();
             const requestId = submitData.request_id;
 
-            // Poll for completion (up to 60s)
+            // Poll for completion (up to 120s)
             let result = null;
-            for (let i = 0; i < 20; i++) {
+            for (let i = 0; i < 40; i++) {
                 await new Promise(r => setTimeout(r, 3000));
                 const statusResp = await fetch(
                     `${FAL_QUEUE_URL}/fal-ai/minimax/requests/${requestId}/status`,
