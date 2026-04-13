@@ -450,12 +450,27 @@ router.post('/:id/execute', protect, requireCredits('content'), async (req, res)
         // ── Collect reference images from user inputs ──────────────────────
         const referenceImages = [];
         if (inputs && skill.inputFields?.length > 0) {
+            console.log(`🔍 Skills Debug: inputFields=${JSON.stringify(skill.inputFields?.map(f => ({ name: f.name, type: f.type })))}`);
+            console.log(`🔍 Skills Debug: input keys=${JSON.stringify(Object.keys(inputs))}`);
             for (const field of skill.inputFields) {
                 if ((field.type === 'image_upload' || field.type === 'image_library') && inputs[field.name]) {
-                    referenceImages.push(inputs[field.name]);
+                    const imgData = inputs[field.name];
+                    const imgPreview = typeof imgData === 'string' ? imgData.substring(0, 50) : typeof imgData;
+                    console.log(`📷 Skills: Found reference image in field "${field.name}" (type=${field.type}): ${imgPreview}... (${typeof imgData === 'string' ? imgData.length : 0} chars)`);
+                    referenceImages.push(imgData);
                 }
             }
         }
+        // Also check if inputs has any image-like data even without matching inputFields
+        if (referenceImages.length === 0 && inputs) {
+            for (const [key, value] of Object.entries(inputs)) {
+                if (typeof value === 'string' && (value.startsWith('data:image/') || (value.startsWith('http') && /\.(jpg|jpeg|png|webp|gif)/i.test(value)))) {
+                    console.log(`📷 Skills: Found image in input "${key}" (no matching field type): ${value.substring(0, 50)}... (${value.length} chars)`);
+                    referenceImages.push(value);
+                }
+            }
+        }
+        console.log(`📷 Skills: Total reference images collected: ${referenceImages.length}`);
 
         // ── AUTO-DETECT skill type from instructions & inputs ──────────────
         // If the user created a skill with type=text_output but the instructions
