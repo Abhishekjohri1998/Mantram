@@ -881,7 +881,7 @@ export default function SkillsHub() {
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                 {filtered.map(skill => {
                                     const c = getColors(skill.color)
-                                    const typeMeta = SKILL_TYPE_META[skill.skillType || 'text_output']
+                                    const typeMeta = SKILL_TYPE_META[skill.skillType] || SKILL_TYPE_META.text_output
                                     return (
                                         <div key={skill._id}
                                             className={`glass-panel rounded-2xl p-5 hover:bg-[var(--sys-surface)] transition-all group cursor-pointer border border-[var(--sys-border)] hover:${c.border}`}
@@ -957,7 +957,7 @@ export default function SkillsHub() {
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                     {marketplaceSkills.map(skill => {
                                         const c = getColors(skill.color || 'violet')
-                                        const typeMeta = SKILL_TYPE_META[skill.skillType || 'text_output']
+                                        const typeMeta = SKILL_TYPE_META[skill.skillType] || SKILL_TYPE_META.text_output
                                         const alreadyInstalled = skillsList.some(s => s.originalSkillId === skill._id || s._id === skill._id)
                                         return (
                                             <div key={skill._id} className="glass-panel rounded-2xl p-5 border border-[var(--sys-border)]">

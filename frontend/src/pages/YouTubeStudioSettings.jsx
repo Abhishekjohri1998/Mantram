@@ -364,7 +364,6 @@ function ChannelEditor({ channel, templates, onSave, onClose }) {
         channelName: '', channelId: '', channelUrl: '', niche: '',
         logoUrl: '', logoPlacement: 'top-right',
         defaultLanguage: { title: 'english', description: 'english', tags: 'english', thumbnail: 'english' },
-        defaultTemplateId: '',
         titlePreferences: { defaultMode: 'auto', maxLength: 65, style: 'auto' },
         thumbnailPreferences: { alwaysIncludeLogo: true, showTitleText: true, textLines: 2 },
         seoPreferences: { includeChapters: true, includeHashtags: true, hashtagCount: 5 },
