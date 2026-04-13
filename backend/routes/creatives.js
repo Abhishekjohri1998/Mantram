@@ -191,6 +191,7 @@ export async function internalGenerateCreative({ body, user, creditsDeducted, jo
                     brief: prompt,
                     format: type || 'instagram-post', // Changed to format to match node signature
                     mode: 'fast', // Enforce fast-path to bypass sequential LLM criticism delays
+                    refImageUrls: skillRefUrls, // Pass reference images from skill payload
                     options: options || {},
                     emit: async (agent, message, status, detail) => {
                         if (progressId) {
