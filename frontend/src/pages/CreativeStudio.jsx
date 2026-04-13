@@ -9,6 +9,7 @@ import VoiceInput from '../components/VoiceInput'
 import PublishModal from '../components/PublishModal'
 import GlobalLoader from '../components/GlobalLoader'
 import MaskingCanvas from '../components/MaskingCanvas'
+import Walkthrough from '../components/Walkthrough'
 import './CreativeStudio/CreativeStudio.css'
 
 // ── Helper: Time Ago ──
@@ -2312,9 +2313,19 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                 description="Use Mantram AI Creative Studio to generate stunning, brand-aligned ad creatives, social media graphics, and AI product photoshoots without a graphic designer." 
                 canonical="/creative-studio"
             />
+            <Walkthrough studioId="creativeStudio" />
+            {studioMode === 'create' && <Walkthrough studioId="creativeCreate" dependsOn="creativeStudio" />}
+            {studioMode === 'photoshoot' && <Walkthrough studioId="creativePhotoshoot" dependsOn="creativeStudio" />}
+            {studioMode === 'carousel' && <Walkthrough studioId="creativeCarousel" dependsOn="creativeStudio" />}
+            {studioMode === 'campaigns' && <Walkthrough studioId="creativeCampaigns" dependsOn="creativeStudio" />}
+            {studioMode === 'campaignlogo' && <Walkthrough studioId="creativeCampaignlogo" dependsOn="creativeStudio" />}
+            {studioMode === 'tryon' && <Walkthrough studioId="creativeTryon" dependsOn="creativeStudio" />}
+            {studioMode === 'mockups' && <Walkthrough studioId="creativeMockups" dependsOn="creativeStudio" />}
+            {studioMode === 'templates' && <Walkthrough studioId="creativeTemplates" dependsOn="creativeStudio" />}
+            {studioMode === 'imagebank' && <Walkthrough studioId="creativeImagebank" dependsOn="creativeStudio" />}
 
             {/* ══ Unified Studio Navigation (sticky — tabs + optional gallery sub-bar) ══ */}
-            <div className="flex flex-col gap-0 sticky z-40 border-b border-[var(--sys-border)]" style={{ top: 0, backgroundColor: 'var(--sys-surface)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', boxShadow: '0 2px 12px rgba(0,0,0,0.05)' }}>
+            <div data-wt="creative-modes" className="flex flex-col gap-0 sticky z-40 border-b border-[var(--sys-border)]" style={{ top: 0, backgroundColor: 'var(--sys-surface)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', boxShadow: '0 2px 12px rgba(0,0,0,0.05)' }}>
                 {/* ── Row 1: Tab Buttons ── */}
                 <div className="flex items-center gap-1.5 p-2 overflow-x-auto scrollbar-hide whitespace-nowrap">
                 {[
@@ -2428,7 +2439,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
 
 
                     {/* ═══════════ GALLERY (full-width — settings moved to floating bar) ═══════════ */}
-                    <div className="creative-gallery relative">
+                    <div className="creative-gallery relative" data-wt="creative-gallery">
 
                         {/* ═══ NATIVE ANIMATE WORKSPACE (MAIN UI) ═══ */}
                         {showAnimatePanel && (
@@ -3640,7 +3651,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                     </div>{/* ═══════════ END RIGHT GALLERY PANEL ═══════════ */}
 
                     {/* ═══════════ SIDEBAR COMMAND PANEL WITH SETTINGS ═══════════ */}
-                    <div className="creative-tools-panel !border-none !bg-[var(--sys-surface)]">
+                    <div data-wt="creative-prompt" className="creative-tools-panel !border-none !bg-[var(--sys-surface)]">
                             {/* ── NEW FREEPIK SIDEBAR BODY ── */}
                             <div className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-hide creative-tools-panel-body !flex !flex-col !h-full p-0">
                                 
@@ -3844,7 +3855,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 </div>
                                 {/* Big Soft Generate */}
                                 <CreditTooltipWrapper action="creative">
-                                    <button onClick={handleGenerate} disabled={!prompt.trim() || !activeBrand || activeGenerations.length >= 3}
+                                    <button data-wt="creative-generate" onClick={handleGenerate} disabled={!prompt.trim() || !activeBrand || activeGenerations.length >= 3}
                                         className={"studio-btn-primary w-full !py-3.5 !rounded-2xl transition-all flex items-center justify-center gap-2 " + (prompt.trim() ? "bg-[var(--sys-text)] hover:bg-black dark:hover:bg-white text-[var(--sys-bg)]" : "bg-[var(--sys-border)] text-[var(--sys-text-muted)] outline-none")}>
                                         {activeGenerations.length > 0 ? (
                                             <><span className="material-symbols-outlined animate-spin text-[18px]">progress_activity</span> <span className="text-[14px] font-bold">Generating {activeGenerations.length}/3...</span></>
@@ -3868,7 +3879,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
             {studioMode === 'photoshoot' && (
                 <div className="creative-split fade-up">
                                                 {/* ── NEW FREEPIK SIDEBAR BODY (PHOTOSHOOT) ── */}
-                            <div className="creative-tools-panel !border-none !bg-[var(--sys-surface)]">
+                            <div data-wt="ps-tools" className="creative-tools-panel !border-none !bg-[var(--sys-surface)]">
                                 <div className="flex items-center justify-between px-5 pt-5 pb-3">
                                     <div className="flex items-center gap-2">
                                         <div className="w-5 h-5 rounded-md bg-[var(--sys-text)] flex items-center justify-center">
@@ -4061,7 +4072,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 </div>
                                 {/* Big Soft Generate */}
                                 <CreditTooltipWrapper action="creative">
-                                    <button onClick={handlePhotoshoot} disabled={!photoshootBrief.trim() || !productImage || photoshootGenerating}
+                                    <button data-wt="ps-generate" onClick={handlePhotoshoot} disabled={!photoshootBrief.trim() || !productImage || photoshootGenerating}
                                         className={"w-full !py-3.5 !rounded-lg font-bold transition-all flex items-center justify-center gap-2 " + (photoshootBrief.trim() && productImage ? "bg-[var(--sys-text)] hover:bg-black text-[var(--sys-bg)] cursor-pointer" : "bg-[var(--sys-border)] text-[var(--sys-text-muted)] cursor-not-allowed")}>
                                         {photoshootGenerating ? (
                                             <><span className="material-symbols-outlined animate-spin text-[18px]">progress_activity</span> <span className="text-[14px]">Shooting Scene...</span></>
@@ -4669,7 +4680,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
 
             {/* =================== CAMPAIGN LOGO GENERATOR =================== */}
             {studioMode === 'campaignlogo' && (
-                <div className="max-w-6xl mx-auto fade-up pt-6">
+                <div data-wt="logo-area" className="max-w-6xl mx-auto fade-up pt-6">
                     <div className="glow-border rounded-2xl p-4 sm:p-6 mb-6 relative overflow-hidden" style={{ background: 'var(--sys-primary), rgba(239,68,68,0.04), rgba(255, 77, 0,0.03))' }}>
                         <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(circle at 80% 20%, rgba(245,158,11,0.08) 0%, transparent 50%)' }} />
                         <div className="relative">
@@ -5007,7 +5018,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                     </div>
 
                     {/* ═══ SIDEBAR COMMAND PANEL ═══ */}
-                    <div className="creative-tools-panel !border-none !bg-[var(--sys-surface)]">
+                    <div data-wt="carousel-panel" className="creative-tools-panel !border-none !bg-[var(--sys-surface)]">
                         {/* ── NEW FREEPIK SIDEBAR BODY ── */}
                         <div className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-hide creative-tools-panel-body !flex !flex-col !h-full p-0">
                                 
@@ -5198,7 +5209,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                         {/* ── Soft Generate Plinth ── */}
                         <div className="creative-tools-panel-footer !bg-[var(--sys-bg)] !border-none px-5 pt-3 pb-5 space-y-3 z-10 border-t border-[var(--sys-border)] shadow-[0_-10px_40px_rgba(0,0,0,0.03)] sticky bottom-0">
                             <CreditTooltipWrapper action="creative">
-                                <button onClick={handleCarouselGenerate} disabled={!carouselPrompt.trim() || !activeBrand || carouselGenerating}
+                                <button data-wt="carousel-generate" onClick={handleCarouselGenerate} disabled={!carouselPrompt.trim() || !activeBrand || carouselGenerating}
                                     className={"studio-btn-primary w-full !py-3.5 !rounded-2xl transition-all flex items-center justify-center gap-2 " + (carouselPrompt.trim() && !carouselGenerating ? "bg-[var(--sys-text)] hover:bg-black dark:hover:bg-white text-[var(--sys-bg)] shadow-[0_2px_10px_rgba(255,153,128,0.2)] cursor-pointer" : "bg-[var(--sys-border)] text-[var(--sys-text-muted)] outline-none")}>
                                     {carouselGenerating ? (
                                         <><span className="material-symbols-outlined animate-spin text-[18px]">progress_activity</span> <span className="text-[14px] font-bold">Generating...</span></>
@@ -5218,7 +5229,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
             {studioMode === 'campaigns' && (
                 <div className="max-w-6xl mx-auto fade-up pt-6">
                     {/* Header */}
-                    <div className="glow-border rounded-2xl p-4 sm:p-6 mb-6 relative overflow-hidden" style={{ background: 'var(--sys-primary), rgba(255, 77, 0,0.04), rgba(6,182,212,0.03))' }}>
+                    <div data-wt="camp-header" className="glow-border rounded-2xl p-4 sm:p-6 mb-6 relative overflow-hidden" style={{ background: 'var(--sys-primary), rgba(255, 77, 0,0.04), rgba(6,182,212,0.03))' }}>
                         <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(circle at 80% 20%, rgba(255, 77, 0,0.08) 0%, transparent 50%)' }} />
                         <div className="relative">
                             <h2 className="text-xl font-bold text-[var(--sys-text)] flex items-center gap-3 mb-1">
@@ -5231,7 +5242,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                     </div>
 
                     {/* Step Indicator — 3-step flow */}
-                    <div className="flex items-center gap-2 mb-6 overflow-x-auto scrollbar-hide pb-2">
+                    <div data-wt="camp-steps" className="flex items-center gap-2 mb-6 overflow-x-auto scrollbar-hide pb-2">
                         {[{n:1,l:'Intelligence Brief',icon:'psychology'},{n:2,l:'Copy & Style',icon:'palette'},{n:3,l:'Generate',icon:'auto_awesome'}].map((s,i)=>(
                             <Fragment key={s.n}>
                                 <button onClick={()=>s.n<campStep&&setCampStep(s.n)} className={`flex-shrink-0 flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${campStep===s.n?'bg-[var(--sys-text)] text-[var(--sys-bg)] border border-[var(--sys-text)]':campStep>s.n?'bg-[var(--sys-primary-dim)] text-[var(--sys-primary)] border border-[var(--sys-border)] cursor-pointer':'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] border border-[var(--sys-border)]'}`}>
@@ -5990,7 +6001,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
             {studioMode === 'templates' && (
                 <div>
 
-                    <div className="flex items-center justify-between mb-6 fade-up">
+                    <div data-wt="templates-header" className="flex items-center justify-between mb-6 fade-up">
                         <div>
                             <h3 className="text-xl font-extrabold text-gradient flex items-center gap-2">
                                 <span className="material-symbols-outlined text-2xl">dashboard_customize</span>
@@ -7313,7 +7324,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
 
             {/* =================== IMAGE BANK MODE =================== */}
             {studioMode === 'imagebank' && (
-                <div className="fade-up">
+                <div data-wt="imagebank-area" className="fade-up">
 
                     {/* ═══ GEMINI EDIT IMAGE WORKSPACE (Image Bank) ═══ */}
                     {showEditPanel && studioMode === 'imagebank' && (
@@ -8315,7 +8326,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
 
             {/* ====================== VIRTUAL TRY-ON MODE ====================== */}
             {studioMode === 'tryon' && (
-                <div className="max-w-5xl mx-auto fade-up pt-6">
+                <div data-wt="tryon-header" className="max-w-5xl mx-auto fade-up pt-6">
                     {/* Hero Header */}
                     <div className="glow-border rounded-2xl p-4 sm:p-6 mb-6 relative overflow-hidden" style={{ background: 'var(--sys-primary), rgba(255, 77, 0,0.04), rgba(6,182,212,0.03))' }}>
                         <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(circle at 80% 20%, rgba(236,72,153,0.08) 0%, transparent 50%), radial-gradient(circle at 20% 80%, rgba(255, 77, 0,0.06) 0%, transparent 50%)' }} />
@@ -8598,7 +8609,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
 
             {/* ====================== LIFESTYLE MOCKUPS MODE ====================== */}
             {studioMode === 'mockups' && (
-                <div className="max-w-5xl mx-auto fade-up pt-6">
+                <div data-wt="mockup-header" className="max-w-5xl mx-auto fade-up pt-6">
                     {/* Hero Header */}
                     <div className="glow-border rounded-2xl p-4 sm:p-6 mb-6 relative overflow-hidden" style={{ background: 'var(--sys-primary), rgba(255, 77, 0,0.04), rgba(255, 77, 0,0.03))' }}>
                         <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(circle at 80% 20%, rgba(6,182,212,0.08) 0%, transparent 50%), radial-gradient(circle at 20% 80%, rgba(255, 77, 0,0.06) 0%, transparent 50%)' }} />

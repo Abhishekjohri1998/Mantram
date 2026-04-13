@@ -4,6 +4,7 @@ import SEOHead from '../components/SEOHead'
 import { useBrand } from '../context/BrandContext'
 import { funnelStudio as api, nurtureSequences as nurtureApi, funnelIntelligence as intelApi, funnelAutomation as autoApi, funnelSharing as shareApi } from '../services/api'
 import StudioReportButton from '../components/reports/StudioReportButton'
+import Walkthrough from '../components/Walkthrough'
 
 // ═══════════════════════════════════════════════════════════════
 // FUNNEL STUDIO — Dashboard + Pipeline Kanban + Funnel Builder
@@ -1286,9 +1287,10 @@ export default function FunnelStudio() {
     return (
         <DashboardLayout title="Funnel Studio" subtitle="Build and manage your sales funnels">
             <SEOHead title="Funnel Studio — Mantram AI" noIndex={true} />
+            <Walkthrough studioId="funnelStudio" />
 
             {/* —— Standardized Studio Tab Bar —— */}
-            <div className="studio-tab-bar">
+            <div data-wt="funnel-tabs" className="studio-tab-bar">
                 <div className="studio-tab-row">
                     {[
                         { id: 'dashboard', icon: 'filter_alt', label: 'My Funnels' },

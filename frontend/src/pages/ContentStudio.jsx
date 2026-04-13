@@ -9,6 +9,7 @@ import GlobalLoader from '../components/GlobalLoader'
 import { CreditBadge, CreditTooltipWrapper } from '../components/CreditBadge'
 import PublishModal from '../components/PublishModal'
 import { useCallback, lazy, Suspense } from 'react'
+import Walkthrough from '../components/Walkthrough'
 
 
 
@@ -230,7 +231,7 @@ function SmartInput({ onParse, onSkip }) {
     }
 
     return (
-        <div className="max-w-2xl mx-auto text-center mb-8 animate-fade-in">
+        <div data-wt="smart-input" className="max-w-2xl mx-auto text-center mb-8 animate-fade-in">
             <div className="relative">
                 <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-primary-fixed text-xl">auto_awesome</span>
                 <input
@@ -261,7 +262,7 @@ function SmartInput({ onParse, onSkip }) {
 
 function StepGoal({ onSelect }) {
     return (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-4xl mx-auto">
+        <div data-wt="goal-grid" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-4xl mx-auto">
             {GOALS.map((g, i) => (
                 <button key={g.id} onClick={() => onSelect(g.id)}
                     className="glass-card p-5 text-left cursor-pointer group animate-fade-in"
@@ -4957,6 +4958,7 @@ SPOKESPERSON QUOTES:`
 
     return (
         <DashboardLayout title="Content Studio" subtitle="AI-powered content for every channel">
+            <Walkthrough studioId="contentStudio" />
             {/* Progress Stepper (shown at steps 1-4) */}
             {step > 0 && step < 5 && (
                 <div className="flex items-center gap-2 mb-8 max-w-3xl mx-auto">

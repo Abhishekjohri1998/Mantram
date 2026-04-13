@@ -9,6 +9,7 @@ import { creatives as creativesAPI } from '../services/api'
 import AdvancedMode from '../components/VideoStudio/AdvancedMode'
 import UGCCreator from '../components/VideoStudio/UGCCreator'
 import VideoAgent from '../components/VideoStudio/VideoAgent'
+import Walkthrough from '../components/Walkthrough'
 
 const API_BASE = import.meta.env.VITE_API_URL || `${window.location.origin}/api`
 
@@ -541,8 +542,9 @@ export default function VideoStudio() {
     return (
         <DashboardLayout title="Video Studio" subtitle="AI-powered video generation & editing">
             <SEOHead title="Video Studio — Mantram AI" noIndex={true} />
+            <Walkthrough studioId="videoStudio" />
             {/* —— Studio Mode Tab Bar (standardized sticky nav) —— */}
-                <div className="studio-tab-bar">
+                <div data-wt="video-modes" className="studio-tab-bar">
                     <div className="studio-tab-row">
                         {[
                             { id: 'advanced', icon: 'terminal', label: 'Advanced' },
@@ -862,7 +864,7 @@ export default function VideoStudio() {
                     {step === 0 && (
                         <div className="space-y-6">
                             {/* Video Type Selector */}
-                            <div className="glass-panel rounded-2xl p-5 border border-[var(--sys-border)]">
+                            <div data-wt="video-type" className="glass-panel rounded-2xl p-5 border border-[var(--sys-border)]">
                                 <h3 className="text-[11px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest mb-4 flex items-center gap-2">
                                     <span className="material-symbols-outlined text-[#FF4D00] text-[15px]">category</span>
                                     What kind of video?
@@ -889,7 +891,7 @@ export default function VideoStudio() {
                             </div>
 
                             {/* Brief Input */}
-                            <div className="glass-panel rounded-2xl p-5 border border-[var(--sys-border)]">
+                            <div data-wt="video-brief" className="glass-panel rounded-2xl p-5 border border-[var(--sys-border)]">
                                 <h3 className="text-base font-bold text-[var(--sys-text)] mb-3 flex items-center gap-2">
                                     <span className="material-symbols-outlined text-primary">edit_note</span>
                                     Your Brief
@@ -903,7 +905,7 @@ export default function VideoStudio() {
                             </div>
 
                             {/* Image Input — 3 Options */}
-                            <div className="glass-panel rounded-2xl p-5 border border-[var(--sys-border)]">
+                            <div data-wt="video-images" className="glass-panel rounded-2xl p-5 border border-[var(--sys-border)]">
                                 <h3 className="text-base font-bold text-[var(--sys-text)] mb-3 flex items-center gap-2">
                                     <span className="material-symbols-outlined text-primary">image</span>
                                     Reference Images <span className="text-[var(--sys-text-muted)] font-normal">(optional)</span>
@@ -1132,7 +1134,7 @@ export default function VideoStudio() {
                                     currentStage="Generating Concepts"
                                 />
                             ) : (
-                                <button onClick={handleStart}
+                                <button data-wt="video-start" onClick={handleStart}
                                     className="w-full py-4 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] font-bold text-base hover:shadow-xl hover:shadow-none transition-all cursor-pointer flex items-center justify-center gap-3">
                                     <span className="material-symbols-outlined">auto_awesome</span>Generate Video Concepts
                                 </button>

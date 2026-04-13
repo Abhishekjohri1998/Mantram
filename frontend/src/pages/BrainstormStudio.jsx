@@ -5,6 +5,7 @@ import FormattedText from '../components/FormattedText'
 import { brainstormStudio as bsAPI } from '../services/api'
 import { useBrand } from '../context/BrandContext'
 import { useAuth } from '../context/AuthContext'
+import Walkthrough from '../components/Walkthrough'
 
 // ── Topic quick-starts ────────────────────────────────────────────────────────
 const TOPICS = [
@@ -780,10 +781,11 @@ export default function BrainstormStudio() {
 
   return (
     <DashboardLayout title="Brainstorm Studio" subtitle="Powered by Fidato AI">
+      <Walkthrough studioId="brainstormStudio" />
       <div className="bs-root">
 
         {/* Phase bar */}
-        <div className="bs-phase-bar">
+        <div data-wt="bs-phase" className="bs-phase-bar">
           <div className="bs-phase-inner">
             {Object.entries(PHASES).map(([key, p]) => (
               <div key={key} className={`bs-phase-step ${phase === key ? 'active' : ''}`}
@@ -810,7 +812,7 @@ export default function BrainstormStudio() {
 
           {/* Topic chips — shown only at start */}
           {showTopics && (
-            <div className="bs-topics-wrap">
+            <div data-wt="bs-topics" className="bs-topics-wrap">
               <div className="bs-topics-label">What do you want to brainstorm?</div>
               <div className="bs-topics-grid">
                 {TOPICS.map(t => (
@@ -854,7 +856,7 @@ export default function BrainstormStudio() {
         <FeedbackToast message={feedbackToast.message} visible={feedbackToast.visible} />
 
         {/* Input */}
-        <div className="bs-input-area">
+        <div data-wt="bs-input" className="bs-input-area">
           <button
             className={`bs-mic-btn ${isListening ? 'listening' : ''}`}
             onClick={toggleVoice}

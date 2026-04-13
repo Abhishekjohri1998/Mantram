@@ -9,6 +9,7 @@ import { seoStudio as seoAPI, googleAnalytics as gaAPI } from '../services/api'
 import StudioReportButton from '../components/reports/StudioReportButton'
 import SeoAdvancedTools from '../components/seo/SeoAdvancedTools'
 import SeoTaskToast from '../components/seo/SeoTaskToast'
+import Walkthrough from '../components/Walkthrough'
 
 import GlobalLoader from '../components/GlobalLoader'
 
@@ -954,6 +955,7 @@ small{color:#94a3b8;font-size:10px}
                 description="Use Mantram AI SEO Studio to run technical SEO audits, perform AI-powered keyword clustering, and optimize your website for Google SGE and AI search visibility." 
                 canonical="/seo-studio"
             />
+            <Walkthrough studioId="seoStudio" />
 
             {!activeBrand ? (
                 <div className="max-w-7xl mx-auto">
@@ -968,7 +970,7 @@ small{color:#94a3b8;font-size:10px}
                 <div className="flex gap-0 min-h-0">
 
                     {/* ── Left Sidebar Navigation ── */}
-                    <div className="w-52 flex-shrink-0 sticky top-[4rem] self-start h-[calc(100vh-4rem)] overflow-y-auto"
+                    <div data-wt="seo-health" className="w-52 flex-shrink-0 sticky top-[4rem] self-start h-[calc(100vh-4rem)] overflow-y-auto"
                         style={{ borderRight: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.01)' }}>
                         <div className="py-3 px-2 space-y-4">
                             {/* GA Status */}

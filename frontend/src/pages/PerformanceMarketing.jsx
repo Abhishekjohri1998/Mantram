@@ -7,6 +7,7 @@ import DashboardLayout from '../components/DashboardLayout'
 import StudioReportButton from '../components/reports/StudioReportButton'
 import GlobalLoader from '../components/GlobalLoader'
 import { apiFetch as api, googleAnalytics } from '../services/api'
+import Walkthrough from '../components/Walkthrough'
 
 
 // ── Tab config ──
@@ -392,6 +393,7 @@ export default function PerformanceMarketing() {
                 description="Use Mantram AI Performance Studio to completely automate media buying. Conduct AI competitor research, generate cross-platform ad strategies, and manage Google Ads and Meta Ads campaigns." 
                 canonical="/performance-marketing"
             />
+            <Walkthrough studioId="pmStudio" />
             <div className="max-w-7xl mx-auto space-y-6">
                 {/* ── Error display ── */}
                 {error && (
@@ -417,7 +419,7 @@ export default function PerformanceMarketing() {
                 {/* ════════════════════════════════════════════════════════════ */}
                 {/* TAB NAVIGATION                                             */}
                 {/* ════════════════════════════════════════════════════════════ */}
-                <div className="flex gap-1 p-1.5 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] overflow-x-auto">
+                <div data-wt="pm-tabs" className="flex gap-1 p-1.5 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] overflow-x-auto">
                     {TABS.map(t => (
                         <button
                             key={t.id}

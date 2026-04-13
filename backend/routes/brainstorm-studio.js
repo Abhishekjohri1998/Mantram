@@ -1586,26 +1586,24 @@ async function mcotReason(message, history, sessionState, brandCtx, brand, sseEm
   const useWebSearch = needsWebResearch(message, detectedIntent);
   if (isDirectRequest) console.log(`[fidato-chat] Direct request detected: "${message.slice(0, 50)}..."`);
 
-  // ── Emit reasoning steps to frontend ──────────────────────────────────────
-  emitStep(`Analyzing ${brandName || 'brand'} DNA and context`, '🧬');
-  await new Promise(r => setTimeout(r, 200));
+  // ── Emit reasoning steps to frontend (optimized: skip redundant steps on follow-ups) ──
+  // Brand DNA is already built in-memory from the frontend payload — no DB/Redis/MCP call needed.
+  // Only show the "Analyzing DNA" step on the FIRST message when context needs to be established.
+  const isFirstTurn = userMessageCount <= 1 && !sessionState.intent;
+
+  if (isFirstTurn) {
+    emitStep(`Analyzing ${brandName || 'brand'} DNA and context`, '🧬');
+    await new Promise(r => setTimeout(r, 50));
+  }
 
   if (isDirectRequest) {
     emitStep(`User is asking a specific question — prioritizing their request`, '🎯');
-    await new Promise(r => setTimeout(r, 200));
-  } else {
-    emitStep(`Reviewing conversation (${userMessageCount} turns so far)`, '🔍');
-    await new Promise(r => setTimeout(r, 200));
+  } else if (isFirstTurn) {
+    emitStep('Identifying strategic direction', '🎯');
   }
 
   if (useWebSearch) {
     emitStep('Searching the web for market intelligence...', '🌐');
-    await new Promise(r => setTimeout(r, 200));
-  }
-
-  if (!isDirectRequest) {
-    emitStep('Identifying missing strategic information', '🎯');
-    await new Promise(r => setTimeout(r, 150));
   }
 
   // ── Build MCoT prompt with dedup ──────────────────────────────────────────

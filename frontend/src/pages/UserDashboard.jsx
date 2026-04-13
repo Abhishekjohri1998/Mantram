@@ -8,6 +8,7 @@ import { content as contentAPI, creatives as creativesAPI, trends as trendsAPI, 
 import { getUpcomingEvents, EVENT_COLORS } from '../data/calendarData'
 import SmartCommandBox from '../components/SmartCommandBox'
 import IntelReportViewer from '../components/IntelReportViewer'
+import Walkthrough from '../components/Walkthrough'
 
 // ── Helpers ──
 function getGreeting() {
@@ -399,6 +400,7 @@ export default function UserDashboard() {
     return (
         <DashboardLayout title="Command Center" subtitle="Your AI-driven operational hub">
             <SEOHead title="Command Center — Mantram AI" noIndex={true} />
+            <Walkthrough studioId="dashboard" />
 
             {/* ERROR BANNER */}
             {error && (
@@ -660,7 +662,7 @@ export default function UserDashboard() {
                 <div className="col-span-12 lg:col-span-4 flex flex-col gap-6">
                     
                     {/* ACTIVE STUDIOS LIST */}
-                    <div className="rounded-3xl border border-[var(--sys-border)] bg-[var(--sys-bg)] p-6 relative overflow-hidden">
+                    <div data-wt="dashboard-studios" className="rounded-3xl border border-[var(--sys-border)] bg-[var(--sys-bg)] p-6 relative overflow-hidden">
                         <h3 className="text-sm font-bold text-[var(--sys-text)] uppercase tracking-widest mb-6">Active Studios</h3>
                         <div className="space-y-1">
                             {studios.slice(0, 5).map((s, i) => (

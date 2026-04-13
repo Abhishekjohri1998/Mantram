@@ -6,6 +6,7 @@ import { useBrand } from '../context/BrandContext'
 import { socialMediaStudio as api, social, content as contentAPI } from '../services/api'
 import { CreditBadge } from '../components/CreditBadge'
 import PublishModal from '../components/PublishModal'
+import Walkthrough from '../components/Walkthrough'
 import { getEventsForMonth, getUpcomingEvents, EVENT_COLORS, COUNTRIES } from '../data/calendarData'
 
 const PLATFORMS = [
@@ -330,10 +331,11 @@ export default function SocialMediaStudio() {
     return (
         <DashboardLayout title="Social Media Studio" subtitle="AI-powered social strategy, calendar & publishing — all in one">
             <SEOHead title="Social Media Studio — Mantram AI" noIndex={true} />
+            <Walkthrough studioId="socialStudio" />
             <style>{`@keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}.shimmer-loading{background:var(--sys-primary) 25%,rgba(255,255,255,0.06) 50%,rgba(255,255,255,0.02) 75%);background-size:200% 100%;animation:shimmer 1.5s infinite}@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}`}</style>
 
             {/* TAB BAR — Standardized Studio Nav */}
-            <div className="studio-tab-bar">
+            <div data-wt="social-tabs" className="studio-tab-bar">
                 <div className="studio-tab-row">
                     {TABS.map(t => (
                         <button key={t.id} onClick={() => { setTab(t.id); setError(null) }}
