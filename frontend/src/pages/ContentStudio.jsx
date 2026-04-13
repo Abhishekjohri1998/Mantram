@@ -186,94 +186,693 @@ const SELL_STYLES = [
 // STEP COMPONENTS
 // ============================================================================
 
-function SmartInput({ onParse, onSkip }) {
+// ── Quick-start chips for the new agentic brief ──────────────────────────────
+const QUICK_CHIPS = [
+    { id: 'promote', icon: 'campaign', label: 'Promote', accent: '#F59E0B' },
+    { id: 'celebrate', icon: 'celebration', label: 'Celebrate', accent: '#EC4899' },
+    { id: 'launch', icon: 'rocket_launch', label: 'Launch', accent: '#3B82F6' },
+    { id: 'educate', icon: 'school', label: 'Educate', accent: '#10B981' },
+    { id: 'brand', icon: 'diamond', label: 'Brand', accent: '#8B5CF6' },
+    { id: 'blog', icon: 'edit_note', label: 'Blog', accent: '#14B8A6' },
+    { id: 'press_release', icon: 'newspaper', label: 'Press Release', accent: '#F43F5E' },
+    { id: 'product_content', icon: 'shopping_bag', label: 'Product', accent: '#06B6D4' },
+    { id: 'youtube_content', icon: 'smart_display', label: 'YouTube', accent: '#FF0000' },
+    { id: 'custom_blog', icon: 'draw', label: 'Write Yourself', accent: '#8B5CF6' },
+]
+
+function AgenticBrief({ onSubmit, onChipSelect, activeBrand }) {
     const [input, setInput] = useState('')
     const [parsing, setParsing] = useState(false)
+    const [analyzing, setAnalyzing] = useState(false)
+    const [linkMode, setLinkMode] = useState(false)
+    const [url, setUrl] = useState('')
+    const [imagePreview, setImagePreview] = useState(null)
+    const [imageFile, setImageFile] = useState(null)
+    const textRef = useRef(null)
+
+    const brandName = activeBrand?.name || ''
+    const dna = activeBrand?.dna || {}
+    const industry = dna.industry || dna.category || ''
+
+    // ── Auto-analyze image with AI when uploaded ──
+    const analyzeImage = async (imageData) => {
+        setAnalyzing(true)
+        try {
+            const data = await agentsAPI.analyzeImage({
+                image: imageData,
+                brandId: activeBrand?._id || null,
+                platform: 'instagram',
+            })
+            if (data.success && data.analysis) {
+                // Extract the first (Instagram) caption as starting point
+                // The user can then edit this before hitting Create
+                const caption = data.analysis
+                setInput(prev => prev ? prev + '\n\n' + caption : caption)
+                // Auto-resize textarea
+                setTimeout(() => {
+                    if (textRef.current) {
+                        textRef.current.style.height = 'auto'
+                        textRef.current.style.height = Math.min(textRef.current.scrollHeight, 200) + 'px'
+                    }
+                }, 50)
+            }
+        } catch (err) {
+            console.warn('Image analysis failed:', err.message)
+        } finally {
+            setAnalyzing(false)
+        }
+    }
 
     const handleSubmit = async () => {
-        if (!input.trim()) return
+        if (!input.trim() && !url.trim() && !imagePreview) return
         setParsing(true)
+        const rawInput = input.trim() + (url ? `\nURL: ${url}` : '')
         try {
-            // AI-powered intent parsing via Grok
-            const data = await contentAPI.parseIntent(input)
+            const data = await contentAPI.parseIntent(rawInput)
             const p = data.parsed || {}
-            onParse({
+            onSubmit({
                 goal: p.goal || null,
                 subType: p.subType || null,
                 channel: p.channel || null,
                 tone: p.tone || null,
-                rawInput: input,
-                brief: p.brief || input,
+                rawInput,
+                brief: p.brief || rawInput,
                 confidence: p.confidence || 0.5,
                 method: data.method || 'ai',
+                url: url || null,
+                imagePreview,
+                imageFile,
             })
         } catch (err) {
-            // Fallback to basic keyword detection
-            console.warn('AI intent parse failed, using basic detection:', err.message)
-            const lower = input.toLowerCase()
+            console.warn('AI intent parse failed, using regex:', err.message)
+            const lower = rawInput.toLowerCase()
             let goal = null, channel = null
             if (/promot|offer|sale|discount|deal|product/.test(lower)) goal = 'promote'
             else if (/festival|diwali|christmas|celebrat/.test(lower)) goal = 'celebrate'
             else if (/launch|announce|pr |press/.test(lower)) goal = 'launch'
-            else if (/blog|seo|article|guide|educat/.test(lower)) goal = 'educate'
+            else if (/blog|seo|article|guide|educat/.test(lower)) goal = 'blog'
             else if (/brand|story|about|tagline/.test(lower)) goal = 'brand'
-
+            else if (/youtube|yt |video script/.test(lower)) goal = 'youtube_content'
             if (/instagram|insta/i.test(lower)) channel = 'instagram'
             else if (/linkedin/i.test(lower)) channel = 'linkedin'
             else if (/twitter|tweet/i.test(lower)) channel = 'twitter'
             else if (/youtube|yt /i.test(lower)) channel = 'youtube'
             else if (/website|blog|web/i.test(lower)) channel = 'website'
-
-            onParse({ goal, subType: null, channel, rawInput: input, brief: input, confidence: 0.3, method: 'regex' })
+            onSubmit({ goal, subType: null, channel, rawInput, brief: rawInput, confidence: 0.3, method: 'regex', url: url || null, imagePreview, imageFile })
         } finally {
             setParsing(false)
         }
     }
 
+    const handleImageDrop = (e) => {
+        e.preventDefault()
+        const file = e.dataTransfer?.files?.[0] || e.target?.files?.[0]
+        if (file && file.type.startsWith('image/')) {
+            setImageFile(file)
+            const reader = new FileReader()
+            reader.onload = (ev) => {
+                const dataUrl = ev.target.result
+                setImagePreview(dataUrl)
+                // Auto-analyze the image with AI
+                analyzeImage(dataUrl)
+            }
+            reader.readAsDataURL(file)
+        }
+    }
+
+    // ── Auto-analyze when link is an image URL ──
+    const handleLinkBlur = () => {
+        const trimmed = url.trim()
+        if (!trimmed) return
+        // Check if URL points to an image
+        const isImageUrl = /\.(jpg|jpeg|png|gif|webp|svg|bmp|avif)(\?.*)?$/i.test(trimmed)
+            || /images\.unsplash|pbs\.twimg|instagram.*\.jpg|cdn\.shopify.*\.jpg/i.test(trimmed)
+        if (isImageUrl && !imagePreview) {
+            setImagePreview(trimmed)
+            analyzeImage(trimmed)
+        }
+    }
+
     return (
-        <div data-wt="smart-input" className="max-w-2xl mx-auto text-center mb-8 animate-fade-in">
-            <div className="relative">
-                <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-primary-fixed text-xl">auto_awesome</span>
-                <input
-                    value={input} onChange={e => setInput(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && handleSubmit()}
-                    placeholder="What do you want to create? Type or speak in any language..."
-                    className="input-glass w-full pl-12 pr-28 py-4 text-on-surface text-base rounded-2xl"
+        <div data-wt="agentic-brief" className="ab-root animate-fade-in">
+            {/* Hero */}
+            <div className="ab-hero">
+                <span className="material-symbols-outlined ab-hero-icon">auto_awesome</span>
+                <h2 className="ab-hero-title">
+                    What do you want to <span className="text-primary-fixed">create</span>?
+                </h2>
+                <p className="ab-hero-sub">
+                    {brandName
+                        ? `Describe your idea for ${brandName}${industry ? ` (${industry})` : ''} — Fidato will handle the rest.`
+                        : 'Describe your content idea in any language — Fidato will classify, refine, and generate.'}
+                </p>
+            </div>
+
+            {/* Main Input */}
+            <div className="ab-input-card">
+                <textarea
+                    ref={textRef}
+                    value={input}
+                    onChange={e => { setInput(e.target.value); e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 200) + 'px' }}
+                    onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSubmit() } }}
+                    placeholder={brandName ? `"Write an Instagram post for ${brandName}'s Diwali sale..."` : '"Write a LinkedIn post about our new product launch..."'}
+                    className="ab-textarea"
+                    rows={3}
                     autoFocus
                 />
-                <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                    <VoiceInput
-                        onResult={(text) => setInput(prev => prev ? prev + ' ' + text : text)}
-                        size="small"
-                    />
-                    <button onClick={handleSubmit} disabled={!input.trim() || parsing}
-                        className="btn-primary py-2 px-4 rounded-xl text-sm disabled:opacity-30 cursor-pointer">
-                        {parsing ? <span className="material-symbols-outlined animate-spin text-sm">progress_activity</span> : 'Go →'}
+
+                {/* Link input (toggle) */}
+                {linkMode && (
+                    <div className="ab-link-row animate-fade-in">
+                        <span className="material-symbols-outlined ab-link-icon">link</span>
+                        <input
+                            value={url}
+                            onChange={e => setUrl(e.target.value)}
+                            onBlur={handleLinkBlur}
+                            placeholder="Paste product, page, or image URL"
+                            className="ab-link-input"
+                        />
+                        <button onClick={() => { setLinkMode(false); setUrl('') }} className="ab-link-close">
+                            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>close</span>
+                        </button>
+                    </div>
+                )}
+
+                {/* Image preview */}
+                {imagePreview && (
+                    <div className="ab-image-preview animate-fade-in">
+                        <img src={imagePreview} alt="Attached" className="ab-image-thumb" />
+                        <span className="ab-image-name">
+                            {analyzing
+                                ? <><span className="material-symbols-outlined animate-spin" style={{ fontSize: 12, marginRight: 4 }}>progress_activity</span>Analyzing image...</>
+                                : (imageFile?.name || 'Image attached — caption generated ✓')}
+                        </span>
+                        <button onClick={() => { setImagePreview(null); setImageFile(null); setInput('') }} className="ab-link-close" disabled={analyzing}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>close</span>
+                        </button>
+                    </div>
+                )}
+
+                {/* Toolbar */}
+                <div className="ab-toolbar">
+                    <div className="ab-toolbar-left">
+                        <button className="ab-tool-btn" onClick={() => setLinkMode(l => !l)} title="Paste a link">
+                            <span className="material-symbols-outlined">link</span>
+                        </button>
+                        <label className="ab-tool-btn" title="Upload image">
+                            <span className="material-symbols-outlined">add_photo_alternate</span>
+                            <input type="file" className="hidden" accept="image/*" onChange={handleImageDrop} />
+                        </label>
+                        <VoiceInput
+                            onResult={(text) => setInput(prev => prev ? prev + ' ' + text : text)}
+                            size="small"
+                        />
+                    </div>
+                    <button
+                        onClick={handleSubmit}
+                        disabled={(!input.trim() && !url.trim() && !imagePreview) || parsing || analyzing}
+                        className="ab-submit-btn"
+                    >
+                        {parsing
+                            ? <><span className="material-symbols-outlined animate-spin" style={{ fontSize: 16 }}>progress_activity</span> Classifying...</>
+                            : analyzing
+                                ? <><span className="material-symbols-outlined animate-spin" style={{ fontSize: 16 }}>progress_activity</span> Reading image...</>
+                                : <><span className="material-symbols-outlined" style={{ fontSize: 16 }}>auto_awesome</span> Create →</>}
                     </button>
                 </div>
             </div>
-            <p className="text-xs text-[var(--sys-text-muted)]/50 mt-2.5">
-                <span className="material-symbols-outlined text-xs align-middle mr-0.5">mic</span>
-                Speak in Hindi, Tamil, Spanish, or any language • Or type below ↓
-            </p>
+
+            {/* Quick-start chips */}
+            <div className="ab-chips-wrap">
+                <p className="ab-chips-label">Or pick a content type</p>
+                <div className="ab-chips-grid">
+                    {QUICK_CHIPS.map((c, i) => (
+                        <button
+                            key={c.id}
+                            className="ab-chip"
+                            style={{ animationDelay: `${i * 40}ms`, '--chip-accent': c.accent }}
+                            onClick={() => onChipSelect(c.id)}
+                        >
+                            <span className="material-symbols-outlined ab-chip-icon">{c.icon}</span>
+                            <span>{c.label}</span>
+                        </button>
+                    ))}
+                </div>
+            </div>
         </div>
     )
 }
 
-function StepGoal({ onSelect }) {
+// ============================================================================
+// AGENTIC REFINEMENT — Dynamic settings based on Classification
+// ============================================================================
+function AgenticRefinement({ parsed, onConfirm, onBack, activeBrand, availableProviders, modelOverride, setModelOverride }) {
+    // Classification state (editable)
+    const [contentType, setContentType] = useState(parsed.goal && ['blog', 'educate'].includes(parsed.goal) ? 'blog' : 'social')
+    const [goal, setGoal] = useState(parsed.goal || 'promote')
+    const [channel, setChannel] = useState(parsed.channel ? (Array.isArray(parsed.channel) ? parsed.channel : [parsed.channel]) : [])
+    const [tone, setTone] = useState(parsed.tone || 'bold')
+    const [length, setLength] = useState('medium')
+    const [sellStyle, setSellStyle] = useState('direct')
+    const [details, setDetails] = useState(parsed.rawInput || '')
+    const [url, setUrl] = useState(parsed.url || '')
+    const [imagePreview, setImagePreview] = useState(parsed.imagePreview || null)
+    const [showAdvanced, setShowAdvanced] = useState(false)
+
+    // Blog-specific
+    const [targetWordCount, setTargetWordCount] = useState(1200)
+    const [keywords, setKeywords] = useState('')
+    const [blogType, setBlogType] = useState('seo_blog')
+
+    // Language — default from brand DNA
+    const defaultLang = activeBrand?.dna?.defaultLanguage || 'english'
+    const defaultStyle = activeBrand?.dna?.languageStyle || 'pure'
+    const [language, setLanguage] = useState(defaultLang)
+    const [langStyle, setLangStyle] = useState(defaultStyle)
+    const [scriptType, setScriptType] = useState('regional')
+    const [researchDepth, setResearchDepth] = useState(contentType === 'blog' ? 'deep' : 'quick')
+
+    const confidence = parsed.confidence || 0.5
+    const classLabel = contentType === 'blog' ? 'Blog / Article' : 'Social Post'
+    const classIcon = contentType === 'blog' ? 'edit_note' : 'share'
+
+    const handleConfirm = () => {
+        onConfirm({
+            contentType,
+            goal,
+            channel: channel.length === 1 ? channel[0] : channel.length > 1 ? channel : 'instagram',
+            tone,
+            length,
+            sellStyle,
+            language,
+            langStyle,
+            scriptType,
+            researchDepth,
+            details,
+            url,
+            imagePreview,
+            // Blog specifics
+            targetWordCount,
+            keywords,
+            blogType,
+            rawInput: parsed.rawInput,
+        })
+    }
+
+    const BLOG_TYPES = [
+        { id: 'seo_blog', icon: 'search', label: 'SEO Blog' },
+        { id: 'long_form', icon: 'article', label: 'Long-form' },
+        { id: 'listicle', icon: 'format_list_numbered', label: 'Listicle' },
+        { id: 'case_study', icon: 'assignment', label: 'Case Study' },
+        { id: 'how_to', icon: 'menu_book', label: 'How-To' },
+    ]
+
     return (
-        <div data-wt="goal-grid" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-4xl mx-auto">
-            {GOALS.map((g, i) => (
-                <button key={g.id} onClick={() => onSelect(g.id)}
-                    className="glass-card p-5 text-left cursor-pointer group animate-fade-in"
-                    style={{ animationDelay: `${i * 60}ms` }}>
-                    <div className={`glass-icon ${g.glow} mb-3 group-hover:scale-110 transition-transform duration-300`}>
-                        <span className={`material-symbols-outlined ${g.iconColor} text-lg`}>{g.icon}</span>
+        <div className="ar-root animate-fade-in">
+            <button onClick={onBack} className="ar-back-btn">
+                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>arrow_back</span> Back
+            </button>
+
+            {/* Classification chip */}
+            <div className="ar-classification">
+                <div className="ar-class-left">
+                    <span className="material-symbols-outlined ar-class-icon">{classIcon}</span>
+                    <div>
+                        <span className="ar-class-label">Fidato detected:</span>
+                        <span className="ar-class-type">{classLabel}</span>
+                        {confidence < 0.7 && <span className="ar-class-low">Low confidence — verify below</span>}
                     </div>
-                    <h3 className="text-base font-bold text-on-surface mb-1">{g.label}</h3>
-                    <p className="text-sm text-[var(--sys-text-muted)] leading-relaxed">{g.desc}</p>
+                </div>
+                <div className="ar-class-toggle">
+                    <button
+                        className={`ar-toggle-btn ${contentType === 'social' ? 'active' : ''}`}
+                        onClick={() => { setContentType('social'); setResearchDepth('quick') }}
+                    >
+                        <span className="material-symbols-outlined" style={{ fontSize: 14 }}>share</span> Social
+                    </button>
+                    <button
+                        className={`ar-toggle-btn ${contentType === 'blog' ? 'active' : ''}`}
+                        onClick={() => { setContentType('blog'); setResearchDepth('deep') }}
+                    >
+                        <span className="material-symbols-outlined" style={{ fontSize: 14 }}>edit_note</span> Blog
+                    </button>
+                </div>
+            </div>
+
+            {/* Context summary (editable) */}
+            <div className="ar-context-preview">
+                <div className="ar-ctx-label">
+                    <span className="material-symbols-outlined" style={{ fontSize: 14 }}>description</span>
+                    Your brief
+                </div>
+                <textarea
+                    value={details}
+                    onChange={e => setDetails(e.target.value)}
+                    className="ar-ctx-textarea"
+                    rows={2}
+                />
+                {imagePreview && (
+                    <div className="ar-ctx-image">
+                        <img src={imagePreview} alt="ref" className="ar-ctx-img-thumb" />
+                        <span className="ar-ctx-img-label">Image attached</span>
+                    </div>
+                )}
+            </div>
+
+            {/* ─── SOCIAL PATH ─── */}
+            {contentType === 'social' && (
+                <div className="ar-section-grid animate-fade-in">
+                    {/* Platform */}
+                    <div className="ar-section">
+                        <p className="ar-section-title">
+                            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>public</span> Platform
+                        </p>
+                        <div className="ar-platform-chips">
+                            {CHANNELS.filter(c => c.id !== 'multi').map(ch => (
+                                <button key={ch.id}
+                                    className={`ar-plat-chip ${channel.includes(ch.id) ? 'active' : ''}`}
+                                    onClick={() => setChannel(prev => prev.includes(ch.id) ? prev.filter(x => x !== ch.id) : [...prev, ch.id])}
+                                >
+                                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>{ch.fallbackIcon}</span>
+                                    {ch.label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Tone */}
+                    <div className="ar-section">
+                        <p className="ar-section-title">
+                            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>palette</span> Tone
+                        </p>
+                        <div className="ar-chip-row">
+                            {TONES.map(t => (
+                                <button key={t.id}
+                                    className={`ar-opt-chip ${tone === t.id ? 'active' : ''}`}
+                                    onClick={() => setTone(t.id)}
+                                >
+                                    <span className="material-symbols-outlined" style={{ fontSize: 14 }}>{t.icon}</span> {t.label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Length */}
+                    <div className="ar-section">
+                        <p className="ar-section-title">
+                            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>short_text</span> Length
+                        </p>
+                        <div className="ar-chip-row">
+                            {LENGTHS.map(l => (
+                                <button key={l.id}
+                                    className={`ar-opt-chip ${length === l.id ? 'active' : ''}`}
+                                    onClick={() => setLength(l.id)}
+                                >
+                                    <span className="material-symbols-outlined" style={{ fontSize: 14 }}>{l.icon}</span> {l.label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Sell style (only for promote/launch) */}
+                    {['promote', 'launch'].includes(goal) && (
+                        <div className="ar-section">
+                            <p className="ar-section-title">
+                                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>sell</span> Selling Approach
+                            </p>
+                            <div className="ar-chip-row">
+                                {SELL_STYLES.map(s => (
+                                    <button key={s.id}
+                                        className={`ar-opt-chip ${sellStyle === s.id ? 'active' : ''}`}
+                                        onClick={() => setSellStyle(s.id)}
+                                    >
+                                        {s.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* ─── BLOG PATH ─── */}
+            {contentType === 'blog' && (
+                <div className="ar-section-grid animate-fade-in">
+                    {/* Blog type */}
+                    <div className="ar-section">
+                        <p className="ar-section-title">
+                            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>article</span> Blog Type
+                        </p>
+                        <div className="ar-chip-row">
+                            {BLOG_TYPES.map(t => (
+                                <button key={t.id}
+                                    className={`ar-opt-chip ${blogType === t.id ? 'active' : ''}`}
+                                    onClick={() => setBlogType(t.id)}
+                                >
+                                    <span className="material-symbols-outlined" style={{ fontSize: 14 }}>{t.icon}</span> {t.label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Word count */}
+                    <div className="ar-section">
+                        <p className="ar-section-title">
+                            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>format_size</span>
+                            Word Count — <strong style={{ color: 'var(--sys-primary)' }}>{targetWordCount.toLocaleString()}</strong>
+                        </p>
+                        <input type="range" min={800} max={3000} step={100} value={targetWordCount}
+                            onChange={e => setTargetWordCount(Number(e.target.value))}
+                            className="ar-range" />
+                        <div className="ar-range-labels">
+                            <span>800</span><span>1500</span><span>2000</span><span>3000</span>
+                        </div>
+                    </div>
+
+                    {/* Keywords */}
+                    <div className="ar-section">
+                        <p className="ar-section-title">
+                            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>key</span> Target Keywords
+                        </p>
+                        <input
+                            value={keywords}
+                            onChange={e => setKeywords(e.target.value)}
+                            placeholder="e.g. digital marketing, brand strategy, SEO tips"
+                            className="ar-keyword-input"
+                        />
+                    </div>
+
+                    {/* Tone for blog */}
+                    <div className="ar-section">
+                        <p className="ar-section-title">
+                            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>palette</span> Tone
+                        </p>
+                        <div className="ar-chip-row">
+                            {TONES.map(t => (
+                                <button key={t.id}
+                                    className={`ar-opt-chip ${tone === t.id ? 'active' : ''}`}
+                                    onClick={() => setTone(t.id)}
+                                >
+                                    <span className="material-symbols-outlined" style={{ fontSize: 14 }}>{t.icon}</span> {t.label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ─── SHARED: Language + Advanced ─── */}
+            <div className="ar-footer-section">
+                {/* Language chip */}
+                <div className="ar-lang-row">
+                    <span className="ar-section-title" style={{ marginBottom: 0 }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 14 }}>translate</span> Language
+                    </span>
+                    <select value={language} onChange={e => setLanguage(e.target.value)} className="ar-lang-select">
+                        <option value="english">🇬🇧 English</option>
+                        <option value="hindi">🇮🇳 Hindi</option>
+                        <option value="tamil">🇮🇳 Tamil</option>
+                        <option value="telugu">🇮🇳 Telugu</option>
+                        <option value="bengali">🇮🇳 Bengali</option>
+                        <option value="marathi">🇮🇳 Marathi</option>
+                        <option value="gujarati">🇮🇳 Gujarati</option>
+                        <option value="punjabi">🇮🇳 Punjabi</option>
+                        <option value="kannada">🇮🇳 Kannada</option>
+                    </select>
+                    {language !== 'english' && (
+                        <select value={langStyle} onChange={e => setLangStyle(e.target.value)} className="ar-lang-select">
+                            <option value="pure">Pure {language}</option>
+                            <option value="mixed">Mix with English</option>
+                            <option value="slang">Local Slang</option>
+                        </select>
+                    )}
+                    {language !== 'english' && (
+                        <select value={scriptType} onChange={e => setScriptType(e.target.value)} className="ar-lang-select">
+                            <option value="regional">Regional Script</option>
+                            <option value="roman">Roman Letters</option>
+                        </select>
+                    )}
+                </div>
+
+                {/* Advanced toggle */}
+                <button onClick={() => setShowAdvanced(a => !a)} className="ar-advanced-toggle">
+                    <span className="material-symbols-outlined" style={{ fontSize: 14 }}>{showAdvanced ? 'expand_less' : 'tune'}</span>
+                    Advanced Settings
+                    <span className="ar-badge">{modelOverride === 'auto' ? 'Auto' : modelOverride}</span>
                 </button>
-            ))}
+                {showAdvanced && (
+                    <div className="ar-advanced-panel animate-fade-in">
+                        <div className="ar-section">
+                            <p className="ar-section-title">Research Depth</p>
+                            <div className="ar-chip-row">
+                                <button className={`ar-opt-chip ${researchDepth === 'quick' ? 'active' : ''}`} onClick={() => setResearchDepth('quick')}>
+                                    <span className="material-symbols-outlined" style={{ fontSize: 14 }}>bolt</span> Quick
+                                </button>
+                                <button className={`ar-opt-chip ${researchDepth === 'deep' ? 'active' : ''}`} onClick={() => setResearchDepth('deep')}>
+                                    <span className="material-symbols-outlined" style={{ fontSize: 14 }}>psychology</span> Deep Research
+                                </button>
+                            </div>
+                        </div>
+                        <div className="ar-section">
+                            <p className="ar-section-title">AI Model</p>
+                            <div className="ar-chip-row">
+                                {availableProviders.map(p => (
+                                    <button key={p.id} className={`ar-opt-chip ${modelOverride === p.id ? 'active' : ''}`}
+                                        onClick={() => setModelOverride(p.id)}>
+                                        <span className="material-symbols-outlined" style={{ fontSize: 14 }}>{p.icon}</span> {p.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* CTA */}
+            <button onClick={handleConfirm} className="ar-cta-btn" disabled={contentType === 'social' && channel.length === 0}>
+                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>arrow_forward</span>
+                Review Brief →
+            </button>
+        </div>
+    )
+}
+
+// ============================================================================
+// BRIEF REVIEW — Creative brief confirmation before generation
+// ============================================================================
+function BriefReview({ refinedData, activeBrand, onGenerate, onBack, generating }) {
+    const brandName = activeBrand?.name || 'Your Brand'
+    const dna = activeBrand?.dna || {}
+    const isBlog = refinedData.contentType === 'blog'
+
+    const channelLabel = Array.isArray(refinedData.channel)
+        ? refinedData.channel.map(c => CHANNELS.find(ch => ch.id === c)?.label || c).join(', ')
+        : CHANNELS.find(c => c.id === refinedData.channel)?.label || refinedData.channel || '—'
+    const toneLabel = TONES.find(t => t.id === refinedData.tone)?.label || refinedData.tone
+    const lengthLabel = LENGTHS.find(l => l.id === refinedData.length)?.label || refinedData.length
+    const goalData = GOALS.find(g => g.id === refinedData.goal)
+
+    return (
+        <div className="br-root animate-fade-in">
+            <button onClick={onBack} className="ar-back-btn">
+                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>arrow_back</span> Back
+            </button>
+
+            <div className="br-card">
+                <div className="br-header">
+                    <span className="material-symbols-outlined br-header-icon">assignment</span>
+                    <div>
+                        <h3 className="br-title">Creative Brief</h3>
+                        <p className="br-subtitle">Review and confirm before Fidato generates</p>
+                    </div>
+                </div>
+
+                <div className="br-body">
+                    {/* Row: Type */}
+                    <div className="br-row">
+                        <span className="br-row-label">Type</span>
+                        <span className="br-row-value">
+                            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>{isBlog ? 'edit_note' : 'share'}</span>
+                            {isBlog ? `${refinedData.blogType?.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || 'SEO Blog'} • ${refinedData.targetWordCount?.toLocaleString() || '1,200'} words`
+                                : `${goalData?.label || 'Social Post'} • ${lengthLabel}`}
+                        </span>
+                    </div>
+
+                    {/* Row: Brand */}
+                    <div className="br-row">
+                        <span className="br-row-label">Brand</span>
+                        <span className="br-row-value">
+                            {brandName} • {toneLabel} tone
+                            {dna.defaultLanguage && dna.defaultLanguage !== 'english' && ` • ${dna.defaultLanguage}`}
+                        </span>
+                    </div>
+
+                    {/* Row: Platform / Channel */}
+                    {!isBlog && (
+                        <div className="br-row">
+                            <span className="br-row-label">Platform</span>
+                            <span className="br-row-value">{channelLabel}</span>
+                        </div>
+                    )}
+
+                    {/* Row: Context */}
+                    <div className="br-row">
+                        <span className="br-row-label">Context</span>
+                        <span className="br-row-value br-row-context">{refinedData.details || refinedData.rawInput || '—'}</span>
+                    </div>
+
+                    {/* Row: Keywords (blog) */}
+                    {isBlog && refinedData.keywords && (
+                        <div className="br-row">
+                            <span className="br-row-label">Keywords</span>
+                            <span className="br-row-value">{refinedData.keywords}</span>
+                        </div>
+                    )}
+
+                    {/* Row: Language */}
+                    <div className="br-row">
+                        <span className="br-row-label">Language</span>
+                        <span className="br-row-value">
+                            {refinedData.language === 'english' ? 'English' :
+                                `${refinedData.language?.charAt(0).toUpperCase() + refinedData.language?.slice(1)} (${refinedData.langStyle || 'pure'}) — ${refinedData.scriptType || 'regional'} script`}
+                        </span>
+                    </div>
+
+                    {/* Row: Research */}
+                    <div className="br-row">
+                        <span className="br-row-label">Research</span>
+                        <span className="br-row-value">
+                            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>{refinedData.researchDepth === 'deep' ? 'psychology' : 'bolt'}</span>
+                            {refinedData.researchDepth === 'deep' ? 'Deep Research (Web + SEO + Competitors)' : 'Quick Research (Trending + Brand DNA)'}
+                        </span>
+                    </div>
+
+                    {/* Image */}
+                    {refinedData.imagePreview && (
+                        <div className="br-row">
+                            <span className="br-row-label">Image</span>
+                            <span className="br-row-value">
+                                <img src={refinedData.imagePreview} alt="ref" style={{ width: 40, height: 40, borderRadius: 6, objectFit: 'cover' }} />
+                                Image will be analyzed
+                            </span>
+                        </div>
+                    )}
+                </div>
+
+                {/* CTA */}
+                <div className="br-footer">
+                    <button onClick={onBack} className="br-edit-btn">
+                        <span className="material-symbols-outlined" style={{ fontSize: 14 }}>edit</span> Edit Brief
+                    </button>
+                    <CreditTooltipWrapper action="content">
+                        <button onClick={() => onGenerate(refinedData)} className="br-generate-btn" disabled={generating}>
+                            {generating
+                                ? <><span className="material-symbols-outlined animate-spin" style={{ fontSize: 16 }}>progress_activity</span> Generating...</>
+                                : <><span className="material-symbols-outlined" style={{ fontSize: 16 }}>auto_awesome</span> Looks Good — Generate <CreditBadge action="content" /></>}
+                        </button>
+                    </CreditTooltipWrapper>
+                </div>
+            </div>
         </div>
     )
 }
@@ -4219,12 +4818,14 @@ export default function ContentStudio() {
     const { activeBrand } = useBrand()
     const navigate = useNavigate()
     const [searchParams, setSearchParams] = useSearchParams()
-    const [step, setStep] = useState(0)   // 0=goal, 1=subtype, 2=channel, 3=context, 4=tone, 5=result, 6=PR, 7=product, 8=youtube wizard, 9=youtube result, 10=youtube SEO wizard, 11=youtube SEO result, 12=blog wizard, 13=blog editor, 14=custom blog writer
+    const [step, setStep] = useState(0)   // 0=brief, 1=refinement, 2=brief-review, 5=result, 6=PR, 7=product, 8=youtube, 9=yt-result, 10=yt-seo, 11=yt-seo-result, 12=blog wizard, 13=blog editor, 14=custom blog
     const [goal, setGoal] = useState(null)
     const [subType, setSubType] = useState(null)
     const [channel, setChannel] = useState(null)
     const [context, setContext] = useState(null)
     const [toneSettings, setToneSettings] = useState(null)
+    const [parsedBrief, setParsedBrief] = useState(null)   // AI-classified intent from AgenticBrief
+    const [refinedData, setRefinedData] = useState(null)    // Full settings from AgenticRefinement
     const [result, setResult] = useState(null)
     const [generating, setGenerating] = useState(false)
     const [error, setError] = useState(null)
@@ -4276,20 +4877,22 @@ export default function ContentStudio() {
 
         if (occasion) {
             // Coming from Calendar or Dashboard with an occasion
+            const briefText = `Create content for ${occasion}.${emoji ? 'Emoji: ' + emoji + '. ' : ''}This is a ${tone || 'festive'} occasion.`
             setGoal('celebrate')
-            setSubType('festival')
-            setContext({ details: `Create content for ${occasion}.${emoji ? 'Emoji: ' + emoji + '. ' : ''}This is a ${tone || 'festive'} occasion.` })
+            setContext({ details: briefText })
             setPrefilledOccasion({ name: occasion, tone, emoji })
-            setStep(2) // Jump to channel selection
+            setParsedBrief({ goal: 'celebrate', rawInput: briefText, confidence: 1, method: 'url', channel: null })
+            setStep(1) // → AgenticRefinement
             setSearchParams({}, { replace: true })
         } else if (searchParams.get('fromPhotoshoot')) {
             // Coming from AI Photoshoot — load image and auto-analyze
             const photoshootImg = window.sessionStorage.getItem('photoshootImage')
             if (photoshootImg) {
                 setGoal('promote')
-                setSubType('product')
-                setPhotoshootImage(photoshootImg)
-                setStep(3) // Jump to context step with image
+                const briefText = 'Write a compelling social media post for this product image. Include relevant hashtags and a strong CTA.'
+                setContext({ details: briefText })
+                setParsedBrief({ goal: 'promote', rawInput: briefText, confidence: 1, method: 'url', channel: null, imagePreview: photoshootImg })
+                setStep(1) // → AgenticRefinement
                 window.sessionStorage.removeItem('photoshootImage')
             }
             setSearchParams({}, { replace: true })
@@ -4297,24 +4900,25 @@ export default function ContentStudio() {
             // Coming from Creative Studio — generate caption for generated image
             const creativeImageUrl = searchParams.get('imageUrl')
             if (creativeImageUrl) {
+                const briefText = 'Write a compelling social media caption for this creative. Include relevant hashtags and a strong CTA.'
                 setGoal('promote')
-                setSubType('social')
-                setPhotoshootImage(creativeImageUrl)
-                setContext({ details: 'Write a compelling social media caption for this creative. Include relevant hashtags and a strong CTA.' })
-                setStep(2) // Jump to channel selection
+                setContext({ details: briefText })
+                setParsedBrief({ goal: 'promote', rawInput: briefText, confidence: 1, method: 'url', channel: null, imagePreview: creativeImageUrl })
+                setStep(1) // → AgenticRefinement
             }
             setSearchParams({}, { replace: true })
         } else if (searchParams.get('goal') === 'hijack' || searchParams.get('trend')) {
             // Coming from Dashboard Trending Now widget
             const trendTopic = searchParams.get('trend') || ''
             const trendPrompt = prompt || searchParams.get('prompt') || ''
+            const briefText = trendPrompt || `Create trending content about "${trendTopic}"`
             setGoal('hijack')
-            setContext({ details: trendPrompt || `Create trending content about "${trendTopic}"` })
-            setStep(2) // Jump to channel selection
+            setContext({ details: briefText })
+            setParsedBrief({ goal: 'hijack', rawInput: briefText, confidence: 1, method: 'url', channel: null })
+            setStep(1) // → AgenticRefinement
             setSearchParams({}, { replace: true })
         } else if (prompt) {
-            // Coming from Dashboard Quick Create
-            // Feed through smart parser logic
+            // Coming from Dashboard Quick Create — route through new agentic flow
             const lower = prompt.toLowerCase()
             let detectedGoal = null
             if (/promot|offer|sale|discount|deal|product/.test(lower)) detectedGoal = 'promote'
@@ -4336,45 +4940,81 @@ export default function ContentStudio() {
             setContext({ details: prompt })
             if (detectedGoal === 'youtube_content') {
                 setGoal('youtube_content')
-                setStep(1)  // Show YouTube sub-types (Script vs SEO)
-            } else if (detectedGoal === 'blog') {
-                setGoal('blog')
-                setBlogBrief(prompt)
-                setStep(12)  // Jump to blog input
-            } else if (detectedGoal) {
-                setGoal(detectedGoal)
-                if (detectedChannel) {
-                    setChannel(detectedChannel)
-                    setStep(4) // Jump to tone
-                } else {
-                    setStep(2) // Jump to channel
-                }
+                setStep(15)  // YouTube sub-type picker
             } else {
-                setStep(0) // Show goal chooser
+                setParsedBrief({ goal: detectedGoal || 'promote', rawInput: prompt, confidence: 0.6, method: 'regex', channel: detectedChannel })
+                setGoal(detectedGoal || 'promote')
+                setStep(1) // → AgenticRefinement
             }
             setSearchParams({}, { replace: true })
         }
     }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-    // Smart input handler
+    // Smart input handler — routes through new agentic flow
     const handleSmartParse = (parsed) => {
-        if (parsed.goal === 'blog') {
-            setGoal('blog')
-            setBlogBrief(parsed.rawInput)
-            setStep(12)
-        } else if (parsed.goal) {
-            setGoal(parsed.goal)
-            if (parsed.channel) {
-                setChannel(parsed.channel)
-                setContext({ details: parsed.rawInput })
-                setStep(4) // Jump to tone
-            } else {
-                setStep(1) // Go to sub-type
-            }
-        } else {
-            setContext({ details: parsed.rawInput })
-            setStep(0) // Show goal chooser with context saved
+        // Specialized flows bypass the new pipeline
+        if (parsed.goal === 'press_release') {
+            setGoal('press_release'); setStep(6); return
         }
+        if (parsed.goal === 'product_content') {
+            setGoal('product_content'); setStep(7); return
+        }
+        if (parsed.goal === 'youtube_content') {
+            setGoal('youtube_content'); setStep(15); return  // step 15 = youtube sub-type picker
+        }
+        if (parsed.goal === 'custom_blog') {
+            setGoal('custom_blog'); setStep(14); return
+        }
+        // Everything else → new agentic refinement flow
+        setParsedBrief(parsed)
+        setGoal(parsed.goal)
+        if (parsed.channel) setChannel(parsed.channel)
+        setContext({ details: parsed.rawInput, url: parsed.url })
+        setStep(1) // → AgenticRefinement
+    }
+
+    // Chip quick-select from AgenticBrief
+    const handleChipSelect = (chipId) => {
+        if (chipId === 'press_release') { setGoal('press_release'); setStep(6); return }
+        if (chipId === 'product_content') { setGoal('product_content'); setStep(7); return }
+        if (chipId === 'youtube_content') { setGoal('youtube_content'); setStep(15); return }
+        if (chipId === 'custom_blog') { setGoal('custom_blog'); setStep(14); return }
+        // For social/blog/brand/etc → go to refinement with basic parsed data
+        const isBlog = ['blog', 'educate'].includes(chipId)
+        setParsedBrief({ goal: chipId, rawInput: '', confidence: 1, method: 'chip', channel: null })
+        setGoal(chipId)
+        setStep(1)
+    }
+
+    // Agentic generate — bridge from BriefReview to existing generate pipeline
+    const handleAgenticGenerate = async (data) => {
+        if (data.contentType === 'blog') {
+            // Route to blog pipeline
+            setGoal('blog')
+            handleGenerateBlog({
+                topic: data.details || data.rawInput,
+                blogType: data.blogType || 'seo_blog',
+                targetWordCount: data.targetWordCount || 1200,
+                keywords: data.keywords ? data.keywords.split(',').map(k => k.trim()) : [],
+                targetAudience: activeBrand?.dna?.targetAudience || '',
+                tone: data.tone || 'bold',
+                language: data.language || 'english',
+            })
+            return
+        }
+        // Social content → bridge to existing handleGenerate
+        setGoal(data.goal || 'promote')
+        setChannel(data.channel)
+        setContext({ details: data.details || data.rawInput, url: data.url })
+        handleGenerate({
+            tone: data.tone || 'bold',
+            length: data.length || 'medium',
+            sellStyle: data.sellStyle || 'direct',
+            language: data.language || 'english',
+            langStyle: data.langStyle || 'pure',
+            scriptType: data.scriptType || 'regional',
+            researchDepth: data.researchDepth || 'quick',
+        })
     }
 
     // Build the full prompt from all selections
@@ -4808,7 +5448,7 @@ SPOKESPERSON QUOTES:`
         setContext(null); setToneSettings(null); setResult(null); setError('')
         setAccepted(false); setPrefilledOccasion(null); setSelectedProduct(null)
         setYoutubeData(null); setYoutubeSeoData(null); setContentFeedback(null)
-        setBlogResult(null)
+        setBlogResult(null); setParsedBrief(null); setRefinedData(null)
     }
 
     // Blog generation handler
@@ -4952,27 +5592,27 @@ SPOKESPERSON QUOTES:`
         }
     }
 
-    // Step progress
-    const stepLabels = ['Goal', 'Type', 'Channel', 'Context', 'Tone', 'Result']
-    const totalSteps = 6
+    // Step progress (new 3-step flow)
+    const stepLabels = ['Brief', 'Refine', 'Review']
 
     return (
         <DashboardLayout title="Content Studio" subtitle="AI-powered content for every channel">
             <Walkthrough studioId="contentStudio" />
-            {/* Progress Stepper (shown at steps 1-4) */}
-            {step > 0 && step < 5 && (
+
+            {/* Progress Stepper (shown at steps 1-2) */}
+            {step > 0 && step < 3 && (
                 <div className="flex items-center gap-2 mb-8 max-w-3xl mx-auto">
                     <button onClick={resetAll} className="text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] transition-colors cursor-pointer">
                         <span className="material-symbols-outlined text-sm">arrow_back</span>
                     </button>
-                    {stepLabels.slice(0, 5).map((lbl, i) => (
+                    {stepLabels.map((lbl, i) => (
                         <div key={lbl} className="flex items-center gap-2">
                             <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all
                                 ${step > i ? 'bg-primary text-white' : step === i ? 'bg-primary/20 text-primary border border-primary/40' : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)]'}`}>
                                 {step > i ? '✓' : i + 1}
                             </div>
                             <span className={`text-xs font-bold ${step >= i ? 'text-[var(--sys-text-muted)]' : 'text-[var(--sys-text-muted)]'}`}>{lbl}</span>
-                            {i < 4 && <div className={`w-8 h-px ${step > i ? 'bg-primary/40' : 'bg-[var(--sys-surface)]'}`} />}
+                            {i < 2 && <div className={`w-8 h-px ${step > i ? 'bg-primary/40' : 'bg-[var(--sys-surface)]'}`} />}
                         </div>
                     ))}
                     <div className="ml-auto">
@@ -4985,90 +5625,41 @@ SPOKESPERSON QUOTES:`
                 </div>
             )}
 
-            {/* ========== STEP 0: HERO + GOAL SELECTION ========== */}
+            {/* ========== STEP 0: THE BRIEF (Context-First) ========== */}
             {step === 0 && (
-                <div className="animate-fade-in">
-                    {/* Hero Section */}
-                    <div className="text-center mb-8">
-                        <span className="material-symbols-outlined text-4xl text-primary-fixed mb-2 block">edit_note</span>
-                        <h2 className="text-2xl font-headline font-bold text-on-surface mb-1.5">What do you want to <span className="text-primary-fixed">create?</span></h2>
-                        <p className="text-sm text-[var(--sys-text-muted)] max-w-lg mx-auto">Tell us what you need — we'll handle the rest.</p>
-                    </div>
-
-                    {/* Smart Input */}
-                    <SmartInput onParse={handleSmartParse} />
-
-                    {/* Divider */}
-                    <div className="flex items-center gap-3 max-w-4xl mx-auto mb-5">
-                        <div className="flex-1 h-px bg-outline-variant/20" />
-                        <span className="text-xs text-[var(--sys-text-muted)] font-bold uppercase tracking-wider">Or pick your content type</span>
-                        <div className="flex-1 h-px bg-outline-variant/20" />
-                    </div>
-
-                    {/* Pre-filled Context Banner */}
-                    {prefilledOccasion && step >= 2 && step <= 4 && (
-                        <div className="max-w-2xl mx-auto mb-6 animate-fade-in">
-                            <div className="flex items-center gap-3 p-4 rounded-xl bg-primary/10 border border-primary/20">
-                                <span className="text-2xl">{prefilledOccasion.emoji || 'ads_click'}</span>
-                                <div className="flex-1">
-                                    <p className="text-base font-bold text-[var(--sys-text)]">Creating content for <span className="text-primary">{prefilledOccasion.name}</span></p>
-                                    <p className="text-sm text-[var(--sys-text-muted)] mt-0.5">Suggested tone: {prefilledOccasion.tone || 'festive'} • Select your channel below</p>
-                                </div>
-                                <button onClick={() => { setPrefilledOccasion(null); setStep(0); setGoal(null); setContext(null) }}
-                                    className="text-sm text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] transition-colors cursor-pointer">
-                                    <span className="material-symbols-outlined text-sm">close</span>
-                                </button>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Steps */}
-                    <StepGoal onSelect={(g) => {
-                        if (g === 'press_release') {
-                            setGoal(g); setStep(6)  // Jump to PR wizard
-                        } else if (g === 'product_content') {
-                            setGoal(g); setStep(7)  // Jump to product picker
-                        } else if (g === 'youtube_content') {
-                            setGoal(g); setStep(1)  // Show YouTube sub-types
-                        } else if (g === 'blog') {
-                            setGoal(g); setStep(1)  // Show blog sub-types first
-                        } else if (g === 'custom_blog') {
-                            setGoal(g); setStep(14) // Go directly to SmartBlogWriter
-                        } else {
-                            setGoal(g); setStep(1)
-                        }
-                    }} />
-                </div>
+                <AgenticBrief
+                    onSubmit={handleSmartParse}
+                    onChipSelect={handleChipSelect}
+                    activeBrand={activeBrand}
+                />
             )}
-            {step === 1 && <StepSubType goal={goal} onSelect={(s) => {
-                setSubType(s);
-                if (goal === 'youtube_content') {
-                    // YouTube flow: SEO-only vs Script
-                    if (s === 'youtube_seo') {
-                        setStep(10)  // YouTube SEO / Publish Optimizer wizard
-                    } else {
-                        setStep(8)  // YouTube Script & Ideation wizard
-                    }
-                } else if (goal === 'product_content') {
-                    // Platform IS the channel — auto-set and skip channel step
-                    setChannel('ecommerce');
-                    setStep(context ? 4 : 3);
-                } else if (goal === 'blog') {
-                    // Blog flow: skip channel, go directly to blog wizard
-                    setStep(12);
-                } else {
-                    setStep(2);
-                }
-            }} onBack={() => goal === 'product_content' ? setStep(7) : setStep(0)} />}
-            {step === 2 && <StepChannel goal={goal} onSelect={(c) => { setChannel(c); setStep(context ? 4 : 3) }} onBack={() => goal === 'product_content' ? setStep(7) : setStep(1)} />}
-            {step === 3 && <StepContext goal={goal} subType={subType} brandId={activeBrand?._id} initialImage={photoshootImage} onComplete={(ctx) => { setContext(ctx); setPhotoshootImage(null); setStep(4) }} onBack={() => goal === 'product_content' ? setStep(1) : setStep(2)} />}
-            {step === 4 && (
+
+            {/* ========== STEP 1: THE REFINEMENT (Dynamic Settings) ========== */}
+            {step === 1 && parsedBrief && (
+                <AgenticRefinement
+                    parsed={parsedBrief}
+                    onConfirm={(data) => { setRefinedData(data); setStep(2) }}
+                    onBack={() => { setStep(0); setParsedBrief(null) }}
+                    activeBrand={activeBrand}
+                    availableProviders={availableProviders}
+                    modelOverride={modelOverride}
+                    setModelOverride={setModelOverride}
+                />
+            )}
+
+            {/* ========== STEP 2: BRIEF REVIEW (Confirm & Generate) ========== */}
+            {step === 2 && refinedData && (
                 <>
-                    <StepTone goal={goal} activeBrand={activeBrand} onComplete={handleGenerate} onBack={() => setStep(3)}
-                        availableProviders={availableProviders} modelOverride={modelOverride} setModelOverride={setModelOverride} />
-                    <GlobalLoader 
-                        isActive={generating} 
-                        title="Generating with brand intelligence..." 
+                    <BriefReview
+                        refinedData={refinedData}
+                        activeBrand={activeBrand}
+                        onGenerate={handleAgenticGenerate}
+                        onBack={() => setStep(1)}
+                        generating={generating}
+                    />
+                    <GlobalLoader
+                        isActive={generating}
+                        title="Generating with brand intelligence..."
                         currentStage={`Using ${activeBrand?.name}'s voice DNA for human-authentic output`}
                         icon="auto_awesome"
                         estimatedDuration={45}
@@ -5084,6 +5675,16 @@ SPOKESPERSON QUOTES:`
                     )}
                 </>
             )}
+
+            {/* YouTube Sub-Type Picker (step 15) */}
+            {step === 15 && <StepSubType goal="youtube_content" onSelect={(s) => {
+                setSubType(s);
+                if (s === 'youtube_seo') {
+                    setStep(10)  // YouTube SEO wizard
+                } else {
+                    setStep(8)  // YouTube Script wizard
+                }
+            }} onBack={() => setStep(0)} />}
             {/* Press Release Wizard */}
             {step === 6 && (
                 <>
