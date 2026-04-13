@@ -55,20 +55,67 @@ const TOOLS = {
         const { prompt, style, size = '1:1', count = 1, platform, referenceImages } = params;
         if (!prompt) throw new Error('generate_image: prompt is required');
 
+        // ── Process reference images ──────────────────────────────────────
+        // User uploads arrive as base64 data URLs. The Gemini generation
+        // pipeline needs HTTP URLs (it downloads them to create inlineData).
+        // So we upload base64 → S3, keep HTTP URLs as-is.
+        const processedRefUrls = [];
+        if (referenceImages?.length > 0) {
+            const { uploadToS3 } = await import('../utils/s3.js');
+            for (const refImg of referenceImages) {
+                try {
+                    if (refImg.startsWith('data:image/')) {
+                        // base64 data URL → upload to S3
+                        const s3Url = await uploadToS3(
+                            refImg,
+                            `skill-refs/${ctx.brand?._id || 'default'}/${Date.now()}-ref.png`
+                        );
+                        console.log(`📤 MCP: Uploaded skill reference image to S3: ${s3Url.substring(0, 80)}...`);
+                        processedRefUrls.push(s3Url);
+                    } else if (refImg.startsWith('http')) {
+                        // Already an HTTP URL — use directly
+                        processedRefUrls.push(refImg);
+                    }
+                } catch (uploadErr) {
+                    console.warn(`⚠️ MCP: Failed to process reference image: ${uploadErr.message}`);
+                }
+            }
+        }
+
+        const hasRefs = processedRefUrls.length > 0;
+
+        // Build the prompt — inject reference image guidance if ref images exist
+        let finalPrompt = prompt;
+        if (hasRefs) {
+            finalPrompt = [
+                prompt,
+                '',
+                'REFERENCE IMAGE GUIDANCE:',
+                `${processedRefUrls.length} reference image(s) are provided as visual input.`,
+                'You MUST analyze these reference images and generate a NEW image that:',
+                '- Maintains the same visual style, color palette, and aesthetic',
+                '- Uses similar composition techniques and lighting',
+                '- Matches the overall mood and artistic direction',
+                '- Creates something NEW and original while being clearly inspired by the references',
+                'Do NOT reproduce the reference exactly — create a fresh variation in the same style.',
+            ].join('\n');
+        }
+
         const payload = {
-            prompt,
-            style: style || 'photorealistic',
-            aspectRatio: size,
+            prompt: finalPrompt,
+            type: 'instagram-post',
             brandId: ctx.brand?._id,
+            options: {
+                aspectRatio: size,
+                imageModel: 'nanobanana-2',
+                imageSize: '1K',
+            },
             source: 'skill_execution',
             skillExecutionId: ctx.executionId,
+            // THIS IS THE KEY: pass reference image URLs so internalGenerateCreative
+            // can forward them to routedImageGenerate() as refImageUrls
+            refImageUrls: processedRefUrls,
         };
-
-        // Forward reference images for style-matching generation
-        if (referenceImages?.length > 0) {
-            payload.referenceImages = referenceImages;
-            payload.prompt = `${prompt}\n\nIMPORTANT: Use the provided reference image(s) as visual style guidance. The generated image should match the same artistic style, color palette, composition approach, and visual mood as the reference(s).`;
-        }
 
         // Call the internal creatives generate API
         const baseUrl = process.env.INTERNAL_API_URL || `http://localhost:${process.env.PORT || 3001}`;
@@ -80,7 +127,7 @@ const TOOLS = {
                 'x-skill-execution': 'true',
             },
             body: JSON.stringify(payload),
-            signal: AbortSignal.timeout(120000),
+            signal: AbortSignal.timeout(180000), // 3 min timeout for image gen
         });
 
         const data = await resp.json();
@@ -88,11 +135,27 @@ const TOOLS = {
             throw new Error(`Image generation failed: ${data.error || 'Unknown error'}`);
         }
 
-        // The /api/creatives/generate endpoint returns { success, creative: { imageUrl } }
-        // NOT { imageUrl } at the top level. Handle all response formats:
-        const imageUrl = data.imageUrl || data.creative?.imageUrl;
-        const images = data.images || (imageUrl ? [{ url: imageUrl, id: data.creative?._id }] : []);
-        console.log(`✅ MCP generate_image: ${images.length} image(s) generated${referenceImages?.length ? ` (with ${referenceImages.length} reference(s))` : ''}`);
+        // The /api/creatives/generate returns { success, creative: { imageUrl, _id } }
+        // The imageUrl might be base64 (S3 upload is async), an S3 path, or an HTTP URL.
+        let imageUrl = data.imageUrl || data.creative?.imageUrl;
+        const creativeId = data.creative?._id;
+
+        // If imageUrl is base64, use the proxy endpoint so frontend can display it
+        if (imageUrl?.startsWith('data:image/') && creativeId) {
+            const proxyBase = process.env.INTERNAL_API_URL || `http://localhost:${process.env.PORT || 3001}`;
+            imageUrl = `${proxyBase}/api/creatives/${creativeId}/image`;
+        }
+
+        // If imageUrl is an S3 path, sign it
+        if (imageUrl && imageUrl.includes('s3.') && !imageUrl.includes('X-Amz-Signature')) {
+            try {
+                const { getSignedUrlIfNeeded } = await import('../utils/s3.js');
+                imageUrl = await getSignedUrlIfNeeded(imageUrl);
+            } catch (e) { /* use as-is */ }
+        }
+
+        const images = data.images || (imageUrl ? [{ url: imageUrl, id: creativeId }] : []);
+        console.log(`✅ MCP generate_image: ${images.length} image(s) generated${hasRefs ? ` (with ${processedRefUrls.length} reference(s))` : ''}`);
         return { type: 'images', images, count: images.length };
     },
 

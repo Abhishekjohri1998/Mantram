@@ -168,7 +168,7 @@ setInterval(() => {
 
 export async function internalGenerateCreative({ body, user, creditsDeducted, jobId, progressId }) {
     try {
-        const { brandId, type, prompt, options } = body;
+        const { brandId, type, prompt, options, refImageUrls } = body;
         
         let agenticMeta = { mcotEnabled: true }; 
 
@@ -233,14 +233,22 @@ export async function internalGenerateCreative({ body, user, creditsDeducted, jo
             await addStep(progressId, { agent: 'generating', message: `Generating using ${selectedImageModel}...`, status: 'working' });
         }
 
+        // Forward skill reference image URLs to the generation pipeline
+        // The routedImageGenerate function downloads these URLs and converts
+        // them to Gemini inlineData for image-to-image generation.
+        const skillRefUrls = (refImageUrls || []).filter(u => u && typeof u === 'string');
+        if (skillRefUrls.length > 0) {
+            console.log(`🖼️ [internalGenerate] Forwarding ${skillRefUrls.length} reference image(s) to generation pipeline`);
+        }
+
         const result = await routedImageGenerate(
             fullPrompt,
-            [], // imageParts
+            [], // imageParts (populated from refUrls inside routedImageGenerate)
             0.4, // temperature
             aspectRatio,
             imageSize,
             selectedImageModel,
-            [], // refImageUrls
+            skillRefUrls, // refImageUrls — these get downloaded + converted to inlineData
             customSize
         );
 
