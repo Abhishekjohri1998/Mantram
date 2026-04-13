@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 
 // Fallback statics if cache is cold and DB is unreachable
 const DEFAULT_LLM_PROVIDER = 'grok';
-const DEFAULT_VIDEO_PROVIDER = 'grok';
+const DEFAULT_VIDEO_PROVIDER = 'muapi';
 const DEFAULT_IMAGE_PROVIDER = 'fal';
 
 // In-Memory map cache for ultra-low latency fallback
