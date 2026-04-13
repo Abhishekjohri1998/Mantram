@@ -5,6 +5,7 @@ import { requireStudio } from '../middleware/studioAccess.js';
 import { requireCredits } from '../middleware/credits.js';
 import { safeErrorMessage } from '../utils/safeError.js';
 import BrandStrategy from '../models/BrandStrategy.js';
+import BrainstormSession from '../models/BrainstormSession.js';
 import { getRouter } from '../ai/router.js';
 import { extractJSON } from '../utils/ai-parser.js';
 
@@ -1388,6 +1389,249 @@ router.patch('/strategies/:id/status', protect, async (req, res) => {
   }
 });
 // ============================================================================
+// SESSION CRUD — Persisted Brainstorm History
+// ============================================================================
+
+// GET /api/brainstorm-studio/sessions — List all sessions for the user (brand-filtered)
+router.get('/sessions', protect, async (req, res) => {
+  try {
+    const filter = { user: req.user._id, status: { $ne: 'archived' } };
+    if (req.query.brandId) filter.brand = req.query.brandId;
+    const sessions = await BrainstormSession.find(filter)
+      .sort({ lastMessageAt: -1 })
+      .select('title intent status ideaCount hasDeepDive hasCalendar lastMessageAt createdAt brand')
+      .limit(50);
+    res.json({ success: true, sessions });
+  } catch (error) {
+    res.status(500).json({ success: false, error: safeErrorMessage(error) });
+  }
+});
+
+// GET /api/brainstorm-studio/sessions/:id — Load full session to resume
+router.get('/sessions/:id', protect, async (req, res) => {
+  try {
+    const session = await BrainstormSession.findOne({ _id: req.params.id, user: req.user._id });
+    if (!session) return res.status(404).json({ success: false, error: 'Session not found' });
+    res.json({ success: true, session });
+  } catch (error) {
+    res.status(500).json({ success: false, error: safeErrorMessage(error) });
+  }
+});
+
+// DELETE /api/brainstorm-studio/sessions/:id — Archive a session
+router.delete('/sessions/:id', protect, async (req, res) => {
+  try {
+    await BrainstormSession.findOneAndUpdate(
+      { _id: req.params.id, user: req.user._id },
+      { status: 'archived' }
+    );
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ success: false, error: safeErrorMessage(error) });
+  }
+});
+
+// PATCH /api/brainstorm-studio/sessions/:id/title — Rename a session
+router.patch('/sessions/:id/title', protect, async (req, res) => {
+  try {
+    const { title } = req.body;
+    if (!title) return res.status(400).json({ success: false, error: 'Title required' });
+    await BrainstormSession.findOneAndUpdate(
+      { _id: req.params.id, user: req.user._id },
+      { title }
+    );
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ success: false, error: safeErrorMessage(error) });
+  }
+});
+
+// ============================================================================
+// DEEP DIVE + CALENDAR — Inline generators
+// ============================================================================
+
+// ── Deep Dive: Multi-faceted exploration of a single idea ─────────────────────
+async function generateDeepDiveInline(idea, brand, intent) {
+  const dna = brand?.dna || {};
+  const brandContext = brand
+    ? `Brand: ${brand.name}. Industry: ${dna.industry || 'N/A'}. Voice: ${dna.voice?.personality || 'professional'}. Target: ${dna.targetAudience || 'N/A'}. Country: ${dna.country || 'India'}.`
+    : '';
+
+  const ideaSummary = `Idea Title: ${idea.title || 'Untitled'}
+Hook/Logline: ${idea.logline || idea.hook || ''}
+Description: ${idea.synopsis || idea.description || ''}
+Format: ${idea.format || ''}
+Emotion: ${idea.emotion || ''}
+Target: ${idea.targetPersona || ''}
+Platforms: ${(idea.platforms || []).join(', ') || idea.targetPlatform || ''}`;
+
+  const systemPrompt = `You are a senior brand strategist conducting a DEEP DIVE exploration of a creative idea for ${brand?.name || 'a brand'}.
+
+BRAND CONTEXT:
+${brandContext}
+
+IDEA TO EXPLORE:
+${ideaSummary}
+
+You must produce a comprehensive, actionable deep dive that covers 5 areas. Be SPECIFIC — reference the brand, the idea, and the market. No generic advice.
+
+Respond in STRICT JSON:
+{
+  "ideaTitle": "${idea.title || 'Idea'}",
+  "summary": "2-3 sentence executive summary of the opportunity this idea represents",
+
+  "competitiveAnalysis": {
+    "directCompetitors": [
+      { "name": "Competitor brand", "whatTheyDo": "Their approach in this space", "theirApproach": "How they've done something similar", "ourAdvantage": "Why our idea is better/different" }
+    ],
+    "indirectCompetitors": [
+      { "name": "Brand or category", "category": "Their category", "threat": "Why they compete for attention" }
+    ],
+    "whitespace": "What no one in the market is doing that this idea can own"
+  },
+
+  "executionPlaybook": {
+    "phases": [
+      {
+        "name": "Phase 1: Pre-Launch",
+        "duration": "Week 1-2",
+        "actions": [
+          { "task": "Specific action item", "owner": "Who does this", "deliverable": "What's produced", "channel": "Where it goes" }
+        ]
+      }
+    ],
+    "keyMilestones": [
+      { "week": 1, "milestone": "Specific milestone", "metric": "How to measure" }
+    ]
+  },
+
+  "contentBrief": {
+    "heroAssets": [
+      { "type": "video/image/carousel", "brief": "What to create", "platform": "Where it goes", "specs": "Dimensions/duration" }
+    ],
+    "supportContent": [
+      { "type": "stories/posts/blog", "brief": "What to create", "platform": "Where" }
+    ],
+    "copyDirection": {
+      "headlines": ["Headline option 1", "Headline option 2", "Headline option 3"],
+      "bodyText": ["Body copy direction 1", "Body copy direction 2"],
+      "ctas": ["CTA 1", "CTA 2", "CTA 3"]
+    }
+  },
+
+  "budgetBreakdown": {
+    "totalEstimate": "₹X-Y range",
+    "splits": [
+      { "category": "Content Production", "percentage": 30, "amount": "₹X", "rationale": "Why this allocation" }
+    ],
+    "roiProjection": "Expected return or impact estimate with reasoning"
+  },
+
+  "risks": [
+    { "risk": "What could go wrong", "likelihood": "high/medium/low", "mitigation": "How to prevent or handle" }
+  ]
+}`;
+
+  // Use Gemini grounded search for competitive analysis
+  let result;
+  try {
+    const aiRouter = getRouter();
+    const searchResult = await aiRouter.generateTextWithSearch({
+      systemPrompt,
+      userPrompt: `Deep dive into this ${intent || 'campaign'} idea for ${brand?.name || 'the brand'}. Research competitors and market context. The idea is: "${idea.title}" — ${idea.logline || idea.hook || idea.description || ''}`,
+      temperature: 0.6,
+      maxTokens: 6000,
+    });
+    result = searchResult.text;
+  } catch (err) {
+    console.warn('[deepDive] Grounded search failed, falling back to standard AI:', err.message);
+    result = await aiCall(systemPrompt, `Deep dive into this idea: "${idea.title}"`, { temperature: 0.6, maxTokens: 6000 });
+  }
+
+  try { return parseJSON(result) || {}; } catch { return {}; }
+}
+
+// ── Calendar: Week-by-week content plan from an idea/deep-dive ─────────────────
+async function generateCalendarInline(idea, deepDive, brand, intent) {
+  const dna = brand?.dna || {};
+  const brandContext = brand
+    ? `Brand: ${brand.name}. Industry: ${dna.industry || 'N/A'}. Target: ${dna.targetAudience || 'N/A'}. Country: ${dna.country || 'India'}.`
+    : '';
+
+  const ideaSummary = `Idea: ${idea?.title || 'Campaign'} — ${idea?.logline || idea?.hook || idea?.description || ''}`;
+  const deepDiveCtx = deepDive?.executionPlaybook
+    ? `\nExecution Playbook Phases: ${deepDive.executionPlaybook.phases?.map(p => p.name).join(', ') || 'N/A'}`
+    : '';
+
+  const today = new Date();
+  const startDate = new Date(today);
+  startDate.setDate(startDate.getDate() + ((1 + 7 - startDate.getDay()) % 7 || 7)); // Next Monday
+  const startStr = startDate.toISOString().split('T')[0];
+
+  const systemPrompt = `You are a content strategist creating a detailed, actionable CONTENT CALENDAR for ${brand?.name || 'a brand'}.
+
+BRAND:
+${brandContext}
+
+IDEA:
+${ideaSummary}
+${deepDiveCtx}
+
+Create a 4-week content calendar starting from ${startStr} (Monday).
+
+RULES:
+1. Each week has a THEME that builds momentum
+2. Include specific posts for specific days with platform, type, brief, and time
+3. Platforms: instagram, linkedin, twitter, youtube, facebook — pick what makes sense
+4. Post types: reel, carousel, story, post, video, blog, newsletter
+5. Include specific copy hooks and hashtags for each post
+6. Be SPECIFIC — not generic. Reference the brand and idea.
+7. Include milestones and KPIs to track
+
+Respond in STRICT JSON:
+{
+  "title": "Content Calendar: [Idea Name]",
+  "duration": "4 weeks",
+  "startDate": "${startStr}",
+  "objective": "What this calendar aims to achieve",
+
+  "weeks": [
+    {
+      "weekNumber": 1,
+      "theme": "Week 1: [Theme Name]",
+      "days": [
+        {
+          "date": "${startStr}",
+          "dayOfWeek": "Monday",
+          "posts": [
+            {
+              "platform": "instagram",
+              "type": "reel",
+              "brief": "Specific content brief — what to create",
+              "time": "11:00 AM",
+              "hashtags": ["#Tag1", "#Tag2"],
+              "copyHook": "Opening line or hook for the post"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+
+  "targetKPIs": [
+    { "metric": "Instagram Reach", "target": "50K", "measureAfter": "4 weeks" }
+  ],
+
+  "milestones": [
+    { "week": 1, "title": "Teaser content goes live", "action": "Post first 3 teasers" }
+  ]
+}`;
+
+  const result = await aiCall(systemPrompt, `Generate the content calendar`, { temperature: 0.7, maxTokens: 6000 });
+  try { return parseJSON(result) || {}; } catch { return {}; }
+}
+
+// ============================================================================
 // FIDATO-CHAT  — Conversational Brainstorm Engine (SSE)
 // MCoT: Stage 1 reasons about session state, Stage 2 executes action
 // ============================================================================
@@ -1555,6 +1799,47 @@ async function mcotReason(message, history, sessionState, brandCtx, brand, sseEm
   // ── Post-generation actions (keyword-based, no AI needed) ─────────────────
   const lowerMsg = message.toLowerCase();
   if (sessionState.ideasGenerated) {
+    // Deep Dive detection
+    if (/deep.?dive|explore.*idea|go deeper|let.?s explore|drill down|analyze this|break.*down|detail/i.test(lowerMsg)) {
+      // Figure out which idea to deep dive into
+      const concepts = sessionState.lastIdeas?.filmConcepts || sessionState.lastIdeas?.campaignConcepts || [];
+      let targetIdea = concepts[0]; // default to first
+      if (concepts.length > 1) {
+        const found = concepts.find(c =>
+          lowerMsg.includes(c.title?.toLowerCase()) ||
+          (lowerMsg.includes('first') && concepts.indexOf(c) === 0) ||
+          (lowerMsg.includes('second') && concepts.indexOf(c) === 1) ||
+          (lowerMsg.includes('third') && concepts.indexOf(c) === 2)
+        );
+        if (found) targetIdea = found;
+      }
+      return {
+        intent: detectedIntent,
+        collectedAnswers: sessionState.collectedAnswers || {},
+        readyToGenerate: true,
+        action: 'deep_dive',
+        targetIdea,
+        preGenerationMessage: `Let me do a thorough deep dive into "${targetIdea?.title || 'this idea'}" 🔬`,
+        fidatoResponse: `Here's your deep dive! I've analyzed the competitive landscape, built an execution playbook, content brief, budget breakdown, and risk assessment. Want me to build a content calendar around this?`,
+        askedQuestions,
+      };
+    }
+
+    // Calendar/Strategy generation detection
+    if (/calendar|schedule|plan.*week|content.*plan|posting.*plan|timeline|execution.*plan|create.*plan|build.*plan|strategy.*around/i.test(lowerMsg)) {
+      const concepts = sessionState.lastIdeas?.filmConcepts || sessionState.lastIdeas?.campaignConcepts || [];
+      return {
+        intent: detectedIntent,
+        collectedAnswers: sessionState.collectedAnswers || {},
+        readyToGenerate: true,
+        action: 'generate_calendar',
+        targetIdea: sessionState.selectedIdea || concepts[0] || null,
+        preGenerationMessage: `Building your content calendar! This will have a week-by-week plan with specific posts, platforms, and timings 📅`,
+        fidatoResponse: `Your content calendar is ready! 4 weeks of specific, actionable content — each day mapped out with platform, format, and copy hooks. Want me to push this to your Smart Calendar?`,
+        askedQuestions,
+      };
+    }
+
     if (/script|screenplay|write.*film|full.*script/.test(lowerMsg)) {
       return {
         intent: detectedIntent,
@@ -1574,6 +1859,22 @@ async function mcotReason(message, history, sessionState, brandCtx, brand, sseEm
         action: 'refine_ideas',
         preGenerationMessage: `Got your feedback! Remixing with that direction 🔄`,
         fidatoResponse: `Here's the refined version — closer to what you had in mind?`,
+        askedQuestions,
+      };
+    }
+  }
+
+  // ── Post-deep-dive: proactively suggest calendar ─────────────────────────
+  if (sessionState.hasDeepDive && !sessionState.hasCalendar) {
+    if (/calendar|schedule|plan|yes|sure|go ahead|let.?s do it|do it/i.test(lowerMsg)) {
+      return {
+        intent: detectedIntent,
+        collectedAnswers: sessionState.collectedAnswers || {},
+        readyToGenerate: true,
+        action: 'generate_calendar',
+        targetIdea: sessionState.selectedIdea || null,
+        preGenerationMessage: `Great! Building your content calendar now 📅`,
+        fidatoResponse: `Your content calendar is ready! Want me to push this to your Smart Calendar?`,
         askedQuestions,
       };
     }
@@ -1707,6 +2008,14 @@ ACTIONS AVAILABLE:
 - "direct_response" — Respond directly to the user's request/question with expert insight
 - "generate_ideas" — Ready to generate campaign/film concepts
 - "generate_strategy" — Ready to generate full brand strategy
+- "deep_dive" — User wants to explore/deep-dive into a specific idea
+- "generate_calendar" — User wants a content calendar or execution timeline
+
+PIPELINE AWARENESS (Proactive suggestions):
+- AFTER ideas are generated → suggest "Want me to deep dive into any of these?" or "Pick your favorite and I'll explore it further"
+- AFTER deep dive → suggest "Shall I build a content calendar for the next 4 weeks?" or "Want me to create an execution timeline?"
+- AFTER calendar → suggest "Want me to push this to your Smart Calendar?" or "Save this as a brand strategy?"
+- ALWAYS include these as answerChips so the user can click to proceed
 
 RULES:
 1. 🔴 MOST IMPORTANT: If the user asks a SPECIFIC QUESTION or makes a REQUEST, ALWAYS respond with "direct_response" — NEVER ignore their message
@@ -2207,7 +2516,7 @@ router.post('/fidato-chat', protect, requireStudio('brainstormStudio'), async (r
   res.setHeader('X-Accel-Buffering', 'no');
   try { res.flushHeaders(); } catch {}
 
-  const { message, history = [], sessionState = {}, brand } = req.body;
+  const { message, history = [], sessionState = {}, brand, sessionId } = req.body;
 
   const onClose = () => { try { res.end(); } catch {} };
   req.on('close', onClose);
@@ -2217,6 +2526,44 @@ router.post('/fidato-chat', protect, requireStudio('brainstormStudio'), async (r
 
     // SSE emitter for reasoning steps
     const sseEmit = (data) => sseEvent(res, data);
+
+    // ── Session persistence: find or create ────────────────────────────────
+    let session = null;
+    const userId = req.user?._id;
+    const brandId = brand?._id;
+    if (userId && brandId) {
+      if (sessionId) {
+        session = await BrainstormSession.findOne({ _id: sessionId, user: userId });
+      }
+      if (!session) {
+        // Create a new session on first message
+        const intentGuess = sessionState.intent || detectIntentFromHistory(history, message);
+        const INTENT_TITLES = {
+          'ad-film': '🎬 Ad Film', campaign: '📢 Campaign', 'product-launch': '🚀 Product Launch',
+          naming: '🏷️ Naming', 'brand-strategy': '📊 Brand Strategy', festival: '🎉 Festival',
+          offer: '💰 Offer', positioning: '🎯 Positioning', custom: '💡 Brainstorm',
+        };
+        const titlePrefix = INTENT_TITLES[intentGuess] || '💡 Brainstorm';
+        const titleSnippet = message.length > 40 ? message.slice(0, 37) + '...' : message;
+        session = await BrainstormSession.create({
+          user: userId,
+          brand: brandId,
+          title: `${titlePrefix}: ${titleSnippet}`,
+          intent: intentGuess,
+          sessionState: sessionState,
+          messages: [],
+        });
+      }
+
+      // Save user message to session
+      session.messages.push({ role: 'user', content: message, timestamp: new Date() });
+      session.lastMessageAt = new Date();
+    }
+
+    // Emit sessionId to frontend so it can track
+    if (session) {
+      sseEvent(res, { type: 'session_id', sessionId: session._id.toString() });
+    }
 
     // ── STAGE 1: MCoT Reasoning ─────────────────────────────────────────────
     const reasoning = await mcotReason(message, history, sessionState, brandCtx, brand, sseEmit);
@@ -2229,6 +2576,7 @@ router.post('/fidato-chat', protect, requireStudio('brainstormStudio'), async (r
       questionOptions = null,
       askedQuestions = sessionState.askedQuestions || [],
       reasoning: reasoningText = null,
+      targetIdea = null,
     } = reasoning;
 
     const newSessionState = {
@@ -2242,14 +2590,21 @@ router.post('/fidato-chat', protect, requireStudio('brainstormStudio'), async (r
     // Signal end of reasoning phase
     sseEvent(res, { type: 'reasoning_done' });
 
+    // ── Helper: save Fidato message to session ────────────────────────────
+    const saveFidatoMsg = async (content, extras = {}) => {
+      if (!session) return;
+      session.messages.push({ role: 'fidato', content: content || '', timestamp: new Date(), ...extras });
+    };
+
     // ── STAGE 2: Execute Action ─────────────────────────────────────────────
 
     if (action === 'ask_question' || action === 'general_chat') {
       await streamWords(res, fidatoResponse);
+      await saveFidatoMsg(fidatoResponse, { questionOptions: questionOptions || undefined });
       sseEvent(res, {
         type: 'done',
         sessionState: newSessionState,
-        questionOptions: questionOptions || null,  // use sanitized destructured value
+        questionOptions: questionOptions || null,
       });
 
     } else if (action === 'generate_ideas') {
@@ -2257,12 +2612,10 @@ router.post('/fidato-chat', protect, requireStudio('brainstormStudio'), async (r
       await streamWords(res, preMsg);
       sseEvent(res, { type: 'thinking' });
 
-      // Emit generation reasoning steps
       sseEmit({ type: 'reasoning_step', step: 'Building creative strategy framework...', icon: '🏗️' });
       await new Promise(r => setTimeout(r, 400));
       sseEmit({ type: 'reasoning_step', step: 'Generating campaign concepts with scoring...', icon: '✨' });
 
-      // Inject reinforcement context into generation
       const reinforcedAnswers = { ...newSessionState.collectedAnswers };
       const reinforcement = buildReinforcementContext(sessionState.feedbackLog || []);
       if (reinforcement) reinforcedAnswers._reinforcement = reinforcement;
@@ -2272,13 +2625,88 @@ router.post('/fidato-chat', protect, requireStudio('brainstormStudio'), async (r
       sseEmit({ type: 'reasoning_step', step: `Generated ${(ideas.campaignConcepts || ideas.filmConcepts || []).length} concepts`, icon: '🎯' });
       sseEvent(res, { type: 'ideas', payload: ideas, intent });
 
-      const postMsg = fidatoResponse || "Here's what I came up with! What do you think? Want me to refine any of these, or should I write a full screenplay for one?";
+      const postMsg = fidatoResponse || "Here's what I came up with! Pick your favorite and I can deep dive into it, or I can refine these further 🔥";
       await streamWords(res, postMsg);
 
-      sseEvent(res, {
-        type: 'done',
-        sessionState: { ...newSessionState, ideasGenerated: true, lastIdeas: ideas },
-      });
+      const finalState = { ...newSessionState, ideasGenerated: true, lastIdeas: ideas };
+      await saveFidatoMsg(postMsg, { ideasPayload: ideas, intent });
+      if (session) {
+        session.ideaCount = (ideas.campaignConcepts || ideas.filmConcepts || []).length;
+        session.sessionState = finalState;
+      }
+      sseEvent(res, { type: 'done', sessionState: finalState });
+
+    } else if (action === 'deep_dive') {
+      // ── NEW: Deep Dive into a specific idea ─────────────────────────────
+      const idea = targetIdea || sessionState.lastIdeas?.filmConcepts?.[0] || sessionState.lastIdeas?.campaignConcepts?.[0];
+      if (!idea) {
+        await streamWords(res, "I need some ideas first! Let me generate concepts and then we can deep-dive into your favorite 🔬");
+        sseEvent(res, { type: 'done', sessionState: newSessionState });
+        return res.end();
+      }
+
+      await streamWords(res, preGenerationMessage || `Diving deep into "${idea.title}"... analyzing the competitive landscape, building your execution playbook, and crunching the numbers 🔬`);
+      sseEvent(res, { type: 'thinking' });
+
+      sseEmit({ type: 'reasoning_step', step: `Researching competitive landscape for "${idea.title}"...`, icon: '🌐' });
+      await new Promise(r => setTimeout(r, 400));
+      sseEmit({ type: 'reasoning_step', step: 'Building execution playbook...', icon: '📋' });
+      await new Promise(r => setTimeout(r, 300));
+      sseEmit({ type: 'reasoning_step', step: 'Drafting content brief and budget breakdown...', icon: '💰' });
+
+      const deepDive = await generateDeepDiveInline(idea, brand, intent);
+      sseEvent(res, { type: 'deep_dive', payload: deepDive });
+
+      const postMsg = fidatoResponse || `Here's your deep dive into "${idea.title}"! I've covered the competitive landscape, execution playbook, content brief, budget, and risks. Want me to build a content calendar around this? 📅`;
+      await streamWords(res, postMsg);
+
+      const finalState = {
+        ...newSessionState,
+        selectedIdea: idea,
+        hasDeepDive: true,
+        lastDeepDive: deepDive,
+      };
+      await saveFidatoMsg(postMsg, { deepDivePayload: deepDive });
+      if (session) {
+        session.selectedIdea = idea;
+        session.deepDive = deepDive;
+        session.hasDeepDive = true;
+        session.sessionState = finalState;
+      }
+      sseEvent(res, { type: 'done', sessionState: finalState });
+
+    } else if (action === 'generate_calendar') {
+      // ── NEW: Content Calendar Generation ────────────────────────────────
+      const idea = targetIdea || sessionState.selectedIdea || sessionState.lastIdeas?.campaignConcepts?.[0] || sessionState.lastIdeas?.filmConcepts?.[0];
+      const deepDiveCtx = sessionState.lastDeepDive || null;
+
+      await streamWords(res, preGenerationMessage || `Building your content calendar! Week-by-week, platform-by-platform — every post planned 📅`);
+      sseEvent(res, { type: 'thinking' });
+
+      sseEmit({ type: 'reasoning_step', step: 'Mapping 4-week content timeline...', icon: '📅' });
+      await new Promise(r => setTimeout(r, 300));
+      sseEmit({ type: 'reasoning_step', step: 'Assigning platform-specific posts...', icon: '📱' });
+      await new Promise(r => setTimeout(r, 300));
+      sseEmit({ type: 'reasoning_step', step: 'Writing copy hooks and hashtags...', icon: '✍️' });
+
+      const calendar = await generateCalendarInline(idea, deepDiveCtx, brand, intent);
+      sseEvent(res, { type: 'calendar', payload: calendar });
+
+      const postMsg = fidatoResponse || `Your 4-week content calendar is ready! Every day has specific posts mapped with platform, format, time, and copy hooks. Want me to push this to your Smart Calendar? 🚀`;
+      await streamWords(res, postMsg);
+
+      const finalState = {
+        ...newSessionState,
+        hasCalendar: true,
+        lastCalendar: calendar,
+      };
+      await saveFidatoMsg(postMsg, { calendarPayload: calendar });
+      if (session) {
+        session.calendar = calendar;
+        session.hasCalendar = true;
+        session.sessionState = finalState;
+      }
+      sseEvent(res, { type: 'done', sessionState: finalState });
 
     } else if (action === 'generate_screenplay') {
       const concepts = sessionState.lastIdeas?.filmConcepts || [];
@@ -2308,12 +2736,13 @@ router.post('/fidato-chat', protect, requireStudio('brainstormStudio'), async (r
       const screenplay = await generateScreenplayInline(targetConcept, brand);
       sseEvent(res, { type: 'screenplay', payload: screenplay, conceptTitle: targetConcept.title });
 
-      await streamWords(res, fidatoResponse || "Here's your full production screenplay! Every scene, shot direction, and music cue is in there. Want to send this to the Video Studio?");
+      const postMsg = fidatoResponse || "Here's your full production screenplay! Every scene, shot direction, and music cue is in there. Want me to deep dive into this concept or build a content calendar? 📅";
+      await streamWords(res, postMsg);
 
-      sseEvent(res, {
-        type: 'done',
-        sessionState: { ...newSessionState, screenplayGenerated: true, lastScreenplay: screenplay },
-      });
+      const finalState = { ...newSessionState, screenplayGenerated: true, lastScreenplay: screenplay };
+      await saveFidatoMsg(postMsg, { screenplayPayload: screenplay });
+      if (session) session.sessionState = finalState;
+      sseEvent(res, { type: 'done', sessionState: finalState });
 
     } else if (action === 'generate_strategy') {
       await streamWords(res, preGenerationMessage || "Alright, building your complete brand strategy! This one takes a moment ✍️");
@@ -2328,12 +2757,13 @@ router.post('/fidato-chat', protect, requireStudio('brainstormStudio'), async (r
       const strategy = await generateStrategyInline(newSessionState.collectedAnswers, brand);
       sseEvent(res, { type: 'strategy', payload: strategy });
 
-      await streamWords(res, fidatoResponse || "Your full strategy is ready! Every channel has a budget, every target has a calculation behind it. Want me to explain any part?");
+      const postMsg = fidatoResponse || "Your full strategy is ready! Every channel has a budget, every target has a calculation behind it. Want me to explain any part?";
+      await streamWords(res, postMsg);
 
-      sseEvent(res, {
-        type: 'done',
-        sessionState: { ...newSessionState, ideasGenerated: true, lastStrategy: strategy },
-      });
+      const finalState = { ...newSessionState, ideasGenerated: true, lastStrategy: strategy };
+      await saveFidatoMsg(postMsg, { strategyPayload: strategy });
+      if (session) session.sessionState = finalState;
+      sseEvent(res, { type: 'done', sessionState: finalState });
 
     } else if (action === 'refine_ideas') {
       const currentIdeas = sessionState.lastIdeas;
@@ -2348,7 +2778,6 @@ router.post('/fidato-chat', protect, requireStudio('brainstormStudio'), async (r
 
       sseEmit({ type: 'reasoning_step', step: 'Applying your feedback to reshape concepts...', icon: '🔄' });
 
-      // Inject reinforcement from feedback into refinement
       const reinforcement = buildReinforcementContext(sessionState.feedbackLog || []);
       const refinedAnswers = { ...newSessionState.collectedAnswers, refinementHint: message };
       if (reinforcement) refinedAnswers._reinforcement = reinforcement;
@@ -2356,19 +2785,27 @@ router.post('/fidato-chat', protect, requireStudio('brainstormStudio'), async (r
       const refined = await generateIdeasInline(intent, refinedAnswers, brand);
       sseEvent(res, { type: 'ideas', payload: refined, intent });
 
-      await streamWords(res, fidatoResponse || "Here's the refined version! Better?");
-      sseEvent(res, {
-        type: 'done',
-        sessionState: { ...newSessionState, ideasGenerated: true, lastIdeas: refined },
-      });
+      const postMsg = fidatoResponse || "Here's the refined version! Better?";
+      await streamWords(res, postMsg);
+
+      const finalState = { ...newSessionState, ideasGenerated: true, lastIdeas: refined };
+      await saveFidatoMsg(postMsg, { ideasPayload: refined, intent });
+      if (session) session.sessionState = finalState;
+      sseEvent(res, { type: 'done', sessionState: finalState });
+
     } else if (action === 'direct_response') {
-      // User made a specific request — stream the full response directly
       await streamWords(res, fidatoResponse);
+      await saveFidatoMsg(fidatoResponse);
       sseEvent(res, {
         type: 'done',
         sessionState: newSessionState,
-        questionOptions: questionOptions || null,  // use sanitized destructured value
+        questionOptions: questionOptions || null,
       });
+    }
+
+    // ── Persist session to DB ─────────────────────────────────────────────
+    if (session) {
+      try { await session.save(); } catch (e) { console.warn('[fidato-chat] Session save failed:', e.message); }
     }
 
     res.end();

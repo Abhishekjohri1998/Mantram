@@ -722,8 +722,14 @@ export const brainstormStudio = {
     toggleMilestone: (id, data) => apiFetch(`/brainstorm-studio/strategies/${id}/milestone`, { method: 'PATCH', body: JSON.stringify(data) }),
     updateStrategyStatus: (id, data) => apiFetch(`/brainstorm-studio/strategies/${id}/status`, { method: 'PATCH', body: JSON.stringify(data) }),
 
+    // ── Sessions — Persistent brainstorm history ──
+    sessions: (brandId) => apiFetch(`/brainstorm-studio/sessions${brandId ? `?brandId=${brandId}` : ''}`),
+    loadSession: (id) => apiFetch(`/brainstorm-studio/sessions/${id}`),
+    deleteSession: (id) => apiFetch(`/brainstorm-studio/sessions/${id}`, { method: 'DELETE' }),
+    renameSession: (id, title) => apiFetch(`/brainstorm-studio/sessions/${id}/title`, { method: 'PATCH', body: JSON.stringify({ title }) }),
+
     // ── Fidato Chat: streaming SSE (POST with ReadableStream) ──
-    fidatoChat: async (payload, { onToken, onThinking, onIdeas, onScreenplay, onStrategy, onDone, onError, onReasoningStep, onCitations } = {}) => {
+    fidatoChat: async (payload, { onToken, onThinking, onIdeas, onScreenplay, onStrategy, onDeepDive, onCalendar, onSessionId, onDone, onError, onReasoningStep, onCitations } = {}) => {
         const token = localStorage.getItem('mantram_token') || '';
         const response = await fetch(`${API_BASE}/brainstorm-studio/fidato-chat`, {
             method: 'POST',
@@ -760,6 +766,9 @@ export const brainstormStudio = {
                     else if (evt.type === 'ideas') onIdeas?.(evt.payload, evt.intent);
                     else if (evt.type === 'screenplay') onScreenplay?.(evt.payload, evt.conceptTitle);
                     else if (evt.type === 'strategy') onStrategy?.(evt.payload);
+                    else if (evt.type === 'deep_dive') onDeepDive?.(evt.payload);
+                    else if (evt.type === 'calendar') onCalendar?.(evt.payload);
+                    else if (evt.type === 'session_id') onSessionId?.(evt.sessionId);
                     else if (evt.type === 'done') onDone?.(evt.sessionState, evt.questionOptions || null);
                     else if (evt.type === 'error') onError?.(evt.message);
                 } catch { /* ignore malformed SSE */ }
