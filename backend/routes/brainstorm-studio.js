@@ -1608,7 +1608,7 @@ async function mcotReason(message, history, sessionState, brandCtx, brand, sseEm
 
   // ── Build MCoT prompt with dedup ──────────────────────────────────────────
   const recentHistory = history.slice(-12).map(m =>
-    `${m.role === 'fidato' ? 'FIDATO' : 'USER'}: ${(m.content || '').slice(0, 300)}`
+    `${m.role === 'fidato' ? 'FIDATO' : 'USER'}: ${(m.content || '').slice(0, 1000)}`
   ).join('\n');
 
   const knownAnswers = sessionState.collectedAnswers || {};
@@ -1618,6 +1618,18 @@ async function mcotReason(message, history, sessionState, brandCtx, brand, sseEm
     .join('\n');
 
   const reinforcementCtx = buildReinforcementContext(feedbackLog);
+
+  // ── Build generation context summary ────────────────────────────────────────
+  let generationCtx = '';
+  if (sessionState.ideasGenerated && sessionState.lastIdeas) {
+    const concepts = sessionState.lastIdeas.filmConcepts || sessionState.lastIdeas.campaignConcepts || [];
+    if (concepts.length > 0) {
+      generationCtx = `\n═══════════════════════════════════════════════════\nIDEAS YOU ALREADY GENERATED:\n═══════════════════════════════════════════════════\n${concepts.map((c, i) => `  ${i + 1}. ${c.title}: ${c.logline || c.hook || ''}`).join('\n')}\n`;
+    }
+  }
+  if (sessionState.screenplayGenerated && sessionState.lastScreenplay) {
+    generationCtx += `\n═══════════════════════════════════════════════════\nSCREENPLAY YOU ALREADY GENERATED:\n═══════════════════════════════════════════════════\n  - Title: "${sessionState.lastScreenplay.title}"\n  - Format: ${sessionState.lastScreenplay.format}\n`;
+  }
 
   const dedupBlock = askedQuestions.length > 0
     ? `\n═══════════════════════════════════════════════════
@@ -1643,7 +1655,7 @@ BRAINSTORM TYPE: ${detectedIntent}
 USER MESSAGE COUNT: ${userMessageCount}
 INFORMATION GATHERED SO FAR:
 ${knownSummary || '  (Nothing yet — this is the start of the conversation)'}
-${dedupBlock}${reinforcementCtx ? `
+${dedupBlock}${generationCtx}${reinforcementCtx ? `
 ═══════════════════════════════════════════════════
 REINFORCEMENT LEARNING (User's Preferences):
 ═══════════════════════════════════════════════════

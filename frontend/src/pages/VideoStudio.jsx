@@ -107,6 +107,8 @@ export default function VideoStudio() {
     // File input ref
     const fileInputRef = useRef(null)
     const pollRef = useRef(null)
+    const [generationStartTime, setGenerationStartTime] = useState(null)
+    const [showHighTrafficModal, setShowHighTrafficModal] = useState(false)
 
     // ── Download helper: fetches video as blob for proper file download ──
     async function handleDownloadVideo(url, title) {
@@ -404,6 +406,8 @@ export default function VideoStudio() {
             })
             setGeneration(data.project.generation)
             setPipeline(data.project.pipeline)
+            setGenerationStartTime(Date.now())
+            setShowHighTrafficModal(false)
             setStep(5)
             startPolling()
         } catch (err) { 
@@ -428,9 +432,11 @@ export default function VideoStudio() {
                 if (data.project.status === 'critique' || data.project.generation?.status === 'COMPLETED') {
                     clearInterval(pollRef.current)
                     setCritique(data.project.critique)
+                    setShowHighTrafficModal(false)
                     setStep(6)
                 } else if (data.project.generation?.status === 'FAILED') {
                     clearInterval(pollRef.current)
+                    setShowHighTrafficModal(false)
                     const errMsg = data.project.generation?.error || 'Video generation failed. Try editing the prompt and regenerating.'
                     setError({
                         message: errMsg,
@@ -439,9 +445,14 @@ export default function VideoStudio() {
                     });
                     setStep(6)
                 }
+
+                // Check for high traffic ( > 6 mins)
+                if (generationStartTime && Date.now() - generationStartTime > 360000) {
+                    setShowHighTrafficModal(true)
+                }
             } catch { /* keep polling */ }
         }, 5000) // Poll every 5 seconds
-    }, [projectId])
+    }, [projectId, generationStartTime])
 
     useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current) }, [])
 
@@ -456,6 +467,8 @@ export default function VideoStudio() {
                 body: JSON.stringify({ editedPrompt: backendPrompt }),
             })
             setGeneration(data.project.generation)
+            setGenerationStartTime(Date.now())
+            setShowHighTrafficModal(false)
             setStep(5)
             startPolling()
         } catch (err) { 
@@ -1637,6 +1650,31 @@ export default function VideoStudio() {
                                 />
                             </div>
                             <p className="text-sm text-[var(--sys-text-muted)]">{generation?.progress || 5}% complete — usually takes 1-3 minutes</p>
+                        </div>
+                    )}
+
+                    {/* ── High Traffic Modal ── */}
+                    {showHighTrafficModal && (
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                            <div className="glass-panel max-w-md w-full p-8 rounded-3xl border border-[#FF4D00]/30 shadow-2xl text-center transform animate-in fade-in zoom-in duration-300">
+                                <div className="size-20 bg-[#FF4D00]/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                                    <span className="material-symbols-outlined text-4xl text-[#FF4D00] animate-pulse">traffic</span>
+                                </div>
+                                <h3 className="text-xl font-bold text-[var(--sys-text)] mb-3">High Traffic Detected</h3>
+                                <p className="text-[var(--sys-text-muted)] text-sm leading-relaxed mb-6">
+                                    We are currently experiencing high demand. Your video is in the queue and being processed by our AI models. 
+                                    <br /><br />
+                                    <span className="font-medium text-[var(--sys-text)]">It may take a few more minutes, but please don't refresh or close this tab.</span>
+                                </p>
+                                <div className="flex flex-col gap-3">
+                                    <button 
+                                        onClick={() => setShowHighTrafficModal(false)}
+                                        className="w-full py-3.5 rounded-xl bg-[#FF4D00]/20 text-[#FF7A00] font-bold text-sm border border-[#FF4D00]/30 hover:bg-[#FF4D00]/30 transition-all cursor-pointer"
+                                    >
+                                        I'll Wait
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     )}
 

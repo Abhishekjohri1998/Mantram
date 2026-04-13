@@ -228,6 +228,8 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [] }
     // Each job: { id, projectId, prompt, model, duration, aspectRatio, quality, thumbUrl, progress, status, videoUrl, error }
     const [jobs, setJobs] = useState([])
     const pollRefs = useRef({}) // jobId → intervalId
+    const [showAdvancedHighTraffic, setShowAdvancedHighTraffic] = useState(false)
+    const [highTrafficJobId, setHighTrafficJobId] = useState(null)
 
     function updateJob(id, patch) {
         setJobs(prev => prev.map(j => j.id === id ? { ...j, ...patch } : j))
@@ -257,6 +259,14 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [] }
                 } else if (gen?.status === 'FAILED') {
                     clearInterval(pollRefs.current[jobId]); delete pollRefs.current[jobId]
                     updateJob(jobId, { status: 'failed', error: gen?.error || 'Generation failed' })
+                }
+
+                // High traffic check
+                const job = jobs.find(j => j.id === jobId)
+                if (job && job.startTime && Date.now() - job.startTime > 360000 && !job.highTrafficNotified) {
+                    setShowAdvancedHighTraffic(true)
+                    setHighTrafficJobId(jobId)
+                    updateJob(jobId, { highTrafficNotified: true })
                 }
             } catch { /* keep polling */ }
         }, 5000)
@@ -556,6 +566,7 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [] }
         const newJob = {
             id: jobId, projectId: null, prompt: finalSubmissionPrompt,
             model, duration, aspectRatio, quality, thumbUrl, progress: 3, status: 'generating', videoUrl: null, error: null,
+            startTime: Date.now(),
         }
         setJobs(prev => [newJob, ...prev])
         try {
@@ -590,7 +601,7 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [] }
         if (!i2vImage?.url) { setError('Upload an image first'); return }
         setLoading(true); setError('')
         const jobId = `job-${Date.now()}`
-        setJobs(prev => [{ id: jobId, projectId: null, prompt: prompt.trim() || 'Animate this image', model, duration, aspectRatio, quality, thumbUrl: i2vImage.url, progress: 3, status: 'generating', videoUrl: null, error: null }, ...prev])
+        setJobs(prev => [{ id: jobId, projectId: null, prompt: prompt.trim() || 'Animate this image', model, duration, aspectRatio, quality, thumbUrl: i2vImage.url, progress: 3, status: 'generating', videoUrl: null, error: null, startTime: Date.now() }, ...prev])
         try {
             const d = await api('/video-studio/advanced/image-to-video', {
                 method: 'POST',
@@ -776,6 +787,12 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [] }
                                     <div className="vm-job-bar"><div className="vm-job-bar-fill" style={{ width: `${job.progress || 3}%` }} /></div>
                                     <div className="vm-job-pct">{job.progress || 3}%</div>
                                     <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', textAlign: 'center' }}>{job.model} · {job.duration}s</div>
+                                    {job.startTime && Date.now() - job.startTime > 360000 && (
+                                        <div className="mt-2 text-[9px] font-bold text-orange-400 flex items-center gap-1">
+                                            <span className="material-symbols-outlined text-[12px] animate-pulse">traffic</span>
+                                            High Traffic Load
+                                        </div>
+                                    )}
                                 </>
                             ) : job.status === 'done' ? (
                                 <>
@@ -1224,6 +1241,28 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [] }
                     </div>
                 </div>
             </div>
+            {/* ── High Traffic Modal ── */}
+            {showAdvancedHighTraffic && (
+                <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={() => setShowAdvancedHighTraffic(false)}>
+                    <div className="glass-panel max-w-md w-full p-8 rounded-3xl border border-[#FF4D00]/30 shadow-2xl text-center" onClick={e => e.stopPropagation()}>
+                        <div className="size-20 bg-[#FF4D00]/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                            <span className="material-symbols-outlined text-4xl text-[#FF4D00] animate-pulse">traffic</span>
+                        </div>
+                        <h3 className="text-xl font-bold text-white mb-3">High Traffic Alert</h3>
+                        <p className="text-gray-400 text-sm leading-relaxed mb-6">
+                            The provider is currently under heavy load. Your video generation is still active and in progress, but it's taking longer than usual.
+                            <br /><br />
+                            <span className="text-[#FF7A00] font-bold underline">Please do not refresh.</span> Our system will automatically update when the video is ready.
+                        </p>
+                        <button 
+                            onClick={() => setShowAdvancedHighTraffic(false)}
+                            className="w-full py-3.5 rounded-xl bg-[#FF4D00]/20 text-[#FF7A00] font-bold text-sm border border-[#FF4D00]/30 hover:bg-[#FF4D00]/30 transition-all cursor-pointer"
+                        >
+                            Understood
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

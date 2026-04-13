@@ -43,7 +43,7 @@ const useCanvasStore = create((set, get) => ({
     // ── LAYERS ──
     // ══════════════════════════════════════════════════════════
     layers: [],
-    setLayers: (layers) => set({ layers }),
+    setLayers: (v) => set(s => ({ layers: typeof v === 'function' ? v(s.layers) : v })),
 
     // ══════════════════════════════════════════════════════════
     // ── HISTORY (undo/redo) ──
@@ -125,7 +125,7 @@ const useCanvasStore = create((set, get) => ({
     setGenPrompt: (v) => set({ genPrompt: v }),
     setGenEnhance: (v) => set({ genEnhance: v }),
     setGenRatio: (v) => set({ genRatio: v }),
-    setGenRefs: (v) => set({ genRefs: v }),
+    setGenRefs: (v) => set(s => ({ genRefs: typeof v === 'function' ? v(s.genRefs) : v })),
     setGenLoading: (v) => set({ genLoading: v }),
 
     // ══════════════════════════════════════════════════════════
@@ -162,22 +162,22 @@ const useCanvasStore = create((set, get) => ({
     loadingBankImages: false,
 
     setIconSearch: (v) => set({ iconSearch: v }),
-    setIconResults: (v) => set({ iconResults: v }),
+    setIconResults: (v) => set(s => ({ iconResults: typeof v === 'function' ? v(s.iconResults) : v })),
     setIconLoading: (v) => set({ iconLoading: v }),
     setFontSearch: (v) => set({ fontSearch: v }),
     setFontCategory: (v) => set({ fontCategory: v }),
     setStickerCategory: (v) => set({ stickerCategory: v }),
     setStickerSearch: (v) => set({ stickerSearch: v }),
     setPhotoSearch: (v) => set({ photoSearch: v }),
-    setPhotoResults: (v) => set({ photoResults: v }),
+    setPhotoResults: (v) => set(s => ({ photoResults: typeof v === 'function' ? v(s.photoResults) : v })),
     setPhotoLoading: (v) => set({ photoLoading: v }),
     setPhotoSetupRequired: (v) => set({ photoSetupRequired: v }),
     setTextureSearch: (v) => set({ textureSearch: v }),
-    setTextureResults: (v) => set({ textureResults: v }),
+    setTextureResults: (v) => set(s => ({ textureResults: typeof v === 'function' ? v(s.textureResults) : v })),
     setTextureLoading: (v) => set({ textureLoading: v }),
     setTextureSetupRequired: (v) => set({ textureSetupRequired: v }),
     setImageSourceTab: (v) => set({ imageSourceTab: v }),
-    setGeneratedImages: (v) => set({ generatedImages: v }),
+    setGeneratedImages: (v) => set(s => ({ generatedImages: typeof v === 'function' ? v(s.generatedImages) : v })),
     setLoadingBankImages: (v) => set({ loadingBankImages: v }),
 
     // ══════════════════════════════════════════════════════════
