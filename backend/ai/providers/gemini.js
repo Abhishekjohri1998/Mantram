@@ -193,7 +193,7 @@ export class GeminiProvider extends BaseProvider {
 
         console.log(`\n══════ GEMINI IMAGE GENERATION (${modelId}) ══════`);
         console.log(`📐 Aspect Ratio: ${aspectRatio}`);
-        console.log(`📝 Prompt: ${prompt.substring(0, 100)}...`);
+        console.log(`📝 Prompt: ${(prompt || '').toString().substring(0, 100)}...`);
 
         try {
             // Modern models (Flash 2.5, Flash 3.1 Preview, etc.) use generateContent

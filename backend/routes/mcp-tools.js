@@ -54,8 +54,14 @@ const TOOLS = {
 
     // ── 1. Generate Image ─────────────────────────────────────────────────────
     'creative_studio.generate_image': async (params, ctx) => {
-        const { prompt, style, size = '1:1', count = 1, platform, referenceImages } = params;
+        let { prompt, style, size = '1:1', count = 1, platform, referenceImages } = params;
         if (!prompt) throw new Error('generate_image: prompt is required');
+
+        // Normalize prompt to handle cases where it might be an object
+        if (typeof prompt === 'object') {
+            console.log('📦 MCP generate_image: Normalizing object prompt to string');
+            prompt = prompt.text || prompt.brief || prompt.prompt || prompt.description || JSON.stringify(prompt);
+        }
 
         // ── Process reference images ──────────────────────────────────────
         // User uploads arrive as base64 data URLs. The Gemini generation

@@ -20,7 +20,7 @@ const skillExecutionSchema = new mongoose.Schema({
 
     // AI output
     output: { type: mongoose.Schema.Types.Mixed, required: true },
-    outputFormat: { type: String, enum: ['markdown', 'json', 'html', 'structured'], default: 'structured' },
+    outputFormat: { type: String, enum: ['markdown', 'json', 'html', 'structured', 'image'], default: 'structured' },
 
     // Output routing — where was the output sent?
     routedTo: [{
