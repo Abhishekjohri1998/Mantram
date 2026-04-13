@@ -218,17 +218,17 @@ export async function getMuApiGenerationStatus(requestId) {
 
         const muapiStatus = (data.status || '').toLowerCase();
 
-        // STUCK TASK DETECTION: If processing for > 12 minutes, fail it
+        // STUCK TASK DETECTION: If processing for > 25 minutes, fail it
         const createdAt = data.created_at ? new Date(data.created_at) : null;
         if (muapiStatus === 'processing' && createdAt) {
             const now = new Date();
             const elapsedMins = (now - createdAt) / 60000;
-            if (elapsedMins > 12) {
+            if (elapsedMins > 25) {
                 console.warn(`🛑 MuAPI task ${requestId} stuck in processing for ${elapsedMins.toFixed(1)} mins. Failing for recovery.`);
                 return {
                     status: 'FAILED',
                     progress: 0,
-                    error: `Task timed out: The provider (MuAPI) has had this task in 'processing' for over 12 minutes. This usually indicates a stuck worker or a massive queue. Please try again or switch to a different model.`,
+                    error: `Task timed out: The provider (MuAPI) has had this task in 'processing' for over 25 minutes. This usually indicates a stuck worker or extreme provider load. Please try again later.`,
                     retryable: true,
                     provider: 'muapi',
                     isProviderError: true,
