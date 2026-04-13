@@ -110,6 +110,10 @@ export default function FidatoWidget() {
             if (res.skillResult) {
                 msgs.push({ role: 'skill_card', skillResult: res.skillResult })
             }
+            // Phase 3: if backend found a proactively relevant skill, add a suggestion chip
+            if (res.suggestedSkill) {
+                msgs.push({ role: 'skill_suggestion', skill: res.suggestedSkill })
+            }
             setMessages(prev => [...prev, ...msgs])
         } catch {
             setMessages(prev => [...prev, { role: 'assistant', content: 'oops, something went wrong! try again? 😊' }])
@@ -345,6 +349,23 @@ export default function FidatoWidget() {
                                             </a>
                                         </div>
                                     </div>
+                                ) : m.role === 'skill_suggestion' ? (
+                                    /* Phase 3: Proactive skill suggestion chip */
+                                    <div className="flex-1 rounded-2xl border p-3 cursor-pointer transition-all hover:scale-[1.01]"
+                                        style={{ borderColor: 'rgba(255,77,0,0.25)', background: 'rgba(255,77,0,0.06)' }}>
+                                        <div className="flex items-center gap-2 mb-1.5">
+                                            <span className="material-symbols-outlined text-sm" style={{ color: '#FF7A00' }}>bolt</span>
+                                            <span className="text-[10px] font-bold" style={{ color: '#FF7A00' }}>btw, you have a skill for this!</span>
+                                        </div>
+                                        <p className="text-xs font-bold text-[var(--sys-text)] mb-0.5">{m.skill.name}</p>
+                                        <p className="text-[10px] text-[var(--sys-text-muted)] leading-relaxed mb-2 line-clamp-2">{m.skill.description}</p>
+                                        <button
+                                            onClick={() => sendMessage(`run my ${m.skill.name} skill`)}
+                                            className="w-full py-1.5 rounded-lg text-[11px] font-bold text-white cursor-pointer transition-all hover:opacity-90"
+                                            style={{ background: 'var(--sys-primary)' }}>
+                                            Run it →
+                                        </button>
+                                    </div>
                                 ) : (
                                     <div className={`max-w-[80%] px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed ${m.role === 'user'
                                         ? 'bg-[var(--sys-text)] text-[var(--sys-bg)] rounded-br-sm border border-[var(--sys-border)]'
@@ -354,6 +375,7 @@ export default function FidatoWidget() {
                                         {m.content}
                                     </div>
                                 )}
+
                             </div>
                         ))}
 

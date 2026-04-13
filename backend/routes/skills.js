@@ -197,7 +197,8 @@ router.post('/', protect, async (req, res) => {
     try {
         const { name, description, instructions, category, tags, icon, color,
             inputFields, outputFormat, systemPrompt, modelPreference,
-            temperature, visibility, exampleOutput } = req.body;
+            temperature, visibility, exampleOutput,
+            skillType, mcpActions, chainSkillId, chainInputMap } = req.body;
 
         if (!name?.trim() || !description?.trim() || !instructions?.trim()) {
             return res.status(400).json({ success: false, error: 'Name, description, and instructions are required' });
@@ -219,6 +220,11 @@ router.post('/', protect, async (req, res) => {
             temperature: temperature ?? 0.7,
             visibility: visibility || 'private',
             exampleOutput: exampleOutput || '',
+            // Phase 2/3 agentic fields
+            skillType: skillType || 'text_output',
+            mcpActions: mcpActions || [],
+            ...(chainSkillId ? { chainSkillId } : {}),
+            ...(chainInputMap ? { chainInputMap } : {}),
             status: 'active',
             version: 1,
             changelog: [{ version: 1, changes: 'Initial creation' }],
@@ -245,7 +251,8 @@ router.put('/:id', protect, async (req, res) => {
         const updates = req.body;
         const editableFields = ['name', 'description', 'instructions', 'category', 'tags',
             'icon', 'color', 'inputFields', 'outputFormat', 'systemPrompt',
-            'modelPreference', 'temperature', 'visibility', 'exampleOutput', 'status'];
+            'modelPreference', 'temperature', 'visibility', 'exampleOutput', 'status',
+            'skillType', 'mcpActions', 'chainSkillId', 'chainInputMap'];
 
         let changed = false;
         for (const field of editableFields) {

@@ -393,7 +393,44 @@ ${skillInstructions ? `## Active Skills (FOLLOW these behavioral instructions in
         history.push({ role: 'assistant', content: reply });
         await saveMemory(userId, history);
 
-        res.json({ reply, name: 'Fidato' });
+        // ── Phase 3: Proactive Skill Suggestion ──────────────────────────────
+        // If the conversation is content/creative/campaign-related, suggest a relevant skill
+        let suggestedSkill = null;
+        try {
+            const CONTENT_KEYWORDS = /content|campaign|post|reel|video|creative|image|photo|copy|caption|ad|festival|launch|social|calendar|email|whatsapp/i;
+            if (CONTENT_KEYWORDS.test(message) && !skillIntentMatch) {
+                // Find skills that match by category or tags
+                const allUserSkills = await Skill.find({
+                    status: 'active',
+                    $or: [{ user: req.user._id }, { isPrebuilt: true }],
+                }).limit(20).lean();
+
+                // Score skills by keyword overlap with the message
+                const messageWords = message.toLowerCase().split(/\W+/);
+                let bestSkill = null;
+                let bestScore = 0;
+
+                for (const s of allUserSkills) {
+                    const skillText = `${s.name} ${s.description} ${(s.tags || []).join(' ')} ${s.category}`.toLowerCase();
+                    const score = messageWords.filter(w => w.length > 3 && skillText.includes(w)).length;
+                    if (score > bestScore) { bestScore = score; bestSkill = s; }
+                }
+
+                // Only suggest if we have a decent match (≥2 keyword overlaps) and reply doesn't already reference skills
+                if (bestSkill && bestScore >= 2 && !reply.toLowerCase().includes('skill')) {
+                    suggestedSkill = {
+                        _id: bestSkill._id,
+                        name: bestSkill.name,
+                        icon: bestSkill.icon,
+                        skillType: bestSkill.skillType,
+                        description: bestSkill.description,
+                    };
+                }
+            }
+        } catch { /* Non-fatal — suggestion is optional */ }
+
+        res.json({ reply, name: 'Fidato', suggestedSkill });
+
     } catch (error) {
         console.error('Fidato error:', error.message);
         res.json({

@@ -426,7 +426,7 @@ export default function SkillsHub() {
     const [rating, setRating] = useState(0)
 
     // Build state
-    const [buildForm, setBuildForm] = useState({ name: '', description: '', instructions: '', category: 'general', tags: '', icon: 'auto_awesome', color: 'violet', temperature: 0.7, outputFormat: 'structured', inputFields: [], skillType: 'text_output', mcpActions: [] })
+    const [buildForm, setBuildForm] = useState({ name: '', description: '', instructions: '', category: 'general', tags: '', icon: 'auto_awesome', color: 'violet', temperature: 0.7, outputFormat: 'structured', inputFields: [], skillType: 'text_output', mcpActions: [], chainSkillId: '' })
     const [aiPrompt, setAiPrompt] = useState('')
     const [generating, setGenerating] = useState(false)
     const [enhancingInstructions, setEnhancingInstructions] = useState(false)
@@ -670,7 +670,7 @@ export default function SkillsHub() {
 
     // ── Create skill ──
     const createSkill = async () => {
-        const { name, description, instructions, category, tags, icon, color, temperature, outputFormat, inputFields, skillType, mcpActions } = buildForm
+        const { name, description, instructions, category, tags, icon, color, temperature, outputFormat, inputFields, skillType, mcpActions, chainSkillId } = buildForm
         if (!name.trim() || !description.trim() || !instructions.trim()) { setError({ message: 'Name, description, and instructions are required', isProviderError: false }); return }
         setLoading(true); setError('')
         try {
@@ -681,8 +681,9 @@ export default function SkillsHub() {
                 outputFormat, inputFields,
                 skillType: skillType || 'text_output',
                 mcpActions: mcpActions || [],
+                ...(chainSkillId ? { chainSkillId } : {}),
             })
-            if (data.success) { loadSkills(); setView('browse'); setBuildForm({ name: '', description: '', instructions: '', category: 'general', tags: '', icon: 'auto_awesome', color: 'violet', temperature: 0.7, outputFormat: 'structured', inputFields: [], skillType: 'text_output', mcpActions: [] }) }
+            if (data.success) { loadSkills(); setView('browse'); setBuildForm({ name: '', description: '', instructions: '', category: 'general', tags: '', icon: 'auto_awesome', color: 'violet', temperature: 0.7, outputFormat: 'structured', inputFields: [], skillType: 'text_output', mcpActions: [], chainSkillId: '' }) }
         } catch (e) { setError({ message: e.message, isProviderError: e.isProviderError, provider: e.provider }) }
         finally { setLoading(false) }
 
@@ -1889,6 +1890,32 @@ export default function SkillsHub() {
                                     />
                                 </div>
                             )}
+
+                            {/* Chain Skill Picker — Step 5 */}
+                            <div>
+                                <label className="text-xs text-[var(--sys-text-muted)] font-bold mb-2 block">
+                                    Chain to another skill
+                                    <span className="text-[var(--sys-text-muted)] font-normal"> — runs automatically after this skill completes (optional)</span>
+                                </label>
+                                <select
+                                    value={buildForm.chainSkillId || ''}
+                                    onChange={e => setBuildForm({ ...buildForm, chainSkillId: e.target.value })}
+                                    className="w-full px-4 py-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-sm text-[var(--sys-text)] focus:border-primary focus:outline-none cursor-pointer">
+                                    <option value="">No chain — standalone skill</option>
+                                    {skills.filter(s => s._id !== buildForm._id && s.name).map(s => (
+                                        <option key={s._id} value={s._id}>
+                                            {s.icon ? `${s.name}` : s.name}
+                                            {s.skillType ? ` (${SKILL_TYPE_META[s.skillType]?.label || s.skillType})` : ''}
+                                        </option>
+                                    ))}
+                                </select>
+                                {buildForm.chainSkillId && (
+                                    <p className="text-[10px] text-[var(--sys-text-muted)] mt-1.5 flex items-center gap-1">
+                                        <span className="material-symbols-outlined" style={{ fontSize: 11 }}>info</span>
+                                        Output will be auto-piped as input to the selected skill. Map fields manually in code via chainInputMap if needed.
+                                    </p>
+                                )}
+                            </div>
 
                             <button onClick={createSkill} disabled={loading}
                                 className="w-full py-3 px-6 rounded-xl bg-primary text-white text-sm font-bold hover:bg-primary-light cursor-pointer transition-all flex items-center justify-center gap-2 shadow-none disabled:opacity-50">
