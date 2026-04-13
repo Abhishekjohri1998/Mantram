@@ -876,6 +876,7 @@ export async function advancedGenerateNode(state) {
             falResultUrl: result.resultUrl,
             provider: result.provider || 'fal',
             _piApiPayload: result._piApiPayload || null, // For PiAPI auto-retry
+            _muApiPayload: result._muApiPayload || null, // For MuAPI auto-retry
             _laozhangVideoUrl: result._laozhangVideoUrl || null, // LZ sync video URL
             videoUrl: result._laozhangVideoUrl || '', // Pre-fill if LZ sync
             progress: result._laozhangVideoUrl ? 100 : 5,

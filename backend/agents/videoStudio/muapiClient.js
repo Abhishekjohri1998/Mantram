@@ -164,9 +164,21 @@ export async function submitMuApiVideoGeneration({
         }
         if (untaggedIndices.length > 0) {
             finalPrompt += ` (Visual reference: ${untaggedIndices.join(', ')})`;
-            payload.prompt = finalPrompt;
             console.log(`📝 [MuAPI] Auto-tagged prompt: ${finalPrompt}`);
         }
+        
+        // SECURE: Strip any @imageX tags that exceed the number of images we actually have
+        // Example: If prompt has @image7 but we only uploaded 3, remove @image7 to prevent 500 errors
+        finalPrompt = finalPrompt.replace(/@image(\d+)/g, (match, p1) => {
+            const index = parseInt(p1, 10);
+            if (index > imagesList.length) {
+                console.warn(`🛑 Removing invalid tag ${match} from prompt (only ${imagesList.length} images provided)`);
+                return ''; // remove the tag
+            }
+            return match; // keep the tag
+        }).replace(/\s{2,}/g, ' ').trim(); // clean double spaces
+
+        payload.prompt = finalPrompt;
     } else {
         // TEXT-TO-VIDEO ONLY: Strictly remove any @image tags that might have leaked from prompt enhancement
         // This prevents "Prompt references @image1 but only 0 image(s) provided" MuAPI error.
