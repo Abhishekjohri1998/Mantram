@@ -88,7 +88,7 @@ const GalleryPanel = memo(({
             {result && activeGenerations.length === 0 && (
                 <div className="generation-card generation-card--new mb-5">
                     <div className="studio-compact-prompt-container mb-2.5 group/prompt">
-                        <p className="studio-compact-prompt-text text-xs text-[var(--sys-text-muted)] line-clamp-1 leading-relaxed">
+                        <p className="studio-compact-prompt-text text-xs text-[var(--sys-text-muted)]">
                             {prompt || 'Generated creative'}
                         </p>
                         <div className="studio-prompt-actions">
@@ -342,7 +342,7 @@ const GalleryPanel = memo(({
                                         <div className="w-full xl:w-[350px] p-2 xl:p-4 flex flex-col justify-between flex-shrink-0">
                                             <div>
                                             <div className="studio-compact-prompt-container mb-4 group/prompt">
-                                                <p className="studio-compact-prompt-text text-[13px] text-[var(--sys-text-muted)] font-medium line-clamp-1 leading-relaxed">
+                                                <p className="studio-compact-prompt-text text-[13px] text-[var(--sys-text-muted)] font-medium">
                                                     {group.promptText}
                                                 </p>
                                                 <div className="studio-prompt-actions">
@@ -399,7 +399,7 @@ const GalleryPanel = memo(({
                                         </div>
                                         <div className="flex-1 min-w-0 text-left">
                                             <div className="studio-compact-prompt-container mb-2 group/prompt">
-                                                <p className="studio-compact-prompt-text text-xs text-[var(--sys-text)] line-clamp-1 leading-relaxed">
+                                                <p className="studio-compact-prompt-text text-xs text-[var(--sys-text)]">
                                                     {item._prompt || item.prompt}
                                                 </p>
                                                 <div className="studio-prompt-actions">
@@ -434,7 +434,7 @@ const GalleryPanel = memo(({
                 {bankImages.filter(img => img.source === 'ai-generated' || img.category === 'generated' || img.type !== 'uploaded').map(img => (
                     <div key={img._id} className="generation-card p-3">
                         <div className="studio-compact-prompt-container mb-2 group/prompt">
-                            <p className="studio-compact-prompt-text text-xs text-[var(--sys-text-muted)] line-clamp-1 leading-relaxed text-left">
+                            <p className="studio-compact-prompt-text text-xs text-[var(--sys-text-muted)]">
                                 {img.prompt || img.title}
                             </p>
                             <div className="studio-prompt-actions">
