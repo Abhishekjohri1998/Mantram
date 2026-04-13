@@ -149,15 +149,14 @@ function WebsiteScan({ onComplete, onBack, initialUrl = '' }) {
                             </div>
 
                             <button onClick={handleScan} disabled={!url.trim()}
-                                className="w-full py-4 rounded-2xl text-lg font-bold transition-all cursor-pointer disabled:opacity-20"
-                                style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.4)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                                className="btn-primary w-full py-4 rounded-2xl text-lg disabled:opacity-30">
                                 Continue
                             </button>
                         </div>
                     </div>
 
                     {error && (
-                        <div className={`mt-6 p-4 rounded-xl border ${error.isProviderError ? 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary' : 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary'} text-sm flex items-center gap-2 max-w-lg mx-auto`}>
+                        <div className={`mt-6 p-4 rounded-xl border ${error.isProviderError ? 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-orange-500' : 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-orange-500'} text-sm flex items-center gap-2 max-w-lg mx-auto`}>
                             <span className="material-symbols-outlined text-lg">
                                 {error.isProviderError ? 'warning' : 'error'}
                             </span>
@@ -173,13 +172,13 @@ function WebsiteScan({ onComplete, onBack, initialUrl = '' }) {
                 <div className="flex flex-col items-center justify-center min-h-[70vh] animate-fade-in">
                     {/* Glow background */}
                     <div className="fixed inset-0 pointer-events-none" style={{
-                        background: 'radial-gradient(ellipse 60% 40% at 50% 50%, rgba(var(--primary-rgb, 43, 75, 238), 0.08) 0%, transparent 70%)',
+                        background: 'radial-gradient(ellipse 60% 40% at 50% 50%, rgba(var(--primary-rgb, 255, 77, 0), 0.08) 0%, transparent 70%)',
                     }} />
 
                     <div className="glass-panel rounded-3xl p-10 max-w-lg w-full text-center relative overflow-hidden">
                         {/* Animated glow border */}
                         <div className="absolute inset-0 rounded-3xl pointer-events-none" style={{
-                            background: 'var(--sys-primary), 0.1), transparent 40%, transparent 60%, rgba(16, 185, 129, 0.08))',
+                            background: 'linear-gradient(to right, rgba(255, 77, 0, 0.1), transparent 40%, transparent 60%, rgba(255, 77, 0, 0.08))',
                         }} />
 
                         <div className="relative">
@@ -1309,7 +1308,7 @@ export default function BrandOnboarding() {
 
     if (atLimit) {
         return (
-            <div className="min-h-screen relative" style={{ background: '#0a0c16' }}>
+            <div className="min-h-screen relative" style={{ background: 'var(--sys-bg)' }}>
                 <SEOHead title="Limit Reached — Mantram AI" noIndex={true} />
                 <div className="fixed inset-0 pointer-events-none z-0">
                     <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/15 blur-[120px] rounded-full" />
@@ -1339,7 +1338,7 @@ export default function BrandOnboarding() {
     }
 
     return (
-        <div className="min-h-screen relative" style={{ background: '#0a0c16' }}>
+        <div className="min-h-screen relative" style={{ background: 'var(--sys-bg)' }}>
             <SEOHead
                 title="Brand Setup — Mantram AI"
                 description="Set up your brand DNA on Mantram AI. Extract brand identity from your website in 60 seconds — logo, colors, typography, voice & visual style."
