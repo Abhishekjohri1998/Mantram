@@ -123,12 +123,9 @@ async function ensureSeeded() {
     if (seeded) return;
     seeded = true;
     try {
-        const count = await Skill.countDocuments({ isPrebuilt: true });
-        if (count === 0) {
-            console.log('🌱 Seeding default skills...');
-            await seedDefaultSkills();
-            console.log('✅ Default skills seeded');
-        }
+        console.log('🌱 Synchronizing default skills...');
+        await seedDefaultSkills();
+        console.log('✅ Default skills synchronized');
     } catch (e) { console.warn('Skill seed check failed:', e.message); }
 }
 
@@ -409,15 +406,24 @@ router.post('/:id/execute', protect, requireCredits('content'), async (req, res)
         // ── Build input context string (for AI prompt) ─────────────────────
         let userInputText = '';
         if (inputs && skill.inputFields?.length > 0) {
-            userInputText = skill.inputFields.map(field => {
-                const value = inputs[field.name];
-                if (!value && field.required) throw new Error(`Missing required input: ${field.label}`);
-                // Include image URL in text context so AI planner knows about it
-                if (field.type === 'image_upload' || field.type === 'image_library') {
-                    return value ? `${field.label}: [Reference image uploaded — URL: ${value}]` : '';
-                }
-                return value ? `${field.label}: ${value}` : '';
-            }).filter(Boolean).join('\n');
+            try {
+                userInputText = skill.inputFields.map(field => {
+                    const value = inputs[field.name];
+                    if (!value && field.required) {
+                        const err = new Error(`Missing required input: ${field.label}`);
+                        err.status = 400;
+                        throw err;
+                    }
+                    // Include image URL in text context so AI planner knows about it
+                    if (field.type === 'image_upload' || field.type === 'image_library') {
+                        return value ? `${field.label}: [Reference image uploaded — URL: ${value}]` : '';
+                    }
+                    return value ? `${field.label}: ${value}` : '';
+                }).filter(Boolean).join('\n');
+            } catch (e) {
+                if (e.status === 400) return res.status(400).json({ success: false, error: e.message });
+                throw e; // rethrow mapping or other errors
+            }
         }
 
         const targetMarkets = resolveTargetMarkets(brand);

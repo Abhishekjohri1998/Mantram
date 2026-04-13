@@ -342,7 +342,7 @@ const GalleryPanel = memo(({
                                         <div className="w-full xl:w-[350px] p-2 xl:p-4 flex flex-col justify-between flex-shrink-0">
                                             <div>
                                             <div className="studio-compact-prompt-container mb-4 group/prompt">
-                                                <p className="studio-compact-prompt-text text-[13px] text-[var(--sys-text-muted)] font-medium" title={group.promptText}>
+                                                <p className="studio-compact-prompt-text text-xs text-[var(--sys-text-muted)] font-medium" title={group.promptText}>
                                                     {group.promptText}
                                                 </p>
                                                 <div className="studio-prompt-actions">
@@ -399,7 +399,7 @@ const GalleryPanel = memo(({
                                         </div>
                                         <div className="flex-1 min-w-0 text-left">
                                             <div className="studio-compact-prompt-container mb-2 group/prompt">
-                                                <p className="studio-compact-prompt-text text-xs text-[var(--sys-text)]" title={item._prompt || item.prompt}>
+                                                <p className="studio-compact-prompt-text text-xs text-[var(--sys-text-muted)]" title={item._prompt || item.prompt}>
                                                     {item._prompt || item.prompt}
                                                 </p>
                                                 <div className="studio-prompt-actions">

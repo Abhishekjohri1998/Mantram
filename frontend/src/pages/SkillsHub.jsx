@@ -621,6 +621,18 @@ export default function SkillsHub() {
     // ── Execute skill (with credit cost awareness) ──
     const executeSkill = async () => {
         if (!selectedSkill) return
+
+        // ── Validation ──────────────────────────────────────────────────────
+        if (selectedSkill.inputFields?.length > 0) {
+            for (const field of selectedSkill.inputFields) {
+                if (field.required && !inputs[field.name]) {
+                    setError({ message: `Please fill in the required field: ${field.label}`, isProviderError: false });
+                    // Scroll to error if needed or provide visual feedback
+                    return;
+                }
+            }
+        }
+
         setExecuting(true); setResult(null); setError('')
 
         const skillType = selectedSkill.skillType || 'text_output'

@@ -777,8 +777,20 @@ export async function seedDefaultSkills() {
             updateOne: {
                 filter: { name: skill.name, isPrebuilt: true },
                 update: {
+                    $set: {
+                        description:  skill.description,
+                        instructions: skill.instructions,
+                        systemPrompt: skill.systemPrompt,
+                        inputFields:  skill.inputFields || [],
+                        skillType:     skill.skillType || 'text_output',
+                        category:      skill.category || 'general',
+                        outputFormat:  skill.outputFormat || 'structured',
+                        icon:          skill.icon || 'auto_awesome',
+                        color:         skill.color || 'violet',
+                        temperature:   skill.temperature || 0.7,
+                        tags:          skill.tags || [],
+                    },
                     $setOnInsert: {
-                        ...skill,
                         user: admin._id,
                         isPrebuilt: true,
                         status: 'active',
