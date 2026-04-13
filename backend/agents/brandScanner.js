@@ -1,12 +1,22 @@
 import * as cheerio from 'cheerio';
 import { setMaxListeners } from 'events';
+import { callMcpTool } from '../mcp/registry.js';
 
 /**
- * Scan a website and extract comprehensive brand DNA using AI Vision + Social Intelligence
+ * Scan a website and extract comprehensive brand DNA using AI Vision + Social Intelligence + MCP Enrichment
+ * @param {string} url — website to scan
+ * @param {object} aiRouter — smart AI router
+ * @param {function} onProgress — optional callback (phase, message, percent) for SSE streaming
  */
-export async function scanWebsite(url, aiRouter) {
+export async function scanWebsite(url, aiRouter, onProgress) {
+    const emit = (phase, message, percent) => {
+        if (typeof onProgress === 'function') onProgress(phase, message, percent);
+        console.log(`  [${percent}%] ${message}`);
+    };
+
     url = url.trim();
     if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
+    emit('init', 'Connecting to website...', 5);
     console.log(`🔍 Scanning website: ${url}`);
 
     let html = await fetchPage(url);
@@ -38,7 +48,8 @@ export async function scanWebsite(url, aiRouter) {
     // Fetch external CSS stylesheets and inject as inline styles
     await fetchExternalCSS($, url);
 
-    // ── Phase 1: Traditional HTML extraction (existing) ─────────────────
+    // ── Phase 1: Traditional HTML extraction ─────────────────
+    emit('extract', 'Extracting page structure...', 10);
     const meta = extractMeta($, url);
     const selectorLogos = extractLogos($, url);
     const cssColors = extractColors($, url);
@@ -53,9 +64,11 @@ export async function scanWebsite(url, aiRouter) {
     console.log(`  📝 Content samples: ${contentSamples.length}`);
     console.log(`  🖼️  Banner images found: ${bannerImages.length}`);
     console.log(`  📷 Total homepage images found: ${allImages.length}`);
+    emit('extract', 'Page structure extracted', 15);
 
-    // ── Phase 1b+2+3: PARALLEL — Vision + Social + SubPages ────────────
+    // ── Phase 2+3: PARALLEL — Vision + Social + SubPages ────────────
     // These 3 expensive operations are independent — run concurrently
+    emit('parallel', 'AI Vision + Social + Sub-page crawl (parallel)...', 20);
     const socialLinks = extractSocialLinks($, url);
     console.log(`  🔗 Social links found: ${Object.values(socialLinks).filter(Boolean).length}`);
 
@@ -86,6 +99,7 @@ export async function scanWebsite(url, aiRouter) {
     if (visionAnalysis) console.log(`  🧠 Vision analysis: logo=${visionAnalysis?.logo ? '✅' : '❌'}, colors=${visionAnalysis?.colors?.length || 0}`);
     if (isSPA) console.log('  ⏭️ Skipping Vision analysis (SPA — Puppeteer already used for content)');
     console.log(`  📄 Sub-pages crawled: ${subPageContent.length} content pieces`);
+    emit('parallel', 'Vision + Social + Pages complete', 45);
     if (socialVoice.captionStyle) console.log(`  📱 Social voice analysis: ✅`);
 
     // Close shared Puppeteer browser if we opened one
@@ -101,6 +115,7 @@ export async function scanWebsite(url, aiRouter) {
     ];
 
     // ── Enhanced AI Voice/Tone Analysis + Brand Name — PARALLEL ───────────
+    emit('voice', 'Analyzing brand voice & tone...', 50);
     // These 2 AI calls are independent — run concurrently
     const [voiceResult, nameResult] = await Promise.allSettled([
         // Voice/tone analysis
@@ -116,6 +131,7 @@ export async function scanWebsite(url, aiRouter) {
                 : '';
 
             return aiRouter.analyzeText({
+                provider: 'gemini',
                 text: allContentSamples.join('\n\n') + colorContext + bannerContext + socialContext,
                 task: `You are a brand strategist and visual identity expert. Analyze this website's brand identity using ALL the content provided — including sub-page content from About, Team, Products, Services, Values pages.
 Return ONLY valid JSON (no markdown, no explanation) with these fields:
@@ -173,6 +189,7 @@ ${socialContext ? 'IMPORTANT: Social media data is provided — use it to deeply
         // Brand name extraction (independent of voice analysis)
         (aiRouter ? (async () => {
             const result = await aiRouter.generateText({
+                provider: 'gemini',
                 systemPrompt: 'You are a brand naming expert. Return ONLY the brand name, nothing else. No quotes, no explanation.',
                 userPrompt: `Extract the actual brand name from this website info:
 Page Title: "${meta.title || ''}"
@@ -197,6 +214,7 @@ Rules:
 
     if (voiceResult.status === 'rejected') console.error('Voice analysis failed:', voiceResult.reason?.message);
     if (nameResult.status === 'rejected') console.error('Brand name extraction failed:', nameResult.reason?.message);
+    emit('voice', 'Brand voice analyzed', 60);
 
     // ── Merge brand colors: Vision > AI-curated > CSS fallback ───────────
     let namedColors;
@@ -220,6 +238,7 @@ Rules:
         try {
             const bn = voiceAnalysis.brandName || meta.title || '';
             const colorResult = await aiRouter.analyzeText({
+                provider: 'gemini',
                 text: `Website: ${url}\nBrand: ${bn}\nIndustry: ${voiceAnalysis.industry || 'unknown'}\nCSS Colors found: ${cssColors.slice(0, 15).map(c => c.hex).join(', ')}`,
                 task: `Pick EXACTLY 4-5 TRUE brand identity colors from the CSS colors list.\nReturn ONLY JSON: {"brandColors": [{"hex": "#000000", "name": "Jet Black", "usage": "primary"}]}\n\nRules:\n- Pick ONLY colors that represent the brand identity (logo, accent, background)\n- Give descriptive names ("Electric Lime" not "Green")\n- usage: primary/secondary/accent/background\n- Order: primary first\n- EXCLUDE generic UI/framework colors`,
             });
@@ -297,9 +316,151 @@ Rules:
         }
     }
 
+    // ══════════════════════════════════════════════════════════════════════
+    // PHASE 4: GEMINI GROUNDED ENRICHMENT — Competitors, Sentiment, Platform Voice
+    // Uses Gemini's native Google Search grounding for real-time web research.
+    // This is faster and more reliable than the MCP/Grok pipeline.
+    // ══════════════════════════════════════════════════════════════════════
+    emit('competitors', 'Discovering competitors & market position...', 65);
+
+    const detectedIndustry = voiceAnalysis.industry || '';
+    const socialLinksFound = Object.entries(socialLinks).filter(([, v]) => v);
+
+    // Helper: Gemini grounded search + JSON extraction in one step
+    async function geminiGroundedResearch(prompt, fallbackLabel) {
+        try {
+            // Use Gemini's generateTextWithSearch for grounded web access
+            const result = await aiRouter.generateTextWithSearch({
+                systemPrompt: 'You are a brand intelligence analyst. Always return ONLY valid JSON — no markdown, no explanation, no ```json blocks.',
+                userPrompt: prompt,
+                temperature: 0.2,
+                maxTokens: 2000,
+            });
+            const text = result?.text || '';
+            const jsonMatch = text.match(/\{[\s\S]*\}/);
+            if (jsonMatch) return JSON.parse(jsonMatch[0]);
+            console.warn(`  ⚠️ ${fallbackLabel}: No JSON in Gemini response`);
+            return {};
+        } catch (err) {
+            console.warn(`  ⚠️ ${fallbackLabel} failed:`, err.message);
+            return {};
+        }
+    }
+
+    // Run all 3 enrichment tasks in parallel using Gemini grounded search
+    const [competitorResult, sentimentResult, platformVoiceResult] = await Promise.allSettled([
+        // 1. Competitor discovery — Gemini searches the web directly
+        (aiRouter && brandName ? geminiGroundedResearch(
+            `Research the competitive landscape for "${brandName}" (${detectedIndustry || 'consumer brand'}) — website: ${url}.
+Brand Description: ${voiceAnalysis.brandDescription || meta.description || ''}
+
+Search the web for real competitors of ${brandName} and return ONLY valid JSON:
+{
+  "competitors": [
+    { "name": "Competitor Name", "url": "https://...", "strengths": "What they do well", "weaknesses": "Where they fall short vs ${brandName}" }
+  ],
+  "marketPosition": "premium / mid-range / budget / niche",
+  "differentiators": ["3-5 things that make ${brandName} unique vs competitors"],
+  "industryTrends": ["3-5 current trends in this industry"]
+}
+Rules:
+- List 3-5 REAL competitors (not made up) — search the web to confirm they exist
+- Be specific about strengths/weaknesses based on real information
+- Market position based on pricing and brand positioning`,
+            'Competitor discovery'
+        ) : Promise.resolve({})),
+
+        // 2. Public sentiment — Gemini searches reviews/ratings
+        (aiRouter && brandName ? geminiGroundedResearch(
+            `Research public reviews, ratings, and customer feedback for "${brandName}" (${detectedIndustry || 'brand'}).
+
+Search the web for "${brandName} reviews", "${brandName} customer feedback", "${brandName} ratings" and return ONLY valid JSON:
+{
+  "overallSentiment": "positive / mixed / negative / unknown",
+  "rating": "e.g. 4.5/5 or empty string if not found",
+  "reviewHighlights": ["3-5 things customers love about ${brandName}"],
+  "reviewConcerns": ["2-3 common complaints or concerns"],
+  "sentimentSummary": "2-3 sentence summary of how the public perceives ${brandName}"
+}
+Rules:
+- Only include information you can actually find via web search
+- If no reviews/ratings found, return "unknown" sentiment
+- Be honest — don't fabricate reviews`,
+            'Sentiment analysis'
+        ) : Promise.resolve({})),
+
+        // 3. Per-platform social voice — Gemini analyzes social presence
+        (aiRouter && socialLinksFound.length > 0 ? geminiGroundedResearch(
+            `Analyze how "${brandName}" communicates across social media platforms.
+Known social profiles: ${socialLinksFound.map(([p, u]) => `${p}: ${u}`).join(', ')}
+
+Search the web for ${brandName}'s social media presence and analyze their content style on each platform. Return ONLY valid JSON:
+{
+  "instagram": {
+    "tone": "casual/polished/playful/etc",
+    "captionStyle": "how captions are written on Instagram",
+    "hashtagStrategy": "how many hashtags, branded vs trending",
+    "visualStyle": "type of visuals — product shots, lifestyle, UGC, reels",
+    "emojiUsage": "none/minimal/moderate/heavy",
+    "avgCaptionLength": "short/medium/long",
+    "contentThemes": ["3-5 recurring content themes"]
+  },
+  "linkedin": {
+    "tone": "professional/thought-leadership/etc",
+    "captionStyle": "how posts are written on LinkedIn",
+    "articleStyle": "long-form style if any",
+    "professionalLevel": "corporate/startup-casual/executive",
+    "contentThemes": ["3-5 recurring themes"]
+  },
+  "twitter": {
+    "tone": "witty/informative/conversational/etc",
+    "tweetStyle": "short quips/threads/retweet-heavy",
+    "threadUsage": "frequent/occasional/rare",
+    "hashtagStrategy": "how hashtags are used",
+    "contentThemes": ["3-5 recurring themes"]
+  },
+  "facebook": {
+    "tone": "community/promotional/informative",
+    "postStyle": "how Facebook posts are written",
+    "engagementStyle": "how they engage with followers",
+    "contentThemes": ["3-5 recurring themes"]
+  }
+}
+Rules:
+- Only include platforms where ${brandName} has a known presence
+- Be specific about differences between platforms`,
+            'Per-platform voice analysis'
+        ) : Promise.resolve({})),
+    ]);
+
+    const competitiveIntel = competitorResult.status === 'fulfilled' ? competitorResult.value : {};
+    const publicSentiment = sentimentResult.status === 'fulfilled' ? sentimentResult.value : {};
+    const platformVoice = platformVoiceResult.status === 'fulfilled' ? platformVoiceResult.value : {};
+
+    if (competitiveIntel.competitors?.length) console.log(`  🏆 Discovered ${competitiveIntel.competitors.length} competitors`);
+    if (publicSentiment.overallSentiment) console.log(`  ⭐ Public sentiment: ${publicSentiment.overallSentiment}`);
+    if (Object.keys(platformVoice).some(k => platformVoice[k]?.tone)) console.log(`  📱 Per-platform voice: ✅`);
+    emit('competitors', 'Competitive intelligence gathered', 80);
+
+    // ── Calculate onboarding completeness score ──────────────────────────
+    const onboardingPhases = {
+        website: true,
+        vision: !!visionAnalysis,
+        subPages: subPageContent.length > 0,
+        social: Object.values(socialLinks).some(Boolean),
+        competitors: (competitiveIntel.competitors?.length || 0) > 0,
+        sentiment: !!publicSentiment.overallSentiment && publicSentiment.overallSentiment !== 'unknown',
+        platformVoice: Object.keys(platformVoice).some(k => platformVoice[k]?.tone),
+    };
+    const completedPhases = Object.values(onboardingPhases).filter(Boolean).length;
+    const onboardingScore = Math.round((completedPhases / Object.keys(onboardingPhases).length) * 100);
+    emit('complete', 'Brand DNA built successfully!', 100);
+
     return {
         name: brandName,
         website: url,
+        onboardingScore,
+        onboardingPhases,
         dna: {
             logo: finalLogo,
             colors: namedColors,
@@ -321,6 +482,7 @@ Rules:
             contentStyle,
             socialLinks,
             socialVoice,
+            platformVoice,
             bannerImages: bannerImages.slice(0, 15),
             brandImages: allImages,
             brandDescription: voiceAnalysis.brandDescription || voiceAnalysis.companyOverview || meta.description || '',
@@ -329,12 +491,28 @@ Rules:
             tagline: voiceAnalysis.tagline || '',
             photographyStyle: voiceAnalysis.photographyStyle || '',
             websiteSnapshot: visionAnalysis?.screenshot || '',
-            // New deep-crawl fields
+            // Deep-crawl fields
             companyOverview: voiceAnalysis.companyOverview || '',
             servicesOffered: voiceAnalysis.servicesOffered || [],
             uniqueSellingPoints: voiceAnalysis.uniqueSellingPoints || [],
             missionStatement: voiceAnalysis.missionStatement || '',
             brandValues: voiceAnalysis.brandValues || [],
+            // Phase 4: MCP enrichment
+            competitiveIntel: {
+                competitors: competitiveIntel.competitors || [],
+                marketPosition: competitiveIntel.marketPosition || '',
+                differentiators: competitiveIntel.differentiators || [],
+                industryTrends: competitiveIntel.industryTrends || [],
+                lastAnalyzedAt: new Date(),
+            },
+            publicSentiment: {
+                overallSentiment: publicSentiment.overallSentiment || '',
+                rating: publicSentiment.rating || '',
+                reviewHighlights: publicSentiment.reviewHighlights || [],
+                reviewConcerns: publicSentiment.reviewConcerns || [],
+                sentimentSummary: publicSentiment.sentimentSummary || '',
+                lastAnalyzedAt: new Date(),
+            },
         },
         rawScanData: { meta, colors: namedColors, fonts, logos: selectorLogos, bannerImages, contentSamples: contentSamples.slice(0, 3) },
     };
@@ -868,7 +1046,8 @@ async function analyzeSocialMedia(socialLinks, aiRouter) {
     if (socialContent.length > 0 && aiRouter) {
         try {
             const analysis = await aiRouter.analyzeText({
-                text: socialContent.join('\n\n'),
+                provider: 'gemini',
+                text: socialContent.slice(0, 5000).join('\n\n'),
                 task: `Analyze these social media content samples from a brand. Return ONLY valid JSON:
 {
   "captionStyle": "1 sentence describing how captions are written",

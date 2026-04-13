@@ -109,6 +109,76 @@ const brandSchema = new mongoose.Schema({
             designAvoid: [String],                             // "Never use busy patterns" | "Avoid neon colors"
             lastAnalyzedAt: { type: Date },
         },
+
+        // Per-platform voice profiles — how the brand sounds differently on each platform
+        // Used by Content Studio to generate platform-native content
+        platformVoice: {
+            instagram: {
+                tone: { type: String, default: '' },
+                captionStyle: { type: String, default: '' },
+                hashtagStrategy: { type: String, default: '' },
+                visualStyle: { type: String, default: '' },
+                emojiUsage: { type: String, default: '' },
+                avgCaptionLength: { type: String, default: '' },
+                contentThemes: [String],
+            },
+            linkedin: {
+                tone: { type: String, default: '' },
+                captionStyle: { type: String, default: '' },
+                articleStyle: { type: String, default: '' },
+                professionalLevel: { type: String, default: '' },
+                contentThemes: [String],
+            },
+            twitter: {
+                tone: { type: String, default: '' },
+                tweetStyle: { type: String, default: '' },
+                threadUsage: { type: String, default: '' },
+                hashtagStrategy: { type: String, default: '' },
+                contentThemes: [String],
+            },
+            facebook: {
+                tone: { type: String, default: '' },
+                postStyle: { type: String, default: '' },
+                engagementStyle: { type: String, default: '' },
+                contentThemes: [String],
+            },
+        },
+
+        // Competitive intelligence — auto-discovered during onboarding via MCP web_search
+        competitiveIntel: {
+            competitors: [{
+                name: { type: String },
+                url: { type: String, default: '' },
+                strengths: { type: String, default: '' },
+                weaknesses: { type: String, default: '' },
+            }],
+            marketPosition: { type: String, default: '' },     // "premium" / "mid-range" / "budget" / "niche"
+            differentiators: [String],                          // AI-extracted from competitor comparison
+            industryTrends: [String],                           // Current trends in the brand's industry
+            lastAnalyzedAt: { type: Date },
+        },
+
+        // Public sentiment — from Google reviews, Trustpilot, social mentions
+        publicSentiment: {
+            overallSentiment: { type: String, default: '' },    // "positive" / "mixed" / "negative"
+            rating: { type: String, default: '' },              // "4.5/5" etc.
+            reviewHighlights: [String],                         // What customers love
+            reviewConcerns: [String],                           // What customers complain about
+            sentimentSummary: { type: String, default: '' },    // AI-written 2-3 sentence summary
+            lastAnalyzedAt: { type: Date },
+        },
+    },
+
+    // Onboarding completeness — tracks which intelligence phases completed
+    onboardingScore: { type: Number, default: 0, min: 0, max: 100 },
+    onboardingPhases: {
+        website: { type: Boolean, default: false },
+        vision: { type: Boolean, default: false },
+        subPages: { type: Boolean, default: false },
+        social: { type: Boolean, default: false },
+        competitors: { type: Boolean, default: false },
+        sentiment: { type: Boolean, default: false },
+        platformVoice: { type: Boolean, default: false },
     },
 
     // Custom Categories — user-created template categories (e.g. Birthday, Anniversary)

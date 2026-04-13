@@ -78,6 +78,10 @@ export const optionalAuth = async (req, res, next) => {
     if (req.headers.authorization?.startsWith('Bearer')) {
         token = req.headers.authorization.split(' ')[1];
     }
+    // SSE fallback: EventSource can't set headers, so accept ?token= query param
+    if (!token && req.query.token) {
+        token = req.query.token;
+    }
     if (token) {
         try {
             const decoded = jwt.verify(token, config.jwtSecret);

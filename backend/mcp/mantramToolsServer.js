@@ -89,6 +89,19 @@ const TOOL_DEFINITIONS = [
             required: ['brandId'],
         },
     },
+    {
+        name: 'scrape_social_profile',
+        description: 'Analyze a social media profile\'s content style, voice, and themes via web search. Returns platform-specific content intelligence.',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                url: { type: 'string', description: 'Social media profile URL' },
+                platform: { type: 'string', enum: ['instagram', 'linkedin', 'twitter', 'facebook'], description: 'Social platform' },
+                brandName: { type: 'string', description: 'Brand name for search context' },
+            },
+            required: ['url', 'platform'],
+        },
+    },
 ];
 
 // ── Tool Executor ─────────────────────────────────────────────────────────────
@@ -104,6 +117,14 @@ async function executeTool(name, args) {
         case 'fetch_seo_audit':        result = await fetchSEOAudit(args.brandId); break;
         case 'fetch_content_history':  result = await fetchContentHistory(args.brandId, args.platform || '', args.limit || 15); break;
         case 'fetch_performance_learnings': result = await fetchPerformanceLearnings(args.brandId); break;
+        case 'scrape_social_profile': {
+            // Option C: Use web search to find social content (no scraping needed)
+            const searchQuery = args.brandName
+                ? `site:${new URL(args.url).hostname} "${args.brandName}"`
+                : `site:${new URL(args.url).hostname}`;
+            result = await webSearch(searchQuery, 'quick');
+            break;
+        }
         default: throw new Error(`Unknown MCP tool: ${name}`);
     }
     console.log(`   ✅ MCP: ${name} => ${Date.now() - t0}ms`);

@@ -136,11 +136,13 @@ class Orchestrator {
 
     /**
      * Scan a website and extract brand DNA
+     * @param {string} url — website to scan
+     * @param {function} onProgress — optional (phase, message, percent) callback for SSE streaming
      */
-    async scanWebsite(url) {
+    async scanWebsite(url, onProgress) {
         // Delegate to brand scanner agent
         const { scanWebsite } = await import('./brandScanner.js');
-        return scanWebsite(url, this.smartRouter.modelRouter);
+        return scanWebsite(url, this.smartRouter.modelRouter, onProgress);
     }
 
     /**

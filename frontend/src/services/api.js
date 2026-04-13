@@ -249,6 +249,14 @@ export const creatives = {
 // ============ Agent API ============
 export const agents = {
     scanWebsite: (url) => apiFetch('/agents/scan-website', { method: 'POST', body: JSON.stringify({ url }) }),
+    // SSE streaming version — returns EventSource URL for real-time progress
+    getScanStreamUrl: (url) => {
+        const token = localStorage.getItem('mantram_token') || '';
+        const baseUrl = API_BASE.replace('/api', ''); // SSE needs full path
+        const encodedUrl = encodeURIComponent(url);
+        // EventSource doesn't support custom headers, so we pass token as query param
+        return `${API_BASE}/agents/scan-website/stream?url=${encodedUrl}${token ? `&token=${token}` : ''}`;
+    },
     brainstorm: (data) => apiFetch('/agents/brainstorm', { method: 'POST', body: JSON.stringify(data) }),
     saveBrainstorm: (brandData) => apiFetch('/agents/brainstorm/save', { method: 'POST', body: JSON.stringify({ brandData }) }),
     generateLogo: (data) => apiFetch('/agents/generate-logo', { method: 'POST', body: JSON.stringify(data) }),
