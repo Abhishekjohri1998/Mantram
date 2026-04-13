@@ -1902,7 +1902,7 @@ export default function SkillsHub() {
                                     onChange={e => setBuildForm({ ...buildForm, chainSkillId: e.target.value })}
                                     className="w-full px-4 py-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-sm text-[var(--sys-text)] focus:border-primary focus:outline-none cursor-pointer">
                                     <option value="">No chain — standalone skill</option>
-                                    {skills.filter(s => s._id !== buildForm._id && s.name).map(s => (
+                                    {skillsList.filter(s => s._id !== buildForm._id && s.name).map(s => (
                                         <option key={s._id} value={s._id}>
                                             {s.icon ? `${s.name}` : s.name}
                                             {s.skillType ? ` (${SKILL_TYPE_META[s.skillType]?.label || s.skillType})` : ''}
