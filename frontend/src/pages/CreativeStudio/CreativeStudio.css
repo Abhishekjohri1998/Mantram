@@ -467,6 +467,7 @@
   overflow: hidden !important;
   text-overflow: ellipsis !important;
   display: block !important;
+  line-height: 1.4;
 }
 
 .studio-prompt-actions {
