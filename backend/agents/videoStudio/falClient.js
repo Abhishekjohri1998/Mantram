@@ -306,7 +306,15 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
     if (!MODEL_AVAILABLE[model]) throw new Error(`Model '${model}' is not available.`);
 
     // Enforce provider-specific prompt length limits
-    const safePrompt = truncatePrompt(prompt, model);
+    let safePrompt = truncatePrompt(prompt, model);
+
+    // 🧹 WATERMARK AVOIDANCE: For Seedance models, append negative-like instructions to the prompt
+    if (model.includes('seedance')) {
+        const watermarkRef = ' (no watermark, clean background, high quality, 4k)';
+        if (!safePrompt.includes('no watermark')) {
+            safePrompt += watermarkRef;
+        }
+    }
 
     const [s3ImageUrl, s3RefAudio, s3RefVideo, ...s3ReferenceImages] = await Promise.all([
         ensureS3Url(imageUrl, 'video-studio/generations'),

@@ -129,6 +129,7 @@ export async function submitMuApiVideoGeneration({
         aspect_ratio: mapAspectRatio(aspectRatio),
         quality: mapQuality(qualityMode),
         remove_watermark: true,
+        no_watermark: true, // Safeguard for alternative API versions
     };
 
     // 🔎 Indexing Logic:
