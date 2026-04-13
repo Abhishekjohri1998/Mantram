@@ -142,8 +142,17 @@ const TOOLS = {
 
         // If imageUrl is base64, use the proxy endpoint so frontend can display it
         if (imageUrl?.startsWith('data:image/') && creativeId) {
-            const proxyBase = process.env.INTERNAL_API_URL || `http://localhost:${process.env.PORT || 3001}`;
-            imageUrl = `${proxyBase}/api/creatives/${creativeId}/image`;
+            // Use relative path for frontend consumption to avoid localhost leak in production
+            const internalUrl = process.env.INTERNAL_API_URL || '';
+            const isLocal = !internalUrl || internalUrl.includes('localhost') || internalUrl.includes('127.0.0.1');
+            
+            if (isLocal) {
+                // Return relative path for the frontend to resolve
+                imageUrl = `/api/creatives/${creativeId}/image`;
+            } else {
+                // Use the configured internal URL if it's external (e.g. cross-server)
+                imageUrl = `${internalUrl.replace(/\/$/, '')}/api/creatives/${creativeId}/image`;
+            }
         }
 
         // If imageUrl is an S3 path, sign it
