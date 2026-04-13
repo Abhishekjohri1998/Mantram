@@ -13,6 +13,9 @@ const DEFAULT_SKILLS = [
         tags: ['festival', 'campaign', 'D2C', 'seasonal', 'india'],
         icon: 'celebration',
         color: 'amber',
+        skillType: 'create_content',
+        outputAction: 'save_to_content',
+        estimatedCreditCost: 2,
         instructions: `You are a Festival Campaign Strategist for Indian D2C brands.
 
 Given the brand context and selected festival, create a COMPLETE campaign plan.
@@ -455,6 +458,182 @@ Respond in JSON:
         outputFormat: 'structured',
         temperature: 0.7,
     },
+    // ══════════════════════════════════════════════════════════════
+    // PHASE 1 EXECUTABLE SKILLS (generate_image, create_content)
+    // ══════════════════════════════════════════════════════════════
+
+    // ── 11. Product Hero Shot (generate_image) ─────────────────────────────
+    {
+        name: 'Product Hero Shot',
+        description: 'Upload a product brief → instantly generates 4 brand-aware ad-ready creative images via Creative Studio',
+        category: 'creative',
+        tags: ['product', 'image', 'ads', 'creative', 'hero'],
+        icon: 'photo_camera',
+        color: 'blue',
+        skillType: 'generate_image',
+        outputAction: 'queue_generation',
+        estimatedCreditCost: 20,
+        mcpActions: [
+            {
+                tool: 'creative_studio.generate_images',
+                label: 'Generate 4 hero shot variants',
+                params: {
+                    prompts: '{{ai_planned}}',
+                    size: '1:1',
+                    style: 'photorealistic product photography',
+                },
+            },
+        ],
+        instructions: `You are a Product Photography Art Director.
+
+Your goal: Generate 4 distinct image generation prompts for product hero shots that can be sent to an AI image generator.
+
+For EACH of the 4 prompts, create a variation in:
+- Shot angle (front, 3/4, lifestyle, flat-lay)
+- Background style (studio white, lifestyle environment, textured surface, abstract gradient)
+- Lighting mood (bright studio, golden hour, dramatic shadows, soft diffused)
+
+Incorporate the brand's color palette, target audience lifestyle, and the product's USP into each prompt.
+
+Each prompt must be a complete, detailed image generation instruction (60-100 words) in this format:
+"[Product name] product photography, [shot angle], [background description], [lighting], [style keywords], [quality suffixes]"
+
+The prompts array MUST have exactly 4 items.
+Return valid JSON with toolParams[0].params.prompts as an array of 4 strings.`,
+        inputFields: [
+            { name: 'productName', label: 'Product Name', type: 'text', required: true, placeholder: 'e.g., Glow Face Serum 30ml' },
+            { name: 'productDesc', label: 'Product Description', type: 'textarea', required: true, placeholder: 'Describe the product, packaging, key features, colors...' },
+            { name: 'style', label: 'Visual Style', type: 'select', required: false, options: ['Luxury/Premium', 'Clean & Minimal', 'Vibrant & Fun', 'Natural/Organic', 'Bold & Graphic', 'Lifestyle & Aspirational'] },
+            { name: 'platform', label: 'Primary Platform', type: 'select', required: false, options: ['Instagram Feed', 'Amazon/Meesho Listing', 'Meta Ads', 'Website Banner', 'YouTube Thumbnail'] },
+        ],
+        outputFormat: 'image',
+        temperature: 0.6,
+    },
+
+    // ── 12. 30-Day Content Calendar (create_content + auto-save) ───────────
+    {
+        name: '30-Day Content Calendar',
+        description: 'Generate a full month of social media posts for all platforms — auto-saved to Content Studio as drafts',
+        category: 'content',
+        tags: ['calendar', '30-day', 'social', 'planning', 'month'],
+        icon: 'calendar_month',
+        color: 'emerald',
+        skillType: 'create_content',
+        outputAction: 'save_to_content',
+        estimatedCreditCost: 3,
+        instructions: `You are a Social Media Strategist. Create a complete 30-day content calendar.
+
+For EACH day (Day 1 to Day 30), generate:
+- Main platform: Instagram (required), one of LinkedIn/Twitter (alternate by day)
+- Content pillar: rotate between Educational, Entertaining, Promotional (max 20%), Behind-scenes, UGC/Social-proof
+- Caption (with hashtags)
+- Visual direction (brief)
+- Best posting time IST
+
+Additionally provide:
+- 8 Reel concepts (spread across the month)
+- 4 Carousel ideas
+- 2 Story series
+
+Respond in JSON:
+{
+    "monthTheme": "",
+    "contentMix": { "educational": "30%", "entertaining": "25%", "promotional": "20%", "behindScenes": "15%", "ugc": "10%" },
+    "days": [
+        {
+            "day": 1,
+            "date": "Day 1",
+            "pillar": "",
+            "platform": "instagram",
+            "caption": "",
+            "hashtags": [],
+            "visualDirection": "",
+            "bestTime": ""
+        }
+    ],
+    "reelConcepts": [{ "day": 0, "title": "", "hook": "", "script": "" }],
+    "carouselIdeas": [{ "day": 0, "title": "", "slides": [] }]
+}
+
+Be specific to the brand's industry and audience. All 30 days must be present in the JSON.`,
+        inputFields: [
+            { name: 'monthFocus', label: 'Month / Focus Theme', type: 'text', required: false, placeholder: 'e.g., April — Summer launch & new product' },
+            { name: 'keyDates', label: 'Important Dates / Events', type: 'textarea', required: false, placeholder: 'e.g., Product launch on April 15, Sale April 20-22...' },
+            { name: 'avoidDays', label: 'Days Off (no posting)', type: 'text', required: false, placeholder: 'e.g., Sundays, Day 10, Day 20' },
+        ],
+        outputFormat: 'structured',
+        temperature: 0.7,
+    },
+
+    // ── 13. Festival Campaign Kit (orchestrate — content saved to Content Studio) ──
+    {
+        name: 'Festival Campaign Kit',
+        description: 'Complete campaign kit for any Indian festival: social posts + ad copy + email + WhatsApp — all auto-saved as drafts',
+        category: 'content',
+        tags: ['festival', 'campaign', 'kit', 'india', 'auto-save'],
+        icon: 'celebration',
+        color: 'rose',
+        skillType: 'orchestrate',
+        outputAction: 'save_to_content',
+        estimatedCreditCost: 3,
+        mcpActions: [
+            {
+                tool: 'content_studio.save_draft',
+                label: 'Save campaign posts to Content Studio',
+                optional: true,
+                params: {
+                    type: 'social',
+                    tags: ['festival-campaign', 'auto-generated'],
+                },
+            },
+        ],
+        instructions: `You are a Festival Campaign Kit Generator for Indian D2C brands.
+
+Given the festival and brand context, generate a COMPLETE ready-to-use campaign kit.
+
+Include EXACTLY:
+1. 6 social media captions (mix of Instagram, LinkedIn, Twitter) with hashtags
+2. 3 ad copy variants (Meta/Google) with headline + body + CTA
+3. 2 Email templates (teaser + launch)
+4. 2 WhatsApp message templates (urgency-driven)
+5. 3 Story frames scripts
+
+All content should:
+- Be brand-voice aligned
+- Include Hinglish naturally where appropriate
+- Have strong CTAs
+- Reflect the festival's emotional context
+
+Respond in JSON:
+{
+    "campaignName": "",
+    "festivalTheme": "",
+    "posts": [
+        { "platform": "instagram", "caption": "", "hashtags": [], "type": "feed" }
+    ],
+    "adCopies": [
+        { "platform": "meta", "headline": "", "body": "", "cta": "" }
+    ],
+    "emails": [
+        { "type": "teaser", "subject": "", "body": "" }
+    ],
+    "whatsapp": [
+        { "type": "launch", "message": "" }
+    ],
+    "stories": [
+        { "frame": 1, "text": "", "cta": "" }
+    ]
+}
+
+Posts array must have 6 items. All fields required.`,
+        inputFields: [
+            { name: 'festival', label: 'Festival', type: 'select', required: true, options: ['Diwali', 'Holi', 'Navratri', 'Raksha Bandhan', 'Eid', 'Christmas', 'New Year', 'Pongal', 'Independence Day', 'Republic Day', "Valentine's Day", "Mother's Day", 'Durga Puja', 'Baisakhi'] },
+            { name: 'offer', label: 'Festival Offer / Discount', type: 'text', required: false, placeholder: 'e.g., 30% off, Free gift on orders above ₹999' },
+            { name: 'tone', label: 'Campaign Tone', type: 'select', required: false, options: ['Celebratory & Warm', 'Premium & Aspirational', 'Fun & Festive', 'Emotional & Family-focused'] },
+        ],
+        outputFormat: 'structured',
+        temperature: 0.75,
+    },
 ];
 
 
@@ -481,7 +660,7 @@ export async function seedDefaultSkills() {
                         user: admin._id,
                         isPrebuilt: true,
                         status: 'active',
-                        visibility: 'marketplace',
+                        visibility: 'mantram_users',
                         version: 1,
                         changelog: [{ version: 1, changes: 'Initial release', date: new Date() }],
                     }

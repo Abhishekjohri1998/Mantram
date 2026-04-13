@@ -2,7 +2,16 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import SEOHead from '../components/SEOHead'
 import { useBrand } from '../context/BrandContext'
 import DashboardLayout from '../components/DashboardLayout'
-import { skills as skillsAPI, creatives as creativesAPI } from '../services/api'
+import { skills as skillsAPI, creatives as creativesAPI, mcpTools } from '../services/api'
+
+// ── Skill Type Metadata (Phase 1) ──
+const SKILL_TYPE_META = {
+    text_output:    { label: 'AI Text',      icon: 'text_fields',    color: '#8b5cf6', bg: 'rgba(139,92,246,0.12)' },
+    generate_image: { label: 'Image Gen',    icon: 'image',          color: '#06b6d4', bg: 'rgba(6,182,212,0.12)' },
+    generate_video: { label: 'Video',        icon: 'movie_creation', color: '#f59e0b', bg: 'rgba(245,158,11,0.12)' },
+    create_content: { label: 'Auto-Save',    icon: 'edit_note',      color: '#10b981', bg: 'rgba(16,185,129,0.12)' },
+    orchestrate:    { label: 'Orchestrate',  icon: 'account_tree',   color: '#FF4D00', bg: 'rgba(255,77,0,0.12)'   },
+}
 
 // ── Size Presets ──
 const SIZE_PRESETS = [
@@ -181,6 +190,42 @@ function ResultRenderer({ output, outputFormat }) {
     )
 }
 
+// ── MCP Image Results Renderer ──
+function ImageResults({ images = [] }) {
+    if (!images.length) return null
+    return (
+        <div>
+            <p className="text-xs font-bold text-primary uppercase mb-3 flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-sm">image</span>
+                Generated Images ({images.length})
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+                {images.map((img, i) => (
+                    <div key={i} className="relative group rounded-xl overflow-hidden border border-[var(--sys-border)] aspect-square bg-[var(--sys-surface)]">
+                        {img.url ? (
+                            <img src={img.url} alt={`Generated ${i+1}`} className="w-full h-full object-cover" />
+                        ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                                <span className="material-symbols-outlined text-4xl text-[var(--sys-text-muted)]">image</span>
+                            </div>
+                        )}
+                        {img.url && (
+                            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center gap-2">
+                                <a href={img.url} target="_blank" rel="noopener noreferrer"
+                                    className="px-3 py-1.5 bg-white/20 rounded-lg text-white text-xs font-bold hover:bg-white/30 transition-all"
+                                    onClick={e => e.stopPropagation()}>Open</a>
+                                <a href={img.url} download={`skill-image-${i+1}.jpg`}
+                                    className="px-3 py-1.5 bg-primary/80 rounded-lg text-white text-xs font-bold hover:bg-primary transition-all"
+                                    onClick={e => e.stopPropagation()}>Download</a>
+                            </div>
+                        )}
+                    </div>
+                ))}
+            </div>
+        </div>
+    )
+}
+
 // ── Main Component ──
 export default function SkillsHub() {
     const { activeBrand } = useBrand()
@@ -203,7 +248,7 @@ export default function SkillsHub() {
     const [rating, setRating] = useState(0)
 
     // Build state
-    const [buildForm, setBuildForm] = useState({ name: '', description: '', instructions: '', category: 'general', tags: '', icon: 'auto_awesome', color: 'violet', temperature: 0.7, outputFormat: 'structured', inputFields: [] })
+    const [buildForm, setBuildForm] = useState({ name: '', description: '', instructions: '', category: 'general', tags: '', icon: 'auto_awesome', color: 'violet', temperature: 0.7, outputFormat: 'structured', inputFields: [], skillType: 'text_output' })
     const [aiPrompt, setAiPrompt] = useState('')
     const [generating, setGenerating] = useState(false)
     const [enhancingInstructions, setEnhancingInstructions] = useState(false)
@@ -225,6 +270,15 @@ export default function SkillsHub() {
     const [loadingHistory, setLoadingHistory] = useState(false)
     const [routing, setRouting] = useState(null) // executionId being routed
     const [routeSuccess, setRouteSuccess] = useState(null)
+
+    // Phase 1: Credit cost + Marketplace state
+    const [creditCost, setCreditCost] = useState(null)   // { totalCost, breakdown, skillType }
+    const [loadingCost, setLoadingCost] = useState(false)
+    const [showCostModal, setShowCostModal] = useState(false)
+    const [marketplaceSkills, setMarketplaceSkills] = useState([])
+    const [loadingMarketplace, setLoadingMarketplace] = useState(false)
+    const [installingSkill, setInstallingSkill] = useState(null)
+    const [activeTab, setActiveTab] = useState('mine') // mine | marketplace
 
     // Load skills + active skills
     useEffect(() => {
@@ -335,11 +389,55 @@ export default function SkillsHub() {
         } catch (e) { setError({ message: e.message, isProviderError: e.isProviderError, provider: e.provider }) }
     }
 
-    // ── Execute skill ──
+    // ── Fetch credit cost when a skill is selected ──
+    useEffect(() => {
+        if (!selectedSkill) { setCreditCost(null); return }
+        let mounted = true
+        setLoadingCost(true)
+        skillsAPI.creditCost(selectedSkill._id)
+            .then(d => { if (mounted && d.success) setCreditCost(d) })
+            .catch(() => {})
+            .finally(() => { if (mounted) setLoadingCost(false) })
+        return () => { mounted = false }
+    }, [selectedSkill?._id])
+
+    // ── Load marketplace skills ──
+    const loadMarketplace = async () => {
+        if (marketplaceSkills.length > 0) return
+        setLoadingMarketplace(true)
+        try {
+            const d = await skillsAPI.browseMarketplace({ limit: 30 })
+            if (d.success) setMarketplaceSkills(d.skills || [])
+        } catch {}
+        finally { setLoadingMarketplace(false) }
+    }
+
+    useEffect(() => { if (activeTab === 'marketplace') loadMarketplace() }, [activeTab])
+
+    // ── Install marketplace skill ──
+    const installSkill = async (skillId) => {
+        setInstallingSkill(skillId)
+        try {
+            const d = await skillsAPI.installSkill(skillId)
+            if (d.success) { loadSkills(); loadMarketplace(); setError('') }
+        } catch (e) { setError({ message: e.message }) }
+        finally { setInstallingSkill(null) }
+    }
+
+    // ── Execute skill (with credit cost awareness) ──
     const executeSkill = async () => {
         if (!selectedSkill) return
         setExecuting(true); setResult(null); setError('')
-        const stages = ['Understanding your inputs...', 'Loading brand context...', 'Applying skill instructions...', 'Generating output...', 'Polishing results...']
+
+        const skillType = selectedSkill.skillType || 'text_output'
+        const stagesByType = {
+            generate_image: ['Analyzing your brief...', 'Composing image prompts...', 'Generating images via Creative Studio...', 'Finalizing output...'],
+            generate_video: ['Processing your request...', 'Building video prompt...', 'Queuing video generation...', 'Job queued! Check Video Studio.'],
+            create_content: ['Understanding your inputs...', 'Loading brand context...', 'Generating content...', 'Saving to Content Studio...'],
+            orchestrate:    ['Planning execution...', 'Running tools...', 'Aggregating results...', 'Finalizing...'],
+            text_output:    ['Understanding your inputs...', 'Loading brand context...', 'Applying skill instructions...', 'Generating output...', 'Polishing results...'],
+        }
+        const stages = stagesByType[skillType] || stagesByType.text_output
         let idx = 0; setExecutingStage(stages[0])
         const interval = setInterval(() => { idx = Math.min(idx + 1, stages.length - 1); setExecutingStage(stages[idx]) }, 3000)
 
@@ -378,7 +476,7 @@ export default function SkillsHub() {
 
     // ── Create skill ──
     const createSkill = async () => {
-        const { name, description, instructions, category, tags, icon, color, temperature, outputFormat, inputFields } = buildForm
+        const { name, description, instructions, category, tags, icon, color, temperature, outputFormat, inputFields, skillType } = buildForm
         if (!name.trim() || !description.trim() || !instructions.trim()) { setError({ message: 'Name, description, and instructions are required', isProviderError: false }); return }
         setLoading(true); setError('')
         try {
@@ -387,8 +485,9 @@ export default function SkillsHub() {
                 tags: tags.split(',').map(t => t.trim()).filter(Boolean),
                 icon, color, temperature: parseFloat(temperature) || 0.7,
                 outputFormat, inputFields,
+                skillType: skillType || 'text_output',
             })
-            if (data.success) { loadSkills(); setView('browse'); setBuildForm({ name: '', description: '', instructions: '', category: 'general', tags: '', icon: 'auto_awesome', color: 'violet', temperature: 0.7, outputFormat: 'structured', inputFields: [] }) }
+            if (data.success) { loadSkills(); setView('browse'); setBuildForm({ name: '', description: '', instructions: '', category: 'general', tags: '', icon: 'auto_awesome', color: 'violet', temperature: 0.7, outputFormat: 'structured', inputFields: [], skillType: 'text_output' }) }
         } catch (e) { setError({ message: e.message, isProviderError: e.isProviderError, provider: e.provider }) }
         finally { setLoading(false) }
     }
@@ -407,6 +506,7 @@ export default function SkillsHub() {
                     icon: g.icon || 'auto_awesome', color: g.color || 'violet',
                     temperature: g.temperature || 0.7, outputFormat: g.outputFormat || 'structured',
                     inputFields: g.inputFields || [],
+                    skillType: g.skillType || 'text_output',
                 })
                 setAiPrompt('')
             }
@@ -538,7 +638,7 @@ export default function SkillsHub() {
                         </div>
 
                         {/* Category Tabs */}
-                        <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
+                        <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
                             {CATEGORIES.map(cat => (
                                 <button key={cat.id} onClick={() => setActiveCategory(cat.id)}
                                     className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-all ${activeCategory === cat.id
@@ -551,8 +651,22 @@ export default function SkillsHub() {
                             ))}
                         </div>
 
-                        {/* Skills Grid */}
-                        {loading ? (
+                        {/* Mine / Marketplace Tabs */}
+                        <div className="flex gap-1 mb-5 p-1 bg-[var(--sys-surface)] rounded-xl w-fit">
+                            {[{ id: 'mine', label: 'My Skills', icon: 'bolt' }, { id: 'marketplace', label: 'Marketplace', icon: 'storefront' }].map(tab => (
+                                <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+                                    className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold cursor-pointer transition-all ${activeTab === tab.id
+                                        ? 'bg-[var(--sys-bg)] text-[var(--sys-text)] shadow-sm'
+                                        : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]'
+                                    }`}>
+                                    <span className="material-symbols-outlined text-sm">{tab.icon}</span>
+                                    {tab.label}
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* Skills Grid — Mine */}
+                        {activeTab === 'mine' && (loading ? (
                             <div className="text-center py-20">
                                 <span className="material-symbols-outlined text-primary animate-spin text-3xl">progress_activity</span>
                                 <p className="text-sm text-[var(--sys-text-muted)] mt-3">Loading skills...</p>
@@ -568,6 +682,7 @@ export default function SkillsHub() {
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                 {filtered.map(skill => {
                                     const c = getColors(skill.color)
+                                    const typeMeta = SKILL_TYPE_META[skill.skillType || 'text_output']
                                     return (
                                         <div key={skill._id}
                                             className={`glass-panel rounded-2xl p-5 hover:bg-[var(--sys-surface)] transition-all group cursor-pointer border border-[var(--sys-border)] hover:${c.border}`}
@@ -581,10 +696,25 @@ export default function SkillsHub() {
                                                     <p className="text-[11px] text-[var(--sys-text-muted)] line-clamp-2 mt-0.5">{skill.description}</p>
                                                 </div>
                                             </div>
+                                            {/* Type badge + meta */}
+                                            <div className="flex items-center gap-1.5 mb-3">
+                                                <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-bold"
+                                                    style={{ background: typeMeta.bg, color: typeMeta.color }}>
+                                                    <span className="material-symbols-outlined" style={{ fontSize: 11 }}>{typeMeta.icon}</span>
+                                                    {typeMeta.label}
+                                                </span>
+                                                {skill.estimatedCreditCost > 0 && (
+                                                    <span className="inline-flex items-center gap-0.5 text-[10px] px-2 py-0.5 rounded-full font-bold bg-[var(--sys-surface)] text-[var(--sys-text-muted)]">
+                                                        <span className="material-symbols-outlined" style={{ fontSize: 11 }}>toll</span>
+                                                        ~{skill.estimatedCreditCost} cr
+                                                    </span>
+                                                )}
+                                            </div>
                                             <div className="flex items-center justify-between">
                                                 <div className="flex items-center gap-2">
                                                     <span className={`text-[10px] px-2 py-0.5 rounded-full ${c.bg} ${c.text} font-bold uppercase`}>{skill.category}</span>
                                                     {skill.isPrebuilt && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary font-bold">BUILT-IN</span>}
+                                                    {skill.isPublished && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 font-bold">SHARED</span>}
                                                 </div>
                                                 <div className="flex items-center gap-2">
                                                     {skill.usageCount > 0 && <span className="flex items-center gap-0.5 text-[10px] text-[var(--sys-text-muted)]"><span className="material-symbols-outlined text-xs">play_arrow</span>{skill.usageCount}</span>}
@@ -593,10 +723,10 @@ export default function SkillsHub() {
                                                     <button
                                                         onClick={(e) => toggleSkillActive(skill._id, e)}
                                                         disabled={togglingSkill === skill._id}
-                                                        title={activeSkillIds.has(skill._id) ? 'Deactivate (remove from persistent instructions)' : 'Activate (inject into Fidato as persistent instruction)'}
+                                                        title={activeSkillIds.has(skill._id) ? 'Deactivate' : 'Activate (inject into Fidato)'}
                                                         className={`size-7 rounded-lg flex items-center justify-center transition-all cursor-pointer ${
                                                             activeSkillIds.has(skill._id)
-                                                                ? 'bg-[#FF4D00]/20 text-[#FF4D00]  ring-[#FF4D00]/30'
+                                                                ? 'bg-[#FF4D00]/20 text-[#FF4D00]'
                                                                 : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] hover:text-[#FF4D00] hover:bg-[#FF4D00]/10'
                                                         }`}>
                                                         {togglingSkill === skill._id
@@ -609,6 +739,72 @@ export default function SkillsHub() {
                                     )
                                 })}
                             </div>
+                        ))}
+
+                        {/* Skills Grid — Marketplace */}
+                        {activeTab === 'marketplace' && (
+                            loadingMarketplace ? (
+                                <div className="text-center py-20">
+                                    <span className="material-symbols-outlined text-primary animate-spin text-3xl">progress_activity</span>
+                                    <p className="text-sm text-[var(--sys-text-muted)] mt-3">Loading marketplace...</p>
+                                </div>
+                            ) : marketplaceSkills.length === 0 ? (
+                                <div className="text-center py-20 glass-panel rounded-2xl">
+                                    <span className="material-symbols-outlined text-[var(--sys-text-muted)] text-5xl block mb-3">storefront</span>
+                                    <h3 className="text-lg font-bold text-[var(--sys-text)] mb-2">Marketplace Coming Soon</h3>
+                                    <p className="text-sm text-[var(--sys-text-muted)]">Be the first to publish a skill! Create a skill and hit 'Publish to Marketplace'.</p>
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                    {marketplaceSkills.map(skill => {
+                                        const c = getColors(skill.color || 'violet')
+                                        const typeMeta = SKILL_TYPE_META[skill.skillType || 'text_output']
+                                        const alreadyInstalled = skillsList.some(s => s.originalSkillId === skill._id || s._id === skill._id)
+                                        return (
+                                            <div key={skill._id} className="glass-panel rounded-2xl p-5 border border-[var(--sys-border)]">
+                                                <div className="flex items-start gap-3 mb-3">
+                                                    <div className={`w-10 h-10 rounded-xl ${c.bg} flex items-center justify-center`}>
+                                                        <span className={`material-symbols-outlined ${c.text} text-xl`}>{skill.icon || 'auto_awesome'}</span>
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <h3 className="text-sm font-bold text-[var(--sys-text)] truncate">{skill.name}</h3>
+                                                        <p className="text-[11px] text-[var(--sys-text-muted)] line-clamp-2 mt-0.5">{skill.description}</p>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-1.5 mb-3">
+                                                    <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-bold"
+                                                        style={{ background: typeMeta.bg, color: typeMeta.color }}>
+                                                        <span className="material-symbols-outlined" style={{ fontSize: 11 }}>{typeMeta.icon}</span>
+                                                        {typeMeta.label}
+                                                    </span>
+                                                    {skill.installCount > 0 && (
+                                                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--sys-surface)] text-[var(--sys-text-muted)] font-bold">
+                                                            {skill.installCount} installs
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                {skill.publisherName && (
+                                                    <p className="text-[10px] text-[var(--sys-text-muted)] mb-3">by {skill.publisherName}</p>
+                                                )}
+                                                <button
+                                                    onClick={() => !alreadyInstalled && installSkill(skill._id)}
+                                                    disabled={alreadyInstalled || installingSkill === skill._id}
+                                                    className={`w-full py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                                                        alreadyInstalled
+                                                            ? 'bg-emerald-500/10 text-emerald-400 cursor-default'
+                                                            : 'btn-primary'
+                                                    }`}>
+                                                    {installingSkill === skill._id
+                                                        ? <><span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>Installing...</>
+                                                        : alreadyInstalled
+                                                            ? <><span className="material-symbols-outlined text-sm">check_circle</span>Installed</>
+                                                            : <><span className="material-symbols-outlined text-sm">download</span>Install</>}
+                                                </button>
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            )
                         )}
                     </div>
                 )}
@@ -856,8 +1052,24 @@ export default function SkillsHub() {
                                     <p className="text-xs text-[var(--sys-text-muted)]">This skill doesn't require any inputs — it uses your brand context.</p>
                                 )}
 
+                                {/* Credit Cost Preview */}
+                                {creditCost && (
+                                    <div className="mt-4 p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] flex items-center gap-3">
+                                        <span className="material-symbols-outlined text-primary text-base">toll</span>
+                                        <div className="flex-1">
+                                            <p className="text-xs font-bold text-[var(--sys-text)]">Estimated Cost: ~{creditCost.totalCost} credits</p>
+                                            {creditCost.breakdown?.length > 1 && (
+                                                <p className="text-[10px] text-[var(--sys-text-muted)] mt-0.5">
+                                                    {creditCost.breakdown.map(b => `${b.label} (${b.cost}cr)`).join(' + ')}
+                                                </p>
+                                            )}
+                                        </div>
+                                        {loadingCost && <span className="material-symbols-outlined text-xs animate-spin text-[var(--sys-text-muted)]">progress_activity</span>}
+                                    </div>
+                                )}
+
                                 <button onClick={executeSkill}
-                                    className="mt-6 w-full py-3 px-6 rounded-xl bg-primary text-white text-sm font-bold hover:bg-primary-light cursor-pointer transition-all flex items-center justify-center gap-2 shadow-none">
+                                    className="mt-4 w-full py-3 px-6 rounded-xl bg-primary text-white text-sm font-bold hover:bg-primary-light cursor-pointer transition-all flex items-center justify-center gap-2 shadow-none">
                                     <span className="material-symbols-outlined text-sm">play_arrow</span> Run Skill
                                 </button>
                             </div>
@@ -901,8 +1113,43 @@ export default function SkillsHub() {
                                     </div>
                                 )}
 
-                                {/* Render output */}
-                                <ResultRenderer output={result.output} outputFormat={result.outputFormat} />
+                                {/* Render output — image results first if present */}
+                                {result.mcpResults?.length > 0 && (['generate_image', 'orchestrate'].includes(result.skillType)) && (
+                                    <div className="mb-4 space-y-4">
+                                        {result.mcpResults.filter(r => r.success && r.result?.images?.length > 0).map((r, i) => (
+                                            <ImageResults key={i} images={r.result.images} />
+                                        ))}
+                                    </div>
+                                )}
+
+                                {/* Text/structured output */}
+                                {(result.output?.content || result.output?.summary || (!result.mcpResults?.length && result.output)) && (
+                                    <ResultRenderer output={result.output} outputFormat={result.outputFormat} />
+                                )}
+
+                                {/* MCP execution trace */}
+                                {result.mcpResults?.length > 0 && (
+                                    <div className="mt-4 p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                                        <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase mb-2 flex items-center gap-1">
+                                            <span className="material-symbols-outlined" style={{ fontSize: 12 }}>account_tree</span>
+                                            Execution Trace ({result.mcpResults.length} tools)
+                                        </p>
+                                        <div className="space-y-1.5">
+                                            {result.mcpResults.map((r, i) => (
+                                                <div key={i} className={`flex items-center gap-2 text-[11px] ${
+                                                    r.success ? 'text-emerald-400' : 'text-red-400'
+                                                }`}>
+                                                    <span className="material-symbols-outlined" style={{ fontSize: 12 }}>
+                                                        {r.success ? 'check_circle' : 'error'}
+                                                    </span>
+                                                    <span className="font-mono opacity-70">{r.tool}</span>
+                                                    <span className="text-[var(--sys-text-muted)]">{r.label}</span>
+                                                    {r.error && <span className="text-red-400"> — {r.error}</span>}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
 
                                 {/* Actions — Output Routing (Model B) */}
                                 <div className="flex flex-wrap gap-3 mt-6 pt-4 border-t border-[var(--sys-border)]">
@@ -1073,11 +1320,46 @@ export default function SkillsHub() {
                                 </div>
                             </div>
 
+
                             <div>
                                 <label className="text-xs text-[var(--sys-text-muted)] font-bold mb-1.5 block">Description *</label>
                                 <input type="text" value={buildForm.description} onChange={e => setBuildForm({ ...buildForm, description: e.target.value })}
                                     placeholder="One-line description for skill discovery..." className="w-full px-4 py-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-sm text-[var(--sys-text)] focus:border-primary focus:outline-none" />
                             </div>
+
+                            {/* Skill Type Picker */}
+                            <div>
+                                <label className="text-xs text-[var(--sys-text-muted)] font-bold mb-2 block">Skill Type *</label>
+                                <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                                    {Object.entries(SKILL_TYPE_META).map(([type, meta]) => (
+                                        <button key={type} type="button"
+                                            onClick={() => setBuildForm({ ...buildForm, skillType: type })}
+                                            className={`p-3 rounded-xl border text-left cursor-pointer transition-all ${
+                                                buildForm.skillType === type
+                                                    ? 'border-2'
+                                                    : 'border border-[var(--sys-border)] bg-[var(--sys-surface)]'
+                                            }`}
+                                            style={buildForm.skillType === type ? { borderColor: meta.color, background: meta.bg } : {}}>
+                                            <span className="material-symbols-outlined text-xl block mb-1"
+                                                style={{ color: buildForm.skillType === type ? meta.color : 'var(--sys-text-muted)' }}>
+                                                {meta.icon}
+                                            </span>
+                                            <p className="text-[11px] font-bold leading-tight"
+                                                style={{ color: buildForm.skillType === type ? meta.color : 'var(--sys-text)' }}>
+                                                {meta.label}
+                                            </p>
+                                        </button>
+                                    ))}
+                                </div>
+                                <p className="text-[10px] text-[var(--sys-text-muted)] mt-1.5">
+                                    {buildForm.skillType === 'text_output' && 'Generates text, social posts, ad copy, or structured JSON output.'}
+                                    {buildForm.skillType === 'generate_image' && 'Triggers Creative Studio to generate images with brand context.'}
+                                    {buildForm.skillType === 'generate_video' && 'Queues a video generation job in the Video Studio.'}
+                                    {buildForm.skillType === 'create_content' && 'Generates content and auto-saves it as drafts in Content Studio.'}
+                                    {buildForm.skillType === 'orchestrate' && 'Runs multiple tools in sequence — images + content + calendar in one shot.'}
+                                </p>
+                            </div>
+
 
                             <div>
                                 <label className="text-xs text-[var(--sys-text-muted)] font-bold mb-1.5 block">Instructions * <span className="text-[var(--sys-text-muted)] font-normal">(what the AI does when running this skill)</span></label>

@@ -10,6 +10,7 @@ import { seedDefaultSkills } from '../seeds/defaultSkills.js';
 import { resolveTargetMarkets, getMarketContext, getRelevantFestivals } from '../utils/globalCalendar.js';
 import { safeErrorMessage } from '../utils/safeError.js';
 import { setMaxListeners } from 'events';
+import { executeTool, interpolate, MCP_TOOL_MANIFEST } from './mcp-tools.js';
 
 const MAX_ACTIVE_SKILLS = 5;
 
@@ -147,7 +148,7 @@ router.get('/', protect, async (req, res) => {
             $or: [
                 { user: req.user._id },
                 { isPrebuilt: true },
-                { visibility: 'marketplace' },
+                { visibility: 'mantram_users' },
             ],
         };
         if (category) query.category = category;
@@ -374,12 +375,12 @@ router.post('/:id/execute', protect, requireCredits('content'), async (req, res)
             $or: [
                 { user: req.user._id },
                 { isPrebuilt: true },
-                { visibility: 'marketplace' },
+                { visibility: 'mantram_users' },
             ],
         });
         if (!skill) return res.status(404).json({ success: false, error: 'Skill not found or inactive' });
 
-        // Load brand context if provided
+        // ── Load brand context ────────────────────────────────────────────────
         let brandContext = '';
         let brand = null;
         if (brandId) {
@@ -398,87 +399,186 @@ router.post('/:id/execute', protect, requireCredits('content'), async (req, res)
             }
         }
 
-        // Build user input string from inputFields
+        // ── Build input context string (for AI prompt) ─────────────────────
         let userInputText = '';
         if (inputs && skill.inputFields?.length > 0) {
             userInputText = skill.inputFields.map(field => {
                 const value = inputs[field.name];
                 if (!value && field.required) throw new Error(`Missing required input: ${field.label}`);
+                // Don't include image data in text prompt — too large
+                if (field.type === 'image_upload' || field.type === 'image_library') {
+                    return value ? `${field.label}: [Image provided]` : '';
+                }
                 return value ? `${field.label}: ${value}` : '';
             }).filter(Boolean).join('\n');
         }
 
-        // Resolve target markets from brand data
         const targetMarkets = resolveTargetMarkets(brand);
-
-        // Construct the AI prompt
         const now = new Date();
         const dateContext = `TODAY'S DATE: ${now.toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}. Current year is ${now.getFullYear()}. All dates in your response MUST be in ${now.getFullYear()} or later. NEVER use past dates.`;
-
-        // Get market-specific context (cultural norms, currency, language)
         const marketCtx = getMarketContext(targetMarkets);
-
-        // Get real festival dates filtered by target markets
         const festivalContext = getRelevantFestivals(
             `${userInputText} ${skill.name} ${skill.description} ${skill.instructions}`,
             targetMarkets,
         );
 
-        const systemPrompt = [
-            skill.systemPrompt || `You are an expert AI assistant executing the "${skill.name}" skill.`,
-            '',
-            `=== CURRENT DATE ===`,
-            dateContext,
-            '',
-            marketCtx || '',
-            festivalContext || '',
-            '=== SKILL INSTRUCTIONS ===',
-            skill.instructions,
-            '',
-            brandContext ? `=== BRAND CONTEXT ===\n${brandContext}\nTarget Markets: ${targetMarkets.join(', ')}` : `Target Markets: ${targetMarkets.join(', ')}`,
-            '',
-            'CRITICAL RULES:',
-            '1. DATES: Use ONLY verified dates from the festival calendar above. NEVER guess or hallucinate dates.',
-            '2. MARKET: Adapt all content to the specified target markets — use their currency, cultural references, language nuances, and local trends.',
-            '3. LANGUAGE: Generate content in the language appropriate for the target market (e.g., Portuguese for Brazil, Arabic for Saudi, Hinglish for India).',
-            '4. CULTURAL: Respect cultural sensitivities of each target market. If multiple markets, note differences.',
-            '',
-            skill.outputFormat === 'json' || skill.outputFormat === 'structured'
-                ? 'Respond in valid JSON format.'
-                : skill.outputFormat === 'html'
-                    ? 'Respond in clean HTML.'
-                    : 'Respond in well-formatted Markdown.',
-        ].filter(Boolean).join('\n');
+        // ── MCP Context object (passed to all tool calls) ────────────────────
+        const jwtToken = req.headers.authorization?.split(' ')[1] || '';
+        const mcpContext = {
+            user: req.user,
+            brand,
+            brandContext,
+            inputs,
+            executionId: null, // will be set after history record created
+            internalToken: jwtToken,
+        };
 
-        const userPrompt = userInputText
-            ? `Execute this skill with the following inputs:\n\n${userInputText}\n\nTarget Markets: ${targetMarkets.join(', ')}. Today: ${now.toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' })}. Use ONLY verified dates. Adapt content for the specified target markets.`
-            : `Execute this skill for the brand context provided. Target Markets: ${targetMarkets.join(', ')}. Today: ${now.toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' })}. Use ONLY verified dates. Adapt content for the specified target markets.`;
+        // ── EXECUTION ROUTER ─────────────────────────────────────────────────
+        // For non-text skills, run through MCP tool pipeline first
+        let mcpResults = [];
+        let aiOutput = null;
+        const skillType = skill.skillType || 'text_output';
 
-        // Execute
-        const isJson = skill.outputFormat === 'json' || skill.outputFormat === 'structured';
-        const elapsed = Date.now() - (req.startTime || Date.now());
-        const remainingBudget = Math.max(300000, 600000 - elapsed);
-        const result = await aiCall(systemPrompt, userPrompt, {
-            temperature: skill.temperature,
-            maxTokens: 4096,
-            json: isJson,
-            timeout: remainingBudget
-        });
+        if (skillType === 'generate_image' || skillType === 'generate_video' || skillType === 'create_content' || skillType === 'orchestrate') {
+            console.log(`⚡ Skills MCP: executing skill type=${skillType}, actions=${skill.mcpActions?.length || 0}`);
 
-        // Parse result
-        let output;
-        if (isJson) {
-            output = parseJSON(result);
-        } else {
-            output = { content: result };
+            // Step 1: If the skill has instructions, let AI plan the execution params
+            if (skill.instructions && skill.mcpActions?.length > 0) {
+                const planSystemPrompt = [
+                    `You are an AI execution planner for the "${skill.name}" skill.`,
+                    'Your job is to generate the exact parameters for each MCP tool call based on the user inputs and brand context.',
+                    '',
+                    '=== SKILL INSTRUCTIONS ===',
+                    skill.instructions,
+                    '',
+                    brandContext ? `=== BRAND CONTEXT ===\n${brandContext}` : '',
+                    dateContext,
+                    marketCtx || '',
+                    festivalContext || '',
+                    '',
+                    'USER INPUTS:',
+                    userInputText || '(no inputs provided)',
+                    '',
+                    'MCP TOOLS TO INVOKE:',
+                    (skill.mcpActions || []).map((a, i) => `${i + 1}. ${a.tool} — ${a.label || ''}`).join('\n'),
+                    '',
+                    'Return ONLY valid JSON with this exact shape:',
+                    '{',
+                    '  "toolParams": [',
+                    '    { "tool": "<tool_id>", "params": { ... } }',
+                    '  ],',
+                    '  "summary": "One sentence describing what will be generated"',
+                    '}',
+                    'For generate_image tools, "params.prompt" must be a complete, high-quality image generation prompt incorporating brand identity.',
+                    'For create_content tools, "params.content" must be the full content array or text.',
+                ].filter(Boolean).join('\n');
+
+                const planUserPrompt = `Plan the execution for these user inputs:\n${userInputText || '(no inputs)'}`;
+
+                try {
+                    const planResult = await aiCall(planSystemPrompt, planUserPrompt, { json: true, temperature: 0.4, maxTokens: 2048 });
+                    const plan = parseJSON(planResult);
+                    aiOutput = { summary: plan.summary };
+
+                    // Use AI-planned params, merged with static params if available
+                    for (let i = 0; i < (skill.mcpActions || []).length; i++) {
+                        const action = skill.mcpActions[i];
+                        const plannedAction = (plan.toolParams || [])[i];
+                        const baseParams = interpolate(action.params || {}, { ...inputs, brand: brand?.name, market: targetMarkets[0] });
+                        const mergedParams = { ...baseParams, ...(plannedAction?.params || {}) };
+
+                        try {
+                            const toolResult = await executeTool(action.tool, mergedParams, mcpContext);
+                            mcpResults.push({ tool: action.tool, label: action.label || action.tool, result: toolResult, success: true });
+                        } catch (toolErr) {
+                            console.error(`MCP tool ${action.tool} failed:`, toolErr.message);
+                            if (!action.optional) throw toolErr;
+                            mcpResults.push({ tool: action.tool, label: action.label || action.tool, error: toolErr.message, success: false });
+                        }
+                    }
+                } catch (planErr) {
+                    console.warn(`MCP planning failed, falling back to direct tool params: ${planErr.message}`);
+                    // Fallback: run tools with static interpolated params only
+                    for (const action of (skill.mcpActions || [])) {
+                        const params = interpolate(action.params || {}, { ...inputs, brand: brand?.name });
+                        try {
+                            const toolResult = await executeTool(action.tool, params, mcpContext);
+                            mcpResults.push({ tool: action.tool, label: action.label || action.tool, result: toolResult, success: true });
+                        } catch (toolErr) {
+                            if (!action.optional) throw toolErr;
+                            mcpResults.push({ tool: action.tool, label: action.label || action.tool, error: toolErr.message, success: false });
+                        }
+                    }
+                }
+            } else if (skill.mcpActions?.length > 0) {
+                // No AI planning — run tools with static params
+                for (const action of skill.mcpActions) {
+                    const params = interpolate(action.params || {}, { ...inputs, brand: brand?.name });
+                    try {
+                        const toolResult = await executeTool(action.tool, params, mcpContext);
+                        mcpResults.push({ tool: action.tool, label: action.label || action.tool, result: toolResult, success: true });
+                    } catch (toolErr) {
+                        if (!action.optional) throw toolErr;
+                        mcpResults.push({ tool: action.tool, label: action.label || action.tool, error: toolErr.message, success: false });
+                    }
+                }
+            }
         }
 
-        // Update usage stats
+        // ── Standard AI text execution (always runs for text_output; also for enriching MCP results) ──
+        if (skillType === 'text_output' || skillType === 'create_content') {
+            const isJson = skill.outputFormat === 'json' || skill.outputFormat === 'structured';
+            const systemPrompt = [
+                skill.systemPrompt || `You are an expert AI assistant executing the "${skill.name}" skill.`,
+                '',
+                `=== CURRENT DATE ===`, dateContext,
+                '',
+                marketCtx || '',
+                festivalContext || '',
+                '=== SKILL INSTRUCTIONS ===',
+                skill.instructions,
+                '',
+                brandContext ? `=== BRAND CONTEXT ===\n${brandContext}\nTarget Markets: ${targetMarkets.join(', ')}` : `Target Markets: ${targetMarkets.join(', ')}`,
+                '',
+                'CRITICAL RULES:',
+                '1. DATES: Use ONLY verified dates from the festival calendar above. NEVER guess or hallucinate dates.',
+                '2. MARKET: Adapt all content to the specified target markets.',
+                '3. LANGUAGE: Generate content in the language appropriate for the target market.',
+                '4. CULTURAL: Respect cultural sensitivities of each target market.',
+                '',
+                isJson ? 'Respond in valid JSON format.' : skill.outputFormat === 'html' ? 'Respond in clean HTML.' : 'Respond in well-formatted Markdown.',
+            ].filter(Boolean).join('\n');
+
+            const userPrompt = userInputText
+                ? `Execute this skill with the following inputs:\n\n${userInputText}\n\nTarget Markets: ${targetMarkets.join(', ')}. Today: ${now.toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' })}. Use ONLY verified dates.`
+                : `Execute this skill for the brand context provided. Target Markets: ${targetMarkets.join(', ')}. Today: ${now.toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' })}.`;
+
+            const elapsed = Date.now() - (req.startTime || Date.now());
+            const remainingBudget = Math.max(300000, 600000 - elapsed);
+            const result = await aiCall(systemPrompt, userPrompt, { temperature: skill.temperature, maxTokens: 4096, json: isJson, timeout: remainingBudget });
+            aiOutput = isJson ? parseJSON(result) : { content: result };
+
+            // Auto-save to Content Studio if outputAction says so
+            if (skill.outputAction === 'save_to_content' && aiOutput) {
+                await executeTool('content_studio.save_draft', {
+                    content: aiOutput.posts || aiOutput.socialPosts || aiOutput.content || JSON.stringify(aiOutput, null, 2),
+                    title: skill.name,
+                }, mcpContext);
+            }
+        }
+
+        // ── Aggregate final output ────────────────────────────────────────────
+        const output = {
+            ...(aiOutput || {}),
+            ...(mcpResults.length > 0 ? { mcpResults, skillType } : {}),
+        };
+
+        // ── Update usage stats ────────────────────────────────────────────────
         skill.usageCount += 1;
         skill.lastUsedAt = new Date();
         await skill.save();
 
-        // Save execution to history
+        // ── Save execution to history ─────────────────────────────────────────
         let execution;
         try {
             execution = await SkillExecution.create({
@@ -492,6 +592,8 @@ router.post('/:id/execute', protect, requireCredits('content'), async (req, res)
                 inputs: inputs || {},
                 output,
                 outputFormat: skill.outputFormat,
+                mcpResults,
+                skillType,
                 status: 'completed',
             });
         } catch (histErr) {
@@ -502,13 +604,155 @@ router.post('/:id/execute', protect, requireCredits('content'), async (req, res)
             success: true,
             skillName: skill.name,
             skillId: skill._id,
+            skillType,
             executionId: execution?._id || null,
             output,
             outputFormat: skill.outputFormat,
+            mcpResults,
             suggestedNextSkills: skill.suggestedNextSkills,
         });
     } catch (error) {
         console.error('Execute skill error:', error);
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+
+// ============================================================================
+// CREDIT COST PREVIEW — Show cost before executing
+// ============================================================================
+
+router.get('/:id/credit-cost', protect, async (req, res) => {
+    try {
+        const skill = await Skill.findOne({
+            _id: req.params.id,
+            status: 'active',
+            $or: [{ user: req.user._id }, { isPrebuilt: true }, { visibility: 'mantram_users' }],
+        }).lean();
+        if (!skill) return res.status(404).json({ success: false, error: 'Skill not found' });
+
+        // Calculate cost from mcpActions manifest
+        let mcpCost = 0;
+        for (const action of (skill.mcpActions || [])) {
+            const manifest = MCP_TOOL_MANIFEST.find(t => t.id === action.tool);
+            if (manifest) mcpCost += manifest.creditCost;
+        }
+
+        const totalCost = Math.max(skill.estimatedCreditCost || 1, mcpCost || 1);
+        const breakdown = (skill.mcpActions || []).map(a => {
+            const m = MCP_TOOL_MANIFEST.find(t => t.id === a.tool);
+            return { tool: a.tool, label: a.label || m?.label || a.tool, cost: m?.creditCost || 0 };
+        });
+        breakdown.push({ tool: 'ai_inference', label: 'AI Inference', cost: 1 });
+
+        res.json({ success: true, totalCost, breakdown, skillType: skill.skillType || 'text_output' });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+
+// ============================================================================
+// MARKETPLACE — Browse, Publish, Install (Mantram users only)
+// ============================================================================
+
+// Browse marketplace
+router.get('/marketplace/browse', protect, async (req, res) => {
+    try {
+        const { category, search, limit = 20, skip = 0 } = req.query;
+        const query = { isPublished: true, status: 'active' };
+        if (category) query.category = category;
+        if (search) query.$text = { $search: search };
+
+        const skills = await Skill.find(query)
+            .select('-instructions -systemPrompt -changelog')
+            .sort({ installCount: -1, avgRating: -1, createdAt: -1 })
+            .skip(parseInt(skip))
+            .limit(Math.min(parseInt(limit), 50))
+            .lean();
+
+        const total = await Skill.countDocuments(query);
+        res.json({ success: true, skills, total });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// Publish skill to marketplace
+router.post('/:id/publish', protect, async (req, res) => {
+    try {
+        const skill = await Skill.findOne({ _id: req.params.id, user: req.user._id });
+        if (!skill) return res.status(404).json({ success: false, error: 'Skill not found or not yours' });
+        if (skill.isPrebuilt) return res.status(403).json({ success: false, error: 'Pre-built skills are already public' });
+
+        skill.isPublished = true;
+        skill.publishedAt = new Date();
+        skill.publisherName = req.user.name || req.user.email?.split('@')[0] || 'Mantram User';
+        skill.visibility = 'mantram_users';
+        await skill.save();
+
+        res.json({ success: true, message: `"${skill.name}" published to Mantram Marketplace` });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// Unpublish from marketplace
+router.post('/:id/unpublish', protect, async (req, res) => {
+    try {
+        const skill = await Skill.findOne({ _id: req.params.id, user: req.user._id });
+        if (!skill) return res.status(404).json({ success: false, error: 'Skill not found' });
+
+        skill.isPublished = false;
+        skill.visibility = 'private';
+        await skill.save();
+
+        res.json({ success: true, message: `"${skill.name}" removed from marketplace` });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// Install a marketplace skill (creates a copy in user's workspace)
+router.post('/:id/install', protect, async (req, res) => {
+    try {
+        const source = await Skill.findOne({ _id: req.params.id, isPublished: true, status: 'active' }).lean();
+        if (!source) return res.status(404).json({ success: false, error: 'Skill not found in marketplace' });
+
+        // Check if already installed
+        const existing = await Skill.findOne({ user: req.user._id, originalSkillId: source._id });
+        if (existing) return res.json({ success: true, skill: existing, message: 'Already installed', alreadyInstalled: true });
+
+        const installed = await Skill.create({
+            user: req.user._id,
+            name: source.name,
+            description: source.description,
+            instructions: source.instructions,
+            systemPrompt: source.systemPrompt,
+            category: source.category,
+            tags: source.tags,
+            icon: source.icon,
+            color: source.color,
+            skillType: source.skillType,
+            inputFields: source.inputFields,
+            mcpActions: source.mcpActions,
+            outputFormat: source.outputFormat,
+            outputAction: source.outputAction,
+            estimatedCreditCost: source.estimatedCreditCost,
+            modelPreference: source.modelPreference,
+            temperature: source.temperature,
+            visibility: 'private',
+            status: 'active',
+            originalSkillId: source._id,
+            version: 1,
+            changelog: [{ version: 1, changes: `Installed from Mantram Marketplace: "${source.name}" by ${source.publisherName}` }],
+        });
+
+        // Increment install count on source
+        await Skill.findByIdAndUpdate(source._id, { $inc: { installCount: 1 } });
+
+        res.status(201).json({ success: true, skill: installed, message: `"${source.name}" installed to your workspace` });
+    } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
@@ -632,7 +876,7 @@ router.post('/:id/activate', protect, async (req, res) => {
             $or: [
                 { user: req.user._id },
                 { isPrebuilt: true },
-                { visibility: 'marketplace' },
+                { visibility: 'mantram_users' },
             ],
         });
         if (!skill) return res.status(404).json({ success: false, error: 'Skill not found' });

@@ -878,6 +878,8 @@ export const skills = {
     execute: (id, data) => apiFetch(`/skills/${id}/execute`, { method: 'POST', body: JSON.stringify(data) }),
     generate: (data) => apiFetch('/skills/generate', { method: 'POST', body: JSON.stringify(data) }),
     enhanceInstructions: (data) => apiFetch('/skills/enhance-instructions', { method: 'POST', body: JSON.stringify(data) }),
+    // Credit cost preview (shown before execution)
+    creditCost: (id) => apiFetch(`/skills/${id}/credit-cost`),
     // Model A — Persistent skill activation
     activate: (id) => apiFetch(`/skills/${id}/activate`, { method: 'POST' }),
     deactivate: (id) => apiFetch(`/skills/${id}/deactivate`, { method: 'POST' }),
@@ -888,6 +890,19 @@ export const skills = {
         return apiFetch(`/skills/executions/list?${query}`);
     },
     routeExecution: (executionId, data) => apiFetch(`/skills/executions/${executionId}/route`, { method: 'POST', body: JSON.stringify(data) }),
+    // Marketplace (Mantram users)
+    browseMarketplace: (params = {}) => {
+        const query = new URLSearchParams(params).toString();
+        return apiFetch(`/skills/marketplace/browse?${query}`);
+    },
+    installSkill: (id) => apiFetch(`/skills/${id}/install`, { method: 'POST' }),
+    publishSkill: (id) => apiFetch(`/skills/${id}/publish`, { method: 'POST' }),
+    unpublishSkill: (id) => apiFetch(`/skills/${id}/unpublish`, { method: 'POST' }),
+};
+
+// ============ MCP Tools API ============
+export const mcpTools = {
+    list: () => apiFetch('/mcp-tools'),
 };
 
 // ============ Google Analytics + Search Console API (brand-aware) ============
