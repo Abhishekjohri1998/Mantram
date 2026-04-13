@@ -88,13 +88,19 @@ const GalleryPanel = memo(({
             {result && activeGenerations.length === 0 && (
                 <div className="generation-card generation-card--new mb-5">
                     <div className="studio-compact-prompt-container mb-2.5 group/prompt">
-                        <p className="studio-compact-prompt-text text-xs text-[var(--sys-text-muted)]" title={prompt || 'Generated creative'}>
+                        <p className="studio-compact-prompt-text text-xs" title={prompt}>
                             {prompt || 'Generated creative'}
                         </p>
                         <div className="studio-prompt-actions">
-                            <button onClick={() => { navigator.clipboard.writeText(prompt); setFeedbackToast?.('Prompt copied to clipboard') }}
-                                className="studio-prompt-action-btn" title="Copy Prompt">
-                                <span className="material-symbols-outlined">content_copy</span>
+                            <button onClick={() => { 
+                                navigator.clipboard.writeText(prompt); 
+                                setFeedbackToast?.('Prompt copied to clipboard');
+                                setCopiedField?.('prompt_result');
+                                setTimeout(() => setCopiedField?.(null), 2000);
+                            }}
+                                className={`studio-prompt-action-btn ${copiedField === 'prompt_result' ? 'text-primary' : ''}`} 
+                                title="Copy Complete Prompt">
+                                <span className="material-symbols-outlined">{copiedField === 'prompt_result' ? 'check' : 'content_copy'}</span>
                             </button>
                             <button onClick={() => { setPrompt(prompt); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
                                 className="studio-prompt-action-btn" title="Reuse Prompt">
@@ -346,9 +352,15 @@ const GalleryPanel = memo(({
                                                     {group.promptText}
                                                 </p>
                                                 <div className="studio-prompt-actions">
-                                                    <button onClick={() => { navigator.clipboard.writeText(group.promptText); setFeedbackToast?.('Prompt copied to clipboard') }}
-                                                        className="studio-prompt-action-btn" title="Copy Prompt">
-                                                        <span className="material-symbols-outlined">content_copy</span>
+                                                    <button onClick={() => { 
+                                                        navigator.clipboard.writeText(group.promptText); 
+                                                        setFeedbackToast?.('Prompt copied to clipboard');
+                                                        setCopiedField?.(`prompt_history_${gIdx}`);
+                                                        setTimeout(() => setCopiedField?.(null), 2000);
+                                                    }}
+                                                        className={`studio-prompt-action-btn ${copiedField === `prompt_history_${gIdx}` ? 'text-primary' : ''}`} 
+                                                        title="Copy Prompt">
+                                                        <span className="material-symbols-outlined">{copiedField === `prompt_history_${gIdx}` ? 'check' : 'content_copy'}</span>
                                                     </button>
                                                     <button onClick={() => { setPrompt(group.promptText); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
                                                         className="studio-prompt-action-btn" title="Reuse Prompt">
@@ -403,9 +415,15 @@ const GalleryPanel = memo(({
                                                     {item._prompt || item.prompt}
                                                 </p>
                                                 <div className="studio-prompt-actions">
-                                                    <button onClick={() => { navigator.clipboard.writeText(item._prompt || item.prompt); setFeedbackToast?.('Prompt copied to clipboard') }}
-                                                        className="studio-prompt-action-btn" title="Copy Prompt">
-                                                        <span className="material-symbols-outlined">content_copy</span>
+                                                    <button onClick={() => { 
+                                                        navigator.clipboard.writeText(item._prompt || item.prompt); 
+                                                        setFeedbackToast?.('Prompt copied to clipboard');
+                                                        setCopiedField?.(`prompt_list_${idx}`);
+                                                        setTimeout(() => setCopiedField?.(null), 2000);
+                                                    }}
+                                                        className={`studio-prompt-action-btn ${copiedField === `prompt_list_${idx}` ? 'text-primary' : ''}`} 
+                                                        title="Copy Prompt">
+                                                        <span className="material-symbols-outlined">{copiedField === `prompt_list_${idx}` ? 'check' : 'content_copy'}</span>
                                                     </button>
                                                     <button onClick={() => { setPrompt(item._prompt || item.prompt); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
                                                         className="studio-prompt-action-btn" title="Reuse Prompt">
@@ -438,9 +456,15 @@ const GalleryPanel = memo(({
                                 {img.prompt || img.title}
                             </p>
                             <div className="studio-prompt-actions">
-                                <button onClick={() => { navigator.clipboard.writeText(img.prompt || img.title); setFeedbackToast?.('Prompt copied to clipboard') }}
-                                    className="studio-prompt-action-btn" title="Copy Prompt">
-                                    <span className="material-symbols-outlined">content_copy</span>
+                                <button onClick={() => { 
+                                    navigator.clipboard.writeText(img.prompt || img.title); 
+                                    setFeedbackToast?.('Prompt copied to clipboard');
+                                    setCopiedField?.(`prompt_bank_${img._id}`);
+                                    setTimeout(() => setCopiedField?.(null), 2000);
+                                }}
+                                    className={`studio-prompt-action-btn ${copiedField === `prompt_bank_${img._id}` ? 'text-primary' : ''}`} 
+                                    title="Copy Prompt">
+                                    <span className="material-symbols-outlined">{copiedField === `prompt_bank_${img._id}` ? 'check' : 'content_copy'}</span>
                                 </button>
                                 <button onClick={() => { setPrompt(img.prompt || img.title); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
                                     className="studio-prompt-action-btn" title="Reuse Prompt">
