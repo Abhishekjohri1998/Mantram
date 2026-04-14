@@ -3198,9 +3198,9 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                     <div className="flex gap-4 overflow-x-auto snap-x scrollbar-hide pb-2">
                                                         {group.items.map((item, iIdx) => (
                                                             <div key={item._id || iIdx} className="relative rounded-xl shrink-0 snap-start overflow-hidden" style={{ width: group.items.length === 1 ? '100%' : group.items.length === 2 ? '48%' : '32%' }}>
-                                                                <div className="group/img relative w-full h-full rounded-xl overflow-hidden border border-[var(--sys-border)] transition-all bg-[var(--sys-surface)] flex justify-center">
+                                                                <div className="group/img relative w-fit h-full rounded-xl overflow-hidden border border-[var(--sys-border)] transition-all">
                                                                     <img src={item.imageUrl} alt={group.prompt} loading="lazy" decoding="async"
-                                                                        className="w-auto h-[220px] max-w-full object-contain object-center block aspect-video sm:aspect-auto" />
+                                                                        className="w-auto h-[220px] max-w-full object-contain object-left block bg-[var(--sys-surface)] aspect-video sm:aspect-auto" />
                                                                     
                                                                     {item._idx === 0 && <span className="absolute top-2 left-2 w-5 h-5 rounded-full bg-[var(--sys-bg)] shadow flex items-center justify-center pointer-events-none"></span>}
                                                                     
