@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useRef, useCallback, Suspense, lazy } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import DashboardLayout from '../components/DashboardLayout'
 import { content as contentAPI, agents as agentsAPI, creatives as creativesAPI, products as productsAPI } from '../services/api'
@@ -8,7 +8,6 @@ import VoiceInput from '../components/VoiceInput'
 import GlobalLoader from '../components/GlobalLoader'
 import { CreditBadge, CreditTooltipWrapper } from '../components/CreditBadge'
 import PublishModal from '../components/PublishModal'
-import { useCallback, lazy, Suspense } from 'react'
 import Walkthrough from '../components/Walkthrough'
 import './ContentStudio.css'
 
@@ -1110,8 +1109,9 @@ function StepContext({ onComplete, onBack, goal, subType, initialImage, brandId 
                     </button>
                 ))}
             </div>
-
-            {/* Manual */}
+﻿
+            <div className="cs-card p-6 border-[var(--sys-border)] bg-[var(--sys-surface)]">
+                {/* Manual */}
             {contextType === 'manual' && (
                 <div className="relative">
                     <textarea value={details} onChange={e => setDetails(e.target.value)}
@@ -1412,6 +1412,7 @@ function StepContext({ onComplete, onBack, goal, subType, initialImage, brandId 
                     )}
                 </div>
             )}
+        </div>
 
             <button onClick={handleContextComplete}
                 className="cs-btn-primary mt-8">
@@ -2169,7 +2170,27 @@ function StepYouTubeWizard({ onComplete, onBack, activeBrand, availableProviders
 // YOUTUBE RESULT VIEW
 // ============================================================================
 
-function YouTubeResultView({ result, youtubeData, onNewContent, generating, activeBrand }) {
+const YTSectionHeader = ({ icon, title, count, sectionKey, copyText, color = 'text-primary', expanded, onToggle, onCopy, copied }) => (
+    <div className="flex items-center justify-between mb-3">
+        <button onClick={() => onToggle(sectionKey)} className="flex items-center gap-2 cursor-pointer group">
+            <span className={`material-symbols-outlined text-lg ${color}`}>{icon}</span>
+            <h4 className="text-base font-bold text-[var(--sys-text)]">{title}</h4>
+            {count && <span className="text-xs bg-[var(--sys-surface)] text-[var(--sys-text-muted)] px-2 py-0.5 rounded-full">{count}</span>}
+            <span className="material-symbols-outlined text-sm text-[var(--sys-text-muted)] group-hover:text-[var(--sys-text)] transition-colors">
+                {expanded ? 'expand_less' : 'expand_more'}
+            </span>
+        </button>
+        {copyText && (
+            <button onClick={() => onCopy(copyText, sectionKey)}
+                className="flex items-center gap-1 text-xs text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] transition-colors cursor-pointer">
+                <span className="material-symbols-outlined text-sm">{copied === sectionKey ? 'check' : 'content_copy'}</span>
+                {copied === sectionKey ? 'Copied!' : 'Copy'}
+            </button>
+        )}
+    </div>
+)
+
+function YouTubeResultView({ result, youtubeData, onNewContent }) {
     const [copiedSection, setCopiedSection] = useState(null)
     const [expandedSections, setExpandedSections] = useState({ script: true, title: true, description: true, tags: true, keywords: true })
 
@@ -2210,26 +2231,6 @@ function YouTubeResultView({ result, youtubeData, onNewContent, generating, acti
     const toggleSection = (key) => {
         setExpandedSections(prev => ({ ...prev, [key]: !prev[key] }))
     }
-
-    const SectionHeader = ({ icon, title, count, sectionKey, copyText, color = 'text-primary' }) => (
-        <div className="flex items-center justify-between mb-3">
-            <button onClick={() => toggleSection(sectionKey)} className="flex items-center gap-2 cursor-pointer group">
-                <span className={`material-symbols-outlined text-lg ${color}`}>{icon}</span>
-                <h4 className="text-base font-bold text-[var(--sys-text)]">{title}</h4>
-                {count && <span className="text-xs bg-[var(--sys-surface)] text-[var(--sys-text-muted)] px-2 py-0.5 rounded-full">{count}</span>}
-                <span className="material-symbols-outlined text-sm text-[var(--sys-text-muted)] group-hover:text-[var(--sys-text)] transition-colors">
-                    {expandedSections[sectionKey] ? 'expand_less' : 'expand_more'}
-                </span>
-            </button>
-            {copyText && (
-                <button onClick={() => copySection(copyText, sectionKey)}
-                    className="flex items-center gap-1 text-xs text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] transition-colors cursor-pointer">
-                    <span className="material-symbols-outlined text-sm">{copiedSection === sectionKey ? 'check' : 'content_copy'}</span>
-                    {copiedSection === sectionKey ? 'Copied!' : 'Copy'}
-                </button>
-            )}
-        </div>
-    )
 
     return (
         <div className="cs-animate-fade cs-centered-container !max-w-3xl">
@@ -2275,7 +2276,8 @@ function YouTubeResultView({ result, youtubeData, onNewContent, generating, acti
 
             {/* Title Section */}
             <div className="cs-glass-card p-6 mb-6">
-                <SectionHeader icon="title" title="Video Title" sectionKey="title" copyText={videoTitle} color="text-primary" />
+                <YTSectionHeader icon="title" title="Video Title" sectionKey="title" copyText={videoTitle} color="text-primary" 
+                    expanded={expandedSections.title} onToggle={toggleSection} onCopy={copySection} copied={copiedSection} />
                 {expandedSections.title && (
                     <div className="cs-animate-fade">
                         <p className="text-lg font-bold text-[var(--sys-text)] leading-relaxed">{videoTitle}</p>
@@ -2290,7 +2292,8 @@ function YouTubeResultView({ result, youtubeData, onNewContent, generating, acti
 
             {/* Script Section */}
             <div className="cs-glass-card p-6 mb-6">
-                <SectionHeader icon="movie" title="Video Script" count={`${script.split(/\s+/).length} words`} sectionKey="script" copyText={script} />
+                <YTSectionHeader icon="movie" title="Video Script" count={`${script.split(/\s+/).length} words`} sectionKey="script" copyText={script} 
+                    expanded={expandedSections.script} onToggle={toggleSection} onCopy={copySection} copied={copiedSection} />
                 {expandedSections.script && (
                     <div className="cs-animate-fade text-sm text-[var(--sys-text-muted)] leading-relaxed whitespace-pre-wrap max-h-96 overflow-y-auto pr-2 custom-scrollbar">
                         {script}
@@ -2300,7 +2303,8 @@ function YouTubeResultView({ result, youtubeData, onNewContent, generating, acti
 
             {/* Description Section */}
             <div className="cs-glass-card p-6 mb-6">
-                <SectionHeader icon="description" title="YouTube Description" sectionKey="description" copyText={description} />
+                <YTSectionHeader icon="description" title="YouTube Description" sectionKey="description" copyText={description} 
+                    expanded={expandedSections.description} onToggle={toggleSection} onCopy={copySection} copied={copiedSection} />
                 {expandedSections.description && (
                     <div className="cs-animate-fade text-sm text-[var(--sys-text-muted)] leading-relaxed whitespace-pre-wrap max-h-64 overflow-y-auto pr-2 custom-scrollbar">
                         {description}
@@ -2311,7 +2315,8 @@ function YouTubeResultView({ result, youtubeData, onNewContent, generating, acti
             {/* Tags Section */}
             {tags.length > 0 && (
                 <div className="cs-glass-card p-6 mb-6">
-                    <SectionHeader icon="sell" title="Tags" count={`${tags.length} tags`} sectionKey="tags" copyText={tags.join(', ')} color="text-primary" />
+                    <YTSectionHeader icon="sell" title="Tags" count={`${tags.length} tags`} sectionKey="tags" copyText={tags.join(', ')} color="text-primary" 
+                        expanded={expandedSections.tags} onToggle={toggleSection} onCopy={copySection} copied={copiedSection} />
                     {expandedSections.tags && (
                         <div className="cs-animate-fade flex flex-wrap gap-2">
                             {tags.map((tag, i) => (
@@ -2328,8 +2333,9 @@ function YouTubeResultView({ result, youtubeData, onNewContent, generating, acti
             {/* Keywords Section */}
             {(keywords.primary?.length > 0 || keywords.secondary?.length > 0) && (
                 <div className="cs-glass-card p-6 mb-6">
-                    <SectionHeader icon="key" title="Keywords" sectionKey="keywords"
-                        copyText={`Primary: ${(keywords.primary || []).join(', ')}\nSecondary: ${(keywords.secondary || []).join(', ')}`} color="text-primary" />
+                    <YTSectionHeader icon="key" title="Keywords" sectionKey="keywords"
+                        copyText={`Primary: ${(keywords.primary || []).join(', ')}\nSecondary: ${(keywords.secondary || []).join(', ')}`} color="text-primary" 
+                        expanded={expandedSections.keywords} onToggle={toggleSection} onCopy={copySection} copied={copiedSection} />
                     {expandedSections.keywords && (
                         <div className="cs-animate-fade space-y-3">
                             {keywords.primary?.length > 0 && (
@@ -3186,6 +3192,18 @@ function SmartBlogWriter({ activeBrand, onBack, onGenerateImage }) {
         }
     }
 
+    const exportMarkdown = () => {
+        let md = `# ${title || 'Untitled Blog'}\n\n`
+        if (heroImageUrl) md += `![Hero](${heroImageUrl})\n\n`
+        sections.forEach(s => {
+            md += `## ${s.heading || ''}\n\n`
+            if (s.imageUrl) md += `![${s.heading || 'Image'}](${s.imageUrl})\n\n`
+            md += `${s.body}\n\n`
+        })
+        navigator.clipboard.writeText(md)
+        setCopied('md'); setTimeout(() => setCopied(''), 2000)
+    }
+
     return (
         <div className="cs-blog-canvas">
             {/* Header */}
@@ -3439,6 +3457,122 @@ function SmartBlogWriter({ activeBrand, onBack, onGenerateImage }) {
 // Image style picker renders INLINE at each section (not at top)
 // ============================================================================
 
+const BlogImageStylePicker = ({ 
+    sectionIndex, 
+    onClose, 
+    pickerTab, 
+    setPickerTab, 
+    IMAGE_RATIOS, 
+    selectedImageRatio, 
+    setSelectedImageRatio, 
+    IMAGE_STYLES, 
+    selectedImageStyle, 
+    setSelectedImageStyle, 
+    onGenerate, 
+    generatingSection, 
+    brandImages, 
+    onUseBrandDirect, 
+    onUseBrandAI 
+}) => {
+    const isHeroSection = sectionIndex === -1
+    return (
+        <div className="cs-glass-card p-6 my-6 border-primary/20 animate-fade-in" style={!isHeroSection ? { marginLeft: '-2.5rem' } : {}}>
+            <div className="flex items-center justify-between mb-4">
+                <h4 className="text-sm font-bold text-[var(--sys-text)] flex items-center gap-2">
+                    <span className="material-symbols-outlined text-sm text-primary">palette</span>
+                    {isHeroSection ? 'Hero Image' : `Section Visual`}
+                </h4>
+                <button onClick={onClose} className="cs-btn-icon">
+                    <span className="material-symbols-outlined text-sm">close</span>
+                </button>
+            </div>
+
+            {/* Tab Switcher */}
+            <div className="flex gap-1 mb-6 p-1 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                <button onClick={() => setPickerTab('ai')}
+                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-xs font-bold transition-all ${pickerTab === 'ai' ? 'bg-primary/10 text-primary border border-primary/20' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]'}`}>
+                    <span className="material-symbols-outlined text-sm">auto_awesome</span> AI Generate
+                </button>
+                <button onClick={() => setPickerTab('brand')}
+                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-xs font-bold transition-all ${pickerTab === 'brand' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]'}`}>
+                    <span className="material-symbols-outlined text-sm">photo_library</span> Brand Assets
+                    {brandImages.length > 0 && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400">{brandImages.length}</span>}
+                </button>
+            </div>
+
+            {/* AI Generate Tab */}
+            {pickerTab === 'ai' && (
+                <>
+                    {!isHeroSection && (
+                        <div className="mb-6">
+                            <p className="text-[10px] text-[var(--sys-text-muted)] uppercase tracking-widest font-bold mb-3 opacity-60">Aspect Ratio</p>
+                            <div className="flex gap-2">
+                                {IMAGE_RATIOS.map(r => (
+                                    <button key={r.id} onClick={() => setSelectedImageRatio(r.id)}
+                                        className={`flex-1 flex flex-col items-center py-3 rounded-xl border transition-all ${selectedImageRatio === r.id ? 'border-primary bg-primary/5 text-primary' : 'border-[var(--sys-border)] text-[var(--sys-text-muted)] hover:border-primary/30'}`}>
+                                        <span className="material-symbols-outlined text-base mb-1">{r.icon}</span>
+                                        <span className="text-[10px] font-bold">{r.label}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                    
+                    <div className="cs-grid-adaptive !grid-cols-4 mb-6">
+                        {IMAGE_STYLES.map(style => (
+                            <button key={style.id} onClick={() => setSelectedImageStyle(style.id)}
+                                className={`p-3 rounded-xl border transition-all text-center flex flex-col items-center justify-center gap-1 ${selectedImageStyle === style.id ? 'border-primary bg-primary/5 text-primary' : 'border-[var(--sys-border)] text-[var(--sys-text-muted)] hover:border-primary/30'}`}>
+                                <span className="material-symbols-outlined text-xl">{style.icon}</span>
+                                <span className="text-[10px] font-bold">{style.label}</span>
+                            </button>
+                        ))}
+                    </div>
+                    <button onClick={() => onGenerate(sectionIndex, selectedImageStyle)}
+                        disabled={generatingSection !== null}
+                        className="cs-btn-primary py-4">
+                        <span className={`material-symbols-outlined text-sm ${generatingSection !== null ? 'animate-spin' : ''}`}>
+                            {generatingSection !== null ? 'progress_activity' : 'auto_awesome'}
+                        </span>
+                        {generatingSection !== null ? 'Painting Masterpiece...' : `Generate ${IMAGE_STYLES.find(s => s.id === selectedImageStyle)?.label} Visual`}
+                    </button>
+                </>
+            )}
+
+            {/* Brand Gallery Tab */}
+            {pickerTab === 'brand' && (
+                <>
+                    {brandImages.length > 0 ? (
+                        <div className="cs-grid-adaptive !grid-cols-3 mb-4">
+                            {brandImages.map((img, idx) => (
+                                <div key={idx} className="group/brand rounded-xl overflow-hidden relative border border-[var(--sys-border)] aspect-square bg-black/20">
+                                    <img src={img.url} alt={img.label} className="w-full h-full object-cover" loading="lazy" />
+                                    <div className="absolute inset-0 bg-black/70 opacity-0 group-hover/brand:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2 p-2">
+                                        <button onClick={() => onUseBrandDirect(sectionIndex, img.url)}
+                                            disabled={generatingSection !== null}
+                                            className="w-full py-1.5 rounded-lg text-[9px] font-black text-white bg-emerald-600/80 backdrop-blur-sm">
+                                            USE DIRECT
+                                        </button>
+                                        <button onClick={() => onUseBrandAI(sectionIndex, img.url, selectedImageStyle)}
+                                            disabled={generatingSection !== null}
+                                            className="w-full py-1.5 rounded-lg text-[9px] font-black text-white bg-primary/80 backdrop-blur-sm">
+                                            AI ENHANCE
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="text-center py-12 opacity-40">
+                            <span className="material-symbols-outlined text-4xl block mb-2">cloud_off</span>
+                            <p className="text-sm font-bold">No Brand Assets Found</p>
+                        </div>
+                    )}
+                </>
+            )}
+        </div>
+    )
+}
+
 function BlogEditorView({ content, activeBrand, onNewContent, onGenerateImage }) {
     const [blogData, setBlogData] = useState(() => ({
         title: content?.title || '',
@@ -3658,106 +3792,6 @@ function BlogEditorView({ content, activeBrand, onNewContent, onGenerateImage })
         finally { setGeneratingSection(null) }
     }
 
-    const ImageStylePickerInline = ({ sectionIndex }) => {
-        const isHeroSection = sectionIndex === -1
-        return (
-        <div className="cs-glass-card p-6 my-6 border-primary/20 animate-fade-in" style={!isHeroSection ? { marginLeft: '-2.5rem' } : {}}>
-            <div className="flex items-center justify-between mb-4">
-                <h4 className="text-sm font-bold text-[var(--sys-text)] flex items-center gap-2">
-                    <span className="material-symbols-outlined text-sm text-primary">palette</span>
-                    {isHeroSection ? 'Hero Image' : `Section Visual`}
-                </h4>
-                <button onClick={() => setImageStylePicker(null)} className="cs-btn-icon">
-                    <span className="material-symbols-outlined text-sm">close</span>
-                </button>
-            </div>
-
-            {/* Tab Switcher */}
-            <div className="flex gap-1 mb-6 p-1 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
-                <button onClick={() => setPickerTab('ai')}
-                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-xs font-bold transition-all ${pickerTab === 'ai' ? 'bg-primary/10 text-primary border border-primary/20' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]'}`}>
-                    <span className="material-symbols-outlined text-sm">auto_awesome</span> AI Generate
-                </button>
-                <button onClick={() => setPickerTab('brand')}
-                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-xs font-bold transition-all ${pickerTab === 'brand' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]'}`}>
-                    <span className="material-symbols-outlined text-sm">photo_library</span> Brand Assets
-                    {brandImages.length > 0 && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400">{brandImages.length}</span>}
-                </button>
-            </div>
-
-            {/* AI Generate Tab */}
-            {pickerTab === 'ai' && (
-                <>
-                    {!isHeroSection && (
-                        <div className="mb-6">
-                            <p className="text-[10px] text-[var(--sys-text-muted)] uppercase tracking-widest font-bold mb-3 opacity-60">Aspect Ratio</p>
-                            <div className="flex gap-2">
-                                {IMAGE_RATIOS.map(r => (
-                                    <button key={r.id} onClick={() => setSelectedImageRatio(r.id)}
-                                        className={`flex-1 flex flex-col items-center py-3 rounded-xl border transition-all ${selectedImageRatio === r.id ? 'border-primary bg-primary/5 text-primary' : 'border-[var(--sys-border)] text-[var(--sys-text-muted)] hover:border-primary/30'}`}>
-                                        <span className="material-symbols-outlined text-base mb-1">{r.icon}</span>
-                                        <span className="text-[10px] font-bold">{r.label}</span>
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-                    
-                    <div className="cs-grid-adaptive !grid-cols-4 mb-6">
-                        {IMAGE_STYLES.map(style => (
-                            <button key={style.id} onClick={() => setSelectedImageStyle(style.id)}
-                                className={`p-3 rounded-xl border transition-all text-center flex flex-col items-center justify-center gap-1 ${selectedImageStyle === style.id ? 'border-primary bg-primary/5 text-primary' : 'border-[var(--sys-border)] text-[var(--sys-text-muted)] hover:border-primary/30'}`}>
-                                <span className="material-symbols-outlined text-xl">{style.icon}</span>
-                                <span className="text-[10px] font-bold">{style.label}</span>
-                            </button>
-                        ))}
-                    </div>
-                    <button onClick={() => handleGenerateImage(sectionIndex, selectedImageStyle)}
-                        disabled={generatingSection !== null}
-                        className="cs-btn-primary py-4">
-                        <span className={`material-symbols-outlined text-sm ${generatingSection !== null ? 'animate-spin' : ''}`}>
-                            {generatingSection !== null ? 'progress_activity' : 'auto_awesome'}
-                        </span>
-                        {generatingSection !== null ? 'Painting Masterpiece...' : `Generate ${IMAGE_STYLES.find(s => s.id === selectedImageStyle)?.label} Visual`}
-                    </button>
-                </>
-            )}
-
-            {/* Brand Gallery Tab */}
-            {pickerTab === 'brand' && (
-                <>
-                    {brandImages.length > 0 ? (
-                        <div className="cs-grid-adaptive !grid-cols-3 mb-4">
-                            {brandImages.map((img, idx) => (
-                                <div key={idx} className="group/brand rounded-xl overflow-hidden relative border border-[var(--sys-border)] aspect-square bg-black/20">
-                                    <img src={img.url} alt={img.label} className="w-full h-full object-cover" loading="lazy" />
-                                    <div className="absolute inset-0 bg-black/70 opacity-0 group-hover/brand:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2 p-2">
-                                        <button onClick={() => handleUseBrandImageDirect(sectionIndex, img.url)}
-                                            disabled={generatingSection !== null}
-                                            className="w-full py-1.5 rounded-lg text-[9px] font-black text-white bg-emerald-600/80 backdrop-blur-sm">
-                                            USE DIRECT
-                                        </button>
-                                        <button onClick={() => handleUseBrandImageAI(sectionIndex, img.url, selectedImageStyle)}
-                                            disabled={generatingSection !== null}
-                                            className="w-full py-1.5 rounded-lg text-[9px] font-black text-white bg-primary/80 backdrop-blur-sm">
-                                            AI ENHANCE
-                                        </button>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    ) : (
-                        <div className="text-center py-12 opacity-40">
-                            <span className="material-symbols-outlined text-4xl block mb-2">cloud_off</span>
-                            <p className="text-sm font-bold">No Brand Assets Found</p>
-                        </div>
-                    )}
-                </>
-            )}
-        </div>
-        )
-    }
-
     const copyAsHtml = () => {
         let html = `<article style="max-width:720px;margin:0 auto;font-family:Georgia,serif;color:#1a1a1a;line-height:1.8">\n`
         html += `<h1 style="font-size:2.5rem;font-weight:800;margin-bottom:0.5rem">${blogData.title}</h1>\n`
@@ -3891,7 +3925,12 @@ function BlogEditorView({ content, activeBrand, onNewContent, onGenerateImage })
                         </div>
                     </button>
                 )}
-                {imageStylePicker === -1 && <ImageStylePickerInline sectionIndex={-1} />}
+                {imageStylePicker === -1 && <BlogImageStylePicker sectionIndex={-1} 
+                    onClose={() => setImageStylePicker(null)} pickerTab={pickerTab} setPickerTab={setPickerTab} 
+                    IMAGE_RATIOS={IMAGE_RATIOS} selectedImageRatio={selectedImageRatio} setSelectedImageRatio={setSelectedImageRatio} 
+                    IMAGE_STYLES={IMAGE_STYLES} selectedImageStyle={selectedImageStyle} setSelectedImageStyle={setSelectedImageStyle} 
+                    onGenerate={handleGenerateImage} generatingSection={generatingSection} brandImages={brandImages} 
+                    onUseBrandDirect={handleUseBrandImageDirect} onUseBrandAI={handleUseBrandImageAI} />}
             </div>
 
             {/* Title & Subtitle */}
@@ -3974,7 +4013,12 @@ function BlogEditorView({ content, activeBrand, onNewContent, onGenerateImage })
                             </div>
                         )}
 
-                        {imageStylePicker === i && <ImageStylePickerInline sectionIndex={i} />}
+                        {imageStylePicker === i && <BlogImageStylePicker sectionIndex={i} 
+                            onClose={() => setImageStylePicker(null)} pickerTab={pickerTab} setPickerTab={setPickerTab} 
+                            IMAGE_RATIOS={IMAGE_RATIOS} selectedImageRatio={selectedImageRatio} setSelectedImageRatio={setSelectedImageRatio} 
+                            IMAGE_STYLES={IMAGE_STYLES} selectedImageStyle={selectedImageStyle} setSelectedImageStyle={setSelectedImageStyle} 
+                            onGenerate={handleGenerateImage} generatingSection={generatingSection} brandImages={brandImages} 
+                            onUseBrandDirect={handleUseBrandImageDirect} onUseBrandAI={handleUseBrandImageAI} />}
 
                         {/* Divider & Add Controls */}
                         <div className="absolute left-0 top-0 flex flex-col gap-2 opacity-0 group-hover/section:opacity-100 transition-all ml-[-2.5rem]">
@@ -4479,6 +4523,7 @@ function ContentHistory({ brandId, onSelect, visible, onToggle }) {
 
     useEffect(() => {
         if (!visible) return
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setLoading(true)
         // Load all content for the active brand, or all user content as fallback
         const params = { limit: 30 }
@@ -4558,6 +4603,7 @@ function StepProductPicker({ brandId, selectedProduct, onSelect, onBack }) {
 
     useEffect(() => {
         if (!brandId) return
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setLoading(true)
         productsAPI.list({ brandId, limit: 50 })
             .then(res => setProductsList(res.products || []))
@@ -5440,15 +5486,6 @@ SPOKESPERSON QUOTES:`
     return (
         <DashboardLayout title="Content Studio" subtitle="AI-powered content for every channel">
             <Walkthrough studioId="contentStudio" />
-<<<<<<< HEAD
-            
-            <div className="cs-view-wrapper">
-                {/* Progress Stepper (shown at steps 1-4) */}
-                {step > 0 && step < 5 && (
-                    <div className="flex items-center gap-2 max-w-3xl mx-auto w-full">
-                        <button onClick={resetAll} className="text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] transition-colors cursor-pointer">
-                            <span className="material-symbols-outlined text-sm">arrow_back</span>
-=======
 
             {/* Progress Stepper (shown at steps 1-2) */}
             {step > 0 && step < 3 && (
@@ -5460,7 +5497,7 @@ SPOKESPERSON QUOTES:`
                         <div key={lbl} className="flex items-center gap-2">
                             <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all
                                 ${step > i ? 'bg-primary text-white' : step === i ? 'bg-primary/20 text-primary border border-primary/40' : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)]'}`}>
-                                {step > i ? '✓' : i + 1}
+                                {step > i ? 'check' : i + 1}
                             </div>
                             <span className={`text-xs font-bold ${step >= i ? 'text-[var(--sys-text-muted)]' : 'text-[var(--sys-text-muted)]'}`}>{lbl}</span>
                             {i < 2 && <div className={`w-8 h-px ${step > i ? 'bg-primary/40' : 'bg-[var(--sys-surface)]'}`} />}
@@ -5471,84 +5508,11 @@ SPOKESPERSON QUOTES:`
                             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer ${showHistory ? 'bg-primary/20 text-primary' : 'glass-panel text-[var(--sys-text-muted)] hover:text-white'}`}>
                             <span className="material-symbols-outlined text-sm">history</span>
                             History
->>>>>>> 9d09bde184794ae693f02c2b270862653983a3f0
                         </button>
-                        {stepLabels.slice(0, 5).map((lbl, i) => (
-                            <div key={lbl} className="flex items-center gap-2">
-                                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all
-                                    ${step > i ? 'bg-primary text-white' : step === i ? 'bg-primary/20 text-primary border border-primary/40' : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)]'}`}>
-                                    {step > i ? '✓' : i + 1}
-                                </div>
-                                <span className={`text-xs font-bold ${step >= i ? 'text-[var(--sys-text-muted)]' : 'text-[var(--sys-text-muted)]'}`}>{lbl}</span>
-                                {i < 4 && <div className={`w-8 h-px ${step > i ? 'bg-primary/40' : 'bg-[var(--sys-surface)]'}`} />}
-                            </div>
-                        ))}
-                        <div className="ml-auto">
-                            <button onClick={() => setShowHistory(!showHistory)}
-                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer ${showHistory ? 'bg-primary/20 text-primary' : 'glass-panel text-[var(--sys-text-muted)] hover:text-white'}`}>
-                                <span className="material-symbols-outlined text-sm">history</span>
-                                History
-                            </button>
-                        </div>
                     </div>
-                )}
-
-<<<<<<< HEAD
-                {/* ========== STEP 0: HERO + GOAL SELECTION ========== */}
-                {step === 0 && (
-                    <div className="animate-fade-in">
-                        {/* Hero Section */}
-                        <div className="cs-header text-center">
-                            <span className="material-symbols-outlined text-4xl text-primary mb-2 block">edit_note</span>
-                            <h2 className="cs-title">What do you want to <span>create?</span></h2>
-                            <p className="cs-subtitle max-w-lg mx-auto">Tell us what you need — we'll handle the rest.</p>
-                        </div>
-
-                    {/* Smart Input */}
-                    <SmartInput onParse={handleSmartParse} />
-
-                    {/* Divider */}
-                    <div className="flex items-center gap-3 max-w-4xl mx-auto mb-5">
-                        <div className="flex-1 h-px bg-outline-variant/20" />
-                        <span className="text-xs text-[var(--sys-text-muted)] font-bold uppercase tracking-wider">Or pick your content type</span>
-                        <div className="flex-1 h-px bg-outline-variant/20" />
-                    </div>
-
-                    {/* Pre-filled Context Banner */}
-                    {prefilledOccasion && step >= 2 && step <= 4 && (
-                        <div className="max-w-2xl mx-auto mb-6 animate-fade-in">
-                            <div className="flex items-center gap-3 p-4 rounded-xl bg-primary/10 border border-primary/20">
-                                <span className="text-2xl">{prefilledOccasion.emoji || 'ads_click'}</span>
-                                <div className="flex-1">
-                                    <p className="text-base font-bold text-[var(--sys-text)]">Creating content for <span className="text-primary">{prefilledOccasion.name}</span></p>
-                                    <p className="text-sm text-[var(--sys-text-muted)] mt-0.5">Suggested tone: {prefilledOccasion.tone || 'festive'} • Select your channel below</p>
-                                </div>
-                                <button onClick={() => { setPrefilledOccasion(null); setStep(0); setGoal(null); setContext(null) }}
-                                    className="text-sm text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] transition-colors cursor-pointer">
-                                    <span className="material-symbols-outlined text-sm">close</span>
-                                </button>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Steps */}
-                    <StepGoal onSelect={(g) => {
-                        if (g === 'press_release') {
-                            setGoal(g); setStep(6)  // Jump to PR wizard
-                        } else if (g === 'product_content') {
-                            setGoal(g); setStep(7)  // Jump to product picker
-                        } else if (g === 'youtube_content') {
-                            setGoal(g); setStep(1)  // Show YouTube sub-types
-                        } else if (g === 'blog') {
-                            setGoal(g); setStep(1)  // Show blog sub-types first
-                        } else if (g === 'custom_blog') {
-                            setGoal(g); setStep(14) // Go directly to SmartBlogWriter
-                        } else {
-                            setGoal(g); setStep(1)
-                        }
-                    }} />
                 </div>
-=======
+            )}
+
             {/* ========== STEP 0: THE BRIEF (Context-First) ========== */}
             {step === 0 && (
                 <AgenticBrief
@@ -5556,7 +5520,6 @@ SPOKESPERSON QUOTES:`
                     onChipSelect={handleChipSelect}
                     activeBrand={activeBrand}
                 />
->>>>>>> 9d09bde184794ae693f02c2b270862653983a3f0
             )}
 
             {/* ========== STEP 1: THE REFINEMENT (Dynamic Settings) ========== */}
@@ -5810,8 +5773,8 @@ SPOKESPERSON QUOTES:`
                 brandId={activeBrand?._id}
                 visible={showHistory}
                 onToggle={() => setShowHistory(false)}
+                onSelect={handleHistorySelect}
             />
-            </div>
         </DashboardLayout>
     )
 }

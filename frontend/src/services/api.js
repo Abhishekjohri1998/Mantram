@@ -366,8 +366,6 @@ export const team = {
     updateApproval: (id, data) => apiFetch(`/team/approvals/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     // AI
     teamHealth: () => apiFetch('/team/ai/team-health', { method: 'POST' }),
-    // Additional methods for TeamDashboard.jsx
-    revokeInvite: (inviteId) => apiFetch(`/team/invites/${inviteId}`, { method: 'DELETE' }),
 };
 
 // ============ Fidato AI Assistant ============
@@ -419,8 +417,6 @@ export const social = {
     status: () => apiFetch('/social/status'),
     getPosts: (accountId) => apiFetch(`/social/accounts/${accountId}/posts`),
     getInsights: (accountId, postId) => apiFetch(`/social/accounts/${accountId}/posts/${postId}/insights`),
-    // Additional methods for SocialMediaStudio.jsx
-    connect: (platform) => apiFetch(`/social/connect/${platform}`, { method: 'POST' }),
 };
 
 // ============ Voice API ============
