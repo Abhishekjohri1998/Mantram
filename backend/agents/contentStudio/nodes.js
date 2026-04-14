@@ -57,7 +57,7 @@ export async function researchNode(state) {
     // Previously sequential: ~2-3s wait for intelligence THEN LLM call.
     // Now: both resolve together, saving 2-3s on every content request.
     const [brandResult, intelligence] = await Promise.all([
-        loadBrandContext(state.brandId),
+        agentUtils.loadBrandContext(state.brandId),
         gatherIntelligence(state),
     ]);
     const { brandContext, brand } = brandResult;
@@ -234,7 +234,7 @@ export async function seoNode(state) {
 
     const { brandContext } = state.brandContext
         ? { brandContext: state.brandContext }                // ⚡ Reuse from state
-        : await loadBrandContext(state.brandId);
+        : await agentUtils.loadBrandContext(state.brandId);
     const languageDirective = state.languageDirective || '';
 
     // Include real SEO audit data if available
@@ -273,7 +273,7 @@ export async function toneMatcherNode(state) {
 
     const { brandContext } = state.brandContext
         ? { brandContext: state.brandContext }                // ⚡ Reuse from state
-        : await loadBrandContext(state.brandId);
+        : await agentUtils.loadBrandContext(state.brandId);
     const languageDirective = state.languageDirective || '';
     const langInfo = state.langInfo || { isRegional: false, displayName: 'English' };
 
@@ -363,7 +363,7 @@ export async function platformOptimizerNode(state) {
 
     const { brandContext } = state.brandContext
         ? { brandContext: state.brandContext }                // ⚡ Reuse from state
-        : await loadBrandContext(state.brandId);
+        : await agentUtils.loadBrandContext(state.brandId);
     const { langInfo, languageDirective } = await getLangDirective(state);
 
     const userPrompt = [
@@ -400,7 +400,7 @@ export async function qualityCriticNode(state) {
 
     const { brandContext } = state.brandContext
         ? { brandContext: state.brandContext }                // ⚡ Reuse from state
-        : await loadBrandContext(state.brandId);
+        : await agentUtils.loadBrandContext(state.brandId);
     const { langInfo, languageDirective } = await getLangDirective(state);
 
     const userPrompt = [
