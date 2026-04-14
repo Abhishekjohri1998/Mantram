@@ -4689,6 +4689,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                             className="flex items-center gap-1 px-1.5 py-1 rounded bg-[#1877F2]/20 hover:bg-[#1877F2]/40 text-[9px] border-[var(--sys-border)] font-medium transition-all border border-[#1877F2]/30" title="Publish to Content Studio">
                                                             <span className="material-symbols-outlined text-[10px]">send</span> Share
                                                         </button>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
@@ -4698,11 +4699,6 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             )}
                         </div>
                     </div>
-                    </div>
-
-
-
-                        
 
                 </div>
             )}
