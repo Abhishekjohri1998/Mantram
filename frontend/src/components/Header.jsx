@@ -6,10 +6,7 @@ import { useBrand } from '../context/BrandContext'
 import { useCredits } from '../context/CreditContext'
 import { superadmin } from '../services/api'
 import { useUI } from '../context/UIContext'
-
-// Removed local NexusBar import
-
-// Removed local AgentFidatoPanel import
+import './Header.css'
 
 export default function Header({ title, subtitle, onMenuToggle }) {
     const { user, logout } = useAuth()
@@ -99,19 +96,19 @@ export default function Header({ title, subtitle, onMenuToggle }) {
 
     return (
         <>
-            <div className="sticky top-0 z-50">
+            <div className="hdr-wrapper">
             {/* Admin Platform Alerts */}
             {platformAlerts.map(alert => (
-                <div key={`admin-alert-${alert.id}`} className={`${alert.level === 'critical' ? 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)]' : 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)]'} border-b py-2 px-4 animate-fade-in flex items-center justify-center gap-3 `}>
+                <div key={`admin-alert-${alert.id}`} className="hdr-alert-banner" style={{ borderColor: 'var(--sys-border)' }}>
                     <span className={`material-symbols-outlined text-sm ${alert.level === 'critical' ? 'text-primary' : 'text-primary'}`}>
                         {alert.level === 'critical' ? 'dangerous' : 'warning'}
                     </span>
-                    <p className={`text-xs font-medium ${alert.level === 'critical' ? 'border-[var(--sys-border)]' : 'border-[var(--sys-border)]'}`}>
+                    <p style={{ color: 'var(--sys-text)' }}>
                         <span className="uppercase font-bold">{alert.provider}</span> Platform {alert.level === 'critical' ? 'EXHAUSTED' : 'Credits Low'} ({alert.percentUsed}% consumed). Please recharge the API account.
                     </p>
                     <button
                         onClick={() => navigate('/superadmin')}
-                        className={`text-[10px] px-2 py-0.5 rounded-full border transition-all ${alert.level === 'critical' ? 'bg-[var(--sys-surface)] text-[var(--sys-text)] border-[var(--sys-border)] hover:bg-[var(--sys-surface)]' : 'bg-[var(--sys-surface)] text-black border-[var(--sys-border)] hover:bg-[var(--sys-surface)]'}`}
+                        className="hdr-alert-btn"
                     >
                         Manage
                     </button>
@@ -120,88 +117,86 @@ export default function Header({ title, subtitle, onMenuToggle }) {
 
             {/* Credit Warning Banners */}
             {showWarning && (
-                <div className="bg-[var(--sys-primary-dim)] border-b border-[var(--sys-border)] py-2 px-4 animate-fade-in flex items-center justify-center gap-3 ">
+                <div className="hdr-alert-banner">
                     <span className="material-symbols-outlined text-primary text-lg">warning</span>
-                    <p className="border-[var(--sys-border)] text-xs sm:text-sm font-medium">
+                    <p style={{ color: 'var(--sys-text)' }}>
                         Your credits are going to expire soon (only <span className="font-bold">{creditBalance.remaining}</span> left). Please buy more to keep using the agentic studios.
                     </p>
-                    <button onClick={() => navigate('/credits')} className="px-3 py-1 bg-[var(--sys-surface)] text-black text-[10px] font-black uppercase rounded-lg hover:bg-[var(--sys-surface)] transition-all cursor-pointer">
+                    <button onClick={() => navigate('/credits')} className="hdr-banner-credit-btn primary">
                         Buy More
                     </button>
                 </div>
             )}
             {showConsumed && (
-                <div className="bg-[var(--sys-primary-dim)] border-b border-[var(--sys-border)] py-2 px-4 animate-fade-in flex items-center justify-center gap-3 ">
+                <div className="hdr-alert-banner">
                     <span className="material-symbols-outlined text-primary text-lg">error</span>
-                    <p className="border-[var(--sys-border)] text-xs sm:text-sm font-medium">
+                    <p style={{ color: 'var(--sys-text)' }}>
                         All credits consumed! You cannot perform any more AI operations until you top up.
                     </p>
-                    <button onClick={() => navigate('/credits')} className="px-3 py-1 bg-[var(--sys-surface)] text-[var(--sys-text)] text-[10px] font-black uppercase rounded-lg hover:bg-[var(--sys-surface)] transition-all cursor-pointer shadow-none">
+                    <button onClick={() => navigate('/credits')} className="hdr-banner-credit-btn">
                         Top Up Now
                     </button>
                 </div>
             )}
 
-            {/* Resume Banner — shown when switching back to a brand with in-progress jobs */}
+            {/* Resume Banner */}
             {resumeJobs.length > 0 && (
-                <div className="bg-[#FF4D00]/10 border-b border-[#FF4D00]/20 py-2 px-4 animate-fade-in flex items-center justify-center gap-3 ">
+                <div className="hdr-banner-resume">
                     <span className="animate-spin material-symbols-outlined text-[#FF4D00] text-lg">refresh</span>
-                    <p className="text-orange-50 text-xs sm:text-sm font-medium">
+                    <p>
                         <span className="font-bold">{resumeJobs.length}</span> job{resumeJobs.length > 1 ? 's are' : ' is'} still processing for <span className="font-bold">{activeBrand?.name}</span>.
                     </p>
                     {resumeJobs[0]?.page && (
-                        <button
-                            onClick={() => navigate(resumeJobs[0].page)}
-                            className="px-3 py-1 bg-[#FF4D00] text-white text-[10px] font-black uppercase rounded-lg hover:bg-[#FF4D00] transition-all cursor-pointer"
-                        >
+                        <button onClick={() => navigate(resumeJobs[0].page)}>
                             Resume
                         </button>
                     )}
                 </div>
             )}
 
-            <header className="fixed top-0 w-full flex justify-between items-center px-6 md:px-8 py-4 h-16 bg-[var(--sys-bg)]/90 backdrop-blur-xl border-b border-[var(--sys-border)] z-50">
-                <div className="flex items-center gap-8 min-w-0">
-                    <div className="flex items-center gap-2.5">
-                        <img src="/mantram-logo.png" alt="Mantram AI" className="w-8 h-8 rounded-lg object-cover flex-shrink-0" />
-                        <div className="font-headline tracking-tighter text-2xl font-black italic text-primary-fixed uppercase hidden lg:block">Mantram.AI</div>
+            <header className="hdr-main">
+                <div className="hdr-left">
+                    <div className="hdr-logo-group">
+                        <img src="/mantram-logo.png" alt="Mantram AI" className="hdr-logo-img" />
+                        <div className="hdr-logo-text">Mantram.AI</div>
                     </div>
                     {/* Hamburger — visible on mobile/tablet */}
                     <button
                         onClick={onMenuToggle}
-                        className="lg:hidden p-2 rounded-lg heavy-in-soft-out transition-all cursor-pointer flex-shrink-0 text-[var(--sys-text-muted)] hover:text-primary-fixed hover:bg-primary-fixed/8"
+                        className="hdr-hamburger"
                     >
                         <span className="material-symbols-outlined text-xl">menu</span>
                     </button>
 
                     {title && (
-                        <div className="hidden md:block min-w-0 border-l border-[var(--sys-border)] pl-6 space-y-0.5">
-                            <h1 className="text-sm font-bold truncate tracking-tight text-[var(--sys-text)] uppercase leading-none">{title}</h1>
-                            {subtitle && <p className="text-[10px] uppercase tracking-widest text-[var(--sys-text-muted)] leading-none">{subtitle}</p>}
+                        <div className="hdr-title-group">
+                            <h1 className="hdr-title">{title}</h1>
+                            {subtitle && <p className="hdr-subtitle">{subtitle}</p>}
                         </div>
                     )}
                 </div>
-                <div className="flex items-center gap-1.5 sm:gap-3 flex-shrink-0">
+                
+                <div className="hdr-right">
                     {/* Global Brand Switcher */}
                     {brands.length > 0 && (
                         <div className="relative" ref={brandMenuRef}>
                             <button
                                 onClick={() => setShowBrandMenu(!showBrandMenu)}
-                                className="flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:bg-[var(--sys-surface)] transition-all cursor-pointer group"
+                                className="hdr-brand-btn group"
                                 title={`Active brand: ${activeBrand?.name || 'None'}`}
                             >
-                                <div className="w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-bold text-[var(--sys-text)] flex-shrink-0"
+                                <div className="hdr-brand-avatar"
                                     style={{ background: activeBrand?.dna?.colors?.[0]?.hex || '#8b5cf6' }}>
                                     {activeBrand?.name?.charAt(0) || '?'}
                                 </div>
-                                <span className="text-sm font-medium text-[var(--sys-text)] max-w-[100px] truncate hidden sm:block">
+                                <span className="hdr-brand-name">
                                     {activeBrand?.name || 'Select Brand'}
                                 </span>
                                 <span className="material-symbols-outlined text-[var(--sys-text-muted)] text-sm">unfold_more</span>
                             </button>
 
                             {showBrandMenu && (
-                                <div className="absolute right-0 top-full mt-2 w-64 glass-panel rounded-xl border border-[var(--sys-border)] shadow-none overflow-hidden animate-fade-in z-50">
+                                <div className="hdr-dropdown-menu hdr-brand-menu">
                                     <div className="px-3 py-2 border-b border-[var(--sys-border)]">
                                         <p className="text-[10px] uppercase tracking-widest text-[var(--sys-text-muted)] font-bold">Switch Brand</p>
                                     </div>
@@ -225,7 +220,6 @@ export default function Header({ title, subtitle, onMenuToggle }) {
                                                     {activeBrand?._id === brand._id && (
                                                         <span className="material-symbols-outlined text-sm" style={{ color: '#FF4D00' }}>check_circle</span>
                                                     )}
-                                                    {/* Show active job indicator per brand */}
                                                     {brandJobs.length > 0 && (
                                                         <span className="flex h-2 w-2">
                                                             <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-[#FF4D00] opacity-75" />
@@ -236,7 +230,6 @@ export default function Header({ title, subtitle, onMenuToggle }) {
                                             )
                                         })}
                                     </div>
-                                    {/* Quick tip */}
                                     <div className="px-3 py-2 border-t border-[var(--sys-border)]">
                                         <p className="text-[9px] text-[var(--sys-text-muted)]">Switching brands saves your current page and resumes where you left off.</p>
                                     </div>
@@ -249,7 +242,7 @@ export default function Header({ title, subtitle, onMenuToggle }) {
                     {creditBalance && !creditBalance.unlimited && (
                         <button
                             onClick={() => { navigate('/credits'); setShowMenu(false) }}
-                            className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:bg-[var(--sys-surface)] transition-all cursor-pointer group"
+                            className="hdr-credit-btn group"
                             title="Credit Balance — Click to view details"
                         >
                             <div className="relative">
@@ -273,14 +266,14 @@ export default function Header({ title, subtitle, onMenuToggle }) {
                         </button>
                     )}
                     {creditBalance?.unlimited && (
-                        <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary/10 border border-primary/20">
+                        <div className="hdr-credit-infinite">
                             <span className="material-symbols-outlined text-lg text-primary">all_inclusive</span>
                             <span className="text-xs font-bold text-primary hidden md:inline">Unlimited</span>
                         </div>
                     )}
 
                     {/* Notifications */}
-                    <button className="p-2 transition-colors relative rounded-xl cursor-pointer text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)]">
+                    <button className="hdr-action-btn">
                         <span className="material-symbols-outlined text-xl">notifications</span>
                         <span className="absolute top-2 right-2 w-2 h-2 rounded-full border-2 border-[var(--sys-bg)] bg-primary"></span>
                     </button>
@@ -288,12 +281,10 @@ export default function Header({ title, subtitle, onMenuToggle }) {
                     {/* Agent Fidato INTEL */}
                     <button
                         onClick={toggleFidato}
-                        className="relative cursor-pointer group"
+                        className="hdr-action-btn p-0 bg-transparent border-none group"
                         title="Agent Fidato — Competitive Intelligence"
-                        style={{ padding: 0, background: 'none', border: 'none' }}
                     >
-                        <div className="absolute -inset-1 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-primary/20 blur-md" />
-                        <div className="relative flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all duration-300 group-hover:scale-[1.03] bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                        <div className="hdr-intel-wrapper">
                             <div className="relative">
                                 <span className="material-symbols-outlined text-lg group-hover:scale-110 transition-transform duration-300 text-primary">shield</span>
                                 {intelMissionCount > 0 && (
@@ -315,7 +306,7 @@ export default function Header({ title, subtitle, onMenuToggle }) {
                     </button>
 
                     {/* Help */}
-                    <button className="hidden sm:block p-2 text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] transition-colors rounded-xl hover:bg-[var(--sys-surface)]">
+                    <button className="hdr-action-btn hidden-sm">
                         <span className="material-symbols-outlined text-xl">help</span>
                     </button>
 
@@ -323,22 +314,22 @@ export default function Header({ title, subtitle, onMenuToggle }) {
                     <div className="relative" ref={menuRef}>
                         <button
                             onClick={() => setShowMenu(!showMenu)}
-                            className="flex items-center gap-2 sm:gap-3 sm:pl-3 sm:border-l border-[var(--sys-border)] cursor-pointer hover:bg-[var(--sys-surface)] rounded-xl pr-1 sm:pr-2 py-1 transition-all"
+                            className="hdr-user-btn"
                         >
-                            <div className="text-right hidden md:block">
+                            <div className="hdr-user-info">
                                 <p className="text-[13px] font-bold text-[var(--sys-text)] leading-tight">{user?.name || 'User'}</p>
                                 <p className="text-[10px] uppercase tracking-widest font-bold text-[var(--sys-text-muted)] mt-0.5">
                                     {user?.role === 'superadmin' ? 'Super Admin' : user?.role === 'admin' ? 'Admin' : user?.plan || 'Starter'}
                                 </p>
                             </div>
-                            <div className="size-9 sm:size-10 rounded-full flex items-center justify-center text-[var(--sys-text)] bg-[var(--sys-surface-hover)] font-bold text-sm flex-shrink-0 transition-all hover:-translate-y-0.5 border border-[var(--sys-border)]">
+                            <div className="hdr-user-avatar">
                                 {initials}
                             </div>
                             <span className="material-symbols-outlined text-[var(--sys-text-muted)] text-sm hidden sm:block">expand_more</span>
                         </button>
 
                         {showMenu && (
-                            <div className="absolute right-0 top-full mt-2 w-56 sm:w-64 glass-panel rounded-xl border border-[var(--sys-border)] shadow-none overflow-hidden animate-fade-in z-50">
+                            <div className="hdr-dropdown-menu hdr-user-menu">
                                 <div className="p-3 border-b border-[var(--sys-border)]">
                                     <p className="text-base font-bold text-[var(--sys-text)]">{user?.name}</p>
                                     <p className="text-sm text-[var(--sys-text-muted)] truncate">{user?.email}</p>
@@ -387,11 +378,6 @@ export default function Header({ title, subtitle, onMenuToggle }) {
                 </div>
             </header>
         </div>
-
-        {/* NexusBar — Now rendered globally in App.jsx */}
-        {/* <NexusBar /> */}
-
-        {/* Agent Fidato INTEL — Now controlled globally via UIContext */}
-    </>
-)
+        </>
+    )
 }
