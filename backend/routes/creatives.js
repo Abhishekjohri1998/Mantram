@@ -17,7 +17,26 @@ import { requireStudio } from '../middleware/studioAccess.js';
 import { addWatermark } from '../utils/watermark.js';
 import { getSetting } from '../models/SystemSettings.js';
 
-import { uploadToS3, getSignedUrlIfNeeded } from '../utils/s3.js';
+import { uploadToS3, getSignedUrlIfNeeded, getSignedUrlForPath } from '../utils/s3.js';
+
+/**
+ * Fetch any URL, pre-signing private S3 URLs with backend AWS credentials first.
+ * This is the ONLY way to reliably fetch images from our private S3 bucket server-side.
+ */
+async function presignedFetch(url, opts = {}) {
+    if (!url) return null;
+    let fetchUrl = url;
+    const isOurS3 = url.includes('amazonaws.com') && (url.includes('mantram-assets') || url.includes('mantram-media'));
+    // Only pre-sign if it's NOT already a signed URL (signed URLs contain X-Amz-Signature)
+    if (isOurS3 && !url.includes('X-Amz-Signature')) {
+        try {
+            fetchUrl = await getSignedUrlForPath(url, 300); // 5-min presigned URL
+        } catch (e) {
+            console.warn(`⚠️ presignedFetch: Could not pre-sign S3 URL: ${e.message}`);
+        }
+    }
+    return fetch(fetchUrl, { headers: { 'User-Agent': 'Mozilla/5.0 (Mantram AI Backend)' }, ...opts });
+}
 import { overlayLogo, fetchImageBuffer } from '../utils/logoOverlay.js';
 import { GoogleGenAI } from '@google/genai';
 import { safeErrorMessage } from '../utils/safeError.js';
@@ -238,8 +257,120 @@ export async function internalGenerateCreative({ body, user, creditsDeducted, jo
         // The routedImageGenerate function downloads these URLs and converts
         // them to Gemini inlineData for image-to-image generation.
         const skillRefUrls = (refImageUrls || []).filter(u => u && typeof u === 'string');
-        if (skillRefUrls.length > 0) {
-            console.log(`🖼️ [internalGenerate] Forwarding ${skillRefUrls.length} reference image(s) to generation pipeline`);
+
+        // ── Extract template reference images from options ──
+        // Templates send product photos, character images, and reference images
+        // via options.baseImage, options.productImageUrl, options.characters, etc.
+        // These MUST be forwarded to the image model as reference images.
+        const templateRefUrls = [];
+        if (options) {
+            // Product image (base64 → upload to S3 first, HTTP URL → use directly)
+            if (options.baseImage && typeof options.baseImage === 'string') {
+                if (options.baseImage.startsWith('data:image/')) {
+                    try {
+                        const s3Url = await uploadToS3(options.baseImage, `templates/${brandId}/${Date.now()}-product.png`);
+                        templateRefUrls.push(s3Url);
+                        console.log(`🖼️ [Template] Uploaded base64 product image to S3 for reference`);
+                    } catch (e) {
+                        console.warn(`⚠️ [Template] Failed to upload baseImage to S3:`, e.message);
+                    }
+                } else if (options.baseImage.startsWith('http')) {
+                    templateRefUrls.push(options.baseImage);
+                }
+            }
+            // Product image URL (already an HTTP URL)
+            if (options.productImageUrl && typeof options.productImageUrl === 'string' && options.productImageUrl.startsWith('http')) {
+                templateRefUrls.push(options.productImageUrl);
+            }
+            // Character/model reference images (for face/appearance preservation)
+            if (Array.isArray(options.characters)) {
+                for (const char of options.characters) {
+                    if (char.image && typeof char.image === 'string') {
+                        if (char.image.startsWith('data:image/')) {
+                            try {
+                                const s3Url = await uploadToS3(char.image, `templates/${brandId}/${Date.now()}-char.png`);
+                                templateRefUrls.push(s3Url);
+                                console.log(`🖼️ [Template] Uploaded character image "${char.name}" to S3`);
+                            } catch (e) {
+                                console.warn(`⚠️ [Template] Failed to upload character image:`, e.message);
+                            }
+                        } else if (char.image.startsWith('http')) {
+                            templateRefUrls.push(char.image);
+                        }
+                    }
+                }
+            }
+            // Template reference image (for inpainting / style reference)
+            if (options.templateRefImageUrl && typeof options.templateRefImageUrl === 'string' && options.templateRefImageUrl.startsWith('http')) {
+                templateRefUrls.push(options.templateRefImageUrl);
+            }
+            // Generic reference images from template fields
+            if (options.referenceImages) {
+                for (const [key, val] of Object.entries(options.referenceImages)) {
+                    if (val && typeof val === 'string') {
+                        if (val.startsWith('data:image/')) {
+                            try {
+                                const s3Url = await uploadToS3(val, `templates/${brandId}/${Date.now()}-ref-${key}.png`);
+                                templateRefUrls.push(s3Url);
+                            } catch (e) {
+                                console.warn(`⚠️ [Template] Failed to upload reference image ${key}:`, e.message);
+                            }
+                        } else if (val.startsWith('http')) {
+                            templateRefUrls.push(val);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Merge skill refs + template refs (deduplicated)
+        const allRefUrls = [...new Set([...skillRefUrls, ...templateRefUrls])];
+        if (allRefUrls.length > 0) {
+            console.log(`🖼️ [internalGenerate] Forwarding ${allRefUrls.length} reference image(s) to generation pipeline (skills: ${skillRefUrls.length}, templates: ${templateRefUrls.length})`);
+        }
+
+        // ── Build template inpainting prompt when a template reference image is provided ──
+        // This tells Gemini EXACTLY which image is the design template vs. new content.
+        const isTemplateMode = !!(options?.templateInpainting && options?.templateRefImageUrl);
+        if (isTemplateMode) {
+            const contentImageCount = allRefUrls.filter(u => u !== options.templateRefImageUrl).length;
+            const templateUrl = options.templateRefImageUrl;
+            // Put template ref FIRST so Gemini sees it as IMAGE 1
+            const contentUrls = allRefUrls.filter(u => u !== templateUrl);
+            allRefUrls.length = 0;
+            allRefUrls.push(templateUrl, ...contentUrls);
+
+            const contentDesc = contentImageCount > 0
+                ? `I have also provided ${contentImageCount} new content image(s) — place them into the design positions marked in the template (e.g. product slot, model/person slot).`
+                : '';
+
+            const originalPrompt = fullPrompt;
+            fullPrompt = `TEMPLATE INPAINTING — STRICT DESIGN REPLICATION:
+
+IMAGE 1 (the template): This is the reference design template. You MUST preserve:
+- The EXACT background, colors, gradients, and textures
+- The EXACT layout, composition, and element positions 
+- The EXACT typography style, font weight, and text placement
+- All decorative elements, borders, shadows, and visual effects
+- The same overall aesthetic and mood
+
+${contentImageCount > 0 ? `IMAGE 2+: These are the new content images to INSERT into the template design.
+- Replace the product/subject slot in the template with the provided new content image(s)
+- Keep every other part of the design IDENTICAL to Image 1
+- The new content should blend naturally into the existing template design
+` : ''}
+CONTENT TO GENERATE (fill into the template):
+${originalPrompt}
+
+ABSOLUTE RULES:
+1. The output MUST look like Image 1 (the template) — same layout, same colors, same structure
+2. Only the content (product/person/text) changes — NOT the design shell
+3. Do NOT reimagine or reinterpret the design — replicate it precisely
+4. ${contentImageCount > 0 ? 'The new content image(s) should appear in the same position as the original product/subject' : 'Generate fresh content in the same design shell'}
+
+Generate the adapted creative now.`;
+
+            console.log(`🎨 [Template Inpainting] Mode active — ${allRefUrls.length} images (1 template + ${contentImageCount} content)`);
         }
 
         const result = await routedImageGenerate(
@@ -249,7 +380,7 @@ export async function internalGenerateCreative({ body, user, creditsDeducted, jo
             aspectRatio,
             imageSize,
             selectedImageModel,
-            skillRefUrls, // refImageUrls — these get downloaded + converted to inlineData
+            allRefUrls, // refImageUrls — these get downloaded + converted to inlineData
             customSize
         );
 
@@ -1103,15 +1234,18 @@ async function routedImageGenerate(promptText, imageParts = [], temperature = 0.
                         console.log(`📥 [Native Router] Extracting ${lzRefUrls.length} S3 Reference Images to buffers for Native payload...`);
                         for (const url of lzRefUrls) {
                             try {
-                                const resp = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Mantram AI Backend)' }, signal: AbortSignal.timeout(15000) });
-                                if (resp.ok) {
-                                    const buf = await resp.arrayBuffer();
-                                    const ct = resp.headers.get('content-type') || 'image/jpeg';
-                                    finalImageParts.push({ inlineData: { mimeType: ct, data: Buffer.from(buf).toString('base64') } });
-                                }
-                            } catch (e) {
-                                console.warn(`⚠️ [Native Router] Could not process ref image for payload: ${e.message}`);
-                            }
+                        const resp = await presignedFetch(url, { signal: AbortSignal.timeout(20000) });
+                        if (resp && resp.ok) {
+                            const buf = await resp.arrayBuffer();
+                            const ct = resp.headers.get('content-type') || 'image/jpeg';
+                            finalImageParts.push({ inlineData: { mimeType: ct, data: Buffer.from(buf).toString('base64') } });
+                            console.log(`✅ [Native Router] Loaded ref image (${Math.round(buf.byteLength/1024)}KB)`);
+                        } else {
+                            console.warn(`⚠️ [Native Router] Ref image fetch returned HTTP ${resp?.status} — skipping`);
+                        }
+                    } catch (e) {
+                        console.warn(`⚠️ [Native Router] Could not load ref image: ${e.message}`);
+                    }
                         }
                     }
                     
@@ -2023,14 +2157,16 @@ router.post('/edit-image', protect, requireCredits('creative'), async (req, res)
             if (match) { sourceMime = match[1]; sourceBase64 = match[2]; }
         } else {
             try {
-                const imgResp = await fetch(imageUrl);
+                // 20s timeout on the source image fetch — signed S3 URLs can be slow
+                const imgResp = await fetch(imageUrl, { signal: AbortSignal.timeout(20_000) });
                 if (!imgResp.ok) throw new Error(`HTTP ${imgResp.status}`);
                 const buf = await imgResp.arrayBuffer();
                 sourceBase64 = Buffer.from(buf).toString('base64');
                 sourceMime = imgResp.headers.get('content-type') || 'image/jpeg';
+                console.log(`✅ Source image fetched: ${Math.round(buf.byteLength / 1024)}KB (${sourceMime})`);
             } catch (fetchErr) {
                 console.error('❌ Failed to fetch source image:', fetchErr.message);
-                return res.status(400).json({ success: false, error: 'Could not fetch the source image. It may have expired.' });
+                return res.status(400).json({ success: false, error: 'Could not fetch the source image. It may have expired — try regenerating the image first.' });
             }
         }
 
@@ -2123,29 +2259,39 @@ router.post('/edit-image', protect, requireCredits('creative'), async (req, res)
 
         contents.push({ role: 'user', parts: currentParts });
 
-        // ── Call Gemini with 90s timeout ──
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 90_000);
+        // ── Call Gemini — independent timeout NOT tied to HTTP request lifecycle ──
+        // Using Promise.race instead of AbortController so that if the frontend
+        // times out and closes the connection, the Gemini call keeps running
+        // and completes. The response is then saved to S3 regardless.
+        const editStart = Date.now();
+        console.log(`🤖 Calling Gemini ${modelId} for image edit...`);
 
-        let response;
+        const geminiCall = fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents,
+                generationConfig: {
+                    responseModalities: ['TEXT', 'IMAGE'],
+                    temperature: 0.4,
+                },
+            }),
+            // NO signal — this call is fire-and-forget relative to the HTTP request
+        }).then(r => r.json());
+
+        const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Gemini image edit timed out after 170 seconds')), 170_000)
+        );
+
+        let data;
         try {
-            response = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents,
-                    generationConfig: {
-                        responseModalities: ['TEXT', 'IMAGE'],
-                        temperature: 0.4,
-                    },
-                }),
-                signal: controller.signal,
-            });
-        } finally {
-            clearTimeout(timeoutId);
+            data = await Promise.race([geminiCall, timeoutPromise]);
+        } catch (geminiErr) {
+            console.error('❌ Gemini call failed or timed out:', geminiErr.message);
+            throw new Error(`Image editing failed: ${geminiErr.message}`);
         }
+        console.log(`⏱️ Gemini edit completed in ${Date.now() - editStart}ms`);
 
-        const data = await response.json();
         if (data.error) {
             console.error('❌ Gemini Edit Error:', data.error.message);
             throw new Error(`Image editing failed: ${data.error.message}`);
@@ -2179,8 +2325,9 @@ router.post('/edit-image', protect, requireCredits('creative'), async (req, res)
             console.warn('⚠️ S3 upload failed for edit, returning base64:', e.message);
         }
 
-        const finalUrl = s3Url || editedImageUrl;
-        console.log(`✅ Image edit complete → ${s3Url ? 'S3' : 'base64'} (${editPrompt.substring(0, 50)}...)`);
+        // Sign the S3 URL so the browser can actually load it (bucket has no public access)
+        const finalUrl = s3Url ? await getSignedUrlIfNeeded(s3Url) : editedImageUrl;
+        console.log(`✅ Image edit complete → ${s3Url ? 'S3 (signed)' : 'base64'} (${editPrompt.substring(0, 50)}...)`);
 
         res.json({
             success: true,

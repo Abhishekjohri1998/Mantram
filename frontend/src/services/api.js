@@ -244,7 +244,7 @@ export const creatives = {
     cancelJob: (jobId) => apiFetch(`/creatives/jobs/${jobId}`, { method: 'DELETE' }),
     suggestCopy: (data) => apiFetch('/creatives/suggest-copy', { method: 'POST', body: JSON.stringify(data) }),
     // AI Image Editing (Gemini Nano Banana 2)
-    editImage: (data) => apiFetch('/creatives/edit-image', { method: 'POST', body: JSON.stringify(data), timeout: 120000 }),
+    editImage: (data) => apiFetch('/creatives/edit-image', { method: 'POST', body: JSON.stringify(data), timeout: 200000 }),
 };
 
 // ============ Agent API ============

@@ -4,11 +4,46 @@ import { protect } from '../middleware/auth.js'
 import { requireCredits } from '../middleware/credits.js'
 import { URL } from 'url'
 import { safeErrorMessage } from '../utils/safeError.js';
-import { uploadToS3, getSignedUrlIfNeeded } from '../utils/s3.js';
+import { uploadToS3, getSignedUrlIfNeeded, getSignedUrlForPath } from '../utils/s3.js';
 import { agentUtils } from '../agents/shared/agentUtils.js';
 import Brand from '../models/Brand.js';
 import Product from '../models/Product.js';
 const router = express.Router()
+
+/**
+ * Fetches an image URL and returns a Gemini-compatible inlineData part.
+ * Handles private S3 URLs by pre-signing them with backend credentials before fetching.
+ * This avoids any need to pass base64 data through the API — URLs only.
+ */
+async function fetchImageAsInlineData(imageUrl) {
+    if (!imageUrl || typeof imageUrl !== 'string') return null
+    try {
+        // Pre-sign private S3 URLs (our bucket) so the fetch succeeds
+        let fetchUrl = imageUrl
+        const isOurS3 = imageUrl.includes('amazonaws.com') && (
+            imageUrl.includes('mantram-assets') ||
+            imageUrl.includes('mantram-media')
+        )
+        if (isOurS3) {
+            fetchUrl = await getSignedUrlForPath(imageUrl, 300) // 5-min presigned URL
+            console.log(`🔐 Pre-signed S3 URL for analysis fetch`)
+        }
+        const resp = await fetch(fetchUrl, {
+            headers: { 'User-Agent': 'Mozilla/5.0' },
+            signal: AbortSignal.timeout(20_000),
+        })
+        if (!resp.ok) {
+            console.warn(`⚠️ fetchImageAsInlineData: HTTP ${resp.status} for ${imageUrl.substring(0, 60)}`)
+            return null
+        }
+        const buffer = await resp.arrayBuffer()
+        const contentType = resp.headers.get('content-type') || 'image/jpeg'
+        return { inlineData: { mimeType: contentType, data: Buffer.from(buffer).toString('base64') } }
+    } catch (err) {
+        console.error(`❌ fetchImageAsInlineData failed: ${err.message}`)
+        return null
+    }
+}
 
 // ============================================================================
 // MCoT: CANVAS VISUAL GROUNDING PROMPT
@@ -249,18 +284,8 @@ router.post('/ai-analyze', protect, async (req, res) => {
             const mimeType = imageBase64.startsWith('data:') ? imageBase64.split(';')[0].split(':')[1] : 'image/png'
             imagePart = { inlineData: { mimeType, data: base64Data } }
         } else if (imageUrl) {
-            // Fetch remote image and convert to base64
-            try {
-                const imgResp = await fetch(imageUrl)
-                if (imgResp.ok) {
-                    const buffer = await imgResp.arrayBuffer()
-                    const base64Data = Buffer.from(buffer).toString('base64')
-                    const contentType = imgResp.headers.get('content-type') || 'image/jpeg'
-                    imagePart = { inlineData: { mimeType: contentType, data: base64Data } }
-                }
-            } catch (fetchErr) {
-                console.error('Failed to fetch image URL:', fetchErr.message)
-            }
+            imagePart = await fetchImageAsInlineData(imageUrl)
+            if (!imagePart) console.warn('ai-analyze: Could not fetch image URL for analysis')
         }
 
         const parts = []
@@ -268,19 +293,37 @@ router.post('/ai-analyze', protect, async (req, res) => {
         parts.push({ text: prompt })
 
         const baseUrl = 'https://generativelanguage.googleapis.com/v1beta'
-        const url = `${baseUrl}/models/gemini-2.5-flash:generateContent?key=${apiKey}`
-        const resp = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contents: [{ role: 'user', parts }],
-                generationConfig: { temperature: 0.3, maxOutputTokens: 2048 },
-            }),
-        })
-        const data = await resp.json()
-        if (data.error) throw new Error(data.error.message)
+        const ANALYZE_MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash-001', 'gemini-2.0-flash-lite', 'gemini-flash-latest']
 
-        const text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+        let text = ''
+        for (const modelId of ANALYZE_MODELS) {
+            try {
+                const url = `${baseUrl}/models/${modelId}:generateContent?key=${apiKey}`
+                const resp = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ role: 'user', parts }],
+                        generationConfig: { temperature: 0.3, maxOutputTokens: 2048 },
+                    }),
+                    signal: AbortSignal.timeout(30_000),
+                })
+                const data = await resp.json()
+                if (data.error) {
+                    const msg = data.error.message || ''
+                    if (msg.toLowerCase().includes('high demand') || msg.toLowerCase().includes('overload') || resp.status === 503 || resp.status === 429) {
+                        console.warn(`⚠️ ai-analyze: ${modelId} overloaded, trying next`)
+                        continue
+                    }
+                    throw new Error(msg)
+                }
+                const allParts = data.candidates?.[0]?.content?.parts || []
+                for (const p of allParts) { if (p.text && !p.thought) text += p.text }
+                if (text) break
+            } catch (e) {
+                if (e.name !== 'TimeoutError') console.warn(`⚠️ ai-analyze: ${modelId} failed (${e.message?.substring(0, 60)})`)
+            }
+        }
         res.json({ description: text })
     } catch (err) {
         console.error('AI analyze error:', err.message)
@@ -304,17 +347,8 @@ router.post('/ai-analyze-template', protect, async (req, res) => {
             const mimeType = imageBase64.startsWith('data:') ? imageBase64.split(';')[0].split(':')[1] : 'image/png'
             imagePart = { inlineData: { mimeType, data: base64Data } }
         } else if (imageUrl) {
-            try {
-                const imgResp = await fetch(imageUrl)
-                if (imgResp.ok) {
-                    const buffer = await imgResp.arrayBuffer()
-                    const base64Data = Buffer.from(buffer).toString('base64')
-                    const contentType = imgResp.headers.get('content-type') || 'image/jpeg'
-                    imagePart = { inlineData: { mimeType: contentType, data: base64Data } }
-                }
-            } catch (fetchErr) {
-                console.error('Failed to fetch image URL for template analysis:', fetchErr.message)
-            }
+            imagePart = await fetchImageAsInlineData(imageUrl)
+            if (!imagePart) console.warn('ai-analyze-template: Could not fetch image URL for analysis')
         }
 
         if (!imagePart) return res.status(400).json({ error: 'Could not process the image' })
@@ -355,28 +389,63 @@ Return ONLY valid JSON (no markdown, no backticks). Only include elements you ca
 
         const parts = [imagePart, { text: prompt }]
         const baseUrl = 'https://generativelanguage.googleapis.com/v1beta'
-        const url = `${baseUrl}/models/gemini-2.5-flash:generateContent?key=${apiKey}`
-        console.log('🔍 Template analysis: calling Gemini 2.5 Flash...')
-        const resp = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contents: [{ role: 'user', parts }],
-                generationConfig: { temperature: 0.1, maxOutputTokens: 4096, thinkingConfig: { thinkingBudget: 0 } },
-            }),
-        })
-        const data = await resp.json()
-        if (data.error) {
-            console.error('🔍 Template analysis Gemini error:', data.error.message)
-            throw new Error(data.error.message)
+
+        // ── Fallback chain: try multiple models in case one is overloaded ──
+        const ANALYSIS_MODELS = [
+            'gemini-2.5-flash',
+            'gemini-2.0-flash-001',
+            'gemini-2.0-flash-lite',
+            'gemini-flash-latest',
+        ]
+
+        let text = ''
+        let lastError = null
+        for (const modelId of ANALYSIS_MODELS) {
+            try {
+                console.log(`🔍 Template analysis: trying ${modelId}...`)
+                const url = `${baseUrl}/models/${modelId}:generateContent?key=${apiKey}`
+                const resp = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ role: 'user', parts }],
+                        generationConfig: { temperature: 0.1, maxOutputTokens: 4096 },
+                    }),
+                    signal: AbortSignal.timeout(30_000),
+                })
+                const data = await resp.json()
+                if (data.error) {
+                    const errMsg = data.error.message || ''
+                    const isOverloaded = errMsg.toLowerCase().includes('high demand') || errMsg.toLowerCase().includes('overload') || resp.status === 503 || resp.status === 429
+                    if (isOverloaded) {
+                        console.warn(`⚠️ Template analysis: ${modelId} overloaded — trying next model`)
+                        lastError = new Error(errMsg)
+                        continue // try next model
+                    }
+                    throw new Error(errMsg)
+                }
+                // Extract text (gemini-2.5 may return thought + text parts)
+                const allParts = data.candidates?.[0]?.content?.parts || []
+                for (const p of allParts) {
+                    if (p.text && !p.thought) text += p.text
+                }
+                console.log(`✅ Template analysis: ${modelId} succeeded (${text.length} chars)`)
+                break // success — stop trying fallbacks
+            } catch (modelErr) {
+                if (modelErr.name === 'TimeoutError') {
+                    console.warn(`⚠️ Template analysis: ${modelId} timed out — trying next model`)
+                } else {
+                    console.warn(`⚠️ Template analysis: ${modelId} failed (${modelErr.message?.substring(0, 80)}) — trying next model`)
+                }
+                lastError = modelErr
+            }
         }
 
-        // Extract text from all parts (gemini-2.5 may return thought + text parts)
-        const allParts = data.candidates?.[0]?.content?.parts || []
-        let text = ''
-        for (const p of allParts) {
-            if (p.text && !p.thought) text += p.text
+        if (!text && lastError) {
+            console.error('🔍 Template analysis: all models failed:', lastError.message)
+            throw lastError
         }
+
         text = text || '{}'
         console.log('🔍 Template analysis response length:', text.length, 'chars')
         
