@@ -3114,11 +3114,19 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                 {idx === 0 && <span className="absolute top-1.5 left-1.5 text-[8px] font-bold text-[var(--sys-bg)] bg-[var(--sys-text)] px-1.5 py-0.5 rounded-md shadow-sm">Latest</span>}
                                                 {/* Quick Actions Hover Dock */}
                                                 <div className="absolute inset-0 bg-black/60 border border-[var(--sys-border)] opacity-0 group-hover:opacity-100 transition-all flex flex-col justify-end p-2">
-                                                    <p className="text-[9px] text-[var(--sys-text-muted)] line-clamp-2 mb-2 leading-tight">{item._prompt || 'AI Generated'}</p>
+                                                    <p className="text-[9px] text-[var(--sys-text-muted)] truncate mb-2 leading-tight" title={item._prompt}>{item._prompt || 'AI Generated'}</p>
                                                     <div className="mt-1 flex flex-wrap items-center gap-1">
                                                         <button onClick={(e) => { e.stopPropagation(); setZoomImage(item.imageUrl); }}
                                                             className="studio-action-btn-sm !w-7 !h-7" title="Expand Image">
                                                             <span className="material-symbols-outlined !text-[14px]">zoom_in</span>
+                                                        </button>
+                                                        <button onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(item._prompt || ''); setFeedbackToast('Prompt copied!'); setTimeout(() => setFeedbackToast(''), 2000); }}
+                                                            className="studio-action-btn-sm !w-7 !h-7" title="Copy Prompt">
+                                                            <span className="material-symbols-outlined !text-[14px]">content_copy</span>
+                                                        </button>
+                                                        <button onClick={(e) => { e.stopPropagation(); setPrompt(item._prompt || ''); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                                                            className="studio-action-btn-sm !w-7 !h-7" title="Reuse Prompt">
+                                                            <span className="material-symbols-outlined !text-[14px]">refresh</span>
                                                         </button>
                                                         <button onClick={(e) => { e.stopPropagation(); handleOpenEditPanel(item.imageUrl, 'Creative'); }}
                                                             className="studio-btn-pill !text-[9px] !px-2 !py-1 active border-none" title="Edit in AI Canvas">
@@ -3158,7 +3166,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                     <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3 mb-4 pb-4 border-b border-[var(--sys-border)]">
                                                         {/* Prompt Text Block */}
                                                         <div className="flex-1 min-w-0 pr-4">
-                                                            <p className="text-sm font-medium text-[var(--sys-text)] leading-relaxed">{group.prompt}</p>
+                                                            <p className="text-sm font-medium text-[var(--sys-text)] truncate leading-relaxed" title={group.prompt}>{group.prompt}</p>
                                                         </div>
 
                                                         {/* Actions & Metadata Block */}
@@ -3174,6 +3182,16 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                                 </button>
                                                             )}
                                                             <span className="text-[var(--sys-text-muted)] font-normal ml-3 whitespace-nowrap">{getTimeAgo(group.items[0].createdAt)}</span>
+                                                            <div className="flex items-center gap-1 ml-4 pl-4 border-l border-[var(--sys-border)]">
+                                                                <button onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(group.prompt || ''); setFeedbackToast('Prompt copied!'); setTimeout(() => setFeedbackToast(''), 2000); }}
+                                                                    className="p-1.5 rounded-lg hover:bg-[var(--sys-surface-hover)] text-[var(--sys-text-muted)] hover:text-primary transition-colors" title="Copy Prompt">
+                                                                    <span className="material-symbols-outlined text-base">content_copy</span>
+                                                                </button>
+                                                                <button onClick={(e) => { e.stopPropagation(); setPrompt(group.prompt || ''); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                                                                    className="p-1.5 rounded-lg hover:bg-[var(--sys-surface-hover)] text-[var(--sys-text-muted)] hover:text-primary transition-colors" title="Reuse Prompt">
+                                                                    <span className="material-symbols-outlined text-base">refresh</span>
+                                                                </button>
+                                                            </div>
                                                         </div>
                                                     </div>
 
@@ -4642,12 +4660,20 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                 <img src={item.imageUrl} alt={item._brief || 'Photoshoot'} loading="lazy" decoding="async" className="w-full aspect-square object-contain bg-[var(--sys-surface)]" />
                                                 {idx === 0 && <span className="absolute top-1.5 left-1.5 text-[8px] font-bold text-[var(--sys-primary)] bg-[var(--sys-primary-dim)] px-1.5 py-0.5 rounded-md">Latest</span>}
                                                 <div className="absolute inset-0 bg-black/60 border border-[var(--sys-border)] opacity-0 group-hover:opacity-100 transition-all flex flex-col justify-end p-2">
-                                                    <p className="text-[9px] text-[var(--sys-text-muted)] line-clamp-2 mb-1.5 leading-tight">{item._brief || item.description || 'AI Photoshoot'}</p>
+                                                    <p className="text-[9px] text-[var(--sys-text-muted)] truncate mb-1.5 leading-tight" title={item._brief || item.description}>{item._brief || item.description || 'AI Photoshoot'}</p>
                                                     {/* Quick Actions Hover Dock */}
                                                     <div className="flex flex-wrap items-center justify-end gap-1 w-full mt-auto">
                                                         <button onClick={(e) => { e.stopPropagation(); setPhotoshootResult(item); }}
                                                             className="studio-action-btn-sm !w-7 !h-7" title="Expand Image">
                                                             <span className="material-symbols-outlined !text-[14px]">zoom_in</span>
+                                                        </button>
+                                                        <button onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(item._brief || item.description || ''); setFeedbackToast('Prompt copied!'); setTimeout(() => setFeedbackToast(''), 2000); }}
+                                                            className="studio-action-btn-sm !w-7 !h-7" title="Copy Brief">
+                                                            <span className="material-symbols-outlined !text-[14px]">content_copy</span>
+                                                        </button>
+                                                        <button onClick={(e) => { e.stopPropagation(); setPhotoshootBrief(item._brief || item.description || ''); setStudioMode('photoshoot'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                                                            className="studio-action-btn-sm !w-7 !h-7" title="Reuse Brief">
+                                                            <span className="material-symbols-outlined !text-[14px]">refresh</span>
                                                         </button>
                                                         <button onClick={(e) => { e.stopPropagation(); handleOpenEditPanel(item.imageUrl, item._brief || item.description || 'Photoshoot'); }}
                                                             className="studio-btn-pill !text-[9px] !px-2 !py-1 active border-none" title="Edit with Gemini AI">
