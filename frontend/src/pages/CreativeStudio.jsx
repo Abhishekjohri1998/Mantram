@@ -3198,22 +3198,22 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                     <div className="flex gap-4 overflow-x-auto snap-x scrollbar-hide pb-2">
                                                         {group.items.map((item, iIdx) => (
                                                             <div key={item._id || iIdx} className="relative rounded-xl shrink-0 snap-start overflow-hidden" style={{ width: group.items.length === 1 ? '100%' : group.items.length === 2 ? '48%' : '32%' }}>
-                                                                <div className="group/img relative w-fit h-full rounded-xl overflow-hidden border border-[var(--sys-border)] transition-all">
+                                                                <div className="group/img relative w-full h-full rounded-xl overflow-hidden border border-[var(--sys-border)] transition-all bg-[var(--sys-surface)] flex justify-center">
                                                                     <img src={item.imageUrl} alt={group.prompt} loading="lazy" decoding="async"
-                                                                        className="w-auto h-[220px] max-w-full object-contain object-left block bg-[var(--sys-surface)] aspect-video sm:aspect-auto" />
+                                                                        className="w-auto h-[220px] max-w-full object-contain object-center block aspect-video sm:aspect-auto" />
                                                                     
                                                                     {item._idx === 0 && <span className="absolute top-2 left-2 w-5 h-5 rounded-full bg-[var(--sys-bg)] shadow flex items-center justify-center pointer-events-none"></span>}
                                                                     
                                                                     {/* Hover Ribbon Actions inside Image */}
-                                                                    <div className="absolute inset-0 bg-black/40 backdrop-blur-md transition-all opacity-0 group-hover/img:opacity-100 flex flex-col items-start justify-center pl-6 pointer-events-none group-hover/img:pointer-events-auto">
-                                                                        <div className="flex bg-[var(--sys-surface)]/95 backdrop-blur-xl rounded-xl shadow-2xl border border-[var(--sys-border)] overflow-hidden scale-95 group-hover/img:scale-100 transition-transform">
-                                                                            <button onClick={(e) => { e.stopPropagation(); setZoomImage(item.imageUrl); }} className="px-4 py-2 hover:bg-[#FF4D00]/10 text-[var(--sys-text)] hover:text-primary font-semibold text-xs border-r border-[var(--sys-border)] transition-colors">
+                                                                    <div className="absolute inset-0 bg-black/40 backdrop-blur-md transition-all opacity-0 group-hover/img:opacity-100 flex items-center justify-center p-2 pointer-events-none group-hover/img:pointer-events-auto">
+                                                                        <div className="flex bg-[var(--sys-surface)]/95 backdrop-blur-xl rounded-xl shadow-2xl border border-[var(--sys-border)] overflow-hidden scale-95 group-hover/img:scale-100 transition-transform max-w-full">
+                                                                            <button onClick={(e) => { e.stopPropagation(); setZoomImage(item.imageUrl); }} className="px-3 py-2 hover:bg-[#FF4D00]/10 text-[var(--sys-text)] hover:text-primary font-semibold text-[11px] sm:text-xs border-r border-[var(--sys-border)] transition-colors whitespace-nowrap">
                                                                                 View
                                                                             </button>
-                                                                            <button onClick={(e) => { e.stopPropagation(); handleOpenEditPanel(item.imageUrl, 'Creative'); }} className="px-4 py-2 hover:bg-[#FF4D00]/10 text-[var(--sys-text)] hover:text-primary font-semibold text-xs border-r border-[var(--sys-border)] transition-colors">
+                                                                            <button onClick={(e) => { e.stopPropagation(); handleOpenEditPanel(item.imageUrl, 'Creative'); }} className="px-3 py-2 hover:bg-[#FF4D00]/10 text-[var(--sys-text)] hover:text-primary font-semibold text-[11px] sm:text-xs border-r border-[var(--sys-border)] transition-colors whitespace-nowrap">
                                                                                 Edit
                                                                             </button>
-                                                                            <button onClick={(e) => { e.stopPropagation(); handleAnimateClick(item); }} className="px-4 py-2 hover:bg-[#FF4D00]/10 text-[var(--sys-text)] hover:text-primary font-semibold text-xs transition-colors">
+                                                                            <button onClick={(e) => { e.stopPropagation(); handleAnimateClick(item); }} className="px-3 py-2 hover:bg-[#FF4D00]/10 text-[var(--sys-text)] hover:text-primary font-semibold text-[11px] sm:text-xs transition-colors whitespace-nowrap">
                                                                                 Animate
                                                                             </button>
                                                                         </div>
