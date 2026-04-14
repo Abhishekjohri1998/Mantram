@@ -162,7 +162,8 @@ export default function Header({ title, subtitle, onMenuToggle }) {
 
             <header className="fixed top-0 w-full flex justify-between items-center px-6 md:px-8 py-4 h-16 bg-[var(--sys-bg)]/90 backdrop-blur-xl border-b border-[var(--sys-border)] z-50">
                 <div className="flex items-center gap-8 min-w-0">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2.5">
+                        <img src="/mantram-logo.png" alt="Mantram AI" className="w-8 h-8 rounded-lg object-cover flex-shrink-0" />
                         <div className="font-headline tracking-tighter text-2xl font-black italic text-primary-fixed uppercase hidden lg:block">Mantram.AI</div>
                     </div>
                     {/* Hamburger — visible on mobile/tablet */}
