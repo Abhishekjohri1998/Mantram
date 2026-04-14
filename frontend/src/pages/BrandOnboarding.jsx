@@ -61,55 +61,116 @@ function ChoosePath({ onSelect }) {
     )
 }
 
-// ============= Step 2a: Website Scan =============
+// ============= Step 2a: Website Scan (SSE Real-Time Progress) =============
 function WebsiteScan({ onComplete, onBack, initialUrl = '' }) {
     const [url, setUrl] = useState(initialUrl)
     const [scanning, setScanning] = useState(false)
     const [progress, setProgress] = useState(0)
     const [currentStep, setCurrentStep] = useState('')
-    const [stepIndex, setStepIndex] = useState(0)
+    const [completedPhases, setCompletedPhases] = useState([])
     const [error, setError] = useState(null)
 
-    const steps = [
-        { label: 'Connecting to website', icon: 'language', duration: 800 },
-        { label: 'Extracting page structure', icon: 'code', duration: 1000 },
-        { label: 'Taking website screenshot', icon: 'screenshot_monitor', duration: 1200 },
-        { label: 'AI Vision — identifying logo', icon: 'visibility', duration: 1500 },
-        { label: 'AI Vision — detecting brand colors', icon: 'palette', duration: 1200 },
-        { label: 'Detecting typography', icon: 'text_fields', duration: 800 },
-        { label: 'Collecting homepage images', icon: 'photo_library', duration: 1000 },
-        { label: 'Scanning social media profiles', icon: 'share', duration: 1500 },
-        { label: 'Analyzing brand voice & tone', icon: 'record_voice_over', duration: 2000 },
-        { label: 'Building your Brand DNA', icon: 'fingerprint', duration: 1200 },
-    ]
+    // Phase display map — maps backend phase names to user-friendly labels + icons
+    const PHASE_DISPLAY = {
+        init: { icon: 'language', label: 'Connecting to website' },
+        extract: { icon: 'code', label: 'Extracting page structure' },
+        parallel: { icon: 'auto_awesome', label: 'AI Vision + Social + Sub-pages' },
+        voice: { icon: 'record_voice_over', label: 'Analyzing brand voice & tone' },
+        competitors: { icon: 'monitoring', label: 'Discovering competitors & market' },
+        complete: { icon: 'check_circle', label: 'Brand DNA built!' },
+    }
 
     const handleScan = async () => {
         if (!url.trim()) return
         setScanning(true)
         setError(null)
-        setStepIndex(0)
+        setProgress(0)
+        setCurrentStep('Connecting...')
+        setCompletedPhases([])
 
-        // Animate progress steps while the real API call runs
-        let idx = 0
-        const interval = setInterval(() => {
-            if (idx < steps.length) {
-                setCurrentStep(steps[idx].label)
-                setStepIndex(idx)
-                setProgress(Math.round(((idx + 1) / steps.length) * 90))
-                idx++
-            }
-        }, 1400)
+        const normalizedUrl = url.startsWith('http') ? url : `https://${url}`
 
         try {
-            const normalizedUrl = url.startsWith('http') ? url : `https://${url}`
+            // Try SSE streaming first
+            const streamUrl = agents.getScanStreamUrl(normalizedUrl)
+            const eventSource = new EventSource(streamUrl)
+            let lastPhase = ''
+
+            eventSource.addEventListener('progress', (e) => {
+                try {
+                    const data = JSON.parse(e.data)
+                    const display = PHASE_DISPLAY[data.phase] || { icon: 'autorenew', label: data.phase }
+                    setCurrentStep(data.message)
+                    setProgress(data.percent || 0)
+
+                    // Track completed phases for the checklist
+                    if (data.phase !== lastPhase && lastPhase) {
+                        const prev = PHASE_DISPLAY[lastPhase]
+                        if (prev) {
+                            setCompletedPhases(p => {
+                                const exists = p.some(x => x.phase === lastPhase)
+                                return exists ? p : [...p, { phase: lastPhase, label: prev.label, icon: prev.icon }]
+                            })
+                        }
+                    }
+                    lastPhase = data.phase
+                } catch { /* ignore malformed */ }
+            })
+
+            eventSource.addEventListener('complete', (e) => {
+                eventSource.close()
+                try {
+                    const data = JSON.parse(e.data)
+                    setProgress(100)
+                    setCurrentStep('Brand DNA built successfully!')
+                    // Add final phase
+                    setCompletedPhases(p => [...p, { phase: 'complete', label: 'Brand DNA built!', icon: 'check_circle' }])
+                    setTimeout(() => onComplete(data.brand), 800)
+                } catch (err) {
+                    setScanning(false)
+                    setError({ message: 'Failed to parse scan results.' })
+                }
+            })
+
+            eventSource.addEventListener('error', (e) => {
+                eventSource.close()
+                // If SSE event with error data
+                if (e.data) {
+                    try {
+                        const data = JSON.parse(e.data)
+                        setScanning(false)
+                        setError({ message: data.error || 'Scan failed' })
+                        return
+                    } catch { /* fall through */ }
+                }
+                // SSE connection error — fall back to POST
+                console.warn('SSE connection failed, falling back to POST...')
+                fallbackToPost(normalizedUrl)
+            })
+
+            eventSource.onerror = (e) => {
+                // Only handle if not already closed via our event listeners
+                if (eventSource.readyState === EventSource.CLOSED) return
+                eventSource.close()
+                console.warn('SSE onerror, falling back to POST...')
+                fallbackToPost(normalizedUrl)
+            }
+        } catch (err) {
+            // SSE not supported or URL construction failed — fall back
+            fallbackToPost(normalizedUrl)
+        }
+    }
+
+    // Fallback: use the regular POST API if SSE fails
+    const fallbackToPost = async (normalizedUrl) => {
+        setCurrentStep('Scanning website...')
+        setProgress(30)
+        try {
             const data = await agents.scanWebsite(normalizedUrl)
-            clearInterval(interval)
             setProgress(100)
             setCurrentStep('Brand DNA extracted successfully!')
-            setStepIndex(steps.length)
             setTimeout(() => onComplete(data.brand), 800)
         } catch (err) {
-            clearInterval(interval)
             setScanning(false)
             setError({
                 message: err.message || 'Failed to scan website. Please check the URL and try again.',
@@ -168,7 +229,7 @@ function WebsiteScan({ onComplete, onBack, initialUrl = '' }) {
                     )}
                 </div>
             ) : (
-                /* ── Scanning: Pomelli-style Loading ── */
+                /* ── Scanning: Real-Time SSE Progress ── */
                 <div className="flex flex-col items-center justify-center min-h-[70vh] animate-fade-in">
                     {/* Glow background */}
                     <div className="fixed inset-0 pointer-events-none" style={{
@@ -185,38 +246,56 @@ function WebsiteScan({ onComplete, onBack, initialUrl = '' }) {
                             <h2 className="text-3xl font-extrabold mb-3 tracking-tight" style={{ fontStyle: 'italic', fontFamily: 'Georgia, serif' }}>
                                 Generating your Business<br />DNA
                             </h2>
-                            <p className="text-[var(--sys-text-muted)] text-sm mb-8">
-                                We're researching and analyzing your business.<br />
-                                It will take several minutes. Feel free to come back later.
+                            <p className="text-[var(--sys-text-muted)] text-sm mb-6">
+                                AI is researching and analyzing your business in real-time.
                             </p>
 
                             {/* Current Step Badge */}
-                            <div className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl mb-6 transition-all duration-500"
+                            <div className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl mb-4 transition-all duration-500"
                                 style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
                                 <span className="material-symbols-outlined text-primary text-sm animate-pulse">
-                                    {stepIndex < steps.length ? steps[stepIndex]?.icon : 'check_circle'}
+                                    {progress >= 100 ? 'check_circle' : 'autorenew'}
                                 </span>
                                 <span className="text-sm text-[var(--sys-text-muted)] font-medium">{currentStep}</span>
                             </div>
 
+                            {/* Completed Phases Checklist */}
+                            {completedPhases.length > 0 && (
+                                <div className="text-left space-y-2 mb-6 px-4">
+                                    {completedPhases.map((p, i) => (
+                                        <div key={p.phase} className="flex items-center gap-2 animate-fade-in" style={{ animationDelay: `${i * 100}ms` }}>
+                                            <span className="material-symbols-outlined text-green-400 text-sm">check_circle</span>
+                                            <span className="text-xs text-[var(--sys-text-muted)]">{p.label}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
                             {/* Website URL chip */}
-                            <div className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl mx-auto mb-8"
+                            <div className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl mx-auto mb-6"
                                 style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)' }}>
                                 <span className="material-symbols-outlined text-[var(--sys-text-muted)] text-sm">link</span>
                                 <span className="text-sm text-[var(--sys-text)] font-medium">{url.startsWith('http') ? url : `https://${url}`}</span>
                             </div>
 
+                            {/* Progress Bar */}
+                            <div className="w-full h-1.5 bg-[var(--sys-surface)] rounded-full overflow-hidden mb-3">
+                                <div className="h-full bg-primary rounded-full transition-all duration-700 ease-out"
+                                    style={{ width: `${progress}%` }} />
+                            </div>
+
                             {/* Progress indicator */}
                             <div className="flex items-center justify-center gap-2 text-sm">
-                                <div className="relative size-5">
-                                    <svg className="size-5 -rotate-90" viewBox="0 0 20 20">
-                                        <circle cx="10" cy="10" r="8" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="2" />
-                                        <circle cx="10" cy="10" r="8" fill="none" stroke="var(--primary, #2B4BEE)" strokeWidth="2"
-                                            strokeDasharray={`${progress * 0.5} 50`}
-                                            className="transition-all duration-700" />
-                                    </svg>
-                                </div>
-                                <span className="text-primary text-sm">About {Math.max(1, 5 - Math.floor(progress / 20))} minutes left</span>
+                                <span className="text-primary text-sm font-medium">{progress}%</span>
+                                {progress < 100 && (
+                                    <span className="text-[var(--sys-text-muted)] text-xs">
+                                        {progress < 30 ? '• Extracting website data' :
+                                         progress < 50 ? '• Running AI analysis' :
+                                         progress < 70 ? '• Analyzing brand voice' :
+                                         progress < 90 ? '• Gathering intelligence' :
+                                         '• Finalizing DNA'}
+                                    </span>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -772,6 +851,15 @@ function ReviewBrand({ brand, onFinish }) {
     const socialLinks = dna.socialLinks || {}
     const socialVoice = dna.socialVoice || {}
     const contentStyle = dna.contentStyle || {}
+
+    // Phase 4 Agentic Data
+    const competitiveIntel = dna.competitiveIntel || brand.competitiveIntel || {}
+    const publicSentiment = dna.publicSentiment || brand.publicSentiment || {}
+    const platformVoice = dna.platformVoice || brand.platformVoice || {}
+
+    const hasCompetitors = (competitiveIntel.competitors?.length || 0) > 0;
+    const hasSentiment = !!publicSentiment.overallSentiment && publicSentiment.overallSentiment !== 'unknown';
+    const hasPlatformVoice = Object.values(platformVoice).some(v => v?.tone);
     const [saving, setSaving] = useState(false)
     const [saved, setSaved] = useState(false)
 
@@ -841,6 +929,16 @@ function ReviewBrand({ brand, onFinish }) {
                 {hasVoice && (
                     <span className="px-3 py-1.5 rounded-full bg-[#FF4D00]/10 border border-[#FF4D00]/20 text-[#FF4D00] text-xs font-medium flex items-center gap-1.5">
                         <span className="material-symbols-outlined text-sm">record_voice_over</span> Voice Analyzed
+                    </span>
+                )}
+                {hasCompetitors && (
+                    <span className="px-3 py-1.5 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-500 text-xs font-medium flex items-center gap-1.5">
+                        <span className="material-symbols-outlined text-sm">monitoring</span> {competitiveIntel.competitors.length} Competitors
+                    </span>
+                )}
+                {hasSentiment && (
+                    <span className="px-3 py-1.5 rounded-full bg-green-500/10 border border-green-500/20 text-green-500 text-xs font-medium flex items-center gap-1.5">
+                        <span className="material-symbols-outlined text-sm">reviews</span> Sentiment Analyzed
                     </span>
                 )}
                 <span className="px-3 py-1.5 rounded-full bg-[var(--sys-primary-dim)] border border-[var(--sys-border)] text-primary text-xs font-medium flex items-center gap-1.5">
@@ -952,33 +1050,95 @@ function ReviewBrand({ brand, onFinish }) {
                             )}
                         </div>
                     </div>
-
-                    {/* ═══ RIGHT: Images ═══ */}
-                    <div>
-                        <p className="text-sm text-[var(--sys-text-muted)] uppercase tracking-widest mb-3">Images</p>
-                        {brandImages.length > 0 ? (
-                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                                <div className="rounded-xl border border-dashed border-[var(--sys-border)] hover:border-primary/30 flex flex-col items-center justify-center py-6 cursor-pointer transition-colors bg-[var(--sys-surface)] aspect-square">
-                                    <span className="material-symbols-outlined text-xl text-[var(--sys-text-muted)] mb-1">cloud_upload</span>
-                                    <span className="text-sm text-[var(--sys-text-muted)]">Upload</span>
-                                </div>
-                                {brandImages.map((img, i) => (
-                                    <div key={i} className="rounded-xl overflow-hidden bg-[var(--sys-surface)] border border-[var(--sys-border)] group aspect-square">
-                                        <img src={img.url} alt={img.alt || `Image ${i + 1}`}
-                                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                                            onError={e => e.target.parentElement.style.display = 'none'} />
-                                    </div>
-                                ))}
-                            </div>
-                        ) : (
-                            <div className="flex flex-col items-center justify-center h-full rounded-xl border border-dashed border-[var(--sys-border)] py-12">
-                                <span className="material-symbols-outlined text-3xl text-[var(--sys-text-muted)] mb-2">photo_library</span>
-                                <p className="text-[var(--sys-text-muted)] text-sm">No images found</p>
-                            </div>
-                        )}
-                    </div>
                 </div>
             </div>
+
+            {/* ══════════════════════════════════════════════════════════════ */}
+            {/* SECTION B.2 — Strategy & Positioning */}
+            {/* ══════════════════════════════════════════════════════════════ */}
+            {(dna.companyOverview || dna.uniqueSellingPoints?.length > 0 || dna.servicesOffered?.length > 0 || dna.missionStatement || dna.brandValues?.length > 0) && (
+                <div className="glass-panel rounded-3xl p-8 mb-6">
+                    <h3 className="text-2xl font-extrabold text-[var(--sys-text)] tracking-tight mb-6 flex items-center gap-2">
+                        <span className="material-symbols-outlined text-primary">lightbulb</span> Strategy & Positioning
+                    </h3>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-4">
+                            {dna.companyOverview && (
+                                <div className="p-4 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                                    <p className="text-xs text-[var(--sys-text-muted)] uppercase tracking-widest mb-2 flex items-center gap-1">
+                                        <span className="material-symbols-outlined text-sm">business</span> Company Overview
+                                    </p>
+                                    <p className="text-sm text-[var(--sys-text)] leading-relaxed">{dna.companyOverview}</p>
+                                </div>
+                            )}
+                            
+                            {dna.missionStatement && (
+                                <div className="p-4 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                                    <p className="text-xs text-[var(--sys-text-muted)] uppercase tracking-widest mb-2 flex items-center gap-1">
+                                        <span className="material-symbols-outlined text-sm">track_changes</span> Mission Statement
+                                    </p>
+                                    <p className="text-sm italic text-[var(--sys-text)] leading-relaxed">"{dna.missionStatement}"</p>
+                                </div>
+                            )}
+
+                            {dna.targetAudience && (
+                                <div className="p-4 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                                    <p className="text-xs text-[var(--sys-text-muted)] uppercase tracking-widest mb-2 flex items-center gap-1">
+                                        <span className="material-symbols-outlined text-sm">group</span> Target Audience
+                                    </p>
+                                    <p className="text-sm text-[var(--sys-text)] leading-relaxed">{dna.targetAudience}</p>
+                                </div>
+                            )}
+
+                            {dna.brandValues?.length > 0 && (
+                                <div className="p-4 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                                    <p className="text-xs text-[var(--sys-text-muted)] uppercase tracking-widest mb-2 flex items-center gap-1">
+                                        <span className="material-symbols-outlined text-sm">volunteer_activism</span> Core Values
+                                    </p>
+                                    <div className="flex flex-wrap gap-2">
+                                        {dna.brandValues.map((val, i) => (
+                                            <span key={i} className="px-3 py-1 rounded-lg bg-primary/10 text-primary text-xs font-semibold">{val}</span>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="space-y-4">
+                            {dna.uniqueSellingPoints?.length > 0 && (
+                                <div className="p-4 rounded-xl bg-[var(--sys-primary-dim)] border border-[var(--sys-border)] h-full">
+                                    <p className="text-xs font-bold text-primary uppercase tracking-widest mb-3 flex items-center gap-1">
+                                        <span className="material-symbols-outlined text-sm">stars</span> Unique Selling Points
+                                    </p>
+                                    <ul className="space-y-2">
+                                        {dna.uniqueSellingPoints.map((usp, i) => (
+                                            <li key={i} className="text-sm text-[var(--sys-text)] flex items-start gap-2">
+                                                <span className="text-primary mt-0.5">•</span> <span>{usp}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
+
+                            {dna.servicesOffered?.length > 0 && (
+                                <div className="p-4 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                                    <p className="text-xs text-[var(--sys-text-muted)] uppercase tracking-widest mb-3 flex items-center gap-1">
+                                        <span className="material-symbols-outlined text-sm">category</span> Services / Products
+                                    </p>
+                                    <ul className="space-y-1.5">
+                                        {dna.servicesOffered.map((srv, i) => (
+                                            <li key={i} className="text-sm text-[var(--sys-text-muted)] flex items-start gap-2">
+                                                <span className="text-[var(--sys-border)] mt-0.5">—</span> <span>{srv}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* ══════════════════════════════════════════════════════════════ */}
             {/* SECTION C — Social Media Intelligence */}
@@ -1070,6 +1230,46 @@ function ReviewBrand({ brand, onFinish }) {
                                         "{cap}"
                                     </div>
                                 ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Platform-Specific Voice Profiles */}
+                    {hasPlatformVoice && (
+                        <div className="mt-8 pt-6 border-t border-[var(--sys-border)]">
+                            <p className="text-sm text-[var(--sys-text-muted)] uppercase tracking-widest mb-4 flex items-center gap-2">
+                                <span className="material-symbols-outlined text-sm">smart_toy</span> Agentic Platform Profiles
+                            </p>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {Object.entries(platformVoice).filter(([, v]) => v?.tone).map(([platform, profile]) => {
+                                    const cfg = platformConfig[platform] || { icon: 'link', label: platform, color: '#888' }
+                                    return (
+                                        <div key={platform} className="p-4 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                                            <div className="flex items-center gap-2 mb-3">
+                                                <span>{cfg.icon}</span>
+                                                <h4 className="font-bold text-[var(--sys-text)] capitalize">{platform}</h4>
+                                            </div>
+                                            <div className="space-y-2">
+                                                {profile.tone && (
+                                                    <p className="text-xs text-[var(--sys-text-muted)]"><span className="font-semibold text-[var(--sys-text)]">Tone:</span> {profile.tone}</p>
+                                                )}
+                                                {profile.captionStyle && (
+                                                    <p className="text-xs text-[var(--sys-text-muted)]"><span className="font-semibold text-[var(--sys-text)]">Style:</span> {profile.captionStyle}</p>
+                                                )}
+                                                {profile.contentThemes?.length > 0 && (
+                                                    <div className="pt-1">
+                                                        <span className="text-[10px] uppercase font-bold text-[var(--sys-text-muted)] mb-1 block">Themes</span>
+                                                        <div className="flex flex-wrap gap-1">
+                                                            {profile.contentThemes.slice(0, 3).map((theme, i) => (
+                                                                <span key={i} className="px-2 py-0.5 rounded bg-[var(--sys-primary-dim)] text-primary text-[10px]">{theme}</span>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )
+                                })}
                             </div>
                         </div>
                     )}
@@ -1192,6 +1392,112 @@ function ReviewBrand({ brand, onFinish }) {
                             <span className="px-3 py-1 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-xs text-[var(--sys-text-muted)]">
                                 Caption length: {contentStyle.captionLengthPreference}
                             </span>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* ══════════════════════════════════════════════════════════════ */}
+            {/* SECTION E — Brand Intelligence (Competitors & Sentiment) */}
+            {/* ══════════════════════════════════════════════════════════════ */}
+            {(hasCompetitors || hasSentiment || hasPlatformVoice) && (
+                <div className="glass-panel rounded-3xl p-8 mb-6">
+                    <h3 className="text-2xl font-extrabold text-[var(--sys-text)] tracking-tight mb-6 flex items-center gap-2">
+                        <span className="material-symbols-outlined text-primary">analytics</span> Market Intelligence
+                    </h3>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        {/* Competitors */}
+                        {hasCompetitors && (
+                            <div>
+                                <p className="text-sm text-[var(--sys-text-muted)] uppercase tracking-widest mb-4">Competitors Discovered</p>
+                                <div className="space-y-3">
+                                    {competitiveIntel.competitors.map((comp, i) => (
+                                        <div key={i} className="p-4 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <h4 className="font-bold text-[var(--sys-text)]">{comp.name}</h4>
+                                            </div>
+                                            {comp.strengths && (
+                                                <p className="text-xs text-[var(--sys-text-muted)] mb-1">
+                                                    <span className="font-semibold text-green-500">Strength:</span> {comp.strengths}
+                                                </p>
+                                            )}
+                                            {comp.weaknesses && (
+                                                <p className="text-xs text-[var(--sys-text-muted)]">
+                                                    <span className="font-semibold text-orange-500">Weakness:</span> {comp.weaknesses}
+                                                </p>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                                {competitiveIntel.differentiators?.length > 0 && (
+                                    <div className="mt-4 p-4 rounded-xl bg-primary/5 border border-primary/20">
+                                        <p className="text-xs font-bold text-primary mb-2">Key Differentiators vs Competition</p>
+                                        <ul className="space-y-1">
+                                            {competitiveIntel.differentiators.map((diff, i) => (
+                                                <li key={i} className="text-xs text-[var(--sys-text-muted)] flex items-start gap-2">
+                                                    <span className="text-primary mt-0.5">•</span> {diff}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Sentiment */}
+                        {hasSentiment && (
+                            <div>
+                                <p className="text-sm text-[var(--sys-text-muted)] uppercase tracking-widest mb-4">Public Sentiment</p>
+                                <div className="p-5 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] h-full flex flex-col">
+                                    <div className="flex items-center gap-4 mb-5">
+                                        <div className={`p-3 rounded-xl flex items-center justify-center ${
+                                            publicSentiment.overallSentiment === 'positive' ? 'bg-green-500/10 text-green-500' :
+                                            publicSentiment.overallSentiment === 'mixed' ? 'bg-yellow-500/10 text-yellow-500' :
+                                            'bg-red-500/10 text-red-500'
+                                        }`}>
+                                            <span className="material-symbols-outlined text-3xl">
+                                                {publicSentiment.overallSentiment === 'positive' ? 'sentiment_very_satisfied' :
+                                                 publicSentiment.overallSentiment === 'mixed' ? 'sentiment_neutral' : 'sentiment_dissatisfied'}
+                                            </span>
+                                        </div>
+                                        <div>
+                                            <p className="text-sm text-[var(--sys-text-muted)]">Overall Sentiment</p>
+                                            <p className="text-xl font-bold text-[var(--sys-text)] capitalize">{publicSentiment.overallSentiment}</p>
+                                            {publicSentiment.rating && <p className="text-xs text-[var(--sys-text-muted)] mt-0.5">Rating: <span className="font-semibold">{publicSentiment.rating}</span></p>}
+                                        </div>
+                                    </div>
+                                    
+                                    {publicSentiment.sentimentSummary && (
+                                        <p className="text-sm text-[var(--sys-text-muted)] italic mb-4">
+                                            "{publicSentiment.sentimentSummary}"
+                                        </p>
+                                    )}
+
+                                    <div className="grid grid-cols-2 gap-4 mt-auto">
+                                        {publicSentiment.reviewHighlights?.length > 0 && (
+                                            <div>
+                                                <p className="text-xs font-bold text-green-500 mb-2">Customers Love</p>
+                                                <ul className="space-y-1">
+                                                    {publicSentiment.reviewHighlights.map((hl, i) => (
+                                                        <li key={i} className="text-[11px] text-[var(--sys-text-muted)] line-clamp-2">{hl}</li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        )}
+                                        {publicSentiment.reviewConcerns?.length > 0 && (
+                                            <div>
+                                                <p className="text-xs font-bold text-orange-500 mb-2">Common Concerns</p>
+                                                <ul className="space-y-1">
+                                                    {publicSentiment.reviewConcerns.map((rc, i) => (
+                                                        <li key={i} className="text-[11px] text-[var(--sys-text-muted)] line-clamp-2">{rc}</li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
                         )}
                     </div>
                 </div>

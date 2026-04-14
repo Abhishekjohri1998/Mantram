@@ -12,7 +12,124 @@ const router = Router();
 import { mirrorBrandAssets, mirrorSingleAsset } from '../services/assetMirror.js';
 import crypto from 'crypto';
 
-// POST /api/agents/scan-website — Brand Scanner Agent
+// GET /api/agents/scan-website/stream — SSE Streaming Brand Scanner
+// Frontend opens EventSource to this endpoint, receives real-time progress
+router.get('/scan-website/stream', optionalAuth, async (req, res) => {
+    const url = req.query.url;
+    if (!url) return res.status(400).json({ success: false, error: 'URL query parameter is required' });
+
+    // Set SSE headers
+    res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'X-Accel-Buffering': 'no', // Disable nginx buffering
+    });
+
+    // SSE helper
+    const sendEvent = (eventType, data) => {
+        res.write(`event: ${eventType}\ndata: ${JSON.stringify(data)}\n\n`);
+    };
+
+    // Keep-alive ping every 15s
+    const keepAlive = setInterval(() => {
+        res.write(': keep-alive\n\n');
+    }, 15000);
+
+    try {
+        // Normalize URL
+        let normalizedUrl = url.trim();
+        if (!/^https?:\/\//i.test(normalizedUrl)) normalizedUrl = `https://${normalizedUrl}`;
+
+        let parsedUrl;
+        try {
+            parsedUrl = new URL(normalizedUrl);
+        } catch {
+            sendEvent('error', { error: 'Invalid URL format' });
+            clearInterval(keepAlive);
+            res.end();
+            return;
+        }
+
+        const orchestrator = getOrchestrator();
+
+        // Progress callback — streams to SSE
+        const onProgress = (phase, message, percent) => {
+            sendEvent('progress', { phase, message, percent });
+        };
+
+        const scanResult = await orchestrator.scanWebsite(normalizedUrl, onProgress);
+
+        // If user is authenticated, save brand to DB
+        let brand = null;
+        if (req.user) {
+            const tempBrandId = crypto.randomUUID();
+            await mirrorBrandAssets(scanResult.dna, tempBrandId);
+
+            brand = await Brand.create({
+                user: req.user._id,
+                name: scanResult.name || parsedUrl.hostname.replace(/^www\./, ''),
+                website: normalizedUrl,
+                onboardingMethod: 'website',
+                dna: scanResult.dna,
+                platformVoice: scanResult.dna.platformVoice || {},
+                competitiveIntel: scanResult.dna.competitiveIntel || {},
+                publicSentiment: scanResult.dna.publicSentiment || {},
+                rawScanData: scanResult.rawScanData,
+                onboardingScore: scanResult.onboardingScore || 0,
+                onboardingPhases: scanResult.onboardingPhases || {},
+            });
+            await req.user.updateOne({ $inc: { 'usage.brandsCreated': 1 } });
+
+            // Auto-trigger Visual DNA analysis in background (fire-and-forget)
+            import('../services/visualDNA.js').then(async ({ analyzeVisualDNA }) => {
+                try {
+                    const visualDNA = await analyzeVisualDNA(brand);
+                    if (visualDNA) {
+                        await Brand.findOneAndUpdate(
+                            { _id: brand._id },
+                            { $set: { 'dna.visualDNA': visualDNA } }
+                        );
+                        console.log(`✅ Visual DNA auto-analyzed for ${brand.name}: style=${visualDNA.designStyle}`);
+                    }
+                } catch (e) { console.warn('⚠️ Background Visual DNA analysis failed:', e.message); }
+            });
+
+            // Auto-trigger SEO Baseline Audit in background (fire-and-forget)
+            import('../services/seoBaseline.js').then(async ({ runSEOBaseline }) => {
+                try {
+                    const seoResults = await runSEOBaseline(brand);
+                    console.log(`✅ SEO Baseline complete for ${brand.name}: score=${seoResults.overallScore} (${seoResults.grading.overall})`);
+                } catch (e) { console.warn('⚠️ Background SEO Baseline failed:', e.message); }
+            });
+        } else {
+            brand = {
+                _id: 'preview',
+                name: scanResult.name || parsedUrl.hostname.replace(/^www\./, ''),
+                website: normalizedUrl,
+                onboardingMethod: 'website',
+                dna: scanResult.dna,
+                platformVoice: scanResult.dna.platformVoice || {},
+                competitiveIntel: scanResult.dna.competitiveIntel || {},
+                publicSentiment: scanResult.dna.publicSentiment || {},
+                status: 'preview',
+                onboardingScore: scanResult.onboardingScore || 0,
+                onboardingPhases: scanResult.onboardingPhases || {},
+            };
+        }
+
+        // Send final result
+        sendEvent('complete', { success: true, brand, scanResult });
+    } catch (error) {
+        console.error('SSE Scan error:', error);
+        sendEvent('error', { error: safeErrorMessage(error) });
+    } finally {
+        clearInterval(keepAlive);
+        res.end();
+    }
+});
+
+// POST /api/agents/scan-website — Brand Scanner Agent (non-streaming fallback)
 router.post('/scan-website', optionalAuth, async (req, res) => {
     try {
         let { url } = req.body;
@@ -49,6 +166,8 @@ router.post('/scan-website', optionalAuth, async (req, res) => {
                 onboardingMethod: 'website',
                 dna: scanResult.dna,
                 rawScanData: scanResult.rawScanData,
+                onboardingScore: scanResult.onboardingScore || 0,
+                onboardingPhases: scanResult.onboardingPhases || {},
             });
             await req.user.updateOne({ $inc: { 'usage.brandsCreated': 1 } });
 
@@ -82,6 +201,8 @@ router.post('/scan-website', optionalAuth, async (req, res) => {
                 onboardingMethod: 'website',
                 dna: scanResult.dna,
                 status: 'preview',
+                onboardingScore: scanResult.onboardingScore || 0,
+                onboardingPhases: scanResult.onboardingPhases || {},
             };
         }
 

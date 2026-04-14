@@ -5,7 +5,7 @@
     "main": "index.js",
     "scripts": {
         "start": "node index.js",
-        "dev": "node index.js",
+        "dev": "node --watch index.js",
         "test": "node --experimental-vm-modules __tests__/test-ai.js"
     },
     "dependencies": {

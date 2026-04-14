@@ -36,7 +36,8 @@ const SCORE_KEYS_CAMP = [
 const PHASES = {
   explore:   { label: 'Exploring',  icon: 'search', color: '#8b5cf6' },
   ideate:    { label: 'Ideating',   icon: 'emoji_objects', color: '#f59e0b' },
-  scripting: { label: 'Scripting',  icon: 'draw',  color: '#06b6d4' },
+  deepdive:  { label: 'Deep Dive',  icon: 'biotech', color: '#06b6d4' },
+  calendar:  { label: 'Calendar',   icon: 'calendar_month', color: '#10b981' },
   deliver:   { label: 'Delivered',  icon: 'ads_click', color: '#22c55e' },
 }
 
@@ -122,7 +123,7 @@ function MiniScore({ label, value, color }) {
 }
 
 // ── Concept card (inside chat) ────────────────────────────────────────────────
-function ConceptCard({ concept, index, isFilm, onScreenplay, onFeedback }) {
+function ConceptCard({ concept, index, isFilm, onScreenplay, onFeedback, onDeepDive }) {
   const [expanded, setExpanded] = useState(false)
   const scoreKeys = isFilm ? SCORE_KEYS_FILM : SCORE_KEYS_CAMP
   const scores = concept.scores || {}
@@ -201,11 +202,275 @@ function ConceptCard({ concept, index, isFilm, onScreenplay, onFeedback }) {
         <button className="bs-ghost-btn" onClick={() => setExpanded(e => !e)}>
           {expanded ? 'Collapse ↑' : 'Expand ↓'}
         </button>
+        <button className="bs-primary-btn bs-deepdive-btn" onClick={() => onDeepDive?.(concept)}>
+          🔬 Deep Dive
+        </button>
         {isFilm && (
           <button className="bs-primary-btn" onClick={() => onScreenplay?.(concept)}>
             ✍️ Write Screenplay
           </button>
         )}
+      </div>
+    </div>
+  )
+}
+
+// ── Deep Dive Panel (tabbed view) ─────────────────────────────────────────────
+function DeepDivePanel({ deepDive }) {
+  const [activeTab, setActiveTab] = useState('competitive')
+  if (!deepDive?.ideaTitle && !deepDive?.summary) return null
+
+  const tabs = [
+    { id: 'competitive', label: '🌐 Competitive', icon: 'groups' },
+    { id: 'playbook', label: '📋 Playbook', icon: 'assignment' },
+    { id: 'content', label: '📝 Content', icon: 'edit_note' },
+    { id: 'budget', label: '💰 Budget', icon: 'payments' },
+    { id: 'risks', label: '⚠️ Risks', icon: 'warning' },
+  ]
+
+  return (
+    <div className="bs-deepdive">
+      <div className="bs-deepdive-header">
+        <div className="bs-sp-title"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">biotech</span> Deep Dive: {deepDive.ideaTitle || 'Analysis'}</div>
+        {deepDive.summary && <p className="bs-deepdive-summary">{deepDive.summary}</p>}
+      </div>
+
+      <div className="bs-deepdive-tabs">
+        {tabs.map(t => (
+          <button key={t.id} className={`bs-dd-tab ${activeTab === t.id ? 'active' : ''}`}
+            onClick={() => setActiveTab(t.id)}>{t.label}</button>
+        ))}
+      </div>
+
+      <div className="bs-deepdive-body">
+        {activeTab === 'competitive' && deepDive.competitiveAnalysis && (
+          <div className="bs-dd-section">
+            {deepDive.competitiveAnalysis.directCompetitors?.map((c, i) => (
+              <div key={i} className="bs-dd-card">
+                <div className="bs-dd-card-title">{c.name}</div>
+                <div className="bs-dd-card-row"><span>Their approach:</span> {c.theirApproach}</div>
+                <div className="bs-dd-card-row bs-dd-advantage"><span>Our edge:</span> {c.ourAdvantage}</div>
+              </div>
+            ))}
+            {deepDive.competitiveAnalysis.whitespace && (
+              <div className="bs-dd-whitespace">
+                <div className="bs-dd-whitespace-label">💡 Market Whitespace</div>
+                <p>{deepDive.competitiveAnalysis.whitespace}</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'playbook' && deepDive.executionPlaybook && (
+          <div className="bs-dd-section">
+            {deepDive.executionPlaybook.phases?.map((phase, i) => (
+              <div key={i} className="bs-dd-phase">
+                <div className="bs-dd-phase-header">
+                  <span className="bs-dd-phase-name">{phase.name}</span>
+                  <span className="bs-dd-phase-dur">{phase.duration}</span>
+                </div>
+                {phase.actions?.map((a, j) => (
+                  <div key={j} className="bs-dd-action">
+                    <div className="bs-dd-action-task">{a.task}</div>
+                    <div className="bs-dd-action-meta">
+                      {a.owner && <span>👤 {a.owner}</span>}
+                      {a.channel && <span>📱 {a.channel}</span>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {activeTab === 'content' && deepDive.contentBrief && (
+          <div className="bs-dd-section">
+            <div className="bs-dd-sublabel">Hero Assets</div>
+            {deepDive.contentBrief.heroAssets?.map((a, i) => (
+              <div key={i} className="bs-dd-card">
+                <div className="bs-dd-card-title">{a.type} · {a.platform}</div>
+                <div className="bs-dd-card-row">{a.brief}</div>
+                {a.specs && <div className="bs-dd-card-meta">{a.specs}</div>}
+              </div>
+            ))}
+            {deepDive.contentBrief.copyDirection && (
+              <div className="bs-dd-copy">
+                <div className="bs-dd-sublabel">Copy Direction</div>
+                <div className="bs-dd-copy-pills">
+                  {deepDive.contentBrief.copyDirection.headlines?.map((h, i) => (
+                    <span key={i} className="bs-tag bs-tag-purple">{h}</span>
+                  ))}
+                  {deepDive.contentBrief.copyDirection.ctas?.map((c, i) => (
+                    <span key={i} className="bs-tag bs-tag-amber">{c}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'budget' && deepDive.budgetBreakdown && (
+          <div className="bs-dd-section">
+            <div className="bs-dd-budget-total">Total Estimate: <strong>{deepDive.budgetBreakdown.totalEstimate}</strong></div>
+            {deepDive.budgetBreakdown.splits?.map((s, i) => (
+              <div key={i} className="bs-dd-budget-row">
+                <div className="bs-dd-budget-cat">{s.category}</div>
+                <div className="bs-dd-budget-bar">
+                  <div className="bs-dd-budget-fill" style={{ width: `${s.percentage}%` }} />
+                </div>
+                <div className="bs-dd-budget-val">{s.amount} ({s.percentage}%)</div>
+              </div>
+            ))}
+            {deepDive.budgetBreakdown.roiProjection && (
+              <div className="bs-dd-roi"><span>📈 ROI:</span> {deepDive.budgetBreakdown.roiProjection}</div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'risks' && deepDive.risks && (
+          <div className="bs-dd-section">
+            {deepDive.risks.map((r, i) => (
+              <div key={i} className="bs-dd-risk">
+                <div className="bs-dd-risk-header">
+                  <span className={`bs-dd-risk-badge bs-dd-risk-${r.likelihood}`}>{r.likelihood}</span>
+                  <span className="bs-dd-risk-text">{r.risk}</span>
+                </div>
+                <div className="bs-dd-risk-fix"><span>Fix:</span> {r.mitigation}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── Calendar View (week-by-week) ──────────────────────────────────────────────
+const PLATFORM_COLORS = {
+  instagram: '#E1306C', linkedin: '#0A66C2', twitter: '#1DA1F2',
+  youtube: '#FF0000', facebook: '#1877F2', blog: '#f59e0b', newsletter: '#8b5cf6'
+}
+const PLATFORM_ICONS = {
+  instagram: '📸', linkedin: '💼', twitter: '𝕏', youtube: '▶️',
+  facebook: '👥', blog: '📝', newsletter: '📧'
+}
+
+function CalendarView({ calendar, onPushToCalendar }) {
+  if (!calendar?.weeks?.length) return null
+  return (
+    <div className="bs-calendar">
+      <div className="bs-calendar-header">
+        <div className="bs-sp-title"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">calendar_month</span> {calendar.title || 'Content Calendar'}</div>
+        <div className="bs-sp-sub">{calendar.duration} · Starts {calendar.startDate}</div>
+        {calendar.objective && <p className="bs-calendar-obj">{calendar.objective}</p>}
+      </div>
+
+      {calendar.weeks.map((week, wi) => (
+        <div key={wi} className="bs-cal-week">
+          <div className="bs-cal-week-header">{week.theme || `Week ${week.weekNumber}`}</div>
+          <div className="bs-cal-days">
+            {week.days?.map((day, di) => (
+              <div key={di} className="bs-cal-day">
+                <div className="bs-cal-day-label">
+                  <span className="bs-cal-day-name">{day.dayOfWeek}</span>
+                  <span className="bs-cal-day-date">{day.date}</span>
+                </div>
+                {day.posts?.map((post, pi) => (
+                  <div key={pi} className="bs-cal-post"
+                    style={{ borderLeftColor: PLATFORM_COLORS[post.platform] || '#8b5cf6' }}>
+                    <div className="bs-cal-post-top">
+                      <span className="bs-cal-platform">{PLATFORM_ICONS[post.platform] || '📱'} {post.platform}</span>
+                      <span className="bs-cal-type">{post.type}</span>
+                      <span className="bs-cal-time">{post.time}</span>
+                    </div>
+                    <div className="bs-cal-post-brief">{post.brief}</div>
+                    {post.copyHook && <div className="bs-cal-hook">"{post.copyHook}"</div>}
+                    {post.hashtags?.length > 0 && (
+                      <div className="bs-cal-hashtags">{post.hashtags.join(' ')}</div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+
+      {calendar.targetKPIs?.length > 0 && (
+        <div className="bs-cal-kpis">
+          <div className="bs-dd-sublabel">📊 Target KPIs</div>
+          {calendar.targetKPIs.map((k, i) => (
+            <div key={i} className="bs-cal-kpi">{k.metric}: <strong>{k.target}</strong> <span>(measure after {k.measureAfter})</span></div>
+          ))}
+        </div>
+      )}
+
+      {onPushToCalendar && (
+        <div className="bs-cal-actions">
+          <button className="bs-primary-btn" onClick={onPushToCalendar}>
+            📅 Push to Smart Calendar
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Session History Sidebar ──────────────────────────────────────────────────
+function SessionSidebar({ sessions, activeSessionId, onSelect, onNew, onDelete, visible, onToggle }) {
+  const grouped = { today: [], yesterday: [], older: [] }
+  const now = new Date()
+  sessions.forEach(s => {
+    const d = new Date(s.lastMessageAt || s.createdAt)
+    const diffH = (now - d) / 3600000
+    if (diffH < 24) grouped.today.push(s)
+    else if (diffH < 48) grouped.yesterday.push(s)
+    else grouped.older.push(s)
+  })
+
+  const timeAgo = (d) => {
+    const ms = now - new Date(d)
+    const m = Math.floor(ms / 60000)
+    if (m < 60) return `${m}m`
+    const h = Math.floor(m / 60)
+    if (h < 24) return `${h}h`
+    return `${Math.floor(h / 24)}d`
+  }
+
+  return (
+    <div className={`bs-sidebar ${visible ? 'open' : ''}`}>
+      <div className="bs-sidebar-header">
+        <span>📋 Sessions</span>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button className="bs-sidebar-new" onClick={onNew} title="New session"><span className="material-symbols-outlined" style={{ fontSize: 16 }}>add</span></button>
+          <button className="bs-sidebar-close" onClick={onToggle}><span className="material-symbols-outlined" style={{ fontSize: 16 }}>close</span></button>
+        </div>
+      </div>
+      <div className="bs-sidebar-list">
+        {[{ label: 'Today', items: grouped.today }, { label: 'Yesterday', items: grouped.yesterday }, { label: 'Older', items: grouped.older }].map(g => {
+          if (!g.items.length) return null
+          return (
+            <div key={g.label}>
+              <div className="bs-sidebar-group">{g.label}</div>
+              {g.items.map(s => (
+                <div key={s._id} className={`bs-sidebar-item ${s._id === activeSessionId ? 'active' : ''}`}
+                  onClick={() => onSelect(s._id)}>
+                  <div className="bs-sidebar-item-title">{s.title || 'Untitled'}</div>
+                  <div className="bs-sidebar-item-meta">
+                    <span>{timeAgo(s.lastMessageAt || s.createdAt)}</span>
+                    {s.ideaCount > 0 && <span className="bs-sidebar-badge">💡{s.ideaCount}</span>}
+                    {s.hasDeepDive && <span className="bs-sidebar-badge">🔬</span>}
+                    {s.hasCalendar && <span className="bs-sidebar-badge">📅</span>}
+                  </div>
+                  <button className="bs-sidebar-del" onClick={e => { e.stopPropagation(); onDelete(s._id) }} title="Delete">
+                    <span className="material-symbols-outlined" style={{ fontSize: 14 }}>delete</span>
+                  </button>
+                </div>
+              ))}
+            </div>
+          )
+        })}
+        {sessions.length === 0 && <div className="bs-sidebar-empty">No sessions yet</div>}
       </div>
     </div>
   )
@@ -377,7 +642,7 @@ function NamingView({ namingIdeas }) {
 }
 
 // ── Ideas block (rendered inside Fidato message) ──────────────────────────────
-function IdeasBlock({ payload, intent, onScreenplay, onFeedback }) {
+function IdeasBlock({ payload, intent, onScreenplay, onFeedback, onDeepDive }) {
   if (!payload) return null
   const isFilm = intent === 'ad-film'
   const isNaming = intent === 'naming'
@@ -394,6 +659,7 @@ function IdeasBlock({ payload, intent, onScreenplay, onFeedback }) {
           isFilm={isFilm}
           onScreenplay={onScreenplay}
           onFeedback={onFeedback}
+          onDeepDive={onDeepDive}
         />
       ))}
 
@@ -433,15 +699,16 @@ function IdeasBlock({ payload, intent, onScreenplay, onFeedback }) {
 }
 
 // ── Single message bubble ─────────────────────────────────────────────────────
-function Message({ msg, onScreenplay, onFeedback, onSelectOption, isLatest, streaming }) {
+function Message({ msg, onScreenplay, onFeedback, onDeepDive, onSelectOption, isLatest, streaming }) {
   const isFidato = msg.role === 'fidato'
-  // Chips show when: it's a Fidato message, is the last one, has options, and no generated content yet
   const showOptions = isFidato
     && msg.questionOptions?.length > 0
     && isLatest
     && !msg.ideasPayload
     && !msg.screenplayPayload
     && !msg.strategyPayload
+    && !msg.deepDivePayload
+    && !msg.calendarPayload
     && !msg.thinking
 
   return (
@@ -455,7 +722,6 @@ function Message({ msg, onScreenplay, onFeedback, onSelectOption, isLatest, stre
         )}
         {msg.thinking && <ThinkingDots />}
 
-        {/* Clickable chips — pick one or type your own */}
         {showOptions && (
           <div className="bs-q-options">
             <div className="bs-q-options-hint">Pick one or type your own ↓</div>
@@ -480,6 +746,7 @@ function Message({ msg, onScreenplay, onFeedback, onSelectOption, isLatest, stre
             intent={msg.intent}
             onScreenplay={onScreenplay}
             onFeedback={onFeedback}
+            onDeepDive={onDeepDive}
           />
         )}
         {msg.screenplayPayload && (
@@ -487,6 +754,12 @@ function Message({ msg, onScreenplay, onFeedback, onSelectOption, isLatest, stre
         )}
         {msg.strategyPayload && (
           <StrategyView strategy={msg.strategyPayload} />
+        )}
+        {msg.deepDivePayload && (
+          <DeepDivePanel deepDive={msg.deepDivePayload} />
+        )}
+        {msg.calendarPayload && (
+          <CalendarView calendar={msg.calendarPayload} />
         )}
       </div>
     </div>
@@ -553,6 +826,11 @@ export default function BrainstormStudio() {
   const [showReasoning, setShowReasoning] = useState(false)
   const [feedbackToast, setFeedbackToast] = useState({ message: '', visible: false })
 
+  // Session history state
+  const [activeSessionId, setActiveSessionId] = useState(null)
+  const [sessionList, setSessionList] = useState([])
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+
   const bottomRef = useRef(null)
   const inputRef = useRef(null)
   const currentMsgIdRef = useRef(null)
@@ -602,13 +880,62 @@ export default function BrainstormStudio() {
     setMessages([{ id: 'welcome', role: 'fidato', content: greeting, timestamp: Date.now() }])
   }, [firstName, activeBrand])
 
-  // Phase sync
+  // Load session list on mount and when brand changes
   useEffect(() => {
-    if (sessionState.screenplayGenerated || sessionState.lastScreenplay) setPhase('deliver')
+    if (!activeBrand?._id) return
+    bsAPI.sessions(activeBrand._id).then(r => {
+      if (r.success) setSessionList(r.sessions || [])
+    }).catch(() => {})
+  }, [activeBrand?._id])
+
+  // Phase sync — now includes deep dive and calendar stages
+  useEffect(() => {
+    if (sessionState.hasCalendar) setPhase('calendar')
+    else if (sessionState.hasDeepDive) setPhase('deepdive')
+    else if (sessionState.screenplayGenerated || sessionState.lastScreenplay) setPhase('deliver')
     else if (sessionState.ideasGenerated) setPhase('ideate')
     else if (sessionState.intent) setPhase('explore')
     else setPhase('explore')
   }, [sessionState])
+
+  // ── Load a session by ID ────────────────────────────────────────────────────
+  const loadSession = useCallback(async (id) => {
+    try {
+      const r = await bsAPI.loadSession(id)
+      if (!r.success || !r.session) return
+      const s = r.session
+      setActiveSessionId(s._id)
+      setSessionState(s.sessionState || {})
+      // Reconstruct messages from stored conversation
+      const msgs = s.messages.map((m, i) => ({
+        id: `loaded-${i}`,
+        role: m.role,
+        content: m.content || '',
+        timestamp: new Date(m.timestamp).getTime(),
+        ideasPayload: m.ideasPayload || null,
+        screenplayPayload: m.screenplayPayload || null,
+        strategyPayload: m.strategyPayload || null,
+        deepDivePayload: m.deepDivePayload || null,
+        calendarPayload: m.calendarPayload || null,
+        intent: m.intent || null,
+        questionOptions: m.questionOptions || null,
+      }))
+      setMessages(msgs)
+      setSidebarOpen(false)
+    } catch (e) {
+      console.warn('Failed to load session:', e.message)
+    }
+  }, [])
+
+  // ── Delete session ────────────────────────────────────────────────────────
+  const deleteSession = useCallback(async (id) => {
+    await bsAPI.deleteSession(id).catch(() => {})
+    setSessionList(prev => prev.filter(s => s._id !== id))
+    if (id === activeSessionId) {
+      setActiveSessionId(null)
+      resetSession()
+    }
+  }, [activeSessionId])
 
   // ── Append/update message helpers ──────────────────────────────────────────
   const addMessage = useCallback((msg) => {
@@ -670,7 +997,7 @@ export default function BrainstormStudio() {
 
     try {
       await bsAPI.fidatoChat(
-        { message: msg, history, sessionState, brand: activeBrand },
+        { message: msg, history, sessionState, brand: activeBrand, sessionId: activeSessionId },
         {
           onToken: (token) => {
             if (thinkingShown) {
@@ -698,9 +1025,24 @@ export default function BrainstormStudio() {
           onStrategy: (payload) => {
             updateMessage(fidId, { strategyPayload: payload, thinking: false })
           },
+          onDeepDive: (payload) => {
+            updateMessage(fidId, { deepDivePayload: payload, thinking: false })
+          },
+          onCalendar: (payload) => {
+            updateMessage(fidId, { calendarPayload: payload, thinking: false })
+          },
+          onSessionId: (id) => {
+            setActiveSessionId(id)
+          },
           onDone: (newState, questionOptions) => {
             if (newState) setSessionState(newState)
             updateMessage(fidId, { thinking: false, questionOptions: questionOptions || null })
+            // Refresh session list after each exchange
+            if (activeBrand?._id) {
+              bsAPI.sessions(activeBrand._id).then(r => {
+                if (r.success) setSessionList(r.sessions || [])
+              }).catch(() => {})
+            }
           },
           onError: (errMsg) => {
             setError(errMsg)
@@ -722,6 +1064,11 @@ export default function BrainstormStudio() {
   // ── Screenplay request ──────────────────────────────────────────────────────
   const handleScreenplayRequest = useCallback((concept) => {
     sendMessage(`Write the full screenplay for "${concept.title}"`)
+  }, [sendMessage])
+
+  // ── Deep Dive request ───────────────────────────────────────────────────────
+  const handleDeepDiveRequest = useCallback((concept) => {
+    sendMessage(`Deep dive into "${concept.title}"`)
   }, [sendMessage])
 
   // ── Feedback / suggestion handler ───────────────────────────────────────────
@@ -781,6 +1128,7 @@ export default function BrainstormStudio() {
   const resetSession = useCallback(() => {
     setSessionState({ intent: null, collectedAnswers: {}, ideasGenerated: false, screenplayGenerated: false, lastIdeas: null, lastScreenplay: null })
     setPhase('explore')
+    setActiveSessionId(null)
     const greeting = brandName
       ? `Fresh start! What should we brainstorm for ${brandName} today? `
       : `Fresh start! What are we building today? `
@@ -797,8 +1145,23 @@ export default function BrainstormStudio() {
       <Walkthrough studioId="brainstormStudio" />
       <div className="bs-root">
 
+        {/* Session Sidebar */}
+        <SessionSidebar
+          sessions={sessionList}
+          activeSessionId={activeSessionId}
+          onSelect={loadSession}
+          onNew={resetSession}
+          onDelete={deleteSession}
+          visible={sidebarOpen}
+          onToggle={() => setSidebarOpen(o => !o)}
+        />
+
         {/* Phase bar */}
         <div data-wt="bs-phase" className="bs-phase-bar">
+          <button className="bs-sidebar-toggle" onClick={() => setSidebarOpen(o => !o)} title="Session history">
+            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>menu</span>
+            {sessionList.length > 0 && <span className="bs-sidebar-count">{sessionList.length}</span>}
+          </button>
           <div className="bs-phase-inner">
             {Object.entries(PHASES).map(([key, p]) => (
               <div key={key} className={`bs-phase-step ${phase === key ? 'active' : ''}`}
@@ -808,7 +1171,6 @@ export default function BrainstormStudio() {
               </div>
             ))}
           </div>
-          {/* Language badge — shown when a regional brand is active */}
           {langInfo && (
             <div className="bs-lang-badge" title={`Generating creative copy in ${langInfo.label}`}>
               {langInfo.flag} {langInfo.label}
@@ -845,6 +1207,7 @@ export default function BrainstormStudio() {
               msg={msg}
               onScreenplay={handleScreenplayRequest}
               onFeedback={handleFeedback}
+              onDeepDive={handleDeepDiveRequest}
               onSelectOption={sendMessage}
               isLatest={idx === messages.length - 1}
               streaming={streaming}
