@@ -2441,6 +2441,28 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                     {/* ═══════════ GALLERY (full-width — settings moved to floating bar) ═══════════ */}
                     <div className="creative-gallery relative" data-wt="creative-gallery">
 
+                        {/* ── Quick Prompt Bar (always visible at top) ── */}
+                        <div className="sticky top-0 z-20 bg-[var(--sys-bg)]/90 backdrop-blur-lg border-b border-[var(--sys-border)] px-4 py-2.5">
+                            <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide">
+                                <span className="text-[9px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest whitespace-nowrap flex-shrink-0">Quick Prompt</span>
+                                <span className="w-px h-3 bg-[var(--sys-border)] flex-shrink-0" />
+                                {[
+                                    { icon: 'share', label: 'Social Post', color: '#6366f1', prompt: `Create a visually stunning social media post for ${activeBrand?.name || 'the brand'}. Make it eye-catching, on-brand, and shareable.` },
+                                    { icon: 'inventory_2', label: 'Product Shot', color: '#f59e0b', prompt: `Create a premium product showcase for ${activeBrand?.name || 'the brand'}. Feature the product prominently with brand colors.` },
+                                    { icon: 'local_offer', label: 'Sale / Offer', color: '#ef4444', prompt: (() => { const tmpl = templateCategories.find(c => c.id === 'sales')?.subTemplates?.[0]; return tmpl?.buildPrompt?.(activeBrand || { name: 'the brand', dna: {} }, {}) || `Create a bold promotional sale creative for ${activeBrand?.name || 'the brand'}. Feature a big discount offer, urgency-driven design, eye-catching colors.`; })() },
+                                    { icon: 'format_quote', label: 'Quote', color: '#10b981', prompt: (() => { const tmpl = templateCategories.find(c => c.id === 'quotes')?.subTemplates?.[0]; return tmpl?.buildPrompt?.(activeBrand || { name: 'the brand', dna: {} }, {}) || `Create an elegant quote card for ${activeBrand?.name || 'the brand'}. Large quotation marks, brand colors, professional typography.`; })() },
+                                    { icon: 'campaign', label: 'Announcement', color: 'var(--sys-text)', prompt: (() => { const tmpl = templateCategories.find(c => c.id === 'announcement')?.subTemplates?.[0]; return tmpl?.buildPrompt?.(activeBrand || { name: 'the brand', dna: {} }, {}) || `Create an announcement creative for ${activeBrand?.name || 'the brand'}. Bold, attention-grabbing design.`; })() },
+                                    { icon: 'auto_stories', label: 'Brand Story', color: '#f97316', prompt: `Create a compelling brand story visual for ${activeBrand?.name || 'the brand'}. Tell the brand narrative through imagery.` },
+                                ].map(chip => (
+                                    <button key={chip.label} onClick={() => setPrompt(chip.prompt)}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:border-[var(--sys-text-muted)] hover:shadow-sm transition-all cursor-pointer flex-shrink-0 group">
+                                        <span className="material-symbols-outlined text-[14px] transition-transform group-hover:scale-110" style={{ color: chip.color }}>{chip.icon}</span>
+                                        <span className="text-[11px] font-semibold text-[var(--sys-text)] whitespace-nowrap">{chip.label}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
                         {/* ═══ NATIVE ANIMATE WORKSPACE (MAIN UI) ═══ */}
                         {showAnimatePanel && (
                             <div className="mb-6 studio-card border-primary/30 shadow-lg shadow-primary/5 bg-[var(--sys-surface)] overflow-hidden animate-fade-in relative">
@@ -3616,35 +3638,14 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             );
                         })()}
 
-                        {/* ── Empty State with Inline Suggestions ── */}
+                        {/* ── Empty State ── */}
                         {!result && activeGenerations.length === 0 && bankImages.filter(img => img.source === 'ai-generated' || img.category === 'generated' || img.type === 'creative').length === 0 && (
-                            <div className="flex flex-col items-center justify-center py-12 px-4">
+                            <div className="flex flex-col items-center justify-center py-16 px-4">
                                 <div className="w-16 h-16 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] flex items-center justify-center mb-4">
                                     <span className="material-symbols-outlined text-3xl text-[var(--sys-text-muted)]">palette</span>
                                 </div>
                                 <h3 className="text-base font-bold text-[var(--sys-text)] mb-1">No generations yet</h3>
-                                <p className="text-sm text-[var(--sys-text-muted)] max-w-xs text-center mb-6">Describe your vision in the prompt panel and hit Generate to create your first brand visual.</p>
-
-                                <p className="text-[11px] text-[var(--sys-text-muted)] uppercase tracking-wider font-bold mb-3">Try a quick prompt</p>
-                                <div className="flex flex-wrap justify-center gap-2">
-                                    {[
-                                        { icon: 'share', label: 'Social Post', color: '#6366f1', prompt: `Create a visually stunning social media post for ${activeBrand?.name || 'the brand'}. Make it eye-catching, on-brand, and shareable.` },
-                                        { icon: 'inventory_2', label: 'Product Shot', color: '#f59e0b', prompt: `Create a premium product showcase for ${activeBrand?.name || 'the brand'}. Feature the product prominently with brand colors.` },
-                                        { icon: 'local_offer', label: 'Sale / Offer', color: '#ef4444', template: templateCategories.find(c => c.id === 'sales')?.subTemplates?.[0] },
-                                        { icon: 'format_quote', label: 'Quote', color: '#10b981', template: templateCategories.find(c => c.id === 'quotes')?.subTemplates?.[0] },
-                                        { icon: 'campaign', label: 'Announcement', color: 'var(--sys-text)', template: templateCategories.find(c => c.id === 'announcement')?.subTemplates?.[0] },
-                                        { icon: 'auto_stories', label: 'Brand Story', color: '#f97316', prompt: `Create a compelling brand story visual for ${activeBrand?.name || 'the brand'}. Tell the brand narrative through imagery.` },
-                                    ].map(chip => (
-                                        <button key={chip.label} onClick={() => {
-                                            if (chip.template && chip.template.fields?.length > 0) { setActiveQuickTemplate(chip.template); setTemplateFields({}); }
-                                            else if (chip.prompt) setPrompt(chip.prompt);
-                                        }}
-                                            className="studio-btn-secondary hover:-translate-y-0.5 shadow-sm !rounded-xl !py-2.5">
-                                            <span className="material-symbols-outlined text-[16px]" style={{ color: chip.color }}>{chip.icon}</span>
-                                            <span className="text-[var(--sys-text)]">{chip.label}</span>
-                                        </button>
-                                    ))}
-                                </div>
+                                <p className="text-sm text-[var(--sys-text-muted)] max-w-xs text-center">Use a quick prompt from above, or describe your vision in the prompt panel and hit Generate.</p>
                             </div>
                         )}
 
