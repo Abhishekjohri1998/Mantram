@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../context/AuthContext'
+import { auth } from '../services/api'
 
 /**
  * useWalkthrough — First-visit detection + walkthrough state management.
  *
- * Checks localStorage for `mantram_wt_{studioId}_{userId}`.
+ * Checks backend user state + localStorage fallback.
  * On first visit, auto-triggers after a delay so the page has rendered.
  *
  * @param {string} studioId — unique key for the studio (e.g. 'contentStudio')
@@ -27,24 +28,41 @@ export default function useWalkthrough(studioId, opts = {}) {
 
   // Auto-trigger on first visit
   useEffect(() => {
-    if (!storageKey) return
-    const seen = localStorage.getItem(storageKey)
-    if (seen) return // already completed
+    if (!storageKey || !user) return
 
-    // If we depend on a parent walkthrough, check if it's done
-    if (parentKey && !localStorage.getItem(parentKey)) return
+    // 1. Check Backend Persistence
+    const isCompletedInBackend = user.completedWalkthroughs?.includes(studioId);
+    if (isCompletedInBackend) return;
+
+    // 2. Check LocalStorage (Fallback/Cache)
+    const seen = localStorage.getItem(storageKey)
+    if (seen) return 
+
+    // 3. If we depend on a parent walkthrough, check if it's done
+    const parentDone = (dependsOn && user.completedWalkthroughs?.includes(dependsOn)) || 
+                      (parentKey && localStorage.getItem(parentKey));
+    
+    if (dependsOn && !parentDone) return
 
     const timer = setTimeout(() => {
       setActive(true)
     }, delay)
 
     return () => clearTimeout(timer)
-  }, [storageKey, parentKey, delay])
+  }, [storageKey, user, dependsOn, parentKey, delay, studioId])
 
   const complete = useCallback(() => {
     setActive(false)
+    // 1. Immediate local feedback
     if (storageKey) localStorage.setItem(storageKey, 'completed')
-  }, [storageKey])
+    
+    // 2. Persist to Backend
+    if (user) {
+      auth.completeWalkthrough(studioId).catch(err => {
+        console.warn('⚠️ [useWalkthrough] Persistence failed:', err.message);
+      });
+    }
+  }, [storageKey, user, studioId])
 
   const start = useCallback(() => {
     setActive(true)

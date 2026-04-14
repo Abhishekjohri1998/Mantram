@@ -122,6 +122,9 @@ const userSchema = new mongoose.Schema({
         default: 'approved' 
     },
     queueNumber: { type: Number },
+
+    // Persistence: track which onboarding walkthroughs have been completed
+    completedWalkthroughs: { type: [String], default: [] },
 }, { timestamps: true });
 
 // Virtual: remaining credits (includes non-expired top-up)

@@ -269,7 +269,8 @@ router.post('/login', async (req, res) => {
                 organization: user.organization || null,
                 isTeamMember: ownedCount === 0 && sharedCount > 0,
                 planDetails,
-                brandCount
+                brandCount,
+                completedWalkthroughs: user.completedWalkthroughs || []
             },
         });
 
@@ -512,6 +513,33 @@ router.put('/profile', protect, async (req, res) => {
         { returnDocument: 'after', runValidators: true }
     );
     res.json({ success: true, user });
+});
+
+/**
+ * PUT /api/auth/walkthrough
+ * Marks a specific studio walkthrough as completed for the current user.
+ */
+router.put('/walkthrough', protect, async (req, res) => {
+    try {
+        const { studioId } = req.body;
+        if (!studioId) return res.status(400).json({ success: false, error: 'studioId is required' });
+
+        const user = await User.findByIdAndUpdate(
+            req.user._id,
+            { $addToSet: { completedWalkthroughs: studioId } },
+            { new: true, runValidators: true }
+        );
+
+        if (!user) return res.status(404).json({ success: false, error: 'User not found' });
+
+        res.json({ 
+            success: true, 
+            completedWalkthroughs: user.completedWalkthroughs || [] 
+        });
+    } catch (error) {
+        console.error('❌ Walkthrough update error:', error);
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
 });
 
 // PUT /api/auth/claim-userid — One-time custom User ID claim
