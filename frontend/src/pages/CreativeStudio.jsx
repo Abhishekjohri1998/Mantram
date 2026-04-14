@@ -540,7 +540,7 @@ export default function CreativeStudio() {
     // Accepts an optional imageItem so gallery buttons can pass the specific
     // image directly instead of relying on the async setResult + stale closure.
     const handleAnimateClick = async (imageItem) => {
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        document.querySelector('main')?.scrollTo({ top: 0, behavior: 'smooth' });
         const target = imageItem || result
         const imageUrl = target?.imageUrl
         if (!imageUrl) {
@@ -702,7 +702,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
             setAnimateModalOpen(false)
         }
         // Scroll to top so user sees the edit panel
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        document.querySelector('main')?.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
     // ── Gemini Edit: Generate edited image ──
@@ -3204,7 +3204,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                                 {item._idx === 0 && <span className="absolute top-2 left-2 w-5 h-5 rounded-full bg-[var(--sys-bg)] shadow flex items-center justify-center pointer-events-none"></span>}
                                                                 
                                                                 {/* Hover Ribbon Actions inside Image */}
-                                                                <div className="absolute inset-0 bg-black/40 backdrop-blur-md transition-all opacity-0 group-hover/img:opacity-100 flex flex-col items-center justify-center pointer-events-none group-hover/img:pointer-events-auto">
+                                                                <div className="absolute inset-0 bg-black/40 backdrop-blur-md transition-all opacity-0 group-hover/img:opacity-100 flex flex-col items-start justify-center pl-6 pointer-events-none group-hover/img:pointer-events-auto">
                                                                     <div className="flex bg-[var(--sys-surface)]/95 backdrop-blur-xl rounded-xl shadow-2xl border border-[var(--sys-border)] overflow-hidden scale-95 group-hover/img:scale-100 transition-transform">
                                                                         <button onClick={(e) => { e.stopPropagation(); setZoomImage(item.imageUrl); }} className="px-4 py-2 hover:bg-[#FF4D00]/10 text-[var(--sys-text)] hover:text-primary font-semibold text-xs border-r border-[var(--sys-border)] transition-colors">
                                                                             View
