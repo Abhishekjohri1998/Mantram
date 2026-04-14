@@ -192,7 +192,7 @@ export default function Header({ title, subtitle, onMenuToggle }) {
                                 <span className="hdr-brand-name">
                                     {activeBrand?.name || 'Select Brand'}
                                 </span>
-                                <span className="material-symbols-outlined text-[var(--sys-text-muted)] text-sm">unfold_more</span>
+                                <span className="material-symbols-outlined text-[var(--sys-text-muted)] text-sm hdr-hide-mobile">unfold_more</span>
                             </button>
 
                             {showBrandMenu && (
@@ -325,7 +325,7 @@ export default function Header({ title, subtitle, onMenuToggle }) {
                             <div className="hdr-user-avatar">
                                 {initials}
                             </div>
-                            <span className="material-symbols-outlined text-[var(--sys-text-muted)] text-sm hidden sm:block">expand_more</span>
+                            <span className="material-symbols-outlined text-[var(--sys-text-muted)] text-sm hdr-hide-mobile">expand_more</span>
                         </button>
 
                         {showMenu && (
