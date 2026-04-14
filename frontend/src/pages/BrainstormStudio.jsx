@@ -6,6 +6,7 @@ import { brainstormStudio as bsAPI } from '../services/api'
 import { useBrand } from '../context/BrandContext'
 import { useAuth } from '../context/AuthContext'
 import Walkthrough from '../components/Walkthrough'
+import './BrainstormStudio.css'
 
 // ── Topic quick-starts ────────────────────────────────────────────────────────
 const TOPICS = [
