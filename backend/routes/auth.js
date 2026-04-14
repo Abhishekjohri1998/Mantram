@@ -527,7 +527,7 @@ router.put('/walkthrough', protect, async (req, res) => {
         const user = await User.findByIdAndUpdate(
             req.user._id,
             { $addToSet: { completedWalkthroughs: studioId } },
-            { new: true, runValidators: true }
+            { returnDocument: 'after', runValidators: true }
         );
 
         if (!user) return res.status(404).json({ success: false, error: 'User not found' });

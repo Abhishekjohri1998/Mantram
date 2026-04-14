@@ -450,7 +450,7 @@ router.put('/channel-configs/:id', protect, async (req, res) => {
         const channel = await YoutubeChannelConfig.findOneAndUpdate(
             { _id: req.params.id, userId: req.user._id },
             { $set: update },
-            { new: true, runValidators: true }
+            { returnDocument: 'after', runValidators: true }
         ).populate('defaultTemplateId', 'name icon visual classification')
          .populate('shows.templateId', 'name icon visual classification');
         if (!channel) return res.status(404).json({ success: false, error: 'Channel not found' });
@@ -480,7 +480,7 @@ router.post('/channel-configs/:id/default', protect, async (req, res) => {
         const channel = await YoutubeChannelConfig.findOneAndUpdate(
             { _id: req.params.id, userId: req.user._id },
             { $set: { isDefault: true } },
-            { new: true }
+            { returnDocument: 'after' }
         );
         if (!channel) return res.status(404).json({ success: false, error: 'Channel not found' });
         res.json({ success: true, channel });
@@ -555,7 +555,7 @@ router.post('/templates/:id/set-default', protect, async (req, res) => {
         const tpl = await ThumbnailTemplate.findOneAndUpdate(
             { _id: req.params.id, userId: req.user._id },
             { $set: { isDefault: true } },
-            { new: true }
+            { returnDocument: 'after' }
         );
         if (!tpl) return res.status(404).json({ success: false, error: 'Template not found' });
         res.json({ success: true, template: tpl });
@@ -590,7 +590,7 @@ router.put('/templates/:id', protect, async (req, res) => {
         const template = await ThumbnailTemplate.findOneAndUpdate(
             { _id: req.params.id, userId: req.user._id },
             { $set: req.body },
-            { new: true, runValidators: true }
+            { returnDocument: 'after', runValidators: true }
         );
         if (!template) return res.status(404).json({ success: false, error: 'Template not found' });
         res.json({ success: true, template });
