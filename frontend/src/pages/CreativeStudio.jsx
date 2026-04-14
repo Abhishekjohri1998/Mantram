@@ -3197,24 +3197,26 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                     {/* Bottom Row: Image Array Gallery */}
                                                     <div className="flex gap-4 overflow-x-auto snap-x scrollbar-hide pb-2">
                                                         {group.items.map((item, iIdx) => (
-                                                            <div key={item._id || iIdx} className="relative group/img rounded-xl overflow-hidden shrink-0 snap-start border border-[var(--sys-border)]" style={{ width: group.items.length === 1 ? '100%' : group.items.length === 2 ? '48%' : '32%' }}>
-                                                                <img src={item.imageUrl} alt={group.prompt} loading="lazy" decoding="async"
-                                                                    className="w-full h-[220px] object-contain object-left block bg-[var(--sys-surface)] aspect-video sm:aspect-auto" />
-                                                                
-                                                                {item._idx === 0 && <span className="absolute top-2 left-2 w-5 h-5 rounded-full bg-[var(--sys-bg)] shadow flex items-center justify-center pointer-events-none"></span>}
-                                                                
-                                                                {/* Hover Ribbon Actions inside Image */}
-                                                                <div className="absolute inset-0 bg-black/40 backdrop-blur-md transition-all opacity-0 group-hover/img:opacity-100 flex flex-col items-start justify-center pl-6 pointer-events-none group-hover/img:pointer-events-auto">
-                                                                    <div className="flex bg-[var(--sys-surface)]/95 backdrop-blur-xl rounded-xl shadow-2xl border border-[var(--sys-border)] overflow-hidden scale-95 group-hover/img:scale-100 transition-transform">
-                                                                        <button onClick={(e) => { e.stopPropagation(); setZoomImage(item.imageUrl); }} className="px-4 py-2 hover:bg-[#FF4D00]/10 text-[var(--sys-text)] hover:text-primary font-semibold text-xs border-r border-[var(--sys-border)] transition-colors">
-                                                                            View
-                                                                        </button>
-                                                                        <button onClick={(e) => { e.stopPropagation(); handleOpenEditPanel(item.imageUrl, 'Creative'); }} className="px-4 py-2 hover:bg-[#FF4D00]/10 text-[var(--sys-text)] hover:text-primary font-semibold text-xs border-r border-[var(--sys-border)] transition-colors">
-                                                                            Edit
-                                                                        </button>
-                                                                        <button onClick={(e) => { e.stopPropagation(); handleAnimateClick(item); }} className="px-4 py-2 hover:bg-[#FF4D00]/10 text-[var(--sys-text)] hover:text-primary font-semibold text-xs transition-colors">
-                                                                            Animate
-                                                                        </button>
+                                                            <div key={item._id || iIdx} className="relative rounded-xl shrink-0 snap-start overflow-hidden" style={{ width: group.items.length === 1 ? '100%' : group.items.length === 2 ? '48%' : '32%' }}>
+                                                                <div className="group/img relative w-fit h-full rounded-xl overflow-hidden border border-[var(--sys-border)] transition-all">
+                                                                    <img src={item.imageUrl} alt={group.prompt} loading="lazy" decoding="async"
+                                                                        className="w-auto h-[220px] max-w-full object-contain object-left block bg-[var(--sys-surface)] aspect-video sm:aspect-auto" />
+                                                                    
+                                                                    {item._idx === 0 && <span className="absolute top-2 left-2 w-5 h-5 rounded-full bg-[var(--sys-bg)] shadow flex items-center justify-center pointer-events-none"></span>}
+                                                                    
+                                                                    {/* Hover Ribbon Actions inside Image */}
+                                                                    <div className="absolute inset-0 bg-black/40 backdrop-blur-md transition-all opacity-0 group-hover/img:opacity-100 flex flex-col items-start justify-center pl-6 pointer-events-none group-hover/img:pointer-events-auto">
+                                                                        <div className="flex bg-[var(--sys-surface)]/95 backdrop-blur-xl rounded-xl shadow-2xl border border-[var(--sys-border)] overflow-hidden scale-95 group-hover/img:scale-100 transition-transform">
+                                                                            <button onClick={(e) => { e.stopPropagation(); setZoomImage(item.imageUrl); }} className="px-4 py-2 hover:bg-[#FF4D00]/10 text-[var(--sys-text)] hover:text-primary font-semibold text-xs border-r border-[var(--sys-border)] transition-colors">
+                                                                                View
+                                                                            </button>
+                                                                            <button onClick={(e) => { e.stopPropagation(); handleOpenEditPanel(item.imageUrl, 'Creative'); }} className="px-4 py-2 hover:bg-[#FF4D00]/10 text-[var(--sys-text)] hover:text-primary font-semibold text-xs border-r border-[var(--sys-border)] transition-colors">
+                                                                                Edit
+                                                                            </button>
+                                                                            <button onClick={(e) => { e.stopPropagation(); handleAnimateClick(item); }} className="px-4 py-2 hover:bg-[#FF4D00]/10 text-[var(--sys-text)] hover:text-primary font-semibold text-xs transition-colors">
+                                                                                Animate
+                                                                            </button>
+                                                                        </div>
                                                                     </div>
                                                                 </div>
                                                             </div>
@@ -4654,11 +4656,12 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     </div>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-[500px] overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.1) transparent' }}>
                                         {psHistory.map((item, idx) => (
-                                            <div key={item._id || idx} className={`group relative rounded-xl overflow-hidden border ${idx === 0 ? 'border-[var(--sys-border)] ' : 'border-[var(--sys-border)]'} bg-[var(--sys-surface)] cursor-pointer transition-all hover:border-[var(--sys-border)]`}
+                                            <div key={item._id || idx} className={`relative rounded-xl overflow-hidden border border-[var(--sys-border)] bg-[var(--sys-surface)] transition-all`}
                                                 onClick={() => setZoomImage(item.imageUrl)}>
-                                                <img src={item.imageUrl} alt={item._brief || 'Photoshoot'} loading="lazy" decoding="async" className="w-full aspect-square object-contain object-left bg-[var(--sys-surface)]" />
-                                                {idx === 0 && <span className="absolute top-1.5 left-1.5 text-[8px] font-bold text-[var(--sys-primary)] bg-[var(--sys-primary-dim)] px-1.5 py-0.5 rounded-md">Latest</span>}
-                                                <div className="absolute inset-0 bg-black/60 border border-[var(--sys-border)] opacity-0 group-hover:opacity-100 transition-all flex flex-col justify-end p-2">
+                                                <div className="group relative w-fit h-full rounded-xl overflow-hidden cursor-pointer">
+                                                    <img src={item.imageUrl} alt={item._brief || 'Photoshoot'} loading="lazy" decoding="async" className="w-auto h-full max-w-full aspect-square object-contain object-left bg-[var(--sys-surface)]" />
+                                                    {idx === 0 && <span className="absolute top-1.5 left-1.5 text-[8px] font-bold text-[var(--sys-primary)] bg-[var(--sys-primary-dim)] px-1.5 py-0.5 rounded-md">Latest</span>}
+                                                    <div className="absolute inset-0 bg-black/60 border border-[var(--sys-border)] opacity-0 group-hover:opacity-100 transition-all flex flex-col justify-end p-2">
                                                     <p className="text-[9px] text-[var(--sys-text-muted)] truncate mb-1.5 leading-tight" title={item._brief || item.description}>{item._brief || item.description || 'AI Photoshoot'}</p>
                                                     {/* Quick Actions Hover Dock */}
                                                     <div className="flex flex-wrap items-center justify-end gap-1 w-full mt-auto">
