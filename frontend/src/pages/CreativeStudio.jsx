@@ -540,6 +540,7 @@ export default function CreativeStudio() {
     // Accepts an optional imageItem so gallery buttons can pass the specific
     // image directly instead of relying on the async setResult + stale closure.
     const handleAnimateClick = async (imageItem) => {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
         const target = imageItem || result
         const imageUrl = target?.imageUrl
         if (!imageUrl) {
@@ -700,10 +701,8 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
             setShowAnimatePanel(false)
             setAnimateModalOpen(false)
         }
-        // Scroll to top of gallery so user sees the edit panel
-        requestAnimationFrame(() => {
-            document.querySelector('.creative-gallery')?.scrollTo({ top: 0, behavior: 'smooth' })
-        })
+        // Scroll to top so user sees the edit panel
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
     // ── Gemini Edit: Generate edited image ──
