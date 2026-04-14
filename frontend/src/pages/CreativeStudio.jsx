@@ -540,6 +540,7 @@ export default function CreativeStudio() {
     // Accepts an optional imageItem so gallery buttons can pass the specific
     // image directly instead of relying on the async setResult + stale closure.
     const handleAnimateClick = async (imageItem) => {
+        document.querySelector('main')?.scrollTo({ top: 0, behavior: 'smooth' });
         const target = imageItem || result
         const imageUrl = target?.imageUrl
         if (!imageUrl) {
@@ -700,10 +701,8 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
             setShowAnimatePanel(false)
             setAnimateModalOpen(false)
         }
-        // Scroll to top of gallery so user sees the edit panel
-        requestAnimationFrame(() => {
-            document.querySelector('.creative-gallery')?.scrollTo({ top: 0, behavior: 'smooth' })
-        })
+        // Scroll to top so user sees the edit panel
+        document.querySelector('main')?.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
     // ── Gemini Edit: Generate edited image ──
@@ -3110,15 +3109,23 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                         {generationHistory.map((item, idx) => (
                                             <div key={item._id || idx} className={`group relative rounded-xl overflow-hidden border ${idx === 0 ? 'border-[var(--sys-text)]  ring-[#FF4D00]/20' : 'border-[var(--sys-border)]'} bg-[var(--sys-surface)] cursor-pointer transition-all hover:border-[var(--sys-border)] hover:scale-[1.02]`}
                                                 onClick={() => setZoomImage(item.imageUrl)}>
-                                                <img src={item.imageUrl} alt={item._prompt || 'Creative'} loading="lazy" decoding="async" className="w-full aspect-square object-cover" />
+                                                <img src={item.imageUrl} alt={item._prompt || 'Creative'} loading="lazy" decoding="async" className="w-full aspect-square object-contain object-left max-h-[240px] bg-[var(--sys-surface)]" />
                                                 {idx === 0 && <span className="absolute top-1.5 left-1.5 text-[8px] font-bold text-[var(--sys-bg)] bg-[var(--sys-text)] px-1.5 py-0.5 rounded-md shadow-sm">Latest</span>}
                                                 {/* Quick Actions Hover Dock */}
                                                 <div className="absolute inset-0 bg-black/60 border border-[var(--sys-border)] opacity-0 group-hover:opacity-100 transition-all flex flex-col justify-end p-2">
-                                                    <p className="text-[9px] text-[var(--sys-text-muted)] line-clamp-2 mb-2 leading-tight">{item._prompt || 'AI Generated'}</p>
+                                                    <p className="text-[9px] text-[var(--sys-text-muted)] truncate mb-2 leading-tight" title={item._prompt}>{item._prompt || 'AI Generated'}</p>
                                                     <div className="mt-1 flex flex-wrap items-center gap-1">
                                                         <button onClick={(e) => { e.stopPropagation(); setZoomImage(item.imageUrl); }}
                                                             className="studio-action-btn-sm !w-7 !h-7" title="Expand Image">
                                                             <span className="material-symbols-outlined !text-[14px]">zoom_in</span>
+                                                        </button>
+                                                        <button onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(item._prompt || ''); setFeedbackToast('Prompt copied!'); setTimeout(() => setFeedbackToast(''), 2000); }}
+                                                            className="studio-action-btn-sm !w-7 !h-7" title="Copy Prompt">
+                                                            <span className="material-symbols-outlined !text-[14px]">content_copy</span>
+                                                        </button>
+                                                        <button onClick={(e) => { e.stopPropagation(); setPrompt(item._prompt || ''); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                                                            className="studio-action-btn-sm !w-7 !h-7" title="Reuse Prompt">
+                                                            <span className="material-symbols-outlined !text-[14px]">refresh</span>
                                                         </button>
                                                         <button onClick={(e) => { e.stopPropagation(); handleOpenEditPanel(item.imageUrl, 'Creative'); }}
                                                             className="studio-btn-pill !text-[9px] !px-2 !py-1 active border-none" title="Edit in AI Canvas">
@@ -3158,7 +3165,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                     <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3 mb-4 pb-4 border-b border-[var(--sys-border)]">
                                                         {/* Prompt Text Block */}
                                                         <div className="flex-1 min-w-0 pr-4">
-                                                            <p className="text-sm font-medium text-[var(--sys-text)] leading-relaxed">{group.prompt}</p>
+                                                            <p className="text-sm font-medium text-[var(--sys-text)] truncate leading-relaxed" title={group.prompt}>{group.prompt}</p>
                                                         </div>
 
                                                         {/* Actions & Metadata Block */}
@@ -3174,30 +3181,42 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                                 </button>
                                                             )}
                                                             <span className="text-[var(--sys-text-muted)] font-normal ml-3 whitespace-nowrap">{getTimeAgo(group.items[0].createdAt)}</span>
+                                                            <div className="flex items-center gap-1 ml-4 pl-4 border-l border-[var(--sys-border)]">
+                                                                <button onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(group.prompt || ''); setFeedbackToast('Prompt copied!'); setTimeout(() => setFeedbackToast(''), 2000); }}
+                                                                    className="p-1.5 rounded-lg hover:bg-[var(--sys-surface-hover)] text-[var(--sys-text-muted)] hover:text-primary transition-colors" title="Copy Prompt">
+                                                                    <span className="material-symbols-outlined text-base">content_copy</span>
+                                                                </button>
+                                                                <button onClick={(e) => { e.stopPropagation(); setPrompt(group.prompt || ''); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                                                                    className="p-1.5 rounded-lg hover:bg-[var(--sys-surface-hover)] text-[var(--sys-text-muted)] hover:text-primary transition-colors" title="Reuse Prompt">
+                                                                    <span className="material-symbols-outlined text-base">refresh</span>
+                                                                </button>
+                                                            </div>
                                                         </div>
                                                     </div>
 
                                                     {/* Bottom Row: Image Array Gallery */}
                                                     <div className="flex gap-4 overflow-x-auto snap-x scrollbar-hide pb-2">
                                                         {group.items.map((item, iIdx) => (
-                                                            <div key={item._id || iIdx} className="relative group/img rounded-xl overflow-hidden shrink-0 snap-start border border-[var(--sys-border)]" style={{ width: group.items.length === 1 ? '100%' : group.items.length === 2 ? '48%' : '32%' }}>
-                                                                <img src={item.imageUrl} alt={group.prompt} loading="lazy" decoding="async"
-                                                                    className="w-full h-auto object-cover block bg-[var(--sys-bg)] aspect-video sm:aspect-auto" />
-                                                                
-                                                                {item._idx === 0 && <span className="absolute top-2 left-2 w-5 h-5 rounded-full bg-[var(--sys-bg)] shadow flex items-center justify-center pointer-events-none"></span>}
-                                                                
-                                                                {/* Hover Ribbon Actions inside Image */}
-                                                                <div className="absolute inset-0 bg-black/40 backdrop-blur-md transition-all opacity-0 group-hover/img:opacity-100 flex flex-col items-center justify-center pointer-events-none group-hover/img:pointer-events-auto">
-                                                                    <div className="flex bg-[var(--sys-surface)]/95 backdrop-blur-xl rounded-xl shadow-2xl border border-[var(--sys-border)] overflow-hidden scale-95 group-hover/img:scale-100 transition-transform">
-                                                                        <button onClick={(e) => { e.stopPropagation(); setZoomImage(item.imageUrl); }} className="px-4 py-2 hover:bg-[#FF4D00]/10 text-[var(--sys-text)] hover:text-primary font-semibold text-xs border-r border-[var(--sys-border)] transition-colors">
-                                                                            View
-                                                                        </button>
-                                                                        <button onClick={(e) => { e.stopPropagation(); handleOpenEditPanel(item.imageUrl, 'Creative'); }} className="px-4 py-2 hover:bg-[#FF4D00]/10 text-[var(--sys-text)] hover:text-primary font-semibold text-xs border-r border-[var(--sys-border)] transition-colors">
-                                                                            Edit
-                                                                        </button>
-                                                                        <button onClick={(e) => { e.stopPropagation(); handleAnimateClick(item); }} className="px-4 py-2 hover:bg-[#FF4D00]/10 text-[var(--sys-text)] hover:text-primary font-semibold text-xs transition-colors">
-                                                                            Animate
-                                                                        </button>
+                                                            <div key={item._id || iIdx} className="relative rounded-xl shrink-0 snap-start overflow-hidden" style={{ width: group.items.length === 1 ? '100%' : group.items.length === 2 ? '48%' : '32%' }}>
+                                                                <div className="group/img relative w-fit h-full rounded-xl overflow-hidden border border-[var(--sys-border)] transition-all">
+                                                                    <img src={item.imageUrl} alt={group.prompt} loading="lazy" decoding="async"
+                                                                        className="w-auto h-[220px] max-w-full object-contain object-left block bg-[var(--sys-surface)] aspect-video sm:aspect-auto" />
+                                                                    
+                                                                    {item._idx === 0 && <span className="absolute top-2 left-2 w-5 h-5 rounded-full bg-[var(--sys-bg)] shadow flex items-center justify-center pointer-events-none"></span>}
+                                                                    
+                                                                    {/* Hover Ribbon Actions inside Image */}
+                                                                    <div className="absolute inset-0 bg-black/40 backdrop-blur-md transition-all opacity-0 group-hover/img:opacity-100 flex flex-col items-start justify-center pl-6 pointer-events-none group-hover/img:pointer-events-auto">
+                                                                        <div className="flex bg-[var(--sys-surface)]/95 backdrop-blur-xl rounded-xl shadow-2xl border border-[var(--sys-border)] overflow-hidden scale-95 group-hover/img:scale-100 transition-transform">
+                                                                            <button onClick={(e) => { e.stopPropagation(); setZoomImage(item.imageUrl); }} className="px-4 py-2 hover:bg-[#FF4D00]/10 text-[var(--sys-text)] hover:text-primary font-semibold text-xs border-r border-[var(--sys-border)] transition-colors">
+                                                                                View
+                                                                            </button>
+                                                                            <button onClick={(e) => { e.stopPropagation(); handleOpenEditPanel(item.imageUrl, 'Creative'); }} className="px-4 py-2 hover:bg-[#FF4D00]/10 text-[var(--sys-text)] hover:text-primary font-semibold text-xs border-r border-[var(--sys-border)] transition-colors">
+                                                                                Edit
+                                                                            </button>
+                                                                            <button onClick={(e) => { e.stopPropagation(); handleAnimateClick(item); }} className="px-4 py-2 hover:bg-[#FF4D00]/10 text-[var(--sys-text)] hover:text-primary font-semibold text-xs transition-colors">
+                                                                                Animate
+                                                                            </button>
+                                                                        </div>
                                                                     </div>
                                                                 </div>
                                                             </div>
@@ -4624,6 +4643,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     </div>
                                 </div>
                             )}
+                        </div>
 
                             {/* ── In-Session Photoshoot Gallery ── */}
                             {psHistory.length > 1 && (
@@ -4637,17 +4657,26 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     </div>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-[500px] overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.1) transparent' }}>
                                         {psHistory.map((item, idx) => (
-                                            <div key={item._id || idx} className={`group relative rounded-xl overflow-hidden border ${idx === 0 ? 'border-[var(--sys-border)] ' : 'border-[var(--sys-border)]'} bg-[var(--sys-surface)] cursor-pointer transition-all hover:border-[var(--sys-border)]`}
+                                            <div key={item._id || idx} className={`relative rounded-xl overflow-hidden border border-[var(--sys-border)] bg-[var(--sys-surface)] transition-all`}
                                                 onClick={() => setZoomImage(item.imageUrl)}>
-                                                <img src={item.imageUrl} alt={item._brief || 'Photoshoot'} loading="lazy" decoding="async" className="w-full aspect-square object-cover" />
-                                                {idx === 0 && <span className="absolute top-1.5 left-1.5 text-[8px] font-bold text-[var(--sys-primary)] bg-[var(--sys-primary-dim)] px-1.5 py-0.5 rounded-md">Latest</span>}
-                                                <div className="absolute inset-0 bg-black/60 border border-[var(--sys-border)] opacity-0 group-hover:opacity-100 transition-all flex flex-col justify-end p-2">
-                                                    <p className="text-[9px] text-[var(--sys-text-muted)] line-clamp-2 mb-1.5 leading-tight">{item._brief || item.description || 'AI Photoshoot'}</p>
+                                                <div className="group relative w-fit h-full rounded-xl overflow-hidden cursor-pointer">
+                                                    <img src={item.imageUrl} alt={item._brief || 'Photoshoot'} loading="lazy" decoding="async" className="w-auto h-full max-w-full aspect-square object-contain object-left bg-[var(--sys-surface)]" />
+                                                    {idx === 0 && <span className="absolute top-1.5 left-1.5 text-[8px] font-bold text-[var(--sys-primary)] bg-[var(--sys-primary-dim)] px-1.5 py-0.5 rounded-md">Latest</span>}
+                                                    <div className="absolute inset-0 bg-black/60 border border-[var(--sys-border)] opacity-0 group-hover:opacity-100 transition-all flex flex-col justify-end p-2">
+                                                    <p className="text-[9px] text-[var(--sys-text-muted)] truncate mb-1.5 leading-tight" title={item._brief || item.description}>{item._brief || item.description || 'AI Photoshoot'}</p>
                                                     {/* Quick Actions Hover Dock */}
                                                     <div className="flex flex-wrap items-center justify-end gap-1 w-full mt-auto">
                                                         <button onClick={(e) => { e.stopPropagation(); setPhotoshootResult(item); }}
                                                             className="studio-action-btn-sm !w-7 !h-7" title="Expand Image">
                                                             <span className="material-symbols-outlined !text-[14px]">zoom_in</span>
+                                                        </button>
+                                                        <button onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(item._brief || item.description || ''); setFeedbackToast('Prompt copied!'); setTimeout(() => setFeedbackToast(''), 2000); }}
+                                                            className="studio-action-btn-sm !w-7 !h-7" title="Copy Brief">
+                                                            <span className="material-symbols-outlined !text-[14px]">content_copy</span>
+                                                        </button>
+                                                        <button onClick={(e) => { e.stopPropagation(); setPhotoshootBrief(item._brief || item.description || ''); setStudioMode('photoshoot'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                                                            className="studio-action-btn-sm !w-7 !h-7" title="Reuse Brief">
+                                                            <span className="material-symbols-outlined !text-[14px]">refresh</span>
                                                         </button>
                                                         <button onClick={(e) => { e.stopPropagation(); handleOpenEditPanel(item.imageUrl, item._brief || item.description || 'Photoshoot'); }}
                                                             className="studio-btn-pill !text-[9px] !px-2 !py-1 active border-none" title="Edit with Gemini AI">
@@ -4661,6 +4690,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                             className="flex items-center gap-1 px-1.5 py-1 rounded bg-[#1877F2]/20 hover:bg-[#1877F2]/40 text-[9px] border-[var(--sys-border)] font-medium transition-all border border-[#1877F2]/30" title="Publish to Content Studio">
                                                             <span className="material-symbols-outlined text-[10px]">send</span> Share
                                                         </button>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
@@ -4670,11 +4700,6 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             )}
                         </div>
                     </div>
-                    </div>
-
-
-
-                        
 
                 </div>
             )}
@@ -7942,7 +7967,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
 
             {/* ═══ ZOOM LIGHTBOX (for generated result — global, all tabs) ═══ */}
             {zoomImage && (
-                <div className="fixed inset-0 z-[110] flex items-center justify-center animate-fade-in"
+                <div className="fixed inset-0 z-[110] flex items-center justify-start pl-[5vw] md:pl-[10vw] animate-fade-in"
                     onClick={() => setZoomImage(null)}>
                     <div className="absolute inset-0 bg-black/60 " />
                     <div className="relative max-w-[90vw] max-h-[90vh]" onClick={e => e.stopPropagation()}>
@@ -8580,7 +8605,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                 {(vtoHdResult || vtoPreviewResult) ? (
                                     <div className="flex-1 flex flex-col">
                                         <div className="flex-1 rounded-xl overflow-hidden bg-[var(--sys-surface)] mb-3">
-                                            <img src={vtoHdResult || vtoPreviewResult} alt="Virtual Try-On Result" className="w-full h-full object-contain max-h-[500px]" />
+                                            <img src={vtoHdResult || vtoPreviewResult} alt="Virtual Try-On Result" className="w-full h-full object-contain object-left max-h-[500px]" />
                                         </div>
                                         <div className="flex gap-2">
                                             <button onClick={() => handleDownloadImage(vtoHdResult || vtoPreviewResult, "try-on-result.png")}
@@ -9078,7 +9103,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                 {mockupResult ? (
                                     <div className="flex-1 flex flex-col">
                                         <div className="flex-1 rounded-xl overflow-hidden bg-[var(--sys-surface)] mb-3">
-                                            <img src={mockupResult} alt="Lifestyle Mockup" className="w-full h-full object-contain max-h-[500px]" />
+                                            <img src={mockupResult} alt="Lifestyle Mockup" className="w-full h-full object-contain object-left max-h-[500px]" />
                                         </div>
                                         <div className="flex gap-2">
                                             <button onClick={() => handleDownloadImage(mockupResult, "lifestyle-mockup.png")}
@@ -9406,7 +9431,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                 {logoResult ? (
                                     <div className="flex-1 flex flex-col">
                                         <div className="flex-1 rounded-xl overflow-hidden bg-[var(--sys-surface)] mb-3">
-                                            <img src={logoResult} alt="Logo Mockup" className="w-full h-full object-contain max-h-[500px]" />
+                                            <img src={logoResult} alt="Logo Mockup" className="w-full h-full object-contain object-left max-h-[500px]" />
                                         </div>
                                         <div className="flex gap-2">
                                             <button onClick={() => handleDownloadImage(logoResult, "logo-mockup.png")}
