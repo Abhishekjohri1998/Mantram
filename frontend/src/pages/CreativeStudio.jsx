@@ -4643,6 +4643,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     </div>
                                 </div>
                             )}
+                        </div>
 
                             {/* ── In-Session Photoshoot Gallery ── */}
                             {psHistory.length > 1 && (
