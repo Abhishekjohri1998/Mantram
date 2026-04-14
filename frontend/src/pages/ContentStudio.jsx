@@ -1092,7 +1092,7 @@ function StepContext({ onComplete, onBack, goal, subType, initialImage, brandId 
             </div>
 
             {/* Context type tabs */}
-            <div className="flex gap-2 mb-6 flex-wrap">
+            <div className="cs-context-tabs">
                 {[
                     { id: 'manual', icon: 'edit', label: 'Write Details' },
                     { id: 'url', icon: 'link', label: 'Paste Link' },
@@ -1100,8 +1100,7 @@ function StepContext({ onComplete, onBack, goal, subType, initialImage, brandId 
                     { id: 'library', icon: 'photo_library', label: 'Image Bank' },
                 ].map(t => (
                     <button key={t.id} onClick={() => setContextType(t.id)}
-                        className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${contextType === t.id ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'cs-glass-card !bg-transparent text-[var(--sys-text-muted)] hover:text-white'
-                            } `}>
+                        className={`cs-tab-btn ${contextType === t.id ? 'active' : ''}`}>
                         <span className="material-symbols-outlined text-sm">{t.icon}</span> {t.label}
                         {t.id === 'library' && libraryCounts.all > 0 && (
                             <span className="bg-[var(--sys-surface)] text-xs px-1.5 py-0.5 rounded-full">{libraryCounts.all}</span>
@@ -1156,11 +1155,11 @@ function StepContext({ onComplete, onBack, goal, subType, initialImage, brandId 
                                 reader.readAsDataURL(file)
                             }
                         }} onDragOver={e => e.preventDefault()}
-                            className="border border-dashed border-[var(--sys-border)] rounded-2xl p-10 text-center hover:border-primary/40 transition-colors">
-                            <span className="material-symbols-outlined text-4xl text-[var(--sys-text-muted)] mb-3 block">add_photo_alternate</span>
-                            <p className="text-[var(--sys-text-muted)] mb-2 text-sm">Drag & drop a product image or creative</p>
-                            <p className="text-xs text-[var(--sys-text-muted)] mb-3 opacity-60">AI will analyze the image and create a content brief</p>
-                            <label className="cs-btn-primary !h-9 !px-5 text-[10px] cursor-pointer inline-flex items-center">
+                            className="cs-upload-zone">
+                            <span className="material-symbols-outlined cs-upload-icon">add_photo_alternate</span>
+                            <p className="cs-upload-text">Drag & drop a product image or creative</p>
+                            <p className="cs-upload-subtext">AI will analyze the image and create a content brief</p>
+                            <label className="cs-btn-primary !h-9 !px-5 text-[10px] cursor-pointer inline-flex items-center mt-3 mx-auto w-auto">
                                 Choose Image
                                 <input type="file" className="hidden" onChange={(e) => {
                                     const file = e.target.files?.[0]
