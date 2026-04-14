@@ -3110,7 +3110,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                         {generationHistory.map((item, idx) => (
                                             <div key={item._id || idx} className={`group relative rounded-xl overflow-hidden border ${idx === 0 ? 'border-[var(--sys-text)]  ring-[#FF4D00]/20' : 'border-[var(--sys-border)]'} bg-[var(--sys-surface)] cursor-pointer transition-all hover:border-[var(--sys-border)] hover:scale-[1.02]`}
                                                 onClick={() => setZoomImage(item.imageUrl)}>
-                                                <img src={item.imageUrl} alt={item._prompt || 'Creative'} loading="lazy" decoding="async" className="w-full aspect-square object-cover" />
+                                                <img src={item.imageUrl} alt={item._prompt || 'Creative'} loading="lazy" decoding="async" className="w-full aspect-square object-contain max-h-[240px] bg-[var(--sys-surface)]" />
                                                 {idx === 0 && <span className="absolute top-1.5 left-1.5 text-[8px] font-bold text-[var(--sys-bg)] bg-[var(--sys-text)] px-1.5 py-0.5 rounded-md shadow-sm">Latest</span>}
                                                 {/* Quick Actions Hover Dock */}
                                                 <div className="absolute inset-0 bg-black/60 border border-[var(--sys-border)] opacity-0 group-hover:opacity-100 transition-all flex flex-col justify-end p-2">
@@ -3182,7 +3182,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                         {group.items.map((item, iIdx) => (
                                                             <div key={item._id || iIdx} className="relative group/img rounded-xl overflow-hidden shrink-0 snap-start border border-[var(--sys-border)]" style={{ width: group.items.length === 1 ? '100%' : group.items.length === 2 ? '48%' : '32%' }}>
                                                                 <img src={item.imageUrl} alt={group.prompt} loading="lazy" decoding="async"
-                                                                    className="w-full h-auto object-cover block bg-[var(--sys-bg)] aspect-video sm:aspect-auto" />
+                                                                    className="w-full h-[220px] object-contain block bg-[var(--sys-surface)] aspect-video sm:aspect-auto" />
                                                                 
                                                                 {item._idx === 0 && <span className="absolute top-2 left-2 w-5 h-5 rounded-full bg-[var(--sys-bg)] shadow flex items-center justify-center pointer-events-none"></span>}
                                                                 
@@ -4639,7 +4639,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                         {psHistory.map((item, idx) => (
                                             <div key={item._id || idx} className={`group relative rounded-xl overflow-hidden border ${idx === 0 ? 'border-[var(--sys-border)] ' : 'border-[var(--sys-border)]'} bg-[var(--sys-surface)] cursor-pointer transition-all hover:border-[var(--sys-border)]`}
                                                 onClick={() => setZoomImage(item.imageUrl)}>
-                                                <img src={item.imageUrl} alt={item._brief || 'Photoshoot'} loading="lazy" decoding="async" className="w-full aspect-square object-cover" />
+                                                <img src={item.imageUrl} alt={item._brief || 'Photoshoot'} loading="lazy" decoding="async" className="w-full aspect-square object-contain bg-[var(--sys-surface)]" />
                                                 {idx === 0 && <span className="absolute top-1.5 left-1.5 text-[8px] font-bold text-[var(--sys-primary)] bg-[var(--sys-primary-dim)] px-1.5 py-0.5 rounded-md">Latest</span>}
                                                 <div className="absolute inset-0 bg-black/60 border border-[var(--sys-border)] opacity-0 group-hover:opacity-100 transition-all flex flex-col justify-end p-2">
                                                     <p className="text-[9px] text-[var(--sys-text-muted)] line-clamp-2 mb-1.5 leading-tight">{item._brief || item.description || 'AI Photoshoot'}</p>
