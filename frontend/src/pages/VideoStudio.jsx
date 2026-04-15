@@ -851,7 +851,7 @@ export default function VideoStudio() {
                 {studioMode === 'storyboard' && (<>
 
                     {/* ── Progress Steps ── */}
-                    <div className="flex items-center gap-1 video-tabs-container">
+                    <div className="flex items-center gap-1 video-tabs-container pt-6 pb-6 mt-4 relative w-full z-10" style={{ overflowY: 'visible' }}>
                         {STEPS.map((s, i) => (
                             <div key={s.id} className="flex items-center flex-shrink-0">
                                 <div className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium transition-all ${i === step ? 'bg-[var(--sys-primary-dim)] video-highlight-text border border-[var(--sys-primary)]' :
