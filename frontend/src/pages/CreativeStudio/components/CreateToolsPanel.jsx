@@ -347,28 +347,35 @@ const CreateToolsPanel = memo(({
                 />
 
                 {/* @character dropdown */}
-                {showCharTags && (characters.length > 0 || referenceImages.upload) && (
+                {showCharTags && (characters.length > 0 || referenceImages.upload || referenceImages.style) && (
                     <div className="absolute left-4 bottom-full mb-1 bg-[#1a1a2e] border border-[var(--sys-border)] rounded-xl shadow-2xl p-2 z-50 min-w-[200px]">
-                        {characters.filter(c => !charTagFilter || c.name.toLowerCase().includes(charTagFilter)).map((char, idx) => (
-                            <button key={idx} onClick={() => {
-                                const textarea = promptTextareaRef.current
-                                if (!textarea) return
-                                const cursor = textarea.selectionStart
-                                const textBefore = prompt.substring(0, cursor)
-                                const textAfter = prompt.substring(cursor)
-                                const tagName = char.name.replace(/\s/g, '')
-                                const newBefore = textBefore.replace(/@\w*$/, `@${tagName} `)
-                                setPrompt(newBefore + textAfter)
-                                setShowCharTags(false)
-                                setTimeout(() => { textarea.focus(); textarea.selectionStart = textarea.selectionEnd = newBefore.length }, 50)
-                            }} className="flex items-center gap-2 w-full px-2 py-1.5 rounded-lg hover:bg-violet-500/15 text-left transition-colors">
-                                <img src={char.image} alt="" className="w-6 h-6 rounded-full object-cover" />
-                                <div>
-                                    <span className="text-xs font-bold text-[var(--sys-text)]">{char.name}</span>
-                                    <span className="text-[10px] text-violet-400 ml-1.5">@{char.name.replace(/\s/g, '')}</span>
-                                </div>
-                            </button>
-                        ))}
+                        {(() => {
+                            const tagOptions = [...characters];
+                            if (referenceImages.upload) tagOptions.push({ name: 'Reference', image: referenceImages.upload });
+                            if (referenceImages.style) tagOptions.push({ name: 'Style', image: referenceImages.style });
+                            return tagOptions.filter(c => !charTagFilter || c.name.toLowerCase().includes(charTagFilter)).map((char, idx) => (
+                                <button key={idx} onClick={() => {
+                                    const textarea = promptTextareaRef.current
+                                    if (!textarea) return
+                                    const cursor = textarea.selectionStart
+                                    const textBefore = prompt.substring(0, cursor)
+                                    const textAfter = prompt.substring(cursor)
+                                    const tagName = char.name.replace(/\s/g, '')
+                                    const newBefore = textBefore.replace(/@\w*$/, `@${tagName} `)
+                                    setPrompt(newBefore + textAfter)
+                                    setShowCharTags(false)
+                                    setTimeout(() => { textarea.focus(); textarea.selectionStart = textarea.selectionEnd = newBefore.length }, 50)
+                                }} className="flex items-center gap-2 w-full px-2 py-1.5 rounded-lg hover:bg-violet-500/15 text-left transition-colors">
+                                    <div className="w-6 h-6 rounded-full overflow-hidden shrink-0 bg-black/20">
+                                        <img src={char.image} alt="" className="w-full h-full object-cover" />
+                                    </div>
+                                    <div>
+                                        <span className="text-xs font-bold text-[var(--sys-text)]">{char.name}</span>
+                                        <span className="text-[10px] text-violet-400 ml-1.5">@{char.name.replace(/\s/g, '')}</span>
+                                    </div>
+                                </button>
+                            ));
+                        })()}
                     </div>
                 )}
 

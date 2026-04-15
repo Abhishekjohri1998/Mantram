@@ -3764,8 +3764,8 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                             value={prompt}
                                             onChange={e => {
                                                 const val = e.target.value; setPrompt(val);
-                                                const cursor = e.target.selectionStart; const textBefore = val.substring(0, cursor); const atMatch = textBefore.match(/@(\\w*)$/);
-                                                if (atMatch && (characters.length > 0 || referenceImages.upload)) { setShowCharTags(true); setCharTagFilter(atMatch[1].toLowerCase()); } else { setShowCharTags(false); }
+                                                const cursor = e.target.selectionStart; const textBefore = val.substring(0, cursor); const atMatch = textBefore.match(/@(\w*)$/);
+                                                if (atMatch && (characters.length > 0 || referenceImages.upload || referenceImages.style)) { setShowCharTags(true); setCharTagFilter(atMatch[1].toLowerCase()); } else { setShowCharTags(false); }
                                             }}
                                             onKeyDown={e => {
                                                 if (e.key === 'Enter' && !e.shiftKey && !showCharTags) { e.preventDefault(); handleGenerate() }
@@ -3778,20 +3778,27 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                         />
                                         
                                         {/* Char Tag Auto-fill Box */}
-                                        {showCharTags && (characters.length > 0 || referenceImages.upload) && (
+                                        {showCharTags && (characters.length > 0 || referenceImages.upload || referenceImages.style) && (
                                             <div className="absolute left-2 top-2/3 mb-2 bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl shadow-xl p-2 z-[60] min-w-[200px] animate-fade-in">
-                                                <p className="text-[10px] text-[var(--sys-text-muted)]/50 mb-1.5 px-2">Tag a character</p>
-                                                {characters.filter(c => !charTagFilter || c.name.toLowerCase().includes(charTagFilter)).map((char, idx) => (
-                                                    <button key={idx} onClick={() => {
-                                                        const textarea = promptTextareaRef.current; if (!textarea) return;
-                                                        const cursor = textarea.selectionStart; const before = prompt.substring(0, cursor); const after = prompt.substring(cursor);
-                                                        const cleaned = before.replace(/@\\w*$/, ''); const tagName = char.name.replace(/\\s/g, '');
-                                                        setPrompt(cleaned + '@' + tagName + ' ' + after); setShowCharTags(false); setTimeout(() => textarea.focus(), 50);
-                                                    }} className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-black/5 transition-all text-left cursor-pointer">
-                                                        <img src={char.image} alt="" className="w-6 h-6 rounded-full object-cover border border-[var(--sys-border)]" />
-                                                        <div><p className="text-xs font-bold text-[var(--sys-text)]">@{char.name}</p></div>
-                                                    </button>
-                                                ))}
+                                                <p className="text-[10px] text-[var(--sys-text-muted)]/50 mb-1.5 px-2">Tag a reference</p>
+                                                {(() => {
+                                                    const tagOptions = [...characters];
+                                                    if (referenceImages.upload) tagOptions.push({ name: 'Reference', image: referenceImages.upload });
+                                                    if (referenceImages.style) tagOptions.push({ name: 'Style', image: referenceImages.style });
+                                                    return tagOptions.filter(c => !charTagFilter || c.name.toLowerCase().includes(charTagFilter)).map((char, idx) => (
+                                                        <button key={idx} onClick={() => {
+                                                            const textarea = promptTextareaRef.current; if (!textarea) return;
+                                                            const cursor = textarea.selectionStart; const before = prompt.substring(0, cursor); const after = prompt.substring(cursor);
+                                                            const cleaned = before.replace(/@\w*$/, ''); const tagName = char.name.replace(/\s/g, '');
+                                                            setPrompt(cleaned + '@' + tagName + ' ' + after); setShowCharTags(false); setTimeout(() => textarea.focus(), 50);
+                                                        }} className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-black/5 transition-all text-left cursor-pointer">
+                                                            <div className="w-6 h-6 rounded-full overflow-hidden border border-[var(--sys-border)] shrink-0 bg-[var(--sys-surface)]">
+                                                                <img src={char.image} alt="" className="w-full h-full object-cover" />
+                                                            </div>
+                                                            <div><p className="text-xs font-bold text-[var(--sys-text)]">@{char.name.replace(/\s/g, '')}</p></div>
+                                                        </button>
+                                                    ));
+                                                })()}
                                             </div>
                                         )}
 
@@ -8156,7 +8163,8 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                 reader.onload = async ev => {
                                                     const s3Url = await uploadToS3(ev.target.result, 'refs')
                                                     if (refPickerSlot?.startsWith('character-')) {
-                                                        setCharacters(prev => [...prev, { name: `Character ${prev.length + 1}`, image: s3Url }])
+                                                        const pfx = refPickerSlot === 'character-add' ? 'Reference' : 'Character';
+                                                        setCharacters(prev => [...prev, { name: `${pfx} ${prev.filter(c => c.name.startsWith(pfx)).length + 1}`, image: s3Url }])
                                                     } else {
                                                         setReferenceImages(prev => ({ ...prev, [refPickerSlot]: s3Url }))
                                                     }
@@ -8177,7 +8185,8 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                     <button key={img._id || i}
                                                         onClick={() => {
                                                             if (refPickerSlot?.startsWith('character-')) {
-                                                                setCharacters(prev => [...prev, { name: `Character ${prev.length + 1}`, image: img.imageUrl }])
+                                                                const pfx = refPickerSlot === 'character-add' ? 'Reference' : 'Character';
+                                                                setCharacters(prev => [...prev, { name: `${pfx} ${prev.filter(c => c.name.startsWith(pfx)).length + 1}`, image: img.imageUrl }])
                                                             } else {
                                                                 setReferenceImages(prev => ({ ...prev, [refPickerSlot]: img.imageUrl }))
                                                             }
@@ -8213,7 +8222,8 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                     <button key={`brand-${i}`}
                                                         onClick={() => {
                                                             if (refPickerSlot?.startsWith('character-')) {
-                                                                setCharacters(prev => [...prev, { name: `Character ${prev.length + 1}`, image: img.url }])
+                                                                const pfx = refPickerSlot === 'character-add' ? 'Reference' : 'Character';
+                                                                setCharacters(prev => [...prev, { name: `${pfx} ${prev.filter(c => c.name.startsWith(pfx)).length + 1}`, image: img.url }])
                                                             } else {
                                                                 setReferenceImages(prev => ({ ...prev, [refPickerSlot]: img.url }))
                                                             }
