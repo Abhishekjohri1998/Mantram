@@ -332,13 +332,12 @@ const GalleryPanel = memo(({
                                 return groupedBlocks.map((group, gIdx) => (
                                     <div key={gIdx} className="w-full bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:border-[var(--sys-primary)] shadow-sm rounded-2xl p-1 sm:p-2 flex flex-col xl:flex-row gap-4 mb-4 animate-fade-in group/band">
                                         
-                                        {/* Left Side: Images Grid */}
-                                        <div className="flex-1 flex gap-2 overflow-x-auto snap-x snap-mandatory pr-2 custom-scrollbar min-h-[300px]">
+                                        {/* Left Side: Images Grid — 2 columns, scrollable vertically */}
+                                        <div className="flex-1 grid grid-cols-2 gap-2 auto-rows-auto overflow-y-auto max-h-[500px] pr-1 custom-scrollbar">
                                             {group.items.map((item, idx) => (
-                                                <div key={item._id || idx} className="relative rounded-xl overflow-hidden cursor-pointer group/card snap-start flex-shrink-0 transition-transform duration-300 hover:scale-[1.01]"
-                                                    style={{ width: idx === 0 ? '45%' : '30%', minWidth: idx === 0 ? '300px' : '220px' }}
+                                                <div key={item._id || idx} className="relative rounded-xl overflow-hidden cursor-pointer group/card transition-transform duration-300 hover:scale-[1.02]"
                                                     onClick={() => setZoomImage(item.imageUrl)}>
-                                                    <img src={item.imageUrl} alt="Creative" className="w-full h-full object-cover rounded-xl shadow-md" />
+                                                    <img src={item.imageUrl} alt="Creative" className="w-full h-auto object-cover rounded-xl shadow-md" />
                                                     {idx === 0 && gIdx === 0 && <span className="absolute top-2 left-2 text-[8px] font-bold text-white bg-[var(--sys-primary)] px-1.5 py-0.5 rounded-sm shadow-sm opacity-90 uppercase tracking-widest">Latest</span>}
                                                 </div>
                                             ))}
