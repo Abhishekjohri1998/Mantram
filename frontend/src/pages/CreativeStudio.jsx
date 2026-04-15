@@ -3853,7 +3853,8 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                             <span className="material-symbols-outlined text-[15px]">crop_landscape</span>
                                             {selectedType ? creativeTypes.find(c => c.id === selectedType)?.label?.split('(')[0].trim() : '16:9'}
                                         </button>
-                                        <div className="absolute bottom-full left-0 mb-3 hidden group-hover/tray:block w-[180px] bg-[var(--sys-bg)] border border-[var(--sys-border)] shadow-xl rounded-[14px] p-1.5 z-50 animate-fade-in text-left">
+                                        <div className="absolute bottom-full left-0 mb-0 pb-2 hidden group-hover/tray:block w-[180px] z-50 animate-fade-in text-left">
+                                            <div className="bg-[var(--sys-bg)] border border-[var(--sys-border)] shadow-xl rounded-[14px] p-1.5">
                                             {creativeTypes.map(c => (
                                                 <button key={c.id} onClick={() => setSelectedType(c.id)} className={"w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg transition-colors " + (selectedType === c.id ? "bg-[var(--sys-text)] text-[var(--sys-bg)]" : "text-[var(--sys-text)] hover:bg-[var(--sys-surface)]")}>
                                                     <span className="material-symbols-outlined text-[16px]">{c.icon}</span>
@@ -3870,6 +3871,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                     <input type="number" placeholder="H" value={customHeight} onChange={(e) => setCustomHeight(e.target.value)} className="w-[45%] text-[10px] p-1 bg-black/10 rounded border border-black/20 text-center text-black font-mono outline-none" />
                                                 </div>
                                             )}
+                                            </div>
                                         </div>
                                     </div>
                                     <div className="relative group/tray">
