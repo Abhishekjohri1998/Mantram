@@ -400,8 +400,8 @@ Generate the adapted creative now.`;
         // --- ENFORCE EXACT CUSTOM SIZE WITH SHARP ---
         if (customSize && customSize.width && customSize.height) {
             try {
-                const targetW = parseInt(customSize.width, 10);
-                const targetH = parseInt(customSize.height, 10);
+                const targetW = Math.max(8, Math.round(parseInt(customSize.width, 10) / 8) * 8);
+                const targetH = Math.max(8, Math.round(parseInt(customSize.height, 10) / 8) * 8);
                 console.log(`✂️ Enforcing exact custom size crop: ${targetW}x${targetH} from AI generated ratio.`);
                 const sharp = (await import('sharp')).default;
                 const imgBuffer = await fetchImageBuffer(rawImageUrl);
