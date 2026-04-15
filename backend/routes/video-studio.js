@@ -2943,70 +2943,124 @@ router.post('/:id/voiceover-preview', protect, async (req, res) => {
             durationMs = Math.round(buffer.length / 16000) * 1000;
 
         } else {
-            // ── Minimax TTS (global voices + cloned voices) via fal.ai ──
-            const falKey = process.env.FAL_API_KEY;
-            if (!falKey) return res.status(500).json({ success: false, error: 'FAL_API_KEY not configured' });
+            // ── Primary: Gemini 2.5 Flash TTS (synchronous, ~3-5s, no polling) ──
+            // Falls back to Minimax via fal.ai if Gemini fails.
+            const geminiKey = process.env.GEMINI_API_KEY;
+            let geminiSuccess = false;
 
-            const payload = {
-                text: fullScript.substring(0, 5000),
-                voice_setting: {
-                    voice_id: voiceId || 'moss_en_hd',
-                    speed: speed || 1,
-                },
-                output_format: 'url',
-                language_boost: 'auto',
-            };
-            if (emotion) payload.voice_setting.emotion = emotion;
-
-            // Submit to fal.ai queue
-            const submitResp = await fetch(`${FAL_QUEUE_URL}/fal-ai/minimax/speech-02-hd`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Key ${falKey}`,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(payload),
-                signal: AbortSignal.timeout(60000),
-            });
-
-            if (!submitResp.ok) {
-                const errText = await submitResp.text();
-                throw new Error(`TTS failed (${submitResp.status}): ${errText.substring(0, 200)}`);
-            }
-
-            const submitData = await submitResp.json();
-            const requestId = submitData.request_id;
-
-            // Poll for completion (up to 120s)
-            let result = null;
-            for (let i = 0; i < 40; i++) {
-                await new Promise(r => setTimeout(r, 3000));
-                const statusResp = await fetch(
-                    `${FAL_QUEUE_URL}/fal-ai/minimax/requests/${requestId}/status`,
-                    { headers: { 'Authorization': `Key ${falKey}` } }
-                );
-                if (!statusResp.ok) continue;
-                const statusData = await statusResp.json();
-                if (statusData.status === 'COMPLETED') {
-                    const resultResp = await fetch(
-                        `${FAL_QUEUE_URL}/fal-ai/minimax/requests/${requestId}`,
-                        { headers: { 'Authorization': `Key ${falKey}` } }
+            if (geminiKey) {
+                try {
+                    console.log(`🎙️ [Voiceover] Trying Gemini 2.5 Flash TTS (synchronous)...`);
+                    const geminiResp = await fetch(
+                        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${geminiKey}`,
+                        {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                contents: [{ parts: [{ text: fullScript.substring(0, 5000) }] }],
+                                generationConfig: {
+                                    responseModalities: ['AUDIO'],
+                                    speechConfig: {
+                                        voiceConfig: {
+                                            prebuiltVoiceConfig: {
+                                                // Map common voiceIds to Gemini voices; default to Kore
+                                                voiceName: (() => {
+                                                    const v = (voiceId || '').toLowerCase();
+                                                    if (v.includes('female') || v.includes('moss') || v.includes('anushka')) return 'Kore';
+                                                    if (v.includes('male') || v.includes('arvind')) return 'Charon';
+                                                    return 'Kore';
+                                                })(),
+                                            }
+                                        }
+                                    }
+                                }
+                            }),
+                            signal: AbortSignal.timeout(45000), // 45s hard cap — Gemini is synchronous
+                        }
                     );
-                    result = await resultResp.json();
-                    break;
-                } else if (statusData.status === 'FAILED') {
-                    throw new Error('TTS generation failed');
+
+                    if (geminiResp.ok) {
+                        const geminiData = await geminiResp.json();
+                        const audioPart = geminiData.candidates?.[0]?.content?.parts?.find(
+                            p => p.inlineData?.mimeType?.startsWith('audio/')
+                        );
+                        if (audioPart?.inlineData?.data) {
+                            const buf = Buffer.from(audioPart.inlineData.data, 'base64');
+                            const mimeType = audioPart.inlineData.mimeType || 'audio/wav';
+                            const ext = mimeType.includes('mp3') ? 'mp3' : 'wav';
+                            const s3Key = `voiceover-preview/${req.user._id}/${Date.now()}-gemini.${ext}`;
+                            audioUrl = await uploadToS3(buf, s3Key, mimeType);
+                            durationMs = Math.round(buf.length / 24000) * 1000; // rough estimate
+                            geminiSuccess = true;
+                            console.log(`✅ [Voiceover] Gemini TTS done: ${buf.length} bytes → ${audioUrl.substring(0, 60)}`);
+                        }
+                    } else {
+                        const errText = await geminiResp.text().catch(() => '');
+                        console.warn(`⚠️ [Voiceover] Gemini TTS returned ${geminiResp.status}: ${errText.substring(0, 100)}`);
+                    }
+                } catch (gErr) {
+                    console.warn(`⚠️ [Voiceover] Gemini TTS failed: ${gErr.message} — falling back to Minimax`);
                 }
             }
 
-            if (!result?.audio?.url) throw new Error('TTS timed out — please try again');
+            // ── Fallback: Minimax via fal.ai (async queue, capped at 60s) ──
+            if (!geminiSuccess) {
+                const falKey = process.env.FAL_API_KEY;
+                if (!falKey) throw new Error('No TTS provider configured (FAL_API_KEY missing)');
 
-            // Download audio and upload to S3
-            const audioResp = await fetch(result.audio.url);
-            const audioBuffer = Buffer.from(await audioResp.arrayBuffer());
-            const s3Key = `voiceover-preview/${req.user._id}/${Date.now()}.mp3`;
-            audioUrl = await uploadToS3(audioBuffer, s3Key, 'audio/mpeg');
-            durationMs = result.duration_ms || 0;
+                const payload = {
+                    text: fullScript.substring(0, 5000),
+                    voice_setting: { voice_id: voiceId || 'moss_en_hd', speed: speed || 1 },
+                    output_format: 'url',
+                    language_boost: 'auto',
+                };
+                if (emotion) payload.voice_setting.emotion = emotion;
+
+                const submitResp = await fetch(`${FAL_QUEUE_URL}/fal-ai/minimax/speech-02-hd`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Key ${falKey}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                    signal: AbortSignal.timeout(30000),
+                });
+                if (!submitResp.ok) {
+                    const errText = await submitResp.text();
+                    throw new Error(`Minimax TTS submit failed (${submitResp.status}): ${errText.substring(0, 200)}`);
+                }
+
+                const { request_id: requestId } = await submitResp.json();
+                console.log(`🔊 [Voiceover] Minimax queued: requestId=${requestId}`);
+
+                // Poll up to 60s (20 × 3s) — half the previous limit
+                let result = null;
+                for (let i = 0; i < 20; i++) {
+                    await new Promise(r => setTimeout(r, 3000));
+                    const statusResp = await fetch(
+                        `${FAL_QUEUE_URL}/fal-ai/minimax/requests/${requestId}/status`,
+                        { headers: { 'Authorization': `Key ${falKey}` }, signal: AbortSignal.timeout(10000) }
+                    );
+                    if (!statusResp.ok) continue;
+                    const statusData = await statusResp.json();
+                    if (statusData.status === 'COMPLETED') {
+                        const resultResp = await fetch(
+                            `${FAL_QUEUE_URL}/fal-ai/minimax/requests/${requestId}`,
+                            { headers: { 'Authorization': `Key ${falKey}` } }
+                        );
+                        result = await resultResp.json();
+                        break;
+                    } else if (statusData.status === 'FAILED') {
+                        throw new Error('Minimax TTS generation failed. Please try again.');
+                    }
+                }
+
+                if (!result?.audio?.url) throw new Error('TTS timed out — Gemini unavailable and Minimax took too long. Please try again.');
+
+                const audioResp = await fetch(result.audio.url, { signal: AbortSignal.timeout(20000) });
+                const audioBuffer = Buffer.from(await audioResp.arrayBuffer());
+                const s3Key = `voiceover-preview/${req.user._id}/${Date.now()}.mp3`;
+                audioUrl = await uploadToS3(audioBuffer, s3Key, 'audio/mpeg');
+                durationMs = result.duration_ms || 0;
+                console.log(`✅ [Voiceover] Minimax TTS done: ${audioUrl.substring(0, 60)}`);
+            }
         }
 
         // Save voiceover preview to project

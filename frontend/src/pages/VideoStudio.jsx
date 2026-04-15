@@ -362,6 +362,9 @@ export default function VideoStudio() {
     // ══════════════════════════════════════════════════════════════════════════
     async function handleGenerateVoiceover() {
         setVoiceoverLoading(true); setError('')
+        // 90s client-side cap — Gemini TTS is ~5s, Minimax fallback polls up to 60s
+        const voController = new AbortController()
+        const voTimeout = setTimeout(() => voController.abort(), 90000)
         try {
             const body = {
                 voiceProvider: selectedVoProvider,
@@ -376,15 +379,21 @@ export default function VideoStudio() {
             const data = await api(`/video-studio/${projectId}/voiceover-preview`, {
                 method: 'POST',
                 body: JSON.stringify(body),
+                signal: voController.signal,
             })
             setVoiceoverAudioUrl(data.audioUrl)
         } catch (err) { 
-            if (err.name === 'AbortError') return
+            if (err.name === 'AbortError') {
+                setError({ message: 'Voiceover generation timed out. Please try again.' })
+                return
+            }
             setError({ 
                 message: err.message, 
                 isProviderError: err.isProviderError, 
                 provider: err.provider 
             }) 
+        } finally {
+            clearTimeout(voTimeout)
         }
         setVoiceoverLoading(false)
     }
