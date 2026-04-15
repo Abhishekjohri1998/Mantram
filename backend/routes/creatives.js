@@ -1183,253 +1183,106 @@ async function geminiImageGenerate(promptText, imageParts = [], temperature = 0.
     return { imageUrl, model: usedModel, textResponse, warnings };
 }
 
-// ── Unified Image Generate — routes to correct provider based on selected model ──
-// refImageUrls: original S3/HTTP URLs of reference images (for LZ multimodal routing)
+// ── Unified Image Generate — Gemini-only, NO fallbacks ──
+// All image generation routes exclusively through gemini-3.1-flash-image-preview.
+// If Gemini is busy or unavailable, returns a clear error — no silent model switching.
 async function routedImageGenerate(promptText, imageParts = [], temperature = 0.4, aspectRatio = '1:1', imageSize = '1K', selectedModel = 'nanobanana-2', refImageUrls = [], customSize = null) {
-    const modelConfig = IMAGE_MODEL_CONFIG[selectedModel] || IMAGE_MODEL_CONFIG['nanobanana-2'];
+    const GEMINI_MODEL = 'gemini-3.1-flash-image-preview';
     const router = getRouter();
 
-    let activeProvider = modelConfig.provider;
-    try {
-        const liveProvider = await getActiveProvider('image', selectedModel);
-        if (liveProvider) activeProvider = liveProvider;
-    } catch (e) {
-        console.warn('⚠️ Could not read image provider from cache:', e.message);
-    }
-
-    console.log(`🎯 Image Model Router: ${selectedModel} → ${activeProvider} (${modelConfig.name})`);
+    console.log(`🎯 Image Generation: All models → ${GEMINI_MODEL} (Gemini-only, no fallbacks)`);
     if (customSize) console.log(`📐 Custom Size: ${customSize.width}x${customSize.height}`);
 
-    // ── HARD TIMEOUT: 180 seconds max for any image generation ──
+    // ── HARD TIMEOUT: 180 seconds max ──
     const TIMEOUT_MS = 180_000;
     const timeoutPromise = new Promise((_, reject) =>
         setTimeout(() => reject(new Error('Image generation timed out after 180 seconds. Please try again.')), TIMEOUT_MS)
     );
 
     const generatePromise = (async () => {
-        // ═══════════════════════════════════════════════════════════════
-        // LAOZHANG-FIRST ROUTING — Cheapest image provider
-        // Try LZ for NanoBanana 2/Pro, Flux, Seedream 5 (50-75% cheaper)
-        // Falls through to direct provider on failure.
-        // ═══════════════════════════════════════════════════════════════
-        // LZ CONFIRMED WORKING MODELS (live-tested 2026-03-29):
-        //   ✅ flux-kontext-pro     — returns URL, ~8s
-        //   ✅ flux-kontext-max     — returns URL, ~12s
-        //   ✅ gemini-3.1-flash-image-preview — returns b64, ~15-20s
-        //   ✅ gemini-3-pro-image-preview     — returns b64, ~20-30s
-        //   ❌ ideogram-*, seedream-*, black-forest-labs/* — 503 no channel on this account
-        // Models without native LZ support → route to best available alternative
-        const LZ_IMAGE_MAP = {
-            'nanobanana-2': 'gemini-3.1-flash-image-preview',  // Gemini Flash via LZ ✅
-            'nanobanana-pro': 'gemini-3.1-flash-image-preview',  // Gemini Pro via LZ ✅
-            'flux-pro-v1.1': 'flux-kontext-pro',                // Flux Kontext Pro via LZ ✅
-            'flux-2-pro': 'flux-kontext-max',                // Flux Kontext Max via LZ ✅ (premium)
-            'seedream-5': 'flux-kontext-max',                // → Flux Max (seedream not on this LZ account)
-            'ideogram': 'flux-kontext-pro',                // → Flux Pro (ideogram not on this LZ account)
-        };
-        const lzModel = LZ_IMAGE_MAP[selectedModel];
-        const hasRefImages = (imageParts && imageParts.length > 0) || (refImageUrls && refImageUrls.length > 0);
-        const LZ_MULTIMODAL_MODELS = ['gemini-3.1-flash-image-preview', 'gemini-3-pro-image-preview'];
-        const isMultimodalCapable = LZ_MULTIMODAL_MODELS.includes(lzModel);
+        // ── Determine aspect ratio for Gemini ──
+        let nativeAspectRatio = aspectRatio;
 
-        if (lzModel && isLaozhangAvailable()) {
-            try {
-                // Map aspect ratio to WxH
-                const AR_SIZE_MAP = {
-                    '1:1': '1024x1024', '16:9': '1792x1024', '9:16': '1024x1792',
-                    '4:5': '1024x1280', '3:4': '768x1024', '4:3': '1024x768',
-                    '3:2': '1536x1024', '2:3': '1024x1536',
-                };
-                const lzSize = AR_SIZE_MAP[aspectRatio] || (imageSize === '2K' ? '2048x2048' : '1024x1024');
+        if (customSize && customSize.width && customSize.height) {
+            const w = parseInt(customSize.width, 10);
+            const h = parseInt(customSize.height, 10);
+            const ratio = w / h;
+            const nativeRatios = [
+                { str: "1:1", val: 1 / 1 }, { str: "1:4", val: 1 / 4 }, { str: "1:8", val: 1 / 8 },
+                { str: "2:3", val: 2 / 3 }, { str: "3:2", val: 3 / 2 }, { str: "3:4", val: 3 / 4 },
+                { str: "4:1", val: 4 / 1 }, { str: "4:3", val: 4 / 3 }, { str: "4:5", val: 4 / 5 },
+                { str: "5:4", val: 5 / 4 }, { str: "8:1", val: 8 / 1 }, { str: "9:16", val: 9 / 16 },
+                { str: "16:9", val: 16 / 9 }, { str: "21:9", val: 21 / 9 }
+            ];
+            let closestRatio = nativeRatios[0];
+            let minDiff = Math.abs(ratio - closestRatio.val);
+            for (let i = 1; i < nativeRatios.length; i++) {
+                const diff = Math.abs(ratio - nativeRatios[i].val);
+                if (diff < minDiff) { minDiff = diff; closestRatio = nativeRatios[i]; }
+            }
+            nativeAspectRatio = closestRatio.str;
+            console.log(`📐 Custom ${w}x${h} → Gemini native ratio '${nativeAspectRatio}'`);
+        }
 
-                let finalLzSize = lzSize;
+        // ── Download reference images as inline buffers for Gemini SDK ──
+        let finalImageParts = imageParts || [];
+        const lzRefUrls = (refImageUrls || []).filter(u => u && u.startsWith('http'));
 
-                if (customSize && customSize.width && customSize.height) {
-                    let w = parseInt(customSize.width, 10);
-                    let h = parseInt(customSize.height, 10);
-
-                    if (isMultimodalCapable) {
-                        const ratio = w / h;
-                        const nativeRatios = [
-                            { str: "1:1", val: 1 / 1 }, { str: "1:4", val: 1 / 4 }, { str: "1:8", val: 1 / 8 },
-                            { str: "2:3", val: 2 / 3 }, { str: "3:2", val: 3 / 2 }, { str: "3:4", val: 3 / 4 },
-                            { str: "4:1", val: 4 / 1 }, { str: "4:3", val: 4 / 3 }, { str: "4:5", val: 4 / 5 },
-                            { str: "5:4", val: 5 / 4 }, { str: "8:1", val: 8 / 1 }, { str: "9:16", val: 9 / 16 },
-                            { str: "16:9", val: 16 / 9 }, { str: "21:9", val: 21 / 9 }
-                        ];
-                        let closestRatio = nativeRatios[0];
-                        let minDiff = Math.abs(ratio - closestRatio.val);
-                        for (let i = 1; i < nativeRatios.length; i++) {
-                            const diff = Math.abs(ratio - nativeRatios[i].val);
-                            if (diff < minDiff) { minDiff = diff; closestRatio = nativeRatios[i]; }
-                        }
-                        finalLzSize = closestRatio.str;
-                        console.log(`📐 Native Gemini API: Target ${w}x${h} matches Native Ratio '${closestRatio.str}'. Passing literal string '${finalLzSize}' to LLM proxy.`);
+        if (finalImageParts.length === 0 && lzRefUrls.length > 0) {
+            console.log(`📥 Downloading ${lzRefUrls.length} reference images for Gemini...`);
+            for (const url of lzRefUrls) {
+                try {
+                    const resp = await presignedFetch(url, { signal: AbortSignal.timeout(35000) });
+                    if (resp && resp.ok) {
+                        const buf = await resp.arrayBuffer();
+                        const ct = resp.headers.get('content-type') || 'image/jpeg';
+                        finalImageParts.push({ inlineData: { mimeType: ct, data: Buffer.from(buf).toString('base64') } });
+                        console.log(`✅ Loaded ref image (${Math.round(buf.byteLength / 1024)}KB)`);
                     } else {
-                        finalLzSize = `${w}x${h}`;
-                        console.log(`📐 Native Ratio Enforced: passing exact ${finalLzSize} directly to backend.`);
+                        console.warn(`⚠️ Ref image fetch returned HTTP ${resp?.status} — skipping`);
                     }
+                } catch (e) {
+                    console.warn(`⚠️ Could not load ref image: ${e.message}`);
                 }
-
-                let lzResult;
-                const lzRefUrls = (refImageUrls || []).filter(u => u && u.startsWith('http'));
-
-                // Route Natively if Model is Gemini to avoid DALL-E resolution constraints in LaoZhang proxy.
-                let nativeSuccess = false;
-                if (lzModel.includes('gemini') || selectedModel.includes('nanobanana')) {
-                    console.log(`🚀 [Native Router] Routing ${lzModel} natively to access Gemini Advanced Features.`);
-
-                    // FETCH IMAGE URL BUFFERS FOR NATIVE SDK
-                    // If imageParts is empty but user provided reference image URLs, dynamically download them.
-                    let finalImageParts = imageParts || [];
-                    if (finalImageParts.length === 0 && lzRefUrls && lzRefUrls.length > 0) {
-                        console.log(`📥 [Native Router] Extracting ${lzRefUrls.length} S3 Reference Images to buffers for Native payload...`);
-                        for (const url of lzRefUrls) {
-                            try {
-                                const resp = await presignedFetch(url, { signal: AbortSignal.timeout(35000) });
-                                if (resp && resp.ok) {
-                                    const buf = await resp.arrayBuffer();
-                                    const ct = resp.headers.get('content-type') || 'image/jpeg';
-                                    finalImageParts.push({ inlineData: { mimeType: ct, data: Buffer.from(buf).toString('base64') } });
-                                    console.log(`✅ [Native Router] Loaded ref image (${Math.round(buf.byteLength / 1024)}KB)`);
-                                } else {
-                                    console.warn(`⚠️ [Native Router] Ref image fetch returned HTTP ${resp?.status} — skipping`);
-                                }
-                            } catch (e) {
-                                console.warn(`⚠️ [Native Router] Could not load ref image: ${e.message}`);
-                            }
-                        }
-                    }
-
-                    try {
-                        // Native Gemini expects the string ratio (e.g. '4:5'), not exact resolutions like '1024x1280'
-                        const nativeAspectRatio = (customSize && isMultimodalCapable) ? finalLzSize : aspectRatio;
-
-                        const routerResult = await router.generateImage({
-                            prompt: promptText,
-                            aspectRatio: nativeAspectRatio,
-                            model: lzModel,
-                            imageParts: finalImageParts,
-                            size: imageSize
-                        }, {
-                            provider: 'gemini'
-                        });
-
-                        return {
-                            imageUrl: routerResult.imageUrl,
-                            model: selectedModel,
-                            provider: 'gemini',
-                            textResponse: '',
-                            warnings: [],
-                        };
-                    } catch (nativeErr) {
-                        console.warn(`⚠️ [Native Router] Native Gemini failed (${nativeErr.message.substring(0, 80)}). Falling back to LaoZhang proxy...`);
-                    }
-                }
-
-                // If native wasn't attempted, or if it failed, we use LaoZhang Proxy
-                if (!nativeSuccess) {
-                    if (hasRefImages && isMultimodalCapable && lzRefUrls.length > 0) {
-                        console.log(`🏷️ [LaoZhang-Multimodal] ${selectedModel} → ${lzModel} with ${lzRefUrls.length} S3 URLs (size=${finalLzSize})...`);
-                        lzResult = await laozhangMultimodalImageGenerate(promptText, lzRefUrls, { model: lzModel, size: finalLzSize });
-                    } else {
-                        if (hasRefImages && !isMultimodalCapable) {
-                            console.log(`ℹ️ [LaoZhang] ${selectedModel}: ref images present but not multimodal-capable — using text-only (brand context is in prompt)`);
-                        }
-                        console.log(`🏷️ [LaoZhang-First] ${selectedModel} → ${lzModel} via LaoZhang (cheapest, size=${finalLzSize})...`);
-                        lzResult = await laozhangImageGenerate(promptText, { model: lzModel, size: finalLzSize });
-                    }
-
-                    if (lzResult?.imageUrl) {
-                        console.log(`✅ [LaoZhang] Image generated via ${lzModel}`);
-                        return {
-                            imageUrl: lzResult.imageUrl,
-                            model: selectedModel,
-                            provider: 'laozhang',
-                            textResponse: '',
-                            warnings: [],
-                        };
-                    }
-                }
-            } catch (lzErr) {
-                console.warn(`⚠️ [LaoZhang] Image ${selectedModel} failed (${lzErr.message?.substring(0, 100)}), falling through to direct provider...`);
             }
         }
 
-        // Special handling for fal.ai
-        if (activeProvider === 'fal') {
-            const falResult = await falImageGenerate(promptText, modelConfig.endpoint || 'xai/grok-imagine-image', aspectRatio, customSize);
-            return { ...falResult, provider: 'fal' };
-        }
-
-        // Special handling for Grok Imagen (xAI)
-        if (activeProvider === 'grok') {
-            const grokResult = await grokImageGenerate(promptText, aspectRatio);
-            return { ...grokResult, provider: 'grok' };
-        }
-
-        // Route via central ModelRouter — Gemini only, NO OpenAI fallback
+        // ── Generate via native Gemini router ──
+        console.log(`🚀 Generating image via native ${GEMINI_MODEL}...`);
         const routerResult = await router.generateImage({
             prompt: promptText,
-            aspectRatio,
-            model: modelConfig.modelId,
-            imageParts,
+            aspectRatio: nativeAspectRatio,
+            model: GEMINI_MODEL,
+            imageParts: finalImageParts,
             size: imageSize
         }, {
-            provider: modelConfig.provider
+            provider: 'gemini'
         });
-        return { ...routerResult, provider: routerResult.provider || modelConfig.provider || 'gemini' };
+
+        return {
+            imageUrl: routerResult.imageUrl,
+            model: selectedModel,
+            provider: 'gemini',
+            textResponse: '',
+            warnings: [],
+        };
     })();
 
     try {
         return await Promise.race([generatePromise, timeoutPromise]);
     } catch (error) {
-        console.error(`❌ Image generation failed (${selectedModel}):`, error.message);
+        console.error(`❌ Image generation failed (${GEMINI_MODEL}):`, error.message);
 
-        // Parse specific error types for clear frontend messages
-        const msg = error.message || '';
-        const isQuotaExhausted = msg.includes('QUOTA_EXHAUSTED') || msg.includes('balance') || msg.includes('billing') || msg.includes('locked');
-        const isModelNotFound = msg.includes('MODEL_NOT_FOUND') || msg.includes('not found') || msg.includes('404');
-        const isBusy = msg.includes('BUSY') || msg.includes('429') || msg.includes('503') || msg.includes('capacity') || msg.includes('timed out');
-
-        if (isQuotaExhausted) {
-            return {
-                imageUrl: null,
-                model: selectedModel,
-                textResponse: '',
-                warnings: [],
-                modelBusy: true,
-                busyModel: selectedModel,
-                errorMessage: `${modelConfig.name} provider quota exhausted. Please check billing or try a different model (NanoBanana uses Gemini, Grok Imagen uses xAI).`,
-                errorType: 'quota',
-            };
-        }
-
-        if (isModelNotFound) {
-            return {
-                imageUrl: null,
-                model: selectedModel,
-                textResponse: '',
-                warnings: [],
-                modelBusy: true,
-                busyModel: selectedModel,
-                errorMessage: `${modelConfig.name} model endpoint not available. Please try a different model.`,
-                errorType: 'model_error',
-            };
-        }
-
-        // Actual busy / timeout errors
+        // All failures → single clear message: Gemini is busy
         return {
             imageUrl: null,
             model: selectedModel,
             textResponse: '',
             warnings: [],
             modelBusy: true,
-            busyModel: selectedModel,
-            errorMessage: isBusy
-                ? `${modelConfig.name} is currently busy. Please try again or select a different model.`
-                : error.message,
-            errorType: isBusy ? 'busy' : 'error',
+            busyModel: GEMINI_MODEL,
+            errorMessage: 'Gemini is busy, please try again later.',
+            errorType: 'busy',
         };
     }
 }
