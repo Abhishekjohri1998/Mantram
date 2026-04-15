@@ -97,11 +97,11 @@ const CreateToolsPanel = memo(({
                         <div className="flex items-center gap-2">
                             <input type="number" value={customWidth} onChange={e => setCustomWidth(e.target.value)}
                                 placeholder="Width" min="100" max="4096"
-                                className="studio-input-glass text-center" />
+                                className="studio-input-glass text-center !text-[var(--sys-text)] placeholder-[var(--sys-text-muted)]" />
                             <span className="text-[var(--sys-text-muted)] text-xs font-bold">×</span>
                             <input type="number" value={customHeight} onChange={e => setCustomHeight(e.target.value)}
                                 placeholder="Height" min="100" max="4096"
-                                className="studio-input-glass text-center" />
+                                className="studio-input-glass text-center !text-[var(--sys-text)] placeholder-[var(--sys-text-muted)]" />
                         </div>
                         {customWidth && customHeight && (() => {
                             const w = parseInt(customWidth), h = parseInt(customHeight)
