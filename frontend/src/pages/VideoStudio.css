@@ -1,0 +1,137 @@
+/* ═══════════════════════════════════════════════════════
+   VIDEO STUDIO GLOBAL STYLES
+   Abstracted styling for VideoStudio component ecosystem.
+   Provides unified Light/Dark mode consistency.
+═══════════════════════════════════════════════════════ */
+
+/* ── Tab Layout Fixes ── */
+.video-tabs-container {
+  /* Fixing the vertical top-clipping on Storyboard tabs caused by active state borders getting hidden via overflow */
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+  margin-bottom: 2rem;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: var(--sys-border) transparent;
+}
+
+.video-tabs-container::-webkit-scrollbar { 
+  display: none; 
+}
+
+/* ── Interactive Progress Steps ── */
+.video-step-active {
+  background-color: var(--sys-primary-dim) !important;
+  color: var(--sys-primary) !important;
+  border: 1px solid var(--sys-primary) !important;
+  box-shadow: 0 4px 12px rgba(255, 77, 0, 0.08); /* slight glow to make it stand out */
+}
+
+.video-step-completed {
+  background-color: var(--sys-primary-dim) !important;
+  color: var(--sys-primary) !important;
+  border: 1px solid transparent;
+}
+
+.video-step-inactive {
+  background-color: transparent;
+  color: var(--sys-text-muted) !important;
+  border: 1px solid transparent;
+}
+
+/* ── Specialized Cards ── */
+.video-card-base {
+  background-color: var(--sys-surface) !important;
+  border: 1px solid var(--sys-border) !important;
+  color: var(--sys-text) !important;
+  transition: all 0.2s ease;
+}
+
+.video-card-base:hover {
+  border-color: var(--sys-border); /* Explicitly match generic hover unless specified below */
+}
+
+.video-card-selectable-active {
+  background-color: var(--sys-primary-dim) !important;
+  border: 1px solid var(--sys-primary) !important;
+  box-shadow: 0 0px 10px rgba(255, 77, 0, 0.1) !important;
+}
+
+.video-card-selectable-inactive {
+  background-color: var(--sys-surface) !important;
+  border: 1px solid var(--sys-border) !important;
+}
+.video-card-selectable-inactive:hover {
+  border-color: var(--sys-border) !important;
+  background-color: var(--sys-surface) !important;
+}
+
+.video-card-hover-tint:hover {
+  border-color: var(--sys-primary) !important;
+  /* Very subtle tint representing the primary brand color mixed with the surface */
+  background-color: var(--sys-primary-dim) !important;
+}
+
+/* ── Form Interactions ── */
+.video-input {
+  background-color: var(--sys-surface) !important;
+  border: 1px solid var(--sys-border) !important;
+  color: var(--sys-text) !important;
+}
+
+.video-input:focus {
+  border-color: var(--sys-primary) !important;
+  outline: none;
+}
+
+.video-input::placeholder {
+  color: var(--sys-text-muted) !important;
+}
+
+/* ── Code / Text Areas ── */
+.video-code-editor {
+  background-color: var(--sys-surface) !important;
+  border: 1px solid var(--sys-border) !important;
+  color: var(--sys-text) !important;
+  font-family: var(--font-mono) !important;
+}
+
+.video-code-editor:focus {
+  border-color: var(--sys-primary) !important;
+  outline: none;
+}
+
+/* ── Badges ── */
+.video-badge {
+  background-color: var(--sys-primary-dim) !important;
+  color: var(--sys-primary) !important;
+}
+
+/* ── Action Buttons ── */
+.video-action-btn {
+  background-color: var(--sys-primary-dim) !important;
+  color: var(--sys-primary) !important;
+  border: 1px solid var(--sys-border) !important;
+}
+
+.video-action-btn:hover:not(:disabled) {
+  border-color: var(--sys-primary) !important;
+  /* Darken the dim slightly */
+  filter: brightness(1.1);
+}
+
+/* ── Highlighting Effects ── */
+.video-highlight-text {
+  color: var(--sys-primary) !important;
+}
+
+.video-highlight-icon {
+  color: var(--sys-primary) !important;
+}
+
+.video-highlight-panel {
+  border: 1px solid var(--sys-primary) !important;
+  box-shadow: 0 0 25px rgba(255, 77, 0, 0.1) !important;
+  background-color: var(--sys-surface) !important;
+}

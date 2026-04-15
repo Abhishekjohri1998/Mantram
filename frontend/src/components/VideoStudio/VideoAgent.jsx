@@ -594,7 +594,7 @@ export default function VideoAgent({ activeBrand }) {
                                             ✅ Approve & Generate Previews
                                         </button>
                                         <button onClick={() => handleApproveGenerate(msg.sessionId)}
-                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#FF4D00]/20 text-[#FF7A00] text-[11px] font-bold hover:bg-[#FF4D00]/30 cursor-pointer transition-colors border border-[#FF4D00]/30">
+                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--sys-primary-dim)] video-highlight-text text-[11px] font-bold hover:bg-[var(--sys-primary-dim)] cursor-pointer transition-colors border border-[var(--sys-primary)]">
                                             <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>fast_forward</span>
                                             ⚡ Skip to Video Gen
                                         </button>
@@ -674,7 +674,7 @@ export default function VideoAgent({ activeBrand }) {
                                 <div className="flex gap-1">
                                     <div className="w-1.5 h-1.5 rounded-full bg-[var(--sys-surface)] animate-bounce" style={{ animationDelay: '0ms' }} />
                                     <div className="w-1.5 h-1.5 rounded-full bg-[var(--sys-surface)] animate-bounce" style={{ animationDelay: '150ms' }} />
-                                    <div className="w-1.5 h-1.5 rounded-full bg-[#FF4D00] animate-bounce" style={{ animationDelay: '300ms' }} />
+                                    <div className="w-1.5 h-1.5 rounded-full bg-[var(--sys-primary)] animate-bounce" style={{ animationDelay: '300ms' }} />
                                 </div>
                                 <span className="text-xs text-[var(--sys-text-muted)]">AI writing storyboard, selecting models...</span>
                             </div>
@@ -724,10 +724,10 @@ export default function VideoAgent({ activeBrand }) {
                             </div>
                         )}
                         {characterPhoto && (
-                            <div className="flex items-center gap-1.5 bg-[#FF4D00]/10 border border-[#FF4D00]/20 rounded-lg px-2 py-1 group">
+                            <div className="flex items-center gap-1.5 bg-[var(--sys-primary-dim)] border border-[var(--sys-primary)] rounded-lg px-2 py-1 group">
                                 <img src={characterPhoto.url} alt="" className="w-6 h-6 rounded-full object-cover" />
-                                <span className="text-[10px] text-[#FF7A00] font-medium">👤 Character</span>
-                                <button onClick={() => setCharacterPhoto(null)} className="text-[#FF4D00] hover:text-[var(--sys-primary)] cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity" style={{ fontSize: '10px' }}>✕</button>
+                                <span className="text-[10px] video-highlight-text font-medium">👤 Character</span>
+                                <button onClick={() => setCharacterPhoto(null)} className="video-highlight-text hover:text-[var(--sys-primary)] cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity" style={{ fontSize: '10px' }}>✕</button>
                             </div>
                         )}
                         {audioFile && (
@@ -752,7 +752,7 @@ export default function VideoAgent({ activeBrand }) {
                 {/* Character Description (collapsible) */}
                 <div className="mb-2 px-1">
                     <button onClick={() => setShowCharDesc(!showCharDesc)}
-                        className={`text-[10px] flex items-center gap-1 mb-1 cursor-pointer transition-colors ${characterDesc.trim() ? 'text-[#FF4D00]' : 'text-[var(--sys-text-muted)] hover:text-[#FF4D00]'}`}>
+                        className={`text-[10px] flex items-center gap-1 mb-1 cursor-pointer transition-colors ${characterDesc.trim() ? 'video-highlight-text' : 'text-[var(--sys-text-muted)] hover:video-highlight-text'}`}>
                         <span className="material-symbols-outlined" style={{ fontSize: '12px' }}>{showCharDesc ? 'expand_less' : 'group'}</span>
                         {characterDesc.trim() ? `👤 Characters defined (${characterDesc.trim().split('\n').filter(Boolean).length})` : 'Define characters (optional)'}
                     </button>
@@ -760,7 +760,7 @@ export default function VideoAgent({ activeBrand }) {
                         <textarea value={characterDesc}
                             onChange={e => setCharacterDesc(e.target.value)}
                             placeholder="Describe your characters, e.g.:\n• Hero: 25-year-old woman, long black hair, red dress, confident\n• Villain: Tall man in dark suit, scar on left cheek\n• Narrator: Warm, friendly grandmother figure"
-                            className="w-full bg-white/[0.03] border border-[#FF4D00]/20 rounded-xl px-3 py-2 text-[11px] text-[var(--sys-text-muted)] placeholder:text-[var(--sys-text-muted)] resize-none focus:outline-none focus:border-[#FF4D00]/40"
+                            className="w-full bg-white/[0.03] border border-[var(--sys-primary)] rounded-xl px-3 py-2 text-[11px] text-[var(--sys-text-muted)] placeholder:text-[var(--sys-text-muted)] resize-none focus:outline-none focus:border-[var(--sys-primary)]"
                             rows={3} />
                     )}
                 </div>
@@ -773,7 +773,7 @@ export default function VideoAgent({ activeBrand }) {
                         <span className="material-symbols-outlined text-lg">shopping_bag</span>
                     </button>
                     <button onClick={() => charFileRef.current?.click()}
-                        className={`p-2 rounded-xl transition-all cursor-pointer flex-shrink-0 ${characterPhoto ? 'bg-[#FF4D00]/20 text-[#FF7A00]' : 'text-[var(--sys-text-muted)] hover:text-[#FF4D00] hover:bg-[#FF4D00]/10'}`}
+                        className={`p-2 rounded-xl transition-all cursor-pointer flex-shrink-0 ${characterPhoto ? 'bg-[var(--sys-primary-dim)] video-highlight-text' : 'text-[var(--sys-text-muted)] hover:video-highlight-text hover:bg-[var(--sys-primary-dim)]'}`}
                         title="Upload model/character photo for consistency">
                         <span className="material-symbols-outlined text-lg">face</span>
                     </button>
@@ -793,12 +793,12 @@ export default function VideoAgent({ activeBrand }) {
                         <select value={videoModel} onChange={e => setVideoModel(e.target.value)}
                             className="appearance-none bg-white/[0.05] border border-[var(--sys-border)]/[0.08] rounded-lg text-[10px] text-[var(--sys-text-muted)] pl-2 pr-6 py-1.5 cursor-pointer hover:bg-white/[0.08] focus:outline-none focus:border-[var(--sys-border)] transition-colors"
                             title="Select video model">
-                            <option value="auto" className="bg-[#08080C]">🤖 Auto (Best)</option>
-                            <option value="kling-3.0" className="bg-[#08080C]">👑 Kling 3.0</option>
-                            <option value="veo-3.1" className="bg-[#08080C]">🎬 Veo 3.1</option>
-                            <option value="seedance-2.0" className="bg-[#08080C]">🎥 Seedance 2.0</option>
-                            <option value="hunyuan" className="bg-[#08080C]">🎨 Hunyuan (Draft)</option>
-                            <option value="grok-imagine" className="bg-[#08080C]">🤖 Grok (Fast)</option>
+                            <option value="auto" className="bg-[var(--sys-surface)]">🤖 Auto (Best)</option>
+                            <option value="kling-3.0" className="bg-[var(--sys-surface)]">👑 Kling 3.0</option>
+                            <option value="veo-3.1" className="bg-[var(--sys-surface)]">🎬 Veo 3.1</option>
+                            <option value="seedance-2.0" className="bg-[var(--sys-surface)]">🎥 Seedance 2.0</option>
+                            <option value="hunyuan" className="bg-[var(--sys-surface)]">🎨 Hunyuan (Draft)</option>
+                            <option value="grok-imagine" className="bg-[var(--sys-surface)]">🤖 Grok (Fast)</option>
                         </select>
                         <span className="material-symbols-outlined absolute right-1 top-1/2 -translate-y-1/2 text-[var(--sys-text-muted)] pointer-events-none" style={{ fontSize: '12px' }}>expand_more</span>
                     </div>
@@ -917,7 +917,7 @@ export default function VideoAgent({ activeBrand }) {
                 {pipeline && (
                     <div className="glass-panel rounded-2xl p-5 border border-[var(--sys-border)]/[0.08]">
                         <h3 className="text-sm font-bold text-[var(--sys-text)] flex items-center gap-2 mb-3">
-                            <span className="material-symbols-outlined text-[#FF4D00] text-lg">analytics</span>
+                            <span className="material-symbols-outlined video-highlight-text text-lg">analytics</span>
                             Pipeline Status
                         </h3>
                         <div className="space-y-2 text-xs">
@@ -926,7 +926,7 @@ export default function VideoAgent({ activeBrand }) {
                             <div className="flex justify-between"><span className="text-[var(--sys-text-muted)]">Duration</span><span className="text-[var(--sys-text)]">~{pipeline.pipeline?.totalDuration}s</span></div>
                             <div className="flex justify-between"><span className="text-[var(--sys-text-muted)]">Model</span><span className="text-[var(--sys-text)]">{MODEL_INFO[pipeline.pipeline?.model]?.icon} {MODEL_INFO[pipeline.pipeline?.model]?.name || pipeline.pipeline?.model}</span></div>
                             <div className="flex justify-between"><span className="text-[var(--sys-text-muted)]">Voiceover</span><span className="text-[var(--sys-text)]">{pipeline.voiceover?.provider || 'None'}{pipeline.voiceover?.url?.startsWith('fal-pending:') ? ' (generating...)' : ''}</span></div>
-                            {pipeline.pipeline?.characterRefUsed && <div className="flex justify-between"><span className="text-[var(--sys-text-muted)]">Character</span><span className="text-[#FF7A00]">👤 Ref sheet active</span></div>}
+                            {pipeline.pipeline?.characterRefUsed && <div className="flex justify-between"><span className="text-[var(--sys-text-muted)]">Character</span><span className="video-highlight-text">👤 Ref sheet active</span></div>}
                             {pipeline.audioFile && <div className="flex justify-between"><span className="text-[var(--sys-text-muted)]">Audio</span><span className="text-[var(--sys-primary)]">🎧 User audio {pipeline.audioFile.transcript ? '(transcribed ✓)' : '(base track)'}</span></div>}
                             {pipeline.music?.url && <div className="flex justify-between"><span className="text-[var(--sys-text-muted)]">Music</span><span className="text-[var(--sys-primary)]">🎵 {pipeline.music.mood || 'AI Generated'}{pipeline.music.url?.startsWith('fal-pending:') ? ' (generating...)' : ''}</span></div>}
                             {pipeline.textOverlays?.length > 0 && <div className="flex justify-between"><span className="text-[var(--sys-text-muted)]">Overlays</span><span className="text-[var(--sys-primary)]">📝 {pipeline.textOverlays.length} text layers</span></div>}

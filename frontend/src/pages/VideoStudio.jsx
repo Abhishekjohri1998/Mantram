@@ -10,6 +10,7 @@ import AdvancedMode from '../components/VideoStudio/AdvancedMode'
 import UGCCreator from '../components/VideoStudio/UGCCreator'
 import VideoAgent from '../components/VideoStudio/VideoAgent'
 import Walkthrough from '../components/Walkthrough'
+import './VideoStudio.css'
 
 const API_BASE = import.meta.env.VITE_API_URL || `${window.location.origin}/api`
 
@@ -598,7 +599,7 @@ export default function VideoStudio() {
                     <div className="glass-panel rounded-2xl p-5 mb-6 border border-[var(--sys-border)]">
                         <div className="flex items-center justify-between mb-4">
                             <h3 className="text-base font-bold text-[var(--sys-text)] flex items-center gap-2">
-                                <span className="material-symbols-outlined text-[#FF4D00]">folder_open</span>
+                                <span className="material-symbols-outlined video-highlight-text">folder_open</span>
                                 Video History
                                 <span className="text-xs font-normal text-[var(--sys-text-muted)] ml-1">({projects.length})</span>
                             </h3>
@@ -629,7 +630,7 @@ export default function VideoStudio() {
 
                         {projects.length === 0 ? (
                             <div className="text-center py-12">
-                                <span className="material-symbols-outlined text-4xl text-slate-700 mb-3 block">videocam_off</span>
+                                <span className="material-symbols-outlined text-4xl text-[var(--sys-text-muted)] mb-3 block">videocam_off</span>
                                 <p className="text-sm text-[var(--sys-text-muted)]">No videos yet. Create your first one!</p>
                             </div>
                         ) : historyView === 'list' ? (
@@ -684,7 +685,7 @@ export default function VideoStudio() {
                                                     {modelName && (
                                                         <span className="text-[10px] text-[var(--sys-text-muted)]">{modelName}</span>
                                                     )}
-                                                    <span className="text-[10px] text-slate-700">{timeAgo}</span>
+                                                    <span className="text-[10px] text-[var(--sys-text-muted)]">{timeAgo}</span>
                                                 </div>
                                             </div>
 
@@ -693,7 +694,7 @@ export default function VideoStudio() {
                                                 {videoUrl && (
                                                     <>
                                                         <button onClick={(e) => { e.stopPropagation(); setPlayingVideo(videoUrl) }}
-                                                            className="p-1.5 rounded-lg text-[var(--sys-text-muted)] hover:text-[#FF4D00] hover:bg-[#FF4D00]/10 transition-all cursor-pointer"
+                                                            className="p-1.5 rounded-lg text-[var(--sys-text-muted)] hover:video-highlight-text hover:bg-[var(--sys-primary-dim)] transition-all cursor-pointer"
                                                             title="Play">
                                                             <span className="material-symbols-outlined text-base">play_arrow</span>
                                                         </button>
@@ -706,7 +707,7 @@ export default function VideoStudio() {
                                                 )}
                                                 {promptText && (
                                                     <button onClick={(e) => { e.stopPropagation(); handleCopyPrompt(promptText, p._id) }}
-                                                        className={`p-1.5 rounded-lg transition-all cursor-pointer ${copiedId === p._id ? 'text-primary bg-[var(--sys-primary-dim)]' : 'text-[var(--sys-text-muted)] hover:text-[#FF4D00] hover:bg-[#FF4D00]/10'}`}
+                                                        className={`p-1.5 rounded-lg transition-all cursor-pointer ${copiedId === p._id ? 'text-primary bg-[var(--sys-primary-dim)]' : 'text-[var(--sys-text-muted)] hover:video-highlight-text hover:bg-[var(--sys-primary-dim)]'}`}
                                                         title={copiedId === p._id ? 'Copied!' : 'Copy prompt'}>
                                                         <span className="material-symbols-outlined text-base">{copiedId === p._id ? 'check' : 'content_copy'}</span>
                                                     </button>
@@ -772,13 +773,13 @@ export default function VideoStudio() {
                                                 <p className="text-xs font-medium text-[var(--sys-text)] truncate mb-1">{p.title || 'Untitled Video'}</p>
                                                 <div className="flex items-center gap-1.5 mb-2">
                                                     {modelName && <span className="text-[9px] text-[var(--sys-text-muted)]">{modelName}</span>}
-                                                    <span className="text-[9px] text-slate-700">{timeAgo}</span>
+                                                    <span className="text-[9px] text-[var(--sys-text-muted)]">{timeAgo}</span>
                                                 </div>
                                                 <div className="flex items-center gap-1">
                                                     {videoUrl && (
                                                         <>
                                                             <button onClick={() => setPlayingVideo(videoUrl)}
-                                                                className="p-1 rounded text-[var(--sys-text-muted)] hover:text-[#FF4D00] hover:bg-[#FF4D00]/10 transition-all cursor-pointer" title="Play">
+                                                                className="p-1 rounded text-[var(--sys-text-muted)] hover:video-highlight-text hover:bg-[var(--sys-primary-dim)] transition-all cursor-pointer" title="Play">
                                                                 <span className="material-symbols-outlined text-sm">play_arrow</span>
                                                             </button>
                                                             <button onClick={() => handleDownloadVideo(videoUrl, p.title || 'video')}
@@ -789,7 +790,7 @@ export default function VideoStudio() {
                                                     )}
                                                     {promptText && (
                                                         <button onClick={() => handleCopyPrompt(promptText, p._id)}
-                                                            className={`p-1 rounded transition-all cursor-pointer ${copiedId === p._id ? 'text-primary bg-[var(--sys-primary-dim)]' : 'text-[var(--sys-text-muted)] hover:text-[#FF4D00] hover:bg-[#FF4D00]/10'}`}
+                                                            className={`p-1 rounded transition-all cursor-pointer ${copiedId === p._id ? 'text-primary bg-[var(--sys-primary-dim)]' : 'text-[var(--sys-text-muted)] hover:video-highlight-text hover:bg-[var(--sys-primary-dim)]'}`}
                                                             title={copiedId === p._id ? 'Copied!' : 'Copy prompt'}>
                                                             <span className="material-symbols-outlined text-sm">{copiedId === p._id ? 'check' : 'content_copy'}</span>
                                                         </button>
@@ -850,10 +851,10 @@ export default function VideoStudio() {
                 {studioMode === 'storyboard' && (<>
 
                     {/* ── Progress Steps ── */}
-                    <div className="flex items-center gap-1 mb-8 overflow-x-auto pb-2">
+                    <div className="flex items-center gap-1 video-tabs-container">
                         {STEPS.map((s, i) => (
                             <div key={s.id} className="flex items-center flex-shrink-0">
-                                <div className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium transition-all ${i === step ? 'bg-[#FF4D00]/20 text-[#FF7A00] border border-[#FF4D00]/30' :
+                                <div className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium transition-all ${i === step ? 'bg-[var(--sys-primary-dim)] video-highlight-text border border-[var(--sys-primary)]' :
                                     i < step ? 'bg-[var(--sys-primary-dim)] text-primary' : 'text-[var(--sys-text-muted)]'
                                     }`}>
                                     <span className="material-symbols-outlined text-sm">{i < step ? 'check_circle' : s.icon}</span>
@@ -888,18 +889,18 @@ export default function VideoStudio() {
                             {/* Video Type Selector */}
                             <div data-wt="video-type" className="glass-panel rounded-2xl p-5 border border-[var(--sys-border)]">
                                 <h3 className="text-[11px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest mb-4 flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-[#FF4D00] text-[15px]">category</span>
+                                    <span className="material-symbols-outlined video-highlight-text text-[15px]">category</span>
                                     What kind of video?
                                 </h3>
                                 <div className="flex flex-wrap gap-2.5">
                                     {VIDEO_TYPES.map(vt => (
                                         <button key={vt.id} onClick={() => setVideoType(vt.id)}
                                             className={`flex-1 min-w-[180px] max-w-[240px] flex items-center gap-3 p-3 rounded-xl transition-all duration-300 cursor-pointer border text-left ${videoType === vt.id
-                                                ? 'bg-[#FF4D00]/15 border-[#FF4D00]/40 shadow-md shadow-none'
+                                                ? 'bg-[var(--sys-primary-dim)] border-[var(--sys-primary)] shadow-md shadow-none'
                                                 : 'bg-[var(--sys-surface)] border-[var(--sys-border)] hover:border-[var(--sys-border)] hover:bg-[var(--sys-surface)]'
                                                 }`}>
-                                            <div className={`shrink-0 flex items-center justify-center size-9 rounded-lg ${videoType === vt.id ? 'bg-[#FF4D00]/20' : 'bg-[var(--sys-surface)]'}`}>
-                                                <span className={`material-symbols-outlined text-[19px] ${videoType === vt.id ? 'text-[#FF4D00]' : 'text-[var(--sys-text-muted)]'}`}>
+                                            <div className={`shrink-0 flex items-center justify-center size-9 rounded-lg ${videoType === vt.id ? 'bg-[var(--sys-primary-dim)]' : 'bg-[var(--sys-surface)]'}`}>
+                                                <span className={`material-symbols-outlined text-[19px] ${videoType === vt.id ? 'video-highlight-text' : 'text-[var(--sys-text-muted)]'}`}>
                                                     {vt.icon}
                                                 </span>
                                             </div>
@@ -922,7 +923,7 @@ export default function VideoStudio() {
                                     value={brief}
                                     onChange={e => setBrief(e.target.value)}
                                     placeholder="Describe what you want... e.g. 'A 15-second Instagram reel showcasing our new summer collection with upbeat music and golden hour lighting'"
-                                    className="w-full h-32 px-4 py-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm placeholder-slate-600 outline-none focus:border-[#FF4D00]/30 resize-none"
+                                    className="w-full h-32 px-4 py-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm placeholder-[var(--sys-text-muted)] outline-none focus:border-[var(--sys-primary)] resize-none"
                                 />
                             </div>
 
@@ -935,8 +936,8 @@ export default function VideoStudio() {
                                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
                                     {/* Option 1: Upload */}
                                     <button onClick={() => fileInputRef.current?.click()}
-                                        className="p-4 rounded-xl border border-dashed border-[var(--sys-border)] hover:border-[#FF4D00]/30 flex flex-col items-center gap-2 cursor-pointer transition-all bg-[var(--sys-surface)]">
-                                        <span className="material-symbols-outlined text-2xl text-[#FF4D00]">cloud_upload</span>
+                                        className="p-4 rounded-xl border border-dashed border-[var(--sys-border)] hover:border-[var(--sys-primary)] flex flex-col items-center gap-2 cursor-pointer transition-all bg-[var(--sys-surface)]">
+                                        <span className="material-symbols-outlined text-2xl video-highlight-text">cloud_upload</span>
                                         <span className="text-sm font-medium text-[var(--sys-text-muted)]">Upload Image</span>
                                         <span className="text-xs text-[var(--sys-text-muted)]">From your device</span>
                                     </button>
@@ -978,14 +979,14 @@ export default function VideoStudio() {
                                                 value={urlInputValue}
                                                 onChange={e => setUrlInputValue(e.target.value)}
                                                 placeholder="https://example.com/image.jpg"
-                                                className="flex-1 px-3 py-2.5 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] placeholder-slate-600 outline-none focus:border-[#FF4D00]/30"
+                                                className="flex-1 px-3 py-2.5 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] placeholder-[var(--sys-text-muted)] outline-none focus:border-[var(--sys-primary)]"
                                             />
                                             <button onClick={() => {
                                                 if (urlInputValue.trim()) {
                                                     setImages(prev => [...prev, { url: urlInputValue.trim(), source: 'url', label: 'From URL' }])
                                                     setUrlInputValue(''); setShowUrlInput(false)
                                                 }
-                                            }} className="px-4 py-2.5 rounded-lg bg-[#FF4D00]/20 text-[#FF7A00] font-medium text-sm hover:bg-[#FF4D00]/30 transition-all cursor-pointer">
+                                            }} className="px-4 py-2.5 rounded-lg bg-[var(--sys-primary-dim)] video-highlight-text font-medium text-sm hover:bg-[var(--sys-primary-dim)] transition-all cursor-pointer">
                                                 Add
                                             </button>
                                             <button onClick={() => { setShowUrlInput(false); setUrlInputValue('') }}
@@ -1004,7 +1005,7 @@ export default function VideoStudio() {
                                             value={aiPromptValue}
                                             onChange={e => setAiPromptValue(e.target.value)}
                                             placeholder="e.g. A luxury perfume bottle on a marble surface with golden hour lighting..."
-                                            className="w-full h-20 px-3 py-2.5 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] placeholder-slate-600 outline-none focus:border-[var(--sys-border)] resize-none text-sm"
+                                            className="w-full h-20 px-3 py-2.5 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] placeholder-[var(--sys-text-muted)] outline-none focus:border-[var(--sys-border)] resize-none text-sm"
                                         />
                                         <div className="flex gap-2 mt-2">
                                             <button onClick={async () => {
@@ -1106,7 +1107,7 @@ export default function VideoStudio() {
                                                     value={urlInputValue}
                                                     onChange={e => setUrlInputValue(e.target.value)}
                                                     placeholder="https://example.com/image.jpg"
-                                                    className="flex-1 px-3 py-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] placeholder-slate-600 outline-none focus:border-[var(--sys-border)] text-sm"
+                                                    className="flex-1 px-3 py-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] placeholder-[var(--sys-text-muted)] outline-none focus:border-[var(--sys-border)] text-sm"
                                                 />
                                                 <button onClick={() => {
                                                     if (urlInputValue.trim()) {
@@ -1188,10 +1189,10 @@ export default function VideoStudio() {
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     {concepts.map((c, i) => (
                                         <button key={i} onClick={() => handleSelectConcept(i)}
-                                            className="text-left p-5 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:border-[#FF4D00]/30 hover:bg-[#FF4D00]/5 transition-all cursor-pointer group">
+                                            className="text-left p-5 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:border-[var(--sys-primary)] hover:bg-[var(--sys-primary-dim)] transition-all cursor-pointer group">
                                             <div className="flex items-start justify-between mb-3">
-                                                <h3 className="text-base font-bold text-[var(--sys-text)] group-hover:text-[#FF7A00] transition-colors">{c.title}</h3>
-                                                <span className="text-xs px-2 py-1 rounded-full bg-[#FF4D00]/10 text-[#FF4D00] flex-shrink-0 ml-2">{c.duration}s</span>
+                                                <h3 className="text-base font-bold text-[var(--sys-text)] group-hover:video-highlight-text transition-colors">{c.title}</h3>
+                                                <span className="text-xs px-2 py-1 rounded-full bg-[var(--sys-primary-dim)] video-highlight-text flex-shrink-0 ml-2">{c.duration}s</span>
                                             </div>
                                             <p className="text-sm text-[var(--sys-text-muted)] mb-3 leading-relaxed">{c.description}</p>
                                             <div className="flex flex-wrap gap-2">
@@ -1215,7 +1216,7 @@ export default function VideoStudio() {
                             {/* Shot-by-shot Storyboard */}
                             <div>
                                 <h2 className="text-lg font-bold text-[var(--sys-text)] mb-1 flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-[#FF4D00]">movie</span>
+                                    <span className="material-symbols-outlined video-highlight-text">movie</span>
                                     Shot-by-Shot Storyboard
                                 </h2>
                                 <p className="text-sm text-[var(--sys-text-muted)] mb-4">{script.narrative}</p>
@@ -1224,7 +1225,7 @@ export default function VideoStudio() {
                                     {(script.shots || []).map((shot, i) => (
                                         <div key={i} className="glass-panel rounded-xl p-4 border border-[var(--sys-border)]">
                                             <div className="flex items-center gap-3 mb-2">
-                                                <span className="text-xs font-bold text-[#FF4D00] bg-[#FF4D00]/10 px-2 py-0.5 rounded">Shot {shot.shotNum}</span>
+                                                <span className="text-xs font-bold video-highlight-text bg-[var(--sys-primary-dim)] px-2 py-0.5 rounded">Shot {shot.shotNum}</span>
                                                 <span className="text-sm text-[var(--sys-text-muted)]">{shot.duration}s</span>
                                                 <span className="text-xs text-[var(--sys-text-muted)] ml-auto">{shot.transition}</span>
                                             </div>
@@ -1258,19 +1259,19 @@ export default function VideoStudio() {
                             </div>
 
                             {/* Backend Prompt — fully editable */}
-                            <div className="glass-panel rounded-2xl p-5 border border-[#FF4D00]/20">
+                            <div className="glass-panel rounded-2xl p-5 border border-[var(--sys-primary)]">
                                 <div className="flex items-center justify-between mb-3">
                                     <h3 className="text-base font-bold text-[var(--sys-text)] flex items-center gap-2">
-                                        <span className="material-symbols-outlined text-[#FF4D00]">code</span>
+                                        <span className="material-symbols-outlined video-highlight-text">code</span>
                                         Exact Backend Prompt
                                     </h3>
-                                    <span className="text-sm text-[#FF4D00] bg-[#FF4D00]/10 px-2 py-0.5 rounded-full"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">edit</span> Editable</span>
+                                    <span className="text-sm video-highlight-text bg-[var(--sys-primary-dim)] px-2 py-0.5 rounded-full"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">edit</span> Editable</span>
                                 </div>
                                 <p className="text-sm text-[var(--sys-text-muted)] mb-2">This is the exact prompt sent to the AI video model. Edit it to fine-tune the output.</p>
                                 <textarea
                                     value={backendPrompt}
                                     onChange={e => setBackendPrompt(e.target.value)}
-                                    className="w-full h-40 px-4 py-3 rounded-xl bg-[var(--sys-surface)] border border-[#FF4D00]/20 text-orange-50 text-xs font-mono outline-none focus:border-[#FF4D00]/40 resize-y leading-relaxed"
+                                    className="w-full h-40 px-4 py-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-primary)] text-[var(--sys-text)] text-xs font-mono outline-none focus:border-[var(--sys-primary)] resize-y leading-relaxed"
                                 />
                             </div>
 
@@ -1316,7 +1317,7 @@ export default function VideoStudio() {
                                     <div className="space-y-2">
                                         {script.shots.filter(s => s.dialogue).map((shot, i) => (
                                             <div key={i} className="flex items-start gap-3 p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
-                                                <span className="text-xs font-bold text-[#FF4D00] bg-[#FF4D00]/10 px-2 py-0.5 rounded flex-shrink-0 mt-0.5">
+                                                <span className="text-xs font-bold video-highlight-text bg-[var(--sys-primary-dim)] px-2 py-0.5 rounded flex-shrink-0 mt-0.5">
                                                     Shot {shot.shotNum}
                                                 </span>
                                                 <p className="text-sm text-[var(--sys-text-muted)] italic">"{shot.dialogue}"</p>
@@ -1335,7 +1336,7 @@ export default function VideoStudio() {
                                 <div className="flex flex-wrap gap-2 mb-4">
                                     <button onClick={() => setSelectedVoProvider('minimax')}
                                         className={`flex-1 sm:flex-none px-4 py-2 rounded-xl text-sm font-medium transition-all cursor-pointer ${selectedVoProvider === 'minimax'
-                                            ? 'bg-[#FF4D00]/20 text-[#FF7A00] border border-[#FF4D00]/30'
+                                            ? 'bg-[var(--sys-primary-dim)] video-highlight-text border border-[var(--sys-primary)]'
                                             : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] border border-[var(--sys-border)] hover:text-[var(--sys-text)]'}`}>
                                         🌍 Global (Minimax)
                                     </button>
@@ -1360,7 +1361,7 @@ export default function VideoStudio() {
                                         ].map(v => (
                                             <button key={v.voice_id} onClick={() => setSelectedVoVoice(v)}
                                                 className={`text-left p-3 rounded-xl transition-all cursor-pointer ${selectedVoVoice?.voice_id === v.voice_id
-                                                    ? 'bg-[#FF4D00]/15 border border-[#FF4D00]/40'
+                                                    ? 'bg-[var(--sys-primary-dim)] border border-[var(--sys-primary)]'
                                                     : 'bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:border-[var(--sys-border)]'}`}>
                                                 <p className="text-sm font-bold text-[var(--sys-text)]">{v.name}</p>
                                                 <p className="text-xs text-[var(--sys-text-muted)]">{v.gender} · {v.desc}</p>
@@ -1449,7 +1450,7 @@ export default function VideoStudio() {
                                 Choose Video Model & Review Cost
                             </h2>
                             <p className="text-sm text-[var(--sys-text-muted)] -mt-3">
-                                AI recommended <strong className="text-[#FF7A00]">{
+                                AI recommended <strong className="video-highlight-text">{
                                     routing.selectedModel === 'veo-3.1' ? 'Google Veo 3.1' :
                                         routing.selectedModel === 'veo-3.1-fast' ? 'Google Veo 3.1 Fast' :
                                             routing.selectedModel === 'kling-3.0' ? 'Kling 3.0' :
@@ -1461,11 +1462,11 @@ export default function VideoStudio() {
 
                             {/* First Frame Preview */}
                             {images?.some(i => i.source === 'ai-first-frame') && (
-                                <div className="glass-panel rounded-2xl p-4 border border-[#FF4D00]/20">
+                                <div className="glass-panel rounded-2xl p-4 border border-[var(--sys-primary)]">
                                     <div className="flex items-center gap-2 mb-3">
-                                        <span className="material-symbols-outlined text-[#FF4D00]">image</span>
+                                        <span className="material-symbols-outlined video-highlight-text">image</span>
                                         <p className="text-sm font-bold text-[var(--sys-text)]">Auto-Generated First Frame</p>
-                                        <span className="text-xs px-2 py-0.5 rounded-full bg-[#FF4D00]/20 text-[#FF7A00]">AI Generated</span>
+                                        <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--sys-primary-dim)] video-highlight-text">AI Generated</span>
                                     </div>
                                     <img src={images.find(i => i.source === 'ai-first-frame')?.url} alt="First frame" className="w-full max-w-md rounded-xl border border-[var(--sys-border)]" />
                                     <p className="text-xs text-[var(--sys-text-muted)] mt-2">This image will be used as the first frame of your video for visual consistency.</p>
@@ -1488,7 +1489,7 @@ export default function VideoStudio() {
                                         }}
                                         disabled={!m.available}
                                         className={`text-left p-5 rounded-2xl transition-all cursor-pointer relative ${routing.selectedModel === m.id
-                                            ? 'bg-[#FF4D00]/10 border border-[#FF4D00]/40 shadow-none'
+                                            ? 'bg-[var(--sys-primary-dim)] border border-[var(--sys-primary)] shadow-none'
                                             : m.available
                                                 ? 'bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:border-[var(--sys-border)] hover:bg-[var(--sys-surface)]'
                                                 : 'bg-[var(--sys-surface)] border border-[var(--sys-border)] opacity-50 cursor-not-allowed'
@@ -1504,7 +1505,7 @@ export default function VideoStudio() {
                                             </span>
                                         )}
                                         <div className="flex items-center gap-2 mb-2">
-                                            <span className="material-symbols-outlined text-2xl" style={{ color: '#FF4D00' }}>{m.icon}</span>
+                                            <span className="material-symbols-outlined text-2xl" style={{ color: 'var(--sys-primary)' }}>{m.icon}</span>
                                             <h3 className="text-base font-bold text-[var(--sys-text)]">{m.name}</h3>
                                             {modelCapabilities?.[m.id]?.activeProvider && (
                                                 <span className="px-1.5 py-0.5 ml-auto rounded text-[10px] uppercase tracking-wider font-bold bg-[var(--sys-surface)] text-[var(--sys-text-muted)] border border-[var(--sys-border)]">
@@ -1527,7 +1528,7 @@ export default function VideoStudio() {
                             <div className="glass-panel rounded-2xl p-6 border border-[var(--sys-border)]">
                                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
                                     <div className="p-3 rounded-xl bg-[var(--sys-surface)] text-center">
-                                        <p className="text-lg font-bold text-[#FF4D00]">{routing.resolution}</p>
+                                        <p className="text-lg font-bold video-highlight-text">{routing.resolution}</p>
                                         <p className="text-sm text-[var(--sys-text-muted)]">Resolution</p>
                                     </div>
                                     <div className="p-3 rounded-xl bg-[var(--sys-surface)] text-center">
@@ -1551,7 +1552,7 @@ export default function VideoStudio() {
                                         {(modelCapabilities?.[routing.selectedModel]?.resolutions || ['720p', '1080p', '4k']).map(r => (
                                             <button key={r} onClick={() => setRouting(prev => ({ ...prev, resolution: r }))}
                                                 className={`px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-all ${routing.resolution === r
-                                                    ? 'bg-[#FF4D00]/20 text-[#FF7A00] border border-[#FF4D00]/30'
+                                                    ? 'bg-[var(--sys-primary-dim)] video-highlight-text border border-[var(--sys-primary)]'
                                                     : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] border border-[var(--sys-border)] hover:text-[var(--sys-text)]'
                                                     }`}>{r}</button>
                                         ))}
@@ -1595,7 +1596,7 @@ export default function VideoStudio() {
                                                 onClick={() => setRouting(prev => ({ ...prev, generateAudio: true }))}
                                                 className={`px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-all ${
                                                     routing.generateAudio !== false
-                                                        ? 'bg-[#FF4D00]/20 text-[#FF7A00] border border-[#FF4D00]/30'
+                                                        ? 'bg-[var(--sys-primary-dim)] video-highlight-text border border-[var(--sys-primary)]'
                                                         : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] border border-[var(--sys-border)] hover:text-[var(--sys-text)]'
                                                 }`}>
                                                 <span className="flex items-center gap-1"><span className="material-symbols-outlined text-[14px]">volume_up</span> With Audio</span>
@@ -1639,8 +1640,8 @@ export default function VideoStudio() {
                     {step === 5 && (
                         <div className="flex flex-col items-center justify-center py-16">
                             <div className="relative mb-8">
-                                <div className="w-32 h-32 rounded-full border-4 border-[#FF4D00]/20 flex items-center justify-center">
-                                    <span className="material-symbols-outlined text-5xl text-[#FF4D00] animate-pulse">movie</span>
+                                <div className="w-32 h-32 rounded-full border-4 border-[var(--sys-primary)] flex items-center justify-center">
+                                    <span className="material-symbols-outlined text-5xl video-highlight-text animate-pulse">movie</span>
                                 </div>
                                 <div className="absolute inset-0 w-32 h-32 rounded-full border-4 border-transparent border-t-violet-500 animate-spin" />
                             </div>
@@ -1665,9 +1666,9 @@ export default function VideoStudio() {
                     {/* ── High Traffic Modal ── */}
                     {showHighTrafficModal && (
                         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-                            <div className="glass-panel max-w-md w-full p-8 rounded-3xl border border-[#FF4D00]/30 shadow-2xl text-center transform animate-in fade-in zoom-in duration-300">
-                                <div className="size-20 bg-[#FF4D00]/10 rounded-full flex items-center justify-center mx-auto mb-6">
-                                    <span className="material-symbols-outlined text-4xl text-[#FF4D00] animate-pulse">traffic</span>
+                            <div className="glass-panel max-w-md w-full p-8 rounded-3xl border border-[var(--sys-primary)] shadow-2xl text-center transform animate-in fade-in zoom-in duration-300">
+                                <div className="size-20 bg-[var(--sys-primary-dim)] rounded-full flex items-center justify-center mx-auto mb-6">
+                                    <span className="material-symbols-outlined text-4xl video-highlight-text animate-pulse">traffic</span>
                                 </div>
                                 <h3 className="text-xl font-bold text-[var(--sys-text)] mb-3">High Traffic Detected</h3>
                                 <p className="text-[var(--sys-text-muted)] text-sm leading-relaxed mb-6">
@@ -1678,7 +1679,7 @@ export default function VideoStudio() {
                                 <div className="flex flex-col gap-3">
                                     <button 
                                         onClick={() => setShowHighTrafficModal(false)}
-                                        className="w-full py-3.5 rounded-xl bg-[#FF4D00]/20 text-[#FF7A00] font-bold text-sm border border-[#FF4D00]/30 hover:bg-[#FF4D00]/30 transition-all cursor-pointer"
+                                        className="w-full py-3.5 rounded-xl bg-[var(--sys-primary-dim)] video-highlight-text font-bold text-sm border border-[var(--sys-primary)] hover:bg-[var(--sys-primary-dim)] transition-all cursor-pointer"
                                     >
                                         I'll Wait
                                     </button>
@@ -1761,18 +1762,18 @@ export default function VideoStudio() {
                             )}
 
                             {/* Edit Prompt + Regenerate */}
-                            <div className="glass-panel rounded-2xl p-5 border border-[#FF4D00]/20">
+                            <div className="glass-panel rounded-2xl p-5 border border-[var(--sys-primary)]">
                                 <h3 className="text-base font-bold text-[var(--sys-text)] mb-3 flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-[#FF4D00]">code</span>
+                                    <span className="material-symbols-outlined video-highlight-text">code</span>
                                     Edit Prompt & Regenerate
                                 </h3>
                                 <textarea
                                     value={backendPrompt}
                                     onChange={e => setBackendPrompt(e.target.value)}
-                                    className="w-full h-32 px-4 py-3 rounded-xl bg-[var(--sys-surface)] border border-[#FF4D00]/20 text-orange-50 text-xs font-mono outline-none focus:border-[#FF4D00]/40 resize-y"
+                                    className="w-full h-32 px-4 py-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-primary)] text-[var(--sys-text)] text-xs font-mono outline-none focus:border-[var(--sys-primary)] resize-y"
                                 />
                                 <button onClick={handleEditAndRegenerate} disabled={loading}
-                                    className="mt-3 px-6 py-2.5 rounded-xl bg-[#FF4D00]/20 text-[#FF7A00] font-medium text-sm border border-[#FF4D00]/30 hover:bg-[#FF4D00]/30 transition-all cursor-pointer disabled:opacity-50 flex items-center gap-2">
+                                    className="mt-3 px-6 py-2.5 rounded-xl bg-[var(--sys-primary-dim)] video-highlight-text font-medium text-sm border border-[var(--sys-primary)] hover:bg-[var(--sys-primary-dim)] transition-all cursor-pointer disabled:opacity-50 flex items-center gap-2">
                                     <span className="material-symbols-outlined text-sm">refresh</span>
                                     Regenerate (5 credits)
                                 </button>
