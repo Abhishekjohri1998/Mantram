@@ -85,10 +85,18 @@ export async function apiFetch(endpoint, options = {}) {
         clearTimeout(timer);
         if (e.name === 'AbortError') throw new Error('Request timed out — the server is still processing. Please try again.');
         
-        // Detailed error for common fetch failures
+        // Improved network error detection — 'Failed to fetch' / 'Load failed' covers many scenarios
         const msg = e.message || '';
-        if (msg.includes('Load failed') || msg.includes('Failed to fetch')) {
-            throw new Error('Network error — This usually means the server is down or blocked by CORS. Ensure https://api.mantram.ai is accessible.');
+        if (msg.includes('Load failed') || msg.includes('Failed to fetch') || msg.includes('NetworkError')) {
+            // Try to determine the likely cause
+            if (msg.includes('ERR_CONNECTION_REFUSED') || msg.includes('ECONNREFUSED')) {
+                throw new Error('Server is not reachable — it may be restarting. Please wait a moment and try again.');
+            }
+            if (msg.includes('ERR_CONNECTION_RESET') || msg.includes('ECONNRESET')) {
+                throw new Error('Connection was reset mid-request — the server may have restarted. Please try again.');
+            }
+            // Generic connectivity failure
+            throw new Error('Could not connect to the server. Please check your internet connection and try again. If the problem persists, the server may be restarting.');
         }
         throw new Error(msg || 'Unknown network error');
     }

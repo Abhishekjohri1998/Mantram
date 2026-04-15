@@ -198,6 +198,10 @@ export async function internalGenerateCreative({ body, user, creditsDeducted, jo
         const brand = await Brand.findById(brandId);
         if (!brand) throw new Error('Brand not found');
 
+        // ── Define skillRefUrls HERE — BEFORE the pipeline call so they reach visual grounding ──
+        // Previously this was defined after the pipeline call, so pipeline always got an empty array.
+        const skillRefUrls = (refImageUrls || []).filter(u => u && typeof u === 'string');
+
         let pipelineResult;
         try {
             // ── 45s timeout on agentic pipeline — falls back to raw prompt if slow ──
@@ -208,10 +212,13 @@ export async function internalGenerateCreative({ body, user, creditsDeducted, jo
                 runCreativePipeline({
                     brandId,
                     brief: prompt,
-                    format: type || 'instagram-post', // Changed to format to match node signature
+                    format: type || 'instagram-post',
                     mode: 'fast', // Enforce fast-path to bypass sequential LLM criticism delays
-                    refImageUrls: skillRefUrls, // Pass reference images from skill payload
-                    options: options || {},
+                    refImageUrls: skillRefUrls, // ✅ Now correctly defined before this call
+                    generateCopy: !!(options?.generateCopy), // Only inject text when explicitly enabled
+                    customCopy: options?.customCopy || null,
+                    aspectRatio: options?.aspectRatio || '1:1',
+                    imageModel: (options?.imageModel || 'nanobanana-2').toLowerCase(),
                     emit: async (agent, message, status, detail) => {
                         if (progressId) {
                             await addStep(progressId, { agent, message, status, detail });
@@ -253,10 +260,7 @@ export async function internalGenerateCreative({ body, user, creditsDeducted, jo
             await addStep(progressId, { agent: 'generating', message: `Generating using ${selectedImageModel}...`, status: 'working' });
         }
 
-        // Forward skill reference image URLs to the generation pipeline
-        // The routedImageGenerate function downloads these URLs and converts
-        // them to Gemini inlineData for image-to-image generation.
-        const skillRefUrls = (refImageUrls || []).filter(u => u && typeof u === 'string');
+        // skillRefUrls is already defined above (before the pipeline call) — reused here for templateRefUrls merging below.
 
         // ── Extract template reference images from options ──
         // Templates send product photos, character images, and reference images

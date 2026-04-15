@@ -655,7 +655,7 @@ export async function promptEngineerNode(state) {
         `Composition: ${state.artDirection?.composition || ''}`,
         `Key Elements: ${(state.artDirection?.keyElements || []).join(', ')}`,
         `Scroll Stop Factor: ${state.artDirection?.scrollStopFactor || ''}`,
-        state.artDirection?.suggestedHeadline ? `SUGGESTED HEADLINE TEXT: "${state.artDirection.suggestedHeadline}" — INCORPORATE this as bold, readable text in the image prompt. Describe it like: 'Bold text reading "${state.artDirection.suggestedHeadline}" prominently displayed in high-contrast lettering'` : '',
+        state.artDirection?.suggestedHeadline && state.generateCopy ? `SUGGESTED HEADLINE TEXT: "${state.artDirection.suggestedHeadline}" — INCORPORATE this as bold, readable text in the image prompt. Describe it like: 'Bold text reading "${state.artDirection.suggestedHeadline}" prominently displayed in high-contrast lettering'` : '',
         `Avoid: ${(state.artDirection?.avoidList || []).join(', ')}`,
         `Format: ${formatIntel2?.label || formatKey2} (${formatIntel2?.spec || state.aspectRatio || '1:1'})`,
         `Aspect Ratio: ${state.aspectRatio || '1:1'}`,
@@ -1077,6 +1077,7 @@ export async function runCreativePipeline(params) {
         style: style || '',
         imageModel: imageModel || 'nanobanana-2',
         refImageUrls: refImageUrls || [],
+        generateCopy: !!generateCopy, // ⬅ Gate: controls whether headline text is baked into image prompt
     };
 
     // Node 0: Brand Intelligence (DB-only, ~50ms — now ~0ms on cache hit)
