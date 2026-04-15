@@ -43,7 +43,9 @@ async function ensureConnected() {
             console.log('✅ MCP Registry: Internal tool server connected');
         })
         .catch((err) => {
+            _connected = false;
             _connecting = false;
+            _connectPromise = null;
             // Non-fatal — studio will fall back to direct tool calls
             console.warn('⚠️ MCP Registry: Could not connect to internal server:', err.message);
         });
@@ -52,8 +54,19 @@ async function ensureConnected() {
 }
 
 /**
+ * Force a reconnection on the next call (used after session invalidation).
+ */
+function resetConnection() {
+    _connected = false;
+    _connecting = false;
+    _connectPromise = null;
+    mcpBridge.disconnect(SERVER_NAME);
+}
+
+/**
  * Execute an MCP tool by name with args.
  * Falls back gracefully if MCP server is unavailable.
+ * Auto-retries once on stale session errors.
  * @param {string} toolName — one of: web_search, fetch_trending, scrape_competitor, fetch_seo_audit, fetch_content_history, fetch_performance_learnings
  * @param {object} args
  * @returns {object} Parsed JSON result from the tool
@@ -64,6 +77,20 @@ export async function callMcpTool(toolName, args = {}) {
         const rawText = await mcpBridge.executeTool(`${SERVER_NAME}__${toolName}`, args);
         return JSON.parse(rawText);
     } catch (err) {
+        // On stale session errors, reset connection and retry once
+        const isSessionError = err.message?.includes('404') || err.message?.includes('No active MCP session') || err.message?.includes('not connected');
+        if (isSessionError) {
+            console.warn(`⚠️ MCP: Session lost for ${toolName} — resetting and retrying...`);
+            resetConnection();
+            try {
+                await ensureConnected();
+                const rawText = await mcpBridge.executeTool(`${SERVER_NAME}__${toolName}`, args);
+                return JSON.parse(rawText);
+            } catch (retryErr) {
+                console.warn(`⚠️ MCP: Retry also failed for ${toolName} — falling back to direct call:`, retryErr.message);
+                return await callToolDirectly(toolName, args);
+            }
+        }
         console.warn(`⚠️ MCP callMcpTool(${toolName}) failed — falling back to direct call:`, err.message);
         return await callToolDirectly(toolName, args);
     }

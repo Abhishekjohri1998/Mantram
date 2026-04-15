@@ -12,11 +12,24 @@ class McpBridgeManager {
     }
 
     /**
+     * Disconnect and forget a server (forces re-connect on next use).
+     */
+    disconnect(serverName) {
+        const client = this.clients.get(serverName);
+        if (client) {
+            try { client.close?.(); } catch (_) { /* ignore */ }
+            this.clients.delete(serverName);
+            console.log(`🔌 MCP: Disconnected ${serverName}`);
+        }
+    }
+
+    /**
      * Connect to an MCP server running over Server-Sent Events (SSE)
      * e.g., a local python MCP proxy, or a third-party tool provider.
      */
     async connectServer(serverName, sseUrl) {
         try {
+            // If we already have a client cached, validate it's still alive
             if (this.clients.has(serverName)) {
                 return this.clients.get(serverName);
             }
@@ -34,6 +47,8 @@ class McpBridgeManager {
             console.log(`✅ MCP Server ${serverName} connected`);
             return client;
         } catch (error) {
+            // Ensure stale client is removed so next call retries
+            this.clients.delete(serverName);
             console.error(`❌ Failed to connect to MCP Server ${serverName}:`, error);
             throw error;
         }
@@ -83,18 +98,27 @@ class McpBridgeManager {
 
         console.log(`🛠️ Dispatched MCP Tool: ${rawToolName} on ${serverName}`);
         
-        const result = await client.callTool({
-            name: rawToolName,
-            arguments: args
-        });
+        try {
+            const result = await client.callTool({
+                name: rawToolName,
+                arguments: args
+            });
 
-        // Parse result.content (usually an array of TextContent/ImageContent)
-        if (result.content && result.content.length > 0) {
-            const textContent = result.content.filter(c => c.type === 'text').map(c => c.text).join('\n');
-            return textContent;
+            // Parse result.content (usually an array of TextContent/ImageContent)
+            if (result.content && result.content.length > 0) {
+                const textContent = result.content.filter(c => c.type === 'text').map(c => c.text).join('\n');
+                return textContent;
+            }
+            
+            return JSON.stringify(result);
+        } catch (err) {
+            // If it's a session error (404/stale), evict the client so next call reconnects
+            if (err.message?.includes('404') || err.message?.includes('No active MCP session')) {
+                console.warn(`⚠️ MCP: Stale session for ${serverName} — evicting for reconnect`);
+                this.disconnect(serverName);
+            }
+            throw err;
         }
-        
-        return JSON.stringify(result);
     }
 }
 
