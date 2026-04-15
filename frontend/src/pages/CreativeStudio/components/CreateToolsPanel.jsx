@@ -348,7 +348,7 @@ const CreateToolsPanel = memo(({
 
                 {/* @character dropdown */}
                 {showCharTags && (characters.length > 0 || referenceImages.upload || referenceImages.style) && (
-                    <div className="absolute left-4 bottom-full mb-1 bg-[#1a1a2e] border border-[var(--sys-border)] rounded-xl shadow-2xl p-2 z-50 min-w-[200px]">
+                    <div className="absolute left-4 bottom-full mb-1 bg-[var(--sys-bg)] border border-[var(--sys-border)] rounded-xl shadow-2xl p-2 z-50 min-w-[200px]">
                         {(() => {
                             const tagOptions = [...characters];
                             if (referenceImages.upload) tagOptions.push({ name: 'Reference', image: referenceImages.upload });
@@ -408,7 +408,7 @@ const CreateToolsPanel = memo(({
                         <span className="material-symbols-outlined text-[10px] ml-auto">{showModelMenu ? 'expand_less' : 'expand_more'}</span>
                     </button>
                     {showModelMenu && (
-                        <div className="absolute left-0 right-0 bottom-full mb-1 bg-[#1a1a2e]/95 backdrop-blur-xl border border-[var(--sys-border)] rounded-xl shadow-2xl z-50 p-1.5 space-y-0.5">
+                        <div className="absolute left-0 right-0 bottom-full mb-1 bg-[var(--sys-bg)]/95 backdrop-blur-xl border border-[var(--sys-border)] rounded-xl shadow-2xl z-50 p-1.5 space-y-0.5">
                             {IMAGE_MODELS.map(m => (
                                 <button key={m.id} onClick={() => { setImageModel(m.id); setShowModelMenu(false) }}
                                     className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-left transition-all ${imageModel === m.id ? 'bg-[var(--sys-surface)] text-[var(--sys-text)]' : 'text-[var(--sys-text-muted)] hover:bg-[var(--sys-surface)] hover:text-[var(--sys-text)]'}`}>

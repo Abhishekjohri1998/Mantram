@@ -332,8 +332,8 @@ const GalleryPanel = memo(({
                                 return groupedBlocks.map((group, gIdx) => (
                                     <div key={gIdx} className="w-full bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:border-[var(--sys-primary)] shadow-sm rounded-2xl p-1 sm:p-2 flex flex-col xl:flex-row gap-4 mb-4 animate-fade-in group/band">
                                         
-                                        {/* Left Side: Images Grid — 2 columns, scrollable vertically */}
-                                        <div className="flex-1 grid grid-cols-2 gap-2 auto-rows-auto overflow-y-auto max-h-[500px] pr-1 custom-scrollbar">
+                                        {/* Left Side: Images Grid — 1 column mobile, 2 columns sm+ */}
+                                        <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-2 auto-rows-auto overflow-y-auto max-h-[500px] pr-1 custom-scrollbar">
                                             {group.items.map((item, idx) => (
                                                 <div key={item._id || idx} className="relative rounded-xl overflow-hidden cursor-pointer group/card transition-transform duration-300 hover:scale-[1.02]"
                                                     onClick={() => setZoomImage(item.imageUrl)}>

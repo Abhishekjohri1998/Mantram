@@ -4883,7 +4883,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     <div className="flex-1">
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
                                             {clgResults.map((url,i)=>(
-                                                <div key={i} className="rounded-xl overflow-hidden bg-[repeating-conic-gradient(#1a1a2e_0%_25%,#16162a_0%_50%)] bg-[length:16px_16px] group relative">
+                                                <div key={i} className="rounded-xl overflow-hidden bg-[var(--sys-bg)] group relative">
                                                     <img src={url} alt={`Variant ${i+1}`} className="w-full h-auto object-contain" />
                                                     <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                                                         <a href={url} download={`campaign-logo-${i+1}.png`} target="_blank" rel="noreferrer" className="px-3 py-1.5 rounded-lg bg-[var(--sys-surface)] text-[var(--sys-text)] text-xs font-medium hover:bg-[var(--sys-surface)] transition-all cursor-pointer flex items-center gap-1"><span className="material-symbols-outlined text-sm">download</span>Save</a>
@@ -6008,7 +6008,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                     {/* ══ Best Performing Library Modal ══ */}
                     {bplOpen&&(
                         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--sys-surface)] " onClick={()=>setBplOpen(false)}>
-                            <div className="bg-[#0f0f23] rounded-2xl border border-[var(--sys-border)] w-full max-w-3xl max-h-[70vh] overflow-hidden" onClick={e=>e.stopPropagation()}>
+                            <div className="bg-[var(--sys-bg)] rounded-2xl border border-[var(--sys-border)] w-full max-w-3xl max-h-[70vh] overflow-hidden" onClick={e=>e.stopPropagation()}>
                                 <div className="flex items-center justify-between p-4 sm:p-5 border-b border-[var(--sys-border)]">
                                     <h3 className="font-bold text-[var(--sys-text)] text-base flex items-center gap-2"><span className="material-symbols-outlined text-yellow-400">emoji_events</span>Best Performing Creatives</h3>
                                     <button onClick={()=>setBplOpen(false)} className="w-8 h-8 rounded-full bg-[var(--sys-surface)] flex items-center justify-center text-[var(--sys-text)] hover:bg-[var(--sys-surface)] transition-all cursor-pointer"><span className="material-symbols-outlined text-lg">close</span></button>
@@ -8070,12 +8070,12 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
             {refPickerSlot && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--sys-surface)] animate-fade-in"
                     onClick={() => setRefPickerSlot(null)}>
-                    <div className="bg-[#1A1A26] rounded-2xl shadow-2xl overflow-hidden animate-scale-in flex flex-col md:flex-row"
+                    <div className="bg-[var(--sys-bg)] rounded-2xl shadow-2xl overflow-hidden animate-scale-in flex flex-col md:flex-row"
                         style={{ width: '720px', maxWidth: '92vw', height: '520px', maxHeight: '85vh' }}
                         onClick={e => e.stopPropagation()}>
 
                         {/* ── Left Sidebar ── */}
-                        <div className="w-full md:w-[200px] flex-shrink-0 bg-[#12121f] border-b md:border-b-0 md:border-r border-[var(--sys-border)] flex flex-col">
+                        <div className="w-full md:w-[200px] flex-shrink-0 bg-[var(--sys-bg)] border-b md:border-b-0 md:border-r border-[var(--sys-border)] flex flex-col">
                             {/* Header */}
                             <div className="p-4 pb-3">
                                 <h3 className="text-sm font-extrabold text-[var(--sys-text)] capitalize flex items-center gap-2">
@@ -9488,7 +9488,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
                     <div className="absolute inset-0 bg-black/60 transition-opacity" onClick={() => setShowBusyModal(false)} />
                     
-                    <div className="relative w-full max-w-[calc(100%-2rem)] sm:max-w-md mx-auto transform overflow-hidden rounded-3xl border border-[var(--sys-border)] bg-[#161b22] p-4 sm:p-8 text-center shadow-2xl transition-all animate-in fade-in zoom-in duration-300">
+                    <div className="relative w-full max-w-[calc(100%-2rem)] sm:max-w-md mx-auto transform overflow-hidden rounded-3xl border border-[var(--sys-border)] bg-[var(--sys-bg)] p-4 sm:p-8 text-center shadow-2xl transition-all animate-in fade-in zoom-in duration-300">
                         {/* Premium Glow effect */}
                         <div className="absolute -top-24 -left-24 h-48 w-48 rounded-full bg-[var(--sys-primary-dim)] blur-[80px]" />
                         <div className="absolute -bottom-24 -right-24 h-48 w-48 rounded-full bg-[var(--sys-primary-dim)] blur-[80px]" />
