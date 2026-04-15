@@ -398,23 +398,67 @@ Generate the adapted creative now.`;
         }
 
         // --- ENFORCE EXACT CUSTOM SIZE WITH SHARP ---
+        // Hardened pipeline: normalize input → resize with cover → fallback to fill
+        // Fixes "offset out of range" errors caused by corrupt metadata or unusual
+        // channel layouts in AI-generated images (libvips buffer miscalculation).
         if (customSize && customSize.width && customSize.height) {
             try {
-                const targetW = Math.max(8, Math.round(parseInt(customSize.width, 10) / 8) * 8);
-                const targetH = Math.max(8, Math.round(parseInt(customSize.height, 10) / 8) * 8);
-                console.log(`✂️ Enforcing exact custom size crop: ${targetW}x${targetH} from AI generated ratio.`);
-                const sharp = (await import('sharp')).default;
-                const imgBuffer = await fetchImageBuffer(rawImageUrl);
-                if (imgBuffer) {
-                    const resizedBuffer = await sharp(imgBuffer)
-                        .resize({ width: targetW, height: targetH, fit: 'cover', position: 'centre' })
-                        .png()
-                        .toBuffer();
-                    rawImageUrl = `data:image/png;base64,${resizedBuffer.toString('base64')}`;
-                    console.log(`✅ Cropped to exact requested size: ${targetW}x${targetH}`);
+                const targetW = parseInt(customSize.width, 10);
+                const targetH = parseInt(customSize.height, 10);
+                if (targetW > 0 && targetH > 0) {
+                    console.log(`✂️ Enforcing exact custom size crop: ${targetW}x${targetH} from AI generated ratio.`);
+                    const sharp = (await import('sharp')).default;
+                    const imgBuffer = await fetchImageBuffer(rawImageUrl);
+                    if (imgBuffer) {
+                        // Step 1: Normalize — re-encode through PNG to strip corrupt metadata,
+                        // fix channel mismatches, and guarantee a clean pixel buffer.
+                        const normalizedBuffer = await sharp(imgBuffer, { limitInputPixels: false })
+                            .toColourspace('srgb')  // force consistent color space
+                            .png()
+                            .toBuffer();
+
+                        // Step 2: Resize with cover fit (crop to fill)
+                        let resizedBuffer;
+                        try {
+                            resizedBuffer = await sharp(normalizedBuffer, { limitInputPixels: false })
+                                .resize({ width: targetW, height: targetH, fit: 'cover', position: 'centre' })
+                                .png()
+                                .toBuffer();
+                        } catch (coverErr) {
+                            // Fallback: if cover fit fails (buffer offset), use fill + flatten
+                            console.warn(`⚠️ Cover resize failed (${coverErr.message}), falling back to fill+extract`);
+                            const meta = await sharp(normalizedBuffer).metadata();
+                            const scaled = await sharp(normalizedBuffer, { limitInputPixels: false })
+                                .resize({
+                                    width: Math.max(targetW, targetH),
+                                    height: Math.max(targetW, targetH),
+                                    fit: 'inside',
+                                    withoutEnlargement: false,
+                                })
+                                .png()
+                                .toBuffer();
+                            const scaledMeta = await sharp(scaled).metadata();
+                            const extractLeft = Math.max(0, Math.floor(((scaledMeta.width || targetW) - targetW) / 2));
+                            const extractTop = Math.max(0, Math.floor(((scaledMeta.height || targetH) - targetH) / 2));
+                            resizedBuffer = await sharp(scaled, { limitInputPixels: false })
+                                .extract({
+                                    left: extractLeft,
+                                    top: extractTop,
+                                    width: Math.min(targetW, scaledMeta.width || targetW),
+                                    height: Math.min(targetH, scaledMeta.height || targetH),
+                                })
+                                .resize({ width: targetW, height: targetH, fit: 'fill' })
+                                .png()
+                                .toBuffer();
+                        }
+
+                        rawImageUrl = `data:image/png;base64,${resizedBuffer.toString('base64')}`;
+                        console.log(`✅ Cropped to exact requested size: ${targetW}x${targetH}`);
+                    }
                 }
             } catch (resizeErr) {
                 console.warn('⚠️ Failed to enforce exact custom size crop:', resizeErr.message);
+                // Continue with the raw AI-generated image — user still gets output
             }
         }
 
