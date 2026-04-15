@@ -137,7 +137,7 @@ async function createCreativeJob(req, res) {
                 await GenerationJob.findOneAndUpdate(
                     { jobId },
                     { status: 'failed', completedAt: new Date(), errorMessage: err.message }
-                ).catch(() => {});
+                ).catch(() => { });
 
                 // Refund credits on failure
                 if (req.creditsDeducted > 0) {
@@ -150,7 +150,7 @@ async function createCreativeJob(req, res) {
 
     } catch (error) {
         console.error('❌ [Job] createCreativeJob top-level error:', error);
-        
+
         // Refund if job creation failed after credit deduction
         if (req.creditsDeducted > 0) {
             try {
@@ -164,10 +164,10 @@ async function createCreativeJob(req, res) {
         // Enhanced error visibility for staging - pass through message if not Production
         const isProd = process.env.NODE_ENV === 'production';
         const errorMsg = isProd ? safeErrorMessage(error) : (error.message || 'Internal server error');
-        
+
         if (!res.headersSent) {
-            res.status(500).json({ 
-                success: false, 
+            res.status(500).json({
+                success: false,
                 error: errorMsg,
                 details: isProd ? undefined : error.stack // Hide stack in Prod
             });
@@ -188,8 +188,8 @@ setInterval(() => {
 export async function internalGenerateCreative({ body, user, creditsDeducted, jobId, progressId }) {
     try {
         const { brandId, type, prompt, options, refImageUrls } = body;
-        
-        let agenticMeta = { mcotEnabled: true }; 
+
+        let agenticMeta = { mcotEnabled: true };
 
         if (progressId) {
             await addStep(progressId, { agent: 'intel', message: 'Analyzing brand DNA...', status: 'working' });
@@ -251,7 +251,7 @@ export async function internalGenerateCreative({ body, user, creditsDeducted, jo
             if (w && h) ratioNum = w / h;
         }
 
-        if (ratioNum >= 2.5 || ratioNum <= 1/2.5) {
+        if (ratioNum >= 2.5 || ratioNum <= 1 / 2.5) {
             console.log(`📐 Extreme aspect ratio detected (ratio ${ratioNum.toFixed(2)}). Injecting anti-tiling prompt.`);
             fullPrompt += "\n\nCRITICAL COMPOSITION INSTRUCTION: Render this as a single, continuous, and seamless scene spanning the entire canvas. DO NOT tile the image. DO NOT repeat elements, borders, or patterns.";
         }
@@ -456,9 +456,9 @@ Generate the adapted creative now.`;
             };
             await GenerationJob.findOneAndUpdate(
                 { jobId },
-                { 
-                    status: 'completed', 
-                    completedAt: new Date(), 
+                {
+                    status: 'completed',
+                    completedAt: new Date(),
                     creativeId: creative._id,
                     // Store safe external URL for quick display (may be null until S3 upload finishes)
                     imageUrl: slimCreative.imageUrl || slimCreative.thumbnailUrl || null,
@@ -467,7 +467,7 @@ Generate the adapted creative now.`;
             ).catch(err => console.error('[GenerationJob] Failed to mark completed:', err.message));
         }
 
-        user.updateOne({ $inc: { 'usage.creativesGenerated': 1 } }).catch(() => {});
+        user.updateOne({ $inc: { 'usage.creativesGenerated': 1 } }).catch(() => { });
 
         if (progressId) {
             await addStep(progressId, { agent: 'generating', message: 'Image created successfully!', status: 'done' });
@@ -527,7 +527,7 @@ Generate the adapted creative now.`;
                         await GenerationJob.updateOne(
                             { jobId },
                             { $set: { imageUrl: finalUrl, 'result.creative.imageUrl': finalUrl, 'result.creative.thumbnailUrl': finalUrl } }
-                        ).catch(() => {});
+                        ).catch(() => { });
                     }
                 } else {
                     await Creative.updateOne(
@@ -556,13 +556,15 @@ Generate the adapted creative now.`;
                             const q = criticResult.postGenCritique;
                             await Creative.updateOne(
                                 { _id: creative._id },
-                                { $set: {
-                                    'aiMeta.qualityScore': q.overallScore || null,
-                                    'aiMeta.qualityVerdict': q.verdict || null,
-                                    'aiMeta.qualityIssues': q.issues || [],
-                                    'aiMeta.qualitySummary': q.critiqueNotes || null,
-                                    'aiMeta.processingStatus': 'ready',
-                                }}
+                                {
+                                    $set: {
+                                        'aiMeta.qualityScore': q.overallScore || null,
+                                        'aiMeta.qualityVerdict': q.verdict || null,
+                                        'aiMeta.qualityIssues': q.issues || [],
+                                        'aiMeta.qualitySummary': q.critiqueNotes || null,
+                                        'aiMeta.processingStatus': 'ready',
+                                    }
+                                }
                             );
                             console.log(`🔎 [PostGenCritic] ${creative._id}: score=${q.overallScore}, verdict=${q.verdict}`);
                         }
@@ -592,11 +594,11 @@ router.get('/proxy-download', protect, async (req, res) => {
 
         const response = await fetch(decodeURIComponent(url));
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        
+
         const contentType = response.headers.get('content-type') || 'application/octet-stream';
         res.setHeader('Content-Type', contentType);
         res.setHeader('Content-Disposition', `attachment; filename="${(filename || 'download.png').replace(/[^a-zA-Z0-9_.-]/g, '_')}"`);
-        
+
         const arrayBuffer = await response.arrayBuffer();
         const buffer = Buffer.from(arrayBuffer);
         res.send(buffer);
@@ -621,14 +623,14 @@ router.post('/jobs', protect, requireCredits('creative'), async (req, res) => {
 router.get('/jobs', protect, async (req, res) => {
     try {
         const since = new Date(Date.now() - 24 * 60 * 60 * 1000); // last 24h
-        
+
         // Simplified query to ensure it hits the index { user: 1, createdAt: -1 } efficiently
         // removed $slice: -5 temporarily to rule out environment-specific projection errors
         const jobs = await GenerationJob.find(
             { user: req.user._id, createdAt: { $gte: since } },
-            { 
+            {
                 jobId: 1, status: 1, type: 1, format: 1, imageUrl: 1, errorMessage: 1,
-                creativeId: 1, createdAt: 1, startedAt: 1, completedAt: 1, steps: 1 
+                creativeId: 1, createdAt: 1, startedAt: 1, completedAt: 1, steps: 1
             }
         )
             .sort({ createdAt: -1 })
@@ -655,8 +657,10 @@ router.get('/jobs/:jobId', protect, async (req, res) => {
     try {
         const job = await GenerationJob.findOne(
             { jobId: req.params.jobId, user: req.user._id },
-            { jobId: 1, status: 1, type: 1, prompt: 1, format: 1, imageUrl: 1, errorMessage: 1,
-              creativeId: 1, result: 1, warnings: 1, createdAt: 1, startedAt: 1, completedAt: 1, steps: 1 }
+            {
+                jobId: 1, status: 1, type: 1, prompt: 1, format: 1, imageUrl: 1, errorMessage: 1,
+                creativeId: 1, result: 1, warnings: 1, createdAt: 1, startedAt: 1, completedAt: 1, steps: 1
+            }
         ).lean();
         if (!job) return res.status(404).json({ success: false, error: 'Job not found' });
 
@@ -710,28 +714,28 @@ function buildBrandDescription(brand) {
     parts.push(`brand called ${brand.name}`);
     if (dna.voice?.personality) parts.push(`with a ${dna.voice.personality} feel`);
     if (dna.targetAudience) parts.push(`targeting ${dna.targetAudience}`);
-    
+
     // Tagline — woven in naturally
     if (dna.tagline) parts.push(`— "${dna.tagline}"`);
-    
+
     // Company overview / brand description — the elevator pitch
     const overview = dna.companyOverview || dna.brandDescription || '';
     if (overview) parts.push(`— ${overview.substring(0, 200)}`);
-    
+
     // Services/products — described naturally, no bullet points
     const services = dna.servicesOffered || [];
     if (services.length > 0) {
         const serviceList = services.slice(0, 5).join(', ');
         parts.push(`offering ${serviceList}`);
     }
-    
+
     // USPs — described as strengths, not labels
     const usps = dna.uniqueSellingPoints || [];
     if (usps.length > 0) {
         const uspList = usps.slice(0, 3).join(', ');
         parts.push(`known for ${uspList}`);
     }
-    
+
     return parts.join(' ');
 }
 
@@ -740,14 +744,14 @@ function buildVisualContext(brand) {
     const parts = [];
     const dna = brand.dna || {};
     if (dna.voice?.personality) parts.push(`Brand personality: ${dna.voice.personality}`);
-    
+
     // NOTE: Typography metadata removed from prompts — Gemini renders font names,
     // weights, and style labels (e.g. "Work Sans 700 normal") as visible text cards
     // on the image. Typography is handled by the canvas editor, not image generation.
-    
+
     // ── Photography & Image Style ──
     if (dna.photographyStyle) parts.push(`Photography direction: ${dna.photographyStyle}`);
-    
+
     // ── Visual DNA — AI-extracted design intelligence ──
     const vdna = dna.visualDNA || {};
     if (vdna.designStyle) parts.push(`Design style: ${vdna.designStyle}`);
@@ -758,13 +762,13 @@ function buildVisualContext(brand) {
     if (vdna.typographyStyle) parts.push(`Typography rendering: ${vdna.typographyStyle}`);
     if (vdna.decorativeElements) parts.push(`Decorative elements: ${vdna.decorativeElements}`);
     // NOTE: vdna.imageAnalysis removed — it often contains raw color descriptions\n    // and hex codes that Gemini renders as visible swatches on generated images
-    
+
     // ── Design rules from visual DNA ──
     const designRules = vdna.designRules || [];
     const designAvoid = vdna.designAvoid || [];
     if (designRules.length > 0) parts.push(`DESIGN RULES — always follow: ${designRules.slice(0, 5).join('; ')}`);
     if (designAvoid.length > 0) parts.push(`DESIGN AVOIDS — never do: ${designAvoid.slice(0, 5).join('; ')}`);
-    
+
     // ── Content style do's and don'ts ──
     if (dna.contentStyle?.dos?.length) {
         parts.push(`Content principles: ${dna.contentStyle.dos.slice(0, 3).join(', ')}`);
@@ -772,7 +776,7 @@ function buildVisualContext(brand) {
     if (dna.contentStyle?.donts?.length) {
         parts.push(`Content avoids: ${dna.contentStyle.donts.slice(0, 3).join(', ')}`);
     }
-    
+
     // ── Brand values & mission — gives AI deeper context for visual storytelling ──
     const values = dna.brandValues || [];
     if (values.length > 0) {
@@ -1140,7 +1144,7 @@ async function geminiImageGenerate(promptText, imageParts = [], temperature = 0.
 async function routedImageGenerate(promptText, imageParts = [], temperature = 0.4, aspectRatio = '1:1', imageSize = '1K', selectedModel = 'nanobanana-2', refImageUrls = [], customSize = null) {
     const modelConfig = IMAGE_MODEL_CONFIG[selectedModel] || IMAGE_MODEL_CONFIG['nanobanana-2'];
     const router = getRouter();
-    
+
     let activeProvider = modelConfig.provider;
     try {
         const liveProvider = await getActiveProvider('image', selectedModel);
@@ -1154,7 +1158,7 @@ async function routedImageGenerate(promptText, imageParts = [], temperature = 0.
 
     // ── HARD TIMEOUT: 180 seconds max for any image generation ──
     const TIMEOUT_MS = 180_000;
-    const timeoutPromise = new Promise((_, reject) => 
+    const timeoutPromise = new Promise((_, reject) =>
         setTimeout(() => reject(new Error('Image generation timed out after 180 seconds. Please try again.')), TIMEOUT_MS)
     );
 
@@ -1172,12 +1176,12 @@ async function routedImageGenerate(promptText, imageParts = [], temperature = 0.
         //   ❌ ideogram-*, seedream-*, black-forest-labs/* — 503 no channel on this account
         // Models without native LZ support → route to best available alternative
         const LZ_IMAGE_MAP = {
-            'nanobanana-2':   'gemini-3.1-flash-image-preview',  // Gemini Flash via LZ ✅
+            'nanobanana-2': 'gemini-3.1-flash-image-preview',  // Gemini Flash via LZ ✅
             'nanobanana-pro': 'gemini-3.1-flash-image-preview',  // Gemini Pro via LZ ✅
-            'flux-pro-v1.1':  'flux-kontext-pro',                // Flux Kontext Pro via LZ ✅
-            'flux-2-pro':     'flux-kontext-max',                // Flux Kontext Max via LZ ✅ (premium)
-            'seedream-5':     'flux-kontext-max',                // → Flux Max (seedream not on this LZ account)
-            'ideogram':       'flux-kontext-pro',                // → Flux Pro (ideogram not on this LZ account)
+            'flux-pro-v1.1': 'flux-kontext-pro',                // Flux Kontext Pro via LZ ✅
+            'flux-2-pro': 'flux-kontext-max',                // Flux Kontext Max via LZ ✅ (premium)
+            'seedream-5': 'flux-kontext-max',                // → Flux Max (seedream not on this LZ account)
+            'ideogram': 'flux-kontext-pro',                // → Flux Pro (ideogram not on this LZ account)
         };
         const lzModel = LZ_IMAGE_MAP[selectedModel];
         const hasRefImages = (imageParts && imageParts.length > 0) || (refImageUrls && refImageUrls.length > 0);
@@ -1188,30 +1192,30 @@ async function routedImageGenerate(promptText, imageParts = [], temperature = 0.
             try {
                 // Map aspect ratio to WxH
                 const AR_SIZE_MAP = {
-                    '1:1':  '1024x1024', '16:9': '1792x1024', '9:16': '1024x1792',
-                    '4:5':  '1024x1280', '3:4':  '768x1024',  '4:3':  '1024x768',
-                    '3:2':  '1536x1024', '2:3':  '1024x1536',
+                    '1:1': '1024x1024', '16:9': '1792x1024', '9:16': '1024x1792',
+                    '4:5': '1024x1280', '3:4': '768x1024', '4:3': '1024x768',
+                    '3:2': '1536x1024', '2:3': '1024x1536',
                 };
                 const lzSize = AR_SIZE_MAP[aspectRatio] || (imageSize === '2K' ? '2048x2048' : '1024x1024');
-                
+
                 let finalLzSize = lzSize;
 
                 if (customSize && customSize.width && customSize.height) {
                     let w = parseInt(customSize.width, 10);
                     let h = parseInt(customSize.height, 10);
-                    
+
                     if (isMultimodalCapable) {
                         const ratio = w / h;
                         const nativeRatios = [
-                            { str: "1:1", val: 1/1 }, { str: "1:4", val: 1/4 }, { str: "1:8", val: 1/8 },
-                            { str: "2:3", val: 2/3 }, { str: "3:2", val: 3/2 }, { str: "3:4", val: 3/4 },
-                            { str: "4:1", val: 4/1 }, { str: "4:3", val: 4/3 }, { str: "4:5", val: 4/5 },
-                            { str: "5:4", val: 5/4 }, { str: "8:1", val: 8/1 }, { str: "9:16", val: 9/16 },
-                            { str: "16:9", val: 16/9 }, { str: "21:9", val: 21/9 }
+                            { str: "1:1", val: 1 / 1 }, { str: "1:4", val: 1 / 4 }, { str: "1:8", val: 1 / 8 },
+                            { str: "2:3", val: 2 / 3 }, { str: "3:2", val: 3 / 2 }, { str: "3:4", val: 3 / 4 },
+                            { str: "4:1", val: 4 / 1 }, { str: "4:3", val: 4 / 3 }, { str: "4:5", val: 4 / 5 },
+                            { str: "5:4", val: 5 / 4 }, { str: "8:1", val: 8 / 1 }, { str: "9:16", val: 9 / 16 },
+                            { str: "16:9", val: 16 / 9 }, { str: "21:9", val: 21 / 9 }
                         ];
                         let closestRatio = nativeRatios[0];
                         let minDiff = Math.abs(ratio - closestRatio.val);
-                        for(let i=1; i<nativeRatios.length; i++) {
+                        for (let i = 1; i < nativeRatios.length; i++) {
                             const diff = Math.abs(ratio - nativeRatios[i].val);
                             if (diff < minDiff) { minDiff = diff; closestRatio = nativeRatios[i]; }
                         }
@@ -1230,7 +1234,7 @@ async function routedImageGenerate(promptText, imageParts = [], temperature = 0.
                 let nativeSuccess = false;
                 if (lzModel.includes('gemini') || selectedModel.includes('nanobanana')) {
                     console.log(`🚀 [Native Router] Routing ${lzModel} natively to access Gemini Advanced Features.`);
-                    
+
                     // FETCH IMAGE URL BUFFERS FOR NATIVE SDK
                     // If imageParts is empty but user provided reference image URLs, dynamically download them.
                     let finalImageParts = imageParts || [];
@@ -1238,25 +1242,25 @@ async function routedImageGenerate(promptText, imageParts = [], temperature = 0.
                         console.log(`📥 [Native Router] Extracting ${lzRefUrls.length} S3 Reference Images to buffers for Native payload...`);
                         for (const url of lzRefUrls) {
                             try {
-                        const resp = await presignedFetch(url, { signal: AbortSignal.timeout(20000) });
-                        if (resp && resp.ok) {
-                            const buf = await resp.arrayBuffer();
-                            const ct = resp.headers.get('content-type') || 'image/jpeg';
-                            finalImageParts.push({ inlineData: { mimeType: ct, data: Buffer.from(buf).toString('base64') } });
-                            console.log(`✅ [Native Router] Loaded ref image (${Math.round(buf.byteLength/1024)}KB)`);
-                        } else {
-                            console.warn(`⚠️ [Native Router] Ref image fetch returned HTTP ${resp?.status} — skipping`);
+                                const resp = await presignedFetch(url, { signal: AbortSignal.timeout(35000) });
+                                if (resp && resp.ok) {
+                                    const buf = await resp.arrayBuffer();
+                                    const ct = resp.headers.get('content-type') || 'image/jpeg';
+                                    finalImageParts.push({ inlineData: { mimeType: ct, data: Buffer.from(buf).toString('base64') } });
+                                    console.log(`✅ [Native Router] Loaded ref image (${Math.round(buf.byteLength / 1024)}KB)`);
+                                } else {
+                                    console.warn(`⚠️ [Native Router] Ref image fetch returned HTTP ${resp?.status} — skipping`);
+                                }
+                            } catch (e) {
+                                console.warn(`⚠️ [Native Router] Could not load ref image: ${e.message}`);
+                            }
                         }
-                    } catch (e) {
-                        console.warn(`⚠️ [Native Router] Could not load ref image: ${e.message}`);
                     }
-                        }
-                    }
-                    
+
                     try {
                         // Native Gemini expects the string ratio (e.g. '4:5'), not exact resolutions like '1024x1280'
                         const nativeAspectRatio = (customSize && isMultimodalCapable) ? finalLzSize : aspectRatio;
-                        
+
                         const routerResult = await router.generateImage({
                             prompt: promptText,
                             aspectRatio: nativeAspectRatio,
@@ -1266,7 +1270,7 @@ async function routedImageGenerate(promptText, imageParts = [], temperature = 0.
                         }, {
                             provider: 'gemini'
                         });
-                        
+
                         return {
                             imageUrl: routerResult.imageUrl,
                             model: selectedModel,
@@ -1278,7 +1282,7 @@ async function routedImageGenerate(promptText, imageParts = [], temperature = 0.
                         console.warn(`⚠️ [Native Router] Native Gemini failed (${nativeErr.message.substring(0, 80)}). Falling back to LaoZhang proxy...`);
                     }
                 }
-                
+
                 // If native wasn't attempted, or if it failed, we use LaoZhang Proxy
                 if (!nativeSuccess) {
                     if (hasRefImages && isMultimodalCapable && lzRefUrls.length > 0) {
@@ -1327,7 +1331,7 @@ async function routedImageGenerate(promptText, imageParts = [], temperature = 0.
             model: modelConfig.modelId,
             imageParts,
             size: imageSize
-        }, { 
+        }, {
             provider: modelConfig.provider
         });
         return { ...routerResult, provider: routerResult.provider || modelConfig.provider || 'gemini' };
@@ -1371,14 +1375,14 @@ async function routedImageGenerate(promptText, imageParts = [], temperature = 0.
         }
 
         // Actual busy / timeout errors
-        return { 
-            imageUrl: null, 
-            model: selectedModel, 
-            textResponse: '', 
-            warnings: [], 
-            modelBusy: true, 
+        return {
+            imageUrl: null,
+            model: selectedModel,
+            textResponse: '',
+            warnings: [],
+            modelBusy: true,
             busyModel: selectedModel,
-            errorMessage: isBusy 
+            errorMessage: isBusy
                 ? `${modelConfig.name} is currently busy. Please try again or select a different model.`
                 : error.message,
             errorType: isBusy ? 'busy' : 'error',
@@ -1540,7 +1544,7 @@ router.post('/generate-campaign-copy', protect, requireStudio('creativeStudio'),
         const prodArr = products || [];
         const featArr = features || [];
         const copyCount = count || 3;
-        
+
         for (let vi = 0; vi < copyCount; vi++) {
             const prod = productStrategy === 'same' ? prodArr[0] : prodArr[vi % Math.max(1, prodArr.length)];
             if (prod?.title) {
@@ -1679,7 +1683,7 @@ router.get('/', protect, async (req, res) => {
             .lean();
 
         const total = await Creative.countDocuments(filter);
-        
+
         // Sign S3 URLs before returning to frontend
         const signedCreatives = await Promise.all(creatives.map(async c => ({
             ...c,
@@ -2672,7 +2676,7 @@ CRITICAL RULES:
             });
         }
 
-        req.user.updateOne({ $inc: { 'usage.creativesGenerated': 1 } }).catch(() => {});
+        req.user.updateOne({ $inc: { 'usage.creativesGenerated': 1 } }).catch(() => { });
 
         console.log(`✅ Lifestyle Mockup generated — responding immediately`);
         const finalSignedUrl = await getSignedUrlIfNeeded(rawImageUrl);
@@ -2762,14 +2766,14 @@ Analyze deeply and extract:
                     responseSchema: {
                         type: 'OBJECT',
                         properties: {
-                            mood:            { type: 'STRING' },
-                            genre:           { type: 'STRING' },
-                            colorPalette:    { type: 'ARRAY', items: { type: 'STRING' } },
-                            dominantColor:   { type: 'STRING' },
-                            lighting:        { type: 'STRING' },
-                            texture:         { type: 'STRING' },
+                            mood: { type: 'STRING' },
+                            genre: { type: 'STRING' },
+                            colorPalette: { type: 'ARRAY', items: { type: 'STRING' } },
+                            dominantColor: { type: 'STRING' },
+                            lighting: { type: 'STRING' },
+                            texture: { type: 'STRING' },
                             panoramicPrompt: { type: 'STRING' },
-                            suggestedStyle:  { type: 'STRING' },
+                            suggestedStyle: { type: 'STRING' },
                         },
                         required: ['mood', 'genre', 'colorPalette', 'lighting', 'panoramicPrompt', 'suggestedStyle'],
                     },
@@ -2900,30 +2904,30 @@ router.post('/carousel', protect, requireStudio('creativeStudio'), requireCredit
         console.log(`📐 ${slideCount}×${slideRatio} | Model: ${selectedModel} | Style: ${style}`);
 
         // Each panel's pixel dimensions
-        const SLIDE_DIMS = { '1:1':[1080,1080], '4:5':[1080,1350], '9:16':[1080,1920], '16:9':[1920,1080], '3:4':[1080,1440], '2:3':[1080,1620] };
+        const SLIDE_DIMS = { '1:1': [1080, 1080], '4:5': [1080, 1350], '9:16': [1080, 1920], '16:9': [1920, 1080], '3:4': [1080, 1440], '2:3': [1080, 1620] };
         const [slideW, slideH] = SLIDE_DIMS[slideRatio] || [1080, 1080];
         const totalW = slideW * slideCount;   // full panoramic canvas width
         const totalH = slideH;
 
         // Genre/treatment system
         const GENRE_TREATMENTS = {
-            drama:        { lighting: 'dramatic chiaroscuro, deep shadows one side, warm golden rim light', palette: 'deep burgundy, charcoal, amber gold', atmosphere: 'intense, cinematic, emotionally charged depth-of-field' },
-            thriller:     { lighting: 'cool desaturated, stark single-source key light, harsh edge lighting', palette: 'steel blue, near-black, cold silver', atmosphere: 'suspenseful, tense, sharp focus, ominous' },
-            romance:      { lighting: 'soft golden hour backlight, warm bokeh, diffused fill', palette: 'blush rose, champagne, warm ivory, peach', atmosphere: 'dreamy, intimate, hazy warmth' },
-            comedy:       { lighting: 'bright high-key even lighting, cheerful shadows', palette: 'vibrant coral, sunshine yellow, sky blue, lime', atmosphere: 'playful, lively, upbeat, energetic' },
-            horror:       { lighting: 'single harsh upward key light, toxic green ambient, deep shadow pools', palette: 'near-black, toxic green, blood red', atmosphere: 'eerie, dread, unsettling fog' },
-            action:       { lighting: 'explosive rim lighting, lens flares, harsh directional', palette: 'electric blue, fire orange, gunmetal grey', atmosphere: 'kinetic, high-energy, bold, epic' },
-            inspirational:{ lighting: 'golden sunrise rays flooding scene, ethereal God-rays', palette: 'warm gold, sky blue, soft white, sunrise orange', atmosphere: 'uplifting, majestic, hopeful, vast' },
-            luxury:       { lighting: 'soft silk-quality directional light, specular highlights on surfaces', palette: 'champagne gold, deep navy, pearl white', atmosphere: 'opulent, refined, timeless, premium' },
-            nature:       { lighting: 'dappled natural sunlight, soft green ambient', palette: 'forest green, earthy brown, sky blue, muted gold', atmosphere: 'serene, organic, fresh, peaceful' },
-            tech:         { lighting: 'cool blue LED rim light, gradient neon glow', palette: 'electric blue, deep violet, silver, cyan', atmosphere: 'futuristic, clean, minimal, sleek' },
-            modern:       { lighting: 'clean studio soft box, even fill light', palette: 'crisp white, charcoal, accent color', atmosphere: 'clean, professional, contemporary' },
+            drama: { lighting: 'dramatic chiaroscuro, deep shadows one side, warm golden rim light', palette: 'deep burgundy, charcoal, amber gold', atmosphere: 'intense, cinematic, emotionally charged depth-of-field' },
+            thriller: { lighting: 'cool desaturated, stark single-source key light, harsh edge lighting', palette: 'steel blue, near-black, cold silver', atmosphere: 'suspenseful, tense, sharp focus, ominous' },
+            romance: { lighting: 'soft golden hour backlight, warm bokeh, diffused fill', palette: 'blush rose, champagne, warm ivory, peach', atmosphere: 'dreamy, intimate, hazy warmth' },
+            comedy: { lighting: 'bright high-key even lighting, cheerful shadows', palette: 'vibrant coral, sunshine yellow, sky blue, lime', atmosphere: 'playful, lively, upbeat, energetic' },
+            horror: { lighting: 'single harsh upward key light, toxic green ambient, deep shadow pools', palette: 'near-black, toxic green, blood red', atmosphere: 'eerie, dread, unsettling fog' },
+            action: { lighting: 'explosive rim lighting, lens flares, harsh directional', palette: 'electric blue, fire orange, gunmetal grey', atmosphere: 'kinetic, high-energy, bold, epic' },
+            inspirational: { lighting: 'golden sunrise rays flooding scene, ethereal God-rays', palette: 'warm gold, sky blue, soft white, sunrise orange', atmosphere: 'uplifting, majestic, hopeful, vast' },
+            luxury: { lighting: 'soft silk-quality directional light, specular highlights on surfaces', palette: 'champagne gold, deep navy, pearl white', atmosphere: 'opulent, refined, timeless, premium' },
+            nature: { lighting: 'dappled natural sunlight, soft green ambient', palette: 'forest green, earthy brown, sky blue, muted gold', atmosphere: 'serene, organic, fresh, peaceful' },
+            tech: { lighting: 'cool blue LED rim light, gradient neon glow', palette: 'electric blue, deep violet, silver, cyan', atmosphere: 'futuristic, clean, minimal, sleek' },
+            modern: { lighting: 'clean studio soft box, even fill light', palette: 'crisp white, charcoal, accent color', atmosphere: 'clean, professional, contemporary' },
         };
 
         let genre = style || 'luxury';
         if (themeAnalysis?.genre) genre = themeAnalysis.genre.toLowerCase().replace(/[^a-z]/g, '');
         else if (themeAnalysis?.mood) {
-            const moodMap = { cinematic:'drama', dark:'thriller', romantic:'romance', playful:'comedy', scary:'horror', bold:'action', inspiring:'inspirational', natural:'nature', futuristic:'tech' };
+            const moodMap = { cinematic: 'drama', dark: 'thriller', romantic: 'romance', playful: 'comedy', scary: 'horror', bold: 'action', inspiring: 'inspirational', natural: 'nature', futuristic: 'tech' };
             for (const [k, v] of Object.entries(moodMap)) {
                 if (themeAnalysis.mood.toLowerCase().includes(k)) { genre = v; break; }
             }
@@ -2937,20 +2941,20 @@ router.post('/carousel', protect, requireStudio('creativeStudio'), requireCredit
         if (themeImageUrl) {
             try {
                 const s3Url = themeImageUrl.startsWith('data:')
-                    ? await uploadToS3(themeImageUrl, `carousel-themes/${brandId||'default'}/${Date.now()}-theme.png`)
+                    ? await uploadToS3(themeImageUrl, `carousel-themes/${brandId || 'default'}/${Date.now()}-theme.png`)
                     : themeImageUrl;
                 themeRefUrls = [s3Url];
                 console.log(`✅ Theme reference uploaded`);
-            } catch(e) { console.warn(`⚠️ Theme upload failed: ${e.message}`); }
+            } catch (e) { console.warn(`⚠️ Theme upload failed: ${e.message}`); }
         }
 
         // ── Build the SINGLE panoramic background prompt ──
         // This generates ONE wide image that covers all panels as a unified scene
-        const themeStr    = themeAnalysis?.panoramicPrompt ? `SCENE INSPIRATION: "${themeAnalysis.panoramicPrompt}" — use this as the visual blueprint. ` : '';
-        const moodStr     = themeAnalysis?.mood ? `Mood: ${themeAnalysis.mood}. ` : '';
-        const lightStr    = themeAnalysis?.lighting ? `Lighting: ${themeAnalysis.lighting}. ` : `Lighting: ${treatment.lighting}. `;
-        const colorStr    = themeAnalysis?.colorPalette?.length
-            ? `Colors from reference: ${themeAnalysis.colorPalette.slice(0,5).join(', ')}. `
+        const themeStr = themeAnalysis?.panoramicPrompt ? `SCENE INSPIRATION: "${themeAnalysis.panoramicPrompt}" — use this as the visual blueprint. ` : '';
+        const moodStr = themeAnalysis?.mood ? `Mood: ${themeAnalysis.mood}. ` : '';
+        const lightStr = themeAnalysis?.lighting ? `Lighting: ${themeAnalysis.lighting}. ` : `Lighting: ${treatment.lighting}. `;
+        const colorStr = themeAnalysis?.colorPalette?.length
+            ? `Colors from reference: ${themeAnalysis.colorPalette.slice(0, 5).join(', ')}. `
             : `Color palette: ${treatment.palette}. `;
 
         const panoramicPrompt = `${themeStr}${moodStr}Ultra-wide seamless panoramic background environment for a ${slideCount}-panel marketing carousel. ${prompt}.
@@ -2978,7 +2982,7 @@ STRICT RULES: No text, no people, no faces, no products, no logos, no watermarks
         try {
             const customSize = { width: totalW, height: totalH };
             panoramicResult = await routedImageGenerate(panoramicPrompt, [], 0.3, '16:9', '1K', selectedModel, themeRefUrls, customSize);
-        } catch(err) {
+        } catch (err) {
             if (req.creditsDeducted > 0) await refundCredits(req.user._id, req.creditsDeducted, 'carousel', 'Refund: Panoramic generation failed', 'creative');
             return res.status(500).json({ success: false, error: `Panoramic background failed: ${safeErrorMessage(err)}` });
         }
@@ -3013,7 +3017,7 @@ STRICT RULES: No text, no people, no faces, no products, no logos, no watermarks
                 let panoBuf;
                 try {
                     panoBuf = await toBuffer(panoramicResult.imageUrl, 30000);
-                } catch(fetchErr) {
+                } catch (fetchErr) {
                     console.warn(`   ⚠️ Panoramic fetch failed, retrying in 3s... (${fetchErr.message})`);
                     await new Promise(r => setTimeout(r, 1000));
                     panoBuf = await toBuffer(panoramicResult.imageUrl, 30000);
@@ -3040,7 +3044,7 @@ STRICT RULES: No text, no people, no faces, no products, no logos, no watermarks
                         .png()
                         .toBuffer();
                     panelBufs.push(panelBuf);
-                    console.log(`   ✂️  Panel ${i+1}/${slideCount} extracted at x=${i * slideW}`);
+                    console.log(`   ✂️  Panel ${i + 1}/${slideCount} extracted at x=${i * slideW}`);
                 }
                 console.log(`✅ Split complete: ${panelBufs.length} panels at ${slideW}×${slideH}px each`);
 
@@ -3050,7 +3054,7 @@ STRICT RULES: No text, no people, no faces, no products, no logos, no watermarks
 
                     if (productImages[i]) {
                         try {
-                            console.log(`\n   🎨 Panel ${i+1}/${slideCount}: Compositing product using exact background pixels...`);
+                            console.log(`\n   🎨 Panel ${i + 1}/${slideCount}: Compositing product using exact background pixels...`);
 
                             // ── EXPERIMENTAL ZERO-HALLUCINATION COMPOSITING ──
                             // Utility: Background Removal via fal.ai 
@@ -3058,7 +3062,7 @@ STRICT RULES: No text, no people, no faces, no products, no logos, no watermarks
                                 const falKey = process.env.FAL_API_KEY || process.env.FAL_KEY;
                                 if (!falKey) { console.warn('Missing FAL_API_KEY for auto-transparent cutouts'); return url; }
                                 const r = await fetch('https://queue.fal.run/fal-ai/bria/rmbg-1.4', {
-                                    method: 'POST', 
+                                    method: 'POST',
                                     headers: { 'Authorization': `Key ${falKey}`, 'Content-Type': 'application/json' },
                                     body: JSON.stringify({ image_url: url })
                                 });
@@ -3072,7 +3076,7 @@ STRICT RULES: No text, no people, no faces, no products, no logos, no watermarks
                             if (productUrl.startsWith('data:')) {
                                 productUrl = await uploadToS3(
                                     productUrl,
-                                    `carousels/${brandId||'default'}/${carouselId}-rawproduct-${i+1}.png`
+                                    `carousels/${brandId || 'default'}/${carouselId}-rawproduct-${i + 1}.png`
                                 );
                             }
 
@@ -3094,9 +3098,9 @@ STRICT RULES: No text, no people, no faces, no products, no logos, no watermarks
                                 .png()
                                 .toBuffer();
 
-                            console.log(`   ✅ Panel ${i+1}: Product perfectly composited with zero background shift.`);
-                        } catch(pErr) {
-                            console.warn(`   ⚠️ Panel ${i+1}: Exact compositing failed (${pErr.message}) — using clean background`);
+                            console.log(`   ✅ Panel ${i + 1}: Product perfectly composited with zero background shift.`);
+                        } catch (pErr) {
+                            console.warn(`   ⚠️ Panel ${i + 1}: Exact compositing failed (${pErr.message}) — using clean background`);
                         }
                     }
 
@@ -3118,11 +3122,11 @@ STRICT RULES: No text, no people, no faces, no products, no logos, no watermarks
 
                 // ── STEP 4: Upload to S3 — update job Map per-panel for live polling ──
                 const panelUrls = [];
-                const panoKey = `carousels/${brandId||'default'}/${carouselId}-pano.png`;
+                const panoKey = `carousels/${brandId || 'default'}/${carouselId}-pano.png`;
                 const panoramicS3Url = await uploadToS3(finalPanels[0], panoKey, 'image/png');
 
                 for (let i = 0; i < finalPanels.length; i++) {
-                    const url = await uploadToS3(finalPanels[i], `carousels/${brandId||'default'}/${carouselId}-panel-${i+1}.png`, 'image/png');
+                    const url = await uploadToS3(finalPanels[i], `carousels/${brandId || 'default'}/${carouselId}-panel-${i + 1}.png`, 'image/png');
                     panelUrls.push(url);
                     carouselJobs.set(carouselId, {
                         status: i === finalPanels.length - 1 ? 'ready' : 'uploading',
@@ -3131,7 +3135,7 @@ STRICT RULES: No text, no people, no faces, no products, no logos, no watermarks
                         error: null,
                         updatedAt: Date.now(),
                     });
-                    console.log(`   ☁️  Panel ${i+1}/${finalPanels.length} → S3`);
+                    console.log(`   ☁️  Panel ${i + 1}/${finalPanels.length} → S3`);
                 }
 
                 // Persist to MongoDB
@@ -3150,10 +3154,10 @@ STRICT RULES: No text, no people, no faces, no products, no logos, no watermarks
                 console.log(`🖼️  Full panoramic: ${totalW}×${totalH}px`);
                 console.log(`══════════════════════════════════════════\n`);
 
-            } catch(pipeErr) {
+            } catch (pipeErr) {
                 console.error('❌ Carousel pipeline error:', pipeErr.message);
                 console.error('❌ Stack:', pipeErr.stack);
-                carouselJobs.set(carouselId, { status: 'error', panels: [], panoramicUrl: panoramicResult?.imageUrl||'', error: pipeErr.message, updatedAt: Date.now() });
+                carouselJobs.set(carouselId, { status: 'error', panels: [], panoramicUrl: panoramicResult?.imageUrl || '', error: pipeErr.message, updatedAt: Date.now() });
             }
         })();
 
@@ -3173,7 +3177,7 @@ router.get('/carousel/:carouselId', protect, async (req, res) => {
         if (liveJob) {
             const signedPanels = await Promise.all((liveJob.panels || []).map(p => getSignedUrlIfNeeded(p)));
             const signedPano = await getSignedUrlIfNeeded(liveJob.panoramicUrl || '');
-            
+
             return res.json({
                 success: true,
                 status: liveJob.status,

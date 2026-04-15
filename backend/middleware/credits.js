@@ -25,7 +25,7 @@ const ACTION_LABELS = {
     seoCompetitors: 'SEO Competitors', seoAiVisibility: 'SEO AI Visibility',
     seoAsk: 'SEO Ask', seoAuditPage: 'SEO Page Audit',
     seoCompetitorDiscover: 'SEO Discover Competitors', seoBacklinks: 'SEO Backlink Intelligence',
-    seoWarRoom: 'SEO War Room',    seoLlmProbe: 'SEO LLM Probe',
+    seoWarRoom: 'SEO War Room', seoLlmProbe: 'SEO LLM Probe',
     seoAutoFix: 'SEO Auto-Fix', seoPromptMining: 'SEO Prompt Mining',
     seoGenerateFix: 'SEO Content Fix (AI)',
     brainstorm: 'Brainstorm Generate', brainstormRefine: 'Brainstorm Refine',
@@ -163,7 +163,7 @@ export const requireCredits = (actionOrCost = 1) => {
                 // Dynamic video credits — calculated per request
                 if (rawCost === 'dynamic' && actionOrCost === 'videoGenerate') {
                     const { model = 'kling-3.0', duration = 5,
-                            resolution = '1080p', qualityMode = 'fast' } = req.body;
+                        resolution = '1080p', qualityMode = 'fast' } = req.body;
                     const estimate = estimateCost(model, duration, resolution, qualityMode);
                     // ceil(USD × 70) ensures ~75% margin at ₹5/credit floor
                     cost = Math.max(Math.ceil(estimate.usd * 70), 5);
@@ -334,11 +334,11 @@ export const deductCredits = async (userId, actionOrCost, amount = 1, brandId = 
 export const getCreditBalance = (user) => {
     // Superadmin and Enterprise plans have unlimited credits
     if (user.role === 'superadmin' || user.plan === 'enterprise' || (user.credits?.total >= 999999)) {
-        return { 
-            total: Infinity, 
-            used: user.credits?.used || 0, 
-            remaining: Infinity, 
-            unlimited: true, 
+        return {
+            total: Infinity,
+            used: user.credits?.used || 0,
+            remaining: Infinity,
+            unlimited: true,
             bonus: user.credits?.bonus || 0,
             topUp: user.credits?.topUp || 0,
             plan: user.plan || 'enterprise'
@@ -353,11 +353,11 @@ export const getCreditBalance = (user) => {
         ? user.credits.topUp : 0;
     const remaining = Math.max(0, (total + bonus + topUp) - used);
 
-    return { 
-        total, 
-        used, 
-        remaining, 
-        unlimited: false, 
+    return {
+        total,
+        used,
+        remaining,
+        unlimited: false,
         bonus,
         topUp,
         topUpExpiry: user.credits?.topUpExpiry || null,
@@ -381,7 +381,7 @@ let MODEL_COSTS = {
     'gemini-2.5-flash': { input: 0.015, output: 0.06 },
     'gemini-2.5-pro': { input: 0.125, output: 0.50 },
     'claude-3-opus-20240229': { input: 0.3, output: 1.5 },
-    'claude-3-5-sonnet-20241022': { input: 0.1, output: 0.5 },
+    'claude-3-7-sonnet-20250219': { input: 0.1, output: 0.5 },
     'sarvam-m': { input: 0.02, output: 0.08 },
     // ── Image models (flat cost per image in USD cents) ──
     'gemini-3.1-flash-image-preview': { flatCost: 4.0, type: 'image' },
@@ -418,7 +418,7 @@ let MODEL_COSTS = {
 export async function syncLiveModelPricing() {
     const baselines = await getSetting('pricing_baselines', null);
     if (!baselines) return;
-    
+
     for (const [key, model] of Object.entries(baselines)) {
         if (model.type === 'text') {
             const id = model.modelId;
@@ -437,7 +437,7 @@ export async function syncLiveModelPricing() {
 }
 
 // Try initializing once at boot
-syncLiveModelPricing().catch(() => {});
+syncLiveModelPricing().catch(() => { });
 
 // ⚡ PERF: In-memory accumulator for provider budget tracking.
 // Instead of reading+writing DB on every AI call (getSetting+setSetting ~2 round-trips each),
@@ -502,7 +502,7 @@ export const refundCredits = async (userId, amount, actionName, description, stu
         }
 
         const [updated] = await Promise.all(updateOps);
-        
+
         // Log the refund
         const updTopUp = (updated?.credits?.topUp > 0 && updated?.credits?.topUpExpiry && new Date(updated.credits.topUpExpiry) > new Date()) ? updated.credits.topUp : 0;
         const balanceAfter = (updated?.credits?.total || 0) + (updated?.credits?.bonus || 0) + updTopUp - (updated?.credits?.used || 0);
@@ -551,7 +551,7 @@ export const logTokenUsage = async (userId, tokenData, meta = {}) => {
             await CreditUsage.create({
                 user: userId,
                 action: meta.action || 'ai_call',
-                cost: 0, 
+                cost: 0,
                 description: `Token usage: ${model}`,
                 studio: meta.studio || 'unknown',
                 metadata: { route: meta.route || '', brandId: meta.brandId },
