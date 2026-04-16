@@ -69,31 +69,39 @@ const EXCLUDED_LOG_PATTERNS = [
     /ecosystem\.autofix/i,   // Stale PM2 logs from old process name
 ];
 
-for (const dir of [sharedLogs, homeLogs, pm2Logs]) {
-    if (fs.existsSync(dir)) {
-        const files = fs.readdirSync(dir).filter(f => {
-            if (!f.endsWith('.log')) return false;
-            // Exclude our own logs to prevent feedback loops
-            if (EXCLUDED_LOG_PATTERNS.some(p => p.test(f))) return false;
-            return true;
-        });
-        for (const f of files) {
-            CONFIG.logPaths.push(path.join(dir, f));
+/**
+ * Scan all log directories and return deduplicated list of valid log file paths.
+ * Reusable for both initial boot and periodic re-scans.
+ */
+function rescanLogDirs() {
+    const paths = [];
+    for (const dir of [sharedLogs, homeLogs, pm2Logs]) {
+        if (fs.existsSync(dir)) {
+            const files = fs.readdirSync(dir).filter(f => {
+                if (!f.endsWith('.log')) return false;
+                if (EXCLUDED_LOG_PATTERNS.some(p => p.test(f))) return false;
+                return true;
+            });
+            for (const f of files) {
+                paths.push(path.join(dir, f));
+            }
         }
     }
+    // Fallback: default PM2 log locations
+    if (paths.length === 0) {
+        const defaultPaths = [
+            `${pm2Logs}/mantram-server-out.log`,
+            `${pm2Logs}/mantram-server-error.log`,
+        ];
+        for (const p of defaultPaths) {
+            if (fs.existsSync(p)) paths.push(p);
+        }
+    }
+    return paths;
 }
 
-// Fallback: use PM2 managed logs
-if (CONFIG.logPaths.length === 0) {
-    // Default PM2 log locations
-    const defaultPaths = [
-        `${pm2Logs}/mantram-server-out.log`,
-        `${pm2Logs}/mantram-server-error.log`,
-    ];
-    for (const p of defaultPaths) {
-        if (fs.existsSync(p)) CONFIG.logPaths.push(p);
-    }
-}
+// Perform initial scan
+CONFIG.logPaths = rescanLogDirs();
 
 // ── State ─────────────────────────────────────────────────────────────────
 const processedHashes = new Map();   // hash -> last processed timestamp
@@ -147,20 +155,20 @@ if (!CONFIG.enabled) {
 }
 
 // ── Main: Start tailing logs ──────────────────────────────────────────────
+let tailProcess = null;       // Module-level handle for kill/restart
+let rescanInterval = null;    // Periodic re-scan timer
+let healthInterval = null;    // Health check timer
+
 function startWatching() {
+    // Re-scan in case paths are stale
+    if (CONFIG.logPaths.length === 0) {
+        CONFIG.logPaths = rescanLogDirs();
+    }
+
     if (CONFIG.logPaths.length === 0) {
         console.log('⚠️ No log files found. Retrying in 30s...');
         setTimeout(() => {
-            // Re-scan for log files
-            for (const dir of [sharedLogs, homeLogs, pm2Logs]) {
-                if (fs.existsSync(dir)) {
-                    const files = fs.readdirSync(dir).filter(f => f.endsWith('.log'));
-                    for (const f of files) {
-                        const full = path.join(dir, f);
-                        if (!CONFIG.logPaths.includes(full)) CONFIG.logPaths.push(full);
-                    }
-                }
-            }
+            CONFIG.logPaths = rescanLogDirs();
             if (CONFIG.logPaths.length > 0) startWatching();
             else {
                 console.error('❌ Still no log files found. Check PM2 log paths.');
@@ -173,18 +181,18 @@ function startWatching() {
     console.log(`🔍 Tailing ${CONFIG.logPaths.length} log file(s)...`);
 
     // Use tail -F (capital F follows file renames/rotations)
-    const tail = spawn('tail', ['-F', '-n', '0', ...CONFIG.logPaths], {
+    tailProcess = spawn('tail', ['-F', '-n', '0', ...CONFIG.logPaths], {
         stdio: ['ignore', 'pipe', 'pipe'],
     });
 
-    tail.stdout.on('data', (chunk) => {
+    tailProcess.stdout.on('data', (chunk) => {
         const lines = chunk.toString('utf-8').split('\n').filter(Boolean);
         for (const line of lines) {
             onLogLine(line);
         }
     });
 
-    tail.stderr.on('data', (chunk) => {
+    tailProcess.stderr.on('data', (chunk) => {
         // tail stderr messages (file truncated, etc.) — ignore
         const msg = chunk.toString('utf-8').trim();
         if (msg && !msg.includes('file truncated')) {
@@ -192,19 +200,43 @@ function startWatching() {
         }
     });
 
-    tail.on('close', (code) => {
+    tailProcess.on('close', (code) => {
+        tailProcess = null;
         console.error(`❌ tail process exited with code ${code}. Restarting in 5s...`);
         setTimeout(startWatching, 5000);
     });
 
-    tail.on('error', (err) => {
+    tailProcess.on('error', (err) => {
+        tailProcess = null;
         console.error('❌ tail spawn error:', err.message);
         setTimeout(startWatching, 5000);
     });
 
-    // Periodic health logging
-    setInterval(() => {
-        console.log(`📊 AutoFix Health: ${dailyPRCount}/${CONFIG.maxDailyPRs} PRs today | ${processedHashes.size} errors in cooldown | Buffer: ${errorBuffer.length} lines`);
+    // ── Periodic re-scan for NEW log files (every 2 minutes) ──────────────
+    // After redeployments, PM2 creates new process IDs → new log files.
+    // tail -F can't discover brand-new files, so we must restart it.
+    if (rescanInterval) clearInterval(rescanInterval);
+    rescanInterval = setInterval(() => {
+        const freshPaths = rescanLogDirs();
+        const newFiles = freshPaths.filter(f => !CONFIG.logPaths.includes(f));
+        if (newFiles.length > 0) {
+            console.log(`🔄 AutoFix: Discovered ${newFiles.length} new log file(s): ${newFiles.map(f => path.basename(f)).join(', ')}`);
+            console.log('   Restarting tail to include new files...');
+            CONFIG.logPaths = freshPaths;
+            // Kill current tail — the 'close' handler will call startWatching()
+            if (tailProcess) {
+                tailProcess.removeAllListeners('close'); // Prevent double-restart
+                tailProcess.kill();
+                tailProcess = null;
+                setTimeout(startWatching, 1000);
+            }
+        }
+    }, 120_000); // Every 2 minutes
+
+    // ── Periodic health logging (every 5 minutes) ─────────────────────────
+    if (healthInterval) clearInterval(healthInterval);
+    healthInterval = setInterval(() => {
+        console.log(`📊 AutoFix Health: ${dailyPRCount}/${CONFIG.maxDailyPRs} PRs today | ${processedHashes.size} errors in cooldown | Buffer: ${errorBuffer.length} lines | Tailing: ${CONFIG.logPaths.length} files`);
         
         // Reset daily counter
         if (Date.now() - dailyResetTime > 86400000) {

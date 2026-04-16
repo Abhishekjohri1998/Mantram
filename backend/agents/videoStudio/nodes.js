@@ -618,7 +618,9 @@ export async function pollGenerationStatus(state) {
             ...statusResult,
             ...(statusResult.status === 'COMPLETED' ? { completedAt: new Date() } : {}),
         },
-        status: statusResult.status === 'COMPLETED' ? 'critique' : 'generating',
+        status: statusResult.status === 'COMPLETED' ? 'critique'
+             : statusResult.status === 'FAILED' ? 'failed'
+             : 'generating',
     };
 }
 

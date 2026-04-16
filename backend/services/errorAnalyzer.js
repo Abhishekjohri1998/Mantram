@@ -9,6 +9,7 @@
 
 import fs from 'fs';
 import path from 'path';
+import { execSync } from 'child_process';
 import { extractStackFiles } from './errorClassifier.js';
 
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
@@ -45,6 +46,73 @@ function isFileAllowed(filePath) {
     if (BLOCKED_FILE_PATTERNS.some(p => p.test(filePath))) return false;
     if (ALLOWED_DIRS.some(dir => filePath.includes(dir))) return true;
     return false;
+}
+
+/**
+ * Extract meaningful keywords from error text for codebase searching.
+ * Pulls model names, route paths, identifiers that might appear in source files.
+ */
+function extractErrorKeywords(errorText) {
+    const keywords = [];
+
+    // Model names (e.g., claude-3-5-sonnet-latest, gpt-4o, seedance-2.0)
+    const modelMatches = errorText.match(/\b(claude-[\w.-]+|gpt-[\w.-]+|gemini-[\w.-]+|seedance-[\w.-]+|kling-[\w.-]+)\b/gi);
+    if (modelMatches) keywords.push(...new Set(modelMatches));
+
+    // API route paths (e.g., /api/video-studio/advanced/generate)
+    const routeMatches = errorText.match(/\/api\/[\w/-]+/g);
+    if (routeMatches) keywords.push(...new Set(routeMatches));
+
+    // Specific error identifiers (function names, variable names after "is not defined")
+    const undefMatch = errorText.match(/(\w+)\s+is not defined/);
+    if (undefMatch) keywords.push(undefMatch[1]);
+
+    // Provider names from log context
+    const providerMatch = errorText.match(/\[(\w+)\]\s*(?:API\s*)?Error/i);
+    if (providerMatch) keywords.push(providerMatch[1].toLowerCase());
+
+    return keywords.filter(k => k.length >= 4); // Skip tiny keywords
+}
+
+/**
+ * Search the codebase for files containing a keyword.
+ * Uses synchronous grep for simplicity. Returns [{file, line}].
+ */
+function grepCodebase(keyword, appRoot) {
+    const results = [];
+    
+    // Search only in allowed backend directories
+    const searchDirs = ALLOWED_DIRS.map(d => path.join(appRoot, d.replace(/^\//, ''))).filter(d => fs.existsSync(d));
+    
+    for (const dir of searchDirs) {
+        try {
+            // grep -rnl: recursive, line numbers, files-with-matches
+            const output = execSync(
+                `grep -rn --include="*.js" -l "${keyword.replace(/"/g, '\\"')}" "${dir}"`,
+                { encoding: 'utf-8', timeout: 5000 }
+            ).trim();
+            
+            if (output) {
+                for (const filePath of output.split('\n').filter(Boolean).slice(0, 3)) {
+                    // Find the actual line number
+                    try {
+                        const lineOutput = execSync(
+                            `grep -n "${keyword.replace(/"/g, '\\"')}" "${filePath}" | head -1`,
+                            { encoding: 'utf-8', timeout: 3000 }
+                        ).trim();
+                        const lineMatch = lineOutput.match(/^(\d+):/);
+                        results.push({ file: filePath, line: lineMatch ? parseInt(lineMatch[1]) : 1 });
+                    } catch {
+                        results.push({ file: filePath, line: 1 });
+                    }
+                }
+            }
+        } catch {
+            // grep returns exit code 1 when no matches — ignore
+        }
+    }
+
+    return results;
 }
 
 /**
@@ -182,9 +250,34 @@ export async function analyzeError(errorEvent, options = {}) {
         }
     }
 
+    // ── 1b. Fallback: keyword-based search when no stack trace files found ──
     if (sourceContexts.length === 0) {
-        console.log('⚠️ AutoFix: No allowed source files found in stack trace — skipping analysis');
-        return { canFix: false, rootCause: 'No fixable source files in stack trace', explanation: '', confidence: 0, changes: [] };
+        console.log('⚠️ AutoFix: No stack trace files — trying keyword-based search...');
+        const keywords = extractErrorKeywords(errorEvent.errorText);
+        
+        for (const kw of keywords.slice(0, 3)) {
+            try {
+                const grepResults = grepCodebase(kw, appRoot);
+                for (const gr of grepResults.slice(0, 2)) {
+                    if (isFileAllowed(gr.file)) {
+                        const content = readSourceContext(gr.file, gr.line);
+                        if (content) {
+                            sourceContexts.push({ file: gr.file, line: gr.line, content });
+                        }
+                    }
+                }
+            } catch (e) {
+                // grep failed — continue with other keywords
+            }
+            if (sourceContexts.length >= 3) break;
+        }
+
+        if (sourceContexts.length > 0) {
+            console.log(`🔍 AutoFix: Found ${sourceContexts.length} relevant file(s) via keyword search: ${sourceContexts.map(s => path.basename(s.file)).join(', ')}`);
+        } else {
+            console.log('⚠️ AutoFix: No allowed source files found via stack trace or keyword search — skipping analysis');
+            return { canFix: false, rootCause: 'No fixable source files in stack trace', explanation: '', confidence: 0, changes: [] };
+        }
     }
 
     // ── 2. Build user prompt ──────────────────────────────────────────────
