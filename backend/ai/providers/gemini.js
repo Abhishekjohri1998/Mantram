@@ -213,46 +213,68 @@ export class GeminiProvider extends BaseProvider {
                 const safeARs = ["1:1","1:4","1:8","2:3","3:2","3:4","4:1","4:3","4:5","5:4","8:1","9:16","16:9","21:9"];
                 const nativeAspectRatio = safeARs.includes(aspectRatio) ? aspectRatio : '1:1';
 
-                // ── 90s hard timeout — Gemini can hang indefinitely without it ──
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 90_000);
-
                 let response;
-                try {
-                    response = await fetch(url, fetchOptions({
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            contents: [{ role: 'user', parts }],
-                            generationConfig: {
-                                responseModalities: ['TEXT', 'IMAGE'],
-                                temperature: 0.4,
-                                imageConfig: {
-                                    aspectRatio: nativeAspectRatio,
-                                    imageSize: "2K"
-                                }
-                            },
-                        }),
-                        signal: controller.signal,
-                    }));
-                } finally {
-                    clearTimeout(timeoutId);
+                let data;
+                let lastError = null;
+
+                for (let attempt = 1; attempt <= 2; attempt++) {
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 90_000);
+                    try {
+                        response = await fetch(url, fetchOptions({
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                contents: [{ role: 'user', parts }],
+                                generationConfig: {
+                                    responseModalities: ['TEXT', 'IMAGE'],
+                                    temperature: 0.4,
+                                    imageConfig: {
+                                        aspectRatio: nativeAspectRatio,
+                                        imageSize: "2K"
+                                    }
+                                },
+                            }),
+                            signal: controller.signal,
+                        }));
+                        data = await response.json();
+                        
+                        if (data.error) {
+                            const errMsg = data.error.message || JSON.stringify(data.error);
+                            const isBusy = errMsg.toLowerCase().includes('high demand') || 
+                                           errMsg.toLowerCase().includes('busy') || 
+                                           response.status === 503 || 
+                                           response.status === 429;
+                            if (isBusy) {
+                                throw new Error(`BUSY: ${errMsg}`);
+                            }
+                            throw new Error(`Gemini Image Error: ${errMsg}`);
+                        }
+                        
+                        // Success -> break out of retry loop
+                        lastError = null;
+                        break;
+                    } catch (attemptErr) {
+                        clearTimeout(timeoutId);
+                        
+                        const isTimeout = attemptErr.name === 'AbortError' || (attemptErr.message && attemptErr.message.toLowerCase().includes('aborted'));
+                        const isBusy = attemptErr.message && attemptErr.message.includes('BUSY:');
+                        
+                        if ((isTimeout || isBusy) && attempt === 1) {
+                            console.warn(`⚠️ Gemini Image attempt 1 failed (${isTimeout ? 'Timeout' : '503 Busy'}). Retrying in 2s...`);
+                            await new Promise(r => setTimeout(r, 2000));
+                            continue;
+                        }
+                        
+                        // If it's not a retryable error or we exhausted attempts
+                        if (isTimeout) throw new Error('BUSY: Gemini API timed out after 90 seconds. Google servers are likely overloaded.');
+                        throw attemptErr;
+                    } finally {
+                        clearTimeout(timeoutId);
+                    }
                 }
 
-                const data = await response.json();
-                
-                if (data.error) {
-                    const errMsg = data.error.message || JSON.stringify(data.error);
-                    const isBusy = errMsg.toLowerCase().includes('high demand') || 
-                                   errMsg.toLowerCase().includes('busy') || 
-                                   response.status === 503 || 
-                                   response.status === 429;
-                    
-                    if (isBusy) {
-                        throw new Error(`BUSY: ${errMsg}`);
-                    }
-                    throw new Error(`Gemini Image Error: ${errMsg}`);
-                }
+                if (lastError) throw lastError;
 
                 const resParts = data.candidates?.[0]?.content?.parts || [];
                 // ── Return base64 immediately — caller's background IIFE handles S3 upload ──
@@ -300,6 +322,11 @@ export class GeminiProvider extends BaseProvider {
                 throw new Error('Gemini Predict returned no image');
             }
         } catch (err) {
+            const isTimeout = err.name === 'AbortError' || (err.message && err.message.toLowerCase().includes('aborted'));
+            if (isTimeout) {
+                console.warn(`⏳ Gemini Image generation timed out after 90s (${modelId})`);
+                throw new Error('BUSY: Gemini API timed out after 90 seconds. Google servers are likely overloaded.');
+            }
             console.error(`❌ Gemini Image generation failed (${modelId}):`, err.message);
             throw err;
         }
