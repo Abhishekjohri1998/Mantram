@@ -281,6 +281,7 @@ jobs:
             # 8. Start Auto-Fix Agent (singleton log watcher)
             echo "🤖 Starting Auto-Fix Agent..."
             cd $CURRENT_LINK
+            mkdir -p $HOME/Mantram/backend/logs
             pm2 delete mantram-autofix || true
             pm2 start backend/deploy/autofix.config.cjs --update-env
             pm2 save

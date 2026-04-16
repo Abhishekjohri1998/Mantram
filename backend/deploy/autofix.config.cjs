@@ -4,10 +4,15 @@
  * Runs as a SINGLETON (fork mode, 1 instance) alongside the main server cluster.
  * Tails PM2 logs and auto-creates GitHub PRs for detected bugs.
  * 
- * Start:  pm2 start backend/deploy/ecosystem.autofix.cjs --update-env
+ * Start:  pm2 start backend/deploy/autofix.config.cjs --update-env
  * Stop:   pm2 delete mantram-autofix
  * Logs:   pm2 logs mantram-autofix
  */
+const os = require('os');
+const path = require('path');
+
+const logsDir = path.join(os.homedir(), 'Mantram', 'backend', 'logs');
+
 module.exports = {
     apps: [{
         name: 'mantram-autofix',
@@ -33,9 +38,9 @@ module.exports = {
         // Graceful shutdown
         kill_timeout: 5000,
 
-        // Logging — separate from main server logs to avoid feedback loops
-        error_file: '/var/www/mantram/shared/logs/autofix-error.log',
-        out_file: '/var/www/mantram/shared/logs/autofix-out.log',
+        // Logging — use the same logs dir as main server (~/Mantram/backend/logs/)
+        error_file: path.join(logsDir, 'autofix-error.log'),
+        out_file: path.join(logsDir, 'autofix-out.log'),
         merge_logs: true,
         log_date_format: 'YYYY-MM-DD HH:mm:ss',
     }]
