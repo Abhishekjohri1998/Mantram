@@ -851,16 +851,16 @@ export default function VideoStudio() {
                 {studioMode === 'storyboard' && (<>
 
                     {/* ── Progress Steps ── */}
-                    <div className="flex items-center gap-1 video-tabs-container pt-6 pb-6 mt-4 relative w-full z-10" style={{ overflowY: 'visible' }}>
+                    <div className="flex flex-wrap items-center gap-y-3 gap-x-1 video-tabs-container pt-4 pb-6 mt-4 relative w-full z-10">
                         {STEPS.map((s, i) => (
                             <div key={s.id} className="flex items-center flex-shrink-0">
                                 <div className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium transition-all ${i === step ? 'bg-[var(--sys-primary-dim)] video-highlight-text border border-[var(--sys-primary)]' :
                                     i < step ? 'bg-[var(--sys-primary-dim)] text-primary' : 'text-[var(--sys-text-muted)]'
                                     }`}>
                                     <span className="material-symbols-outlined text-sm">{i < step ? 'check_circle' : s.icon}</span>
-                                    <span className="hidden sm:inline">{s.label}</span>
+                                    <span>{s.label}</span>
                                 </div>
-                                {i < STEPS.length - 1 && <div className={`w-4 sm:w-8 h-px mx-1 ${i < step ? 'bg-[var(--sys-primary-dim)]' : 'bg-[var(--sys-surface)]'}`} />}
+                                {i < STEPS.length - 1 && <div className={`w-2 sm:w-6 h-px mx-1 hidden sm:block ${i < step ? 'bg-[var(--sys-primary-dim)]' : 'bg-[var(--sys-surface)]'}`} />}
                             </div>
                         ))}
                     </div>
