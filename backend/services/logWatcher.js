@@ -31,17 +31,19 @@ import { createFixPR } from './autofixPR.js';
 
 // ── Load .env if dotenv is available ──────────────────────────────────────
 try {
-    const dotenvPath = path.resolve(process.cwd(), '.env');
-    if (!fs.existsSync(dotenvPath)) {
-        // Try parent directory (when cwd is backend/)
-        const parentEnv = path.resolve(process.cwd(), '../backend/.env');
-        if (fs.existsSync(parentEnv)) {
+    // Try multiple possible .env locations (deployment symlinks, cwd, etc.)
+    const possibleEnvPaths = [
+        path.resolve(process.cwd(), 'backend/.env'),    // When cwd is repo root (~/Mantram)
+        path.resolve(process.cwd(), '.env'),             // When cwd is backend/
+        path.resolve(process.env.HOME || '/home/ec2-user', 'Mantram/backend/.env'), // Absolute fallback
+    ];
+    for (const envPath of possibleEnvPaths) {
+        if (fs.existsSync(envPath)) {
             const { config } = await import('dotenv');
-            config({ path: parentEnv });
+            config({ path: envPath });
+            console.log(`📄 Loaded .env from: ${envPath}`);
+            break;
         }
-    } else {
-        const { config } = await import('dotenv');
-        config({ path: dotenvPath });
     }
 } catch (_) { /* dotenv not available — rely on PM2 env injection */ }
 
@@ -61,9 +63,20 @@ const sharedLogs = '/var/www/mantram/shared/logs';
 const homeLogs = path.join(CONFIG.appRoot, 'backend/logs');
 const pm2Logs = path.join(process.env.HOME || '/home/ec2-user', '.pm2/logs');
 
+// Files to EXCLUDE — prevent feedback loops (agent tailing its own output)
+const EXCLUDED_LOG_PATTERNS = [
+    /autofix/i,              // Our own logs
+    /ecosystem\.autofix/i,   // Stale PM2 logs from old process name
+];
+
 for (const dir of [sharedLogs, homeLogs, pm2Logs]) {
     if (fs.existsSync(dir)) {
-        const files = fs.readdirSync(dir).filter(f => f.endsWith('.log'));
+        const files = fs.readdirSync(dir).filter(f => {
+            if (!f.endsWith('.log')) return false;
+            // Exclude our own logs to prevent feedback loops
+            if (EXCLUDED_LOG_PATTERNS.some(p => p.test(f))) return false;
+            return true;
+        });
         for (const f of files) {
             CONFIG.logPaths.push(path.join(dir, f));
         }
@@ -114,6 +127,22 @@ if (!CONFIG.enabled) {
         }
     }, 60000);
 } else {
+    // ── Validate required credentials at startup ──────────────────────────
+    const missingKeys = [];
+    if (!process.env.ANTHROPIC_API_KEY) missingKeys.push('ANTHROPIC_API_KEY');
+    if (!process.env.GITHUB_PAT) missingKeys.push('GITHUB_PAT');
+    
+    if (missingKeys.length > 0) {
+        console.log(`⚠️ AutoFix: Missing required env vars: ${missingKeys.join(', ')}`);
+        console.log('   The agent will detect errors but CANNOT create PRs until these are set.');
+        console.log('   Add them to backend/.env and restart: pm2 restart mantram-autofix');
+        if (CONFIG.dryRun) {
+            console.log('   (Dry run mode is ON — will still log detections)');
+        }
+    } else {
+        console.log('✅ API Keys: ANTHROPIC_API_KEY ✓ | GITHUB_PAT ✓');
+    }
+    
     startWatching();
 }
 

@@ -157,9 +157,20 @@ export async function analyzeError(errorEvent, options = {}) {
         // Try the absolute path first, then resolve relative to appRoot
         let content = readSourceContext(sf.file, sf.line);
         if (!content) {
+            // Try resolving via appRoot (handles ~/Mantram symlink)
             const resolved = path.join(appRoot, sf.file.replace(/^.*?\/backend\//, 'backend/'));
             content = readSourceContext(resolved, sf.line);
-            if (content) sf.file = resolved; // Update to the resolved path
+            if (content) sf.file = resolved;
+        }
+        if (!content) {
+            // Handle deployment paths: /home/.../deployments/20260416_xxx/backend/...
+            // Resolve to the current symlink: ~/Mantram/backend/...
+            const deployMatch = sf.file.match(/\/deployments[^/]*\/[^/]+\/backend\/(.*)/);
+            if (deployMatch) {
+                const resolved = path.join(appRoot, 'backend', deployMatch[1]);
+                content = readSourceContext(resolved, sf.line);
+                if (content) sf.file = resolved;
+            }
         }
 
         if (content && isFileAllowed(sf.file)) {
