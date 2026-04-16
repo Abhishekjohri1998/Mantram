@@ -278,6 +278,14 @@ jobs:
             ls -1t | tail -n +6 | xargs rm -rf || true
             echo "🧹 Old releases cleaned up"
 
+            # 8. Start Auto-Fix Agent (singleton log watcher)
+            echo "🤖 Starting Auto-Fix Agent..."
+            cd $CURRENT_LINK
+            pm2 delete mantram-autofix || true
+            pm2 start backend/deploy/ecosystem.autofix.cjs --update-env
+            pm2 save
+            echo "✅ Auto-Fix Agent started"
+
       - name: 🔒 Revoke Runner IP (Cleanup)
         if: always()
         run: |

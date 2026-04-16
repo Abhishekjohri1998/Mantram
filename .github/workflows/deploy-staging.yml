@@ -253,6 +253,14 @@ jobs:
             ls -1t | tail -n +4 | xargs rm -rf || true
             echo "🧹 Old staging releases cleaned up"
 
+            # 9. Start Auto-Fix Agent (singleton log watcher)
+            echo "🤖 Starting Auto-Fix Agent..."
+            cd $CURRENT_LINK
+            pm2 delete mantram-autofix-staging || true
+            AUTOFIX_ENABLED=true pm2 start backend/deploy/ecosystem.autofix.cjs --update-env --name mantram-autofix-staging
+            pm2 save
+            echo "✅ Auto-Fix Agent (staging) started"
+
       - name: 🔒 Revoke Runner IP (Cleanup)
         if: always()
         run: |
