@@ -114,6 +114,9 @@ export default function Sidebar({ mobileOpen, onClose }) {
                             <>
                                 <span className={`material-symbols-outlined text-[20px] flex-shrink-0 ${isActive ? 'text-primary-fixed' : 'group-hover:text-tertiary'}`}>{item.icon}</span>
                                 {!isCollapsed && <span className="truncate text-xs uppercase tracking-widest font-label">{item.label}</span>}
+                                {!isCollapsed && item.badge && (
+                                    <span className="ml-auto px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider rounded-full bg-primary-fixed/15 text-primary-fixed border border-primary-fixed/25 leading-none">{item.badge}</span>
+                                )}
                             </>
                         )}
                     </NavLink>

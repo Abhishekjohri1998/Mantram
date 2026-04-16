@@ -8,6 +8,7 @@ import GlobalLoader from '../components/GlobalLoader'
 import { creatives as creativesAPI } from '../services/api'
 import AdvancedMode from '../components/VideoStudio/AdvancedMode'
 import UGCCreator from '../components/VideoStudio/UGCCreator'
+import UGCPro from '../components/VideoStudio/UGCPro'
 import VideoAgent from '../components/VideoStudio/VideoAgent'
 import Walkthrough from '../components/Walkthrough'
 import './VideoStudio.css'
@@ -674,6 +675,7 @@ export default function VideoStudio() {
                         {[
                             { id: 'advanced', icon: 'terminal', label: 'Advanced' },
                             { id: 'ugc', icon: 'person_play', label: 'UGC Creator' },
+                            { id: 'ugc-pro', icon: 'smart_display', label: 'UGC Pro' },
                             { id: 'agent', icon: 'smart_display', label: 'Video Agent' },
                             { id: 'storyboard', icon: 'view_timeline', label: 'Storyboard' },
                         ].map(tab => (
@@ -962,6 +964,11 @@ export default function VideoStudio() {
                 {/* ── UGC CREATOR MODE (HeyGen) ── */}
                 {studioMode === 'ugc' && (
                     <UGCCreator activeBrand={activeBrand} />
+                )}
+
+                {/* ── UGC PRO MODE (Seedance 2.0 / MuAPI) ── */}
+                {studioMode === 'ugc-pro' && (
+                    <UGCPro activeBrand={activeBrand} projects={projects} />
                 )}
 
                 {/* ── VIDEO AGENT MODE ── */}

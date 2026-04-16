@@ -39,6 +39,7 @@ const ACTION_LABELS = {
     creativeCampaign: 'Multi-Platform Campaign', creativeCritique: 'AI Quality Critique',
     adCreative: 'Ad Creative Image', voiceClone: 'Voice Clone', voiceTranscribe: 'Voice Transcribe',
     promptEnhance: 'AI Prompt Enhancement', imageEnhance: 'AI Image Enhancement',
+    ugcProGenerate: 'UGC Pro Video Generation', ugcProAnalyze: 'UGC Pro Product Analysis',
 };
 
 // Provider credit multipliers — Claude is premium (higher API cost to us)
@@ -95,6 +96,8 @@ const DEFAULT_CREDIT_COSTS = {
     voiceTranscribe: 1,
     promptEnhance: 1,
     imageEnhance: 2,
+    ugcProGenerate: 15,            // Seedance 2.0 via MuAPI (base cost, chained adds 10 per segment)
+    ugcProAnalyze: 1,              // Product intelligence analysis
 };
 
 // Cache for credit costs (refresh every 5 minutes)

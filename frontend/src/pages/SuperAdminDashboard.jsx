@@ -150,6 +150,7 @@ export default function SuperAdminDashboard() {
         { label: 'AI Operations', icon: 'smart_toy', items: [
             { id: 'ai', label: 'AI & System', icon: 'psychology' },
             { id: 'tokenUsage', label: 'Token Usage', icon: 'monitoring' },
+            { id: 'ugcStudio', label: 'UGC Studio', icon: 'smart_display' },
         ]},
         { label: 'Platform', icon: 'settings', items: [
             { id: 'studios', label: 'Studio Management', icon: 'rocket_launch' },
@@ -4169,10 +4170,156 @@ export default function SuperAdminDashboard() {
                     </div>
                 )}
 
+                {/* ════════════ UGC STUDIO SETTINGS ════════════ */}
+                {tab === 'ugcStudio' && (
+                    <UGCStudioSettings />
+                )}
+
             </div>{/* end flex-1 content */}
             </div>{/* end sidebar+content flex */}
             </div>{/* end outer wrapper */}
         </DashboardLayout>
+    )
+}
+
+/* ── UGC Studio Settings Sub-Component ── */
+function UGCStudioSettings() {
+    const [flags, setFlags] = useState({})
+    const [loading, setLoading] = useState(true)
+    const [saving, setSaving] = useState('')
+
+    const token = localStorage.getItem('mantram_token')
+    const apiBase = (import.meta.env.VITE_API_URL || `${window.location.origin}/api`).replace(/\/$/, '')
+
+    useEffect(() => {
+        fetch(`${apiBase}/superadmin/feature-flags`, { headers: { Authorization: `Bearer ${token}` } })
+            .then(r => r.json())
+            .then(d => { if (d.success) setFlags(d.flags || {}) })
+            .catch(() => {})
+            .finally(() => setLoading(false))
+    }, [])
+
+    const update = async (key, value) => {
+        setSaving(key)
+        try {
+            await fetch(`${apiBase}/superadmin/feature-flags/${key}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ value }),
+            })
+            setFlags(prev => ({ ...prev, [key]: { ...prev[key], value } }))
+        } catch {}
+        setSaving('')
+    }
+
+    if (loading) return <div className="text-center py-20 text-[var(--sys-text-muted)]">Loading UGC settings...</div>
+
+    return (
+        <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
+            <div className="flex items-center justify-between mb-6">
+                <div>
+                    <h3 className="text-lg font-bold text-[var(--sys-text)] flex items-center gap-2">
+                        <span className="material-symbols-outlined text-primary">smart_display</span>
+                        UGC Studio Settings
+                    </h3>
+                    <p className="text-sm text-[var(--sys-text-muted)] mt-1">Configure Seedance 2.0 (MuAPI) UGC Pro generation</p>
+                </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* V1 Legacy Toggle */}
+                <div className="glass-panel rounded-2xl p-5 border border-[var(--sys-border)]">
+                    <h4 className="text-sm font-black text-[var(--sys-text)] uppercase tracking-wider mb-3 flex items-center gap-2">
+                        <span className="material-symbols-outlined text-primary text-lg">history</span>
+                        UGC V1 (HeyGen)
+                    </h4>
+                    <p className="text-xs text-[var(--sys-text-muted)] mb-4">Keep the legacy HeyGen UGC tab visible in Video Studio.</p>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" checked={flags.ugcV1Enabled?.value ?? true}
+                            onChange={e => update('ugcV1Enabled', e.target.checked)} className="accent-amber-500" />
+                        <span className="text-xs font-bold text-[var(--sys-text)]">
+                            {(flags.ugcV1Enabled?.value ?? true) ? 'Enabled' : 'Disabled'}
+                        </span>
+                        {saving === 'ugcV1Enabled' && <span className="material-symbols-outlined text-sm animate-spin text-primary">progress_activity</span>}
+                    </label>
+                </div>
+
+                {/* Pro Toggle */}
+                <div className="glass-panel rounded-2xl p-5 border border-[var(--sys-border)]">
+                    <h4 className="text-sm font-black text-[var(--sys-text)] uppercase tracking-wider mb-3 flex items-center gap-2">
+                        <span className="material-symbols-outlined text-primary text-lg">rocket_launch</span>
+                        UGC Pro (Seedance 2.0)
+                    </h4>
+                    <p className="text-xs text-[var(--sys-text-muted)] mb-4">Show UGC Pro in sidebar for all users.</p>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" checked={flags.ugcProEnabled?.value ?? true}
+                            onChange={e => update('ugcProEnabled', e.target.checked)} className="accent-emerald-500" />
+                        <span className="text-xs font-bold text-[var(--sys-text)]">
+                            {(flags.ugcProEnabled?.value ?? true) ? 'Enabled' : 'Disabled'}
+                        </span>
+                        {saving === 'ugcProEnabled' && <span className="material-symbols-outlined text-sm animate-spin text-primary">progress_activity</span>}
+                    </label>
+                </div>
+
+                {/* Model Selector */}
+                <div className="glass-panel rounded-2xl p-5 border border-[var(--sys-border)]">
+                    <h4 className="text-sm font-black text-[var(--sys-text)] uppercase tracking-wider mb-3 flex items-center gap-2">
+                        <span className="material-symbols-outlined text-primary text-lg">tune</span>
+                        Default Model
+                    </h4>
+                    <p className="text-xs text-[var(--sys-text-muted)] mb-4">Seedance 2.0 generation mode used for UGC Pro.</p>
+                    <select value={flags.ugcProModel?.value || 'seedance-v2.0-i2v'}
+                        onChange={e => update('ugcProModel', e.target.value)}
+                        className="w-full px-4 py-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-sm text-[var(--sys-text)] cursor-pointer outline-none focus:border-[var(--sys-border)]">
+                        <option value="seedance-v2.0-i2v">Image-to-Video (I2V) — Recommended</option>
+                        <option value="seedance-2.0-omni-reference">Omni Reference — Multi-Image</option>
+                        <option value="seedance-v2.0-t2v">Text-to-Video (T2V) — No avatar</option>
+                    </select>
+                    {saving === 'ugcProModel' && <span className="material-symbols-outlined text-sm animate-spin text-primary mt-2 block">progress_activity</span>}
+                </div>
+
+                {/* Quality Selector */}
+                <div className="glass-panel rounded-2xl p-5 border border-[var(--sys-border)]">
+                    <h4 className="text-sm font-black text-[var(--sys-text)] uppercase tracking-wider mb-3 flex items-center gap-2">
+                        <span className="material-symbols-outlined text-primary text-lg">high_quality</span>
+                        Default Quality
+                    </h4>
+                    <p className="text-xs text-[var(--sys-text-muted)] mb-4">Default quality level for UGC video generation.</p>
+                    <select value={flags.ugcProQuality?.value || 'high'}
+                        onChange={e => update('ugcProQuality', e.target.value)}
+                        className="w-full px-4 py-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-sm text-[var(--sys-text)] cursor-pointer outline-none focus:border-[var(--sys-border)]">
+                        <option value="high">High — Best visual quality</option>
+                        <option value="basic">Fast — Quicker generation</option>
+                    </select>
+                    {saving === 'ugcProQuality' && <span className="material-symbols-outlined text-sm animate-spin text-primary mt-2 block">progress_activity</span>}
+                </div>
+            </div>
+
+            {/* Info Card */}
+            <div className="mt-6 glass-panel rounded-2xl p-5 border border-[var(--sys-border)]">
+                <h4 className="text-sm font-black text-[var(--sys-text)] uppercase tracking-wider mb-3 flex items-center gap-2">
+                    <span className="material-symbols-outlined text-primary text-lg">info</span>
+                    UGC Pro Pipeline
+                </h4>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-center">
+                    <div className="bg-[var(--sys-surface)] rounded-xl p-3 border border-[var(--sys-border)]">
+                        <p className="text-[10px] text-[var(--sys-text-muted)] uppercase font-bold">Engine</p>
+                        <p className="text-sm font-bold text-[var(--sys-text)] mt-1">Seedance 2.0</p>
+                    </div>
+                    <div className="bg-[var(--sys-surface)] rounded-xl p-3 border border-[var(--sys-border)]">
+                        <p className="text-[10px] text-[var(--sys-text-muted)] uppercase font-bold">Provider</p>
+                        <p className="text-sm font-bold text-[var(--sys-text)] mt-1">MuAPI</p>
+                    </div>
+                    <div className="bg-[var(--sys-surface)] rounded-xl p-3 border border-[var(--sys-border)]">
+                        <p className="text-[10px] text-[var(--sys-text-muted)] uppercase font-bold">Base Cost</p>
+                        <p className="text-sm font-bold text-primary mt-1">15 credits</p>
+                    </div>
+                    <div className="bg-[var(--sys-surface)] rounded-xl p-3 border border-[var(--sys-border)]">
+                        <p className="text-[10px] text-[var(--sys-text-muted)] uppercase font-bold">Max Duration</p>
+                        <p className="text-sm font-bold text-[var(--sys-text)] mt-1">30s (chained)</p>
+                    </div>
+                </div>
+            </div>
+        </div>
     )
 }
 

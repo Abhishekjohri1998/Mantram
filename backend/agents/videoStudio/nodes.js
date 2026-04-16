@@ -23,11 +23,15 @@ import {
     PROMPT_ENHANCER_PROMPT,
     DURATION_PLANNER_PROMPT,
     VIDEO_VISUAL_GROUNDING_PROMPT,
+    UGC_PRODUCT_GROUNDING_PROMPT,
+    UGC_AVATAR_PROMPT,
+    UGC_PROMPT_BUILDER_PROMPT,
 } from './prompts.js';
 import { estimateCost, submitVideoGeneration, getGenerationStatus, getGrokGenerationStatus, MODEL_CAPABILITIES } from './falClient.js';
 import { getKieGenerationStatus } from './kieClient.js';
 import { getPiApiGenerationStatus, resubmitPiApiTask, uploadImageToHostedUrl, submitPiApiWatermarkRemoval } from './piApiClient.js';
-import { getMuApiGenerationStatus, resubmitMuApiTask } from './muapiClient.js';
+import { getMuApiGenerationStatus, resubmitMuApiTask, submitMuApiVideoGeneration } from './muapiClient.js';
+import { geminiImageGenerate } from './firstFrame.js';
 
 import { getPastProjects } from './selfLearning.js';
 import { agentUtils } from '../shared/agentUtils.js';
@@ -927,3 +931,208 @@ export async function advancedGenerateNode(state) {
         status: result._laozhangVideoUrl ? 'critique' : 'advanced-generating',
     };
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// UGC PRO NODES — MCoT-driven pipeline for Seedance 2.0 UGC generation
+// ══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * UGC Pro Node 1: Product Visual Grounding (MCoT — callMultimodalAgent)
+ * Analyses product images + URL content to extract UGC-specific product intelligence.
+ */
+export async function ugcProductGroundingNode(state) {
+    console.log('🔍 UGC Pro Node: Product Visual Grounding...');
+
+    const productImages = (state.productImageUrls || []).filter(u => u && u.startsWith('http')).slice(0, 4);
+    let textContext = state.productText || '';
+
+    // If a product URL is provided, scrape content via MCP web_search
+    if (state.productUrl) {
+        try {
+            const searchResult = await callMcpTool('web_search', { query: state.productUrl, mode: 'deep' });
+            if (searchResult?.data?.text) {
+                textContext = `URL: ${state.productUrl}\n\n${searchResult.data.text.substring(0, 5000)}`;
+            }
+        } catch (e) {
+            console.warn(`[UGC Node] URL scrape failed: ${e.message}, using URL only`);
+            textContext = `Product page: ${state.productUrl}`;
+        }
+    }
+
+    const userPrompt = [
+        `Analyse this product for UGC video creation.`,
+        textContext ? `\nPRODUCT INFO:\n${textContext}` : '',
+        productImages.length > 0 ? `\n${productImages.length} product images are attached for visual analysis.` : '',
+    ].filter(Boolean).join('');
+
+    let result;
+    if (productImages.length > 0) {
+        // MCoT: multimodal analysis with product images
+        result = await agentUtils.callMultimodalAgent(
+            UGC_PRODUCT_GROUNDING_PROMPT,
+            userPrompt,
+            productImages,
+            { temperature: 0.2, maxTokens: 2048 }
+        );
+    } else {
+        // Text-only fallback
+        result = await agentUtils.callAgent(
+            UGC_PRODUCT_GROUNDING_PROMPT,
+            userPrompt,
+            0.2, 2048,
+            { preferFast: true }
+        );
+    }
+
+    if (result && !result.error) {
+        console.log(`[UGC Node] Product grounding complete - ${result.productName || 'unknown product'}`);
+    }
+
+    return {
+        ...state,
+        productData: result || {},
+        status: 'product-grounded',
+    };
+}
+
+/**
+ * UGC Pro Node 2: Avatar Generation (NanoBanana 2 via geminiImageGenerate)
+ * Either processes an uploaded avatar image or generates one from a text description + Brand DNA.
+ */
+export async function ugcAvatarNode(state) {
+    console.log('[UGC Node] Avatar Processing...');
+
+    // Path 1: User uploaded an avatar image — just validate and pass through
+    if (state.avatarUrl) {
+        console.log(`  -> Using uploaded avatar: ${state.avatarUrl.substring(0, 60)}...`);
+        return { ...state, avatarReady: true, status: 'avatar-ready' };
+    }
+
+    // Path 2: Generate avatar via NanoBanana 2 with Brand DNA
+    if (!state.avatarDescription) {
+        console.warn('[UGC Node] No avatar URL or description provided');
+        return { ...state, avatarReady: false, status: 'avatar-missing' };
+    }
+
+    try {
+        const { brandContext } = await loadContext(state.brandId, state.userId);
+        const prompt = UGC_AVATAR_PROMPT(
+            brandContext,
+            state.avatarDescription,
+            state.environment || 'home'
+        );
+
+        console.log(`  -> Generating avatar via NanoBanana 2: "${state.avatarDescription.substring(0, 60)}..."`);
+        const { imageUrl } = await geminiImageGenerate(prompt, [], 0.5, {
+            aspectRatio: '9:16',
+            referenceImageUrls: [],
+        });
+
+        console.log(`[UGC Node] Avatar generated: ${imageUrl.substring(0, 60)}...`);
+        return {
+            ...state,
+            avatarUrl: imageUrl,
+            avatarReady: true,
+            avatarGenerated: true,
+            status: 'avatar-ready',
+        };
+    } catch (err) {
+        console.error('[UGC Node] Avatar generation failed:', err.message);
+        return { ...state, avatarReady: false, avatarError: err.message, status: 'avatar-failed' };
+    }
+}
+
+/**
+ * UGC Pro Node 3: Seedance Prompt Builder (callAgent with Brand DNA)
+ * Constructs the final MuAPI-ready prompt from product data + settings.
+ * Enforces @image1 (avatar) and @image2 (product) tags for Seedance I2V.
+ */
+export async function ugcPromptBuilderNode(state) {
+    console.log('[UGC Node] Building Seedance 2.0 prompt...');
+
+    const { brand, brandContext } = await loadContext(state.brandId, state.userId);
+    const product = state.productData || {};
+    const settings = state.settings || {};
+    const imageCount = (state.imageUrls || []).length;
+
+    // Build a rich brand context supplement
+    const brandName = brand?.name || '';
+    const brandDNA = brand?.dna || {};
+
+    const userPrompt = [
+        `Build a Seedance 2.0 UGC video prompt for ${brandName || 'this brand'}.`,
+        '',
+        `BRAND: ${brandName}`,
+        brandDNA.tagline ? `BRAND TAGLINE: ${brandDNA.tagline}` : '',
+        brandDNA.personality ? `BRAND VOICE: ${brandDNA.personality}` : '',
+        brandDNA.targetAudience ? `TARGET AUDIENCE: ${brandDNA.targetAudience}` : '',
+        '',
+        `PRODUCT: ${product.productName || 'Product'}`,
+        `USP: ${product.mainUSP || 'Quality product'}`,
+        `KEY FEATURES: ${(product.keyFeatures || []).join(', ')}`,
+        `CATEGORY: ${product.productCategory || 'other'}`,
+        `HANDLING: ${product.productHandling || 'held in hands'}`,
+        product.tagline ? `PRODUCT TAGLINE: ${product.tagline}` : '',
+        product.problemSolved ? `SOLVES: ${product.problemSolved}` : '',
+        '',
+        `GENERATION SETTINGS:`,
+        `- UGC Style: ${settings.style || 'review'}`,
+        `- Mood: ${settings.mood || 'authentic'}`,
+        `- Environment: ${settings.environment || product.idealEnvironment || 'home'}`,
+        `- Opening Hook: ${settings.hookStyle || 'bold_claim'}`,
+        `- Duration: ${settings.duration || 8} seconds`,
+        `- Aspect Ratio: ${settings.aspectRatio || '9:16'}`,
+        `- CTA: ${settings.cta || 'Shop now'}`,
+        `- Spoken Language: ${settings.language || 'English'}`,
+        '',
+        `CRITICAL LANGUAGE RULE: All spoken dialogue and text hooks in your output prompt MUST be written in ${settings.language || 'English'}. Seedance 2.0 uses this to generate the native audio.`,
+        '',
+        `IMAGES AVAILABLE: ${imageCount}`,
+        imageCount >= 1 ? '- @image1 = avatar/model person (MUST be referenced as the human in every shot)' : '',
+        imageCount >= 2 ? '- @image2 = product (MUST be referenced as the physical product being shown)' : '',
+        imageCount > 2 ? `- @image3 to @image${imageCount} = additional product angles` : '',
+        '',
+        product.suggestedDialogue ? `SUGGESTED DIALOGUE: "${product.suggestedDialogue}"` : '',
+        product.suggestedHooks ? `HOOK OPTIONS: ${product.suggestedHooks.join(' | ')}` : '',
+    ].filter(Boolean).join('\n');
+
+    const result = await agentUtils.callAgent(
+        UGC_PROMPT_BUILDER_PROMPT(brandContext),
+        userPrompt,
+        0.4, 1024,
+    );
+
+    // callAgent may return parsed JSON or raw string
+    let prompt = typeof result === 'string' ? result : (result?.raw || result?.text || JSON.stringify(result));
+
+    // POST-PROCESSING: Guarantee @image1 (avatar) is referenced
+    if (imageCount >= 1 && !prompt.includes('@image1')) {
+        console.log('[UGC Node] Injecting missing @image1 tag into prompt');
+        prompt = `The person @image1 faces the camera in a natural UGC setting. ` + prompt;
+    }
+
+    // Guarantee @image2 (product) is referenced if available
+    if (imageCount >= 2 && !prompt.includes('@image2')) {
+        console.log('[UGC Node] Injecting missing @image2 tag into prompt');
+        prompt = prompt.replace(
+            /\[(\d+)s-(\d+)s\]/,
+            (match) => `${match} The person @image1 holds up the product @image2.`
+        );
+    }
+
+    // Ensure constraint block references @image1
+    if (!prompt.includes('Maintain face')) {
+        prompt += '\nMaintain face and clothing consistency of @image1 throughout, no distortion, natural smooth movements. Generate video without subtitles.';
+    } else if (!prompt.includes('of @image1')) {
+        prompt = prompt.replace('Maintain face and clothing consistency', 'Maintain face and clothing consistency of @image1');
+    }
+
+    console.log(`[UGC Node] Prompt built (${prompt.split(/\s+/).length} words, @image1: ${prompt.includes('@image1')}, @image2: ${prompt.includes('@image2')})`);
+
+    return {
+        ...state,
+        backendPrompt: prompt,
+        status: 'prompt-ready',
+    };
+}
+

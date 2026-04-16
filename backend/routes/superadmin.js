@@ -3877,5 +3877,47 @@ router.get('/users/:id/studio-access', async (req, res) => {
     }
 });
 
+// ══════════════════════════════════════════════════════════════
+// FEATURE FLAGS — UGC Studio Configuration (env-based)
+// ══════════════════════════════════════════════════════════════
+
+// GET /superadmin/feature-flags — list all UGC flags from env
+router.get('/feature-flags', async (req, res) => {
+    try {
+        const flags = {
+            ugcV1Enabled:  { key: 'ugcV1Enabled',  value: true, label: 'UGC V1 (HeyGen) Legacy' },
+            ugcProEnabled: { key: 'ugcProEnabled', value: !!process.env.MUAPI_API_KEY, label: 'UGC Pro (Seedance 2.0)' },
+            ugcProModel:   { key: 'ugcProModel',   value: process.env.UGC_PRO_MODEL || 'seedance-v2.0-i2v', label: 'UGC Pro Model' },
+            ugcProQuality: { key: 'ugcProQuality', value: process.env.UGC_PRO_QUALITY || 'high', label: 'UGC Pro Default Quality' },
+        };
+        res.json({ success: true, flags });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// PUT /superadmin/feature-flags/:key — update env-based flag at runtime
+router.put('/feature-flags/:key', async (req, res) => {
+    try {
+        const { value } = req.body;
+        if (value === undefined) return res.status(400).json({ success: false, error: 'value is required' });
+
+        const envMap = {
+            ugcProModel:   'UGC_PRO_MODEL',
+            ugcProQuality: 'UGC_PRO_QUALITY',
+        };
+
+        const envKey = envMap[req.params.key];
+        if (envKey) {
+            process.env[envKey] = String(value);
+            console.log(`⚙️ SuperAdmin: Set ${envKey} = ${value}`);
+        }
+
+        res.json({ success: true, key: req.params.key, value });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
 export default router;
 

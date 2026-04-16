@@ -451,3 +451,112 @@ Return JSON:
   "avoidList": ["Visual elements to avoid based on what you see — e.g., 'avoid warm tones (brand is cool/blue)'"],
   "confidence": "high|medium|low"
 }`;
+
+
+// ──────────────────────────────────────────────────────────────────────────────
+// UGC PRO: PRODUCT VISUAL GROUNDING (MCoT — callMultimodalAgent)
+// Analyses product images + page content before UGC generation
+// ──────────────────────────────────────────────────────────────────────────────
+
+export const UGC_PRODUCT_GROUNDING_PROMPT = `You are a UGC product intelligence agent. Analyse the provided product images and content to extract structured intelligence for AI UGC video creation.
+
+CRITICAL RULES:
+- ALWAYS identify the product name. Read text printed on packaging, labels, logos, and branding visible in images.
+- If a brand name or product name is visible on the product packaging, use THAT exact name.
+- If no name is visible, describe the product precisely (e.g. "Wireless Bluetooth Earbuds", "Anti-Aging Face Serum", "Premium Yoga Mat").
+- NEVER return "Unknown Product" or "Unknown" — always provide a descriptive name.
+
+Focus on UGC-SPECIFIC insights:
+1. PRODUCT APPEARANCE: Exact visual description — shape, size relative to hands, colour, material, texture.
+2. KEY FEATURES: 3 most visually demonstrable features for UGC video.
+3. MAIN USP: The single most compelling selling point in simple, spoken language.
+4. SUGGESTED DIALOGUE: 20–30 words of natural, conversational UGC script dialogue — as if a real person is talking to camera.
+5. HOOK IDEAS: 3 opening hooks — one question, one bold claim, one story-based.
+6. EMOTIONAL TRIGGER: Primary purchase emotion (desire, curiosity, social proof, urgency, FOMO).
+7. PRODUCT HANDLING: How a person would naturally hold, demonstrate, or interact with this product on camera.
+8. IDEAL ENVIRONMENT: Where this product would be most naturally shown (home, kitchen, gym, cafe, outdoor, studio).
+
+Return JSON:
+{
+  "productName": "string — read from packaging/label if visible, or describe precisely (NEVER return Unknown)",
+  "tagline": "string — one punchy line",
+  "price": "string or null if unknown",
+  "keyFeatures": ["feature 1", "feature 2", "feature 3"],
+  "mainUSP": "string — single most compelling point in spoken language",
+  "targetAudience": "string",
+  "problemSolved": "string",
+  "suggestedDialogue": "20–30 words of natural spoken UGC dialogue",
+  "suggestedHooks": ["question hook", "bold claim hook", "story hook"],
+  "emotionalTrigger": "desire|curiosity|social_proof|urgency|fomo",
+  "productCategory": "electronics|beauty|fitness|food|fashion|home|health|other",
+  "productHandling": "How a presenter naturally holds/uses this product on camera",
+  "idealEnvironment": "home|kitchen|gym|cafe|outdoor|studio|office",
+  "heroColors": ["#hex1", "#hex2"],
+  "confidence": "high|medium|low"
+}`;
+
+
+// ──────────────────────────────────────────────────────────────────────────────
+// UGC PRO: AVATAR GENERATION (NanoBanana 2 prompt template)
+// Used with geminiImageGenerate() from firstFrame.js
+// ──────────────────────────────────────────────────────────────────────────────
+
+export const UGC_AVATAR_PROMPT = (brandContext, userDescription, environment = 'home') => {
+  const ENV = {
+    home:    'warm home interior with natural window light',
+    outdoor: 'outdoor lifestyle setting with soft natural daylight',
+    studio:  'clean minimal studio with professional lighting',
+    cafe:    'cozy cafe interior with warm ambient tones',
+    gym:     'modern fitness studio with motivational lighting',
+    office:  'contemporary workspace with clean natural light',
+  };
+
+  return `Generate a photorealistic portrait of a UGC content creator for a product review video.
+
+${brandContext}
+
+PERSON DESCRIPTION: ${userDescription || 'Natural, approachable person in their 20s-30s, friendly expression, looking directly at camera'}
+ENVIRONMENT: ${ENV[environment] || ENV.home}
+POSE: Upper body facing camera, arms/hands visible (will be holding a product), slight natural smile.
+STYLE: Smartphone-quality candid feel, authentic not overly polished.
+LIGHTING: Soft, natural, flattering light. Catch light in eyes.
+COMPOSITION: Medium close-up, face centered, room for product in frame.
+
+CRITICAL: The person must look like a real human — no AI-uncanny-valley issues. Natural skin texture, realistic hair, believable expression. This image will be used as @image1 for Seedance 2.0 I2V generation.`;
+};
+
+
+// ──────────────────────────────────────────────────────────────────────────────
+// UGC PRO: SEEDANCE PROMPT BUILDER (callAgent — constructs the generation prompt)
+// ──────────────────────────────────────────────────────────────────────────────
+
+export const UGC_PROMPT_BUILDER_PROMPT = (brandContext) => `You are a Seedance 2.0 UGC video prompt builder. You construct prompts optimised for MuAPI Seedance I2V generation.
+
+${brandContext}
+
+SEEDANCE 2.0 UGC PROMPT RULES:
+1. MANDATORY IMAGE REFERENCES:
+   - @image1 = the avatar/model person. You MUST reference @image1 as the person in EVERY shot.
+   - @image2 = product image (if available). You MUST reference @image2 as the product in relevant shots.
+   - Write: "The person @image1 holds the product @image2 up to camera..."
+   - NEVER omit @image1 — it is the actual human face/body that Seedance will use.
+2. Maximum 200 words. One motion verb per shot. Camera movement on separate sentence from subject.
+3. Always include lighting description — biggest quality lever in Seedance 2.0.
+4. Timecoded shots: [00s-03s], [03s-06s], etc. — with camera and subject action.
+5. End with: "Maintain face and clothing consistency of @image1, no distortion, natural movements."
+6. No negative prompts (Seedance doesn't support them).
+7. Native audio, 720p minimum.
+8. UGC feel — slightly handheld, natural, smartphone-quality. Like a real person filming.
+
+BRAND INTEGRATION:
+- Embed the brand personality in the avatar's energy, setting, and visual style.
+- Reference brand colours in environment/props/lighting.
+- Match the UGC setting to the brand's target audience.
+- The avatar should feel like a real customer/fan of this brand.
+
+CRITICAL: Your output prompt MUST contain @image1 at least 2 times. If @image2 is available, reference it at least once.
+
+You will receive: product data, style preferences, and number of available images.
+
+Return ONLY the Seedance 2.0 prompt text — no JSON, no explanation. Just the prompt string.`;
+

@@ -152,5 +152,12 @@ export default {
         host: process.env.REDIS_HOST,
         port: parseInt(process.env.REDIS_PORT) || 6379,
         tls: process.env.REDIS_TLS === 'true',
-    }
+    },
+
+    // MuAPI — Seedance 2.0 Video Generation (UGC Pro)
+    muapi: {
+        apiKey: process.env.MUAPI_API_KEY || process.env.MUAPI_KEY || '',
+        model: process.env.UGC_PRO_MODEL || 'seedance-v2.0-i2v',
+        quality: process.env.UGC_PRO_QUALITY || 'high',
+    },
 };

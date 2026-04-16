@@ -37,6 +37,9 @@ import {
     durationPlannerNode,
     advancedGenerateNode,
     videoVisualGroundingNode,
+    ugcProductGroundingNode,
+    ugcAvatarNode,
+    ugcPromptBuilderNode,
 } from '../agents/videoStudio/nodes.js';
 import { estimateCost, getModelsInfo, MODEL_CAPABILITIES, submitVideoGeneration } from '../agents/videoStudio/falClient.js';
 import { submitPiApiImageToVideo, submitPiApiVideoExtend } from '../agents/videoStudio/piApiClient.js';
@@ -49,6 +52,8 @@ import { uploadToS3, mirrorUrlToS3, getSignedUrlIfNeeded, ensureS3Url } from '..
 import { safeErrorMessage } from '../utils/safeError.js';
 import { loadBrandContext, callMultimodalAgent, callAgent } from '../agents/shared/agentUtils.js';
 import { buildEnhanceSystemPrompt, buildEnhanceUserPrompt, VISUAL_GROUNDING_SYSTEM } from '../agents/videoStudio/promptEnhancer.js';
+import { submitMuApiVideoGeneration, getMuApiGenerationStatus as pollMuApiStatus } from '../agents/videoStudio/muapiClient.js';
+import { geminiImageGenerate } from '../agents/videoStudio/firstFrame.js';
 
 const router = Router();
 
@@ -2845,6 +2850,333 @@ router.get('/ugc/:videoId/status', protect, async (req, res) => {
         console.error('UGC status error:', error);
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// UGC PRO — Seedance 2.0 via MuAPI (MCoT-driven pipeline)
+// IMPORTANT: These routes use literal '/ugc-pro/' prefix and MUST be defined
+// BEFORE any '/:id/' parameterized routes to prevent Express from matching
+// 'ugc-pro' as an :id value.
+// ══════════════════════════════════════════════════════════════════════════════
+
+const ugcUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
+
+// ── POST /api/video-studio/ugc-pro/analyze-product ──
+// MCoT product grounding — URL or text + optional product images
+router.post('/ugc-pro/analyze-product', protect, ugcUpload.array('productImages', 8), async (req, res) => {
+    try {
+        const { productUrl, productText, brandId } = req.body;
+        if (!productUrl && !productText && (!req.files || req.files.length === 0)) {
+            return res.status(400).json({ success: false, error: 'Provide a product URL, text description, or upload product images' });
+        }
+
+        // Upload product images to S3 to get public URLs for MCoT multimodal
+        const productImageUrls = [];
+        if (req.files?.length > 0) {
+            for (const f of req.files) {
+                const s3Key = `ugc-pro/products/${req.user._id}/${Date.now()}-${f.originalname}`;
+                const url = await uploadToS3(f.buffer, s3Key, f.mimetype);
+                productImageUrls.push(url);
+            }
+        }
+
+        // Parse any additional image URLs from body
+        if (req.body.productImageUrls) {
+            const urls = typeof req.body.productImageUrls === 'string'
+                ? JSON.parse(req.body.productImageUrls) : req.body.productImageUrls;
+            productImageUrls.push(...(urls || []).filter(u => u?.startsWith('http')));
+        }
+
+        // If product URL provided but NO images uploaded, try to scrape product images from the page
+        if (productUrl && productImageUrls.length === 0) {
+            try {
+                console.log(`[UGC Analyze] No product images — trying to scrape from URL: ${productUrl}`);
+                const pageResp = await fetch(productUrl, {
+                    headers: { 'User-Agent': 'Mozilla/5.0 (compatible; MantramBot/1.0)' },
+                    signal: AbortSignal.timeout(8000),
+                });
+                const pageHtml = await pageResp.text();
+
+                // Extract image URLs from og:image, product images, and img src attributes
+                const imgUrls = new Set();
+
+                // OG Image (highest priority for product pages)
+                const ogMatch = pageHtml.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i);
+                if (ogMatch?.[1]) imgUrls.add(ogMatch[1]);
+
+                // Twitter card image
+                const twMatch = pageHtml.match(/<meta[^>]*name=["']twitter:image["'][^>]*content=["']([^"']+)["']/i);
+                if (twMatch?.[1]) imgUrls.add(twMatch[1]);
+
+                // Shopify/WooCommerce product image patterns
+                const productImgPattern = /["'](https?:\/\/[^"']*(?:product|cdn|shopify|woocommerce|images)[^"']*\.(?:jpg|jpeg|png|webp)(?:\?[^"']*)?)/gi;
+                let pMatch;
+                while ((pMatch = productImgPattern.exec(pageHtml)) && imgUrls.size < 4) {
+                    if (!pMatch[1].includes('icon') && !pMatch[1].includes('logo') && !pMatch[1].includes('favicon')) {
+                        imgUrls.add(pMatch[1]);
+                    }
+                }
+
+                // Download and upload the first 2 unique product images to S3
+                let scraped = 0;
+                for (const imgUrl of imgUrls) {
+                    if (scraped >= 2) break;
+                    try {
+                        const imgResp = await fetch(imgUrl, { signal: AbortSignal.timeout(5000) });
+                        if (!imgResp.ok) continue;
+                        const contentType = imgResp.headers.get('content-type') || 'image/jpeg';
+                        if (!contentType.startsWith('image/')) continue;
+                        const buffer = Buffer.from(await imgResp.arrayBuffer());
+                        if (buffer.length < 5000) continue; // skip tiny images (icons, etc.)
+                        const ext = contentType.includes('png') ? 'png' : contentType.includes('webp') ? 'webp' : 'jpg';
+                        const s3Key = `ugc-pro/products/${req.user._id}/${Date.now()}-scraped-${scraped}.${ext}`;
+                        const s3Url = await uploadToS3(buffer, s3Key, contentType);
+                        productImageUrls.push(s3Url);
+                        scraped++;
+                        console.log(`[UGC Analyze] Scraped product image ${scraped}: ${imgUrl.substring(0, 80)}`);
+                    } catch { /* skip failed images */ }
+                }
+                if (scraped === 0) console.log(`[UGC Analyze] No product images could be scraped from URL`);
+            } catch (err) {
+                console.warn(`[UGC Analyze] Page scrape failed: ${err.message}`);
+            }
+        }
+
+        console.log(`[UGC Analyze] Analyzing product - ${productUrl || 'manual'}, ${productImageUrls.length} images`);
+
+        // Run MCoT product grounding node
+        const state = await ugcProductGroundingNode({
+            productUrl: productUrl || null,
+            productText: productText || '',
+            productImageUrls,
+            brandId,
+            userId: req.user._id,
+        });
+
+        res.json({
+            success: true,
+            productData: state.productData,
+            productImageUrls,
+        });
+    } catch (err) {
+        console.error('UGC Pro analyze error:', err.message);
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
+    }
+});
+
+// ── POST /api/video-studio/ugc-pro/build-prompt ──
+// Builds the Seedance prompt via MCoT but returns it for user preview/edit
+router.post('/ugc-pro/build-prompt', protect, async (req, res) => {
+    try {
+        const { brandId, productData, settings, avatarUrl, productImageUrls: bodyProductImgUrls } = req.body;
+
+        const parsedProduct = typeof productData === 'string' ? JSON.parse(productData) : (productData || {});
+        const parsedSettings = typeof settings === 'string' ? JSON.parse(settings) : (settings || {});
+        const parsedProductImgs = Array.isArray(bodyProductImgUrls) ? bodyProductImgUrls : [];
+
+        const imageUrls = [];
+        if (avatarUrl) imageUrls.push(avatarUrl);
+        for (const url of parsedProductImgs) {
+            if (url && typeof url === 'string' && url.startsWith('http')) imageUrls.push(url);
+        }
+
+        console.log(`[UGC Build Prompt] Building with ${imageUrls.length} images...`);
+
+        const promptState = await ugcPromptBuilderNode({
+            brandId,
+            userId: req.user._id,
+            productData: parsedProduct,
+            settings: parsedSettings,
+            imageUrls,
+        });
+
+        res.json({
+            success: true,
+            prompt: promptState.backendPrompt,
+            imageCount: imageUrls.length,
+        });
+    } catch (err) {
+        console.error('UGC Pro build-prompt error:', err.message);
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
+    }
+});
+
+// ── POST /api/video-studio/ugc-pro/generate-avatar ──
+// NanoBanana 2 avatar generation from text description + Brand DNA
+router.post('/ugc-pro/generate-avatar', protect, ugcUpload.single('avatarImage'), async (req, res) => {
+    try {
+        const { brandId, description, environment } = req.body;
+
+        // Path 1: Upload — store in S3 and return URL
+        if (req.file) {
+            const s3Key = `ugc-pro/avatars/${req.user._id}/${Date.now()}-${req.file.originalname}`;
+            const avatarUrl = await uploadToS3(req.file.buffer, s3Key, req.file.mimetype);
+            console.log(`✅ UGC Pro: Avatar uploaded to S3: ${avatarUrl.substring(0, 60)}`);
+            return res.json({ success: true, avatarUrl, generated: false });
+        }
+
+        // Path 2: Generate via NanoBanana 2
+        if (!description?.trim()) {
+            return res.status(400).json({ success: false, error: 'Provide a model description or upload a photo' });
+        }
+
+        const state = await ugcAvatarNode({
+            brandId,
+            userId: req.user._id,
+            avatarDescription: description,
+            environment: environment || 'home',
+        });
+
+        if (!state.avatarReady) {
+            throw new Error(state.avatarError || 'Avatar generation failed');
+        }
+
+        res.json({
+            success: true,
+            avatarUrl: state.avatarUrl,
+            generated: true,
+        });
+    } catch (err) {
+        console.error('UGC Pro avatar error:', err.message);
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
+    }
+});
+
+// ── POST /api/video-studio/ugc-pro/generate ──
+// Full UGC video generation — builds prompt via nodes, submits to MuAPI
+router.post('/ugc-pro/generate', protect, requireCredits('ugcProGenerate'), async (req, res) => {
+    try {
+        const {
+            brandId, productData, settings,
+            avatarUrl, productImageUrls: bodyProductImgUrls,
+            prebuiltPrompt,
+        } = req.body;
+
+        console.log(`[UGC Generate] req.body keys: ${Object.keys(req.body).join(', ')}`);
+        console.log(`[UGC Generate] avatarUrl: ${avatarUrl ? avatarUrl.substring(0, 60) + '...' : 'MISSING'}`);
+        console.log(`[UGC Generate] productImageUrls type: ${typeof bodyProductImgUrls}, value: ${JSON.stringify(bodyProductImgUrls)?.substring(0, 200)}`);
+
+        const parsedProduct = typeof productData === 'string' ? JSON.parse(productData) : (productData || {});
+        const parsedSettings = typeof settings === 'string' ? JSON.parse(settings) : (settings || {});
+        const parsedProductImgs = typeof bodyProductImgUrls === 'string'
+            ? JSON.parse(bodyProductImgUrls) : (Array.isArray(bodyProductImgUrls) ? bodyProductImgUrls : []);
+
+        // Collect image URLs: avatar first (@image1), then product images (@image2+)
+        const imageUrls = [];
+        if (avatarUrl) imageUrls.push(avatarUrl);
+        for (const url of parsedProductImgs) {
+            if (url && typeof url === 'string' && url.startsWith('http')) imageUrls.push(url);
+        }
+
+        console.log(`[UGC Generate] Final imageUrls (${imageUrls.length}): ${imageUrls.map(u => u.substring(0, 50)).join(' | ')}`);
+
+        let prompt = prebuiltPrompt;
+        
+        if (!prompt || !prompt.trim()) {
+            // Build Seedance prompt via MCoT node if no prompt was provided
+            console.log(`[UGC Generate] No prebuilt prompt provided, building one...`);
+            const promptState = await ugcPromptBuilderNode({
+                brandId,
+                userId: req.user._id,
+                productData: parsedProduct,
+                settings: parsedSettings,
+                imageUrls,
+            });
+            prompt = promptState.backendPrompt;
+        } else {
+            console.log(`[UGC Generate] Using explicitly provided prebuilt prompt (${prompt.length} chars)`);
+        }
+        const duration = parseInt(parsedSettings.duration || 8);
+        const aspectRatio = parsedSettings.aspectRatio || '9:16';
+        const quality = parsedSettings.quality || 'high';
+
+        console.log(`[UGC Generate] Final prompt @image check — @image1: ${prompt.includes('@image1')}, @image2: ${prompt.includes('@image2')}`);
+        console.log(`[UGC Generate] Submitting — ${duration}s, ${imageUrls.length} images, prompt ${prompt.split(/\s+/).length}w`);
+
+        // Submit to MuAPI via existing muapiClient
+        const genResult = await submitMuApiVideoGeneration({
+            prompt,
+            imageUrl: imageUrls[0] || null,
+            duration,
+            aspectRatio,
+            qualityMode: quality,
+            generateAudio: true,
+            referenceImages: imageUrls.slice(1),
+        });
+
+        // Persist history as a VideoProject
+        const project = await VideoProject.create({
+            user: req.user._id,
+            brand: brandId,
+            studioMode: 'ugc-pro',
+            status: 'generating',
+            script: prompt,
+            backendPrompt: prompt,
+            input: { images: imageUrls, productData: parsedProduct },
+            generation: {
+                provider: 'muapi',
+                model: 'seedance-2.0',
+                taskId: genResult.taskId,
+                requestId: genResult.taskId,
+                duration,
+                aspectRatio,
+                progress: 0,
+                status: 'GENERATING'
+            }
+        });
+
+        res.json({
+            success: true,
+            projectId: project._id,
+            requestId: genResult.taskId,
+            provider: 'muapi',
+            prompt,
+            imageCount: imageUrls.length,
+            duration,
+            aspectRatio,
+        });
+    } catch (err) {
+        console.error('UGC Pro generate error:', err.message);
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
+    }
+});
+
+// ── GET /api/video-studio/ugc-pro/status/:requestId ──
+// Poll MuAPI generation status (uses existing muapiClient) and update history
+router.get('/ugc-pro/status/:requestId', protect, async (req, res) => {
+    try {
+        const result = await pollMuApiStatus(req.params.requestId);
+        
+        // Update DB history to maintain sync
+        if (result && req.params.requestId) {
+            const updatePayload = {
+                'generation.progress': result.progress,
+                'generation.status': result.status === 'COMPLETED' ? 'COMPLETED' : (result.status === 'FAILED' ? 'FAILED' : 'GENERATING')
+            };
+            if (result.videoUrl) updatePayload['generation.videoUrl'] = result.videoUrl;
+            if (result.error) updatePayload['generation.error'] = result.error;
+            if (result.status === 'COMPLETED' || result.status === 'FAILED') {
+                updatePayload.status = result.status === 'COMPLETED' ? 'done' : 'failed';
+            }
+            await VideoProject.findOneAndUpdate(
+                { 'generation.requestId': req.params.requestId, user: req.user._id, studioMode: 'ugc-pro' },
+                updatePayload
+            );
+        }
+
+        res.json({ success: true, ...result });
+    } catch (err) {
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
+    }
+});
+
+// ── GET /api/video-studio/ugc-pro/credit-estimate ──
+// Preview credit cost for UGC Pro generation
+router.get('/ugc-pro/credit-estimate', protect, (req, res) => {
+    const d = parseInt(req.query.duration || 8);
+    // Credit tiers: ≤10s → 15 credits, ≤20s → 25 credits, ≤30s → 35 credits
+    const credits = d <= 10 ? 15 : d <= 20 ? 25 : 35;
+    res.json({ success: true, duration: d, credits });
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
