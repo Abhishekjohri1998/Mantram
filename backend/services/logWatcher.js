@@ -111,6 +111,9 @@ let errorBuffer = [];
 let flushTimer = null;
 let isProcessing = false;
 const processingQueue = [];
+let tailProcess = null;       // Module-level handle for kill/restart
+let rescanInterval = null;    // Periodic re-scan timer
+let healthInterval = null;    // Health check timer
 
 // ── Boot ──────────────────────────────────────────────────────────────────
 console.log('═══════════════════════════════════════════════════');
@@ -155,10 +158,6 @@ if (!CONFIG.enabled) {
 }
 
 // ── Main: Start tailing logs ──────────────────────────────────────────────
-let tailProcess = null;       // Module-level handle for kill/restart
-let rescanInterval = null;    // Periodic re-scan timer
-let healthInterval = null;    // Health check timer
-
 function startWatching() {
     // Re-scan in case paths are stale
     if (CONFIG.logPaths.length === 0) {
