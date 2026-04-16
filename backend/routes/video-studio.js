@@ -45,7 +45,7 @@ import { generateUGCScript, UGC_STYLES } from '../agents/videoStudio/ugcScriptGe
 import { saveLearnings, getStylePreferences } from '../agents/videoStudio/selfLearning.js';
 import { getRouter as getAIRouter } from '../ai/router.js';
 import { getProviderBadge } from '../ai/providerRouting.js';
-import { uploadToS3, mirrorUrlToS3, getSignedUrlIfNeeded } from '../utils/s3.js';
+import { uploadToS3, mirrorUrlToS3, getSignedUrlIfNeeded, ensureS3Url } from '../utils/s3.js';
 import { safeErrorMessage } from '../utils/safeError.js';
 import { loadBrandContext, callMultimodalAgent, callAgent } from '../agents/shared/agentUtils.js';
 import { buildEnhanceSystemPrompt, buildEnhanceUserPrompt, VISUAL_GROUNDING_SYSTEM } from '../agents/videoStudio/promptEnhancer.js';
@@ -941,9 +941,27 @@ router.post('/agent/first-frames', protect, async (req, res) => {
                         mimeType: prodResp.headers.get('content-type') || 'image/jpeg',
                         data: Buffer.from(prodBuf).toString('base64'),
                     });
+                } else if (session.referenceImages && session.referenceImages.length > 0) {
+                    const refResp = await fetch(session.referenceImages[0]);
+                    const refBuf = await refResp.arrayBuffer();
+                    contextImages.push({
+                        mimeType: refResp.headers.get('content-type') || 'image/jpeg',
+                        data: Buffer.from(refBuf).toString('base64'),
+                    });
+                } else if (session.allImages && session.allImages.length > 0) {
+                    const refResp = await fetch(session.allImages[0]);
+                    const refBuf = await refResp.arrayBuffer();
+                    contextImages.push({
+                        mimeType: refResp.headers.get('content-type') || 'image/jpeg',
+                        data: Buffer.from(refBuf).toString('base64'),
+                    });
                 }
 
-                const framePrompt = `Generate a high-quality cinematic first frame for a video scene:\n${scene.visualPrompt}\n\nMood: ${scene.mood || 'professional'}. This should look like a movie still or the opening frame of a commercial. Photorealistic, high production value.`;
+                const injectedPrompt = contextImages.length > 0 
+                    ? `\nCRITICAL MANDATE: Reference images are attached. You MUST accurately represent the exact subject shown in these reference images. Do not invent a new subject, faithfully recreate the one from the image in this scene.` 
+                    : '';
+
+                const framePrompt = `Generate a high-quality cinematic first frame for a video scene:\n${scene.visualPrompt}\n\nMood: ${scene.mood || 'professional'}. This should look like a movie still or the opening frame of a commercial. Photorealistic, high production value.${injectedPrompt}`;
 
                 const result = await geminiImageGenerate(framePrompt, contextImages, 0.5);
 
@@ -1006,7 +1024,10 @@ router.post('/agent/generate', protect, requireCredits('videoGenerate'), async (
                 firstImageUrl = session.characterRefUrl;
             } else if (scene.useProductImage && session.productImages?.length > 0) {
                 firstImageUrl = session.productImages[0];
-            } else if (session.allImages?.length > 0 && i === 0) {
+            } else if (session.productImages?.length > 0) {
+                // Always anchor to product image for consistency across all scenes
+                firstImageUrl = session.productImages[0];
+            } else if (session.allImages?.length > 0) {
                 firstImageUrl = session.allImages[0];
             }
 
@@ -1031,8 +1052,19 @@ router.post('/agent/generate', protect, requireCredits('videoGenerate'), async (
                     },
                 });
 
+                // Build enriched prompt with storyboard context for script fidelity
+                const enrichedPrompt = [
+                    storyboard.visualStyle ? `VISUAL STYLE: ${storyboard.visualStyle}` : '',
+                    storyboard.colorPalette ? `COLOR PALETTE: ${storyboard.colorPalette}` : '',
+                    storyboard.characterAnchors?.length ? `CHARACTERS (maintain exact appearance): ${storyboard.characterAnchors.join('; ')}` : '',
+                    scene.voiceoverText ? `NARRATION FOR THIS SCENE: "${scene.voiceoverText}" — the visuals MUST directly illustrate this narration.` : '',
+                    scene.cameraAngle ? `CAMERA: ${scene.cameraAngle}` : '',
+                    scene.lighting ? `LIGHTING: ${scene.lighting}` : '',
+                    scene.visualPrompt,
+                ].filter(Boolean).join('\n\n');
+
                 const state = await advancedGenerateNode({
-                    prompt: scene.visualPrompt,
+                    prompt: enrichedPrompt,
                     model,
                     duration: dur,
                     resolution: '1080p',
@@ -1040,7 +1072,10 @@ router.post('/agent/generate', protect, requireCredits('videoGenerate'), async (
                     firstImageUrl: firstImageUrl || '',
                     generateAudio: session.voiceover?.enabled !== true,
                     aspectRatio,
-                    referenceImages: (session.referenceImages || []).filter(u => u && !u.startsWith('data:')),
+                    referenceImages: [
+                        ...(session.referenceImages || []),
+                        ...(session.productImages || []),
+                    ].filter(u => u && !u.startsWith('data:')),
                 });
 
                 await VideoProject.findByIdAndUpdate(project._id, {
@@ -1078,18 +1113,45 @@ router.post('/agent/generate', protect, requireCredits('videoGenerate'), async (
                 if (voProvider === 'minimax' || voProvider === 'elevenlabs') {
                     const falKey = process.env.FAL_API_KEY;
                     if (falKey) {
-                        const ttsResp = await fetch('https://queue.fal.run/fal-ai/minimax/speech/text-to-speech', {
+                        let ttsApiUrl, ttsPayload;
+                        if (voProvider === 'elevenlabs') {
+                            ttsApiUrl = 'https://fal.run/fal-ai/elevenlabs/tts/eleven-v3';
+                            ttsPayload = {
+                                text: storyboard.voiceoverScript,
+                                voice: session.voiceover.voiceId || 'Rachel'
+                            };
+                        } else {
+                            ttsApiUrl = 'https://fal.run/fal-ai/minimax/speech-02-hd';
+                            ttsPayload = {
+                                text: storyboard.voiceoverScript,
+                                voice_setting: { voice_id: session.voiceover.voiceId || 'Deep_Voice_Man', speed: session.voiceover.speed || 1.0 }
+                            };
+                        }
+                        // Use synchronous fal.run endpoint with timeout to guarantee completion
+                        const ttsResp = await fetch(ttsApiUrl, {
                             method: 'POST',
                             headers: { 'Authorization': `Key ${falKey}`, 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                text: storyboard.voiceoverScript,
-                                voice_setting: { voice_id: session.voiceover.voiceId || 'moss_en_hd', speed: session.voiceover.speed || 1.0 },
-                                model: 'speech-02-hd',
-                            }),
+                            body: JSON.stringify(ttsPayload),
+                            signal: AbortSignal.timeout(120000), // 120s for long scripts
                         });
                         if (ttsResp.ok) {
                             const ttsData = await ttsResp.json();
-                            if (ttsData.request_id) voiceoverUrl = `fal-pending:${ttsData.request_id}`;
+                            const rawAudioUrl = ttsData.audio?.url || ttsData.audio_url || ttsData.audio_file?.url || ttsData.url;
+                            if (rawAudioUrl) {
+                                // Mirror to S3 immediately so URL stays valid for compile
+                                try {
+                                    const audioResp = await fetch(rawAudioUrl, { signal: AbortSignal.timeout(20000) });
+                                    const audioBuffer = Buffer.from(await audioResp.arrayBuffer());
+                                    const s3Key = `agent-vo/${req.user._id}/${Date.now()}.mp3`;
+                                    voiceoverUrl = await uploadToS3(audioBuffer, s3Key, 'audio/mpeg');
+                                    console.log(`   ✅ Voiceover mirrored to S3: ${voiceoverUrl.substring(0, 60)}`);
+                                } catch (mirrorErr) {
+                                    console.warn(`   ⚠️ S3 mirror failed, using raw URL:`, mirrorErr.message);
+                                    voiceoverUrl = rawAudioUrl;
+                                }
+                            }
+                        } else {
+                            console.warn(`   ⚠️ ${voProvider} generation failed:`, await ttsResp.text());
                         }
                     }
                 } else if (voProvider === 'sarvam') {
@@ -1400,6 +1462,31 @@ router.post('/start', protect, requireCredits('videoBrainstorm'), async (req, re
             if (!brand) return res.status(404).json({ success: false, error: 'Brand not found' });
         }
 
+        // ── Upload data-URI images to S3 so they become HTTP URLs ──
+        // Frontend sends user uploads as data:image/...;base64,... which gets
+        // filtered out by all downstream url.startsWith('http') checks.
+        // Fix: upload to S3 NOW so every downstream step can use them.
+        const processedImages = [];
+        for (const img of (images || [])) {
+            if (img.url && img.url.startsWith('data:')) {
+                try {
+                    console.log(`📤 Uploading user image to S3: ${(img.label || 'unnamed').substring(0, 40)}...`);
+                    const s3Url = await ensureS3Url(img.url, 'video-studio/user-uploads');
+                    if (s3Url) {
+                        processedImages.push({ url: s3Url, source: img.source || 'upload', label: img.label || '' });
+                        console.log(`✅ User image uploaded: ${s3Url.substring(0, 80)}`);
+                    } else {
+                        processedImages.push({ url: img.url, source: img.source || 'upload', label: img.label || '' });
+                    }
+                } catch (e) {
+                    console.warn(`⚠️ Failed to upload user image to S3: ${e.message}`);
+                    processedImages.push({ url: img.url, source: img.source || 'upload', label: img.label || '' });
+                }
+            } else {
+                processedImages.push({ url: img.url, source: img.source || 'upload', label: img.label || '' });
+            }
+        }
+
         // Create project
         const project = await VideoProject.create({
             user: req.user._id,
@@ -1408,17 +1495,13 @@ router.post('/start', protect, requireCredits('videoBrainstorm'), async (req, re
             status: 'brainstorm',
             input: {
                 brief: brief || '',
-                inputType: brief && images?.length ? 'both' : images?.length ? 'image' : 'text',
-                images: (images || []).map(img => ({
-                    url: img.url,
-                    source: img.source || 'upload',
-                    label: img.label || '',
-                })),
+                inputType: brief && processedImages.length ? 'both' : processedImages.length ? 'image' : 'text',
+                images: processedImages,
                 videoType: videoType || 'ad-film',
             },
         });
 
-        console.log(`🎬 Video Studio: Created project ${project._id}`);
+        console.log(`🎬 Video Studio: Created project ${project._id} (${processedImages.length} images, all S3)`);
 
         // Run MCoT visual grounding BEFORE brainstorm (non-blocking)
         let visualGrounding = null;
@@ -1894,55 +1977,34 @@ router.post('/ugc/minimax-tts', protect, async (req, res) => {
         };
         if (emotion) payload.voice_setting.emotion = emotion;
 
-        // Submit to fal.ai queue
-        const submitResp = await fetch(`${FAL_QUEUE_URL}/fal-ai/minimax/speech-02-hd`, {
+        // Use synchronous fal.run endpoint — eliminates queue polling failures
+        const FAL_SYNC_URL = 'https://fal.run';
+        console.log(`🔊 Minimax TTS: calling synchronous endpoint for voice ${voiceId}...`);
+        const resp = await fetch(`${FAL_SYNC_URL}/fal-ai/minimax/speech-02-hd`, {
             method: 'POST',
             headers: {
                 'Authorization': `Key ${falKey}`,
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify(payload),
-            signal: AbortSignal.timeout(30000),
+            signal: AbortSignal.timeout(120000), // 120s timeout for longer scripts
         });
 
-        if (!submitResp.ok) {
-            const errText = await submitResp.text();
-            console.error(`❌ Minimax TTS submit error: ${submitResp.status}`, errText);
+        if (!resp.ok) {
+            const errText = await resp.text();
+            console.error(`❌ Minimax TTS error: ${resp.status}`, errText);
             return res.status(500).json({ success: false, error: `TTS failed: ${errText.substring(0, 200)}` });
         }
 
-        const submitData = await submitResp.json();
-        const requestId = submitData.request_id;
-        console.log(`  → Queued: requestId=${requestId}`);
+        const result = await resp.json();
 
-        // Poll for completion (up to 120s)
-        let result = null;
-        for (let i = 0; i < 40; i++) {
-            await new Promise(r => setTimeout(r, 3000));
-            const statusResp = await fetch(
-                `${FAL_QUEUE_URL}/fal-ai/minimax/requests/${requestId}/status`,
-                { headers: { 'Authorization': `Key ${falKey}` } }
-            );
-            if (!statusResp.ok) continue;
-            const statusData = await statusResp.json();
-            if (statusData.status === 'COMPLETED') {
-                const resultResp = await fetch(
-                    `${FAL_QUEUE_URL}/fal-ai/minimax/requests/${requestId}`,
-                    { headers: { 'Authorization': `Key ${falKey}` } }
-                );
-                result = await resultResp.json();
-                break;
-            } else if (statusData.status === 'FAILED') {
-                return res.status(500).json({ success: false, error: 'TTS generation failed' });
-            }
-        }
-
-        if (!result?.audio?.url) {
-            return res.status(500).json({ success: false, error: 'TTS timed out' });
+        const generatedAudioUrl = result?.audio?.url || result?.audio_url || result?.audio_file?.url || result?.url;
+        if (!generatedAudioUrl) {
+            return res.status(500).json({ success: false, error: 'Minimax TTS returned no audio' });
         }
 
         // Download audio and upload to S3
-        const audioResp = await fetch(result.audio.url);
+        const audioResp = await fetch(generatedAudioUrl);
         const audioBuffer = Buffer.from(await audioResp.arrayBuffer());
         const s3Key = `voice-tts/${req.user._id}/${Date.now()}.mp3`;
         const audioUrl = await uploadToS3(audioBuffer, s3Key, 'audio/mpeg');
@@ -2185,6 +2247,60 @@ router.post('/ugc/sarvam-preview', protect, async (req, res) => {
         res.json({ success: true, audioUrl });
     } catch (error) {
         console.error('Sarvam preview error:', error);
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// POST /api/video-studio/ugc/fal-voice-preview — Short TTS preview for Minimax/ElevenLabs
+// ══════════════════════════════════════════════════════════════════════════════
+router.post('/ugc/minimax-preview', protect, async (req, res) => {
+    try {
+        const { voiceId, provider } = req.body;
+        const falKey = process.env.FAL_API_KEY;
+        if (!falKey) throw new Error('FAL_API_KEY missing');
+
+        const isEleven = provider === 'elevenlabs';
+        let payload, apiUrl;
+        if (isEleven) {
+            payload = {
+                text: 'Hello, this is a brief voice preview. I hope you like my tone.',
+                voice: voiceId || 'Rachel'
+            };
+            apiUrl = 'https://fal.run/fal-ai/elevenlabs/tts/eleven-v3';
+        } else {
+            payload = {
+                text: 'Hello, this is a brief voice preview. I hope you like my tone.',
+                voice_setting: { voice_id: voiceId || 'Deep_Voice_Man', speed: 1 }
+            };
+            apiUrl = 'https://fal.run/fal-ai/minimax/speech-02-hd';
+        }
+
+        console.log(`🔊 Voice preview: calling synchronous endpoint for voice ${voiceId} via ${isEleven ? 'elevenlabs' : 'minimax'}...`);
+        const resp = await fetch(apiUrl, {
+            method: 'POST',
+            headers: { 'Authorization': `Key ${falKey}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+            signal: AbortSignal.timeout(60000), // 60s timeout for sync call
+        });
+        
+        if (!resp.ok) {
+            const errText = await resp.text();
+            throw new Error(`TTS preview failed (${resp.status}): ${errText.substring(0, 200)}`);
+        }
+
+        const result = await resp.json();
+
+        const generatedAudioUrl = result?.audio?.url || result?.audio_url || result?.audio_file?.url || result?.url;
+        if (!generatedAudioUrl) throw new Error('TTS preview returned no audio.');
+
+        const audioResp = await fetch(generatedAudioUrl);
+        const audioBuffer = Buffer.from(await audioResp.arrayBuffer());
+        const s3Key = `ugc-previews/minimax-${voiceId}-${Date.now()}.mp3`;
+        const audioUrl = await uploadToS3(audioBuffer, s3Key, 'audio/mpeg');
+
+        res.json({ success: true, audioUrl });
+    } catch (error) {
+        console.error('Minimax preview error:', error);
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
@@ -2834,33 +2950,44 @@ router.post('/:id/approve', protect, async (req, res) => {
         // Run reference curator + auto-generate first frame image in parallel
         const script = editedScript || project.script;
         const firstShot = script?.shots?.[0];
-        // Check if user provided a real, externally-accessible image
-        // Exclude: base64 data URIs, localhost proxy URLs
-        const hasRealImage = fullState.inputImages?.some(img => {
-            if (!img.url) return false;
-            if (img.url.startsWith('data:')) return false;
-            if (img.url.includes('localhost') || img.url.includes('127.0.0.1')) return false;
-            return img.url.startsWith('http');
-        });
+        // Collect user reference image URLs for style injection (S3 http: or fallback data: URIs)
+        const userRefUrls = (fullState.inputImages || [])
+            .map(img => img.url)
+            .filter(url => url && (url.startsWith('http') || url.startsWith('data:image/')) && !url.includes('localhost') && !url.includes('127.0.0.1'));
 
-        console.log(`🖼️ First frame check: firstShot=${!!firstShot}, hasRealImage=${hasRealImage}, inputImages=${fullState.inputImages?.length || 0}`);
+        console.log(`🖼️ First frame check: firstShot=${!!firstShot}, userRefUrls=${userRefUrls.length}, inputImages=${fullState.inputImages?.length || 0}`);
 
-        // Generate first-frame image if no real image is already provided
+        // Extract aspect ratio from project config (default to 16:9 for video)
+        const targetAspectRatio = project.advancedConfig?.aspectRatio || '16:9';
+
+        // Always generate a cinematic first frame — even when user provides reference images.
+        // User reference images are injected INTO Gemini so it performs style-transfer and
+        // subject-aware scene composition rather than using a raw product-on-white-bg as frame 1.
         let firstFramePromise = Promise.resolve(null);
-        if (firstShot && !hasRealImage) {
-            console.log('🖼️ Auto-generating first frame image from first shot description...');
+        if (firstShot) {
+            console.log(`🖼️ Auto-generating first frame image (refs=${userRefUrls.length}, ratio=${targetAspectRatio})...`);
             firstFramePromise = (async () => {
                 try {
                     const { geminiImageGenerate } = await import('../agents/videoStudio/firstFrame.js');
                     const brand = project.brand ? await Brand.findById(project.brand).lean() : null;
                     const shotDesc = firstShot.description || firstShot.visual || firstShot.prompt || 'cinematic opening shot';
+
+                    // Build a richer prompt that instructs Gemini to incorporate the reference images
+                    const refInstruction = userRefUrls.length > 0
+                        ? `\nREFERENCE IMAGES ARE ATTACHED — incorporate the subjects, products, colors, and visual style from these reference images into the scene. The scene should feel like a natural cinematic extension of the reference images, NOT a copy. Place the subjects/products naturally within the scene composition.`
+                        : '';
+
                     const shotPrompt = `Generate a cinematic, photorealistic still frame for a video scene: ${shotDesc}.
 Style: ${firstShot.style || script?.narrative || 'cinematic, professional'}.
-${brand?.name ? `Brand: ${brand.name}` : ''}
+Aspect Ratio: ${targetAspectRatio} — compose the image for this exact ratio.
+${brand?.name ? `Brand: ${brand.name}` : ''}${refInstruction}
 This image will be used as the FIRST FRAME of a video — make it visually striking, well-composed, and suitable as an opening shot.
 Output ONLY the image, no text or labels.`;
-                    console.log('🖼️ First frame prompt:', shotPrompt.substring(0, 200) + '...');
-                    const result = await geminiImageGenerate(shotPrompt, [], 0.5);
+                    console.log('🖼️ First frame prompt:', shotPrompt.substring(0, 250) + '...');
+                    const result = await geminiImageGenerate(shotPrompt, [], 0.5, {
+                        aspectRatio: targetAspectRatio,
+                        referenceImageUrls: userRefUrls,
+                    });
                     if (result.imageUrl) {
                         console.log('✅ First frame image generated successfully:', result.imageUrl.substring(0, 80));
                         return result.imageUrl;
@@ -2871,7 +2998,7 @@ Output ONLY the image, no text or labels.`;
                 return null;
             })();
         } else {
-            console.log(`🖼️ Skipping first frame generation: ${!firstShot ? 'no first shot in script' : 'user already has a real image'}`);
+            console.log('🖼️ Skipping first frame generation: no first shot in script');
         }
 
         // Run reference curator
@@ -2949,7 +3076,12 @@ router.post('/:id/voiceover-preview', protect, async (req, res) => {
                 body: JSON.stringify({
                     inputs: [fullScript.substring(0, 2000)],
                     target_language_code: langCode || 'hi-IN',
-                    speaker: speaker || 'anushka',
+                    // Map deprecated or invalid speakers
+                    speaker: (() => {
+                        const s = speaker || 'anushka';
+                        if (s === 'arvind') return 'abhilash';
+                        return s;
+                    })(),
                     model: 'bulbul:v2',
                     pitch: 0,
                     pace: speed || 1.0,
@@ -2973,118 +3105,50 @@ router.post('/:id/voiceover-preview', protect, async (req, res) => {
             durationMs = Math.round(buffer.length / 16000) * 1000;
 
         } else {
-            // ── Primary: Gemini 2.5 Flash TTS (synchronous, ~3-5s, no polling) ──
-            // Falls back to Minimax via fal.ai if Gemini fails.
-            const geminiKey = process.env.GEMINI_API_KEY;
-            let geminiSuccess = false;
-
-            if (geminiKey) {
-                try {
-                    console.log(`🎙️ [Voiceover] Trying Gemini 2.5 Flash TTS (synchronous)...`);
-                    const geminiResp = await fetch(
-                        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${geminiKey}`,
-                        {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                contents: [{ parts: [{ text: fullScript.substring(0, 5000) }] }],
-                                generationConfig: {
-                                    responseModalities: ['AUDIO'],
-                                    speechConfig: {
-                                        voiceConfig: {
-                                            prebuiltVoiceConfig: {
-                                                // Map common voiceIds to Gemini voices; default to Kore
-                                                voiceName: (() => {
-                                                    const v = (voiceId || '').toLowerCase();
-                                                    if (v.includes('female') || v.includes('moss') || v.includes('anushka')) return 'Kore';
-                                                    if (v.includes('male') || v.includes('arvind')) return 'Charon';
-                                                    return 'Kore';
-                                                })(),
-                                            }
-                                        }
-                                    }
-                                }
-                            }),
-                            signal: AbortSignal.timeout(45000), // 45s hard cap — Gemini is synchronous
-                        }
-                    );
-
-                    if (geminiResp.ok) {
-                        const geminiData = await geminiResp.json();
-                        const audioPart = geminiData.candidates?.[0]?.content?.parts?.find(
-                            p => p.inlineData?.mimeType?.startsWith('audio/')
-                        );
-                        if (audioPart?.inlineData?.data) {
-                            const buf = Buffer.from(audioPart.inlineData.data, 'base64');
-                            const mimeType = audioPart.inlineData.mimeType || 'audio/wav';
-                            const ext = mimeType.includes('mp3') ? 'mp3' : 'wav';
-                            const s3Key = `voiceover-preview/${req.user._id}/${Date.now()}-gemini.${ext}`;
-                            audioUrl = await uploadToS3(buf, s3Key, mimeType);
-                            durationMs = Math.round(buf.length / 24000) * 1000; // rough estimate
-                            geminiSuccess = true;
-                            console.log(`✅ [Voiceover] Gemini TTS done: ${buf.length} bytes → ${audioUrl.substring(0, 60)}`);
-                        }
-                    } else {
-                        const errText = await geminiResp.text().catch(() => '');
-                        console.warn(`⚠️ [Voiceover] Gemini TTS returned ${geminiResp.status}: ${errText.substring(0, 100)}`);
-                    }
-                } catch (gErr) {
-                    console.warn(`⚠️ [Voiceover] Gemini TTS failed: ${gErr.message} — falling back to Minimax`);
-                }
-            }
-
-            // ── Fallback: Minimax via fal.ai (async queue, capped at 60s) ──
-            if (!geminiSuccess) {
+            // ── Primary: Minimax or ElevenLabs via fal.ai (synchronous) ──
+            if (true) {
                 const falKey = process.env.FAL_API_KEY;
                 if (!falKey) throw new Error('No TTS provider configured (FAL_API_KEY missing)');
+                
+                let apiUrl, payload;
+                const isEleven = voiceProvider === 'elevenlabs';
 
-                const payload = {
-                    text: fullScript.substring(0, 5000),
-                    voice_setting: { voice_id: voiceId || 'moss_en_hd', speed: speed || 1 },
-                    output_format: 'url',
-                    language_boost: 'auto',
-                };
-                if (emotion) payload.voice_setting.emotion = emotion;
+                if (isEleven) {
+                    apiUrl = 'https://fal.run/fal-ai/elevenlabs/tts/eleven-v3';
+                    payload = {
+                        text: fullScript.substring(0, 5000),
+                        voice: voiceId || 'Rachel'
+                    };
+                } else {
+                    apiUrl = 'https://fal.run/fal-ai/minimax/speech-02-hd';
+                    payload = {
+                        text: fullScript.substring(0, 5000),
+                        voice_setting: { voice_id: voiceId || 'Deep_Voice_Man', speed: speed || 1 },
+                        output_format: 'url',
+                        language_boost: 'auto',
+                    };
+                    if (emotion) payload.voice_setting.emotion = emotion;
+                }
 
-                const submitResp = await fetch(`${FAL_QUEUE_URL}/fal-ai/minimax/speech-02-hd`, {
+                console.log(`🔊 [Voiceover] TTS: calling synchronous endpoint via ${isEleven ? 'elevenlabs' : 'minimax'}...`);
+                const resp = await fetch(apiUrl, {
                     method: 'POST',
                     headers: { 'Authorization': `Key ${falKey}`, 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload),
-                    signal: AbortSignal.timeout(30000),
+                    signal: AbortSignal.timeout(120000), // 120s for longer scripts
                 });
-                if (!submitResp.ok) {
-                    const errText = await submitResp.text();
-                    throw new Error(`Minimax TTS submit failed (${submitResp.status}): ${errText.substring(0, 200)}`);
+                
+                if (!resp.ok) {
+                    const errText = await resp.text();
+                    throw new Error(`TTS failed (${resp.status}): ${errText.substring(0, 200)}`);
                 }
 
-                const { request_id: requestId } = await submitResp.json();
-                console.log(`🔊 [Voiceover] Minimax queued: requestId=${requestId}`);
+                const result = await resp.json();
 
-                // Poll up to 60s (20 × 3s) — half the previous limit
-                let result = null;
-                for (let i = 0; i < 20; i++) {
-                    await new Promise(r => setTimeout(r, 3000));
-                    const statusResp = await fetch(
-                        `${FAL_QUEUE_URL}/fal-ai/minimax/requests/${requestId}/status`,
-                        { headers: { 'Authorization': `Key ${falKey}` }, signal: AbortSignal.timeout(10000) }
-                    );
-                    if (!statusResp.ok) continue;
-                    const statusData = await statusResp.json();
-                    if (statusData.status === 'COMPLETED') {
-                        const resultResp = await fetch(
-                            `${FAL_QUEUE_URL}/fal-ai/minimax/requests/${requestId}`,
-                            { headers: { 'Authorization': `Key ${falKey}` } }
-                        );
-                        result = await resultResp.json();
-                        break;
-                    } else if (statusData.status === 'FAILED') {
-                        throw new Error('Minimax TTS generation failed. Please try again.');
-                    }
-                }
+                const generatedAudioUrl = result?.audio?.url || result?.audio_url || result?.audio_file?.url || result?.url;
+                if (!generatedAudioUrl) throw new Error('TTS returned no audio.');
 
-                if (!result?.audio?.url) throw new Error('TTS timed out — Gemini unavailable and Minimax took too long. Please try again.');
-
-                const audioResp = await fetch(result.audio.url, { signal: AbortSignal.timeout(20000) });
+                const audioResp = await fetch(generatedAudioUrl, { signal: AbortSignal.timeout(20000) });
                 const audioBuffer = Buffer.from(await audioResp.arrayBuffer());
                 const s3Key = `voiceover-preview/${req.user._id}/${Date.now()}.mp3`;
                 audioUrl = await uploadToS3(audioBuffer, s3Key, 'audio/mpeg');
@@ -3113,6 +3177,195 @@ router.post('/:id/voiceover-preview', protect, async (req, res) => {
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
+// POST /api/video-studio/:id/generate-images — Generate initial frames for review
+// ══════════════════════════════════════════════════════════════════════════════
+router.post('/:id/generate-images', protect, async (req, res) => {
+    try {
+        const { resolution, model, mode, aspectRatio } = req.body; // Optional overrides
+        const project = await VideoProject.findOne({ _id: req.params.id, user: req.user._id });
+        if (!project) return res.status(404).json({ success: false, error: 'Project not found' });
+        if (project.status !== 'routing') return res.status(400).json({ success: false, error: 'Not in routing stage' });
+
+        // Apply any user overrides
+        const routing = { ...(project.routing?.toObject ? project.routing.toObject() : project.routing) };
+        if (resolution) routing.resolution = resolution;
+        if (model) routing.selectedModel = model;
+        if (mode) routing.mode = mode;
+        if (aspectRatio) routing.aspectRatio = aspectRatio;
+        if (resolution || model || mode || aspectRatio) {
+            routing.costPreview = estimateCost(
+                routing.selectedModel,
+                project.script?.totalDuration || 5,
+                routing.resolution,
+                routing.mode
+            );
+        }
+        await VideoProject.findByIdAndUpdate(project._id, { routing });
+
+        const shots = project.script?.shots || [];
+        const ar = routing.aspectRatio || '16:9';
+
+        // Collect product/reference images
+        const userRefUrls = (project.input?.images || [])
+            .map(img => img.url)
+            .filter(url => url && (url.startsWith('http') || url.startsWith('data:image/')) && !url.includes('localhost'));
+        const brandRefUrls = (project.references?.brandImages || [])
+            .map(img => img.url)
+            .filter(url => url && url.startsWith('http'));
+        const userUploadedUrls = (project.references?.userUploaded || [])
+            .map(img => img.url)
+            .filter(url => url && url.startsWith('http'));
+        const allRefImages = [...userRefUrls, ...userUploadedUrls, ...brandRefUrls];
+
+        if (shots.length > 0) {
+            console.log(`🖼️ Generating images for ${shots.length} shots...`);
+            const { geminiImageGenerate } = await import('../agents/videoStudio/firstFrame.js');
+            const brand = project.brand ? await Brand.findById(project.brand).lean() : null;
+
+            // Generate images sequentially with delay to avoid Gemini rate limits
+            // Gemini image gen allows ~2-3 requests/minute, so we space them 5s apart
+            const generatedImages = [];
+            for (let i = 0; i < shots.length; i++) {
+                // Rate limit spacing: wait 10s between shots to avoid Gemini "high demand" errors
+                if (i > 0) {
+                    console.log(`🖼️ Waiting 10s before shot ${i + 1} (Gemini rate limit spacing)...`);
+                    await new Promise(r => setTimeout(r, 10000));
+                }
+
+                const shot = shots[i];
+                const shotVisual = shot.visual || shot.description || shot.prompt || '';
+                const shotCamera = shot.camera || '';
+                const shotDialogue = shot.dialogue || '';
+
+                try {
+                    const shotPrompt = [
+                        `Generate a cinematic, photorealistic still frame for shot ${i + 1} of a video:`,
+                        shotVisual,
+                        shotCamera ? `Camera: ${shotCamera}` : '',
+                        shotDialogue ? `Scene narration: "${shotDialogue}"` : '',
+                        `Aspect Ratio: ${ar}`,
+                        brand?.name ? `Brand: ${brand.name}` : '',
+                        allRefImages.length > 0 ? 'REFERENCE IMAGES ARE ATTACHED — incorporate the product, subjects, and visual style from these references. Maintain EXACT product appearance throughout.' : '',
+                        'This image will be animated into a video — make it well-composed and suitable for motion.',
+                        'Output ONLY the image, no text or labels.',
+                    ].filter(Boolean).join('\n');
+
+                    const result = await geminiImageGenerate(shotPrompt, [], 0.5, {
+                        aspectRatio: ar,
+                        referenceImageUrls: allRefImages.slice(0, 2), // 2 refs OK — images are resized to 512px via sharp
+                    });
+                    
+                    generatedImages.push(result.imageUrl || (allRefImages.length > 0 && i === 0 ? allRefImages[0] : null));
+                } catch (imgErr) {
+                    console.warn(`⚠️ Shot ${i + 1} image gen failed:`, imgErr.message);
+                    generatedImages.push(allRefImages.length > 0 && i === 0 ? allRefImages[0] : null);
+                }
+            }
+
+            // Update shots with generated images
+            shots.forEach((shot, i) => {
+                shot.imageUrl = generatedImages[i] || ''; // Save intermediate image URL to the shot
+            });
+
+            // Set state to image-review
+            await VideoProject.findByIdAndUpdate(project._id, {
+                'script.shots': shots,
+                status: 'image-review'
+            });
+
+            const updatedProject = await VideoProject.findById(project._id).lean();
+            return res.json({
+                success: true,
+                project: {
+                    ...updatedProject,
+                    pipeline: getPipelineInfo('image-review')
+                }
+            });
+        } else {
+            // No shots, skip straight to single video generation
+            await VideoProject.findByIdAndUpdate(project._id, { status: 'image-review' });
+            const updatedProject = await VideoProject.findById(project._id).lean();
+            return res.json({
+                success: true,
+                project: {
+                    ...updatedProject,
+                    pipeline: getPipelineInfo('image-review')
+                }
+            });
+        }
+    } catch (error) {
+        console.error('Video Studio generate-images error:', error);
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// POST /api/video-studio/:id/regenerate-shot-image — Regenerate a single specific shot frame
+// ══════════════════════════════════════════════════════════════════════════════
+router.post('/:id/regenerate-shot-image', protect, async (req, res) => {
+    try {
+        const { shotIndex, overridePrompt } = req.body;
+        const project = await VideoProject.findOne({ _id: req.params.id, user: req.user._id });
+        if (!project) return res.status(404).json({ success: false, error: 'Project not found' });
+        if (project.status !== 'image-review') return res.status(400).json({ success: false, error: 'Not in image review stage' });
+        
+        const shots = project.script?.shots || [];
+        if (shotIndex < 0 || shotIndex >= shots.length) {
+            return res.status(400).json({ success: false, error: 'Invalid shot index' });
+        }
+
+        const shot = shots[shotIndex];
+        const { geminiImageGenerate } = await import('../agents/videoStudio/firstFrame.js');
+        const ar = project.routing?.aspectRatio || '16:9';
+        
+        // Collect product/reference images
+        const userRefUrls = (project.input?.images || [])
+            .map(img => img.url)
+            .filter(url => url && (url.startsWith('http') || url.startsWith('data:image/')) && !url.includes('localhost'));
+        const brandRefUrls = (project.references?.brandImages || [])
+            .map(img => img.url)
+            .filter(url => url && url.startsWith('http'));
+        const userUploadedUrls = (project.references?.userUploaded || [])
+            .map(img => img.url)
+            .filter(url => url && url.startsWith('http'));
+        const allRefImages = [...userRefUrls, ...userUploadedUrls, ...brandRefUrls];
+
+        const shotVisual = overridePrompt || shot.visual || shot.description || shot.prompt || '';
+        
+        console.log(`🖼️ Regenerating image for shot ${shotIndex + 1}...`);
+        
+        const shotPrompt = [
+            `Generate a cinematic, photorealistic still frame for shot ${shotIndex + 1} of a video:`,
+            shotVisual,
+            `Aspect Ratio: ${ar}`,
+            allRefImages.length > 0 ? 'REFERENCE IMAGES ARE ATTACHED — incorporate the product, subjects, and visual style from these references. Maintain EXACT product appearance throughout.' : '',
+            'This image will be animated into a video — make it well-composed and suitable for motion.',
+            'Output ONLY the image, no text or labels.',
+        ].filter(Boolean).join('\n');
+
+        const result = await geminiImageGenerate(shotPrompt, [], 0.5, {
+            aspectRatio: ar,
+            referenceImageUrls: allRefImages.slice(0, 2) // 2 refs OK — images are resized to 512px via sharp
+        });
+
+        if (result.imageUrl) {
+            shots[shotIndex].imageUrl = result.imageUrl;
+            
+            await VideoProject.findByIdAndUpdate(project._id, {
+                'script.shots': shots
+            });
+            
+            return res.json({ success: true, imageUrl: result.imageUrl, shots });
+        } else {
+            return res.status(500).json({ success: false, error: 'Failed to regenerate image' });
+        }
+    } catch (error) {
+        console.error('Video Studio regenerate-shot-image error:', error);
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
 // POST /api/video-studio/:id/generate — Confirm cost → trigger fal.ai
 // ══════════════════════════════════════════════════════════════════════════════
 router.post('/:id/generate', protect, requireCredits('videoGenerate'), async (req, res) => {
@@ -3123,25 +3376,148 @@ router.post('/:id/generate', protect, requireCredits('videoGenerate'), async (re
         if (project.status !== 'routing') return res.status(400).json({ success: false, error: 'Not in routing stage' });
 
         // Apply any user overrides
+        const routing = { ...(project.routing?.toObject ? project.routing.toObject() : project.routing) };
+        if (resolution) routing.resolution = resolution;
+        if (model) routing.selectedModel = model;
+        if (mode) routing.mode = mode;
+        if (aspectRatio) routing.aspectRatio = aspectRatio;
         if (resolution || model || mode || aspectRatio) {
-            const routing = { ...project.routing.toObject() };
-            if (resolution) routing.resolution = resolution;
-            if (model) routing.selectedModel = model;
-            if (mode) routing.mode = mode;
-            if (aspectRatio) routing.aspectRatio = aspectRatio;
             routing.costPreview = estimateCost(
                 routing.selectedModel,
                 project.script?.totalDuration || 5,
                 routing.resolution,
                 routing.mode
             );
-            await VideoProject.findByIdAndUpdate(project._id, { routing, creditsUsed: req.creditsDeducted || 0 });
-        } else {
-            // Even if no routing updates, track deducted credits
-            await VideoProject.findByIdAndUpdate(project._id, { creditsUsed: req.creditsDeducted || 0 });
+        }
+        await VideoProject.findByIdAndUpdate(project._id, { routing, creditsUsed: req.creditsDeducted || 0 });
+
+        const shots = project.script?.shots || [];
+        const selectedModel = routing.selectedModel || 'grok-imagine';
+        const ar = routing.aspectRatio || '16:9';
+        const qualityMode = routing.mode || 'fast';
+
+        // Collect product/reference images for consistency across all shots
+        const userRefUrls = (project.input?.images || [])
+            .map(img => img.url)
+            .filter(url => url && url.startsWith('http') && !url.includes('localhost'));
+        const brandRefUrls = (project.references?.brandImages || [])
+            .map(img => img.url)
+            .filter(url => url && url.startsWith('http'));
+        const userUploadedUrls = (project.references?.userUploaded || [])
+            .map(img => img.url)
+            .filter(url => url && url.startsWith('http'));
+        const allRefImages = [...userRefUrls, ...userUploadedUrls, ...brandRefUrls];
+
+        // ── SHOT-BY-SHOT PIPELINE ──
+        if (shots.length > 1) {
+            console.log(`🎬 Shot-by-shot pipeline: ${shots.length} shots × ${selectedModel}`);
+
+            const shotGenerations = [];
+            for (let i = 0; i < shots.length; i++) {
+                const shot = shots[i];
+                const shotDur = Math.min(Math.max(shot.duration || 5, 3), 10);
+                const shotVisual = shot.visual || shot.description || shot.prompt || '';
+                const shotCamera = shot.camera || '';
+                const shotDialogue = shot.dialogue || '';
+
+                // Use the pre-generated image chosen during the Image Review step
+                let shotImageUrl = shot.imageUrl || null;
+
+                // If no image is present but we have user ref images, fallback to the first one for shot 1
+                if (!shotImageUrl && allRefImages.length > 0 && i === 0) {
+                    shotImageUrl = allRefImages[0];
+                }
+
+                // Step B: Submit image-to-video (or text-to-video if no image)
+                console.log(`   🎥 Shot ${i + 1}/${shots.length}: submitting to ${selectedModel} (${shotDur}s) with image: ${shotImageUrl ? 'YES' : 'NO'}`);
+                try {
+                    const enrichedPrompt = [
+                        shotVisual,
+                        shotCamera ? `Camera movement: ${shotCamera}` : '',
+                        shotDialogue ? `The scene illustrates: "${shotDialogue}"` : '',
+                    ].filter(Boolean).join('. ');
+
+                    const genResult = await submitVideoGeneration({
+                        model: selectedModel,
+                        prompt: enrichedPrompt,
+                        imageUrl: shotImageUrl || null,
+                        duration: shotDur,
+                        resolution: routing.resolution || '1080p',
+                        mode: qualityMode,
+                        generateAudio: routing.generateAudio !== false,
+                        aspectRatio: ar,
+                        referenceImages: allRefImages.slice(0, 3),
+                    });
+
+                    shotGenerations.push({
+                        shotIndex: i,
+                        shotNumber: i + 1,
+                        duration: shotDur,
+                        visual: shotVisual.substring(0, 200),
+                        dialogue: shotDialogue,
+                        imageUrl: shotImageUrl || '',
+                        falRequestId: genResult.requestId,
+                        falEndpoint: genResult.endpoint,
+                        falStatusUrl: genResult.statusUrl,
+                        falResultUrl: genResult.resultUrl,
+                        provider: genResult.provider || 'fal',
+                        _piApiPayload: genResult._piApiPayload || null,
+                        _muApiPayload: genResult._muApiPayload || null,
+                        _laozhangVideoUrl: genResult._laozhangVideoUrl || null,
+                        videoUrl: genResult._laozhangVideoUrl || '',
+                        status: genResult._laozhangVideoUrl ? 'COMPLETED' : 'IN_QUEUE',
+                        progress: genResult._laozhangVideoUrl ? 100 : 5,
+                        error: '',
+                    });
+
+                    console.log(`   🎬 Shot ${i + 1}: submitted (${genResult.provider}, ${shotDur}s)`);
+                } catch (shotErr) {
+                    console.error(`   ❌ Shot ${i + 1} submission failed:`, shotErr.message);
+                    shotGenerations.push({
+                        shotIndex: i,
+                        shotNumber: i + 1,
+                        duration: shotDur,
+                        visual: shotVisual.substring(0, 200),
+                        status: 'FAILED',
+                        error: shotErr.message,
+                    });
+                }
+            }
+
+            // Save multi-shot generation state
+            await VideoProject.findByIdAndUpdate(project._id, {
+                status: 'multi-generating',
+                generation: {
+                    isMultiShot: true,
+                    shots: shotGenerations,
+                    totalShots: shots.length,
+                    completedShots: shotGenerations.filter(s => s.status === 'COMPLETED').length,
+                    progress: Math.round((shotGenerations.filter(s => s.status === 'COMPLETED').length / shots.length) * 100),
+                    startedAt: new Date(),
+                    model: selectedModel,
+                },
+                backendPrompt: project.backendPrompt,
+            });
+
+            return res.json({
+                success: true,
+                project: {
+                    _id: project._id,
+                    status: 'multi-generating',
+                    generation: {
+                        isMultiShot: true,
+                        totalShots: shots.length,
+                        completedShots: shotGenerations.filter(s => s.status === 'COMPLETED').length,
+                        progress: Math.round((shotGenerations.filter(s => s.status === 'COMPLETED').length / shots.length) * 100),
+                        shots: shotGenerations.map(s => ({ shotNumber: s.shotNumber, status: s.status, progress: s.progress })),
+                    },
+                    pipeline: getPipelineInfo('generating'),
+                },
+            });
         }
 
-        // Build state and run video generator ASYNCHRONOUSLY
+        // ── FALLBACK: Single-shot (no multi-shot script) ──
+        console.log(`🎬 Single-shot generation: ${selectedModel}`);
         const updatedProject = await VideoProject.findById(project._id).lean();
         runStep(project._id, 'generating', videoGeneratorNode, {
             userId: req.user._id.toString(),
@@ -3180,6 +3556,223 @@ router.get('/:id/status', protect, async (req, res) => {
     try {
         const project = await VideoProject.findOne({ _id: req.params.id, user: req.user._id }).lean();
         if (!project) return res.status(404).json({ success: false, error: 'Project not found' });
+
+        // ── MULTI-SHOT GENERATION: Poll all shots + auto-compile ──
+        if (project.status === 'multi-generating' && project.generation?.isMultiShot) {
+            const shotGens = project.generation.shots || [];
+            let anyChanged = false;
+
+            // Poll each incomplete shot
+            for (let i = 0; i < shotGens.length; i++) {
+                const shot = shotGens[i];
+                if (shot.status === 'COMPLETED' || shot.status === 'FAILED' || !shot.falRequestId) continue;
+
+                try {
+                    const shotState = {
+                        generation: {
+                            falRequestId: shot.falRequestId,
+                            falEndpoint: shot.falEndpoint,
+                            falStatusUrl: shot.falStatusUrl,
+                            falResultUrl: shot.falResultUrl,
+                            provider: shot.provider,
+                            _piApiPayload: shot._piApiPayload,
+                            _muApiPayload: shot._muApiPayload,
+                            _laozhangVideoUrl: shot._laozhangVideoUrl,
+                            videoUrl: shot.videoUrl,
+                            progress: shot.progress,
+                        },
+                        routing: project.routing,
+                    };
+                    const updated = await pollGenerationStatus(shotState);
+
+                    if (updated.generation.videoUrl && updated.generation.videoUrl !== shot.videoUrl) {
+                        shotGens[i].videoUrl = updated.generation.videoUrl;
+                        shotGens[i].status = 'COMPLETED';
+                        shotGens[i].progress = 100;
+                        anyChanged = true;
+                    } else if (updated.generation.progress !== shot.progress) {
+                        shotGens[i].progress = updated.generation.progress || shot.progress;
+                        shotGens[i].status = updated.generation.status || shot.status;
+                        anyChanged = true;
+                    }
+                    if (updated.status === 'failed' || updated.generation?.error) {
+                        shotGens[i].status = 'FAILED';
+                        shotGens[i].error = updated.generation.error || 'Generation failed';
+                        anyChanged = true;
+                    }
+                } catch (pollErr) {
+                    console.warn(`   ⚠️ Shot ${i + 1} poll error:`, pollErr.message);
+                }
+            }
+
+            const completedShots = shotGens.filter(s => s.status === 'COMPLETED');
+            const failedShots = shotGens.filter(s => s.status === 'FAILED');
+            const totalProgress = Math.round((completedShots.length / shotGens.length) * 100);
+
+            if (anyChanged) {
+                await VideoProject.findByIdAndUpdate(project._id, {
+                    'generation.shots': shotGens,
+                    'generation.completedShots': completedShots.length,
+                    'generation.progress': totalProgress,
+                });
+            }
+
+            // All shots done (or failed) → auto-compile
+            if (completedShots.length + failedShots.length === shotGens.length && completedShots.length > 0) {
+                console.log(`🎬 All ${completedShots.length}/${shotGens.length} shots complete. Auto-compiling...`);
+
+                try {
+                    const fs = await import('fs');
+                    const path = await import('path');
+                    const os = await import('os');
+                    const { execSync } = await import('child_process');
+                    const ffmpegModule = await import('@ffmpeg-installer/ffmpeg');
+                    const ffmpegPath = ffmpegModule.default?.path || ffmpegModule.path;
+
+                    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mantram-multishot-'));
+
+                    // Download all completed shot videos
+                    const clipPaths = [];
+                    for (const shot of completedShots.sort((a, b) => a.shotIndex - b.shotIndex)) {
+                        const clipPath = path.join(tmpDir, `shot_${shot.shotIndex}.mp4`);
+                        try {
+                            let videoUrl = shot.videoUrl;
+                            // Upload to S3 first if it's a CDN URL
+                            if (videoUrl && !videoUrl.includes('mantram-assets')) {
+                                const s3Result = await downloadAndUploadVideoToS3(`${project._id}-shot-${shot.shotIndex}`, videoUrl);
+                                if (s3Result) videoUrl = s3Result;
+                            }
+                            const resp = await fetch(videoUrl, { signal: AbortSignal.timeout(60000) });
+                            fs.writeFileSync(clipPath, Buffer.from(await resp.arrayBuffer()));
+                            clipPaths.push(clipPath);
+                        } catch (dlErr) {
+                            console.warn(`   ⚠️ Shot ${shot.shotNumber} download failed:`, dlErr.message);
+                        }
+                    }
+
+                    if (clipPaths.length === 0) throw new Error('No clips downloaded');
+
+                    // Download voiceover if available
+                    let voiceoverPath = null;
+                    if (project.voiceoverPreview?.audioUrl) {
+                        voiceoverPath = path.join(tmpDir, 'voiceover.mp3');
+                        try {
+                            const voResp = await fetch(project.voiceoverPreview.audioUrl, { signal: AbortSignal.timeout(30000) });
+                            fs.writeFileSync(voiceoverPath, Buffer.from(await voResp.arrayBuffer()));
+                            console.log(`   🎙️ Voiceover downloaded for mixing`);
+                        } catch { voiceoverPath = null; }
+                    }
+
+                    // FFmpeg: concat all clips
+                    const concatFile = path.join(tmpDir, 'concat.txt');
+                    fs.writeFileSync(concatFile, clipPaths.map(p => `file '${p}'`).join('\n'));
+
+                    const outputPath = path.join(tmpDir, 'compiled.mp4');
+                    let ffCmd = `"${ffmpegPath}" -y -f concat -safe 0 -i "${concatFile}"`;
+
+                    if (voiceoverPath) {
+                        ffCmd += ` -i "${voiceoverPath}"`;
+                        // Mix: original audio at 20% + voiceover at 100%
+                        ffCmd += ` -filter_complex "[0:a]volume=0.2[orig];[1:a]volume=1.0[vo];[orig][vo]amix=inputs=2:duration=longest[aout]" -map 0:v -map "[aout]"`;
+                    } else {
+                        ffCmd += ` -c copy`;
+                    }
+                    ffCmd += ` -movflags +faststart "${outputPath}"`;
+
+                    console.log(`   🔧 FFmpeg compile: ${clipPaths.length} clips + ${voiceoverPath ? 'VO' : 'no VO'}`);
+                    execSync(ffCmd, { stdio: 'pipe', timeout: 180000 });
+
+                    // Upload compiled video to S3
+                    const compiledBuffer = fs.readFileSync(outputPath);
+                    const s3Key = `videos/${project._id}-compiled.mp4`;
+                    const finalUrl = await uploadToS3(compiledBuffer, s3Key, 'video/mp4');
+                    console.log(`   ✅ Compiled video: ${finalUrl.substring(0, 60)}`);
+
+                    // Clean up temp
+                    fs.rmSync(tmpDir, { recursive: true, force: true });
+
+                    // Update project with final compiled video
+                    const finalGeneration = {
+                        ...project.generation,
+                        shots: shotGens,
+                        videoUrl: finalUrl,
+                        status: 'COMPLETED',
+                        progress: 100,
+                        completedAt: new Date(),
+                        isCompiled: true,
+                        totalClips: clipPaths.length,
+                        hasVoiceover: !!voiceoverPath,
+                    };
+
+                    await VideoProject.findByIdAndUpdate(project._id, {
+                        status: 'critique',
+                        generation: finalGeneration,
+                        finalVideoUrl: finalUrl,
+                    });
+
+                    // Run critic on compiled video
+                    const criticState = await runStep(project._id, 'critique', criticNode, {
+                        userId: project.user.toString(),
+                        brandId: project.brand?.toString(),
+                        concepts: project.concepts,
+                        selectedConceptIndex: project.selectedConceptIndex,
+                        script: project.script,
+                        backendPrompt: project.backendPrompt,
+                        routing: project.routing,
+                        generation: finalGeneration,
+                    });
+
+                    return res.json({
+                        success: true,
+                        project: await signVideoProjectAssets({
+                            _id: project._id,
+                            status: 'critique',
+                            generation: finalGeneration,
+                            critique: criticState.critique,
+                            pipeline: getPipelineInfo('critique'),
+                        }),
+                    });
+                } catch (compileErr) {
+                    console.error(`❌ Multi-shot compile failed:`, compileErr.message);
+                    // Fall back to returning first completed shot as the video
+                    const firstCompleted = completedShots.sort((a, b) => a.shotIndex - b.shotIndex)[0];
+                    await VideoProject.findByIdAndUpdate(project._id, {
+                        status: 'critique',
+                        generation: {
+                            ...project.generation,
+                            videoUrl: firstCompleted?.videoUrl || '',
+                            status: 'COMPLETED',
+                            progress: 100,
+                            error: `Compile failed: ${compileErr.message}. Showing first shot only.`,
+                        },
+                    });
+                }
+            }
+
+            // Still in progress — return per-shot status
+            return res.json({
+                success: true,
+                project: await signVideoProjectAssets({
+                    _id: project._id,
+                    status: 'multi-generating',
+                    generation: {
+                        isMultiShot: true,
+                        totalShots: shotGens.length,
+                        completedShots: completedShots.length,
+                        progress: totalProgress,
+                        status: 'IN_PROGRESS',
+                        shots: shotGens.map(s => ({
+                            shotNumber: s.shotNumber,
+                            status: s.status,
+                            progress: s.progress,
+                            visual: s.visual,
+                            error: s.error || '',
+                        })),
+                    },
+                    pipeline: getPipelineInfo('generating'),
+                }),
+            });
+        }
 
         if ((project.status === 'generating' || project.status === 'advanced-generating') && project.generation?.falRequestId) {
 
@@ -3280,10 +3873,79 @@ router.get('/:id/status', protect, async (req, res) => {
                 // If completed, auto-upload video to S3 before CDN URL expires, then run critic
                 if (updated.status === 'critique') {
                     // Fire-and-forget: upload video to S3
-                    if (updated.generation?.videoUrl) {
-                        downloadAndUploadVideoToS3(project._id.toString(), updated.generation.videoUrl)
-                            .catch(e => console.warn('⚠️ Video S3 upload failed:', e.message));
+                    let finalVideoUrl = updated.generation?.videoUrl;
+                    if (finalVideoUrl) {
+                        try {
+                            const s3Url = await downloadAndUploadVideoToS3(project._id.toString(), finalVideoUrl);
+                            if (s3Url) finalVideoUrl = s3Url;
+                        } catch (e) {
+                            console.warn('⚠️ Video S3 upload failed:', e.message);
+                        }
                     }
+
+                    // ── Auto-mix voiceover if the user generated a preview in step 3 ──
+                    if (finalVideoUrl && project.voiceoverPreview?.audioUrl) {
+                        try {
+                            const fs = await import('fs');
+                            const path = await import('path');
+                            const os = await import('os');
+                            const { execSync } = await import('child_process');
+                            const ffmpegModule = await import('@ffmpeg-installer/ffmpeg');
+                            const ffmpegPath = ffmpegModule.default?.path || ffmpegModule.path;
+
+                            const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mantram-vo-mix-'));
+                            console.log(`🎙️ Auto-mixing voiceover into final video...`);
+
+                            // Download video
+                            const videoPath = path.join(tmpDir, 'video.mp4');
+                            const vidResp = await fetch(finalVideoUrl, { signal: AbortSignal.timeout(60000) });
+                            fs.writeFileSync(videoPath, Buffer.from(await vidResp.arrayBuffer()));
+
+                            // Download voiceover
+                            const voPath = path.join(tmpDir, 'voiceover.mp3');
+                            const voResp = await fetch(project.voiceoverPreview.audioUrl, { signal: AbortSignal.timeout(30000) });
+                            fs.writeFileSync(voPath, Buffer.from(await voResp.arrayBuffer()));
+
+                            // Probe if video has an audio stream
+                            let hasAudio = false;
+                            try {
+                                const ffprobePath = ffmpegPath.replace(/ffmpeg$/, 'ffprobe');
+                                const probeCmd = `"${ffprobePath}" -v quiet -select_streams a -show_entries stream=codec_type -of csv=p=0 "${videoPath}"`;
+                                const probeResult = execSync(probeCmd, { stdio: 'pipe', timeout: 10000 }).toString().trim();
+                                hasAudio = probeResult.includes('audio');
+                            } catch { hasAudio = false; }
+
+                            const outputPath = path.join(tmpDir, 'mixed.mp4');
+                            let ffCmd;
+                            if (hasAudio) {
+                                // Mix: original audio at 30% + voiceover at 100%
+                                ffCmd = `"${ffmpegPath}" -y -i "${videoPath}" -i "${voPath}" -filter_complex "[0:a]volume=0.3[orig];[1:a]volume=1.0[vo];[orig][vo]amix=inputs=2:duration=longest[aout]" -map 0:v -map "[aout]" -c:v copy -movflags +faststart "${outputPath}"`;
+                            } else {
+                                // No original audio — just add voiceover track
+                                ffCmd = `"${ffmpegPath}" -y -i "${videoPath}" -i "${voPath}" -map 0:v -map 1:a -c:v copy -shortest -movflags +faststart "${outputPath}"`;
+                            }
+                            execSync(ffCmd, { stdio: 'pipe', timeout: 60000 });
+
+                            // Upload mixed video to S3
+                            const mixedBuffer = fs.readFileSync(outputPath);
+                            const s3Key = `videos/${project._id}-mixed.mp4`;
+                            finalVideoUrl = await uploadToS3(mixedBuffer, s3Key, 'video/mp4');
+                            console.log(`✅ Voiceover mixed into final video: ${finalVideoUrl.substring(0, 60)}`);
+
+                            // Update generation with mixed video URL
+                            updated.generation.videoUrl = finalVideoUrl;
+                            await VideoProject.findByIdAndUpdate(project._id, {
+                                'generation.videoUrl': finalVideoUrl,
+                                finalVideoUrl,
+                            });
+
+                            // Clean up temp files
+                            fs.rmSync(tmpDir, { recursive: true, force: true });
+                        } catch (mixErr) {
+                            console.warn(`⚠️ Voiceover auto-mix failed (video still available without VO):`, mixErr.message);
+                        }
+                    }
+
                     const criticState = await runStep(project._id, 'critique', criticNode, {
                         userId: project.user.toString(),
                         brandId: project.brand?.toString(),

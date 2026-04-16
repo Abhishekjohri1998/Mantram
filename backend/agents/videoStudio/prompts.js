@@ -152,9 +152,13 @@ BACKEND PROMPT FORMAT FOR SEEDANCE 1.0:
 
     'grok-imagine': `
 BACKEND PROMPT FORMAT FOR GROK IMAGINE:
-- Concise, punchy descriptions — Grok works well with short, direct prompts
+- Concise, punchy descriptions — Grok works well with direct, vivid prompts
 - Subject + Action + Setting + Visual Style in 2–3 sentences max
-- Good for social content — focus on one clear visual moment`,
+- Supports reference images: use <IMAGE_1>, <IMAGE_2> etc. to refer to reference images in prompt
+- Supports Image-to-Video: the first frame image is injected automatically
+- Supports Extend-Video: chain multiple segments for longer content (2-10s per extension)
+- For social content: focus on one clear, dramatic visual moment
+- Native audio supported — describe ambient sounds and music mood`,
   };
 
   const promptGuide = MODEL_PROMPT_GUIDE[model] || MODEL_PROMPT_GUIDE['seedance-2.0'];
@@ -235,27 +239,26 @@ export const MODEL_ROUTER_PROMPT = (brandContext) => `You are the Model Router f
 ${brandContext}
 
 AVAILABLE MODELS:
+- grok-imagine: xAI native video. 1–15s. Reference images (up to 7), I2V, extend-video, native audio. 480p–1080p. Cost: ~$0.08/s. RECOMMENDED DEFAULT.
 - kling-3.0: Best for realistic motion, physics, multi-shot storyboards, dialogue scenes. 3–15s. Native audio + voice IDs. Cost: ~$0.07/s
-- grok-imagine: xAI native video. 1–15s. Fast, flexible, good for social content. 720p max. Cost: ~$0.08/s
 - veo-3.1: Best cinematic quality + photorealistic native audio. 5–8s (extendable). Premium. Cost: ~$0.15/s
 - veo-3.1-fast: Faster/cheaper Veo 3.1 variant. 5–8s. Great for prototyping. Cost: ~$0.08/s
 - seedance-1.0: Fast & affordable. 5–10s. Good for quick social content. Cost: ~$0.05/s
-- seedance-2.0: Upgraded Seedance — camera control, native audio, cinematic quality. Best default for product/brand videos. 4–15s. Cost: ~$0.08/s
+- seedance-2.0: Upgraded Seedance — camera control, native audio, cinematic quality. 4–15s. Cost: ~$0.08/s
 
 ROUTING RULES:
-- DEFAULT: seedance-2.0 — best balance of camera control, quality, audio, and cost
-- Multiple shots / storyboard? → kling-3.0 (only model with multi_prompt support)
-- Pure social reel / quick creative? → grok-imagine (fast, flexible 1–15s)
+- DEFAULT: grok-imagine — best balance of speed, quality, reference images, extend capability, and cost
+- Multiple shots / storyboard needing multi_prompt? → kling-3.0 (only model with multi_prompt support)
+- Social reel / quick creative with reference images? → grok-imagine (supports up to 7 reference images)
 - Cinematic premiere / premium brand film? → veo-3.1 or veo-3.1-fast
-- Budget / prototype? → seedance-1.0 or grok-imagine
-- Premium product showcase with camera moves? → seedance-2.0 (camera control strength)
+- Premium product showcase with precise camera moves? → seedance-2.0 (camera control strength)
 - Dialogue / voice acting? → kling-3.0 (voice IDs) or veo-3.1 (native audio)
-- NOTE: grok-imagine max is 720p — don't select for 1080p requests
+- Budget / prototype / fastest turnaround? → seedance-1.0 or grok-imagine
 
 RESPONSE FORMAT — respond with ONLY valid JSON:
 {
-  "selectedModel": "seedance-2.0",
-  "resolution": "1080p",
+  "selectedModel": "grok-imagine",
+  "resolution": "720p",
   "mode": "fast",
   "reasoning": "Why this model was chosen — 1 clear sentence"
 }`;
