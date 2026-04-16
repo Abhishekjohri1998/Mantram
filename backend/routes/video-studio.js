@@ -434,10 +434,10 @@ router.post('/advanced/generate', protect, requireCredits('videoGenerate'), asyn
             success: true,
             project: {
                 _id: project._id,
-                status: projectStatus,
+                status: 'advanced-generating',
                 mode: 'advanced',
-                generation: state.generation,
-                costPreview: state.costPreview,
+                generation: { progress: 5, startedAt: new Date() },
+                costPreview: 0,
                 durationPlan: durationPlan.durationPlan,
             },
         });
