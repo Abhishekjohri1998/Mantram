@@ -146,8 +146,8 @@ router.post(['/advanced/i2v', '/advanced/image-to-video'], protect, requireCredi
             },
         });
 
-        // 3. Submit to dynamic routing engine (MuAPI/LaoZhang/Kie.ai/PiAPI)
-        const result = await submitVideoGeneration({
+        // 3. Submit to dynamic routing engine (MuAPI/LaoZhang/Kie.ai/PiAPI) asynchronously
+        submitVideoGeneration({
             model: 'seedance-2.0',
             prompt: finalPrompt, // Use enhanced prompt
             imageUrl,
@@ -156,35 +156,46 @@ router.post(['/advanced/i2v', '/advanced/image-to-video'], protect, requireCredi
             mode: qualityMode || 'fast',
             referenceImages: referenceImages || [],
             generateAudio: true,
-        });
-
-        // 4. Update project with generation details
-        await VideoProject.findByIdAndUpdate(project._id, {
-            generation: {
-                falRequestId: result.requestId,
-                falEndpoint: result.endpoint || 'seedance-2.0-i2v',
-                provider: result.provider,
-                _piApiPayload: result._piApiPayload || null,
-                _muApiPayload: result._muApiPayload || null,
-                _laozhangVideoUrl: result._laozhangVideoUrl || null,
-                videoUrl: result._laozhangVideoUrl || '',
-                progress: result._laozhangVideoUrl ? 100 : 5,
-                startedAt: new Date(),
-                ...(result._laozhangVideoUrl ? { completedAt: new Date() } : {}),
-            },
-            backendPrompt: prompt || '',
+        }).then(async (result) => {
+            // 4. Update project with generation details
+            await VideoProject.findByIdAndUpdate(project._id, {
+                generation: {
+                    falRequestId: result.requestId,
+                    falEndpoint: result.endpoint || 'seedance-2.0-i2v',
+                    provider: result.provider,
+                    _piApiPayload: result._piApiPayload || null,
+                    _muApiPayload: result._muApiPayload || null,
+                    _laozhangVideoUrl: result._laozhangVideoUrl || null,
+                    videoUrl: result._laozhangVideoUrl || '',
+                    progress: result._laozhangVideoUrl ? 100 : 5,
+                    startedAt: new Date(),
+                    ...(result._laozhangVideoUrl ? { completedAt: new Date() } : {}),
+                },
+                status: result._laozhangVideoUrl ? 'completed' : 'advanced-generating',
+                backendPrompt: prompt || '',
+                ...(result._laozhangVideoUrl ? { finalVideoUrl: result._laozhangVideoUrl } : {})
+            });
+            if (result._laozhangVideoUrl) {
+                const targetKey = `video-studio/generations/${project._id}-${Date.now()}.mp4`;
+                mirrorUrlToS3(result._laozhangVideoUrl, targetKey).catch(e => console.warn('⚠️ LZ Video S3 mirror failed:', e.message));
+            }
+        }).catch(async (error) => {
+            console.error('I2V generate background error:', error);
+            await VideoProject.findByIdAndUpdate(project._id, {
+                status: 'failed',
+                'generation.error': error.message
+            });
         });
 
         res.json({
             success: true,
             project: {
                 _id: project._id,
-                status: result._laozhangVideoUrl ? 'completed' : 'advanced-generating',
+                status: 'advanced-generating',
                 mode: 'image-to-video',
                 generation: {
-                    falRequestId: result.requestId,
-                    provider: result.provider,
-                    progress: result._laozhangVideoUrl ? 100 : 5,
+                    progress: 5,
+                    startedAt: new Date()
                 },
                 costPreview: estimateCost('seedance-2.0', duration || 5, '1080p', qualityMode || 'fast'),
             },
@@ -222,24 +233,12 @@ router.post('/extend-video', protect, requireCredits('videoGenerate'), async (re
 
         console.log(`🔗 Extend request: parent=${parentTaskId}, duration=${duration}, quality=${qualityMode}`);
 
-        // Submit extension using the cascading fallback
-        // Note: Currently MuAPI/LZ don't support native extension, so this 
-        // will likely use PiAPI but will automatically DETOUR to I2V (last frame) 
-        // if PiAPI is down/empty once we implement that logic.
-        const result = await extendVideoGeneration({
-            model: 'seedance-2.0',
-            parentTaskId,
-            prompt: prompt || '',
-            duration: duration || 5,
-            qualityMode: qualityMode || 'fast',
-        });
-
-        // Create new project for the extended video
+        // Create new project for the extended video SYNC
         const extended = await VideoProject.create({
             user: req.user._id,
             brand: original.brand || null,
             title: `${original.title} (Extended)`.substring(0, 80),
-            status: result.provider === 'laozhang' ? 'completed' : 'advanced-generating',
+            status: 'advanced-generating',
             mode: 'extend',
             advancedConfig: {
                 prompt: prompt || `Continuation of: ${original.backendPrompt || ''}`,
@@ -251,28 +250,53 @@ router.post('/extend-video', protect, requireCredits('videoGenerate'), async (re
                 resolution: '1080p',
                 mode: qualityMode || 'fast',
             },
-            generation: {
-                falRequestId: result.requestId,
-                falEndpoint: result.endpoint || 'seedance-2.0-extend',
-                provider: result.provider,
-                _piApiPayload: result._piApiPayload,
-                _muApiPayload: result._muApiPayload,
-                _laozhangVideoUrl: result._laozhangVideoUrl,
-                videoUrl: result._laozhangVideoUrl || '',
-                progress: result._laozhangVideoUrl ? 100 : 5,
-                startedAt: new Date(),
-            },
-            backendPrompt: prompt || '',
+        });
+
+        // Submit extension ASYNCHRONOUSLY
+        extendVideoGeneration({
+            model: 'seedance-2.0',
+            parentTaskId,
+            prompt: prompt || '',
+            duration: duration || 5,
+            qualityMode: qualityMode || 'fast',
+        }).then(async (result) => {
+            await VideoProject.findByIdAndUpdate(extended._id, {
+                status: result.provider === 'laozhang' ? 'completed' : 'advanced-generating',
+                generation: {
+                    falRequestId: result.requestId,
+                    falEndpoint: result.endpoint || 'seedance-2.0-extend',
+                    provider: result.provider,
+                    _piApiPayload: result._piApiPayload,
+                    _muApiPayload: result._muApiPayload,
+                    _laozhangVideoUrl: result._laozhangVideoUrl,
+                    videoUrl: result._laozhangVideoUrl || '',
+                    progress: result._laozhangVideoUrl ? 100 : 5,
+                    startedAt: new Date(),
+                },
+                backendPrompt: prompt || '',
+                ...(result._laozhangVideoUrl ? { finalVideoUrl: result._laozhangVideoUrl } : {})
+            });
+            if (result._laozhangVideoUrl) {
+                const targetKey = `video-studio/generations/${extended._id}-${Date.now()}.mp4`;
+                const { mirrorUrlToS3 } = await import('../utils/s3.js');
+                mirrorUrlToS3(result._laozhangVideoUrl, targetKey).catch(e => console.warn('⚠️ LZ Video S3 mirror failed:', e.message));
+            }
+        }).catch(async (error) => {
+            console.error('Video extend background error:', error);
+            await VideoProject.findByIdAndUpdate(extended._id, {
+                status: 'failed',
+                'generation.error': error.message
+            });
         });
 
         res.json({
             success: true,
             project: {
                 _id: extended._id,
-                status: extended.status,
+                status: 'advanced-generating',
                 mode: 'extend',
                 parentProjectId: projectId,
-                generation: extended.generation,
+                generation: { progress: 5, startedAt: new Date() },
                 costPreview: estimateCost('seedance-2.0', duration || 5, '1080p', qualityMode || 'fast'),
             },
         });
@@ -363,8 +387,8 @@ router.post('/advanced/generate', protect, requireCredits('videoGenerate'), asyn
             duration: duration || 5,
         });
 
-        // 4. Run generation
-        const state = await advancedGenerateNode({
+        // 4. Run generation ASYNCHRONOUSLY
+        advancedGenerateNode({
             prompt: finalPrompt, // Use enhanced prompt
             model: model || 'kling-3.0',
             duration: duration || 5,
@@ -377,28 +401,34 @@ router.post('/advanced/generate', protect, requireCredits('videoGenerate'), asyn
             shots: shots || [],
             refAudio: refAudio || '',
             refVideo: refVideo || ''
+        }).then(async (state) => {
+            // Update project with generation details
+            // LaoZhang sync: state.status may be 'critique' (already completed)
+            const projectStatus = state.status === 'critique' ? 'completed' : 'advanced-generating';
+            const updatePayload = {
+                status: projectStatus,
+                generation: state.generation,
+                backendPrompt: prompt.trim(),
+            };
+            if (state.generation?.videoUrl) {
+                updatePayload.finalVideoUrl = state.generation.videoUrl;
+            }
+            await VideoProject.findByIdAndUpdate(project._id, updatePayload);
+    
+            // LaoZhang sync: video is already generated — upload to S3 before CDN expires
+            // This normally happens in the polling loop, but LZ projects skip polling
+            if (projectStatus === 'completed' && state.generation?.videoUrl) {
+                const targetKey = `video-studio/generations/${project._id}-${Date.now()}.mp4`;
+                mirrorUrlToS3(state.generation.videoUrl, targetKey)
+                    .catch(e => console.warn('⚠️ LZ Video S3 mirror failed:', e.message));
+            }
+        }).catch(async (error) => {
+            console.error('Advanced generate background error:', error);
+            await VideoProject.findByIdAndUpdate(project._id, {
+                status: 'failed',
+                'generation.error': error.message
+            });
         });
-
-        // Update project with generation details
-        // LaoZhang sync: state.status may be 'critique' (already completed)
-        const projectStatus = state.status === 'critique' ? 'completed' : 'advanced-generating';
-        const updatePayload = {
-            status: projectStatus,
-            generation: state.generation,
-            backendPrompt: prompt.trim(),
-        };
-        if (state.generation?.videoUrl) {
-            updatePayload.finalVideoUrl = state.generation.videoUrl;
-        }
-        await VideoProject.findByIdAndUpdate(project._id, updatePayload);
-
-        // LaoZhang sync: video is already generated — upload to S3 before CDN expires
-        // This normally happens in the polling loop, but LZ projects skip polling
-        if (projectStatus === 'completed' && state.generation?.videoUrl) {
-            const targetKey = `video-studio/generations/${project._id}-${Date.now()}.mp4`;
-            mirrorUrlToS3(state.generation.videoUrl, targetKey)
-                .catch(e => console.warn('⚠️ LZ Video S3 mirror failed:', e.message));
-        }
 
         res.json({
             success: true,
@@ -3111,9 +3141,9 @@ router.post('/:id/generate', protect, requireCredits('videoGenerate'), async (re
             await VideoProject.findByIdAndUpdate(project._id, { creditsUsed: req.creditsDeducted || 0 });
         }
 
-        // Build state and run video generator
+        // Build state and run video generator ASYNCHRONOUSLY
         const updatedProject = await VideoProject.findById(project._id).lean();
-        const state = await runStep(project._id, 'generating', videoGeneratorNode, {
+        runStep(project._id, 'generating', videoGeneratorNode, {
             userId: req.user._id.toString(),
             brandId: project.brand?.toString(),
             concepts: updatedProject.concepts,
@@ -3123,14 +3153,14 @@ router.post('/:id/generate', protect, requireCredits('videoGenerate'), async (re
             routing: updatedProject.routing,
             inputImages: updatedProject.input?.images || [],
             references: updatedProject.references,
-        });
+        }).catch(e => console.error('Background runStep generating failed:', e));
 
         res.json({
             success: true,
             project: {
                 _id: project._id,
                 status: 'generating',
-                generation: state.generation,
+                generation: { progress: 5, startedAt: new Date() },
                 pipeline: getPipelineInfo('generating'),
             },
         });
@@ -3330,9 +3360,9 @@ router.post('/:id/edit', protect, requireCredits('videoEdit'), async (req, res) 
             status: 'routing', // Reset to routing for re-generation
         });
 
-        // Re-run generate
+        // Re-run generate ASYNCHRONOUSLY
         const updatedProject = await VideoProject.findById(project._id).lean();
-        const state = await runStep(project._id, 'generating', videoGeneratorNode, {
+        runStep(project._id, 'generating', videoGeneratorNode, {
             userId: req.user._id.toString(),
             brandId: project.brand?.toString(),
             concepts: updatedProject.concepts,
@@ -3342,14 +3372,14 @@ router.post('/:id/edit', protect, requireCredits('videoEdit'), async (req, res) 
             routing: updatedProject.routing,
             inputImages: updatedProject.input?.images || [],
             references: updatedProject.references,
-        });
+        }).catch(e => console.error('Background runStep edit failed:', e));
 
         res.json({
             success: true,
             project: {
                 _id: project._id,
                 status: 'generating',
-                generation: state.generation,
+                generation: { progress: 5, startedAt: new Date() },
                 pipeline: getPipelineInfo('generating'),
             },
         });

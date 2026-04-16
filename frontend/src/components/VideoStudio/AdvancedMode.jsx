@@ -247,7 +247,7 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [] }
                 const d = await api(`/video-studio/${projectId}/status`)
                 const gen = d.project.generation
                 updateJob(jobId, { progress: gen?.progress || 5 })
-                if (gen?.status === 'COMPLETED' || d.project.status === 'critique') {
+                if (gen?.status === 'COMPLETED' || d.project.status === 'critique' || d.project.status === 'completed') {
                     clearInterval(pollRefs.current[jobId]); delete pollRefs.current[jobId]
                     const videoUrl = `${API_BASE}/video-studio/${projectId}/video`
                     updateJob(jobId, { status: 'done', videoUrl, progress: 100 })
@@ -261,16 +261,58 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [] }
                     updateJob(jobId, { status: 'failed', error: gen?.error || 'Generation failed' })
                 }
 
-                // High traffic check
-                const job = jobs.find(j => j.id === jobId)
-                if (job && job.startTime && Date.now() - job.startTime > 360000 && !job.highTrafficNotified) {
-                    setShowAdvancedHighTraffic(true)
-                    setHighTrafficJobId(jobId)
-                    updateJob(jobId, { highTrafficNotified: true })
-                }
+                // High traffic check (5 minutes = 300000ms) with closure-safe state access
+                setJobs(prev => {
+                    const currentJob = prev.find(j => j.id === jobId);
+                    if (currentJob && currentJob.startTime && Date.now() - currentJob.startTime > 300000 && !currentJob.highTrafficNotified) {
+                        setShowAdvancedHighTraffic(true);
+                        setHighTrafficJobId(jobId);
+                        return prev.map(j => j.id === jobId ? { ...j, highTrafficNotified: true } : j);
+                    }
+                    return prev;
+                });
             } catch { /* keep polling */ }
         }, 5000)
     }
+
+    // Persist active generating projects across reloads/navigation
+    const handledGenerating = useRef(new Set());
+    useEffect(() => {
+        let added = false;
+        const newJobs = [];
+        projects.forEach(p => {
+            if ((p.status === 'advanced-generating' || p.status === 'generating') && !handledGenerating.current.has(p._id)) {
+                handledGenerating.current.add(p._id);
+                // Make sure we only add projects not already manually submitted in this active session
+                if (!jobs.some(j => j.projectId === p._id)) {
+                    const jobId = `job-${p._id}`;
+                    newJobs.push({
+                        id: jobId,
+                        projectId: p._id,
+                        prompt: p.advancedConfig?.prompt || p.backendPrompt || p.title || '',
+                        model: p.routing?.selectedModel || '',
+                        duration: p.advancedConfig?.duration || 5,
+                        aspectRatio: p.advancedConfig?.aspectRatio || '16:9',
+                        quality: p.routing?.mode || 'fast',
+                        thumbUrl: p.advancedConfig?.firstImageUrl || '',
+                        progress: p.generation?.progress || 5,
+                        status: 'generating',
+                        videoUrl: null,
+                        error: null,
+                        startTime: p.generation?.startedAt ? new Date(p.generation.startedAt).getTime() : Date.now(),
+                        highTrafficNotified: false
+                    });
+                    if (!pollRefs.current[jobId]) {
+                        startJobPolling(jobId, p._id);
+                    }
+                    added = true;
+                }
+            }
+        });
+        if (added) {
+            setJobs(prev => [...newJobs, ...prev]);
+        }
+    }, [projects, jobs]);
 
     // Cleanup all polls on unmount
     useEffect(() => () => {
