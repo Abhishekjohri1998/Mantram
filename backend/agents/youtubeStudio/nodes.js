@@ -28,7 +28,7 @@ const FAL_KEY  = () => process.env.FAL_KEY || process.env.FAL_API_KEY;
  * Generic FAL.ai text-to-image call (FLUX Pro by default)
  * Returns the first image URL from the result
  */
-async function falGenerateImage({ prompt, imageUrl = null, width = 1280, height = 720, model = 'fal-ai/flux-pro/v1.1' }) {
+export async function falGenerateImage({ prompt, imageUrl = null, width = 1280, height = 720, model = 'fal-ai/flux-pro/v1.1' }) {
     const key = FAL_KEY();
     if (!key) throw new Error('FAL_API_KEY not configured');
 

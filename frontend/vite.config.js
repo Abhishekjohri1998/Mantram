@@ -21,6 +21,10 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:3001',
         changeOrigin: true,
+        // 10min timeout — multi-shot image generation can take 2-3 minutes
+        // Default is 120s which causes "Could not connect" errors
+        timeout: 600000,
+        proxyTimeout: 600000,
       },
     },
   },

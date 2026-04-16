@@ -100,12 +100,12 @@ export const MODEL_CAPABILITIES = {
     },
     'grok-imagine': {
         id: 'grok-imagine', name: 'Grok Imagine', icon: '🤖', provider: 'grok',
-        description: 'xAI native video — fast, affordable, 1-15s, image-to-video',
-        bestFor: 'Social reels, creative experiments, quick turnaround',
-        duration: { min: 1, max: 15, native: 15, step: 1 },
-        resolutions: ['480p', '720p'], aspectRatios: ['1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3'],
-        features: { firstFrame: true, lastFrame: false, referenceImages: false, extendVideo: false, multiShot: false, nativeAudio: true, voiceIds: false, cameraControl: false },
-        maxReferenceImages: 0, costPerSecond: COST_PER_SECOND['grok-imagine'], recommended: false,
+        description: 'xAI native video — fast, 1-15s, reference images, extend, I2V',
+        bestFor: 'Social reels, product placement, character-consistent storytelling',
+        duration: { min: 1, max: 15, native: 15, step: 1, extendChunk: 10, maxExtended: 25 },
+        resolutions: ['480p', '720p', '1080p'], aspectRatios: ['1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3'],
+        features: { firstFrame: true, lastFrame: false, referenceImages: true, extendVideo: true, multiShot: false, nativeAudio: true, voiceIds: false, cameraControl: false },
+        maxReferenceImages: 7, costPerSecond: COST_PER_SECOND['grok-imagine'], recommended: true,
     },
     'hunyuan': {
         id: 'hunyuan', name: 'HunyuanVideo', icon: '🎨', provider: 'fal',
@@ -418,7 +418,8 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
                 imageUrl: s3ImageUrl,
                 duration,
                 resolution,
-                aspectRatio: aspectRatio || '16:9'
+                aspectRatio: aspectRatio || '16:9',
+                referenceImages: s3ReferenceImages.filter(Boolean),
             });
             return {
                 requestId: result.requestId,
@@ -505,34 +506,108 @@ async function fetchFalResult(apiKey, resultUrl) {
 }
 
 /**
- * xAI Grok Imagine — Video Generation
+ * xAI Grok Imagine — Video Generation (correct REST API)
+ * Docs: https://docs.x.ai/docs/guides/video-generation
+ * Submit: POST /v1/videos/generations
+ * Poll:   GET  /v1/videos/{request_id}   → status: pending | done | expired | failed
+ * Result: data.video.url
  */
-export async function submitGrokVideoGeneration({ prompt, imageUrl, duration = 5, resolution = '720p', aspectRatio = '16:9' }) {
+export async function submitGrokVideoGeneration({ prompt, imageUrl, duration = 5, resolution = '720p', aspectRatio = '16:9', referenceImages = [] }) {
     const apiKey = getGrokApiKey();
     const payload = {
         model: 'grok-imagine-video',
-        messages: [{
-            role: 'user',
-            content: [
-                { type: 'text', text: truncatePrompt(prompt, 'grok-imagine') },
-                ...(imageUrl ? [{ type: 'image_url', image_url: { url: imageUrl } }] : [])
-            ]
-        }]
+        prompt: truncatePrompt(prompt, 'grok-imagine'),
+        duration: Math.min(Math.max(duration || 5, 1), 15),
+        aspect_ratio: aspectRatio || '16:9',
+        resolution: resolution === '1080p' ? '1080p' : resolution === '480p' ? '480p' : '720p',
     };
-    console.log('🎬 [Grok] Submitting request...');
-    const response = await fetch(`${GROK_BASE_URL}/chat/completions`, {
+
+    // Image-to-Video: pass source image
+    if (imageUrl) {
+        payload.image = { url: imageUrl };
+        console.log(`📸 [Grok] Image-to-Video: ${imageUrl.substring(0, 80)}...`);
+    }
+
+    // Reference images (up to 7, max 10s duration)
+    if (referenceImages?.length > 0) {
+        payload.reference_images = referenceImages.slice(0, 7).map(url => ({ url }));
+        payload.duration = Math.min(payload.duration, 10); // xAI caps at 10s with ref images
+        console.log(`🖼️ [Grok] ${payload.reference_images.length} reference images attached`);
+    }
+
+    console.log(`🎬 [Grok] Submitting to /v1/videos/generations (duration=${payload.duration}s, ratio=${payload.aspect_ratio}, res=${payload.resolution})...`);
+    const response = await fetch(`${GROK_BASE_URL}/videos/generations`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(60000),
     });
-    if (!response.ok) throw new Error(`xAI failed: ${await response.text()}`);
+    if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`xAI video generation failed (${response.status}): ${errText.substring(0, 300)}`);
+    }
     const data = await response.json();
-    return { requestId: data.id, provider: 'grok' };
+    console.log(`✅ [Grok] Request submitted: requestId=${data.request_id}`);
+    return { requestId: data.request_id, provider: 'grok' };
 }
 
 /**
  * xAI Grok Imagine — Status Polling
+ * GET /v1/videos/{request_id}
+ * Returns: { status: 'pending'|'done'|'expired'|'failed', video?: { url, duration } }
  */
 export async function getGrokGenerationStatus(requestId) {
-    return { status: 'COMPLETED', progress: 100, videoUrl: '', provider: 'grok' };
+    const apiKey = getGrokApiKey();
+    try {
+        const response = await fetch(`${GROK_BASE_URL}/videos/${requestId}`, {
+            headers: { 'Authorization': `Bearer ${apiKey}` },
+            signal: AbortSignal.timeout(15000),
+        });
+        if (!response.ok) {
+            console.warn(`⚠️ [Grok] Poll failed: ${response.status}`);
+            return { status: 'IN_PROGRESS', progress: 30, provider: 'grok' };
+        }
+        const data = await response.json();
+        if (data.status === 'done') {
+            const videoUrl = data.video?.url || '';
+            console.log(`✅ [Grok] Video done: ${videoUrl.substring(0, 80)}...`);
+            return { status: 'COMPLETED', progress: 100, videoUrl, provider: 'grok' };
+        } else if (data.status === 'expired') {
+            return { status: 'FAILED', progress: 0, error: 'Grok video generation request expired.', provider: 'grok' };
+        } else if (data.status === 'failed') {
+            return { status: 'FAILED', progress: 0, error: data.error || 'Grok video generation failed.', provider: 'grok' };
+        }
+        // Still pending
+        return { status: 'IN_PROGRESS', progress: 40, provider: 'grok' };
+    } catch (err) {
+        console.warn(`⚠️ [Grok] Poll error: ${err.message}`);
+        return { status: 'IN_PROGRESS', progress: 30, provider: 'grok' };
+    }
+}
+
+/**
+ * xAI Grok Imagine — Extend Video
+ * POST /v1/videos/extensions
+ */
+export async function extendGrokVideo({ videoUrl, prompt, duration = 6 }) {
+    const apiKey = getGrokApiKey();
+    const payload = {
+        model: 'grok-imagine-video',
+        prompt: truncatePrompt(prompt, 'grok-imagine'),
+        duration: Math.min(Math.max(duration, 2), 10),
+        video: { url: videoUrl },
+    };
+    console.log(`🎬 [Grok] Extending video (duration=${payload.duration}s)...`);
+    const response = await fetch(`${GROK_BASE_URL}/videos/extensions`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(60000),
+    });
+    if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`xAI video extend failed (${response.status}): ${errText.substring(0, 300)}`);
+    }
+    const data = await response.json();
+    return { requestId: data.request_id, provider: 'grok' };
 }

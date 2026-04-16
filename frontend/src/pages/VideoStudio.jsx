@@ -38,6 +38,7 @@ const STEPS = [
     { id: 'script', label: 'Script & Prompt', icon: 'movie' },
     { id: 'voiceover', label: 'Voice Over', icon: 'record_voice_over' },
     { id: 'cost', label: 'Model & Cost', icon: 'payments' },
+    { id: 'image-review', label: 'Image Review', icon: 'photo_library' },
     { id: 'generate', label: 'Generating', icon: 'slow_motion_video' },
     { id: 'review', label: 'Review & Edit', icon: 'rate_review' },
 ]
@@ -93,6 +94,7 @@ export default function VideoStudio() {
     const [playingVideo, setPlayingVideo] = useState(null)
     const [advancedRefillData, setAdvancedRefillData] = useState(null)
     const [historyView, setHistoryView] = useState('list') // 'list' | 'grid'
+    const [historyTab, setHistoryTab] = useState('all') // 'all' | 'completed' | 'progress' | 'drafts'
     const [copiedId, setCopiedId] = useState(null)
 
     // Image input UI state
@@ -110,6 +112,51 @@ export default function VideoStudio() {
     const pollRef = useRef(null)
     const [generationStartTime, setGenerationStartTime] = useState(null)
     const [showHighTrafficModal, setShowHighTrafficModal] = useState(false)
+    
+    // Voice previewing
+    const [previewLoadingId, setPreviewLoadingId] = useState(null)
+    const audioRef = useRef(null)
+
+    async function handlePlayVoiceSample(e, provider, voiceObj) {
+        e.stopPropagation()
+        if (previewLoadingId === voiceObj.voice_id) return
+        
+        // Stop any currently playing audio
+        if (audioRef.current) {
+            audioRef.current.pause()
+        }
+
+        setPreviewLoadingId(voiceObj.voice_id)
+        setError('')
+        try {
+            const body = {}
+            let endpoint = ''
+            
+            if (provider === 'sarvam') {
+                endpoint = '/video-studio/ugc/sarvam-preview'
+                body.speaker = voiceObj.speaker
+                body.langCode = voiceObj.lang_code
+            } else {
+                endpoint = '/video-studio/ugc/minimax-preview'
+                body.voiceId = voiceObj.voice_id
+                body.provider = provider
+            }
+
+            const data = await api(endpoint, {
+                method: 'POST',
+                body: JSON.stringify(body)
+            })
+
+            if (data.audioUrl) {
+                const audio = new Audio(data.audioUrl)
+                audioRef.current = audio
+                audio.play()
+            }
+        } catch (err) {
+            setError({ message: 'Failed to preview voice: ' + err.message })
+        }
+        setPreviewLoadingId(null)
+    }
 
     // ── Download helper: fetches video as blob for proper file download ──
     async function handleDownloadVideo(url, title) {
@@ -402,7 +449,50 @@ export default function VideoStudio() {
     // ══════════════════════════════════════════════════════════════════════════
     // STEP 5: Confirm cost → generate video
     // ══════════════════════════════════════════════════════════════════════════
-    async function handleGenerate() {
+    // ══════════════════════════════════════════════════════════════════════════
+    async function handleGenerateImages() {
+        setLoading(true); setError('')
+        try {
+            const data = await api(`/video-studio/${projectId}/generate-images`, {
+                method: 'POST',
+                body: JSON.stringify({
+                    resolution: routing?.resolution,
+                    model: routing?.selectedModel,
+                    mode: routing?.mode,
+                    aspectRatio: routing?.aspectRatio || '16:9',
+                }),
+            })
+            // data.project has the shots populated with initial images
+            setScript(data.project.script)
+            setPipeline(data.project.pipeline)
+            setStep(5)
+        } catch (err) { 
+            if (err.name === 'AbortError') return
+            setError({ message: err.message }) 
+        }
+        setLoading(false)
+    }
+
+    async function handleRegenerateShotImage(shotIndex, overridePrompt) {
+        setLoading(true); setError('')
+        try {
+            const data = await api(`/video-studio/${projectId}/regenerate-shot-image`, {
+                method: 'POST',
+                body: JSON.stringify({ shotIndex, overridePrompt }),
+            })
+            if (data.project?.script?.shots) {
+                setScript(prev => ({ ...prev, shots: data.project.script.shots }))
+            } else if (data.shots) {
+                setScript(prev => ({ ...prev, shots: data.shots }))
+            }
+        } catch (err) {
+            if (err.name === 'AbortError') return
+            setError({ message: err.message })
+        }
+        setLoading(false)
+    }
+
+    async function handleGenerateVideo() {
         setLoading(true); setError('')
         try {
             const data = await api(`/video-studio/${projectId}/generate`, {
@@ -418,7 +508,7 @@ export default function VideoStudio() {
             setPipeline(data.project.pipeline)
             setGenerationStartTime(Date.now())
             setShowHighTrafficModal(false)
-            setStep(5)
+            setStep(6)
             startPolling()
         } catch (err) { 
             if (err.name === 'AbortError') return
@@ -443,7 +533,7 @@ export default function VideoStudio() {
                     clearInterval(pollRef.current)
                     setCritique(data.project.critique)
                     setShowHighTrafficModal(false)
-                    setStep(6)
+                    setStep(7)
                 } else if (data.project.generation?.status === 'FAILED') {
                     clearInterval(pollRef.current)
                     setShowHighTrafficModal(false)
@@ -453,7 +543,7 @@ export default function VideoStudio() {
                         isProviderError: data.project.generation?.isProviderError,
                         provider: data.project.generation?.provider
                     });
-                    setStep(6)
+                    setStep(7)
                 }
 
                 // Check for high traffic ( > 6 mins)
@@ -479,7 +569,7 @@ export default function VideoStudio() {
             setGeneration(data.project.generation)
             setGenerationStartTime(Date.now())
             setShowHighTrafficModal(false)
-            setStep(5)
+            setStep(6)
             startPolling()
         } catch (err) { 
             if (err.name === 'AbortError') return
@@ -543,8 +633,8 @@ export default function VideoStudio() {
             setGeneration(p.generation)
             setCritique(p.critique)
             setPipeline(p.pipeline)
-            // Determine step from status (voiceover=3, routing=4, generating=5, critique/done=6)
-            const statusMap = { brainstorm: 1, script: 2, voiceover: 3, routing: 4, references: 4, generating: 5, critique: 6, editing: 6, done: 6 }
+            // Determine step from status (voiceover=3, routing=4, image-review=5, generating=6, critique/done=7)
+            const statusMap = { brainstorm: 1, script: 2, voiceover: 3, routing: 4, references: 4, 'image-review': 5, generating: 6, 'multi-generating': 6, critique: 7, editing: 7, done: 7 }
             setStep(statusMap[p.status] || 0)
             setShowHistory(false)
             if (p.status === 'generating') startPolling()
@@ -558,6 +648,18 @@ export default function VideoStudio() {
         }
         setLoading(false)
     }
+
+    // Filter projects based on active tab
+    const filteredProjects = projects.filter(p => {
+        const hasVideo = !!p.generation?.videoUrl;
+        const isGenerating = p.status === 'generating' || p.status === 'advanced-generating';
+        const isCompleted = p.status === 'done' || p.status === 'critique' || hasVideo;
+        
+        if (historyTab === 'completed') return isCompleted;
+        if (historyTab === 'progress') return !isCompleted && isGenerating;
+        if (historyTab === 'drafts') return !isCompleted && !isGenerating;
+        return true; 
+    });
 
     // ══════════════════════════════════════════════════════════════════════════
     // RENDER
@@ -597,12 +699,23 @@ export default function VideoStudio() {
                 {/* ── History Panel (shown in both modes) ── */}
                 {showHistory && (
                     <div className="glass-panel rounded-2xl p-5 mb-6 border border-[var(--sys-border)]">
-                        <div className="flex items-center justify-between mb-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-3">
                             <h3 className="text-base font-bold text-[var(--sys-text)] flex items-center gap-2">
                                 <span className="material-symbols-outlined video-highlight-text">folder_open</span>
                                 Video History
-                                <span className="text-xs font-normal text-[var(--sys-text-muted)] ml-1">({projects.length})</span>
+                                <span className="text-xs font-normal text-[var(--sys-text-muted)] ml-1">({filteredProjects.length})</span>
                             </h3>
+
+                            {/* Tab Filters */}
+                            <div className="flex bg-[var(--sys-surface)] border border-[var(--sys-border)] p-1 rounded-xl">
+                                {['all', 'drafts', 'progress', 'completed'].map(tab => (
+                                    <button key={tab} onClick={() => setHistoryTab(tab)}
+                                        className={`px-3 py-1 text-[11px] font-medium rounded-lg transition-all cursor-pointer capitalize ${historyTab === tab ? 'bg-[var(--sys-border)] text-[var(--sys-text)]' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]'}`}>
+                                        {tab === 'progress' ? 'rendering' : tab}
+                                    </button>
+                                ))}
+                            </div>
+
                             <div className="flex items-center gap-2">
                                 {/* Grid/List toggle */}
                                 <div className="flex rounded-lg border border-[var(--sys-border)] overflow-hidden">
@@ -628,14 +741,18 @@ export default function VideoStudio() {
                             </div>
                         </div>
 
-                        {projects.length === 0 ? (
+                        {filteredProjects.length === 0 ? (
                             <div className="text-center py-12">
-                                <span className="material-symbols-outlined text-4xl text-[var(--sys-text-muted)] mb-3 block">videocam_off</span>
-                                <p className="text-sm text-[var(--sys-text-muted)]">No videos yet. Create your first one!</p>
+                                <span className="material-symbols-outlined text-4xl text-[var(--sys-text-muted)] mb-3 block">
+                                    {historyTab === 'drafts' ? 'edit_document' : 'videocam_off'}
+                                </span>
+                                <p className="text-sm text-[var(--sys-text-muted)]">
+                                    {historyTab === 'all' ? 'No videos yet. Create your first one!' : `No ${historyTab} videos found.`}
+                                </p>
                             </div>
                         ) : historyView === 'list' ? (
                             <div className="space-y-2 max-h-[70vh] overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}>
-                                {projects.map(p => {
+                                {filteredProjects.map(p => {
                                     const rawVideoUrl = p.generation?.videoUrl || '';
                                     // Use proxy URL to serve from local cache (PiAPI CDN URLs expire)
                                     const videoUrl = rawVideoUrl ? `${API_BASE}/video-studio/${p._id}/video` : '';
@@ -718,9 +835,11 @@ export default function VideoStudio() {
                                                     <span className="material-symbols-outlined text-base">replay</span>
                                                 </button>
                                                 <button onClick={(e) => { e.stopPropagation(); loadProject(p._id); setShowHistory(false) }}
-                                                    className="p-1.5 rounded-lg text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)] transition-all cursor-pointer"
-                                                    title="Open project">
-                                                    <span className="material-symbols-outlined text-base">open_in_new</span>
+                                                    className={`p-1.5 rounded-lg transition-all cursor-pointer ${(!isDone && !isGenerating && !isFailed) ? 'text-primary bg-[var(--sys-primary-dim)] hover:bg-[#FF4D00]/20' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)]'}`}
+                                                    title={(!isDone && !isGenerating && !isFailed) ? 'Resume Draft' : 'Open project'}>
+                                                    <span className="material-symbols-outlined text-base">
+                                                        {(!isDone && !isGenerating && !isFailed) ? 'edit_document' : 'open_in_new'}
+                                                    </span>
                                                 </button>
                                             </div>
                                         </div>
@@ -730,7 +849,7 @@ export default function VideoStudio() {
                         ) : (
                             /* ── GRID VIEW ── */
                             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 max-h-[70vh] overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}>
-                                {projects.map(p => {
+                                {filteredProjects.map(p => {
                                     const rawVideoUrl = p.generation?.videoUrl || '';
                                     const videoUrl = rawVideoUrl ? `${API_BASE}/video-studio/${p._id}/video` : '';
                                     const isDone = p.status === 'done' || p.status === 'critique' || rawVideoUrl;
@@ -800,8 +919,11 @@ export default function VideoStudio() {
                                                         <span className="material-symbols-outlined text-sm">replay</span>
                                                     </button>
                                                     <button onClick={() => { loadProject(p._id); setShowHistory(false) }}
-                                                        className="p-1 rounded text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)] transition-all cursor-pointer" title="Open">
-                                                        <span className="material-symbols-outlined text-sm">open_in_new</span>
+                                                        className={`p-1 rounded transition-all cursor-pointer ${(!isDone && !isGenerating && !isFailed) ? 'text-primary bg-[var(--sys-primary-dim)] hover:bg-[#FF4D00]/20' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)]'}`}
+                                                        title={(!isDone && !isGenerating && !isFailed) ? 'Resume Draft' : 'Open'}>
+                                                        <span className="material-symbols-outlined text-sm">
+                                                            {(!isDone && !isGenerating && !isFailed) ? 'edit_document' : 'open_in_new'}
+                                                        </span>
                                                     </button>
                                                 </div>
                                             </div>
@@ -1340,6 +1462,12 @@ export default function VideoStudio() {
                                             : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] border border-[var(--sys-border)] hover:text-[var(--sys-text)]'}`}>
                                         🌍 Global (Minimax)
                                     </button>
+                                    <button onClick={() => setSelectedVoProvider('elevenlabs')}
+                                        className={`flex-1 sm:flex-none px-4 py-2 rounded-xl text-sm font-medium transition-all cursor-pointer ${selectedVoProvider === 'elevenlabs'
+                                            ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
+                                            : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] border border-[var(--sys-border)] hover:text-[var(--sys-text)]'}`}>
+                                        🎙️ Premium (ElevenLabs)
+                                    </button>
                                     <button onClick={() => setSelectedVoProvider('sarvam')}
                                         className={`flex-1 sm:flex-none px-4 py-2 rounded-xl text-sm font-medium transition-all cursor-pointer ${selectedVoProvider === 'sarvam'
                                             ? 'bg-[var(--sys-primary-dim)] text-[var(--sys-primary)] border border-[var(--sys-border)]'
@@ -1350,20 +1478,81 @@ export default function VideoStudio() {
 
                                 {/* Voice Cards */}
                                 {selectedVoProvider === 'minimax' ? (
-                                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 max-h-48 overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}>
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 max-h-64 overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}>
                                         {[
-                                            { voice_id: 'moss_en_hd', name: 'Moss', gender: 'Male', desc: 'Warm & professional' },
-                                            { voice_id: 'Binbin_en_hd', name: 'Binbin', gender: 'Female', desc: 'Clear & bright' },
-                                            { voice_id: 'Kevin_en_hd', name: 'Kevin', gender: 'Male', desc: 'Friendly narrator' },
-                                            { voice_id: 'Vivian_en_hd', name: 'Vivian', gender: 'Female', desc: 'Soft & calm' },
-                                            { voice_id: 'Luke_en_hd', name: 'Luke', gender: 'Male', desc: 'Energetic & lively' },
-                                            { voice_id: 'Sophia_en_hd', name: 'Sophia', gender: 'Female', desc: 'Confident & warm' },
+                                            // Male voices — verified Minimax Speech-02-HD IDs
+                                            { voice_id: 'Deep_Voice_Man', name: 'Deep Voice', gender: 'Male', desc: 'Authoritative & rich' },
+                                            { voice_id: 'Casual_Guy', name: 'Casual Guy', gender: 'Male', desc: 'Relaxed & natural' },
+                                            { voice_id: 'Patient_Man', name: 'Patient', gender: 'Male', desc: 'Corporate & clear' },
+                                            { voice_id: 'Determined_Man', name: 'Determined', gender: 'Male', desc: 'Strong & driven' },
+                                            { voice_id: 'Young_Knight', name: 'Young Knight', gender: 'Male', desc: 'Youthful & bold' },
+                                            { voice_id: 'Decent_Boy', name: 'Decent Boy', gender: 'Male', desc: 'Friendly & youthful' },
+                                            { voice_id: 'Imposing_Manner', name: 'Imposing', gender: 'Male', desc: 'Commanding & powerful' },
+                                            { voice_id: 'Elegant_Man', name: 'Elegant', gender: 'Male', desc: 'Refined & smooth' },
+                                            // Female voices — verified Minimax Speech-02-HD IDs
+                                            { voice_id: 'Wise_Woman', name: 'Wise Woman', gender: 'Female', desc: 'Clear & bright' },
+                                            { voice_id: 'Friendly_Person', name: 'Friendly', gender: 'Female', desc: 'Soft & calm' },
+                                            { voice_id: 'Inspirational_girl', name: 'Inspirational', gender: 'Female', desc: 'Confident & warm' },
+                                            { voice_id: 'Lively_Girl', name: 'Lively Girl', gender: 'Female', desc: 'Cheerful & fun' },
+                                            { voice_id: 'Calm_Woman', name: 'Calm Woman', gender: 'Female', desc: 'Serene narrator' },
+                                            { voice_id: 'Sweet_Girl_2', name: 'Sweet Girl', gender: 'Female', desc: 'Young & charming' },
+                                            { voice_id: 'Lovely_Girl', name: 'Lovely Girl', gender: 'Female', desc: 'Warm & delicate' },
+                                            { voice_id: 'Exuberant_Girl', name: 'Exuberant', gender: 'Female', desc: 'Expressive & bold' },
+                                            { voice_id: 'Abbess', name: 'Abbess', gender: 'Female', desc: 'Mature & elegant' },
                                         ].map(v => (
                                             <button key={v.voice_id} onClick={() => setSelectedVoVoice(v)}
-                                                className={`text-left p-3 rounded-xl transition-all cursor-pointer ${selectedVoVoice?.voice_id === v.voice_id
+                                                className={`text-left p-3 rounded-xl transition-all cursor-pointer relative group ${selectedVoVoice?.voice_id === v.voice_id
                                                     ? 'bg-[var(--sys-primary-dim)] border border-[var(--sys-primary)]'
                                                     : 'bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:border-[var(--sys-border)]'}`}>
-                                                <p className="text-sm font-bold text-[var(--sys-text)]">{v.name}</p>
+                                                
+                                                {/* Play Button */}
+                                                <div onClick={(e) => handlePlayVoiceSample(e, 'minimax', v)} className="absolute top-2 right-2 w-7 h-7 rounded-full bg-[var(--sys-surface)] border border-[var(--sys-border)] flex items-center justify-center text-[var(--sys-text-muted)] hover:text-primary hover:border-primary shadow-sm transition-all z-10" title="Play Sample">
+                                                    {previewLoadingId === v.voice_id ? (
+                                                        <span className="material-symbols-outlined text-[14px] animate-spin text-primary">progress_activity</span>
+                                                    ) : (
+                                                        <span className="material-symbols-outlined text-[16px] ml-0.5">play_arrow</span>
+                                                    )}
+                                                </div>
+
+                                                <p className="text-sm font-bold text-[var(--sys-text)] pr-6">{v.name}</p>
+                                                <p className="text-xs text-[var(--sys-text-muted)]">{v.gender} · {v.desc}</p>
+                                            </button>
+                                        ))}
+                                    </div>
+                                ) : selectedVoProvider === 'elevenlabs' ? (
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 max-h-64 overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}>
+                                        {[
+                                            // Narration & storytelling
+                                            { voice_id: 'Rachel', name: 'Rachel', gender: 'Female', desc: 'Narrative & calm' },
+                                            { voice_id: 'Drew', name: 'Drew', gender: 'Male', desc: 'News & engaging' },
+                                            { voice_id: 'Clyde', name: 'Clyde', gender: 'Male', desc: 'Deep & gravelly' },
+                                            { voice_id: 'Domi', name: 'Domi', gender: 'Female', desc: 'Confident & strong' },
+                                            // Commercial & professional
+                                            { voice_id: 'Bella', name: 'Bella', gender: 'Female', desc: 'Soft & premium' },
+                                            { voice_id: 'Antoni', name: 'Antoni', gender: 'Male', desc: 'Smooth & well-rounded' },
+                                            { voice_id: 'Elli', name: 'Elli', gender: 'Female', desc: 'Clear & youthful' },
+                                            { voice_id: 'Josh', name: 'Josh', gender: 'Male', desc: 'Deep & authoritative' },
+                                            // Character & expressive
+                                            { voice_id: 'Arnold', name: 'Arnold', gender: 'Male', desc: 'Action & gravelly' },
+                                            { voice_id: 'Charlotte', name: 'Charlotte', gender: 'Female', desc: 'Swedish & melodic' },
+                                            { voice_id: 'Mimi', name: 'Mimi', gender: 'Female', desc: 'Childish & energetic' },
+                                            { voice_id: 'Sam', name: 'Sam', gender: 'Male', desc: 'Raspy & conversational' },
+                                        ].map(v => (
+                                            <button key={v.voice_id} onClick={() => setSelectedVoVoice(v)}
+                                                className={`text-left p-3 rounded-xl transition-all cursor-pointer relative group ${selectedVoVoice?.voice_id === v.voice_id
+                                                    ? 'bg-purple-500/15 border border-purple-500/40'
+                                                    : 'bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:border-[var(--sys-border)]'}`}>
+                                                
+                                                {/* Play Button */}
+                                                <div onClick={(e) => handlePlayVoiceSample(e, 'elevenlabs', v)} className="absolute top-2 right-2 w-7 h-7 rounded-full bg-[var(--sys-surface)] border border-[var(--sys-border)] flex items-center justify-center text-[var(--sys-text-muted)] hover:text-purple-400 hover:border-purple-400 shadow-sm transition-all z-10" title="Play Sample">
+                                                    {previewLoadingId === v.voice_id ? (
+                                                        <span className="material-symbols-outlined text-[14px] animate-spin text-purple-400">progress_activity</span>
+                                                    ) : (
+                                                        <span className="material-symbols-outlined text-[16px] ml-0.5">play_arrow</span>
+                                                    )}
+                                                </div>
+
+                                                <p className="text-sm font-bold text-[var(--sys-text)] pr-6">{v.name}</p>
                                                 <p className="text-xs text-[var(--sys-text-muted)]">{v.gender} · {v.desc}</p>
                                             </button>
                                         ))}
@@ -1372,10 +1561,20 @@ export default function VideoStudio() {
                                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 max-h-48 overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}>
                                         {sarvamVoiceList.map(v => (
                                             <button key={v.voice_id} onClick={() => setSelectedVoVoice(v)}
-                                                className={`text-left p-3 rounded-xl transition-all cursor-pointer ${selectedVoVoice?.voice_id === v.voice_id
+                                                className={`text-left p-3 rounded-xl transition-all cursor-pointer relative group ${selectedVoVoice?.voice_id === v.voice_id
                                                     ? 'bg-[var(--sys-primary-dim)] border border-[var(--sys-border)]'
                                                     : 'bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:border-[var(--sys-border)]'}`}>
-                                                <p className="text-sm font-bold text-[var(--sys-text)]">{v.name}</p>
+                                                
+                                                {/* Play Button */}
+                                                <div onClick={(e) => handlePlayVoiceSample(e, 'sarvam', v)} className="absolute top-2 right-2 w-7 h-7 rounded-full bg-[var(--sys-surface)] border border-[var(--sys-border)] flex items-center justify-center text-[var(--sys-text-muted)] hover:text-primary hover:border-primary shadow-sm transition-all z-10" title="Play Sample">
+                                                    {previewLoadingId === v.voice_id ? (
+                                                        <span className="material-symbols-outlined text-[14px] animate-spin text-primary">progress_activity</span>
+                                                    ) : (
+                                                        <span className="material-symbols-outlined text-[16px] ml-0.5">play_arrow</span>
+                                                    )}
+                                                </div>
+
+                                                <p className="text-sm font-bold text-[var(--sys-text)] pr-6">{v.name}</p>
                                                 <p className="text-xs text-[var(--sys-text-muted)]">{v.language} · {v.gender}</p>
                                             </button>
                                         ))}
@@ -1451,6 +1650,7 @@ export default function VideoStudio() {
                             </h2>
                             <p className="text-sm text-[var(--sys-text-muted)] -mt-3">
                                 AI recommended <strong className="video-highlight-text">{
+                                    routing.selectedModel === 'grok-imagine' ? 'Grok Imagine' :
                                     routing.selectedModel === 'veo-3.1' ? 'Google Veo 3.1' :
                                         routing.selectedModel === 'veo-3.1-fast' ? 'Google Veo 3.1 Fast' :
                                             routing.selectedModel === 'kling-3.0' ? 'Kling 3.0' :
@@ -1476,7 +1676,8 @@ export default function VideoStudio() {
                             {/* Model Selector Cards */}
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                 {[
-                                    { id: 'kling-3.0', name: 'Kling 3.0', icon: 'videocam', desc: 'Multi-shot storyboards, native audio + voice IDs, 3-15s', bestFor: 'Product demos, action shots, storyboard videos', features: ['multi-shot', 'native-audio', 'voice-ids', '3-15s'], available: true, recommended: true },
+                                    { id: 'grok-imagine', name: 'Grok Imagine', icon: 'smart_toy', desc: 'xAI native — reference images, I2V, extend, native audio, 1-15s', bestFor: 'Social reels, product placement, character-consistent storytelling', features: ['ref-images', 'i2v', 'extend', 'native-audio', '1-15s'], available: true, recommended: true },
+                                    { id: 'kling-3.0', name: 'Kling 3.0', icon: 'videocam', desc: 'Multi-shot storyboards, native audio + voice IDs, 3-15s', bestFor: 'Product demos, action shots, storyboard videos', features: ['multi-shot', 'native-audio', 'voice-ids', '3-15s'], available: true, recommended: false },
                                     { id: 'veo-3.1', name: 'Google Veo 3.1', icon: 'movie', desc: 'Cinematic quality with native audio + extend-video', bestFor: 'Premium brand films, cinematic ads', features: ['native-audio', 'cinematic', 'extend-video', '5-8s'], available: true, recommended: false },
                                     { id: 'veo-3.1-fast', name: 'Veo 3.1 Fast', icon: 'bolt', desc: 'Faster & cheaper Veo 3.1 — great for prototyping', bestFor: 'Quick iterations, content series, social video', features: ['native-audio', 'fast', '5-8s', 'cost-efficient'], available: true, recommended: false },
                                     { id: 'seedance-2.0', name: 'Seedance 2.0 Pro', icon: 'local_movies', desc: 'Cinematic video with native audio, camera control & physics', bestFor: 'Premium ads, product showcases, brand films', features: ['native-audio', 'camera-control', 'cinematic', '4-15s'], available: true, recommended: false },
@@ -1617,27 +1818,84 @@ export default function VideoStudio() {
                             </div>
 
                             {/* Generate Button */}
-                            <button onClick={handleGenerate} disabled={loading}
+                            <button onClick={handleGenerateImages} disabled={loading}
                                 className="w-full py-4 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] font-bold text-base hover:shadow-xl hover:shadow-none transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-3">
                                 {loading ? (
-                                    <><span className="material-symbols-outlined animate-spin">progress_activity</span>Submitting to {routing.selectedModel}...</>
+                                    <><span className="material-symbols-outlined animate-spin">progress_activity</span>Generating scene images...</>
                                 ) : (
-                                    <><span className="material-symbols-outlined">movie</span>Generate Video with {
-                                        routing.selectedModel === 'veo-3.1' ? 'Veo 3.1' :
-                                            routing.selectedModel === 'veo-3.1-fast' ? 'Veo 3.1 Fast' :
-                                                routing.selectedModel === 'kling-3.0' ? 'Kling 3.0' :
-                                                    routing.selectedModel === 'seedance-2.0' ? 'Seedance 2.0' :
-                                                        routing.selectedModel
-                                    } — {routing.costPreview?.credits || 15} Credits</>
+                                    <><span className="material-symbols-outlined">image</span>Review Scene Images & Verify Consistency</>
                                 )}
                             </button>
                         </div>
                     )}
 
                     {/* ════════════════════════════════════════════════════════════ */}
-                    {/* STEP 5: GENERATING — Live Progress                        */}
+                    {/* STEP 5: IMAGE REVIEW — Check consistency before video         */}
                     {/* ════════════════════════════════════════════════════════════ */}
-                    {step === 5 && (
+                    {step === 5 && script?.shots && (
+                        <div className="space-y-6">
+                            <div className="flex items-center justify-between">
+                                <h2 className="text-lg font-bold text-[var(--sys-text)] flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-primary">photo_library</span>
+                                    Review Scene Images
+                                </h2>
+                                <p className="text-sm text-[var(--sys-text-muted)]">Check character & product consistency</p>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {script.shots.map((shot, idx) => (
+                                    <div key={idx} className="bg-[var(--sys-surface)] rounded-xl border border-[var(--sys-border)] overflow-hidden flex flex-col group">
+                                        <div className="relative aspect-video bg-[var(--sys-background)] border-b border-[var(--sys-border)]">
+                                            {shot.imageUrl ? (
+                                                <img src={shot.imageUrl} alt={`Shot ${idx+1}`} className="w-full h-full object-cover" />
+                                            ) : (
+                                                <div className="flex items-center justify-center h-full text-red-500/80 bg-red-500/5 flex-col gap-2 p-4 text-center">
+                                                    <span className="material-symbols-outlined text-3xl mb-1">broken_image</span>
+                                                    <span className="text-xs font-bold leading-tight">Image Generation Failed<br/>(Gemini Rate Limit)</span>
+                                                </div>
+                                            )}
+                                            <div className="absolute top-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded backdrop-blur-sm shadow-sm border border-white/10">
+                                                Shot {idx+1}
+                                            </div>
+                                            <div className={`absolute inset-0 flex flex-col items-center justify-center gap-4 transition-all ${!shot.imageUrl ? 'bg-red-500/10 opacity-100' : 'bg-black/40 opacity-0 group-hover:opacity-100'}`}>
+                                                {!shot.imageUrl && (
+                                                    <span className="bg-red-500 text-white text-xs px-3 py-1 rounded-full font-bold shadow-lg mt-4 animate-bounce">API Timeout</span>
+                                                )}
+                                                <button 
+                                                    onClick={() => {
+                                                        const newPrompt = window.prompt("Adjust image generation prompt:", shot.visual || shot.description);
+                                                        if (newPrompt !== null) {
+                                                            handleRegenerateShotImage(idx, newPrompt);
+                                                        }
+                                                    }}
+                                                    disabled={loading}
+                                                    className="px-4 py-2 bg-white text-black font-bold rounded-lg text-sm hover:scale-105 transition-transform disabled:opacity-50 flex items-center gap-2 cursor-pointer shadow-xl">
+                                                    <span className="material-symbols-outlined text-sm">refresh</span> Regenerate Frame
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div className="p-3 text-xs text-[var(--sys-text-muted)] line-clamp-2 !leading-relaxed" title={shot.visual || shot.description}>
+                                            {shot.visual || shot.description}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <button onClick={handleGenerateVideo} disabled={loading || script.shots.some(s => !s.imageUrl)}
+                                className="w-full py-4 rounded-2xl bg-[#FF4D00] text-white font-bold text-lg hover:bg-[#E64500] hover:shadow-xl hover:shadow-[#FF4D00]/20 transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-3 mt-6">
+                                {loading ? (
+                                    <><span className="material-symbols-outlined animate-spin">progress_activity</span>Starting Video Processing...</>
+                                ) : (
+                                    <><span className="material-symbols-outlined">movie</span>Approve Images & Generate Video — {routing?.costPreview?.credits || 15} Credits</>
+                                )}
+                            </button>
+                        </div>
+                    )}
+
+                    {/* ════════════════════════════════════════════════════════════ */}
+                    {/* STEP 6: GENERATING — Live Progress                        */}
+                    {/* ════════════════════════════════════════════════════════════ */}
+                    {step === 6 && (
                         <div className="flex flex-col items-center justify-center py-16">
                             <div className="relative mb-8">
                                 <div className="w-32 h-32 rounded-full border-4 border-[var(--sys-primary)] flex items-center justify-center">
@@ -1648,18 +1906,64 @@ export default function VideoStudio() {
 
                             <h2 className="text-xl font-bold text-[var(--sys-text)] mb-2">Creating Your Video</h2>
                             <p className="text-sm text-[var(--sys-text-muted)] mb-6">
-                                {generation?.status === 'IN_QUEUE' ? '⏳ In queue — waiting for GPU...' :
-                                    generation?.status === 'IN_PROGRESS' ? '🎥 Rendering frames...' : '🎬 Processing...'}
+                                {generation?.isMultiShot ? (
+                                    generation?.status === 'COMPLETED' ? '🎬 Final compilation complete!' :
+                                    `🎥 Generating shots... (${generation?.completedShots || 0}/${generation?.totalShots || 1} done)`
+                                ) : (
+                                    generation?.status === 'IN_QUEUE' ? '⏳ In queue — waiting for GPU...' :
+                                    generation?.status === 'IN_PROGRESS' ? '🎥 Rendering frames...' : '🎬 Processing...'
+                                )}
                             </p>
 
-                            {/* Progress bar */}
+                            {/* Overall Progress bar */}
                             <div className="w-full max-w-md h-3 rounded-full bg-[var(--sys-surface)] overflow-hidden mb-4">
                                 <div
                                     className="h-full rounded-full bg-[var(--sys-surface)] border border-[var(--sys-border)] transition-all duration-1000"
                                     style={{ width: `${generation?.progress || 5}%` }}
                                 />
                             </div>
-                            <p className="text-sm text-[var(--sys-text-muted)]">{generation?.progress || 5}% complete — usually takes 1-3 minutes</p>
+                            <p className="text-sm text-[var(--sys-text-muted)] mb-8">{generation?.progress || 5}% overall — usually takes 1-3 minutes</p>
+
+                            {/* Multi-shot detailed progress */}
+                            {generation?.isMultiShot && generation?.shots && (
+                                <div className="w-full max-w-2xl bg-[var(--sys-surface)] rounded-2xl p-6 border border-[var(--sys-border)]">
+                                    <h3 className="text-sm font-bold text-[var(--sys-text)] mb-4 flex items-center gap-2">
+                                        <span className="material-symbols-outlined text-primary text-lg">view_timeline</span>
+                                        Shot-by-Shot Progress
+                                    </h3>
+                                    <div className="space-y-4">
+                                        {generation.shots.map((shot, idx) => (
+                                            <div key={idx} className="flex flex-col gap-2">
+                                                <div className="flex items-center justify-between text-xs">
+                                                    <span className="font-medium text-[var(--sys-text)]">Shot {shot.shotNumber}</span>
+                                                    <span className={`${shot.status === 'COMPLETED' ? 'text-green-500' : shot.status === 'FAILED' ? 'text-red-500' : 'text-[var(--sys-text-muted)]'}`}>
+                                                        {shot.status === 'COMPLETED' ? 'Done' : shot.status === 'FAILED' ? 'Failed' : `${shot.progress || 5}%`}
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center gap-3">
+                                                    <div className="flex-1 h-1.5 rounded-full bg-[var(--sys-background)] overflow-hidden">
+                                                        <div 
+                                                            className={`h-full transition-all duration-500 rounded-full ${shot.status === 'COMPLETED' ? 'bg-green-500' : shot.status === 'FAILED' ? 'bg-red-500' : 'bg-primary'}`}
+                                                            style={{ width: `${shot.progress || 5}%` }}
+                                                        />
+                                                    </div>
+                                                    {shot.status === 'FAILED' && shot.error && (
+                                                        <span className="text-[10px] text-red-500 max-w-[150px] truncate" title={shot.error}>⚠️ {shot.error}</span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    {generation.completedShots === generation.totalShots && generation.status !== 'COMPLETED' && (
+                                        <div className="mt-6 p-3 bg-violet-500/10 rounded-xl border border-violet-500/20 text-center">
+                                            <p className="text-sm text-violet-400 font-medium flex items-center justify-center gap-2 animate-pulse">
+                                                <span className="material-symbols-outlined">auto_fix_high</span>
+                                                Auto-mixing audio and compiling final scene...
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -1689,9 +1993,9 @@ export default function VideoStudio() {
                     )}
 
                     {/* ════════════════════════════════════════════════════════════ */}
-                    {/* STEP 6: REVIEW — Video + Critic + Edit                    */}
+                    {/* STEP 7: REVIEW — Video + Critic + Edit                    */}
                     {/* ════════════════════════════════════════════════════════════ */}
-                    {step === 6 && (
+                    {step === 7 && (
                         <div className="space-y-6">
                             <h2 className="text-lg font-bold text-[var(--sys-text)] flex items-center gap-2">
                                 <span className="material-symbols-outlined text-primary">rate_review</span>

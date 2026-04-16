@@ -120,22 +120,42 @@ export async function videoVisualGroundingNode(state) {
             .limit(5)
             .lean();
 
+        // Collect brand + product images
         const brandImages = [
             ...(brand?.logo?.url ? [brand.logo.url] : []),
             ...(brand?.dna?.brandImages || []).filter(i => i.url).map(i => i.url).slice(0, 3),
             ...products.flatMap(p => (p.images || []).filter(i => i.url).map(i => i.url)).slice(0, 3),
         ].filter(Boolean).slice(0, 5);
 
-        if (brandImages.length === 0) {
-            console.log('🧠 MCoT: No brand images found, skipping visual grounding');
+        // ── Also include user-uploaded ad-hoc reference images from this session ──
+        // These are the images the user attached directly in the studio UI.
+        // Without this, the script director only gets text labels for these images.
+        const userRefImages = (state.inputImages || [])
+            .map(img => img.url)
+            .filter(url => url && url.startsWith('http') && !url.includes('localhost') && !url.includes('127.0.0.1'))
+            .slice(0, 3);
+
+        const allImages = [...brandImages, ...userRefImages].slice(0, 8); // Cap at 8 to avoid payload limits
+
+        if (allImages.length === 0) {
+            console.log('🧠 MCoT: No brand or user images found, skipping visual grounding');
             return { ...state, visualGrounding: null };
         }
 
-        console.log(`🧠 MCoT: Analyzing ${brandImages.length} brand images for video context...`);
+        const userRefCount = userRefImages.length;
+        const brandCount = brandImages.length;
+        console.log(`🧠 MCoT: Analyzing ${allImages.length} images (${brandCount} brand + ${userRefCount} user-uploaded) for video context...`);
+
+        const userPrompt = [
+            `Analyze these ${allImages.length} images from brand "${brand?.name || 'unknown'}" and extract visual DNA for video production.`,
+            userRefCount > 0 ? `The last ${userRefCount} image(s) are reference images uploaded by the user for THIS specific video — pay special attention to their subjects, products, style, and composition.` : '',
+            `The user's brief: "${state.brief || 'Create a professional video'}".`,
+        ].filter(Boolean).join(' ');
+
         const grounding = await agentUtils.callMultimodalAgent(
             VIDEO_VISUAL_GROUNDING_PROMPT,
-            `Analyze these ${brandImages.length} images from brand "${brand?.name || 'unknown'}" and extract visual DNA for video production. The user's brief: "${state.brief || 'Create a professional video'}".`,
-            brandImages,
+            userPrompt,
+            allImages,
             { temperature: 0.2, maxTokens: 4096 }
         );
 
@@ -417,16 +437,30 @@ export async function modelRouterNode(state) {
 export async function videoGeneratorNode(state) {
     console.log('🎥 Node: Video Generator — submitting to fal.ai / Grok...');
 
-    const model = state.routing?.selectedModel || 'kling-3.0';
+    const model = state.routing?.selectedModel || 'grok-imagine';
     const resolution = state.routing?.resolution || '1080p';
     const mode = state.routing?.mode || 'fast';
-    const prompt = state.backendPrompt || state.script?.narrative || '';
+
+    // Enrich prompt with shot-by-shot visual details from the script
+    const shots = state.script?.shots || [];
+    let prompt = state.backendPrompt || state.script?.narrative || '';
+    if (shots.length > 0 && !prompt.includes('Shot ')) {
+        const shotDescriptions = shots.map((s, i) => {
+            const parts = [`Shot ${i + 1} (${s.duration || 3}s):`];
+            if (s.visual) parts.push(s.visual);
+            if (s.camera) parts.push(`Camera: ${s.camera}`);
+            if (s.dialogue) parts.push(`VO: "${s.dialogue}"`);
+            return parts.join(' ');
+        }).join('\n');
+        prompt = `${prompt}\n\nDETAILED SHOT BREAKDOWN:\n${shotDescriptions}`;
+    }
 
     // Use first reference image if available (for image-to-video models)
     // IMPORTANT: Skip base64 data URIs AND localhost URLs — external APIs can't access them
     let imageUrl = null;
     const candidates = [
         ...(state.inputImages || []).map(img => img.url),
+        ...(state.references?.userUploaded || []).map(img => img.url),
         ...(state.references?.brandImages || []).map(img => img.url),
     ].filter(Boolean);
 
@@ -451,8 +485,11 @@ export async function videoGeneratorNode(state) {
         console.log(`📸 Using image for video gen: ${imageUrl.substring(0, 80)}...`);
     }
 
-    // Pass shots for Kling multi-prompt support
-    const shots = state.script?.shots || [];
+    // Collect all reference images for consistency
+    const referenceImages = [
+        ...(state.inputImages || []).map(img => img.url),
+        ...(state.references?.userUploaded || []).map(img => img.url),
+    ].filter(u => u && isExternallyAccessible(u));
 
     const { requestId, endpoint, statusUrl, resultUrl, provider, _piApiPayload, _muApiPayload, _laozhangVideoUrl } = await submitVideoGeneration({
         model,
@@ -464,6 +501,7 @@ export async function videoGeneratorNode(state) {
         shots: shots.length > 1 ? shots : undefined, // Only use multi-prompt if 2+ shots
         generateAudio: state.routing?.generateAudio !== false,
         aspectRatio: state.routing?.aspectRatio || '16:9',
+        referenceImages,
     });
 
     return {
