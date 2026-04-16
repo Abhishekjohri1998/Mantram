@@ -27,7 +27,7 @@ import {
 
 // ── Tool Definitions ──────────────────────────────────────────────────────────
 
-const TOOL_DEFINITIONS = [
+export const TOOL_DEFINITIONS = [
     {
         name: 'web_search',
         description: 'Search the web for real-time information. mode="quick" (Grok, 20-min cache) or mode="deep" (Perplexity/Gemini grounded).',

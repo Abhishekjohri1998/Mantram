@@ -1,119 +1,34 @@
 /**
- * MCP Registry — Auto-connect Singleton
- *
- * On first import, connects the global `mcpBridge` to the internal
- * Mantram Tools MCP server.  All studio nodes import `getMcpTools()`
- * instead of calling tools directly, giving the LLM the ability to
- * pick which tools to call at runtime.
- *
- * Usage in any studio node:
- *   import { callMcpTool, getMcpToolSchemas } from '../../mcp/registry.js';
- *
- *   // Execute a single tool
- *   const trends = await callMcpTool('fetch_trending', { brandId });
- *
- *   // Get tool schemas for LLM function-calling
- *   const tools = await getMcpToolSchemas();
+ * MCP Registry — Local Fast-Path
+ * 
+ * Bypasses HTTP/SSE completely for internal 'mantram-tools' to avoid
+ * PM2 cluster state issues.
  */
 
-import { mcpBridge } from '../ai/mcpClient.js';
+import {TOOL_DEFINITIONS} from './mantramToolsServer.js';
 
 const SERVER_NAME = 'mantram-tools';
-let _connected = false;
-let _connecting = false;
-let _connectPromise = null;
 
-/**
- * Lazily connect to the internal MCP server.
- * Safe to call multiple times — only connects once.
- */
-async function ensureConnected() {
-    if (_connected) return;
-    if (_connecting) return _connectPromise;
-
-    _connecting = true;
-    // Use same PORT the Express server listens on (env var or fallback 3001)
-    const port = process.env.PORT || 3001;
-    const sseUrl = `http://localhost:${port}/mcp/tools/sse`;
-
-    _connectPromise = mcpBridge.connectServer(SERVER_NAME, sseUrl)
-        .then(() => {
-            _connected = true;
-            _connecting = false;
-            console.log('✅ MCP Registry: Internal tool server connected');
-        })
-        .catch((err) => {
-            _connected = false;
-            _connecting = false;
-            _connectPromise = null;
-            // Non-fatal — studio will fall back to direct tool calls
-            console.warn('⚠️ MCP Registry: Could not connect to internal server:', err.message);
-        });
-
-    return _connectPromise;
-}
-
-/**
- * Force a reconnection on the next call (used after session invalidation).
- */
-function resetConnection() {
-    _connected = false;
-    _connecting = false;
-    _connectPromise = null;
-    mcpBridge.disconnect(SERVER_NAME);
-}
-
-/**
- * Execute an MCP tool by name with args.
- * Falls back gracefully if MCP server is unavailable.
- * Auto-retries once on stale session errors.
- * @param {string} toolName — one of: web_search, fetch_trending, scrape_competitor, fetch_seo_audit, fetch_content_history, fetch_performance_learnings
- * @param {object} args
- * @returns {object} Parsed JSON result from the tool
- */
 export async function callMcpTool(toolName, args = {}) {
     try {
-        await ensureConnected();
-        const rawText = await mcpBridge.executeTool(`${SERVER_NAME}__${toolName}`, args);
-        return JSON.parse(rawText);
-    } catch (err) {
-        // On stale session errors, reset connection and retry once
-        const isSessionError = err.message?.includes('404') || err.message?.includes('No active MCP session') || err.message?.includes('not connected');
-        if (isSessionError) {
-            console.warn(`⚠️ MCP: Session lost for ${toolName} — resetting and retrying...`);
-            resetConnection();
-            try {
-                await ensureConnected();
-                const rawText = await mcpBridge.executeTool(`${SERVER_NAME}__${toolName}`, args);
-                return JSON.parse(rawText);
-            } catch (retryErr) {
-                console.warn(`⚠️ MCP: Retry also failed for ${toolName} — falling back to direct call:`, retryErr.message);
-                return await callToolDirectly(toolName, args);
-            }
-        }
-        console.warn(`⚠️ MCP callMcpTool(${toolName}) failed — falling back to direct call:`, err.message);
         return await callToolDirectly(toolName, args);
-    }
-}
-
-/**
- * Get all tool schemas from the MCP server (for LLM function-calling).
- * Returns OpenAI-compatible function schema array.
- */
-export async function getMcpToolSchemas() {
-    try {
-        await ensureConnected();
-        return await mcpBridge.getToolsAsSchema(SERVER_NAME);
     } catch (err) {
-        console.warn('⚠️ MCP: Could not fetch tool schemas:', err.message);
-        return [];
+        console.warn(`⚠️ Local MCP Tool (${toolName}) execution failed:`, err.message);
+        return { success: false, error: err.message };
     }
 }
 
-/**
- * Direct fallback — calls the tool functions without going through MCP.
- * Ensures studios work even if the MCP SSE connection is down.
- */
+export async function getMcpToolSchemas() {
+    return TOOL_DEFINITIONS.map(tool => ({
+        type: 'function',
+        function: {
+            name: `${SERVER_NAME}__${tool.name}`, // Prevent collisions
+            description: tool.description,
+            parameters: tool.inputSchema
+        }
+    }));
+}
+
 async function callToolDirectly(toolName, args) {
     const {
         webSearch,
