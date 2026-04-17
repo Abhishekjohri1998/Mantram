@@ -32,7 +32,7 @@ function resolveTaskType(qualityMode, hasImages) {
         console.log(`📌 PiAPI: images present → forcing seedance-2-preview`);
         return 'seedance-2-preview';
     }
-    return qualityMode === 'quality' ? 'seedance-2-preview' : 'seedance-2-fast-preview';
+    return 'seedance-2-fast-preview';
 }
 
 async function resizeToAspectRatio(base64DataUri, targetRatio) {
@@ -274,7 +274,7 @@ export async function submitPiApiVideoExtend({ parentTaskId, prompt, duration, q
     if (!parentTaskId) throw new Error('Parent task ID is required for Video Extend');
     const dur = Math.min(Math.max(parseInt(duration, 10) || 5, 5), 10);
     console.log(`🔗 PiAPI Extend: parentTaskId=${parentTaskId}, duration=${dur}s`);
-    const taskType = qualityMode === 'quality' ? 'seedance-2-preview' : 'seedance-2-fast-preview';
+    const taskType = 'seedance-2-fast-preview';
     const payload = { model: 'seedance', task_type: taskType, input: { prompt: prompt || '', duration: dur, parent_task_id: parentTaskId, no_watermark: true } };
     const taskId = await submitPiApiPayload(payload);
     return { taskId, provider: 'piapi', model: 'seedance-2.0', mode: 'extend', _payload: payload, parentTaskId, type: 'generation' };
