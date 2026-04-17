@@ -52,7 +52,7 @@ import { uploadToS3, mirrorUrlToS3, getSignedUrlIfNeeded, ensureS3Url } from '..
 import { safeErrorMessage } from '../utils/safeError.js';
 import { loadBrandContext, callMultimodalAgent, callAgent } from '../agents/shared/agentUtils.js';
 import { buildEnhanceSystemPrompt, buildEnhanceUserPrompt, VISUAL_GROUNDING_SYSTEM } from '../agents/videoStudio/promptEnhancer.js';
-import { submitMuApiVideoGeneration, getMuApiGenerationStatus as pollMuApiStatus } from '../agents/videoStudio/muapiClient.js';
+import { submitPiApiVideoGeneration, getPiApiGenerationStatus as pollPiApiStatus } from '../agents/videoStudio/piApiClient.js';
 import { geminiImageGenerate } from '../agents/videoStudio/firstFrame.js';
 import { Q_ADS_CATEGORIES, getCategory, buildQAdPrompt, getQAdsCreditCost } from '../agents/videoStudio/qAdsCategories.js';
 
@@ -3094,8 +3094,8 @@ router.post('/ugc-pro/generate', protect, requireCredits('ugcProGenerate'), asyn
         console.log(`[UGC Generate] Final prompt @image check — @image1: ${prompt.includes('@image1')}, @image2: ${prompt.includes('@image2')}`);
         console.log(`[UGC Generate] Submitting — ${duration}s, ${imageUrls.length} images, prompt ${prompt.split(/\s+/).length}w`);
 
-        // Submit to MuAPI via existing muapiClient
-        const genResult = await submitMuApiVideoGeneration({
+        // Submit to PiAPI via piApiClient
+        const genResult = await submitPiApiVideoGeneration({
             prompt,
             imageUrl: imageUrls[0] || null,
             duration,
@@ -3115,7 +3115,7 @@ router.post('/ugc-pro/generate', protect, requireCredits('ugcProGenerate'), asyn
             backendPrompt: prompt,
             input: { images: imageUrls, productData: parsedProduct },
             generation: {
-                provider: 'muapi',
+                provider: 'piapi',
                 model: 'seedance-2.0',
                 taskId: genResult.taskId,
                 requestId: genResult.taskId,
@@ -3130,7 +3130,7 @@ router.post('/ugc-pro/generate', protect, requireCredits('ugcProGenerate'), asyn
             success: true,
             projectId: project._id,
             requestId: genResult.taskId,
-            provider: 'muapi',
+            provider: 'piapi',
             prompt,
             imageCount: imageUrls.length,
             duration,
@@ -3146,7 +3146,7 @@ router.post('/ugc-pro/generate', protect, requireCredits('ugcProGenerate'), asyn
 // Poll MuAPI generation status (uses existing muapiClient) and update history
 router.get('/ugc-pro/status/:requestId', protect, async (req, res) => {
     try {
-        const result = await pollMuApiStatus(req.params.requestId);
+        const result = await pollPiApiStatus(req.params.requestId);
         
         // Update DB history to maintain sync
         if (result && req.params.requestId) {
@@ -3260,7 +3260,7 @@ router.post('/ugc-pro/qads/generate', protect, async (req, res) => {
 
         console.log(`[Q-Ads Generate] Submitting — ${categoryId}, ${duration}s, ${imageUrls.length} images`);
 
-        const genResult = await submitMuApiVideoGeneration({
+        const genResult = await submitPiApiVideoGeneration({
             prompt,
             imageUrl: imageUrls[0] || null,
             duration, aspectRatio, qualityMode: quality, generateAudio: true,
@@ -3273,7 +3273,7 @@ router.post('/ugc-pro/qads/generate', protect, async (req, res) => {
             script: prompt, backendPrompt: prompt,
             input: { images: imageUrls, productData: parsedProduct, categoryId },
             generation: {
-                provider: 'muapi', model: 'seedance-2.0',
+                provider: 'piapi', model: 'seedance-2.0',
                 taskId: genResult.taskId, requestId: genResult.taskId,
                 duration, aspectRatio, progress: 0, status: 'GENERATING',
             },
@@ -3281,7 +3281,7 @@ router.post('/ugc-pro/qads/generate', protect, async (req, res) => {
 
         res.json({
             success: true, projectId: project._id, requestId: genResult.taskId,
-            provider: 'muapi', categoryId, prompt, imageCount: imageUrls.length, duration, aspectRatio,
+            provider: 'piapi', categoryId, prompt, imageCount: imageUrls.length, duration, aspectRatio,
         });
     } catch (err) {
         console.error('Q-Ads generate error:', err.message);
@@ -3292,7 +3292,7 @@ router.post('/ugc-pro/qads/generate', protect, async (req, res) => {
 // ── GET /api/video-studio/ugc-pro/qads/status/:requestId ──
 router.get('/ugc-pro/qads/status/:requestId', protect, async (req, res) => {
     try {
-        const result = await pollMuApiStatus(req.params.requestId);
+        const result = await pollPiApiStatus(req.params.requestId);
         if (result && req.params.requestId) {
             const updatePayload = {
                 'generation.progress': result.progress,
