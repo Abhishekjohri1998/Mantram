@@ -4187,6 +4187,8 @@ router.get('/:id/status', protect, async (req, res) => {
             const state = {
                 generation: project.generation,
                 routing: project.routing,
+                mode: project.mode,
+                status: project.status,
             };
             const updated = await pollGenerationStatus(state);
 
@@ -4469,11 +4471,12 @@ router.get('/', protect, async (req, res) => {
             (p.status === 'generating' || p.status === 'advanced-generating') && p.generation?.falRequestId
         );
 
+        // ── Auto-sync stuck generating projects (NON-BLOCKING) ──
+        // Fire-and-forget: frontend will pick up real status via its own polling
         if (stuckProjects.length > 0) {
-            console.log(`🔄 Auto-syncing ${stuckProjects.length} stuck generating project(s)...`);
-            await Promise.allSettled(stuckProjects.map(async (p) => {
+            console.log(`🔄 Auto-syncing ${stuckProjects.length} stuck generating project(s) in background...`);
+            Promise.allSettled(stuckProjects.map(async (p) => {
                 try {
-                    // Infer provider from model if not stored (older projects)
                     const model = p.routing?.selectedModel || '';
                     let provider = p.generation?.provider || '';
                     if (!provider) {
@@ -4485,7 +4488,6 @@ router.get('/', protect, async (req, res) => {
                         else provider = 'fal';
                     }
 
-                    // HeyGen projects — poll HeyGen API directly
                     if (provider === 'heygen') {
                         const hStatus = await getHeyGenVideoStatus(p.generation.falRequestId);
                         if (hStatus.status === 'COMPLETED') {
@@ -4494,13 +4496,10 @@ router.get('/', protect, async (req, res) => {
                                 generation: { ...p.generation, videoUrl: hStatus.videoUrl, thumbnailUrl: hStatus.thumbnailUrl || '', progress: 100, completedAt: new Date() },
                                 finalVideoUrl: hStatus.videoUrl,
                             });
-                            p.status = 'completed';
-                            p.generation = { ...p.generation, videoUrl: hStatus.videoUrl, thumbnailUrl: hStatus.thumbnailUrl || '', progress: 100 };
                             if (hStatus.videoUrl) downloadAndUploadVideoToS3(p._id.toString(), hStatus.videoUrl).catch(() => {});
                             console.log(`✅ HeyGen synced ${p._id}: completed`);
                         } else if (hStatus.status === 'FAILED') {
                             await VideoProject.findByIdAndUpdate(p._id, { status: 'failed', 'generation.error': hStatus.error });
-                            p.status = 'failed';
                             if (p.creditsUsed > 0) {
                                 await refundCredits(p.user, p.creditsUsed, 'videoGenerateRefund', `Refund: Stuck HeyGen Video Generation Failed`, 'video', { projectId: p._id });
                                 await VideoProject.findByIdAndUpdate(p._id, { creditsUsed: 0 });
@@ -4514,6 +4513,8 @@ router.get('/', protect, async (req, res) => {
                     const state = {
                         generation: { ...p.generation, provider },
                         routing: { selectedModel: model },
+                        mode: p.mode,
+                        status: p.status,
                     };
                     const updated = await pollGenerationStatus(state);
 
@@ -4523,9 +4524,6 @@ router.get('/', protect, async (req, res) => {
                             status: newStatus,
                             generation: { ...updated.generation, provider },
                         });
-                        // Update the in-memory project for the response
-                        p.status = newStatus;
-                        p.generation = { ...updated.generation, provider };
                         console.log(`✅ Synced project ${p._id}: ${newStatus} — videoUrl: ${updated.generation.videoUrl ? 'YES' : 'no'}`);
                     } else {
                         console.log(`⏳ Project ${p._id} still ${updated.generation?.status || 'unknown'}`);
@@ -4533,7 +4531,7 @@ router.get('/', protect, async (req, res) => {
                 } catch (e) {
                     console.warn(`⚠️ Failed to sync project ${p._id}:`, e.message);
                 }
-            }));
+            })).catch(() => {});
         }
 
         res.json({ success: true, projects: await signVideoProjectAssets(projects), total });

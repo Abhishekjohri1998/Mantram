@@ -91,6 +91,7 @@ export default function VideoStudio() {
 
     // History
     const [projects, setProjects] = useState([])
+    const [projectsLoaded, setProjectsLoaded] = useState(false)
     const [showHistory, setShowHistory] = useState(false)
     const [playingVideo, setPlayingVideo] = useState(null)
     const [advancedRefillData, setAdvancedRefillData] = useState(null)
@@ -248,7 +249,7 @@ export default function VideoStudio() {
 
     // Load history on mount
     useEffect(() => {
-        api('/video-studio?limit=50').then(d => setProjects(d.projects || [])).catch(() => { })
+        api('/video-studio?limit=50').then(d => { setProjects(d.projects || []); setProjectsLoaded(true); }).catch(() => { setProjectsLoaded(true); })
         api('/video-studio/models/capabilities').then(d => setModelCapabilities(d.capabilities || null)).catch(() => { })
 
         // Check for brainstorm context
@@ -958,7 +959,7 @@ export default function VideoStudio() {
 
                 {/* ── ADVANCED MODE ── */}
                 {studioMode === 'advanced' && (
-                    <AdvancedMode activeBrand={activeBrand} initialData={advancedRefillData} projects={projects} />
+                    <AdvancedMode activeBrand={activeBrand} initialData={advancedRefillData} projects={projects} projectsLoaded={projectsLoaded} />
                 )}
 
                 {/* ── UGC CREATOR MODE (HeyGen) ── */}

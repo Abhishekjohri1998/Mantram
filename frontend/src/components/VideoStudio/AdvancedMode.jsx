@@ -157,6 +157,8 @@ const css = `
 .vm-spin { animation: vm-spin 1s linear infinite; }
 @keyframes vm-pulse-border { 0%,100% { border-color: rgba(124,58,237,0.3); } 50% { border-color: rgba(124,58,237,0.7); } }
 .vm-job-item { animation: vm-pulse-border 2s ease-in-out infinite; }
+@keyframes vm-shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+.vm-skeleton { aspect-ratio: 16/9; width: 100%; border-radius: 8px; background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 75%); background-size: 200% 100%; animation: vm-shimmer 1.8s ease-in-out infinite; border: 1px solid var(--sys-border); }
 
 /* Film Format Toggle */
 .vm-format-toggle { display: flex; gap: 2px; background: var(--sys-surface-raised); border: 1px solid var(--sys-border); border-radius: 10px; padding: 3px; }
@@ -208,7 +210,7 @@ function ConfigDropdown({ value, onChange, options, label }) {
     )
 }
 
-export default function AdvancedMode({ activeBrand, initialData, projects = [] }) {
+export default function AdvancedMode({ activeBrand, initialData, projects = [], projectsLoaded = false }) {
     // ── Completed videos grid (local state, prepend new ones) ──
     const [gridVideos, setGridVideos] = useState(() => {
         return projects.filter(p => (p.status === 'done' || p.status === 'critique' || p.status === 'completed') && p.generation?.videoUrl)
@@ -899,8 +901,15 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [] }
                     )
                 })}
 
-                {/* Empty placeholder slots */}
-                {[...Array(Math.max(0, 12 - jobs.length - Math.min(gridVideos.length, Math.max(0, 16 - jobs.length))))].map((_, i) => (
+                {/* Skeleton loading placeholders while projects load */}
+                {!projectsLoaded && gridVideos.length === 0 && jobs.length === 0 && (
+                    [...Array(8)].map((_, i) => (
+                        <div key={`skel-${i}`} className="vm-skeleton" />
+                    ))
+                )}
+
+                {/* Empty placeholder slots (only after loaded) */}
+                {projectsLoaded && [...Array(Math.max(0, 12 - jobs.length - Math.min(gridVideos.length, Math.max(0, 16 - jobs.length))))].map((_, i) => (
                     <div key={`empty-${i}`} className="vm-bg-item" style={{ background: 'rgba(0,0,0,0.02)', border: '1px dashed var(--sys-border)' }} />
                 ))}
             </div>
