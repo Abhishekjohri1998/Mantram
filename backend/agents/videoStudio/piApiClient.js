@@ -28,11 +28,12 @@ function getPiApiKey() {
 }
 
 function resolveTaskType(qualityMode, hasImages) {
+    // Atlas Cloud uses bytedance provider prefixes for Seedance
     if (hasImages) {
-        console.log(`📌 PiAPI: images present → forcing seedance-2-preview`);
-        return 'seedance-2-preview';
+        console.log(`📌 Atlas Cloud: images present → forcing bytedance/seedance-v1-pro-i2v-480p`);
+        return 'bytedance/seedance-v1-pro-i2v-480p';
     }
-    return 'seedance-2-fast-preview';
+    return 'bytedance/seedance-v1-pro-t2v-480p';
 }
 
 async function resizeToAspectRatio(base64DataUri, targetRatio) {
