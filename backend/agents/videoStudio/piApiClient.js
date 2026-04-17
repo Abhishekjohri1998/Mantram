@@ -29,10 +29,10 @@ function getPiApiKey() {
 
 function resolveTaskType(qualityMode, hasImages) {
     if (hasImages) {
-        console.log(`📌 Atlas Cloud: images present → forcing bytedance/seedance-2.0-fast`);
-        return 'bytedance/seedance-2.0-fast';
+        console.log(`📌 Atlas Cloud: images present → forcing bytedance/seedance-2.0-fast/image-to-video`);
+        return 'bytedance/seedance-2.0-fast/image-to-video';
     }
-    return 'bytedance/seedance-2.0-fast';
+    return 'bytedance/seedance-2.0-fast/text-to-video';
 }
 
 async function resizeToAspectRatio(base64DataUri, targetRatio) {
