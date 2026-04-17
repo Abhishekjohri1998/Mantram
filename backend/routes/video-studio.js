@@ -3269,13 +3269,22 @@ router.post('/ugc-pro/qads/generate', protect, async (req, res) => {
 
         // Persist as VideoProject
         const project = await VideoProject.create({
-            user: req.user._id, brand: brandId, studioMode: 'q-ads', status: 'generating',
-            script: prompt, backendPrompt: prompt,
-            input: { images: imageUrls, productData: parsedProduct, categoryId },
+            user: req.user._id, brand: brandId, mode: 'advanced', status: 'advanced-generating',
+            title: `Q-Ad: ${parsedProduct.productName || categoryId}`,
+            backendPrompt: prompt,
+            input: {
+                brief: `Q-Ads [${categoryId}]: ${parsedProduct.productName || 'product'}`,
+                inputType: 'image',
+                images: imageUrls.map((u, i) => ({ url: u, source: 'upload', label: i === 0 ? 'avatar' : `product-${i}` })),
+            },
+            advancedConfig: {
+                prompt, duration, aspectRatio,
+                firstImageUrl: imageUrls[0] || '',
+            },
             generation: {
-                provider: 'muapi', model: 'seedance-2.0',
-                taskId: genResult.taskId, requestId: genResult.taskId,
-                duration, aspectRatio, progress: 0, status: 'GENERATING',
+                provider: 'muapi',
+                falRequestId: genResult.taskId,
+                progress: 0,
             },
         });
 
@@ -3296,7 +3305,6 @@ router.get('/ugc-pro/qads/status/:requestId', protect, async (req, res) => {
         if (result && req.params.requestId) {
             const updatePayload = {
                 'generation.progress': result.progress,
-                'generation.status': result.status === 'COMPLETED' ? 'COMPLETED' : (result.status === 'FAILED' ? 'FAILED' : 'GENERATING'),
             };
             if (result.videoUrl) updatePayload['generation.videoUrl'] = result.videoUrl;
             if (result.error) updatePayload['generation.error'] = result.error;
@@ -3304,7 +3312,7 @@ router.get('/ugc-pro/qads/status/:requestId', protect, async (req, res) => {
                 updatePayload.status = result.status === 'COMPLETED' ? 'done' : 'failed';
             }
             await VideoProject.findOneAndUpdate(
-                { 'generation.requestId': req.params.requestId, user: req.user._id, studioMode: 'q-ads' },
+                { 'generation.falRequestId': req.params.requestId, user: req.user._id },
                 updatePayload
             );
         }
