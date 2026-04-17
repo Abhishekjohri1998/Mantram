@@ -586,7 +586,7 @@ export default function QAds({ activeBrand, projects = [] }) {
                             </button>
                         )}
                     </div>
-                </div>
+                )}
             </div>
         </div>
     )
