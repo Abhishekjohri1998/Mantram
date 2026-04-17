@@ -950,8 +950,9 @@ export async function ugcProductGroundingNode(state) {
     if (state.productUrl) {
         try {
             const searchResult = await callMcpTool('web_search', { query: state.productUrl, mode: 'deep' });
-            if (searchResult?.data?.text) {
-                textContext = `URL: ${state.productUrl}\n\n${searchResult.data.text.substring(0, 5000)}`;
+            if (searchResult?.data) {
+                const extractedText = typeof searchResult.data === 'string' ? searchResult.data : searchResult.data.text || JSON.stringify(searchResult.data);
+                textContext = `URL: ${state.productUrl}\n\n${extractedText.substring(0, 5000)}`;
             }
         } catch (e) {
             console.warn(`[UGC Node] URL scrape failed: ${e.message}, using URL only`);
