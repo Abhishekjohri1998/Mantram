@@ -7,7 +7,7 @@ import config from '../../config/env.js';
 import sharp from 'sharp';
 import { uploadToS3, ensureS3Url } from '../../utils/s3.js';
 
-const PIAPI_BASE_URL = process.env.PIAPI_BASE_URL || 'https://api.piapi.ai';
+const PIAPI_BASE_URL = process.env.PIAPI_BASE_URL || 'https://api.atlascloud.ai';
 const PIAPI_MAX_PROMPT_LENGTH = 1950;
 
 function truncatePrompt(prompt, maxLen = PIAPI_MAX_PROMPT_LENGTH) {
@@ -22,7 +22,7 @@ function truncatePrompt(prompt, maxLen = PIAPI_MAX_PROMPT_LENGTH) {
 }
 
 function getPiApiKey() {
-    const key = config.piapi?.apiKey || process.env.PIAPI_API_KEY;
+    const key = config.piapi?.apiKey || process.env.PIAPI_API_KEY || 'apikey-5213047d313643cc806219208e183def';
     if (!key) throw new Error('PIAPI_API_KEY not configured. Add it to .env');
     return key;
 }
@@ -288,7 +288,9 @@ export async function submitPiApiVideoExtend({ parentTaskId, prompt, duration, q
 
 export async function getPiApiGenerationStatus(taskId) {
     const apiKey = getPiApiKey();
-    const response = await fetch(`${PIAPI_BASE_URL}/api/v1/task/${taskId}`, { headers: { 'x-api-key': apiKey } });
+    const statusUrl = `${PIAPI_BASE_URL}/api/v1/task/${taskId}`;
+    console.log(`📊 [Seedance Status] Polling: ${statusUrl}`);
+    const response = await fetch(statusUrl, { headers: { 'x-api-key': apiKey, 'Authorization': `Bearer ${apiKey}` } });
     const rawText = await response.text();
     console.log(`📊 PiAPI status for ${taskId}: ${rawText.substring(0, 500)}`);
 
