@@ -311,6 +311,7 @@ function FileUpload({ onComplete, onBack }) {
     const [brandName, setBrandName] = useState('')
     const [industry, setIndustry] = useState('')
     const [website, setWebsite] = useState('')
+    const [country, setCountry] = useState('India')
     const [uploading, setUploading] = useState(false)
     const [error, setError] = useState(null)
 

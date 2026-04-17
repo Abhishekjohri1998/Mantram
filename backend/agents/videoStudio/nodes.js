@@ -591,7 +591,17 @@ export async function pollGenerationStatus(state) {
             if (retryCount < MAX_RETRIES) {
                 console.log(`🔄 PiAPI auto-retry ${retryCount + 1}/${MAX_RETRIES}: resubmitting task...`);
                 try {
-                    const retryResult = await resubmitPiApiTask(state.generation._piApiPayload);
+                    let retryPayload = JSON.parse(JSON.stringify(state.generation._piApiPayload)); // Deep copy 
+
+                    // 🛡️ SAFE MODE PIVOT: If Bytedance blocked the generation due to a Real Person
+                    // Strip the offending starting image (Avatar) and retry. Let Seedance hallucinate 
+                    // an Avatar via Text-To-Video while continuing to map the product.
+                    if (statusResult.safetyTriggered && retryPayload.input?.image_urls?.length > 0) {
+                        console.log(`🛡️ Safe Mode Pivot: Dropping offending image reference to bypass safety protocol`);
+                        retryPayload.input.image_urls.shift(); // Drop the first image
+                    }
+
+                    const retryResult = await resubmitPiApiTask(retryPayload);
                     return {
                         ...state,
                         generation: {
@@ -601,6 +611,7 @@ export async function pollGenerationStatus(state) {
                             startedAt: new Date(),
                             error: '',
                             _piApiRetryCount: retryCount + 1,
+                            _piApiPayload: retryPayload, // Update payload for potential 2nd retry
                         },
                         status: state.status, // Keep current status (generating/advanced-generating)
                     };

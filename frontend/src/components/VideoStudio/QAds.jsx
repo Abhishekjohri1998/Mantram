@@ -20,7 +20,7 @@ async function api(path, opts = {}) {
     return data
 }
 async function apiJson(path, body) {
-    return api(path, { method: 'POST', body: JSON.stringify(body) })
+    return api(path, { method: 'POST', body: JSON.stringify(body), headers: { 'Content-Type': 'application/json' } })
 }
 
 const DURATIONS = [
@@ -58,7 +58,10 @@ const css = `
 /* Scott Panel (Floating Card) */
 .qa-layout { position: fixed; bottom: 0; left: 0; width: 100%; z-index: 50; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; padding: 0 16px 24px 16px; pointer-events: none; }
 .qa-layout * { pointer-events: auto; }
-.qa-card { width: 100%; max-width: 860px; background: var(--sys-surface-glass); border: 1px solid var(--sys-border); border-radius: 24px; padding: 0; backdrop-filter: blur(36px); box-shadow: 0 15px 40px rgba(0,0,0,0.15); z-index: 10; display: flex; flex-direction: column; color: var(--sys-text); font-family: 'Inter', sans-serif; }
+.qa-card { width: 100%; max-width: 860px; background: var(--sys-surface-glass); border: 1px solid var(--sys-border); border-radius: 24px; padding: 0; backdrop-filter: blur(36px); box-shadow: 0 15px 40px rgba(0,0,0,0.15); z-index: 10; display: flex; flex-direction: column; color: var(--sys-text); font-family: 'Inter', sans-serif; max-height: calc(100vh - 100px); overflow-y: auto; overflow-x: hidden; }
+.qa-card::-webkit-scrollbar { width: 4px; }
+.qa-card::-webkit-scrollbar-track { background: transparent; }
+.qa-card::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
 .qa-card-header { padding: 6px 16px; border-bottom: 1px solid var(--sys-border); display: flex; align-items: center; justify-content: space-between; font-weight: 700; font-size: 12px; }
 
 /* Category Grid */
@@ -71,12 +74,12 @@ const css = `
 .qa-cat-card.selected::after { content: ''; position: absolute; top: 6px; right: 6px; width: 8px; height: 8px; border-radius: 50%; background: var(--cat-color); }
 
 /* Product input */
-.qa-product-section { padding: 8px 16px; display: flex; gap: 8px; align-items: center; border-bottom: 1px solid var(--sys-border); }
-.qa-prod-input { flex: 1; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--sys-border); background: var(--sys-surface-raised); color: var(--sys-text); font-size: 13px; outline: none; }
+.qa-product-section { padding: 8px 16px; display: flex; gap: 8px; align-items: center; border-bottom: 1px solid var(--sys-border); flex-wrap: wrap; }
+.qa-prod-input { flex: 1; min-width: 200px; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--sys-border); background: var(--sys-surface-raised); color: var(--sys-text); font-size: 13px; outline: none; }
 .qa-prod-input:focus { border-color: var(--sys-primary); }
 
 /* Upper controls */
-.qa-upper { padding: 8px 16px; display: flex; gap: 8px; border-bottom: 1px solid var(--sys-border); align-items: center; flex-wrap: nowrap; }
+.qa-upper { padding: 8px 16px; display: flex; gap: 8px; border-bottom: 1px solid var(--sys-border); align-items: center; flex-wrap: wrap; }
 .qa-thumb-box { width: 36px; height: 36px; border-radius: 8px; border: 1px dashed var(--sys-border); background: var(--sys-surface); display: flex; align-items: center; justify-content: center; cursor: pointer; overflow: hidden; transition: all .2s; flex-shrink: 0; }
 .qa-thumb-box:hover { border-color: var(--sys-primary); background: var(--sys-surface-raised); }
 .qa-thumb-box img { width: 100%; height: 100%; object-fit: cover; }
@@ -102,8 +105,8 @@ const css = `
 .qa-cta-pill.active { color: var(--sys-text); background: var(--sys-surface-raised); border-color: var(--sys-primary); }
 
 /* Bottom bar */
-.qa-bottom { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 6px 16px; border-top: 1px solid var(--sys-border); }
-.qa-bottom-left { display: flex; align-items: center; gap: 4px; flex: 1; flex-wrap: nowrap; }
+.qa-bottom { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 6px 16px; border-top: 1px solid var(--sys-border); flex-wrap: wrap; }
+.qa-bottom-left { display: flex; align-items: center; gap: 4px; flex: 1; flex-wrap: wrap; }
 .qa-generate { padding: 10px 20px; border-radius: 10px; font-weight: 700; font-size: 13px; cursor: pointer; border: none; display: flex; align-items: center; justify-content: center; gap: 6px; color: var(--sys-surface); background: var(--sys-primary); box-shadow: 0 4px 15px rgba(0,0,0,0.1); transition: all .2s; flex-shrink: 0; }
 .qa-generate:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,0,0,0.2); opacity: 0.9; }
 .qa-generate:disabled { opacity: 0.4; cursor: default; background: var(--sys-border); color: var(--sys-text-muted); box-shadow: none; transform: none; }
@@ -191,6 +194,7 @@ export default function QAds({ activeBrand, projects = [] }) {
     const [jobs, setJobs] = useState([])
     const pollRefs = useRef({})
     const [creditEstimate, setCreditEstimate] = useState(null)
+    const [isMinimized, setIsMinimized] = useState(false)
 
     // ── History ──
     const [gridVideos, setGridVideos] = useState(() =>
@@ -296,12 +300,22 @@ export default function QAds({ activeBrand, projects = [] }) {
                 prebuiltPrompt: promptText,
                 settings: { duration, format, cta, customDialogue, quality: 'high' },
             })
+            setIsMinimized(true)
             setJobs(prev => prev.map(j => j.id === jobId ? { ...j, requestId: data.requestId, prompt: data.prompt } : j))
 
-            // Poll
+            // Poll — use mutable ref so Safe Mode can redirect polling to new taskId
+            let currentRequestId = data.requestId
             pollRefs.current[jobId] = setInterval(async () => {
                 try {
-                    const status = await api(`/video-studio/ugc-pro/qads/status/${data.requestId}`)
+                    const status = await api(`/video-studio/ugc-pro/qads/status/${currentRequestId}`)
+
+                    // 🛡️ Safe Mode Pivot: backend stripped avatar and resubmitted — switch to new task
+                    if (status.newRequestId) {
+                        currentRequestId = status.newRequestId
+                        setJobs(prev => prev.map(j => j.id === jobId ? { ...j, progress: 5, requestId: status.newRequestId } : j))
+                        return // Wait for next poll cycle with new ID
+                    }
+
                     setJobs(prev => prev.map(j => j.id === jobId ? { ...j, progress: status.progress || j.progress } : j))
                     if (status.status === 'COMPLETED') {
                         clearInterval(pollRefs.current[jobId]); delete pollRefs.current[jobId]
@@ -402,33 +416,42 @@ export default function QAds({ activeBrand, projects = [] }) {
 
             {/* ═══ Floating Scott Panel ═══ */}
             <div className="qa-layout">
-                <div className="qa-card">
-
-                    {/* Header */}
-                    <div className="qa-card-header">
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#eab308' }}>ads_click</span>
-                            Q-Ads · Quick Ads
-                            {selectedCat && cat && (
-                                <span style={{ fontSize: 10, fontWeight: 600, color: cat.color, marginLeft: 4, padding: '1px 6px', borderRadius: 4, background: `color-mix(in srgb, ${cat.color} 12%, transparent)`, border: `1px solid color-mix(in srgb, ${cat.color} 25%, transparent)` }}>
-                                    {cat.name}
-                                </span>
-                            )}
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            {productData && (
-                                <span style={{ fontSize: 10, fontWeight: 600, color: '#10b981', display: 'flex', alignItems: 'center', gap: 3 }}>
-                                    <span className="material-symbols-outlined" style={{ fontSize: 12 }}>check_circle</span>
-                                    {productData.productName || 'Product'}
-                                </span>
-                            )}
-                            <CreditTooltipWrapper credits={credits} label="Q-Ads">
-                                <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--sys-text-muted)', padding: '2px 6px', borderRadius: 6, background: 'color-mix(in srgb, var(--sys-text) 4%, var(--sys-surface))' }}>{credits}c</span>
-                            </CreditTooltipWrapper>
-                        </div>
+                {isMinimized ? (
+                    <div className="qa-card" style={{ maxWidth: 220, cursor: 'pointer', padding: '12px 20px', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, background: 'var(--sys-surface)', border: '1px solid var(--sys-primary)', borderBottom: 0, borderBottomLeftRadius: 0, borderBottomRightRadius: 0, color: 'var(--sys-primary)' }} onClick={() => setIsMinimized(false)}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 22 }}>expand_less</span>
+                        <span style={{ fontWeight: 700, fontSize: 13 }}>Open Studio</span>
                     </div>
-
-                    {/* Category Grid */}
+                ) : (
+                    <div className="qa-card">
+    
+                        {/* Header */}
+                        <div className="qa-card-header">
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#eab308' }}>ads_click</span>
+                                Q-Ads · Quick Ads
+                                {selectedCat && cat && (
+                                    <span style={{ fontSize: 10, fontWeight: 600, color: cat.color, marginLeft: 4, padding: '1px 6px', borderRadius: 4, background: `color-mix(in srgb, ${cat.color} 12%, transparent)`, border: `1px solid color-mix(in srgb, ${cat.color} 25%, transparent)` }}>
+                                        {cat.name}
+                                    </span>
+                                )}
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                {productData && (
+                                    <span style={{ fontSize: 10, fontWeight: 600, color: '#10b981', display: 'flex', alignItems: 'center', gap: 3 }}>
+                                        <span className="material-symbols-outlined" style={{ fontSize: 12 }}>check_circle</span>
+                                        {productData.productName || 'Product'}
+                                    </span>
+                                )}
+                                <CreditTooltipWrapper credits={credits} label="Q-Ads">
+                                    <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--sys-text-muted)', padding: '2px 6px', borderRadius: 6, background: 'color-mix(in srgb, var(--sys-text) 4%, var(--sys-surface))' }}>{credits}c</span>
+                                </CreditTooltipWrapper>
+                                <button onClick={() => setIsMinimized(true)} style={{ background: 'transparent', border: 'none', color: 'var(--sys-text-muted)', cursor: 'pointer', display: 'flex', marginLeft: 4 }}>
+                                    <span className="material-symbols-outlined" style={{ fontSize: 18 }}>expand_more</span>
+                                </button>
+                            </div>
+                        </div>
+    
+                        {/* Category Grid */}
                     <div className="qa-cat-grid">
                         {categories.map(c => (
                             <div key={c.id}
@@ -588,6 +611,7 @@ export default function QAds({ activeBrand, projects = [] }) {
                         )}
                     </div>
                 </div>
+                )}
             </div>
         </div>
     )

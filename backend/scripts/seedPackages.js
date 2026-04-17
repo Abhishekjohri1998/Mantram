@@ -24,7 +24,7 @@ const PACKAGES = [
             d2cAnalytics: false,
             skillsHub: false,
         },
-        credits: { monthly: 50, rollover: false, bonusOnSignup: 0 },
+        credits: { monthly: 100, rollover: false, bonusOnSignup: 0 },
         pricing: { monthly: 0, quarterly: 0, yearly: 0, currency: 'INR' },
         limits: { maxBrands: 1, maxTeamMembers: 0, maxProducts: 10, maxScheduledPosts: 3, socialIntegrations: 1 },
         badge: 'FREE',
@@ -34,7 +34,7 @@ const PACKAGES = [
         watermarkEnabled: true,
         displayOrder: 0,
         features: [
-            { name: '50 Credits / month', included: true },
+            { name: '100 Credits / month', included: true },
             { name: '1 Brand Profile', included: true },
             { name: 'Content & Brainstorm Studio', included: true },
             { name: 'Creative Studio (with watermark)', included: true },

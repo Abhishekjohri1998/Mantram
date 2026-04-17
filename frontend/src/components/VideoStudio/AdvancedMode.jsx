@@ -278,37 +278,49 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
     }
 
     // Persist active generating projects across reloads/navigation
+    // Only re-hydrate projects that are recently active (< 30 min old)
+    const REHYDRATE_MAX_AGE_MS = 30 * 60 * 1000; // 30 minutes
     const handledGenerating = useRef(new Set());
     useEffect(() => {
         let added = false;
         const newJobs = [];
+        const now = Date.now();
         projects.forEach(p => {
-            if ((p.status === 'advanced-generating' || p.status === 'generating') && !handledGenerating.current.has(p._id)) {
-                handledGenerating.current.add(p._id);
-                // Make sure we only add projects not already manually submitted in this active session
-                if (!jobs.some(j => j.projectId === p._id)) {
-                    const jobId = `job-${p._id}`;
-                    newJobs.push({
-                        id: jobId,
-                        projectId: p._id,
-                        prompt: p.advancedConfig?.prompt || p.backendPrompt || p.title || '',
-                        model: p.routing?.selectedModel || '',
-                        duration: p.advancedConfig?.duration || 5,
-                        aspectRatio: p.advancedConfig?.aspectRatio || '16:9',
-                        quality: p.routing?.mode || 'fast',
-                        thumbUrl: p.advancedConfig?.firstImageUrl || '',
-                        progress: p.generation?.progress || 5,
-                        status: 'generating',
-                        videoUrl: null,
-                        error: null,
-                        startTime: p.generation?.startedAt ? new Date(p.generation.startedAt).getTime() : Date.now(),
-                        highTrafficNotified: false
-                    });
-                    if (!pollRefs.current[jobId]) {
-                        startJobPolling(jobId, p._id);
-                    }
-                    added = true;
+            const isGenerating = p.status === 'advanced-generating' || p.status === 'generating';
+            if (!isGenerating || handledGenerating.current.has(p._id)) return;
+
+            // Skip stale projects — they are dead generations that never completed
+            const updatedAt = p.updatedAt || p.createdAt;
+            const age = updatedAt ? now - new Date(updatedAt).getTime() : Infinity;
+            if (age > REHYDRATE_MAX_AGE_MS) {
+                handledGenerating.current.add(p._id); // Mark as handled so we don't re-check
+                return;
+            }
+
+            handledGenerating.current.add(p._id);
+            // Make sure we only add projects not already manually submitted in this active session
+            if (!jobs.some(j => j.projectId === p._id)) {
+                const jobId = `job-${p._id}`;
+                newJobs.push({
+                    id: jobId,
+                    projectId: p._id,
+                    prompt: p.advancedConfig?.prompt || p.backendPrompt || p.title || '',
+                    model: p.routing?.selectedModel || '',
+                    duration: p.advancedConfig?.duration || 5,
+                    aspectRatio: p.advancedConfig?.aspectRatio || '16:9',
+                    quality: p.routing?.mode || 'fast',
+                    thumbUrl: p.advancedConfig?.firstImageUrl || '',
+                    progress: p.generation?.progress || 5,
+                    status: 'generating',
+                    videoUrl: null,
+                    error: null,
+                    startTime: p.generation?.startedAt ? new Date(p.generation.startedAt).getTime() : Date.now(),
+                    highTrafficNotified: false
+                });
+                if (!pollRefs.current[jobId]) {
+                    startJobPolling(jobId, p._id);
                 }
+                added = true;
             }
         });
         if (added) {

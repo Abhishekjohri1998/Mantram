@@ -52,7 +52,7 @@ import { uploadToS3, mirrorUrlToS3, getSignedUrlIfNeeded, ensureS3Url } from '..
 import { safeErrorMessage } from '../utils/safeError.js';
 import { loadBrandContext, callMultimodalAgent, callAgent } from '../agents/shared/agentUtils.js';
 import { buildEnhanceSystemPrompt, buildEnhanceUserPrompt, VISUAL_GROUNDING_SYSTEM } from '../agents/videoStudio/promptEnhancer.js';
-import { submitMuApiVideoGeneration, getMuApiGenerationStatus as pollMuApiStatus } from '../agents/videoStudio/muapiClient.js';
+import { submitPiApiVideoGeneration, getPiApiGenerationStatus as pollPiApiStatus } from '../agents/videoStudio/piApiClient.js';
 import { geminiImageGenerate } from '../agents/videoStudio/firstFrame.js';
 import { Q_ADS_CATEGORIES, getCategory, buildQAdPrompt, getQAdsCreditCost } from '../agents/videoStudio/qAdsCategories.js';
 
@@ -3094,8 +3094,8 @@ router.post('/ugc-pro/generate', protect, requireCredits('ugcProGenerate'), asyn
         console.log(`[UGC Generate] Final prompt @image check — @image1: ${prompt.includes('@image1')}, @image2: ${prompt.includes('@image2')}`);
         console.log(`[UGC Generate] Submitting — ${duration}s, ${imageUrls.length} images, prompt ${prompt.split(/\s+/).length}w`);
 
-        // Submit to MuAPI via existing muapiClient
-        const genResult = await submitMuApiVideoGeneration({
+        // Submit to PiAPI via piApiClient
+        const genResult = await submitPiApiVideoGeneration({
             prompt,
             imageUrl: imageUrls[0] || null,
             duration,
@@ -3113,9 +3113,9 @@ router.post('/ugc-pro/generate', protect, requireCredits('ugcProGenerate'), asyn
             status: 'generating',
             script: prompt,
             backendPrompt: prompt,
-            input: { images: imageUrls, productData: parsedProduct },
+            input: { images: imageUrls.map(url => ({ url, source: 'existing' })), productData: parsedProduct },
             generation: {
-                provider: 'muapi',
+                provider: 'piapi',
                 model: 'seedance-2.0',
                 taskId: genResult.taskId,
                 requestId: genResult.taskId,
@@ -3130,7 +3130,7 @@ router.post('/ugc-pro/generate', protect, requireCredits('ugcProGenerate'), asyn
             success: true,
             projectId: project._id,
             requestId: genResult.taskId,
-            provider: 'muapi',
+            provider: 'piapi',
             prompt,
             imageCount: imageUrls.length,
             duration,
@@ -3146,7 +3146,7 @@ router.post('/ugc-pro/generate', protect, requireCredits('ugcProGenerate'), asyn
 // Poll MuAPI generation status (uses existing muapiClient) and update history
 router.get('/ugc-pro/status/:requestId', protect, async (req, res) => {
     try {
-        const result = await pollMuApiStatus(req.params.requestId);
+        const result = await pollPiApiStatus(req.params.requestId);
         
         // Update DB history to maintain sync
         if (result && req.params.requestId) {
@@ -3238,9 +3238,15 @@ router.post('/ugc-pro/qads/generate', protect, async (req, res) => {
         const category = getCategory(categoryId);
         if (!category) return res.status(400).json({ success: false, error: `Unknown Q-Ad category: ${categoryId}` });
 
-        // Collect image URLs: avatar first (@image1), then product images (@image2+)
+        // Collect image URLs: product images ONLY for Seedance 2.0 API
+        // NOTE: Avatar is intentionally excluded from image inputs because Seedance 2.0
+        // has strict face detection that blocks any real/realistic person photo.
+        // The avatar's appearance is described in the text prompt instead, and Seedance
+        // will render a character from text without triggering safety filters.
         const imageUrls = [];
-        if (avatarUrl && !category.noAvatar) imageUrls.push(avatarUrl);
+        if (avatarUrl && !category.noAvatar) {
+            console.log(`[Q-Ads Generate] Avatar provided but excluded from Seedance image inputs (safety filter bypass). Avatar influence is via text prompt only.`);
+        }
         for (const url of parsedProductImgs) {
             if (url && typeof url === 'string' && url.startsWith('http')) imageUrls.push(url);
         }
@@ -3254,13 +3260,27 @@ router.post('/ugc-pro/qads/generate', protect, async (req, res) => {
             console.log(`[Q-Ads Generate] Using prebuilt prompt (${prompt.length} chars)`);
         }
 
+        // 🔄 REMAP IMAGE TAGS: Since avatar is excluded from Seedance image inputs,
+        // @image2 (product) is now the actual @image1 sent to the API.
+        // Replace avatar references (@image1) with natural person text,
+        // then remap @image2 → @image1 so Seedance correctly maps the product image.
+        if (imageUrls.length > 0) {
+            // Step 1: Temporarily mark product tags
+            prompt = prompt.replace(/@image2/g, '@@PRODUCT@@');
+            // Step 2: Replace avatar tags with natural person description
+            prompt = prompt.replace(/@image1/g, 'the presenter');
+            // Step 3: Remap product to @image1 (the first actual image sent)
+            prompt = prompt.replace(/@@PRODUCT@@/g, '@image1');
+            console.log(`[Q-Ads Generate] Remapped image tags: avatar→text, product→@image1`);
+        }
+
         const duration = parseInt(parsedSettings.duration || category.recommendedDuration);
         const aspectRatio = parsedSettings.format || category.recommendedFormat || '9:16';
         const quality = parsedSettings.quality || 'high';
 
         console.log(`[Q-Ads Generate] Submitting — ${categoryId}, ${duration}s, ${imageUrls.length} images`);
 
-        const genResult = await submitMuApiVideoGeneration({
+        const genResult = await submitPiApiVideoGeneration({
             prompt,
             imageUrl: imageUrls[0] || null,
             duration, aspectRatio, qualityMode: quality, generateAudio: true,
@@ -3269,28 +3289,24 @@ router.post('/ugc-pro/qads/generate', protect, async (req, res) => {
 
         // Persist as VideoProject
         const project = await VideoProject.create({
-            user: req.user._id, brand: brandId, mode: 'advanced', status: 'advanced-generating',
+            user: req.user._id, brand: brandId, studioMode: 'q-ads', status: 'generating',
             title: `Q-Ad: ${parsedProduct.productName || categoryId}`,
-            backendPrompt: prompt,
+            script: prompt, backendPrompt: prompt,
             input: {
                 brief: `Q-Ads [${categoryId}]: ${parsedProduct.productName || 'product'}`,
-                inputType: 'image',
                 images: imageUrls.map((u, i) => ({ url: u, source: 'upload', label: i === 0 ? 'avatar' : `product-${i}` })),
-            },
-            advancedConfig: {
-                prompt, duration, aspectRatio,
-                firstImageUrl: imageUrls[0] || '',
+                productData: parsedProduct, categoryId
             },
             generation: {
-                provider: 'muapi',
-                falRequestId: genResult.taskId,
-                progress: 0,
+                provider: 'piapi', model: 'seedance-2.0',
+                taskId: genResult.taskId, requestId: genResult.taskId,
+                duration, aspectRatio, progress: 0, status: 'GENERATING',
             },
         });
 
         res.json({
             success: true, projectId: project._id, requestId: genResult.taskId,
-            provider: 'muapi', categoryId, prompt, imageCount: imageUrls.length, duration, aspectRatio,
+            provider: 'piapi', categoryId, prompt, imageCount: imageUrls.length, duration, aspectRatio,
         });
     } catch (err) {
         console.error('Q-Ads generate error:', err.message);
@@ -3301,7 +3317,61 @@ router.post('/ugc-pro/qads/generate', protect, async (req, res) => {
 // ── GET /api/video-studio/ugc-pro/qads/status/:requestId ──
 router.get('/ugc-pro/qads/status/:requestId', protect, async (req, res) => {
     try {
-        const result = await pollMuApiStatus(req.params.requestId);
+        const result = await pollPiApiStatus(req.params.requestId);
+
+        // 🛡️ SAFE MODE PIVOT: If Seedance blocked due to real person face detection,
+        // automatically resubmit without the avatar image (product-only mode)
+        if (result && result.safetyTriggered && result.retryable) {
+            const project = await VideoProject.findOne({
+                'generation.requestId': req.params.requestId, user: req.user._id, studioMode: 'q-ads'
+            });
+
+            if (project && !project.generation?.safeModeRetried) {
+                console.log(`🛡️ [Q-Ads Safe Mode] Safety triggered — stripping avatar and resubmitting product-only...`);
+
+                // Get original images; drop the first one (avatar)
+                const originalImages = (project.input?.images || []).map(i => i.url).filter(Boolean);
+                const productOnlyImages = originalImages.length > 1 ? originalImages.slice(1) : [];
+
+                try {
+                    const retryResult = await submitPiApiVideoGeneration({
+                        prompt: project.backendPrompt || project.script,
+                        imageUrl: productOnlyImages[0] || null,
+                        duration: project.generation?.duration || 5,
+                        aspectRatio: project.generation?.aspectRatio || '9:16',
+                        qualityMode: 'high',
+                        generateAudio: true,
+                        referenceImages: productOnlyImages.slice(1),
+                    });
+
+                    // Update the project with the new task ID
+                    await VideoProject.findByIdAndUpdate(project._id, {
+                        'generation.requestId': retryResult.taskId,
+                        'generation.taskId': retryResult.taskId,
+                        'generation.safeModeRetried': true,
+                        'generation.progress': 5,
+                        'generation.status': 'GENERATING',
+                        'generation.error': '',
+                        status: 'generating',
+                    });
+
+                    console.log(`✅ [Q-Ads Safe Mode] Resubmitted as product-only: new taskId=${retryResult.taskId}`);
+
+                    // Return IN_PROGRESS with the NEW requestId so the frontend switches to polling it
+                    return res.json({
+                        success: true,
+                        status: 'IN_PROGRESS',
+                        progress: 5,
+                        newRequestId: retryResult.taskId,
+                        safeModeActivated: true,
+                    });
+                } catch (retryErr) {
+                    console.error(`❌ [Q-Ads Safe Mode] Retry failed: ${retryErr.message}`);
+                    // Fall through to normal failure handling
+                }
+            }
+        }
+
         if (result && req.params.requestId) {
             const updatePayload = {
                 'generation.progress': result.progress,
@@ -4614,11 +4684,45 @@ router.get('/', protect, async (req, res) => {
             VideoProject.countDocuments(filter),
         ]);
 
+        // ── STEP 0: Auto-expire truly stale generating projects ──
+        // Projects stuck in generating without a request ID for >30min are dead.
+        // Projects with a request ID but older than 2 hours are also expired.
+        const STALE_NO_ID_MS = 30 * 60 * 1000;       // 30 minutes
+        const STALE_WITH_ID_MS = 2 * 60 * 60 * 1000;  // 2 hours
+        const now = Date.now();
+        let expiredCount = 0;
+
+        for (const p of projects) {
+            if (p.status !== 'generating' && p.status !== 'advanced-generating') continue;
+            const age = now - new Date(p.updatedAt || p.createdAt).getTime();
+            const hasRequestId = !!(p.generation?.falRequestId || p.generation?.taskId || p.generation?.requestId);
+
+            if ((!hasRequestId && age > STALE_NO_ID_MS) || age > STALE_WITH_ID_MS) {
+                // Mark as failed in the response object (immediate UI fix)
+                p.status = 'failed';
+                p.generation = {
+                    ...(p.generation || {}),
+                    status: 'FAILED',
+                    error: 'Generation timed out — auto-expired',
+                };
+                // Persist to DB (fire-and-forget)
+                VideoProject.findByIdAndUpdate(p._id, {
+                    status: 'failed',
+                    'generation.status': 'FAILED',
+                    'generation.error': 'Generation timed out — auto-expired',
+                }).exec().catch(err => console.warn(`⚠️ Failed to expire project ${p._id}:`, err.message));
+                expiredCount++;
+            }
+        }
+        if (expiredCount > 0) {
+            console.log(`🧹 Auto-expired ${expiredCount} stale generating project(s)`);
+        }
+
         // ── Auto-sync stuck generating projects ──
-        // If any projects are still "generating"/"advanced-generating", re-check their status
+        // If any projects are still "generating"/"advanced-generating" (not expired above), re-check their status
         // This catches cases where the user closed the tab before polling completed
         const stuckProjects = projects.filter(p =>
-            (p.status === 'generating' || p.status === 'advanced-generating') && p.generation?.falRequestId
+            (p.status === 'generating' || p.status === 'advanced-generating') && (p.generation?.falRequestId || p.generation?.taskId || p.generation?.requestId)
         );
 
         // ── Auto-sync stuck generating projects (NON-BLOCKING) ──

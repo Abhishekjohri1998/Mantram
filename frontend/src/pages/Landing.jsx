@@ -86,7 +86,7 @@ export default function Landing() {
             preview: () => (
                 <div className="h-full w-full flex items-center justify-center relative overflow-hidden group">
                     <div className="absolute inset-0 bg-[var(--sys-surface)] border border-[var(--sys-border)] z-10 pointer-events-none opacity-80" />
-                    <div className="relative rounded-xl overflow-hidden border border-[#48474c]/30 shadow-[0_15px_50px_rgba(0,0,0,0.8)] w-[90%] mx-auto transition-transform duration-500 group-hover:scale-[1.02]">
+                    <div className="relative z-20 rounded-xl overflow-hidden border border-[#48474c]/30 shadow-[0_15px_50px_rgba(0,0,0,0.8)] w-[90%] mx-auto transition-transform duration-500 group-hover:scale-[1.02]">
                         <div className="h-6 bg-[var(--sys-surface)] border-b border-[#48474c]/30 flex items-center px-3 gap-1.5"><div className="w-2h-v2 w-2.5 h-2.5 rounded-full bg-[var(--sys-primary-dim)] border border-[var(--sys-border)]" /><div className="w-2.5 h-2.5 rounded-full bg-yellow-500/20 border border-yellow-500/50" /><div className="w-2.5 h-2.5 rounded-full bg-green-500/20 border border-green-500/50" /></div>
                         <img src="/screenshots/content-studio.png" alt="Content Studio" className="w-full h-auto object-cover object-top opacity-80 group-hover:opacity-100 transition-opacity duration-700 max-h-[300px]" />
                     </div>
@@ -98,7 +98,7 @@ export default function Landing() {
             preview: () => (
                 <div className="h-full w-full flex items-center justify-center relative overflow-hidden group">
                     <div className="absolute inset-0 bg-[var(--sys-surface)] border border-[var(--sys-border)] z-10 pointer-events-none opacity-80" />
-                    <div className="relative rounded-xl overflow-hidden border border-[#48474c]/30 shadow-[0_15px_50px_rgba(0,0,0,0.8)] w-[90%] mx-auto transition-transform duration-500 group-hover:scale-[1.02]">
+                    <div className="relative z-20 rounded-xl overflow-hidden border border-[#48474c]/30 shadow-[0_15px_50px_rgba(0,0,0,0.8)] w-[90%] mx-auto transition-transform duration-500 group-hover:scale-[1.02]">
                         <div className="h-6 bg-[var(--sys-surface)] border-b border-[#48474c]/30 flex items-center px-3 gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-[var(--sys-primary-dim)] border border-[var(--sys-border)]" /><div className="w-2.5 h-2.5 rounded-full bg-yellow-500/20 border border-yellow-500/50" /><div className="w-2.5 h-2.5 rounded-full bg-green-500/20 border border-green-500/50" /></div>
                         <img src="/screenshots/video-studio.png" alt="Video Studio" className="w-full h-auto object-cover object-top opacity-80 group-hover:opacity-100 transition-opacity duration-700 max-h-[300px]" />
                     </div>
@@ -110,7 +110,7 @@ export default function Landing() {
             preview: () => (
                 <div className="h-full w-full flex items-center justify-center relative overflow-hidden group">
                     <div className="absolute inset-0 bg-[var(--sys-surface)] border border-[var(--sys-border)] z-10 pointer-events-none opacity-80" />
-                    <div className="relative rounded-xl overflow-hidden border border-[#48474c]/30 shadow-[0_15px_50px_rgba(0,0,0,0.8)] w-[90%] mx-auto transition-transform duration-500 group-hover:scale-[1.02]">
+                    <div className="relative z-20 rounded-xl overflow-hidden border border-[#48474c]/30 shadow-[0_15px_50px_rgba(0,0,0,0.8)] w-[90%] mx-auto transition-transform duration-500 group-hover:scale-[1.02]">
                         <div className="h-6 bg-[var(--sys-surface)] border-b border-[#48474c]/30 flex items-center px-3 gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-[var(--sys-primary-dim)] border border-[var(--sys-border)]" /><div className="w-2.5 h-2.5 rounded-full bg-yellow-500/20 border border-yellow-500/50" /><div className="w-2.5 h-2.5 rounded-full bg-green-500/20 border border-green-500/50" /></div>
                         <img src="/screenshots/creative-studio.png" alt="Creative Studio" className="w-full h-auto object-cover object-top opacity-80 group-hover:opacity-100 transition-opacity duration-700 max-h-[300px]" />
                     </div>
@@ -122,7 +122,7 @@ export default function Landing() {
             preview: () => (
                 <div className="h-full w-full flex items-center justify-center relative overflow-hidden group">
                     <div className="absolute inset-0 bg-[var(--sys-surface)] border border-[var(--sys-border)] z-10 pointer-events-none opacity-80" />
-                    <div className="relative rounded-xl overflow-hidden border border-[#48474c]/30 shadow-[0_15px_50px_rgba(0,0,0,0.8)] w-[90%] mx-auto transition-transform duration-500 group-hover:scale-[1.02]">
+                    <div className="relative z-20 rounded-xl overflow-hidden border border-[#48474c]/30 shadow-[0_15px_50px_rgba(0,0,0,0.8)] w-[90%] mx-auto transition-transform duration-500 group-hover:scale-[1.02]">
                         <div className="h-6 bg-[var(--sys-surface)] border-b border-[#48474c]/30 flex items-center px-3 gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-[var(--sys-primary-dim)] border border-[var(--sys-border)]" /><div className="w-2.5 h-2.5 rounded-full bg-yellow-500/20 border border-yellow-500/50" /><div className="w-2.5 h-2.5 rounded-full bg-green-500/20 border border-green-500/50" /></div>
                         <img src="/screenshots/performance-studio.png" alt="Performance Studio" className="w-full h-auto object-cover object-top opacity-80 group-hover:opacity-100 transition-opacity duration-700 max-h-[300px]" />
                     </div>
@@ -134,7 +134,7 @@ export default function Landing() {
             preview: () => (
                 <div className="h-full w-full flex items-center justify-center relative overflow-hidden group">
                     <div className="absolute inset-0 bg-[var(--sys-surface)] border border-[var(--sys-border)] z-10 pointer-events-none opacity-80" />
-                    <div className="relative rounded-xl overflow-hidden border border-[#48474c]/30 shadow-[0_15px_50px_rgba(0,0,0,0.8)] w-[90%] mx-auto transition-transform duration-500 group-hover:scale-[1.02]">
+                    <div className="relative z-20 rounded-xl overflow-hidden border border-[#48474c]/30 shadow-[0_15px_50px_rgba(0,0,0,0.8)] w-[90%] mx-auto transition-transform duration-500 group-hover:scale-[1.02]">
                         <div className="h-6 bg-[var(--sys-surface)] border-b border-[#48474c]/30 flex items-center px-3 gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-[var(--sys-primary-dim)] border border-[var(--sys-border)]" /><div className="w-2.5 h-2.5 rounded-full bg-yellow-500/20 border border-yellow-500/50" /><div className="w-2.5 h-2.5 rounded-full bg-green-500/20 border border-green-500/50" /></div>
                         <img src="/screenshots/seo-studio.png" alt="SEO Studio" className="w-full h-auto object-cover object-top opacity-80 group-hover:opacity-100 transition-opacity duration-700 max-h-[300px]" />
                     </div>
@@ -146,7 +146,7 @@ export default function Landing() {
             preview: () => (
                 <div className="h-full w-full flex items-center justify-center relative overflow-hidden group">
                     <div className="absolute inset-0 bg-[var(--sys-surface)] border border-[var(--sys-border)] z-10 pointer-events-none opacity-80" />
-                    <div className="relative rounded-xl overflow-hidden border border-[#48474c]/30 shadow-[0_15px_50px_rgba(0,0,0,0.8)] w-[90%] mx-auto transition-transform duration-500 group-hover:scale-[1.02]">
+                    <div className="relative z-20 rounded-xl overflow-hidden border border-[#48474c]/30 shadow-[0_15px_50px_rgba(0,0,0,0.8)] w-[90%] mx-auto transition-transform duration-500 group-hover:scale-[1.02]">
                         <div className="h-6 bg-[var(--sys-surface)] border-b border-[#48474c]/30 flex items-center px-3 gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-[var(--sys-primary-dim)] border border-[var(--sys-border)]" /><div className="w-2.5 h-2.5 rounded-full bg-yellow-500/20 border border-yellow-500/50" /><div className="w-2.5 h-2.5 rounded-full bg-green-500/20 border border-green-500/50" /></div>
                         <img src="/screenshots/brainstorm-studio.png" alt="Brainstorm Studio" className="w-full h-auto object-cover object-top opacity-80 group-hover:opacity-100 transition-opacity duration-700 max-h-[300px]" />
                     </div>
@@ -158,7 +158,7 @@ export default function Landing() {
             preview: () => (
                 <div className="h-full w-full flex items-center justify-center relative overflow-hidden group">
                     <div className="absolute inset-0 bg-[var(--sys-surface)] border border-[var(--sys-border)] z-10 pointer-events-none opacity-80" />
-                    <div className="relative rounded-xl overflow-hidden border border-[#48474c]/30 shadow-[0_15px_50px_rgba(0,0,0,0.8)] w-[90%] mx-auto transition-transform duration-500 group-hover:scale-[1.02]">
+                    <div className="relative z-20 rounded-xl overflow-hidden border border-[#48474c]/30 shadow-[0_15px_50px_rgba(0,0,0,0.8)] w-[90%] mx-auto transition-transform duration-500 group-hover:scale-[1.02]">
                         <div className="h-6 bg-[var(--sys-surface)] border-b border-[#48474c]/30 flex items-center px-3 gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-[var(--sys-primary-dim)] border border-[var(--sys-border)]" /><div className="w-2.5 h-2.5 rounded-full bg-yellow-500/20 border border-yellow-500/50" /><div className="w-2.5 h-2.5 rounded-full bg-green-500/20 border border-green-500/50" /></div>
                         <img src="/screenshots/d2c-studio.png" alt="D2C Analytics" className="w-full h-auto object-cover object-top opacity-80 group-hover:opacity-100 transition-opacity duration-700 max-h-[300px]" />
                     </div>
@@ -170,7 +170,7 @@ export default function Landing() {
             preview: () => (
                 <div className="h-full w-full flex items-center justify-center relative overflow-hidden group">
                     <div className="absolute inset-0 bg-[var(--sys-surface)] border border-[var(--sys-border)] z-10 pointer-events-none opacity-80" />
-                    <div className="relative rounded-xl overflow-hidden border border-[#48474c]/30 shadow-[0_15px_50px_rgba(0,0,0,0.8)] w-[90%] mx-auto transition-transform duration-500 group-hover:scale-[1.02]">
+                    <div className="relative z-20 rounded-xl overflow-hidden border border-[#48474c]/30 shadow-[0_15px_50px_rgba(0,0,0,0.8)] w-[90%] mx-auto transition-transform duration-500 group-hover:scale-[1.02]">
                         <div className="h-6 bg-[var(--sys-surface)] border-b border-[#48474c]/30 flex items-center px-3 gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-[var(--sys-primary-dim)] border border-[var(--sys-border)]" /><div className="w-2.5 h-2.5 rounded-full bg-yellow-500/20 border border-yellow-500/50" /><div className="w-2.5 h-2.5 rounded-full bg-green-500/20 border border-green-500/50" /></div>
                         <img src="/screenshots/smart-calendar.png" alt="Smart Calendar" className="w-full h-auto object-cover object-top opacity-80 group-hover:opacity-100 transition-opacity duration-700 max-h-[300px]" />
                     </div>
@@ -310,7 +310,7 @@ export default function Landing() {
                                 ))}
 
                                 {/* Overlay gradient */}
-                                <div className="absolute inset-0 bg-[var(--sys-surface)] border border-[var(--sys-border)]" />
+                                <div className="absolute inset-0 bg-gradient-to-t from-[var(--sys-surface)] via-[var(--sys-surface)]/40 to-transparent pointer-events-none" />
 
                                 {/* Navigation arrows */}
                                 <button onClick={() => { setHeroSlide(p => (p - 1 + heroSlides.length) % heroSlides.length); clearInterval(heroInterval.current); heroInterval.current = setInterval(() => setHeroSlide(p => (p + 1) % heroSlides.length), 4000) }}
@@ -393,8 +393,8 @@ export default function Landing() {
                     <p className="text-center text-[var(--sys-text-muted)] text-xs font-bold uppercase tracking-[0.25em] mb-10">Create & publish content for every platform</p>
                     <div className="relative">
                         {/* Fade edges */}
-                        <div className="absolute left-0 top-0 bottom-0 w-24 bg-[var(--sys-surface)] border border-[var(--sys-border)] z-10" />
-                        <div className="absolute right-0 top-0 bottom-0 w-24 bg-[var(--sys-surface)] border border-[var(--sys-border)] z-10" />
+                        <div className="absolute left-0 top-0 bottom-0 w-24 bg-gradient-to-r from-[var(--sys-bg)] to-transparent pointer-events-none z-10" />
+                        <div className="absolute right-0 top-0 bottom-0 w-24 bg-gradient-to-l from-[var(--sys-bg)] to-transparent pointer-events-none z-10" />
                         <div className="flex gap-12 animate-marquee">
                             {[...Array(2)].map((_, setIdx) => (
                                 <div key={setIdx} className="flex gap-12 shrink-0">
@@ -412,7 +412,9 @@ export default function Landing() {
                                     ].map((p, i) => (
                                         <div key={`${setIdx}-${i}`} className="flex flex-col items-center gap-3 group cursor-pointer" title={p.name}>
                                             <div className="size-16 rounded-2xl flex items-center justify-center transition-all duration-300 group-hover:scale-110 group-hover:shadow-lg" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                                                 
+                                                <svg viewBox="0 0 24 24" className="size-8 opacity-70 group-hover:opacity-100 transition-all duration-300" style={{ fill: p.color }}>
+                                                    <path d={p.path} />
+                                                </svg>
                                             </div>
                                             <span className="text-[11px] text-[var(--sys-text-muted)] font-semibold whitespace-nowrap">{p.name}</span>
                                         </div>
@@ -960,7 +962,9 @@ export default function Landing() {
                                     { label: 'Instagram', href: 'https://instagram.com/mantram.ai', path: 'M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z' },
                                 ].map((s, i) => (
                                     <a key={i} href={s.href} target="_blank" rel="noopener noreferrer" aria-label={s.label} className="size-10 rounded-xl flex items-center justify-center text-[var(--sys-text-muted)] hover:text-[#f3eff6] transition-all cursor-pointer" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                                         
+                                        <svg viewBox="0 0 24 24" className="size-5 fill-current">
+                                            <path d={s.path} />
+                                        </svg>
                                     </a>
                                 ))}
                                 <a href="mailto:support@mantram.ai" aria-label="Email" className="size-10 rounded-xl flex items-center justify-center text-[var(--sys-text-muted)] hover:text-[#f3eff6] transition-all cursor-pointer" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>

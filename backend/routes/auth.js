@@ -46,7 +46,7 @@ async function assignDefaultSubscription(user) {
             user: user._id,
             plan: 'free',
             billingCycle: 'monthly',
-            credits: { total: freePackage.credits?.monthly || 50, used: 0 },
+            credits: { total: freePackage.credits?.monthly || 100, used: 0 },
             price: 0,
             startDate: new Date(),
             endDate,
@@ -58,7 +58,7 @@ async function assignDefaultSubscription(user) {
         await User.findByIdAndUpdate(user._id, {
             plan: 'free',
             activeSubscription: subscription._id,
-            'credits.total': freePackage.credits?.monthly || 50,
+            'credits.total': freePackage.credits?.monthly || 100,
             'credits.resetDate': endDate,
         });
         
@@ -123,7 +123,7 @@ router.post('/register', async (req, res) => {
             verificationToken,
             verificationExpires,
             isVerified: false,
-            approvalStatus: 'approved',
+            approvalStatus: 'pending',
             queueNumber,
             milestones: {
                 addedBrand: !!(company || initialWebsite)
@@ -236,11 +236,19 @@ router.post('/login', async (req, res) => {
             });
         }
 
-        // 2. Approval Check (Bypassed: Direct access after verification)
-        if (user.approvalStatus === 'rejected') {
+        // 2. Approval Check
+        if (user.approvalStatus !== 'approved' && user.role !== 'superadmin') {
+            if (user.approvalStatus === 'rejected') {
+                return res.status(403).json({
+                    success: false,
+                    error: 'Your registration request was not approved. Please contact support if you believe this is an error.'
+                });
+            }
+            // pending or undefined
             return res.status(403).json({
                 success: false,
-                error: 'Your registration request was not approved. Please contact support if you believe this is an error.'
+                error: 'Your account is pending approval. You will be notified once approved.',
+                needsApproval: true,
             });
         }
 
@@ -730,7 +738,7 @@ router.get('/google/callback', async (req, res) => {
                 isGoogleUser: true,
                 isVerified: true, // Google users are pre-verified
                 password: Math.random().toString(36).slice(-12),
-                approvalStatus: 'approved'
+                approvalStatus: 'pending'
             });
             // Update waitlist status if exists
             await Waitlist.findOneAndUpdate({ email: profileData.email.toLowerCase() }, { status: 'registered' });
@@ -746,6 +754,19 @@ router.get('/google/callback', async (req, res) => {
                 user.isVerified = true;
                 await user.save();
             }
+        }
+
+        // Check approval before proceeding
+        if (user.approvalStatus !== 'approved' && user.role !== 'superadmin') {
+            const errorMsg = user.approvalStatus === 'rejected' 
+                ? 'Your registration request was not approved.' 
+                : 'Your account is pending approval. You will be notified once approved.';
+            
+            if (flow === 'redirect') {
+                const frontendUrl = config.frontendUrl[0] || 'https://mantram.ai';
+                return res.redirect(`${frontendUrl}/auth?needsApproval=true&error=${encodeURIComponent(errorMsg)}`);
+            }
+            return res.send(closeAuthPopupScript(errorMsg, '', null, true));
         }
 
         // 4. Generate JWT
@@ -811,7 +832,7 @@ router.get('/google/callback', async (req, res) => {
 /**
  * Helper: Close popup and pass token/user to opener
  */
-function closeAuthPopupScript(error, token = '', user = null) {
+function closeAuthPopupScript(error, token = '', user = null, needsApproval = false) {
     return `<!DOCTYPE html>
 <html><head><title>Authenticating...</title></head>
 <body style="background:#0a0c16;color:#fff;font-family:system-ui;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;">
@@ -825,7 +846,7 @@ ${error
     if (window.opener) {
         window.opener.postMessage({
             type: 'GOOGLE_AUTH_SUCCESS',
-            ${error ? `error: ${JSON.stringify(error)}` : `token: '${token}', user: ${JSON.stringify(user)}`}
+            ${error ? `error: ${JSON.stringify(error)}, needsApproval: ${needsApproval}` : `token: '${token}', user: ${JSON.stringify(user)}`}
         }, '*');
     }
     ${!error ? 'setTimeout(() => window.close(), 1000);' : ''}
