@@ -211,14 +211,14 @@ function ConfigDropdown({ value, onChange, options, label }) {
 export default function AdvancedMode({ activeBrand, initialData, projects = [] }) {
     // ── Completed videos grid (local state, prepend new ones) ──
     const [gridVideos, setGridVideos] = useState(() => {
-        return projects.filter(p => (p.status === 'done' || p.status === 'critique') && p.generation?.videoUrl)
+        return projects.filter(p => (p.status === 'done' || p.status === 'critique' || p.status === 'completed') && p.generation?.videoUrl)
     })
 
     // Sync if parent projects prop updates (on mount / history refresh)
     useEffect(() => {
         setGridVideos(prev => {
             const existingIds = new Set(prev.map(p => p._id))
-            const incoming = projects.filter(p => (p.status === 'done' || p.status === 'critique') && p.generation?.videoUrl)
+            const incoming = projects.filter(p => (p.status === 'done' || p.status === 'critique' || p.status === 'completed') && p.generation?.videoUrl)
             const newOnes = incoming.filter(p => !existingIds.has(p._id))
             return newOnes.length ? [...newOnes, ...prev] : prev
         })

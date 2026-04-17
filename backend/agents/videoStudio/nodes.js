@@ -660,9 +660,9 @@ export async function pollGenerationStatus(state) {
             ...statusResult,
             ...(statusResult.status === 'COMPLETED' ? { completedAt: new Date() } : {}),
         },
-        status: statusResult.status === 'COMPLETED' ? 'critique'
+        status: statusResult.status === 'COMPLETED' ? (state.mode === 'image-to-video' ? 'completed' : 'critique')
              : statusResult.status === 'FAILED' ? 'failed'
-             : 'generating',
+             : state.status,
     };
 }
 

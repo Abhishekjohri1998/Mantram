@@ -4190,8 +4190,9 @@ router.get('/:id/status', protect, async (req, res) => {
             };
             const updated = await pollGenerationStatus(state);
 
-            // Update project if status changed
-            if (updated.status !== 'generating') {
+            // Update project if status or progress changed
+            const progressChanged = updated.generation?.progress !== project.generation?.progress;
+            if (updated.status !== project.status || progressChanged) {
                 await VideoProject.findByIdAndUpdate(project._id, {
                     status: updated.status,
                     generation: updated.generation,
@@ -4202,8 +4203,8 @@ router.get('/:id/status', protect, async (req, res) => {
                     await VideoProject.findByIdAndUpdate(project._id, { creditsUsed: 0 });
                 }
 
-                // If completed, auto-upload video to S3 before CDN URL expires, then run critic
-                if (updated.status === 'critique') {
+                // If completed, auto-upload video to S3 before CDN URL expires, then run critic (if needed)
+                if (updated.status === 'critique' || updated.status === 'completed') {
                     // Fire-and-forget: upload video to S3
                     let finalVideoUrl = updated.generation?.videoUrl;
                     if (finalVideoUrl) {
@@ -4278,25 +4279,28 @@ router.get('/:id/status', protect, async (req, res) => {
                         }
                     }
 
-                    const criticState = await runStep(project._id, 'critique', criticNode, {
-                        userId: project.user.toString(),
-                        brandId: project.brand?.toString(),
-                        concepts: project.concepts,
-                        selectedConceptIndex: project.selectedConceptIndex,
-                        script: project.script,
-                        backendPrompt: project.backendPrompt,
-                        routing: project.routing,
-                        generation: updated.generation,
-                    });
+                    let criticState = null;
+                    if (updated.status === 'critique') {
+                        criticState = await runStep(project._id, 'critique', criticNode, {
+                            userId: project.user.toString(),
+                            brandId: project.brand?.toString(),
+                            concepts: project.concepts,
+                            selectedConceptIndex: project.selectedConceptIndex,
+                            script: project.script,
+                            backendPrompt: project.backendPrompt,
+                            routing: project.routing,
+                            generation: updated.generation,
+                        });
+                    }
 
                     return res.json({
                         success: true,
                         project: await signVideoProjectAssets({
                             _id: project._id,
-                            status: 'critique',
+                            status: updated.status,
                             generation: updated.generation,
-                            critique: criticState.critique,
-                            pipeline: getPipelineInfo('critique'),
+                            ...(criticState ? { critique: criticState.critique } : {}),
+                            pipeline: getPipelineInfo(updated.status),
                         }),
                     });
                 }
@@ -4306,9 +4310,9 @@ router.get('/:id/status', protect, async (req, res) => {
                 success: true,
                 project: await signVideoProjectAssets({
                     _id: project._id,
-                    status: updated.status === 'generating' ? 'generating' : updated.status,
+                    status: updated.status,
                     generation: updated.generation,
-                    pipeline: getPipelineInfo(updated.status === 'generating' ? 'generating' : updated.status),
+                    pipeline: getPipelineInfo(updated.status),
                 }),
             });
         }
@@ -4514,7 +4518,7 @@ router.get('/', protect, async (req, res) => {
                     const updated = await pollGenerationStatus(state);
 
                     if (updated.generation?.status === 'COMPLETED' || updated.generation?.status === 'FAILED') {
-                        const newStatus = updated.generation.status === 'COMPLETED' ? 'critique' : 'failed';
+                        const newStatus = updated.generation.status === 'COMPLETED' ? (p.mode === 'image-to-video' ? 'completed' : 'critique') : 'failed';
                         await VideoProject.findByIdAndUpdate(p._id, {
                             status: newStatus,
                             generation: { ...updated.generation, provider },
