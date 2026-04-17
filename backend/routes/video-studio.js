@@ -3113,7 +3113,7 @@ router.post('/ugc-pro/generate', protect, requireCredits('ugcProGenerate'), asyn
             status: 'generating',
             script: prompt,
             backendPrompt: prompt,
-            input: { images: imageUrls, productData: parsedProduct },
+            input: { images: imageUrls.map(url => ({ url, source: 'existing' })), productData: parsedProduct },
             generation: {
                 provider: 'piapi',
                 model: 'seedance-2.0',
@@ -3271,7 +3271,7 @@ router.post('/ugc-pro/qads/generate', protect, async (req, res) => {
         const project = await VideoProject.create({
             user: req.user._id, brand: brandId, studioMode: 'q-ads', status: 'generating',
             script: prompt, backendPrompt: prompt,
-            input: { images: imageUrls, productData: parsedProduct, categoryId },
+            input: { images: imageUrls.map(url => ({ url, source: 'existing' })), productData: parsedProduct, categoryId },
             generation: {
                 provider: 'piapi', model: 'seedance-2.0',
                 taskId: genResult.taskId, requestId: genResult.taskId,
