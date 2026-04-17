@@ -81,9 +81,15 @@ async function submitPiApiPayload(payload) {
         }, null, 2));
 
         try {
-            const response = await fetch(`${PIAPI_BASE_URL}/api/v1/task`, {
+            const endpointUrl = `${PIAPI_BASE_URL}/api/v1/task`;
+            console.log(`🚀 [Seedance Network] Sending to Proxy URL: ${endpointUrl}`);
+            const response = await fetch(endpointUrl, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey },
+                headers: { 
+                    'Content-Type': 'application/json', 
+                    'x-api-key': apiKey,
+                    'Authorization': `Bearer ${apiKey}`
+                },
                 body: JSON.stringify(payload),
                 signal: AbortSignal.timeout(20000),
             });
