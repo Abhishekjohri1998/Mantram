@@ -474,13 +474,24 @@ export default function QAds({ activeBrand, projects = [] }) {
 
                             {/* Upper controls — image thumbs */}
                             <div className="qa-upper">
-                                {/* Product thumb */}
-                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-                                    <div className="qa-thumb-box" onClick={() => productRef.current?.click()}>
-                                        {productImageUrls[0] ? <img src={productImageUrls[0]} alt="" /> :
-                                            <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--sys-text-muted)' }}>inventory_2</span>}
+                                {/* Product thumbs (Multiple) */}
+                                <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4, scrollbarWidth: 'none' }}>
+                                    {productImageUrls.map((url, idx) => (
+                                        <div key={idx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                                            <div className="qa-thumb-box" style={{ position: 'relative' }}>
+                                                <img src={url} alt="" />
+                                                <button onClick={(e) => { e.stopPropagation(); setProductImageUrls(prev => prev.filter((_, i) => i !== idx)) }}
+                                                    style={{ position: 'absolute', top: -4, right: -4, background: '#ef4444', color: '#fff', border: 'none', borderRadius: '50%', width: 14, height: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 10 }}>×</button>
+                                            </div>
+                                            <span className="qa-thumb-label">@{idx + 2}</span>
+                                        </div>
+                                    ))}
+                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                                        <div className="qa-thumb-box" onClick={() => productRef.current?.click()} style={{ borderStyle: 'solid' }}>
+                                            <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--sys-text-muted)' }}>{productImageUrls.length > 0 ? 'add' : 'inventory_2'}</span>
+                                        </div>
+                                        <span className="qa-thumb-label">{productImageUrls.length > 0 ? 'Add' : 'Product'}</span>
                                     </div>
-                                    <span className="qa-thumb-label">Product</span>
                                 </div>
 
                                 {/* Avatar thumb (hidden for cinematic_flex) */}
