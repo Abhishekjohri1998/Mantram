@@ -190,6 +190,7 @@ export default function QAds({ activeBrand, projects = [] }) {
     const [jobs, setJobs] = useState([])
     const pollRefs = useRef({})
     const [creditEstimate, setCreditEstimate] = useState(null)
+    const [isMinimized, setIsMinimized] = useState(false)
 
     // ── History ──
     const [gridVideos, setGridVideos] = useState(() =>
@@ -295,6 +296,7 @@ export default function QAds({ activeBrand, projects = [] }) {
                 prebuiltPrompt: promptText,
                 settings: { duration, format, cta, customDialogue, quality: 'high' },
             })
+            setIsMinimized(true)
             setJobs(prev => prev.map(j => j.id === jobId ? { ...j, requestId: data.requestId, prompt: data.prompt } : j))
 
             // Poll
@@ -401,33 +403,42 @@ export default function QAds({ activeBrand, projects = [] }) {
 
             {/* ═══ Floating Scott Panel ═══ */}
             <div className="qa-layout">
-                <div className="qa-card">
-
-                    {/* Header */}
-                    <div className="qa-card-header">
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#eab308' }}>ads_click</span>
-                            Q-Ads · Quick Ads
-                            {selectedCat && cat && (
-                                <span style={{ fontSize: 10, fontWeight: 600, color: cat.color, marginLeft: 4, padding: '1px 6px', borderRadius: 4, background: `color-mix(in srgb, ${cat.color} 12%, transparent)`, border: `1px solid color-mix(in srgb, ${cat.color} 25%, transparent)` }}>
-                                    {cat.name}
-                                </span>
-                            )}
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            {productData && (
-                                <span style={{ fontSize: 10, fontWeight: 600, color: '#10b981', display: 'flex', alignItems: 'center', gap: 3 }}>
-                                    <span className="material-symbols-outlined" style={{ fontSize: 12 }}>check_circle</span>
-                                    {productData.productName || 'Product'}
-                                </span>
-                            )}
-                            <CreditTooltipWrapper credits={credits} label="Q-Ads">
-                                <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--sys-text-muted)', padding: '2px 6px', borderRadius: 6, background: 'color-mix(in srgb, var(--sys-text) 4%, var(--sys-surface))' }}>{credits}c</span>
-                            </CreditTooltipWrapper>
-                        </div>
+                {isMinimized ? (
+                    <div className="qa-card" style={{ maxWidth: 220, cursor: 'pointer', padding: '12px 20px', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, background: 'var(--sys-surface)', border: '1px solid var(--sys-primary)', borderBottom: 0, borderBottomLeftRadius: 0, borderBottomRightRadius: 0, color: 'var(--sys-primary)' }} onClick={() => setIsMinimized(false)}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 22 }}>expand_less</span>
+                        <span style={{ fontWeight: 700, fontSize: 13 }}>Open Studio</span>
                     </div>
-
-                    {/* Category Grid */}
+                ) : (
+                    <div className="qa-card">
+    
+                        {/* Header */}
+                        <div className="qa-card-header">
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#eab308' }}>ads_click</span>
+                                Q-Ads · Quick Ads
+                                {selectedCat && cat && (
+                                    <span style={{ fontSize: 10, fontWeight: 600, color: cat.color, marginLeft: 4, padding: '1px 6px', borderRadius: 4, background: `color-mix(in srgb, ${cat.color} 12%, transparent)`, border: `1px solid color-mix(in srgb, ${cat.color} 25%, transparent)` }}>
+                                        {cat.name}
+                                    </span>
+                                )}
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                {productData && (
+                                    <span style={{ fontSize: 10, fontWeight: 600, color: '#10b981', display: 'flex', alignItems: 'center', gap: 3 }}>
+                                        <span className="material-symbols-outlined" style={{ fontSize: 12 }}>check_circle</span>
+                                        {productData.productName || 'Product'}
+                                    </span>
+                                )}
+                                <CreditTooltipWrapper credits={credits} label="Q-Ads">
+                                    <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--sys-text-muted)', padding: '2px 6px', borderRadius: 6, background: 'color-mix(in srgb, var(--sys-text) 4%, var(--sys-surface))' }}>{credits}c</span>
+                                </CreditTooltipWrapper>
+                                <button onClick={() => setIsMinimized(true)} style={{ background: 'transparent', border: 'none', color: 'var(--sys-text-muted)', cursor: 'pointer', display: 'flex', marginLeft: 4 }}>
+                                    <span className="material-symbols-outlined" style={{ fontSize: 18 }}>expand_more</span>
+                                </button>
+                            </div>
+                        </div>
+    
+                        {/* Category Grid */}
                     <div className="qa-cat-grid">
                         {categories.map(c => (
                             <div key={c.id}

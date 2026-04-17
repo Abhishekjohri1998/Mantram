@@ -357,7 +357,12 @@ export async function getPiApiGenerationStatus(taskId) {
     }
 
     if (taskStatus === 'failed' || taskStatus === 'error') {
-        const errorMsg = result.data.error || result.data.message || 'Atlas Cloud video generation failed';
+        let errorMsg = result.data?.error || result.data?.message || result?.message || 'Atlas Cloud video generation failed';
+        if (typeof errorMsg === 'string' && errorMsg.includes('real person')) {
+            errorMsg = "Seedance AI blocked generation because it detected a real person's face. Please use a stylized avatar, mascot, or standalone product instead.";
+        } else if (typeof errorMsg === 'string' && errorMsg.includes('safet')) {
+            errorMsg = "Generation blocked by AI safety filters.";
+        }
         console.warn(`⚠️ [Atlas Cloud] Task ${taskId} failed: ${errorMsg}`);
         // Consider errors from atlas cloud as fatal initially, we don't know their retry patterns yet
         return { status: 'FAILED', progress: 0, error: errorMsg, retryable: false };
