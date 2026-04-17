@@ -3238,9 +3238,15 @@ router.post('/ugc-pro/qads/generate', protect, async (req, res) => {
         const category = getCategory(categoryId);
         if (!category) return res.status(400).json({ success: false, error: `Unknown Q-Ad category: ${categoryId}` });
 
-        // Collect image URLs: avatar first (@image1), then product images (@image2+)
+        // Collect image URLs: product images ONLY for Seedance 2.0 API
+        // NOTE: Avatar is intentionally excluded from image inputs because Seedance 2.0
+        // has strict face detection that blocks any real/realistic person photo.
+        // The avatar's appearance is described in the text prompt instead, and Seedance
+        // will render a character from text without triggering safety filters.
         const imageUrls = [];
-        if (avatarUrl && !category.noAvatar) imageUrls.push(avatarUrl);
+        if (avatarUrl && !category.noAvatar) {
+            console.log(`[Q-Ads Generate] Avatar provided but excluded from Seedance image inputs (safety filter bypass). Avatar influence is via text prompt only.`);
+        }
         for (const url of parsedProductImgs) {
             if (url && typeof url === 'string' && url.startsWith('http')) imageUrls.push(url);
         }
@@ -3252,6 +3258,20 @@ router.post('/ugc-pro/qads/generate', protect, async (req, res) => {
             prompt = await buildQAdPrompt({ categoryId, productData: parsedProduct, settings: parsedSettings, brandId, userId: req.user._id });
         } else {
             console.log(`[Q-Ads Generate] Using prebuilt prompt (${prompt.length} chars)`);
+        }
+
+        // 🔄 REMAP IMAGE TAGS: Since avatar is excluded from Seedance image inputs,
+        // @image2 (product) is now the actual @image1 sent to the API.
+        // Replace avatar references (@image1) with natural person text,
+        // then remap @image2 → @image1 so Seedance correctly maps the product image.
+        if (imageUrls.length > 0) {
+            // Step 1: Temporarily mark product tags
+            prompt = prompt.replace(/@image2/g, '@@PRODUCT@@');
+            // Step 2: Replace avatar tags with natural person description
+            prompt = prompt.replace(/@image1/g, 'the presenter');
+            // Step 3: Remap product to @image1 (the first actual image sent)
+            prompt = prompt.replace(/@@PRODUCT@@/g, '@image1');
+            console.log(`[Q-Ads Generate] Remapped image tags: avatar→text, product→@image1`);
         }
 
         const duration = parseInt(parsedSettings.duration || category.recommendedDuration);
