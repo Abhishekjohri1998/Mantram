@@ -4680,11 +4680,45 @@ router.get('/', protect, async (req, res) => {
             VideoProject.countDocuments(filter),
         ]);
 
+        // ── STEP 0: Auto-expire truly stale generating projects ──
+        // Projects stuck in generating without a request ID for >30min are dead.
+        // Projects with a request ID but older than 2 hours are also expired.
+        const STALE_NO_ID_MS = 30 * 60 * 1000;       // 30 minutes
+        const STALE_WITH_ID_MS = 2 * 60 * 60 * 1000;  // 2 hours
+        const now = Date.now();
+        let expiredCount = 0;
+
+        for (const p of projects) {
+            if (p.status !== 'generating' && p.status !== 'advanced-generating') continue;
+            const age = now - new Date(p.updatedAt || p.createdAt).getTime();
+            const hasRequestId = !!(p.generation?.falRequestId || p.generation?.taskId || p.generation?.requestId);
+
+            if ((!hasRequestId && age > STALE_NO_ID_MS) || age > STALE_WITH_ID_MS) {
+                // Mark as failed in the response object (immediate UI fix)
+                p.status = 'failed';
+                p.generation = {
+                    ...(p.generation || {}),
+                    status: 'FAILED',
+                    error: 'Generation timed out — auto-expired',
+                };
+                // Persist to DB (fire-and-forget)
+                VideoProject.findByIdAndUpdate(p._id, {
+                    status: 'failed',
+                    'generation.status': 'FAILED',
+                    'generation.error': 'Generation timed out — auto-expired',
+                }).exec().catch(err => console.warn(`⚠️ Failed to expire project ${p._id}:`, err.message));
+                expiredCount++;
+            }
+        }
+        if (expiredCount > 0) {
+            console.log(`🧹 Auto-expired ${expiredCount} stale generating project(s)`);
+        }
+
         // ── Auto-sync stuck generating projects ──
-        // If any projects are still "generating"/"advanced-generating", re-check their status
+        // If any projects are still "generating"/"advanced-generating" (not expired above), re-check their status
         // This catches cases where the user closed the tab before polling completed
         const stuckProjects = projects.filter(p =>
-            (p.status === 'generating' || p.status === 'advanced-generating') && p.generation?.falRequestId
+            (p.status === 'generating' || p.status === 'advanced-generating') && (p.generation?.falRequestId || p.generation?.taskId || p.generation?.requestId)
         );
 
         // ── Auto-sync stuck generating projects (NON-BLOCKING) ──
