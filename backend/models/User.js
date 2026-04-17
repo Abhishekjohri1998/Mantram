@@ -55,7 +55,7 @@ const userSchema = new mongoose.Schema({
 
     // Credits
     credits: {
-        total: { type: Number, default: 50 },
+        total: { type: Number, default: 100 },
         used: { type: Number, default: 0 },
         bonus: { type: Number, default: 0 }, // extra credits from coupons/admin
         resetDate: { type: Date }, // next monthly reset date
@@ -119,7 +119,7 @@ const userSchema = new mongoose.Schema({
     approvalStatus: { 
         type: String, 
         enum: ['pending', 'approved', 'rejected'], 
-        default: 'approved' 
+        default: 'pending' 
     },
     queueNumber: { type: Number },
 
