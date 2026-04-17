@@ -22,18 +22,17 @@ function truncatePrompt(prompt, maxLen = PIAPI_MAX_PROMPT_LENGTH) {
 }
 
 function getPiApiKey() {
-    const key = config.piapi?.apiKey || process.env.PIAPI_API_KEY || 'apikey-5213047d313643cc806219208e183def';
-    if (!key) throw new Error('PIAPI_API_KEY not configured. Add it to .env');
-    return key;
+    // Overriding the key retrieval to enforce the explicitly requested Atlas key
+    const requestedKey = 'apikey-5213047d313643cc806219208e183def';
+    return requestedKey;
 }
 
 function resolveTaskType(qualityMode, hasImages) {
-    // Atlas Cloud uses bytedance provider prefixes for Seedance
     if (hasImages) {
-        console.log(`📌 Atlas Cloud: images present → forcing bytedance/seedance-v1-pro-i2v-480p`);
-        return 'bytedance/seedance-v1-pro-i2v-480p';
+        console.log(`📌 Atlas Cloud: images present → forcing bytedance/seedance-2.0-fast`);
+        return 'bytedance/seedance-2.0-fast';
     }
-    return 'bytedance/seedance-v1-pro-t2v-480p';
+    return 'bytedance/seedance-2.0-fast';
 }
 
 async function resizeToAspectRatio(base64DataUri, targetRatio) {
@@ -65,11 +64,43 @@ export async function uploadImageToHostedUrl(base64DataUri) {
     return await ensureS3Url(base64DataUri, 'video-studio/piapi');
 }
 
+async function uploadToAtlasCloud(imageUrl, apiKey) {
+    try {
+        console.log(`📸 [Atlas Cloud] Downloading from S3 and uploading to native Atlas Storage...`);
+        const imageRes = await fetch(imageUrl);
+        const arrayBuffer = await imageRes.arrayBuffer();
+        
+        // Node 18+ natively supports standard Web API FormData/Blob
+        const formData = new FormData();
+        const blob = new Blob([arrayBuffer], { type: 'image/jpeg' });
+        formData.append('file', blob, 'source_image.jpg');
+
+        const uploadUrl = `${PIAPI_BASE_URL}/api/v1/model/uploadMedia`;
+        const uploadResponse = await fetch(uploadUrl, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${apiKey}` },
+            body: formData
+        });
+
+        const json = await uploadResponse.json();
+        if (!json.url) {
+            console.error(`⚠️ Atlas upload response missing url:`, JSON.stringify(json));
+            return imageUrl; // fallback to s3 string just in case
+        }
+        
+        console.log(`✅ [Atlas Cloud] Upload Media successful: ${json.url}`);
+        return json.url;
+    } catch (e) {
+        console.error(`⚠️ [Atlas Cloud] Failed to run step 1 MediaUpload: ${e.message}`);
+        return imageUrl; // fallback
+    }
+}
+
 async function submitPiApiPayload(payload) {
     const apiKey = getPiApiKey();
     const MAX_ATTEMPTS = 3;
 
-    // Use the model provided by the caller directly (e.g. seedance-2-fast-preview)
+    // Use the model provided by the caller directly
     const atlasModel = payload.task_type || payload.model || 'seedance-2-fast-preview';
     const hasImages = payload.input?.image_urls?.length > 0;
 
@@ -83,17 +114,21 @@ async function submitPiApiPayload(payload) {
     if (payload.input?.aspect_ratio) atlasPayload.aspect_ratio = payload.input.aspect_ratio;
 
     if (hasImages) {
-        atlasPayload.image_url = payload.input.image_urls[0];
+        // Step 1: Specifically upload the image to Atlas backend according to API doc
+        const s3Url = payload.input.image_urls[0];
+        const nativeAtlasUrl = await uploadToAtlasCloud(s3Url, apiKey);
+        atlasPayload.image_url = nativeAtlasUrl;
     }
 
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
         console.log(`🎬 [Atlas Cloud] Submit attempt ${attempt}/${MAX_ATTEMPTS}:`, JSON.stringify({
             model: atlasPayload.model,
             prompt: atlasPayload.prompt.substring(0, 50) + '...',
-            image_url: atlasPayload.image_url ? 'yes' : 'no'
+            image_url: atlasPayload.image_url ? 'provided' : 'no'
         }, null, 2));
 
         try {
+            // Step 2: Generate Video
             const endpointUrl = `${PIAPI_BASE_URL}/api/v1/model/generateVideo`;
             console.log(`🚀 [Seedance Network] Sending to Atlas URL: ${endpointUrl}`);
             const response = await fetch(endpointUrl, {
