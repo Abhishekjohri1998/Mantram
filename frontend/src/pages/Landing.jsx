@@ -393,8 +393,8 @@ export default function Landing() {
                     <p className="text-center text-[var(--sys-text-muted)] text-xs font-bold uppercase tracking-[0.25em] mb-10">Create & publish content for every platform</p>
                     <div className="relative">
                         {/* Fade edges */}
-                        <div className="absolute left-0 top-0 bottom-0 w-24 bg-[var(--sys-surface)] border border-[var(--sys-border)] z-10" />
-                        <div className="absolute right-0 top-0 bottom-0 w-24 bg-[var(--sys-surface)] border border-[var(--sys-border)] z-10" />
+                        <div className="absolute left-0 top-0 bottom-0 w-24 bg-gradient-to-r from-[var(--sys-bg)] to-transparent pointer-events-none z-10" />
+                        <div className="absolute right-0 top-0 bottom-0 w-24 bg-gradient-to-l from-[var(--sys-bg)] to-transparent pointer-events-none z-10" />
                         <div className="flex gap-12 animate-marquee">
                             {[...Array(2)].map((_, setIdx) => (
                                 <div key={setIdx} className="flex gap-12 shrink-0">
