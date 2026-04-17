@@ -7,7 +7,7 @@ import config from '../../config/env.js';
 import sharp from 'sharp';
 import { uploadToS3, ensureS3Url } from '../../utils/s3.js';
 
-const PIAPI_BASE_URL = 'https://api.piapi.ai';
+const PIAPI_BASE_URL = process.env.PIAPI_BASE_URL || 'https://api.piapi.ai';
 const PIAPI_MAX_PROMPT_LENGTH = 1950;
 
 function truncatePrompt(prompt, maxLen = PIAPI_MAX_PROMPT_LENGTH) {
