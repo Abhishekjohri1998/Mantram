@@ -70,10 +70,16 @@ async function uploadToAtlasCloud(imageUrl, apiKey) {
         const imageRes = await fetch(imageUrl);
         const arrayBuffer = await imageRes.arrayBuffer();
         
+        const contentType = imageRes.headers.get('content-type') || 'image/jpeg';
+        let extension = 'jpg';
+        if (contentType.includes('png')) extension = 'png';
+        else if (contentType.includes('webp')) extension = 'webp';
+        else if (contentType.includes('gif')) extension = 'gif';
+        
         // Node 18+ natively supports standard Web API FormData/Blob
         const formData = new FormData();
-        const blob = new Blob([arrayBuffer], { type: 'image/jpeg' });
-        formData.append('file', blob, 'source_image.jpg');
+        const blob = new Blob([arrayBuffer], { type: contentType });
+        formData.append('file', blob, `source_image.${extension}`);
 
         const uploadUrl = `${PIAPI_BASE_URL}/api/v1/model/uploadMedia`;
         const uploadResponse = await fetch(uploadUrl, {
@@ -255,6 +261,13 @@ export async function submitPiApiVideoGeneration({ prompt, imageUrl, duration, a
  */
 export async function submitPiApiWatermarkRemoval(videoUrl) {
     if (!videoUrl) throw new Error('Video URL is required for watermark removal');
+    
+    // Atlas Cloud does not support 'remove-watermark' model natively as of the recent update.
+    if (PIAPI_BASE_URL.includes('atlascloud')) {
+        console.log(`🧹 PiAPI: Skipping watermark removal because Atlas Cloud dynamically skips or does not support local watermark removal.`);
+        return { taskId: 'skipped_atlas_' + Date.now(), provider: 'piapi', type: 'remove-watermark' };
+    }
+
     console.log(`🧹 PiAPI: Requesting watermark removal for ${videoUrl.substring(0, 80)}...`);
 
     const payload = {
@@ -329,6 +342,11 @@ export async function submitPiApiVideoExtend({ parentTaskId, prompt, duration, q
 }
 
 export async function getPiApiGenerationStatus(taskId) {
+    if (taskId && taskId.startsWith('skipped_atlas_')) {
+        console.log(`📊 [Atlas Cloud] Intercepted skipped task polling. Returning COMPLETED.`);
+        return { status: 'COMPLETED', progress: 100 };
+    }
+
     const apiKey = getPiApiKey();
     const statusUrl = `${PIAPI_BASE_URL}/api/v1/model/prediction/${taskId}`;
     console.log(`📊 [Atlas Cloud Status] Polling: ${statusUrl}`);

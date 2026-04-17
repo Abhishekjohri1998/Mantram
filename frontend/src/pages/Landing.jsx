@@ -412,7 +412,9 @@ export default function Landing() {
                                     ].map((p, i) => (
                                         <div key={`${setIdx}-${i}`} className="flex flex-col items-center gap-3 group cursor-pointer" title={p.name}>
                                             <div className="size-16 rounded-2xl flex items-center justify-center transition-all duration-300 group-hover:scale-110 group-hover:shadow-lg" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                                                 
+                                                <svg viewBox="0 0 24 24" className="size-8 opacity-70 group-hover:opacity-100 transition-all duration-300" style={{ fill: p.color }}>
+                                                    <path d={p.path} />
+                                                </svg>
                                             </div>
                                             <span className="text-[11px] text-[var(--sys-text-muted)] font-semibold whitespace-nowrap">{p.name}</span>
                                         </div>
