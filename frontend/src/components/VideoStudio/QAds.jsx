@@ -5,9 +5,13 @@ const API_BASE = import.meta.env.VITE_API_URL || `${window.location.origin}/api`
 
 async function api(path, opts = {}) {
     const token = localStorage.getItem('mantram_token')
+    const isFormData = opts.body instanceof FormData
+    const headers = isFormData
+        ? { Authorization: `Bearer ${token}`, ...(opts.headers || {}) }
+        : { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, ...(opts.headers || {}) }
     const res = await fetch(`${API_BASE}${path}`, {
         ...opts,
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, ...opts.headers },
+        headers,
     })
     const ct = res.headers.get('content-type') || ''
     if (!ct.includes('application/json')) throw new Error(`Server returned ${res.status}`)
