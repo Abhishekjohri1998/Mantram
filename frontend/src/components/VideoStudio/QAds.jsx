@@ -7,7 +7,7 @@ async function api(path, opts = {}) {
     const token = localStorage.getItem('mantram_token')
     const res = await fetch(`${API_BASE}${path}`, {
         ...opts,
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, ...opts.headers },
+        headers: { Authorization: `Bearer ${token}`, ...opts.headers },
     })
     const ct = res.headers.get('content-type') || ''
     if (!ct.includes('application/json')) throw new Error(`Server returned ${res.status}`)
@@ -16,7 +16,7 @@ async function api(path, opts = {}) {
     return data
 }
 async function apiJson(path, body) {
-    return api(path, { method: 'POST', body: JSON.stringify(body) })
+    return api(path, { method: 'POST', body: JSON.stringify(body), headers: { 'Content-Type': 'application/json' } })
 }
 
 const DURATIONS = [
