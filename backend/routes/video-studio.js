@@ -3293,6 +3293,60 @@ router.post('/ugc-pro/qads/generate', protect, async (req, res) => {
 router.get('/ugc-pro/qads/status/:requestId', protect, async (req, res) => {
     try {
         const result = await pollPiApiStatus(req.params.requestId);
+
+        // 🛡️ SAFE MODE PIVOT: If Seedance blocked due to real person face detection,
+        // automatically resubmit without the avatar image (product-only mode)
+        if (result && result.safetyTriggered && result.retryable) {
+            const project = await VideoProject.findOne({
+                'generation.requestId': req.params.requestId, user: req.user._id, studioMode: 'q-ads'
+            });
+
+            if (project && !project.generation?.safeModeRetried) {
+                console.log(`🛡️ [Q-Ads Safe Mode] Safety triggered — stripping avatar and resubmitting product-only...`);
+
+                // Get original images; drop the first one (avatar)
+                const originalImages = (project.input?.images || []).map(i => i.url).filter(Boolean);
+                const productOnlyImages = originalImages.length > 1 ? originalImages.slice(1) : [];
+
+                try {
+                    const retryResult = await submitPiApiVideoGeneration({
+                        prompt: project.backendPrompt || project.script,
+                        imageUrl: productOnlyImages[0] || null,
+                        duration: project.generation?.duration || 5,
+                        aspectRatio: project.generation?.aspectRatio || '9:16',
+                        qualityMode: 'high',
+                        generateAudio: true,
+                        referenceImages: productOnlyImages.slice(1),
+                    });
+
+                    // Update the project with the new task ID
+                    await VideoProject.findByIdAndUpdate(project._id, {
+                        'generation.requestId': retryResult.taskId,
+                        'generation.taskId': retryResult.taskId,
+                        'generation.safeModeRetried': true,
+                        'generation.progress': 5,
+                        'generation.status': 'GENERATING',
+                        'generation.error': '',
+                        status: 'generating',
+                    });
+
+                    console.log(`✅ [Q-Ads Safe Mode] Resubmitted as product-only: new taskId=${retryResult.taskId}`);
+
+                    // Return IN_PROGRESS with the NEW requestId so the frontend switches to polling it
+                    return res.json({
+                        success: true,
+                        status: 'IN_PROGRESS',
+                        progress: 5,
+                        newRequestId: retryResult.taskId,
+                        safeModeActivated: true,
+                    });
+                } catch (retryErr) {
+                    console.error(`❌ [Q-Ads Safe Mode] Retry failed: ${retryErr.message}`);
+                    // Fall through to normal failure handling
+                }
+            }
+        }
+
         if (result && req.params.requestId) {
             const updatePayload = {
                 'generation.progress': result.progress,

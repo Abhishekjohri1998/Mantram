@@ -299,10 +299,19 @@ export default function QAds({ activeBrand, projects = [] }) {
             setIsMinimized(true)
             setJobs(prev => prev.map(j => j.id === jobId ? { ...j, requestId: data.requestId, prompt: data.prompt } : j))
 
-            // Poll
+            // Poll — use mutable ref so Safe Mode can redirect polling to new taskId
+            let currentRequestId = data.requestId
             pollRefs.current[jobId] = setInterval(async () => {
                 try {
-                    const status = await api(`/video-studio/ugc-pro/qads/status/${data.requestId}`)
+                    const status = await api(`/video-studio/ugc-pro/qads/status/${currentRequestId}`)
+
+                    // 🛡️ Safe Mode Pivot: backend stripped avatar and resubmitted — switch to new task
+                    if (status.newRequestId) {
+                        currentRequestId = status.newRequestId
+                        setJobs(prev => prev.map(j => j.id === jobId ? { ...j, progress: 5, requestId: status.newRequestId } : j))
+                        return // Wait for next poll cycle with new ID
+                    }
+
                     setJobs(prev => prev.map(j => j.id === jobId ? { ...j, progress: status.progress || j.progress } : j))
                     if (status.status === 'COMPLETED') {
                         clearInterval(pollRefs.current[jobId]); delete pollRefs.current[jobId]
