@@ -60,7 +60,7 @@ export default function VideoStudio() {
     // ── State ──
     const [step, setStep] = useState(0) // 0=input, 1=concepts, 2=script, 3=voiceover, 4=cost, 5=generate, 6=review
     const [loading, setLoading] = useState(false)
-    const [studioMode, setStudioMode] = useState('storyboard') // 'advanced' | 'storyboard' | 'ugc'
+    const [studioMode, setStudioMode] = useState('advanced') // 'advanced' | 'storyboard' | 'ugc'
     const [error, setError] = useState(null)
     const [autoStart, setAutoStart] = useState(false)
     const [searchParams, setSearchParams] = useSearchParams()
