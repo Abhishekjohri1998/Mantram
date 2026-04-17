@@ -57,7 +57,10 @@ const css = `
 .ugc-root { --sys-surface-glass: color-mix(in srgb, var(--sys-surface) 85%, transparent); position: relative; width: 100%; min-height: calc(100vh - 80px); display: flex; flex-direction: column; }
 .ugc-layout { position: fixed; bottom: 0; left: 0; width: 100%; z-index: 50; display: flex; flex-direction: column; align-items: center; padding: 0 16px 24px 16px; pointer-events: none; }
 .ugc-layout * { pointer-events: auto; }
-.ugc-card { margin-top: auto; width: 100%; max-width: 860px; background: var(--sys-surface-glass); border: 1px solid var(--sys-border); border-radius: 24px; backdrop-filter: blur(36px); box-shadow: 0 15px 40px rgba(0,0,0,0.15); z-index: 10; display: flex; flex-direction: column; color: var(--sys-text); font-family: 'Inter', sans-serif; }
+.ugc-card { margin-top: auto; width: 100%; max-width: 860px; background: var(--sys-surface-glass); border: 1px solid var(--sys-border); border-radius: 24px; backdrop-filter: blur(36px); box-shadow: 0 15px 40px rgba(0,0,0,0.15); z-index: 10; display: flex; flex-direction: column; color: var(--sys-text); font-family: 'Inter', sans-serif; max-height: calc(100vh - 100px); overflow-y: auto; overflow-x: hidden; }
+.ugc-card::-webkit-scrollbar { width: 4px; }
+.ugc-card::-webkit-scrollbar-track { background: transparent; }
+.ugc-card::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
 .ugc-header { padding: 6px 16px; border-bottom: 1px solid var(--sys-border); display: flex; align-items: center; justify-content: space-between; font-weight: 700; font-size: 12px; }
 .ugc-upper { padding: 8px 16px; display: flex; gap: 8px; border-bottom: 1px solid var(--sys-border); align-items: center; flex-wrap: nowrap; overflow-x: auto; }
 .ugc-thumb { width: 40px; height: 40px; border-radius: 10px; border: 1px dashed var(--sys-border); background: var(--sys-surface); display: flex; align-items: center; justify-content: center; cursor: pointer; overflow: hidden; flex-shrink: 0; transition: all .2s; position: relative; }
@@ -73,7 +76,7 @@ const css = `
 .ugc-prompt-box:focus-within { border-color: var(--sys-primary); }
 .ugc-textarea { width: 100%; background: transparent; border: none; outline: none; resize: vertical; color: var(--sys-text); font-size: 14px; line-height: 1.5; font-family: inherit; min-height: 56px; max-height: 200px; font-weight: 500; }
 .ugc-textarea::placeholder { color: var(--sys-text-muted); opacity: 0.7; }
-.ugc-bottom { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 6px 16px; border-top: 1px solid var(--sys-border); flex-wrap: nowrap; }
+.ugc-bottom { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 6px 16px; border-top: 1px solid var(--sys-border); flex-wrap: wrap; }
 .ugc-bottom-left { display: flex; align-items: center; gap: 4px; flex: 1; flex-wrap: wrap; }
 .ugc-cfg-btn { display: flex; align-items: center; gap: 3px; padding: 4px 8px; background: transparent; border: 1px solid transparent; color: var(--sys-text); cursor: pointer; font-size: 11px; font-weight: 600; border-radius: 8px; transition: 0.2s; white-space: nowrap; }
 .ugc-cfg-btn:hover { background: rgba(255,255,255,0.05); border-color: var(--sys-border); }
@@ -94,8 +97,8 @@ const css = `
 @keyframes ugc-pulse { 0%,100% { border-color: rgba(168,85,247,0.3); } 50% { border-color: rgba(168,85,247,0.7); } }
 .ugc-gen-thumb { position: absolute; inset: 0; }
 .ugc-gen-thumb img { width: 100%; height: 100%; object-fit: cover; opacity: 0.2; }
-.ugc-product-input { margin: 6px 16px; padding: 6px 10px; border-radius: 8px; background: rgba(168,85,247,0.06); border: 1px solid rgba(168,85,247,0.15); display: flex; align-items: center; gap: 8px; }
-.ugc-product-input input { flex: 1; background: transparent; border: none; outline: none; color: var(--sys-text); font-size: 12px; font-weight: 500; }
+.ugc-product-input { margin: 6px 16px; padding: 6px 10px; border-radius: 8px; background: rgba(168,85,247,0.06); border: 1px solid rgba(168,85,247,0.15); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ugc-product-input input { flex: 1; min-width: 200px; background: transparent; border: none; outline: none; color: var(--sys-text); font-size: 12px; font-weight: 500; }
 .ugc-product-input input::placeholder { color: var(--sys-text-muted); }
 `
 

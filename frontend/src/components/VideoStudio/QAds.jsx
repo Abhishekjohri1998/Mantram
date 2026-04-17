@@ -54,7 +54,10 @@ const css = `
 /* Scott Panel (Floating Card) */
 .qa-layout { position: fixed; bottom: 0; left: 0; width: 100%; z-index: 50; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; padding: 0 16px 24px 16px; pointer-events: none; }
 .qa-layout * { pointer-events: auto; }
-.qa-card { width: 100%; max-width: 860px; background: var(--sys-surface-glass); border: 1px solid var(--sys-border); border-radius: 24px; padding: 0; backdrop-filter: blur(36px); box-shadow: 0 15px 40px rgba(0,0,0,0.15); z-index: 10; display: flex; flex-direction: column; color: var(--sys-text); font-family: 'Inter', sans-serif; }
+.qa-card { width: 100%; max-width: 860px; background: var(--sys-surface-glass); border: 1px solid var(--sys-border); border-radius: 24px; padding: 0; backdrop-filter: blur(36px); box-shadow: 0 15px 40px rgba(0,0,0,0.15); z-index: 10; display: flex; flex-direction: column; color: var(--sys-text); font-family: 'Inter', sans-serif; max-height: calc(100vh - 100px); overflow-y: auto; overflow-x: hidden; }
+.qa-card::-webkit-scrollbar { width: 4px; }
+.qa-card::-webkit-scrollbar-track { background: transparent; }
+.qa-card::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
 .qa-card-header { padding: 6px 16px; border-bottom: 1px solid var(--sys-border); display: flex; align-items: center; justify-content: space-between; font-weight: 700; font-size: 12px; }
 
 /* Category Grid */
@@ -67,12 +70,12 @@ const css = `
 .qa-cat-card.selected::after { content: ''; position: absolute; top: 6px; right: 6px; width: 8px; height: 8px; border-radius: 50%; background: var(--cat-color); }
 
 /* Product input */
-.qa-product-section { padding: 8px 16px; display: flex; gap: 8px; align-items: center; border-bottom: 1px solid var(--sys-border); }
-.qa-prod-input { flex: 1; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--sys-border); background: var(--sys-surface-raised); color: var(--sys-text); font-size: 13px; outline: none; }
+.qa-product-section { padding: 8px 16px; display: flex; gap: 8px; align-items: center; border-bottom: 1px solid var(--sys-border); flex-wrap: wrap; }
+.qa-prod-input { flex: 1; min-width: 200px; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--sys-border); background: var(--sys-surface-raised); color: var(--sys-text); font-size: 13px; outline: none; }
 .qa-prod-input:focus { border-color: var(--sys-primary); }
 
 /* Upper controls */
-.qa-upper { padding: 8px 16px; display: flex; gap: 8px; border-bottom: 1px solid var(--sys-border); align-items: center; flex-wrap: nowrap; }
+.qa-upper { padding: 8px 16px; display: flex; gap: 8px; border-bottom: 1px solid var(--sys-border); align-items: center; flex-wrap: wrap; }
 .qa-thumb-box { width: 36px; height: 36px; border-radius: 8px; border: 1px dashed var(--sys-border); background: var(--sys-surface); display: flex; align-items: center; justify-content: center; cursor: pointer; overflow: hidden; transition: all .2s; flex-shrink: 0; }
 .qa-thumb-box:hover { border-color: var(--sys-primary); background: var(--sys-surface-raised); }
 .qa-thumb-box img { width: 100%; height: 100%; object-fit: cover; }
@@ -98,8 +101,8 @@ const css = `
 .qa-cta-pill.active { color: var(--sys-text); background: var(--sys-surface-raised); border-color: var(--sys-primary); }
 
 /* Bottom bar */
-.qa-bottom { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 6px 16px; border-top: 1px solid var(--sys-border); }
-.qa-bottom-left { display: flex; align-items: center; gap: 4px; flex: 1; flex-wrap: nowrap; }
+.qa-bottom { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 6px 16px; border-top: 1px solid var(--sys-border); flex-wrap: wrap; }
+.qa-bottom-left { display: flex; align-items: center; gap: 4px; flex: 1; flex-wrap: wrap; }
 .qa-generate { padding: 10px 20px; border-radius: 10px; font-weight: 700; font-size: 13px; cursor: pointer; border: none; display: flex; align-items: center; justify-content: center; gap: 6px; color: var(--sys-surface); background: var(--sys-primary); box-shadow: 0 4px 15px rgba(0,0,0,0.1); transition: all .2s; flex-shrink: 0; }
 .qa-generate:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,0,0,0.2); opacity: 0.9; }
 .qa-generate:disabled { opacity: 0.4; cursor: default; background: var(--sys-border); color: var(--sys-text-muted); box-shadow: none; transform: none; }
