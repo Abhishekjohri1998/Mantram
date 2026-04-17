@@ -54,6 +54,7 @@ import { loadBrandContext, callMultimodalAgent, callAgent } from '../agents/shar
 import { buildEnhanceSystemPrompt, buildEnhanceUserPrompt, VISUAL_GROUNDING_SYSTEM } from '../agents/videoStudio/promptEnhancer.js';
 import { submitMuApiVideoGeneration, getMuApiGenerationStatus as pollMuApiStatus } from '../agents/videoStudio/muapiClient.js';
 import { geminiImageGenerate } from '../agents/videoStudio/firstFrame.js';
+import { Q_ADS_CATEGORIES, getCategory, buildQAdPrompt, getQAdsCreditCost } from '../agents/videoStudio/qAdsCategories.js';
 
 const router = Router();
 
@@ -3176,6 +3177,147 @@ router.get('/ugc-pro/credit-estimate', protect, (req, res) => {
     const d = parseInt(req.query.duration || 8);
     // Credit tiers: ≤10s → 15 credits, ≤20s → 25 credits, ≤30s → 35 credits
     const credits = d <= 10 ? 15 : d <= 20 ? 25 : 35;
+    res.json({ success: true, duration: d, credits });
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Q-ADS (Quick Ads) — Category-first video ad generation
+// ══════════════════════════════════════════════════════════════════════════════
+
+// ── GET /api/video-studio/ugc-pro/qads/categories ──
+router.get('/ugc-pro/qads/categories', protect, (req, res) => {
+    const categories = Q_ADS_CATEGORIES.map(c => ({
+        id: c.id, name: c.name, tagline: c.tagline, description: c.description,
+        msIcon: c.msIcon, color: c.color, noAvatar: !!c.noAvatar,
+        recommendedDuration: c.recommendedDuration, recommendedFormat: c.recommendedFormat,
+    }));
+    res.json({ success: true, categories });
+});
+
+// ── POST /api/video-studio/ugc-pro/qads/build-prompt ──
+router.post('/ugc-pro/qads/build-prompt', protect, async (req, res) => {
+    try {
+        const { brandId, categoryId, productData, settings, avatarUrl, productImageUrls } = req.body;
+        const parsedProduct = typeof productData === 'string' ? JSON.parse(productData) : (productData || {});
+        const parsedSettings = typeof settings === 'string' ? JSON.parse(settings) : (settings || {});
+
+        console.log(`[Q-Ads Build Prompt] Category: ${categoryId}, product: ${parsedProduct.productName || 'unknown'}`);
+
+        const prompt = await buildQAdPrompt({
+            categoryId,
+            productData: parsedProduct,
+            settings: parsedSettings,
+            brandId,
+            userId: req.user._id,
+        });
+
+        // Count image slots
+        const imageUrls = [];
+        if (avatarUrl) imageUrls.push(avatarUrl);
+        const parsedProdImgs = Array.isArray(productImageUrls) ? productImageUrls : [];
+        for (const url of parsedProdImgs) {
+            if (url && typeof url === 'string' && url.startsWith('http')) imageUrls.push(url);
+        }
+
+        res.json({ success: true, prompt, imageCount: imageUrls.length });
+    } catch (err) {
+        console.error('Q-Ads build-prompt error:', err.message);
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
+    }
+});
+
+// ── POST /api/video-studio/ugc-pro/qads/generate ──
+router.post('/ugc-pro/qads/generate', protect, async (req, res) => {
+    try {
+        const { brandId, categoryId, productData, settings, avatarUrl, productImageUrls: bodyProductImgUrls, prebuiltPrompt } = req.body;
+        const parsedProduct = typeof productData === 'string' ? JSON.parse(productData) : (productData || {});
+        const parsedSettings = typeof settings === 'string' ? JSON.parse(settings) : (settings || {});
+        const parsedProductImgs = typeof bodyProductImgUrls === 'string'
+            ? JSON.parse(bodyProductImgUrls) : (Array.isArray(bodyProductImgUrls) ? bodyProductImgUrls : []);
+
+        const category = getCategory(categoryId);
+        if (!category) return res.status(400).json({ success: false, error: `Unknown Q-Ad category: ${categoryId}` });
+
+        // Collect image URLs: avatar first (@image1), then product images (@image2+)
+        const imageUrls = [];
+        if (avatarUrl && !category.noAvatar) imageUrls.push(avatarUrl);
+        for (const url of parsedProductImgs) {
+            if (url && typeof url === 'string' && url.startsWith('http')) imageUrls.push(url);
+        }
+
+        // Build or use prebuilt prompt
+        let prompt = prebuiltPrompt;
+        if (!prompt || !prompt.trim()) {
+            console.log(`[Q-Ads Generate] Building prompt for category: ${categoryId}`);
+            prompt = await buildQAdPrompt({ categoryId, productData: parsedProduct, settings: parsedSettings, brandId, userId: req.user._id });
+        } else {
+            console.log(`[Q-Ads Generate] Using prebuilt prompt (${prompt.length} chars)`);
+        }
+
+        const duration = parseInt(parsedSettings.duration || category.recommendedDuration);
+        const aspectRatio = parsedSettings.format || category.recommendedFormat || '9:16';
+        const quality = parsedSettings.quality || 'high';
+
+        console.log(`[Q-Ads Generate] Submitting — ${categoryId}, ${duration}s, ${imageUrls.length} images`);
+
+        const genResult = await submitMuApiVideoGeneration({
+            prompt,
+            imageUrl: imageUrls[0] || null,
+            duration, aspectRatio, qualityMode: quality, generateAudio: true,
+            referenceImages: imageUrls.slice(1),
+        });
+
+        // Persist as VideoProject
+        const project = await VideoProject.create({
+            user: req.user._id, brand: brandId, studioMode: 'q-ads', status: 'generating',
+            script: prompt, backendPrompt: prompt,
+            input: { images: imageUrls, productData: parsedProduct, categoryId },
+            generation: {
+                provider: 'muapi', model: 'seedance-2.0',
+                taskId: genResult.taskId, requestId: genResult.taskId,
+                duration, aspectRatio, progress: 0, status: 'GENERATING',
+            },
+        });
+
+        res.json({
+            success: true, projectId: project._id, requestId: genResult.taskId,
+            provider: 'muapi', categoryId, prompt, imageCount: imageUrls.length, duration, aspectRatio,
+        });
+    } catch (err) {
+        console.error('Q-Ads generate error:', err.message);
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
+    }
+});
+
+// ── GET /api/video-studio/ugc-pro/qads/status/:requestId ──
+router.get('/ugc-pro/qads/status/:requestId', protect, async (req, res) => {
+    try {
+        const result = await pollMuApiStatus(req.params.requestId);
+        if (result && req.params.requestId) {
+            const updatePayload = {
+                'generation.progress': result.progress,
+                'generation.status': result.status === 'COMPLETED' ? 'COMPLETED' : (result.status === 'FAILED' ? 'FAILED' : 'GENERATING'),
+            };
+            if (result.videoUrl) updatePayload['generation.videoUrl'] = result.videoUrl;
+            if (result.error) updatePayload['generation.error'] = result.error;
+            if (result.status === 'COMPLETED' || result.status === 'FAILED') {
+                updatePayload.status = result.status === 'COMPLETED' ? 'done' : 'failed';
+            }
+            await VideoProject.findOneAndUpdate(
+                { 'generation.requestId': req.params.requestId, user: req.user._id, studioMode: 'q-ads' },
+                updatePayload
+            );
+        }
+        res.json({ success: true, ...result });
+    } catch (err) {
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
+    }
+});
+
+// ── GET /api/video-studio/ugc-pro/qads/credit-estimate ──
+router.get('/ugc-pro/qads/credit-estimate', protect, (req, res) => {
+    const d = parseInt(req.query.duration || 8);
+    const credits = getQAdsCreditCost(d);
     res.json({ success: true, duration: d, credits });
 });
 

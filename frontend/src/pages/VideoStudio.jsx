@@ -9,6 +9,7 @@ import { creatives as creativesAPI } from '../services/api'
 import AdvancedMode from '../components/VideoStudio/AdvancedMode'
 import UGCCreator from '../components/VideoStudio/UGCCreator'
 import UGCPro from '../components/VideoStudio/UGCPro'
+import QAds from '../components/VideoStudio/QAds'
 import VideoAgent from '../components/VideoStudio/VideoAgent'
 import Walkthrough from '../components/Walkthrough'
 import './VideoStudio.css'
@@ -676,6 +677,7 @@ export default function VideoStudio() {
                         {[
                             { id: 'advanced', icon: 'terminal', label: 'Advanced' },
                             // { id: 'ugc', icon: 'person_play', label: 'UGC Creator' },
+                            { id: 'q-ads', icon: 'ads_click', label: 'Q-Ads' },
                             { id: 'ugc-pro', icon: 'smart_display', label: 'UGC Pro' },
                             { id: 'agent', icon: 'smart_display', label: 'Video Agent' },
                             // { id: 'storyboard', icon: 'view_timeline', label: 'Storyboard' },
@@ -970,6 +972,11 @@ export default function VideoStudio() {
                 {/* ── UGC PRO MODE (Seedance 2.0 / MuAPI) ── */}
                 {studioMode === 'ugc-pro' && (
                     <UGCPro activeBrand={activeBrand} projects={projects} />
+                )}
+
+                {/* ── Q-ADS MODE (Category-first Quick Ads) ── */}
+                {studioMode === 'q-ads' && (
+                    <QAds activeBrand={activeBrand} projects={projects} />
                 )}
 
                 {/* ── VIDEO AGENT MODE ── */}
