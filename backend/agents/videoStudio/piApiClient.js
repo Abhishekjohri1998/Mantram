@@ -68,76 +68,75 @@ async function submitPiApiPayload(payload) {
     const apiKey = getPiApiKey();
     const MAX_ATTEMPTS = 3;
 
+    // Use the model provided by the caller directly (e.g. seedance-2-fast-preview)
+    const atlasModel = payload.task_type || payload.model || 'seedance-2-fast-preview';
+    const hasImages = payload.input?.image_urls?.length > 0;
+
+    const atlasPayload = {
+        model: atlasModel,
+        prompt: payload.input?.prompt || '',
+    };
+
+    // Optional parameters (aspect_ratio, duration)
+    if (payload.input?.duration) atlasPayload.duration = payload.input.duration;
+    if (payload.input?.aspect_ratio) atlasPayload.aspect_ratio = payload.input.aspect_ratio;
+
+    if (hasImages) {
+        atlasPayload.image_url = payload.input.image_urls[0];
+    }
+
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-        console.log(`🎬 PiAPI submit attempt ${attempt}/${MAX_ATTEMPTS}:`, JSON.stringify({
-            model: payload.model,
-            task_type: payload.task_type,
-            input: {
-                ...payload.input,
-                prompt: payload.input.prompt.substring(0, 100) + '...',
-                image_urls: payload.input.image_urls ? `${payload.input.image_urls.length} images` : undefined,
-                duration: payload.input.duration,
-            }
+        console.log(`🎬 [Atlas Cloud] Submit attempt ${attempt}/${MAX_ATTEMPTS}:`, JSON.stringify({
+            model: atlasPayload.model,
+            prompt: atlasPayload.prompt.substring(0, 50) + '...',
+            image_url: atlasPayload.image_url ? 'yes' : 'no'
         }, null, 2));
 
         try {
-            const endpointUrl = `${PIAPI_BASE_URL}/api/v1/task`;
-            console.log(`🚀 [Seedance Network] Sending to Proxy URL: ${endpointUrl}`);
+            const endpointUrl = `${PIAPI_BASE_URL}/api/v1/model/generateVideo`;
+            console.log(`🚀 [Seedance Network] Sending to Atlas URL: ${endpointUrl}`);
             const response = await fetch(endpointUrl, {
                 method: 'POST',
                 headers: { 
                     'Content-Type': 'application/json', 
-                    'x-api-key': apiKey,
                     'Authorization': `Bearer ${apiKey}`
                 },
-                body: JSON.stringify(payload),
-                signal: AbortSignal.timeout(20000),
+                body: JSON.stringify(atlasPayload),
+                signal: AbortSignal.timeout(30000),
             });
 
             const rawText = await response.text();
-            console.log(`📥 PiAPI raw response attempt ${attempt} (${response.status}):`, rawText.substring(0, 1000));
+            console.log(`📥 [Atlas Cloud] Response attempt ${attempt} (${response.status}):`, rawText ? rawText.substring(0, 1000) : 'null');
 
-            let data;
-            try { data = JSON.parse(rawText); }
-            catch (e) { throw new Error(`PiAPI returned non-JSON (${response.status}): ${rawText.substring(0, 200)}`); }
-
-            // ⚠️ CRITICAL: Detect non-retryable errors immediately — don't waste retry cycles
-            if (data.code && data.code !== 200) {
-                const errMsg = data.message || data.data?.error?.message || JSON.stringify(data).substring(0, 300);
-                const errCode = data.data?.error?.code || 0;
-
-                // Insufficient credits — retrying will never fix this
-                if (errCode === 10002 || errMsg.includes('insufficient credits') || errMsg.includes('insufficient_user_quota')) {
+            if (!response.ok) {
+                let errMsg = rawText;
+                try {
+                    const parsed = JSON.parse(rawText);
+                    errMsg = parsed.msg || parsed.message || parsed.error || JSON.stringify(parsed);
+                } catch(e) {}
+                
+                if (response.status === 402 || errMsg.toLowerCase().includes('credit') || errMsg.toLowerCase().includes('balance')) {
                     throw new Error(`PiAPI_INSUFFICIENT_CREDITS: ${errMsg}`);
                 }
-
-                // Account/auth errors — also non-retryable
-                if (errCode === 10001 || errCode === 10003) {
-                    throw new Error(`PiAPI_AUTH_ERROR (${errCode}): ${errMsg}`);
-                }
-
-                throw new Error(`PiAPI submission failed (code ${data.code}): ${errMsg}`);
+                throw new Error(`Atlas Cloud submission failed (${response.status}): ${errMsg}`);
             }
 
-            if (!response.ok && !data.data) {
-                throw new Error(`PiAPI submission failed (${response.status}): ${data.message || data.error || rawText.substring(0, 200)}`);
-            }
+            const data = JSON.parse(rawText);
+            const taskId = data?.data?.id || data?.id || data?.prediction_id || data?.task_id;
+            
+            if (!taskId) throw new Error(`Atlas Cloud did not return a prediction ID. Response: ${rawText.substring(0, 300)}`);
 
-            const taskId = data.data?.task_id || data.task_id;
-            if (!taskId) throw new Error(`PiAPI did not return a taskId. Response: ${JSON.stringify(data).substring(0, 300)}`);
-
-            console.log(`✅ PiAPI queued: taskId=${taskId}`);
+            console.log(`✅ [Atlas Cloud] Task queued: predictionId=${taskId}`);
             return taskId;
         } catch (e) {
-            // Non-retryable errors — throw immediately
-            if (e.message.startsWith('PiAPI_INSUFFICIENT_CREDITS') || e.message.startsWith('PiAPI_AUTH_ERROR')) {
-                console.error(`🚫 PiAPI non-retryable error: ${e.message}`);
+            if (e.message.startsWith('PiAPI_INSUFFICIENT_CREDITS')) {
+                console.error(`🚫 [Atlas Cloud] Non-retryable error: ${e.message}`);
                 throw e;
             }
 
-            console.warn(`⚠️ PiAPI submit attempt ${attempt} failed: ${e.message}`);
+            console.warn(`⚠️ [Atlas Cloud] Submit attempt ${attempt} failed: ${e.message}`);
             if (attempt < MAX_ATTEMPTS) {
-                console.log(`🔄 Retrying PiAPI submit in 3s...`);
+                console.log(`🔄 Retrying Atlas Cloud submit in 3s...`);
                 await new Promise(r => setTimeout(r, 3000));
             } else {
                 throw e;
@@ -288,39 +287,39 @@ export async function submitPiApiVideoExtend({ parentTaskId, prompt, duration, q
 
 export async function getPiApiGenerationStatus(taskId) {
     const apiKey = getPiApiKey();
-    const statusUrl = `${PIAPI_BASE_URL}/api/v1/task/${taskId}`;
-    console.log(`📊 [Seedance Status] Polling: ${statusUrl}`);
-    const response = await fetch(statusUrl, { headers: { 'x-api-key': apiKey, 'Authorization': `Bearer ${apiKey}` } });
+    const statusUrl = `${PIAPI_BASE_URL}/api/v1/model/prediction/${taskId}`;
+    console.log(`📊 [Atlas Cloud Status] Polling: ${statusUrl}`);
+    
+    // Status polling using Atlas specific logic
+    const response = await fetch(statusUrl, { headers: { 'Authorization': `Bearer ${apiKey}` } });
     const rawText = await response.text();
-    console.log(`📊 PiAPI status for ${taskId}: ${rawText.substring(0, 500)}`);
+    console.log(`📊 [Atlas Cloud] Status raw for ${taskId}: ${rawText.substring(0, 300)}`);
 
-    let data;
-    try { data = JSON.parse(rawText); }
+    let result;
+    try { result = JSON.parse(rawText); }
     catch (e) { return { status: 'IN_PROGRESS', progress: 30 }; }
 
-    const task = data.data || data;
-    const status = task.status || task.state || '';
-    console.log(`📊 PiAPI task status: ${status}`);
-
-    if (status === 'completed' || status === 'success') {
-        const output = task.output || {};
-        const videoUrl = output.video || output.video_url || output.url
-            || (Array.isArray(output.videos) ? output.videos[0]?.url : null)
-            || (Array.isArray(output.result_urls) ? output.result_urls[0] : null)
-            || task.video_url || task.output_url || '';
-        console.log(`✅ PiAPI video complete: ${videoUrl ? videoUrl.substring(0, 100) : 'No URL found'}`);
-        return { status: 'COMPLETED', progress: 100, videoUrl, thumbnailUrl: output.thumbnail_url || '', audioUrl: output.audio_url || '' };
+    if (!result?.data) {
+        return { status: 'IN_PROGRESS', progress: 30 };
     }
 
-    if (status === 'failed' || status === 'error') {
-        const errorInfo = task.error || {};
-        const errorMsg = errorInfo.message || errorInfo.raw_message || task.message || 'PiAPI video generation failed';
-        const errorCode = errorInfo.code || 0;
-        const isRetryable = errorCode === 10000 || errorMsg.includes('failed to process task');
-        if (isRetryable) console.warn(`⚠️ PiAPI task ${taskId} retryable error (${errorCode}): ${errorMsg}`);
-        return { status: 'FAILED', progress: 0, error: errorMsg, retryable: isRetryable };
+    const taskStatus = (result.data.status || '').toLowerCase();
+    console.log(`📊 [Atlas Cloud] Task status: ${taskStatus}`);
+
+    if (taskStatus === 'completed' || taskStatus === 'success') {
+        const outputs = result.data.outputs || [];
+        const videoUrl = outputs[0] || result.data.video_url || '';
+        console.log(`✅ [Atlas Cloud] Video complete: ${videoUrl}`);
+        return { status: 'COMPLETED', progress: 100, videoUrl, thumbnailUrl: '', audioUrl: '' };
     }
 
-    if (status === 'processing' || status === 'in_progress') return { status: 'IN_PROGRESS', progress: 50 };
+    if (taskStatus === 'failed' || taskStatus === 'error') {
+        const errorMsg = result.data.error || result.data.message || 'Atlas Cloud video generation failed';
+        console.warn(`⚠️ [Atlas Cloud] Task ${taskId} failed: ${errorMsg}`);
+        // Consider errors from atlas cloud as fatal initially, we don't know their retry patterns yet
+        return { status: 'FAILED', progress: 0, error: errorMsg, retryable: false };
+    }
+
+    if (taskStatus === 'processing' || taskStatus === 'in_progress' || taskStatus === 'starting') return { status: 'IN_PROGRESS', progress: 50 };
     return { status: 'IN_QUEUE', progress: 10 };
 }
