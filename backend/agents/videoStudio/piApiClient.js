@@ -358,14 +358,26 @@ export async function getPiApiGenerationStatus(taskId) {
 
     if (taskStatus === 'failed' || taskStatus === 'error') {
         let errorMsg = result.data?.error || result.data?.message || result?.message || 'Atlas Cloud video generation failed';
+        let safetyTriggered = false;
+
         if (typeof errorMsg === 'string' && errorMsg.includes('real person')) {
-            errorMsg = "Seedance AI blocked generation because it detected a real person's face. Please use a stylized avatar, mascot, or standalone product instead.";
+            errorMsg = "Seedance AI blocked the generation because it detected a photo-realistic face. Auto-retrying by gracefully falling back to Safe Mode...";
+            safetyTriggered = true;
         } else if (typeof errorMsg === 'string' && errorMsg.includes('safet')) {
-            errorMsg = "Generation blocked by AI safety filters.";
+            errorMsg = "Generation blocked by AI safety filters. Auto-retrying in Safe Mode...";
+            safetyTriggered = true;
         }
+
         console.warn(`⚠️ [Atlas Cloud] Task ${taskId} failed: ${errorMsg}`);
-        // Consider errors from atlas cloud as fatal initially, we don't know their retry patterns yet
-        return { status: 'FAILED', progress: 0, error: errorMsg, retryable: false };
+        
+        // Return retryable=true for safety triggers to empower nodes.js to automatically strip images and retry
+        return { 
+            status: 'FAILED', 
+            progress: 0, 
+            error: errorMsg, 
+            retryable: safetyTriggered ? true : false,
+            safetyTriggered: safetyTriggered 
+        };
     }
 
     if (taskStatus === 'processing' || taskStatus === 'in_progress' || taskStatus === 'starting') return { status: 'IN_PROGRESS', progress: 50 };
