@@ -83,13 +83,15 @@ async function uploadToAtlasCloud(imageUrl, apiKey) {
         });
 
         const json = await uploadResponse.json();
-        if (!json.url) {
+        const finalUrl = json?.data?.download_url || json?.data?.url || json?.url;
+        
+        if (!finalUrl) {
             console.error(`⚠️ Atlas upload response missing url:`, JSON.stringify(json));
             return imageUrl; // fallback to s3 string just in case
         }
         
-        console.log(`✅ [Atlas Cloud] Upload Media successful: ${json.url}`);
-        return json.url;
+        console.log(`✅ [Atlas Cloud] Upload Media successful: ${finalUrl}`);
+        return finalUrl;
     } catch (e) {
         console.error(`⚠️ [Atlas Cloud] Failed to run step 1 MediaUpload: ${e.message}`);
         return imageUrl; // fallback
