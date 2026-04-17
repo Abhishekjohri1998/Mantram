@@ -116,17 +116,22 @@ async function submitPiApiPayload(payload) {
     if (payload.input?.aspect_ratio) atlasPayload.aspect_ratio = payload.input.aspect_ratio;
 
     if (hasImages) {
-        // Step 1: Specifically upload the image to Atlas backend according to API doc
-        const s3Url = payload.input.image_urls[0];
-        const nativeAtlasUrl = await uploadToAtlasCloud(s3Url, apiKey);
-        atlasPayload.image_url = nativeAtlasUrl;
+        // Step 1: Specifically upload the images to Atlas backend according to API doc
+        const uploadPromises = payload.input.image_urls.map(s3Url => uploadToAtlasCloud(s3Url, apiKey));
+        const uploadedUrls = await Promise.all(uploadPromises);
+        
+        atlasPayload.image = uploadedUrls[0];
+        if (uploadedUrls.length > 1) {
+            atlasPayload.last_image = uploadedUrls[uploadedUrls.length - 1]; // Atlas only maps the start and end frame natively
+        }
     }
 
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
         console.log(`🎬 [Atlas Cloud] Submit attempt ${attempt}/${MAX_ATTEMPTS}:`, JSON.stringify({
             model: atlasPayload.model,
             prompt: atlasPayload.prompt.substring(0, 50) + '...',
-            image_url: atlasPayload.image_url ? 'provided' : 'no'
+            image: atlasPayload.image ? 'provided' : 'no',
+            last_image: atlasPayload.last_image ? 'provided' : 'no'
         }, null, 2));
 
         try {
