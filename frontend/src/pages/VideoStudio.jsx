@@ -674,10 +674,10 @@ export default function VideoStudio() {
                     <div className="studio-tab-row">
                         {[
                             { id: 'advanced', icon: 'terminal', label: 'Advanced' },
-                            { id: 'ugc', icon: 'person_play', label: 'UGC Creator' },
+                            // { id: 'ugc', icon: 'person_play', label: 'UGC Creator' },
                             { id: 'ugc-pro', icon: 'smart_display', label: 'UGC Pro' },
                             { id: 'agent', icon: 'smart_display', label: 'Video Agent' },
-                            { id: 'storyboard', icon: 'view_timeline', label: 'Storyboard' },
+                            // { id: 'storyboard', icon: 'view_timeline', label: 'Storyboard' },
                         ].map(tab => (
                             <button key={tab.id} onClick={() => setStudioMode(tab.id)}
                                 className={`flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-300 cursor-pointer ${studioMode === tab.id ? 'studio-nav-pill text-[var(--sys-text)] font-bold' : 'studio-nav-tab-inactive'}`}>
