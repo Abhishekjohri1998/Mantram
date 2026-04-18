@@ -89,7 +89,8 @@ async function uploadToAtlasCloud(imageUrl, apiKey) {
         });
 
         const json = await uploadResponse.json();
-        const finalUrl = json?.data?.download_url || json?.data?.url || json?.url;
+        // Atlas Cloud docs: upload response returns { url: "..." } at root level
+        const finalUrl = json?.url || json?.data?.url || json?.data?.download_url;
         
         if (!finalUrl) {
             console.error(`⚠️ Atlas upload response missing url:`, JSON.stringify(json));
@@ -122,28 +123,30 @@ async function submitPiApiPayload(payload) {
     if (payload.input?.aspect_ratio) atlasPayload.aspect_ratio = payload.input.aspect_ratio;
 
     if (hasImages) {
-        // Step 1: Specifically upload the images to Atlas backend according to API doc
+        // Step 1: Upload images to Atlas Cloud storage via /uploadMedia endpoint
         const uploadPromises = payload.input.image_urls.map(s3Url => uploadToAtlasCloud(s3Url, apiKey));
         const uploadedUrls = await Promise.all(uploadPromises);
         
-        atlasPayload.image = uploadedUrls[0];
-        if (uploadedUrls.length > 1) {
-            atlasPayload.last_image = uploadedUrls[uploadedUrls.length - 1]; // Atlas only maps the start and end frame natively
-        }
+        // Atlas Cloud API uses `image_url` (not `image`) per official docs:
+        // https://www.atlascloud.ai/docs/models/video#image-to-video
+        atlasPayload.image_url = uploadedUrls[0];
+        console.log(`📸 [Atlas Cloud] Set image_url for I2V: ${uploadedUrls[0].substring(0, 80)}...`);
     }
 
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
         console.log(`🎬 [Atlas Cloud] Submit attempt ${attempt}/${MAX_ATTEMPTS}:`, JSON.stringify({
             model: atlasPayload.model,
             prompt: atlasPayload.prompt.substring(0, 50) + '...',
-            image: atlasPayload.image ? 'provided' : 'no',
-            last_image: atlasPayload.last_image ? 'provided' : 'no'
+            image_url: atlasPayload.image_url ? 'provided' : 'none',
+            duration: atlasPayload.duration,
+            aspect_ratio: atlasPayload.aspect_ratio,
         }, null, 2));
 
         try {
             // Step 2: Generate Video
             const endpointUrl = `${PIAPI_BASE_URL}/api/v1/model/generateVideo`;
             console.log(`🚀 [Seedance Network] Sending to Atlas URL: ${endpointUrl}`);
+            console.log(`📋 [Atlas Cloud] Full payload:`, JSON.stringify(atlasPayload, null, 2));
             const response = await fetch(endpointUrl, {
                 method: 'POST',
                 headers: { 
@@ -318,7 +321,7 @@ export async function submitPiApiImageToVideo({ imageUrl, prompt, duration, aspe
     finalPrompt = finalPrompt.replace(/<img>[^<]*<\/img>/g, '').trim();
     finalPrompt = truncatePrompt(finalPrompt);
 
-    const taskType = 'seedance-2-preview';
+    const taskType = 'seedance-2-fast-preview';
     const dur = Math.min(Math.max(parseInt(duration, 10) || 5, 5), 15);
     console.log(`🎯 PiAPI I2V task_type: ${taskType} | duration: ${dur}s`);
 
