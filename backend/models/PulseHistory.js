@@ -1,6 +1,6 @@
 /**
  * PulseHistory — stores all Pulse Studio generations
- * Covers: Pulse Deck, Pulse Mail, Pulse Page
+ * Covers: Pulse Deck, Pulse Mail, Pulse Page, A+ Listing
  */
 import mongoose from 'mongoose';
 
@@ -9,7 +9,7 @@ const pulseHistorySchema = new mongoose.Schema({
     brand:      { type: mongoose.Schema.Types.ObjectId, ref: 'Brand', index: true },
 
     // Which Pulse sub-tool generated this
-    tool:       { type: String, enum: ['deck', 'email', 'page'], required: true },
+    tool:       { type: String, enum: ['deck', 'email', 'page', 'aplus'], required: true },
 
     // User brief
     brief:      { type: String, required: true },
@@ -45,6 +45,13 @@ const pulseHistorySchema = new mongoose.Schema({
         url:        { type: String },
         publishedAt:{ type: Date, default: Date.now },
     }],
+
+    // ── A+ Listing fields ──────────────────────────────────────────────────
+    aplusModules:     { type: mongoose.Schema.Types.Mixed, default: null },
+    aplusImages:      { type: mongoose.Schema.Types.Mixed, default: null },
+    aplusProductData: { type: mongoose.Schema.Types.Mixed, default: null },
+    aplusExportText:  { type: String, default: null },
+    aplusModuleCount: { type: Number, default: null },
 
     // Credits used
     creditsUsed:  { type: Number, default: 0 },

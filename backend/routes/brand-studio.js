@@ -4,14 +4,17 @@ import { deductCredits } from '../middleware/credits.js';
 import { generateCampaignDeck } from '../agents/brandStudio/deckBuilder.js';
 import { generateEmail } from '../agents/brandStudio/emailBuilder.js';
 import { generateLandingPage, publishToShopify, generateEmbedCode } from '../agents/brandStudio/landingPageBuilder.js';
+import { generateAplusListing } from '../agents/brandStudio/aplusBuilder.js';
 import { exportEmailToPlatform } from '../utils/emailIntegrations.js';
+import { callAgentText } from '../agents/shared/agentUtils.js';
+import { laozhangImageGenerate, laozhangMultimodalImageGenerate } from '../agents/videoStudio/laozhangClient.js';
 import PulseHistory from '../models/PulseHistory.js';
 import fetch from 'node-fetch';
 import * as cheerio from 'cheerio';
 
 const router = express.Router();
 
-const CREDITS = { deck: 20, email: 12, landing: 18 };
+const CREDITS = { deck: 20, email: 12, landing: 18, aplus: 25 };
 
 // ── POST /api/brand-studio/fetch-url ─────────────────────────
 // Scrapes a product/brand URL and returns structured content
@@ -434,6 +437,156 @@ router.delete('/history/:id', protect, async (req, res) => {
         await PulseHistory.findOneAndDelete({ _id: req.params.id, user: req.user._id });
         res.json({ success: true });
     } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// ── POST /api/brand-studio/aplus/analyze-product ─────────────
+// Step 1: Analyze a product URL and return structured product data
+router.post('/aplus/analyze-product', protect, async (req, res) => {
+    try {
+        const { url } = req.body;
+        if (!url) return res.status(400).json({ success: false, error: 'url required' });
+
+        // Scrape the page
+        const fetchRes = await fetch(url, {
+            headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36', 'Accept-Language': 'en-US,en;q=0.9' },
+            timeout: 15000
+        });
+        const html = await fetchRes.text();
+        const $ = cheerio.load(html);
+
+        let product = {};
+        if (url.includes('amazon.')) {
+            product = {
+                title: $('#productTitle').text().trim() || $('h1').first().text().trim(),
+                rating: $('#acrPopover').attr('title') || '',
+                reviewCount: $('#acrCustomerReviewText').text().trim(),
+                price: $('.a-price .a-offscreen').first().text().trim(),
+                bulletPoints: $('#feature-bullets li').map((_, el) => $(el).text().trim()).get().filter(t => t.length > 5).slice(0, 8),
+                description: $('#productDescription p').text().trim().substring(0, 800),
+                category: $('#wayfinding-breadcrumbs_feature_div').text().replace(/\s+/g, ' ').trim().substring(0, 200),
+                images: $('img[data-a-dynamic-image]').map((_, el) => {
+                    try { return Object.keys(JSON.parse($(el).attr('data-a-dynamic-image') || '{}'))[0]; } catch (_) { return null; }
+                }).get().filter(Boolean).slice(0, 5),
+                platform: 'amazon'
+            };
+        } else {
+            const jsonLd = $('script[type="application/ld+json"]').map((_, el) => {
+                try { return JSON.parse($(el).html()); } catch (_) { return null; }
+            }).get().filter(Boolean).find(d => d?.['@type'] === 'Product');
+            product = {
+                title: jsonLd?.name || $('h1').first().text().trim(),
+                price: jsonLd?.offers?.[0]?.price || $('[class*="price"]').first().text().trim(),
+                description: (jsonLd?.description || $('meta[name="description"]').attr('content') || '').substring(0, 800),
+                bulletPoints: $('ul li').map((_, el) => $(el).text().trim()).get().filter(t => t.length > 10 && t.length < 200).slice(0, 6),
+                images: (jsonLd?.image ? [].concat(jsonLd.image) : [$('meta[property="og:image"]').attr('content')]).filter(Boolean).slice(0, 5),
+                category: $('[class*="breadcrumb"] a').map((_, el) => $(el).text().trim()).get().join(' > '),
+                platform: url.includes('myshopify') || url.includes('/products/') ? 'shopify' : 'web'
+            };
+        }
+
+        res.json({ success: true, product });
+    } catch (err) {
+        console.error('❌ A+ analyze-product:', err.message);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// ── POST /api/brand-studio/aplus/generate ────────────────────
+router.post('/aplus/generate', protect, async (req, res) => {
+    try {
+        const { brandId, productUrl, productData, referenceImages, brief, moduleCount = 7 } = req.body;
+        if (!brandId) return res.status(400).json({ success: false, error: 'brandId required' });
+        if (!brief && !productUrl && !productData) return res.status(400).json({ success: false, error: 'Provide a product URL, product data, or brief' });
+
+        const result = await generateAplusListing({ brandId, productUrl, productData, referenceImages, brief, moduleCount });
+
+        // Thumbnail = first module's hero image
+        const firstImg = Object.values(result.images || {})[0] || null;
+
+        // Save to history
+        await PulseHistory.create({
+            user: req.user._id,
+            brand: brandId || null,
+            tool: 'aplus',
+            brief: brief || productData?.title || productUrl || 'A+ Listing',
+            subType: result.aplusPlan?.productName || '',
+            aplusModules: result.aplusPlan?.modules || [],
+            aplusImages: result.images,
+            aplusProductData: result.productData,
+            aplusExportText: result.exportText,
+            aplusModuleCount: result.moduleCount,
+            thumbnailUrl: firstImg,
+            creditsUsed: CREDITS.aplus,
+            status: 'completed'
+        });
+
+        res.json({
+            success: true,
+            aplusPlan: result.aplusPlan,
+            images: result.images,
+            exportText: result.exportText,
+            productData: result.productData,
+            visualIntelligence: result.visualIntelligence,
+            moduleCount: result.moduleCount,
+            elapsedSeconds: result.elapsedSeconds
+        });
+    } catch (err) {
+        console.error('❌ A+ generate:', err.message);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// ── POST /api/brand-studio/aplus/rephrase ────────────────────
+router.post('/aplus/rephrase', protect, async (req, res) => {
+    try {
+        const { text, instruction, context } = req.body;
+        if (!text) return res.status(400).json({ success: false, error: 'text required' });
+        const result = await callAgentText(
+            `You are an expert Amazon copywriter. Follow Amazon A+ content rules: no pricing, no competitor mentions, no unverified superlatives. Return ONLY the rewritten text, nothing else.`,
+            `TEXT: "${text}"\nINSTRUCTION: ${instruction || 'Make it more compelling, benefit-focused, and Amazon-compliant.'}${context ? `\nCONTEXT: ${context}` : ''}`,
+            0.7, 400
+        );
+        res.json({ success: true, text: (result || '').trim().replace(/^["']|["']$/g, '') });
+    } catch (err) {
+        console.error('❌ A+ rephrase:', err.message);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// ── POST /api/brand-studio/aplus/regenerate-image ────────────
+router.post('/aplus/regenerate-image', protect, async (req, res) => {
+    try {
+        const { imagePrompt, moduleType, productImages, brandColors } = req.body;
+        if (!imagePrompt) return res.status(400).json({ success: false, error: 'imagePrompt required' });
+
+        // Module type → Amazon pixel dimensions (at 2x for Retina)
+        const SIZES = {
+            hero_banner: '1940x1200', header_overlay: '1940x600', brand_story: '1940x1200',
+            image_text_left: '600x600', image_text_right: '600x600',
+            image_highlights: '600x600', three_features: '600x600',
+            four_features: '440x440', comparison_chart: '300x600'
+        };
+        const size = SIZES[moduleType] || '600x600';
+        const colorHints = (brandColors || []).map(c => `${c.hex} (${c.name || c.usage})`).join(', ');
+        const style = `Contemporary premium aesthetic, photorealistic, 8K. ${colorHints ? `Brand palette: ${colorHints}.` : ''} Do NOT include any text, words, letters, or numbers in the image.`;
+
+        let result;
+        if (productImages?.length) {
+            result = await laozhangMultimodalImageGenerate(`${imagePrompt}. ${style}`, productImages.slice(0, 2), {
+                model: 'gemini-3.1-flash-image-preview', size
+            });
+        } else {
+            result = await laozhangImageGenerate(`${imagePrompt}. ${style}`, {
+                model: 'gemini-3.1-flash-image-preview', size
+            });
+        }
+
+        if (!result?.imageUrl) throw new Error('Image generation returned empty');
+        res.json({ success: true, imageUrl: result.imageUrl });
+    } catch (err) {
+        console.error('❌ A+ regenerate-image:', err.message);
         res.status(500).json({ success: false, error: err.message });
     }
 });
