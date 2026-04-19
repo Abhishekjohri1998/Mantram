@@ -18,7 +18,7 @@ const pulseHistorySchema = new mongoose.Schema({
     subType:    { type: String, default: '' },
 
     // ── Deck fields ────────────────────────────────────────────
-    pptxUrl:    { type: String, default: null },
+    hostedUrl:  { type: String, default: null },
     slideCount: { type: Number, default: null },
     deckPlan:   { type: mongoose.Schema.Types.Mixed, default: null },
 

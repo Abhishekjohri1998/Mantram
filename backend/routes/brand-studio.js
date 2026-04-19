@@ -176,7 +176,7 @@ router.post('/deck/generate', protect, async (req, res) => {
             tool: 'deck',
             brief,
             subType: deckType || 'campaign',
-            pptxUrl: result.pptxUrl,
+            hostedUrl: result.hostedUrl,
             slideCount: result.slideCount,
             deckPlan: result.deckPlan,
             thumbnailUrl: result.thumbnailUrl,
@@ -185,14 +185,59 @@ router.post('/deck/generate', protect, async (req, res) => {
 
         res.json({
             success: true,
-            pptxUrl: result.pptxUrl,
+            hostedUrl: result.hostedUrl,
             slideCount: result.slideCount,
             deckPlan: result.deckPlan,
+            images: result.images || {},
+            tokens: result.tokens || {},
             thumbnailUrl: result.thumbnailUrl,
             creditsUsed: CREDITS.deck,
         });
     } catch (err) {
         console.error('❌ Pulse Deck generate:', err.message);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// ── POST /api/brand-studio/deck/rephrase ─────────────────────
+router.post('/deck/rephrase', protect, async (req, res) => {
+    try {
+        const { text, instruction } = req.body;
+        if (!text) return res.status(400).json({ success: false, error: 'text required' });
+        const { callAgentText } = await import('../agents/shared/agentUtils.js');
+        const result = await callAgentText(
+            `You are an expert copywriter. Rewrite the given text based on the instruction. Return ONLY the rewritten text, nothing else. No quotes, no explanation, no preamble.`,
+            `TEXT: "${text}"\nINSTRUCTION: ${instruction || 'Make it more compelling, punchy, and professional.'}`,
+            0.7, 500
+        );
+        res.json({ success: true, text: (result || '').trim().replace(/^["']|["']$/g, '') });
+    } catch (err) {
+        console.error('❌ Pulse Deck rephrase:', err.message);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// ── POST /api/brand-studio/deck/regenerate-image ─────────────
+router.post('/deck/regenerate-image', protect, async (req, res) => {
+    try {
+        const { imagePrompt, slideType, referenceImage } = req.body;
+        if (!imagePrompt) return res.status(400).json({ success: false, error: 'imagePrompt required' });
+        const { laozhangImageGenerate, laozhangMultimodalImageGenerate } = await import('../agents/videoStudio/laozhangClient.js');
+        const model = 'gemini-3.1-flash-image-preview';
+        const size = (slideType === 'hero' || slideType === 'cta') ? '1792x1024' : '1024x768';
+        const style = 'contemporary premium aesthetic, photorealistic, 8k, cinematic lighting. Do NOT render any text, words, or typography.';
+        let imageUrl;
+        if (referenceImage) {
+            const r = await laozhangMultimodalImageGenerate(`${imagePrompt}. ${style}`, [referenceImage], { model, size });
+            imageUrl = r?.imageUrl;
+        } else {
+            const r = await laozhangImageGenerate(`${imagePrompt}. ${style}`, { model, size });
+            imageUrl = r?.imageUrl;
+        }
+        if (!imageUrl) throw new Error('Image generation returned empty');
+        res.json({ success: true, imageUrl });
+    } catch (err) {
+        console.error('❌ Pulse Deck image regen:', err.message);
         res.status(500).json({ success: false, error: err.message });
     }
 });

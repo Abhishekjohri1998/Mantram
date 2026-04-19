@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react'
+import React, { useState, useRef, useCallback, useEffect } from 'react'
 import DashboardLayout from '../../components/DashboardLayout'
 import { useBrand } from '../../context/BrandContext'
 import { apiFetch } from '../../services/api'
@@ -233,10 +233,120 @@ function GenerationOverlay({ loading, progress, stageText, icon }) {
 }
 
 // ── Pulse Deck Tool ──────────────────────────────────────────────────────────
+
+function SlideEditor({ slide, idx, image, onUpdate, onRephraseField, onRegenImage, rephrasing, regenning }) {
+    const typeColors = { hero: '#7c3aed', problem: '#EF4444', solution: '#10B981', features: '#F59E0B', testimonial: '#6366F1', comparison: '#0EA5E9', how: '#8B5CF6', cta: '#EC4899' }
+    const color = typeColors[slide.type] || '#7c3aed'
+
+    const EditableText = ({ field, value, tag = 'div', style: s = {} }) => (
+        <div style={{ position: 'relative', group: true }}>
+            {React.createElement(tag, {
+                contentEditable: true,
+                suppressContentEditableWarning: true,
+                onBlur: (e) => onUpdate(idx, field, e.currentTarget.textContent),
+                style: { outline: 'none', cursor: 'text', borderRadius: 4, padding: '2px 4px', transition: 'all 0.2s', border: '1px solid transparent', ...s },
+                onFocus: (e) => { e.currentTarget.style.border = `1px solid ${color}40`; e.currentTarget.style.background = 'rgba(255,255,255,0.05)' },
+                onMouseLeave: (e) => { if (document.activeElement !== e.currentTarget) { e.currentTarget.style.border = '1px solid transparent'; e.currentTarget.style.background = 'transparent' } },
+            }, value || '')}
+            <button
+                onClick={() => onRephraseField(idx, field, value)}
+                disabled={rephrasing}
+                title="AI Rephrase"
+                style={{ position: 'absolute', top: -8, right: -8, width: 22, height: 22, borderRadius: '50%', background: color, border: 'none', color: '#FFF', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.7, transition: 'opacity 0.2s' }}
+                onMouseEnter={e => e.currentTarget.style.opacity = 1}
+                onMouseLeave={e => e.currentTarget.style.opacity = 0.7}
+            >✦</button>
+        </div>
+    )
+
+    return (
+        <div style={{ background: '#0A0A0A', borderRadius: 16, border: '1px solid rgba(255,255,255,0.08)', overflow: 'hidden', transition: 'all 0.3s' }}>
+            {/* Slide Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 20px', borderBottom: '1px solid rgba(255,255,255,0.06)', background: `${color}08` }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ width: 28, height: 28, borderRadius: 8, background: `${color}20`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, color: color, fontWeight: 800 }}>{idx + 1}</div>
+                    <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 600 }}>{slide.type}</span>
+                </div>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>Click text to edit • ✦ to AI rephrase</div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: image ? '1fr 1fr' : '1fr', gap: 0 }}>
+                {/* Content Side */}
+                <div style={{ padding: 24 }}>
+                    {slide.headline && <EditableText field="headline" value={slide.headline} tag="h3" style={{ fontSize: 22, fontWeight: 800, color: '#FFF', margin: '0 0 12px', lineHeight: 1.3 }} />}
+                    {slide.body && <EditableText field="body" value={slide.body} style={{ fontSize: 14, color: 'rgba(255,255,255,0.7)', lineHeight: 1.6, margin: '0 0 12px' }} />}
+                    {slide.stat && (
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, margin: '12px 0' }}>
+                            <EditableText field="stat.number" value={slide.stat.number} tag="span" style={{ fontSize: 40, fontWeight: 900, color: color }} />
+                            <EditableText field="stat.label" value={slide.stat.label} tag="span" style={{ fontSize: 14, color: 'rgba(255,255,255,0.6)' }} />
+                        </div>
+                    )}
+                    {slide.quote && <EditableText field="quote" value={`"${slide.quote}"`} style={{ fontSize: 16, fontStyle: 'italic', color: 'rgba(255,255,255,0.8)', lineHeight: 1.5, margin: '0 0 8px' }} />}
+                    {slide.author && <EditableText field="author" value={slide.author} style={{ fontSize: 13, fontWeight: 700, color: '#FFF' }} />}
+                    {slide.role && <EditableText field="role" value={slide.role} style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }} />}
+                    {slide.cta && <EditableText field="cta" value={slide.cta} style={{ display: 'inline-block', background: `${color}30`, color: color, padding: '6px 16px', borderRadius: 6, fontSize: 13, fontWeight: 700, marginTop: 8 }} />}
+                    {slide.ctaText && <EditableText field="ctaText" value={slide.ctaText} style={{ display: 'inline-block', background: `${color}30`, color: color, padding: '6px 16px', borderRadius: 6, fontSize: 13, fontWeight: 700, marginTop: 8 }} />}
+                    {slide.items && (
+                        <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
+                            {slide.items.map((item, i) => (
+                                <div key={i} style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: 12, border: '1px solid rgba(255,255,255,0.06)' }}>
+                                    <EditableText field={`items.${i}.title`} value={item.title} style={{ fontSize: 13, fontWeight: 700, color: '#FFF', margin: 0 }} />
+                                    <EditableText field={`items.${i}.description`} value={item.description} style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', margin: '4px 0 0' }} />
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                    {slide.features && (
+                        <div style={{ marginTop: 12 }}>
+                            {slide.features.map((f, i) => (
+                                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                                    <EditableText field={`features.${i}.name`} value={f.name} style={{ fontSize: 13, color: '#FFF', flex: 1 }} />
+                                    <span style={{ fontSize: 14, color: '#22C55E', fontWeight: 700 }}>✓</span>
+                                    <span style={{ fontSize: 14, color: f.theirs ? '#22C55E' : '#EF4444', fontWeight: 700 }}>{f.theirs ? '✓' : '✗'}</span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                {/* Image Side */}
+                {image ? (
+                    <div style={{ position: 'relative', minHeight: 200 }}>
+                        <img src={image} alt="Slide visual" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        <button
+                            onClick={() => onRegenImage(idx)}
+                            disabled={regenning}
+                            style={{ position: 'absolute', bottom: 12, right: 12, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.2)', color: '#FFF', padding: '8px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+                        >
+                            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>autorenew</span>
+                            {regenning ? 'Generating...' : 'Regenerate Image'}
+                        </button>
+                    </div>
+                ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 200, background: 'rgba(255,255,255,0.02)', borderLeft: '1px solid rgba(255,255,255,0.06)' }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 32, color: 'rgba(255,255,255,0.15)' }}>image</span>
+                        <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', margin: '8px 0 12px' }}>No image generated</p>
+                        <button
+                            onClick={() => onRegenImage(idx)}
+                            disabled={regenning}
+                            style={{ background: `${color}20`, border: `1px solid ${color}40`, color: color, padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+                        >
+                            {regenning ? 'Generating...' : '+ Generate Image'}
+                        </button>
+                    </div>
+                )}
+            </div>
+        </div>
+    )
+}
+
 function DeckTool({ brandId, urlContext, setUrlContext, referenceImage, setReferenceImage }) {
     const [brief, setBrief] = useState('')
-    const [selectedSlide, setSelectedSlide] = useState(0)
     const gen = useGenerate(DECK_STAGES)
+    const [editedPlan, setEditedPlan] = useState(null)
+    const [editedImages, setEditedImages] = useState({})
+    const [rephrasing, setRephrasing] = useState(false)
+    const [regenning, setRegenning] = useState(false)
 
     const handleGenerate = async () => {
         if (!brief) return;
@@ -248,6 +358,8 @@ function DeckTool({ brandId, urlContext, setUrlContext, referenceImage, setRefer
             })
             if (!data.success) throw new Error(data.error)
             gen.setResult(data)
+            setEditedPlan(JSON.parse(JSON.stringify(data.deckPlan)))
+            setEditedImages(data.images || {})
             gen.stop(true)
         } catch (err) {
             gen.setError(err.message)
@@ -255,47 +367,109 @@ function DeckTool({ brandId, urlContext, setUrlContext, referenceImage, setRefer
         }
     }
 
-    if (gen.result) {
+    const updateSlideField = (slideIdx, field, value) => {
+        if (!editedPlan) return
+        const updated = { ...editedPlan, slides: [...editedPlan.slides] }
+        const slide = { ...updated.slides[slideIdx] }
+        // Handle nested fields like "stat.number" or "items.0.title"
+        const parts = field.split('.')
+        if (parts.length === 1) {
+            slide[field] = value
+        } else if (parts.length === 2) {
+            slide[parts[0]] = { ...slide[parts[0]], [parts[1]]: value }
+        } else if (parts.length === 3) {
+            const arr = [...(slide[parts[0]] || [])]
+            arr[parseInt(parts[1])] = { ...arr[parseInt(parts[1])], [parts[2]]: value }
+            slide[parts[0]] = arr
+        }
+        updated.slides[slideIdx] = slide
+        setEditedPlan(updated)
+    }
+
+    const handleRephrase = async (slideIdx, field, currentText) => {
+        setRephrasing(true)
+        try {
+            const res = await apiFetch('/brand-studio/deck/rephrase', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: currentText, instruction: 'Make it more compelling, punchy, and professional. Keep it concise.' })
+            })
+            if (res.success && res.text) {
+                updateSlideField(slideIdx, field, res.text)
+            }
+        } catch (e) { console.error(e) }
+        setRephrasing(false)
+    }
+
+    const handleRegenImage = async (slideIdx) => {
+        setRegenning(true)
+        try {
+            const slide = editedPlan.slides[slideIdx]
+            const res = await apiFetch('/brand-studio/deck/regenerate-image', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ imagePrompt: slide.imagePrompt, slideType: slide.type, referenceImage })
+            })
+            if (res.success && res.imageUrl) {
+                setEditedImages(prev => ({ ...prev, [slide.id]: res.imageUrl }))
+            }
+        } catch (e) { console.error(e) }
+        setRegenning(false)
+    }
+
+    if (gen.result && editedPlan) {
         return (
             <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-                    <div style={{ fontSize: 16, color: '#FFF' }}>✅ Your deck is ready <span style={{ background: '#333', padding: '2px 8px', borderRadius: 10, fontSize: 12, marginLeft: 8 }}>{gen.result.slideCount} slides</span></div>
-                    <button style={{ background: '#7c3aed', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: 8, fontWeight: 700, cursor: 'pointer' }} onClick={() => window.open(gen.result.pptxUrl)}>Download PPTX</button>
+                {/* Header */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#22C55E', boxShadow: '0 0 8px #22C55E' }}></div>
+                        <div style={{ fontSize: 16, color: '#FFF', fontWeight: 700 }}>
+                            {editedPlan.title || 'Your Deck'}
+                            <span style={{ background: 'rgba(124,58,237,0.2)', color: '#A78BFA', padding: '2px 10px', borderRadius: 10, fontSize: 12, marginLeft: 10, fontWeight: 600 }}>{editedPlan.slides?.length} slides</span>
+                        </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 10 }}>
+                        <button onClick={() => window.open(gen.result.hostedUrl, '_blank')}
+                            style={{ background: 'linear-gradient(135deg, #7c3aed, #6D28D9)', color: '#fff', border: 'none', padding: '10px 24px', borderRadius: 10, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, boxShadow: '0 4px 16px rgba(124,58,237,0.3)' }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>slideshow</span> Present Live
+                        </button>
+                        <button onClick={() => { navigator.clipboard.writeText(gen.result.hostedUrl); alert('Link copied!') }}
+                            style={{ background: 'rgba(255,255,255,0.08)', color: '#FFF', border: '1px solid rgba(255,255,255,0.15)', padding: '10px 20px', borderRadius: 10, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 14 }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>link</span> Copy Link
+                        </button>
+                    </div>
                 </div>
-                
-                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.5fr) 1fr', gap: 24 }}>
-                    {/* Slide Grid */}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, alignContent: 'start' }}>
-                        {gen.result.deckPlan?.slides?.map((s, idx) => (
-                            <div key={idx} onClick={() => setSelectedSlide(idx)} style={{
-                                background: s.type === 'hero' ? '#111' : s.type === 'stat' ? '#7c3aed' : '#222',
-                                borderRadius: 8, padding: 16, cursor: 'pointer', height: 120, position: 'relative',
-                                border: selectedSlide === idx ? '2px solid #FFFFFF' : '2px solid transparent'
-                            }}>
-                                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', position: 'absolute', top: 8, left: 8 }}>{idx + 1}</div>
-                                <div style={{ marginTop: 20, fontSize: 11, color: '#FFF', fontWeight: 600, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' }}>
-                                    {s.headline || s.stat?.number || s.quote}
-                                </div>
-                                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', position: 'absolute', bottom: 8, right: 8, textTransform: 'uppercase' }}>{s.type}</div>
-                            </div>
-                        ))}
-                    </div>
 
-                    {/* Preview Area using Office Online View */}
-                    <div style={{ background: '#111', borderRadius: 12, border: '1px solid #333', padding: 20 }}>
-                        <div style={{ marginBottom: 16 }}>
-                            <p style={{ margin: 0, fontSize: 12, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>PPTX Live Preview</p>
-                        </div>
-                        <div style={{ height: 350, background: '#000', borderRadius: 8, overflow: 'hidden', border: '1px solid #222' }}>
-                            <iframe src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(gen.result.pptxUrl)}`} width="100%" height="100%" frameBorder="0" title="Presentation Preview"></iframe>
-                        </div>
+                {/* Info Banner */}
+                <div style={{ background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(124,58,237,0.2)', borderRadius: 10, padding: '12px 20px', marginBottom: 24, display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#A78BFA' }}>info</span>
+                    <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>
+                        <strong style={{ color: '#FFF' }}>AI-Generated Content</strong> — Stats, testimonials, and quotes are AI-composed based on your brief and brand DNA. Click any text to edit, or press ✦ to AI-rephrase.
+                    </span>
+                </div>
 
-                        <div style={{ marginTop: 24, display: 'flex', gap: 12 }}>
-                            <button className="btn-secondary" onClick={gen.reset} style={{ flex: 1, padding: 12, borderRadius: 8 }}>Regenerate</button>
-                            <button style={{ flex: 1, background: '#8B5CF6', border: 'none', color: '#fff', borderRadius: 8, fontWeight: 700, cursor: 'pointer' }} onClick={() => window.open(gen.result.pptxUrl)}>Open in Canva</button>
-                        </div>
-                        <p style={{ fontSize: 11, color: '#666', textAlign: 'center', marginTop: 12 }}>Import this PPTX to Canva for drag-drop editing</p>
-                    </div>
+                {/* Slide Editor Cards */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                    {editedPlan.slides?.map((slide, idx) => (
+                        <SlideEditor
+                            key={idx} slide={slide} idx={idx}
+                            image={editedImages[slide.id]}
+                            onUpdate={updateSlideField}
+                            onRephraseField={handleRephrase}
+                            onRegenImage={handleRegenImage}
+                            rephrasing={rephrasing}
+                            regenning={regenning}
+                        />
+                    ))}
+                </div>
+
+                {/* Bottom Actions */}
+                <div style={{ display: 'flex', gap: 12, marginTop: 24 }}>
+                    <button onClick={gen.reset} style={{ flex: 1, padding: 14, borderRadius: 10, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: '#FFF', fontWeight: 600, cursor: 'pointer', fontSize: 14 }}>
+                        ↻ Start Over
+                    </button>
+                    <button onClick={() => window.open(gen.result.hostedUrl + '?print-pdf', '_blank')} style={{ flex: 1, padding: 14, borderRadius: 10, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: '#FFF', fontWeight: 600, cursor: 'pointer', fontSize: 14 }}>
+                        📄 Save as PDF
+                    </button>
                 </div>
             </div>
         )
