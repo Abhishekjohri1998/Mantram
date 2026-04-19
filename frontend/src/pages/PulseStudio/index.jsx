@@ -695,12 +695,163 @@ function MailTool({ brandId, urlContext, setUrlContext, referenceImage, setRefer
     )
 }
 
+// ── History Tab ───────────────────────────────────────────────────────────────
+function HistoryTab({ brandId }) {
+    const [items, setItems] = useState([])
+    const [loading, setLoading] = useState(true)
+    const [filter, setFilter] = useState('all')
+
+    useEffect(() => {
+        fetchHistory()
+    }, [brandId, filter])
+
+    const fetchHistory = async () => {
+        setLoading(true)
+        try {
+            const params = new URLSearchParams({ limit: '50' })
+            if (brandId) params.set('brandId', brandId)
+            if (filter !== 'all') params.set('tool', filter)
+            const data = await apiFetch(`/brand-studio/history?${params}`)
+            if (data.success) setItems(data.items || [])
+        } catch (e) { console.error(e) }
+        setLoading(false)
+    }
+
+    const handleDelete = async (id) => {
+        if (!confirm('Delete this generation?')) return
+        try {
+            await apiFetch(`/brand-studio/history/${id}`, { method: 'DELETE' })
+            setItems(prev => prev.filter(i => i._id !== id))
+        } catch (e) { console.error(e) }
+    }
+
+    const toolIcons = { deck: 'slideshow', email: 'mail', page: 'web' }
+    const toolColors = { deck: '#7c3aed', email: '#0ea5e9', page: '#22C55E' }
+    const toolLabels = { deck: 'Pulse Deck', email: 'Pulse Mail', page: 'Pulse Page' }
+
+    const formatDate = (d) => {
+        const date = new Date(d)
+        const now = new Date()
+        const diff = now - date
+        if (diff < 60000) return 'Just now'
+        if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`
+        if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`
+        return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+    }
+
+    const getOpenUrl = (item) => {
+        if (item.tool === 'deck') return item.hostedUrl
+        if (item.tool === 'email') return item.emailHostedUrl
+        if (item.tool === 'page') return item.pageHostedUrl
+        return null
+    }
+
+    return (
+        <div>
+            {/* Filter Pills */}
+            <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
+                {[{ id: 'all', label: 'All', icon: 'apps' }, { id: 'deck', label: 'Decks', icon: 'slideshow' }, { id: 'email', label: 'Emails', icon: 'mail' }, { id: 'page', label: 'Pages', icon: 'web' }].map(f => (
+                    <button key={f.id} onClick={() => setFilter(f.id)} style={{
+                        background: filter === f.id ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.04)',
+                        color: filter === f.id ? '#FFF' : 'rgba(255,255,255,0.5)',
+                        border: '1px solid ' + (filter === f.id ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.08)'),
+                        padding: '8px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.2s'
+                    }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 16 }}>{f.icon}</span>
+                        {f.label}
+                    </button>
+                ))}
+            </div>
+
+            {loading ? (
+                <div style={{ textAlign: 'center', padding: 60, color: 'rgba(255,255,255,0.3)' }}>
+                    <div style={{ width: 32, height: 32, border: '3px solid rgba(255,255,255,0.1)', borderTop: '3px solid #7c3aed', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 16px' }}></div>
+                    Loading history...
+                </div>
+            ) : items.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: 80 }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 48, color: 'rgba(255,255,255,0.1)', display: 'block', marginBottom: 16 }}>history</span>
+                    <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 15 }}>No generations yet</p>
+                    <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: 13, marginTop: 4 }}>Create your first deck, email, or landing page to see history here</p>
+                </div>
+            ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    {items.map(item => {
+                        const color = toolColors[item.tool] || '#7c3aed'
+                        const openUrl = getOpenUrl(item)
+                        return (
+                            <div key={item._id} style={{
+                                background: '#0A0A0A', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)',
+                                padding: 20, display: 'flex', alignItems: 'center', gap: 16, transition: 'all 0.2s'
+                            }}>
+                                {/* Icon */}
+                                <div style={{
+                                    width: 44, height: 44, borderRadius: 12,
+                                    background: `${color}15`, border: `1px solid ${color}30`,
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+                                }}>
+                                    <span className="material-symbols-outlined" style={{ fontSize: 22, color }}>{toolIcons[item.tool]}</span>
+                                </div>
+
+                                {/* Content */}
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                                        <span style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.1em', color, fontWeight: 700, background: `${color}15`, padding: '2px 8px', borderRadius: 4 }}>
+                                            {toolLabels[item.tool]}
+                                        </span>
+                                        {item.subType && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>· {item.subType}</span>}
+                                    </div>
+                                    <div style={{ fontSize: 14, color: '#FFF', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                        {item.brief}
+                                    </div>
+                                    <div style={{ display: 'flex', gap: 12, marginTop: 6, fontSize: 12, color: 'rgba(255,255,255,0.35)' }}>
+                                        <span>{formatDate(item.createdAt)}</span>
+                                        {item.slideCount && <span>· {item.slideCount} slides</span>}
+                                        {item.creditsUsed > 0 && <span>· {item.creditsUsed} credits</span>}
+                                    </div>
+                                </div>
+
+                                {/* Thumbnail */}
+                                {item.thumbnailUrl && (
+                                    <div style={{ width: 80, height: 52, borderRadius: 8, overflow: 'hidden', flexShrink: 0, border: '1px solid rgba(255,255,255,0.08)' }}>
+                                        <img src={item.thumbnailUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                    </div>
+                                )}
+
+                                {/* Actions */}
+                                <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                                    {openUrl && (
+                                        <button onClick={() => window.open(openUrl, '_blank')} title="Open" style={{
+                                            width: 36, height: 36, borderRadius: 8, background: `${color}15`, border: `1px solid ${color}30`,
+                                            color, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'
+                                        }}>
+                                            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>open_in_new</span>
+                                        </button>
+                                    )}
+                                    <button onClick={() => handleDelete(item._id)} title="Delete" style={{
+                                        width: 36, height: 36, borderRadius: 8, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)',
+                                        color: '#EF4444', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'
+                                    }}>
+                                        <span className="material-symbols-outlined" style={{ fontSize: 18 }}>delete</span>
+                                    </button>
+                                </div>
+                            </div>
+                        )
+                    })}
+                </div>
+            )}
+        </div>
+    )
+}
+
 // ── Main Page Framework ──────────────────────────────────────────────────────
 
 const TAB_DATA = [
     { id: 'deck', icon: 'slideshow', label: 'Pulse Deck' },
     { id: 'mail', icon: 'mail', label: 'Pulse Mail' },
-    { id: 'page', icon: 'web', label: 'Pulse Page' }
+    { id: 'page', icon: 'web', label: 'Pulse Page' },
+    { id: 'history', icon: 'history', label: 'History' }
 ]
 
 export default function PulseStudio() {
@@ -731,6 +882,7 @@ export default function PulseStudio() {
                     {activeTab === 'deck' && <DeckTool brandId={brandId} urlContext={urlContext} setUrlContext={setUrlContext} referenceImage={referenceImage} setReferenceImage={setReferenceImage} />}
                     {activeTab === 'mail' && <MailTool brandId={brandId} urlContext={urlContext} setUrlContext={setUrlContext} referenceImage={referenceImage} setReferenceImage={setReferenceImage} />}
                     {activeTab === 'page' && <PageTool brandId={brandId} urlContext={urlContext} setUrlContext={setUrlContext} referenceImage={referenceImage} setReferenceImage={setReferenceImage} />}
+                    {activeTab === 'history' && <HistoryTab brandId={brandId} />}
                 </div>
             </div>
         </DashboardLayout>
