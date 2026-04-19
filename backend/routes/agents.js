@@ -631,34 +631,34 @@ router.post('/ai-photoshoot', optionalAuth, async (req, res) => {
             'tilt-shift': 'tilt-shift lens, selective focus plane, miniature effect, architectural precision',
         };
         const LIGHT_MAP = {
-            'softbox': 'soft diffused studio lighting from a large softbox, even illumination',
-            'natural': 'soft natural window light with gentle directional shadows',
-            'golden': 'warm golden hour sunlight with long dramatic shadows and amber tones',
-            'dramatic': 'dramatic chiaroscuro lighting, deep shadows, single hard key light',
-            'neon': 'colorful neon lighting with vivid pink/blue/purple ambient glow',
-            'rim': 'edge-lit rim lighting highlighting product silhouette against dark background',
-            'highkey': 'bright high-key lighting, pure white luminous background, minimal shadows',
+            'softbox':   'evenly diffused, shadow-free illumination with smooth wrap-around light and soft gradients — no harsh shadows, no visible light sources in frame',
+            'natural':   'gentle directional daylight with soft natural shadows, the light feels like late-morning sun through a window, warm and airy',
+            'golden':    'warm amber-toned illumination with long low-angle shadows and rich golden highlights, the scene feels like sunset',
+            'dramatic':  'deep chiaroscuro contrast with one strong directional key light and rich dark shadows, high-contrast cinematic feel',
+            'neon':      'vivid neon-coloured ambient glow with electric pink, cyan and purple tones, the light source is unseen and wraps the product in colour',
+            'rim':       'a crisp bright outline tracing the product silhouette against a dark background — the rim light is unseen and appears naturally from behind',
+            'highkey':   'very bright, evenly lit scene with minimal shadows and a luminous clean look, the background fades to pure white',
         };
         const DIR_MAP = {
-            'front-left': 'from the front-left at 45 degrees',
-            'front': 'from directly in front',
-            'front-right': 'from the front-right at 45 degrees',
-            'left': 'from the left side',
-            'right': 'from the right side',
-            'top': 'from directly above, top-down',
-            'back': 'from behind the product, creating a backlit silhouette effect',
+            'front-left': 'the light comes from the front-left at 45 degrees',
+            'front': 'the light comes from directly in front',
+            'front-right': 'the light comes from the front-right at 45 degrees',
+            'left': 'the light comes from the left side',
+            'right': 'the light comes from the right side',
+            'top': 'the light comes from directly above',
+            'back': 'the light comes from directly behind the product',
         };
         const SURFACE_MAP = {
-            'white': 'floating on a pure white infinity-curve studio background',
-            'marble': 'resting on a polished white Carrara marble surface with subtle grey veins',
-            'stone': 'placed on a rough natural stone slab with organic texture',
-            'wood': 'on a warm rustic reclaimed wooden surface with visible grain',
-            'concrete': 'on a raw industrial concrete surface with subtle texture',
-            'fabric': 'draped over soft flowing silk fabric',
-            'podium': 'elevated on a clean geometric cylindrical pedestal podium',
-            'glass': 'on a reflective black glass surface creating a mirror effect',
-            'sand': 'nestled in fine natural sand with shells and botanical elements',
-            'foliage': 'surrounded by fresh green leaves, eucalyptus sprigs and botanical elements',
+            'white':    'set against a seamless clean white background with no visible edges or curves, the product appears to float on a pure white field',
+            'marble':   'resting on a polished white Carrara marble surface with subtle grey veins, reflective and pristine',
+            'stone':    'placed on a rough natural stone slab with organic texture and earthy tones',
+            'wood':     'on a warm rustic reclaimed wooden surface with visible grain and natural character',
+            'concrete': 'on a raw industrial concrete surface with subtle texture and cool grey tones',
+            'fabric':   'draped over soft flowing silk fabric with gentle folds and a luxurious sheen',
+            'podium':   'elevated on a clean cylindrical pedestal with a matte finish, minimal and architectural',
+            'glass':    'on a dark reflective gloss surface with a clean mirror-like reflection of the product beneath it',
+            'sand':     'nestled in fine natural sand with delicate ripples and warm neutral tones',
+            'foliage':  'surrounded by fresh green botanical leaves and eucalyptus sprigs with soft natural light filtering through',
         };
         const MODEL_MAP = {
             'none': '',
@@ -689,27 +689,30 @@ router.post('/ai-photoshoot', optionalAuth, async (req, res) => {
         // Build the prompt based on fidelity
         let photoshootPrompt;
 
+        // Global negative constraint — always appended — prevents AI rendering studio gear
+        const NO_STUDIO_GEAR = `\n\nIMPORTANT: Do NOT show any studio equipment, lighting rigs, light stands, softboxes, umbrella modifiers, reflectors, backdrops, clamps, cables, or any behind-the-scenes technical apparatus in the image. The lighting effect should be visible on the subject only — no hardware in frame.`;
+
         if (fidelity >= 75) {
             // HIGH FIDELITY — strict editing, preserve product exactly
             photoshootPrompt = `Edit this product photo. Do NOT change the product at all — keep every color, label, text, shape, and texture on the product pixel-perfect.
 
-A ${anglePhrase}, captured with a ${lensPhrase}. The product is ${surfPhrase}. ${lightPhrase} ${dirPhrase}. ${modelPhrase}
+A ${anglePhrase}, captured with a ${lensPhrase}. The product is ${surfPhrase}. The lighting: ${lightPhrase}, ${dirPhrase}. ${modelPhrase}
 ${brief ? brief + '.' : ''}${brandColors ? ` Brand accent colors: ${brandColors}.` : ''}
-${moodPhrase} product photography. Photorealistic, magazine-quality, sharp detail. ${ratioPhrase}`;
+${moodPhrase} product photography. Photorealistic, magazine-quality, sharp detail. ${ratioPhrase}${NO_STUDIO_GEAR}`;
         } else if (fidelity >= 50) {
             // BALANCED — preserve product largely but allow artistic styling
             photoshootPrompt = `Create a professional product photoshoot. Keep the product's key details, colors, and branding accurate but enhance the presentation artistically.
 
-A ${anglePhrase}, captured with a ${lensPhrase}. The product is ${surfPhrase}. ${lightPhrase} ${dirPhrase}. ${modelPhrase}
+A ${anglePhrase}, captured with a ${lensPhrase}. The product is ${surfPhrase}. The lighting: ${lightPhrase}, ${dirPhrase}. ${modelPhrase}
 ${brief ? brief + '.' : ''}${brandColors ? ` Accent colors: ${brandColors}.` : ''}
-${moodPhrase} product photography. Photorealistic, magazine-quality. ${ratioPhrase}`;
+${moodPhrase} product photography. Photorealistic, magazine-quality. ${ratioPhrase}${NO_STUDIO_GEAR}`;
         } else {
             // CREATIVE — allow significant artistic interpretation
             photoshootPrompt = `Create an artistic, creative product image inspired by this product. You have creative freedom to reimagine the presentation but keep the product recognizable.
 
-A ${anglePhrase}, captured with a ${lensPhrase}. The product is ${surfPhrase}. ${lightPhrase} ${dirPhrase}. ${modelPhrase}
+A ${anglePhrase}, captured with a ${lensPhrase}. The product is ${surfPhrase}. The lighting: ${lightPhrase}, ${dirPhrase}. ${modelPhrase}
 ${brief ? brief + '.' : ''}${brandColors ? ` Color palette: ${brandColors}.` : ''}
-Bold, ${moodPhrase} visual suitable for advertising and social media. ${ratioPhrase}`;
+Bold, ${moodPhrase} visual suitable for advertising and social media. ${ratioPhrase}${NO_STUDIO_GEAR}`;
         }
 
         // If a dynamic camera shot preset was selected, override/append camera direction

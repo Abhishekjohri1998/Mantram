@@ -63,6 +63,7 @@ import mediaUploadRoutes from './routes/mediaUpload.js';
 import studioReportRoutes from './routes/studio-reports.js';
 import funnelAgenticRoutes from './routes/funnel-agentic.js';
 import retentionStudioRoutes from './routes/retention-studio.js';
+import brandStudioRoutes from './routes/brand-studio.js';
 import { createMantramMcpRouter } from './mcp/mantramToolsServer.js';
 
 const HARDCODED_ORIGINS = [
@@ -362,6 +363,7 @@ app.use('/api/funnel-agentic', funnelAgenticRoutes);
 app.use('/api/media', mediaUploadRoutes);
 app.use('/api/studio-reports', studioReportRoutes);
 app.use('/api/retention-studio', retentionStudioRoutes);
+app.use('/api/brand-studio', brandStudioRoutes);
 
 // ── Internal MCP Tool Server (SSE) — must come AFTER body parsers ──
 // Exposes platform intelligence tools to all studio agents via mcpBridge

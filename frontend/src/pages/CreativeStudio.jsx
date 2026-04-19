@@ -4003,14 +4003,14 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     <div className="space-y-3">
                                         <div className="flex flex-wrap gap-1.5">
                                             {[{id:'softbox',label:'Softbox',ms:'cloud'},{id:'natural',label:'Window',ms:'window'},{id:'golden',label:'Golden Hr',ms:'wb_twilight'},{id:'dramatic',label:'Dramatic',ms:'theater_comedy'},{id:'neon',label:'Neon',ms:'fluorescent'},{id:'rim',label:'Rim',ms:'flare'},{id:'highkey',label:'High Key',ms:'light_mode'}].map(l => (
-                                                <button key={l.id} onClick={() => setLightingStyle(l.id)} className={"studio-btn-pill !px-2.5 !py-1 !text-[10px] transition-all " + (lightingStyle === l.id ? 'bg-[var(--sys-text)] text-[var(--sys-bg)] border-[var(--sys-text)]' : 'bg-[var(--sys-surface)] border-[var(--sys-border)] text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]')}><span className="material-symbols-outlined !text-[12px]">{l.ms}</span> {l.label}</button>
+                                                <button key={l.id} onClick={() => setLightingStyle(l.id)} className="studio-btn-pill !px-2.5 !py-1 !text-[10px] transition-all" style={lightingStyle === l.id ? { background: 'var(--sys-text)', color: 'var(--sys-bg)', borderColor: 'var(--sys-text)' } : {}}><span className="material-symbols-outlined !text-[12px]">{l.ms}</span> {l.label}</button>
                                             ))}
                                         </div>
                                         <div className="flex flex-wrap gap-1.5">
                                             {CAMERA_SHOT_PRESETS.slice(0, 8).map(shot => (
                                                 <button key={shot.id} onClick={() => setPsSelectedShot(prev => prev === shot.id ? null : shot.id)}
-                                                    className={"studio-btn-pill !px-2.5 !py-1 !text-[10px] transition-all " + (psSelectedShot === shot.id ? 'bg-[var(--sys-bg)] border-current shadow-sm' : 'bg-[var(--sys-surface)] border-[var(--sys-border)] text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]')}
-                                                    style={psSelectedShot === shot.id ? { color: shot.color, borderColor: shot.color } : {}}>
+                                                    className="studio-btn-pill !px-2.5 !py-1 !text-[10px] transition-all"
+                                                    style={psSelectedShot === shot.id ? { background: 'var(--sys-text)', color: 'var(--sys-bg)', borderColor: 'var(--sys-text)' } : {}}>
                                                     <span className="leading-none mr-0.5">{shot.emoji}</span> {shot.label}
                                                 </button>
                                             ))}
@@ -4024,12 +4024,12 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     <div className="space-y-3">
                                         <div className="flex flex-wrap gap-1.5">
                                             {[{id:'white',label:'White',ms:'crop_square'},{id:'marble',label:'Marble',ms:'grid_on'},{id:'stone',label:'Stone',ms:'texture'},{id:'wood',label:'Wood',ms:'park'},{id:'concrete',label:'Concrete',ms:'domain'},{id:'fabric',label:'Silk',ms:'checkroom'},{id:'podium',label:'Podium',ms:'account_balance'},{id:'glass',label:'Glass',ms:'blur_on'},{id:'sand',label:'Sand',ms:'beach_access'},{id:'foliage',label:'Foliage',ms:'eco'}].map(s => (
-                                                <button key={s.id} onClick={() => setSurface(s.id)} className={"studio-btn-pill !px-2.5 !py-1 !text-[10px] transition-all " + (surface === s.id ? 'bg-[var(--sys-text)] text-[var(--sys-bg)] border-transparent' : 'bg-[var(--sys-surface)] border-[var(--sys-border)] text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]')}><span className="material-symbols-outlined !text-[12px]">{s.ms}</span> {s.label}</button>
+                                                <button key={s.id} onClick={() => setSurface(s.id)} className="studio-btn-pill !px-2.5 !py-1 !text-[10px] transition-all" style={surface === s.id ? { background: 'var(--sys-text)', color: 'var(--sys-bg)', borderColor: 'transparent' } : {}}><span className="material-symbols-outlined !text-[12px]">{s.ms}</span> {s.label}</button>
                                             ))}
                                         </div>
                                         <div className="flex flex-wrap gap-1.5">
                                             {[{id:'none',label:'No Model',ms:'block'},{id:'hands',label:'Hands',ms:'pan_tool'},{id:'model-woman',label:'Woman',ms:'face_3'},{id:'model-man',label:'Man',ms:'face_6'}].map(m => (
-                                                <button key={m.id} onClick={() => setModelPresence(m.id)} className={"studio-btn-pill !px-3 !py-1 !text-[10px] transition-all " + (modelPresence === m.id ? 'bg-[var(--sys-primary-dim)] text-[var(--sys-primary)] border-[var(--sys-primary)]/30' : 'bg-[var(--sys-surface)] border-[var(--sys-border)] text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]')}><span className="material-symbols-outlined !text-[13px]">{m.ms}</span> {m.label}</button>
+                                                <button key={m.id} onClick={() => setModelPresence(m.id)} className="studio-btn-pill !px-3 !py-1 !text-[10px] transition-all" style={modelPresence === m.id ? { background: 'var(--sys-primary-dim)', color: 'var(--sys-primary)', borderColor: 'rgba(255, 77, 0, 0.3)' } : {}}><span className="material-symbols-outlined !text-[13px]">{m.ms}</span> {m.label}</button>
                                             ))}
                                         </div>
                                     </div>
@@ -4043,7 +4043,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     <div className="flex flex-wrap gap-1.5 mb-4">
                                         {[{id:'editorial',label:'Editorial',ms:'article'},{id:'commercial',label:'Commercial',ms:'shopping_bag'},{id:'lifestyle',label:'Lifestyle',ms:'coffee'},{id:'luxury',label:'Luxury',ms:'diamond'},{id:'minimal',label:'Minimal',ms:'check_box_outline_blank'},{id:'moody',label:'Moody',ms:'dark_mode'},{id:'vibrant',label:'Vibrant',ms:'palette'}].map(m => {
                                             const active = mood.includes(m.id)
-                                            return <button key={m.id} onClick={() => setMood(prev => active ? prev.filter(x => x !== m.id) : [...prev, m.id])} className={"studio-btn-pill !px-2.5 !py-1 !text-[10px] transition-all " + (active ? 'bg-[var(--sys-text)] border-[var(--sys-text)] text-[var(--sys-bg)]' : 'bg-[var(--sys-surface)] border-[var(--sys-border)] text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]')}><span className="material-symbols-outlined !text-[12px]">{m.ms}</span> {m.label}</button>
+                                            return <button key={m.id} onClick={() => setMood(prev => active ? prev.filter(x => x !== m.id) : [...prev, m.id])} className="studio-btn-pill !px-2.5 !py-1 !text-[10px] transition-all" style={active ? { background: 'var(--sys-text)', color: 'var(--sys-bg)', borderColor: 'var(--sys-text)' } : {}}><span className="material-symbols-outlined !text-[12px]">{m.ms}</span> {m.label}</button>
                                         })}
                                     </div>
                                     
@@ -4112,7 +4112,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 </CreditTooltipWrapper>
                             </div>
                         </div>
-                        <div className="flex-1 w-full" /> {/* Push content to right side to match gallery flow */}
+                        
 
                     <div className="creative-gallery pl-4 flex-1">
                   {/* Recent Photoshoots */}
@@ -4654,59 +4654,371 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             )}
                         </div>
 
-                            {/* ── In-Session Photoshoot Gallery ── */}
-                            {psHistory.length > 1 && (
-                                <div className="mt-6 w-full">
-                                    <div className="flex items-center justify-between mb-3">
-                                        <h4 className="text-xs font-bold text-[var(--sys-text-muted)] uppercase tracking-wider flex items-center gap-1.5">
-                                            <span className="material-symbols-outlined text-sm text-primary">photo_library</span>
-                                            Session Photoshoots ({psHistory.length})
+                            {/* ── Photoshoot Library (Masonry Gallery) ── */}
+
+                            {(() => {
+                                const count = bankImages.filter(img => img.type === "ai-photoshoot" || img.type === "photoshoot").length;
+                                if (count > 0) return (
+                                    <div className="mt-8 flex items-center justify-between mb-4 border-t border-[var(--sys-border)] pt-6">
+                                        <h4 className="text-sm font-bold text-[var(--sys-text)] flex items-center gap-2">
+                                            <span className="material-symbols-outlined text-primary">photo_library</span>
+                                            Photoshoot Library ({count})
                                         </h4>
-                                        <button onClick={() => setPsHistory([])} className="text-[10px] text-[var(--sys-text-muted)] hover:text-[var(--sys-text-muted)] cursor-pointer transition-all">Clear</button>
+                                        <div className="flex bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-lg p-0.5" style={{ transform: "scale(0.8)", transformOrigin: "right center" }}>
+                                            <button onClick={() => setViewMode("list")} className={`p-1 rounded-md flex items-center justify-center transition-all ${viewMode === "list" ? "bg-[var(--sys-text)] text-[var(--sys-bg)] shadow-sm" : "text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface-hover)]"}`} title="List View"><span className="material-symbols-outlined" style={{ fontSize: "16px" }}>view_agenda</span></button>
+                                            <button onClick={() => setViewMode("grid")} className={`p-1 rounded-md flex items-center justify-center transition-all ${viewMode === "grid" ? "bg-[var(--sys-text)] text-[var(--sys-bg)] shadow-sm" : "text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface-hover)]"}`} title="Grid View"><span className="material-symbols-outlined" style={{ fontSize: "16px" }}>grid_view</span></button>
+                                        </div>
                                     </div>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-[500px] overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.1) transparent' }}>
-                                        {psHistory.map((item, idx) => (
-                                            <div key={item._id || idx} className={`relative rounded-xl overflow-hidden border border-[var(--sys-border)] bg-[var(--sys-surface)] transition-all`}
-                                                onClick={() => setZoomImage(item.imageUrl)}>
-                                                <div className="group relative w-fit h-full rounded-xl overflow-hidden cursor-pointer">
-                                                    <img src={item.imageUrl} alt={item._brief || 'Photoshoot'} loading="lazy" decoding="async" className="w-auto h-full max-w-full aspect-square object-contain object-left bg-[var(--sys-surface)]" />
-                                                    {idx === 0 && <span className="absolute top-1.5 left-1.5 text-[8px] font-bold text-[var(--sys-primary)] bg-[var(--sys-primary-dim)] px-1.5 py-0.5 rounded-md">Latest</span>}
-                                                    <div className="absolute inset-0 bg-black/60 border border-[var(--sys-border)] opacity-0 group-hover:opacity-100 transition-all flex flex-col justify-end p-2">
-                                                    <p className="text-[9px] text-[var(--sys-text-muted)] truncate mb-1.5 leading-tight" title={item._brief || item.description}>{item._brief || item.description || 'AI Photoshoot'}</p>
-                                                    {/* Quick Actions Hover Dock */}
-                                                    <div className="flex flex-wrap items-center justify-end gap-1 w-full mt-auto">
-                                                        <button onClick={(e) => { e.stopPropagation(); setPhotoshootResult(item); }}
-                                                            className="studio-action-btn-sm !w-7 !h-7" title="Expand Image">
-                                                            <span className="material-symbols-outlined !text-[14px]">zoom_in</span>
+                                );
+                                return null;
+                            })()}
+                        {(() => {
+                            const allGenerated = bankImages.filter(img => img.type === 'ai-photoshoot' || img.type === 'photoshoot');
+                            const filtered = galleryFilter === 'All' ? allGenerated : allGenerated.filter(img => {
+                                const tags = (img.tags || []).map(t => t.toLowerCase());
+                                const title = (img.title || '').toLowerCase();
+                                const prmpt = (img.prompt || '').toLowerCase();
+                                const filterLower = galleryFilter.toLowerCase();
+                                return tags.some(t => t.includes(filterLower)) || title.includes(filterLower) || prmpt.includes(filterLower) || (img.type || '').toLowerCase().includes(filterLower);
+                            });
+                            if (filtered.length === 0 && allGenerated.length > 0) {
+                                return (
+                                    <div className="text-center py-10">
+                                        <span className="material-symbols-outlined text-4xl text-slate-700 mb-2 block">filter_alt_off</span>
+                                        <p className="text-sm text-[var(--sys-text-muted)]">No results matching "{galleryFilter}"</p>
+                                        <button onClick={() => setGalleryFilter('All')} className="mt-2 text-xs text-primary hover:text-primary-light cursor-pointer">Show all</button>
+                                    </div>
+                                );
+                            }
+                            if (filtered.length === 0) return null;
+
+                            {/* ── Grid View ── */}
+                            if (viewMode === 'grid') {
+                                return (
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                                        {filtered.map(img => (
+                                            <div key={img._id} className="group relative rounded-xl overflow-hidden border border-[var(--sys-border)] bg-[var(--sys-surface)] cursor-pointer transition-all hover:border-[var(--sys-border)]"
+                                                onClick={() => setZoomImage(img.imageUrl || img.thumbnailUrl)}>
+                                                <img src={img.imageUrl || img.thumbnailUrl} alt={img.title || 'Creative'}
+                                                    loading="lazy" decoding="async"
+                                                    className="w-full aspect-square object-cover" />
+                                                {/* Hover overlay with actions */}
+                                                <div className="absolute inset-0 bg-black/60 border border-[var(--sys-border)] opacity-0 group-hover:opacity-100 transition-all flex flex-col justify-end p-2">
+                                                    <p className="text-[9px] text-[var(--sys-text-muted)] line-clamp-2 mb-1.5 leading-tight">{img.prompt || img.title || 'AI Generated'}</p>
+                                                    <div className="flex gap-1">
+                                                        <button onClick={(e) => { e.stopPropagation(); handleDownloadImage(img.imageUrl || img.thumbnailUrl, `${img.title || 'creative'}.png`) }}
+                                                            className="p-1 rounded-md bg-[var(--sys-surface)] text-[var(--sys-text)] hover:bg-[var(--sys-surface)] transition-all" title="Download">
+                                                            <span className="material-symbols-outlined text-xs">download</span>
                                                         </button>
-                                                        <button onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(item._brief || item.description || ''); setFeedbackToast('Prompt copied!'); setTimeout(() => setFeedbackToast(''), 2000); }}
-                                                            className="studio-action-btn-sm !w-7 !h-7" title="Copy Brief">
-                                                            <span className="material-symbols-outlined !text-[14px]">content_copy</span>
+                                                        <button onClick={(e) => { e.stopPropagation(); setDesignBaseImage(img.imageUrl || img.thumbnailUrl); setPrompt(img.prompt || ''); }}
+                                                            className="p-1 rounded-md bg-[var(--sys-surface)] text-[var(--sys-text)] hover:bg-primary/40 transition-all" title="Edit">
+                                                            <span className="material-symbols-outlined text-xs">edit</span>
                                                         </button>
-                                                        <button onClick={(e) => { e.stopPropagation(); setPhotoshootBrief(item._brief || item.description || ''); setStudioMode('photoshoot'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-                                                            className="studio-action-btn-sm !w-7 !h-7" title="Reuse Brief">
-                                                            <span className="material-symbols-outlined !text-[14px]">refresh</span>
+                                                        <button onClick={(e) => { e.stopPropagation(); setPublishData({ image: img.imageUrl || img.thumbnailUrl, text: img.title || '' }) }}
+                                                            className="p-1 rounded-md bg-[var(--sys-surface)] text-[var(--sys-text)] hover:bg-[#1877F2]/40 transition-all" title="Publish">
+                                                            <span className="material-symbols-outlined text-xs">share</span>
                                                         </button>
-                                                        <button onClick={(e) => { e.stopPropagation(); handleOpenEditPanel(item.imageUrl, item._brief || item.description || 'Photoshoot'); }}
-                                                            className="studio-btn-pill !text-[9px] !px-2 !py-1 active border-none" title="Edit with Gemini AI">
-                                                            <span className="material-symbols-outlined !text-[12px]">auto_fix_high</span> Edit
-                                                        </button>
-                                                        <button onClick={(e) => { e.stopPropagation(); handleAnimateClick({ imageUrl: item.imageUrl }); }}
-                                                            className="studio-btn-pill !text-[9px] !px-2 !py-1 active border-none" title="Animate via Grok">
-                                                            <span className="material-symbols-outlined !text-[12px]">animation</span> Animate
-                                                        </button>
-                                                        <button onClick={(e) => { e.stopPropagation(); setPublishData({ image: item.imageUrl, text: '' }) }}
-                                                            className="flex items-center gap-1 px-1.5 py-1 rounded bg-[#1877F2]/20 hover:bg-[#1877F2]/40 text-[9px] border-[var(--sys-border)] font-medium transition-all border border-[#1877F2]/30" title="Publish to Content Studio">
-                                                            <span className="material-symbols-outlined text-[10px]">send</span> Share
-                                                        </button>
-                                                        </div>
                                                     </div>
                                                 </div>
+                                                {/* Time ago badge */}
+                                                <span className="absolute top-1.5 right-1.5 text-[8px] text-[var(--sys-text-muted)] bg-[var(--sys-surface)] px-1.5 py-0.5 rounded-md opacity-0 group-hover:opacity-100 transition-all">{getTimeAgo(img.createdAt)}</span>
+                                                {/* MCoT badge */}
+                                                {img.aiMeta?.mcotReasoning && (
+                                                    <button onClick={(e) => { e.stopPropagation(); setViewMode('list'); setExpandedReasoning(img._id); }}
+                                                        className="absolute top-1.5 left-1.5 text-[8px] text-[var(--sys-bg)] bg-[#08080C]/60 px-1.5 py-0.5 rounded-md opacity-0 group-hover:opacity-100 transition-all flex items-center gap-0.5 hover:bg-[#CC3D00]/60 cursor-pointer border border-[var(--sys-text)]"
+                                                        title="View MCoT Reasoning">
+                                                        <span className="material-symbols-outlined" style={{ fontSize: '10px' }}>psychology</span>
+                                                        MCoT
+                                                    </button>
+                                                )}
                                             </div>
                                         ))}
                                     </div>
+                                );
+                            }
+
+                            {/* ── List View (default) ── */}
+                            return (
+                                <div className="space-y-4">
+                                    {filtered.map(img => (
+                                    <div key={img._id} className="generation-card">
+                                        {/* Prompt */}
+                                        <p className="text-xs text-[var(--sys-text-muted)] mb-2 line-clamp-2 leading-relaxed">
+                                            {img.prompt || img.title || 'AI Generated'}
+                                        </p>
+
+                                        {/* Image */}
+                                        <div className="relative rounded-xl overflow-hidden border border-[var(--sys-border)] bg-[var(--sys-surface)] mb-2.5 group">
+                                            <img src={img.imageUrl || img.thumbnailUrl} alt={img.title || 'Creative'}
+                                                loading="lazy" decoding="async"
+                                                className="w-full h-full object-cover block"
+                                                style={{ maxHeight: '400px' }} />
+                                            <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px] transition-all opacity-0 group-hover:opacity-100 flex items-center justify-center gap-3">
+                                                <button onClick={(e) => { e.stopPropagation(); setZoomImage(img.imageUrl || img.thumbnailUrl); }} className="w-10 h-10 rounded-full bg-[var(--sys-surface)] hover:bg-[var(--sys-surface)] text-[var(--sys-text)] flex items-center justify-center border border-[var(--sys-border)] transition-all" title="Expand">
+                                                    <span className="material-symbols-outlined text-base">open_in_full</span>
+                                                </button>
+                                                <button onClick={(e) => { e.stopPropagation(); handleOpenEditPanel(img.imageUrl || img.thumbnailUrl, 'Creative'); }} className="w-10 h-10 rounded-full bg-violet-500/40 hover:bg-violet-500/70 text-violet-100 flex items-center justify-center border border-violet-500/20 transition-all" title="Edit in AI Canvas">
+                                                    <span className="material-symbols-outlined text-base">auto_fix_high</span>
+                                                </button>
+                                                <button onClick={(e) => { e.stopPropagation(); handleAnimateClick(img); }} className="w-10 h-10 rounded-full bg-[var(--sys-text)] hover:bg-[var(--sys-text)] text-[var(--sys-text)] flex items-center justify-center border border-[var(--sys-text)] transition-all shadow-[0_0_12px_rgba(255,77,0,0.4)]" title="Animate">
+                                                    <span className="material-symbols-outlined text-base">animation</span>
+                                                </button>
+                                                <button onClick={(e) => { e.stopPropagation(); setPublishData({ image: img.imageUrl || img.thumbnailUrl, text: '' }); }} className="w-10 h-10 rounded-full bg-[#1877F2]/40 hover:bg-[#1877F2]/70 border-[var(--sys-border)] flex items-center justify-center border border-[#1877F2]/20 transition-all" title="Publish">
+                                                    <span className="material-symbols-outlined text-base">send</span>
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {/* Metadata */}
+                                        <div className="flex items-center gap-2 mb-2 flex-wrap">
+                                            {img.aspectRatio && (
+                                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-[var(--sys-surface)] text-[var(--sys-text)]">
+                                                    {img.aspectRatio}
+                                                </span>
+                                            )}
+                                            {img.model && (
+                                                <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-[var(--sys-surface)] text-[var(--sys-text-muted)]">
+                                                    {img.model}
+                                                </span>
+                                            )}
+                                            <span className="text-[10px] text-[var(--sys-text-muted)]">{getTimeAgo(img.createdAt)}</span>
+                                        </div>
+
+                                        {/* Actions */}
+                                        <div className="flex items-center gap-1">
+                                            <button onClick={() => { 
+                                                setPrompt(img.prompt || img.title || img._prompt || ''); 
+                                                if (img.model) setImageModel(img.model);
+                                                if (img.aspectRatio) {
+                                                    const ct = creativeTypes.find(c => c.aspectRatio === img.aspectRatio);
+                                                    if (ct) setSelectedType(ct.id);
+                                                }
+                                                if (img.style) setStyle(img.style);
+                                            }}
+                                                className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold text-[var(--sys-text)] bg-[var(--sys-text)] hover:bg-[var(--sys-text)] cursor-pointer transition-all" title="Reuse this prompt">
+                                                <span className="material-symbols-outlined text-xs">tune</span>
+                                                Reuse
+                                            </button>
+                                            <button onClick={() => { navigator.clipboard.writeText(img.prompt || img.title || ''); setFeedbackToast('Prompt copied!'); setTimeout(() => setFeedbackToast(''), 2000); }}
+                                                className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold text-[var(--sys-text-muted)] bg-[var(--sys-surface)] hover:bg-[var(--sys-surface)] cursor-pointer transition-all" title="Copy prompt">
+                                                <span className="material-symbols-outlined text-xs">content_copy</span>
+                                                Copy
+                                            </button>
+                                            <button onClick={() => handleAnimateClick(img)}
+                                                className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold text-[var(--sys-bg)] bg-[var(--sys-text)] hover:bg-[var(--sys-text)] cursor-pointer transition-all" title="Animate this image">
+                                                <span className="material-symbols-outlined text-xs">movie</span>
+                                                Animate
+                                            </button>
+                                            <button onClick={() => handleDownloadImage(img.imageUrl || img.thumbnailUrl, `${img.title || 'creative'}.png`)}
+                                                className="p-1.5 rounded-lg text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)] cursor-pointer transition-all" title="Download">
+                                                <span className="material-symbols-outlined text-sm">download</span>
+                                            </button>
+                                            <button onClick={() => { setDesignBaseImage(img.imageUrl || img.thumbnailUrl); setPrompt(img.prompt || ''); }}
+                                                className="p-1.5 rounded-lg text-[var(--sys-text-muted)] hover:text-primary hover:bg-primary/10 cursor-pointer transition-all" title="Edit">
+                                                <span className="material-symbols-outlined text-sm">edit</span>
+                                            </button>
+                                            <button onClick={() => setPublishData({ image: img.imageUrl || img.thumbnailUrl, text: '' })}
+                                                className="p-1.5 rounded-lg text-[var(--sys-text-muted)] hover:text-[#1877F2] hover:bg-[#1877F2]/10 cursor-pointer transition-all" title="Publish">
+                                                <span className="material-symbols-outlined text-sm">share</span>
+                                            </button>
+                                            <button onClick={() => { setResult(img); }}
+                                                className="p-1.5 rounded-lg text-[var(--sys-text-muted)] hover:text-primary hover:bg-[var(--sys-primary-dim)] cursor-pointer transition-all" title="View full">
+                                                <span className="material-symbols-outlined text-sm">open_in_full</span>
+                                            </button>
+                                        </div>
+
+                                        {/* ── MCoT Thinking Mode Toggle ── */}
+                                        {img.aiMeta?.mcotReasoning && (
+                                            <button
+                                                onClick={() => setExpandedReasoning(expandedReasoning === img._id ? null : img._id)}
+                                                className={`studio-btn-pill border-none flex items-center gap-1.5 mt-2 px-2.5 py-1 ${expandedReasoning === img._id ? 'active' : ''}`}
+                                            >
+                                                <span className="material-symbols-outlined text-xs" style={{ fontSize: '12px' }}>psychology</span>
+                                                {expandedReasoning === img._id ? 'Hide Reasoning' : 'Thinking Mode'}
+                                                <span className="material-symbols-outlined text-xs" style={{ fontSize: '10px', transition: 'transform 0.2s', transform: expandedReasoning === img._id ? 'rotate(180deg)' : 'rotate(0deg)' }}>expand_more</span>
+                                            </button>
+                                        )}
+
+                                        {/* ── MCoT Reasoning Chain Panel ── */}
+                                        {expandedReasoning === img._id && img.aiMeta?.mcotReasoning && (() => {
+                                            const r = img.aiMeta.mcotReasoning
+                                            return (
+                                                <div className="mt-2 rounded-xl border border-[var(--sys-text)] bg-[var(--sys-surface)] border border-[var(--sys-border)] overflow-hidden animate-fade-in">
+                                                    {/* Header */}
+                                                    <div className="px-3 py-2 bg-[var(--sys-text-muted)] border-b border-[var(--sys-text)] flex items-center gap-2">
+                                                        <span className="material-symbols-outlined text-[var(--sys-text)]" style={{ fontSize: '14px' }}>neurology</span>
+                                                        <span className="text-[10px] font-bold text-[var(--sys-bg)] uppercase tracking-wider">MCoT Reasoning Chain</span>
+                                                        {img.aiMeta?.pipelineTimeMs && (
+                                                            <span className="text-[9px] text-[var(--sys-text)] ml-auto">{(img.aiMeta.pipelineTimeMs / 1000).toFixed(1)}s</span>
+                                                        )}
+                                                    </div>
+
+                                                    <div className="p-3 space-y-2.5">
+                                                        {/* Step 1: Brand Intelligence */}
+                                                        {r.brandInsight?.name && (
+                                                            <div className="flex gap-2">
+                                                                <div className="w-5 h-5 rounded-md bg-[var(--sys-text)] flex items-center justify-center flex-shrink-0 mt-0.5">
+                                                                    <span className="material-symbols-outlined text-[var(--sys-text)]" style={{ fontSize: '11px' }}>corporate_fare</span>
+                                                                </div>
+                                                                <div className="flex-1 min-w-0">
+                                                                    <p className="text-[9px] font-bold text-[var(--sys-text)] uppercase tracking-wider mb-0.5">Brand Intel</p>
+                                                                    <p className="text-[10px] text-[var(--sys-text)] leading-relaxed">
+                                                                        <span className="text-[var(--sys-text)] font-semibold">{r.brandInsight.name}</span>
+                                                                        {r.brandInsight.industry && <span className="text-[var(--sys-text-muted)]"> · {r.brandInsight.industry}</span>}
+                                                                        {r.brandInsight.brandType && <span className="text-[var(--sys-text-muted)]"> · {r.brandInsight.brandType}</span>}
+                                                                    </p>
+                                                                    {r.brandInsight.targetAudience && (
+                                                                        <p className="text-[9px] text-[var(--sys-text-muted)] mt-0.5"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">ads_click</span> {r.brandInsight.targetAudience}</p>
+                                                                    )}
+                                                                    {r.brandInsight.colors?.length > 0 && (
+                                                                        <div className="flex gap-1 mt-1">
+                                                                            {r.brandInsight.colors.map((c, i) => (
+                                                                                <span key={i} className="text-[8px] px-1.5 py-0.5 rounded bg-[var(--sys-surface)] text-[var(--sys-text-muted)]">{c}</span>
+                                                                            ))}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        )}
+
+                                                        {/* Step 2: Product Match */}
+                                                        {r.matchedProduct?.title && (
+                                                            <div className="flex gap-2">
+                                                                <div className="w-5 h-5 rounded-md bg-[var(--sys-primary-dim)] flex items-center justify-center flex-shrink-0 mt-0.5">
+                                                                    <span className="material-symbols-outlined text-primary" style={{ fontSize: '11px' }}>inventory_2</span>
+                                                                </div>
+                                                                <div className="flex-1 min-w-0">
+                                                                    <p className="text-[9px] font-bold text-primary uppercase tracking-wider mb-0.5">Matched Product</p>
+                                                                    <p className="text-[10px] text-[var(--sys-text)]">
+                                                                        <span className="text-[var(--sys-text)] font-semibold">{r.matchedProduct.title}</span>
+                                                                        {r.matchedProduct.category && <span className="text-[var(--sys-text-muted)]"> · {r.matchedProduct.category}</span>}
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+                                                        )}
+
+                                                        {/* Step 3: Visual Grounding (MCoT Stage 1) */}
+                                                        {r.visualGrounding && (
+                                                            <div className="flex gap-2">
+                                                                <div className="w-5 h-5 rounded-md bg-[var(--sys-primary-dim)] flex items-center justify-center flex-shrink-0 mt-0.5">
+                                                                    <span className="material-symbols-outlined text-primary" style={{ fontSize: '11px' }}>visibility</span>
+                                                                </div>
+                                                                <div className="flex-1 min-w-0">
+                                                                    <p className="text-[9px] font-bold text-primary uppercase tracking-wider mb-0.5">
+                                                                        Visual Grounding
+                                                                        {r.visualGrounding.confidence && (
+                                                                            <span className={`ml-1.5 px-1 py-0.5 rounded text-[8px] font-bold ${
+                                                                                r.visualGrounding.confidence === 'high' ? 'bg-[var(--sys-primary-dim)] text-[var(--sys-primary)]' :
+                                                                                r.visualGrounding.confidence === 'medium' ? 'bg-yellow-500/20 text-yellow-300' :
+                                                                                'bg-[var(--sys-primary-dim)] text-[var(--sys-primary)]'}`}
+                                                                            >{r.visualGrounding.confidence}</span>
+                                                                        )}
+                                                                    </p>
+                                                                    {r.visualGrounding.productAnalysis && (
+                                                                        <p className="text-[10px] text-[var(--sys-text)] leading-relaxed">{r.visualGrounding.productAnalysis}</p>
+                                                                    )}
+                                                                    {r.visualGrounding.colorPalette?.length > 0 && (
+                                                                        <div className="flex gap-1 mt-1 flex-wrap">
+                                                                            <span className="text-[8px] text-[var(--sys-text-muted)]">Colors:</span>
+                                                                            {r.visualGrounding.colorPalette.map((c, i) => (
+                                                                                <span key={i} className="text-[8px] px-1.5 py-0.5 rounded bg-[var(--sys-primary-dim)] text-[var(--sys-primary)]">{c}</span>
+                                                                            ))}
+                                                                        </div>
+                                                                    )}
+                                                                    {r.visualGrounding.materialFinish && (
+                                                                        <p className="text-[9px] text-[var(--sys-text-muted)] mt-0.5"><span className="material-symbols-outlined text-[9px] align-middle mr-0.5">build</span> {r.visualGrounding.materialFinish}</p>
+                                                                    )}
+                                                                    {r.visualGrounding.avoidList?.length > 0 && (
+                                                                        <p className="text-[9px] text-primary/60 mt-0.5"><span className="material-symbols-outlined text-[9px] align-middle mr-0.5">warning</span> Avoid: {r.visualGrounding.avoidList.join(', ')}</p>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        )}
+
+                                                        {/* Step 4: Art Direction */}
+                                                        {r.artDirection && (
+                                                            <div className="flex gap-2">
+                                                                <div className="w-5 h-5 rounded-md bg-[var(--sys-text)] flex items-center justify-center flex-shrink-0 mt-0.5">
+                                                                    <span className="material-symbols-outlined text-[var(--sys-bg)]" style={{ fontSize: '11px' }}>palette</span>
+                                                                </div>
+                                                                <div className="flex-1 min-w-0">
+                                                                    <p className="text-[9px] font-bold text-[var(--sys-bg)] uppercase tracking-wider mb-0.5">Art Direction</p>
+                                                                    <p className="text-[10px] text-[var(--sys-text)] leading-relaxed">
+                                                                        {r.artDirection.mood && <span><span className="text-[var(--sys-text)] font-semibold">Mood:</span> {r.artDirection.mood} · </span>}
+                                                                        {r.artDirection.visualStyle && <span><span className="text-[var(--sys-text)] font-semibold">Style:</span> {r.artDirection.visualStyle}</span>}
+                                                                    </p>
+                                                                    {r.artDirection.lighting && (
+                                                                        <p className="text-[9px] text-[var(--sys-text-muted)] mt-0.5"><span className="material-symbols-outlined text-[9px] align-middle mr-0.5">lightbulb</span> {r.artDirection.lighting}</p>
+                                                                    )}
+                                                                    {r.artDirection.composition && (
+                                                                        <p className="text-[9px] text-[var(--sys-text-muted)] mt-0.5"><span className="material-symbols-outlined text-[9px] align-middle mr-0.5">straighten</span> {r.artDirection.composition}</p>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        )}
+
+                                                        {/* Step 5: Style Critique */}
+                                                        {r.styleCritique && (
+                                                            <div className="flex gap-2">
+                                                                <div className="w-5 h-5 rounded-md bg-[var(--sys-primary-dim)] flex items-center justify-center flex-shrink-0 mt-0.5">
+                                                                    <span className="material-symbols-outlined text-primary" style={{ fontSize: '11px' }}>verified</span>
+                                                                </div>
+                                                                <div className="flex-1 min-w-0">
+                                                                    <p className="text-[9px] font-bold text-primary uppercase tracking-wider mb-0.5">Brand Alignment</p>
+                                                                    <div className="flex items-center gap-2">
+                                                                        <div className="flex-1 h-1.5 rounded-full bg-[var(--sys-surface)] overflow-hidden">
+                                                                            <div className="h-full rounded-full transition-all"
+                                                                                style={{
+                                                                                    width: `${r.styleCritique.brandAlignmentScore || 0}%`,
+                                                                                    background: (r.styleCritique.brandAlignmentScore || 0) >= 80 ? '#34d399' : (r.styleCritique.brandAlignmentScore || 0) >= 60 ? '#fbbf24' : '#f87171',
+                                                                                }}
+                                                                            />
+                                                                        </div>
+                                                                        <span className="text-[10px] font-bold text-[var(--sys-text)]">{r.styleCritique.brandAlignmentScore || 0}%</span>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        )}
+
+                                                        {/* Post-Gen Critique Score (if available — populated async) */}
+                                                        {img.aiMeta?.mcotScore && (
+                                                            <div className="flex gap-2">
+                                                                <div className="w-5 h-5 rounded-md bg-[var(--sys-text)] flex items-center justify-center flex-shrink-0 mt-0.5">
+                                                                    <span className="material-symbols-outlined text-[var(--sys-text)]" style={{ fontSize: '11px' }}>auto_awesome</span>
+                                                                </div>
+                                                                <div className="flex-1 min-w-0">
+                                                                    <p className="text-[9px] font-bold text-[var(--sys-text)] uppercase tracking-wider mb-0.5">Quality Score</p>
+                                                                    <div className="flex items-center gap-2">
+                                                                        <div className="flex-1 h-1.5 rounded-full bg-[var(--sys-surface)] overflow-hidden">
+                                                                            <div className="h-full rounded-full transition-all"
+                                                                                style={{
+                                                                                    width: `${img.aiMeta.mcotScore}%`,
+                                                                                    background: img.aiMeta.mcotScore >= 75 ? '#a78bfa' : img.aiMeta.mcotScore >= 50 ? '#fbbf24' : '#f87171',
+                                                                                }}
+                                                                            />
+                                                                        </div>
+                                                                        <span className="text-[10px] font-bold text-[var(--sys-text)]">{img.aiMeta.mcotScore}/100</span>
+                                                                    </div>
+                                                                    {img.aiMeta.mcotCritique?.verdict && (
+                                                                        <span className={`inline-block mt-1 text-[8px] font-bold px-1.5 py-0.5 rounded ${
+                                                                            img.aiMeta.mcotCritique.verdict === 'approved' ? 'bg-[var(--sys-primary-dim)] text-[var(--sys-primary)]' :
+                                                                            img.aiMeta.mcotCritique.verdict === 'improve' ? 'bg-[var(--sys-primary-dim)] text-[var(--sys-primary)]' :
+                                                                            'bg-[var(--sys-primary-dim)] text-[var(--sys-primary)]'
+                                                                        }`}>{img.aiMeta.mcotCritique.verdict.toUpperCase()}</span>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            )
+                                        })()}
+                                    </div>
+                                    ))}
                                 </div>
-                            )}
+                            );
+                        })()}
+
                         </div>
                     </div>
 

@@ -42,7 +42,7 @@ import {
     ugcPromptBuilderNode,
 } from '../agents/videoStudio/nodes.js';
 import { estimateCost, getModelsInfo, MODEL_CAPABILITIES, submitVideoGeneration } from '../agents/videoStudio/falClient.js';
-import { submitPiApiImageToVideo, submitPiApiVideoExtend } from '../agents/videoStudio/piApiClient.js';
+import { submitAtlasCloudImageToVideo, submitAtlasCloudVideoExtend } from '../agents/videoStudio/atlasClient.js';
 import { listAvatars, listVoices, generateUGCVideo, generatePhotoAvatarVideo, getHeyGenVideoStatus, generateVideoWithAudio, uploadAssetToHeyGen, createPhotoAvatar, getPhotoAvatarStatus, checkPhotoGenStatus, generateVideoAgent, generatePlacementPoses, generatePlacementVideo, registerWebhook, generateLooks, addMotion, listAvatarGroups, listAvatarLooks } from '../agents/videoStudio/heygenClient.js';
 import { generateUGCScript, UGC_STYLES } from '../agents/videoStudio/ugcScriptGenerator.js';
 import { saveLearnings, getStylePreferences } from '../agents/videoStudio/selfLearning.js';
@@ -52,7 +52,7 @@ import { uploadToS3, mirrorUrlToS3, getSignedUrlIfNeeded, ensureS3Url } from '..
 import { safeErrorMessage } from '../utils/safeError.js';
 import { loadBrandContext, callMultimodalAgent, callAgent } from '../agents/shared/agentUtils.js';
 import { buildEnhanceSystemPrompt, buildEnhanceUserPrompt, VISUAL_GROUNDING_SYSTEM } from '../agents/videoStudio/promptEnhancer.js';
-import { submitPiApiVideoGeneration, getPiApiGenerationStatus as pollPiApiStatus } from '../agents/videoStudio/piApiClient.js';
+import { submitAtlasCloudVideoGeneration, getAtlasCloudGenerationStatus as pollAtlasCloudStatus } from '../agents/videoStudio/atlasClient.js';
 import { geminiImageGenerate } from '../agents/videoStudio/firstFrame.js';
 import { Q_ADS_CATEGORIES, getCategory, buildQAdPrompt, getQAdsCreditCost } from '../agents/videoStudio/qAdsCategories.js';
 
@@ -169,7 +169,7 @@ router.post(['/advanced/i2v', '/advanced/image-to-video'], protect, requireCredi
                     falRequestId: result.requestId,
                     falEndpoint: result.endpoint || 'seedance-2.0-i2v',
                     provider: result.provider,
-                    _piApiPayload: result._piApiPayload || null,
+                    _atlasCloudPayload: result._atlasCloudPayload || null,
                     _muApiPayload: result._muApiPayload || null,
                     _laozhangVideoUrl: result._laozhangVideoUrl || null,
                     videoUrl: result._laozhangVideoUrl || '',
@@ -272,7 +272,7 @@ router.post('/extend-video', protect, requireCredits('videoGenerate'), async (re
                     falRequestId: result.requestId,
                     falEndpoint: result.endpoint || 'seedance-2.0-extend',
                     provider: result.provider,
-                    _piApiPayload: result._piApiPayload,
+                    _atlasCloudPayload: result._atlasCloudPayload,
                     _muApiPayload: result._muApiPayload,
                     _laozhangVideoUrl: result._laozhangVideoUrl,
                     videoUrl: result._laozhangVideoUrl || '',
@@ -3094,8 +3094,8 @@ router.post('/ugc-pro/generate', protect, requireCredits('ugcProGenerate'), asyn
         console.log(`[UGC Generate] Final prompt @image check — @image1: ${prompt.includes('@image1')}, @image2: ${prompt.includes('@image2')}`);
         console.log(`[UGC Generate] Submitting — ${duration}s, ${imageUrls.length} images, prompt ${prompt.split(/\s+/).length}w`);
 
-        // Submit to PiAPI via piApiClient
-        const genResult = await submitPiApiVideoGeneration({
+        // Submit to PiAPI via atlasClient
+        const genResult = await submitAtlasCloudVideoGeneration({
             prompt,
             imageUrl: imageUrls[0] || null,
             duration,
@@ -3115,7 +3115,7 @@ router.post('/ugc-pro/generate', protect, requireCredits('ugcProGenerate'), asyn
             backendPrompt: prompt,
             input: { images: imageUrls.map(url => ({ url, source: 'existing' })), productData: parsedProduct },
             generation: {
-                provider: 'piapi',
+                provider: 'atlascloud',
                 model: 'seedance-2.0',
                 taskId: genResult.taskId,
                 requestId: genResult.taskId,
@@ -3130,7 +3130,7 @@ router.post('/ugc-pro/generate', protect, requireCredits('ugcProGenerate'), asyn
             success: true,
             projectId: project._id,
             requestId: genResult.taskId,
-            provider: 'piapi',
+            provider: 'atlascloud',
             prompt,
             imageCount: imageUrls.length,
             duration,
@@ -3146,7 +3146,7 @@ router.post('/ugc-pro/generate', protect, requireCredits('ugcProGenerate'), asyn
 // Poll MuAPI generation status (uses existing muapiClient) and update history
 router.get('/ugc-pro/status/:requestId', protect, async (req, res) => {
     try {
-        const result = await pollPiApiStatus(req.params.requestId);
+        const result = await pollAtlasCloudStatus(req.params.requestId);
         
         // Update DB history to maintain sync
         if (result && req.params.requestId) {
@@ -3280,7 +3280,7 @@ router.post('/ugc-pro/qads/generate', protect, async (req, res) => {
 
         console.log(`[Q-Ads Generate] Submitting — ${categoryId}, ${duration}s, ${imageUrls.length} images`);
 
-        const genResult = await submitPiApiVideoGeneration({
+        const genResult = await submitAtlasCloudVideoGeneration({
             prompt,
             imageUrl: imageUrls[0] || null,
             duration, aspectRatio, qualityMode: quality, generateAudio: true,
@@ -3298,7 +3298,7 @@ router.post('/ugc-pro/qads/generate', protect, async (req, res) => {
                 productData: parsedProduct, categoryId
             },
             generation: {
-                provider: 'piapi', model: 'seedance-2.0',
+                provider: 'atlascloud', model: 'seedance-2.0',
                 taskId: genResult.taskId, requestId: genResult.taskId,
                 duration, aspectRatio, progress: 0, status: 'GENERATING',
             },
@@ -3306,7 +3306,7 @@ router.post('/ugc-pro/qads/generate', protect, async (req, res) => {
 
         res.json({
             success: true, projectId: project._id, requestId: genResult.taskId,
-            provider: 'piapi', categoryId, prompt, imageCount: imageUrls.length, duration, aspectRatio,
+            provider: 'atlascloud', categoryId, prompt, imageCount: imageUrls.length, duration, aspectRatio,
         });
     } catch (err) {
         console.error('Q-Ads generate error:', err.message);
@@ -3317,7 +3317,7 @@ router.post('/ugc-pro/qads/generate', protect, async (req, res) => {
 // ── GET /api/video-studio/ugc-pro/qads/status/:requestId ──
 router.get('/ugc-pro/qads/status/:requestId', protect, async (req, res) => {
     try {
-        const result = await pollPiApiStatus(req.params.requestId);
+        const result = await pollAtlasCloudStatus(req.params.requestId);
 
         // 🛡️ SAFE MODE PIVOT: If Seedance blocked due to real person face detection,
         // automatically resubmit without the avatar image (product-only mode)
@@ -3334,7 +3334,7 @@ router.get('/ugc-pro/qads/status/:requestId', protect, async (req, res) => {
                 const productOnlyImages = originalImages.length > 1 ? originalImages.slice(1) : [];
 
                 try {
-                    const retryResult = await submitPiApiVideoGeneration({
+                    const retryResult = await submitAtlasCloudVideoGeneration({
                         prompt: project.backendPrompt || project.script,
                         imageUrl: productOnlyImages[0] || null,
                         duration: project.generation?.duration || 5,
@@ -4013,7 +4013,7 @@ router.post('/:id/generate', protect, requireCredits('videoGenerate'), async (re
                         falStatusUrl: genResult.statusUrl,
                         falResultUrl: genResult.resultUrl,
                         provider: genResult.provider || 'fal',
-                        _piApiPayload: genResult._piApiPayload || null,
+                        _atlasCloudPayload: genResult._atlasCloudPayload || null,
                         _muApiPayload: genResult._muApiPayload || null,
                         _laozhangVideoUrl: genResult._laozhangVideoUrl || null,
                         videoUrl: genResult._laozhangVideoUrl || '',
@@ -4127,7 +4127,7 @@ router.get('/:id/status', protect, async (req, res) => {
                             falStatusUrl: shot.falStatusUrl,
                             falResultUrl: shot.falResultUrl,
                             provider: shot.provider,
-                            _piApiPayload: shot._piApiPayload,
+                            _atlasCloudPayload: shot._atlasCloudPayload,
                             _muApiPayload: shot._muApiPayload,
                             _laozhangVideoUrl: shot._laozhangVideoUrl,
                             videoUrl: shot.videoUrl,
@@ -4735,7 +4735,7 @@ router.get('/', protect, async (req, res) => {
                     let provider = p.generation?.provider || '';
                     if (!provider) {
                         if (model === 'veo-3.1-fast') provider = 'kie';
-                        else if (model === 'seedance-2.0') provider = 'piapi';
+                        else if (model === 'seedance-2.0') provider = 'atlascloud';
                         else if (model === 'grok-imagine') provider = 'grok';
                         else if (model === 'sora-2') provider = 'laozhang';
                         else if (model.startsWith('heygen')) provider = 'heygen';

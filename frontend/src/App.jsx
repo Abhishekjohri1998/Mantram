@@ -55,6 +55,9 @@ const JoinTeam = lazy(() => import('./pages/JoinTeam'))
 const RetentionStudio = lazy(() => import('./pages/RetentionStudio'))
 const UserSettings = lazy(() => import('./pages/UserSettings'))
 
+// ── Pulse Studio (brief-to-published) ──
+const PulseStudio = lazy(() => import('./pages/PulseStudio/index'))
+
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'))
 const TermsOfService = lazy(() => import('./pages/TermsOfService'))
 const DataDeletion = lazy(() => import('./pages/DataDeletion'))
@@ -153,6 +156,10 @@ function App() {
                     <Route path="/skills" element={<ProtectedRoute><SkillsHub /></ProtectedRoute>} />
                     <Route path="/superadmin" element={<ProtectedRoute allowedRoles={['superadmin']}><SuperAdminDashboard /></ProtectedRoute>} />
                     <Route path="/retention-studio" element={<ProtectedRoute><RetentionStudio /></ProtectedRoute>} />
+                    <Route path="/pulse-studio" element={<ProtectedRoute><PulseStudio /></ProtectedRoute>} />
+                    <Route path="/pulse-studio/*" element={<ProtectedRoute><PulseStudio /></ProtectedRoute>} />
+                    <Route path="/creative-studio/pulse-studio" element={<Navigate to="/pulse-studio" replace />} />
+                    <Route path="/creative-studio/pulse-studio/*" element={<Navigate to="/pulse-studio" replace />} />
                   </Routes>
                 </Suspense>
 

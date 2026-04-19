@@ -1403,3 +1403,98 @@
 .bg-job-toast[data-status="success"] { border-left: 3px solid rgba(34, 197, 94, 0.8); }
 .bg-job-toast[data-status="error"] { border-left: 3px solid rgba(239, 68, 68, 0.8); }
 
+/* ═══════════════════════════════════════════════════
+   STUDIO BUTTON SYSTEM
+   Used throughout Creative Studio, Photoshoot Panel,
+   Video Studio, and all sub-panels.
+═══════════════════════════════════════════════════ */
+
+/* ── Pill chip button (lighting / surface / mood / shot selectors) ── */
+.studio-btn-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.3rem 0.75rem;
+  border-radius: 99px;
+  border: 1px solid var(--sys-border);
+  background: var(--sys-surface);
+  color: var(--sys-text-muted);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  font-family: var(--font-body);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  white-space: nowrap;
+  user-select: none;
+}
+.studio-btn-pill:hover {
+  color: var(--sys-text);
+  border-color: var(--sys-text);
+  background: var(--sys-surface);
+}
+.studio-btn-pill.active,
+.studio-btn-pill[data-active="true"] {
+  background: var(--sys-text);
+  color: var(--sys-bg);
+  border-color: var(--sys-text);
+}
+.studio-btn-pill:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ── Primary action button (Generate, Submit, etc.) ── */
+.studio-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1.25rem;
+  border-radius: 8px;
+  border: none;
+  background: var(--sys-primary);
+  color: #ffffff;
+  font-size: 0.875rem;
+  font-weight: 700;
+  font-family: var(--font-display);
+  cursor: pointer;
+  transition: opacity 0.15s ease, transform 0.1s ease;
+  white-space: nowrap;
+  user-select: none;
+}
+.studio-btn-primary:hover:not(:disabled) { opacity: 0.88; }
+.studio-btn-primary:active:not(:disabled) { transform: scale(0.98); opacity: 0.8; }
+.studio-btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* ── Secondary action button (Cancel, Back, secondary actions) ── */
+.studio-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  border: 1px solid var(--sys-border);
+  background: var(--sys-surface);
+  color: var(--sys-text);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  font-family: var(--font-body);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+  white-space: nowrap;
+  user-select: none;
+}
+.studio-btn-secondary:hover:not(:disabled) {
+  background: var(--sys-bg);
+  border-color: var(--sys-text);
+}
+.studio-btn-secondary:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* Light theme overrides */
+.theme-light .studio-btn-pill.active,
+.theme-light .studio-btn-pill[data-active="true"] {
+  background: var(--sys-text);
+  color: var(--sys-surface);
+  border-color: var(--sys-text);
+}
