@@ -64,11 +64,11 @@
 }
 
 .hdr-banner-resume {
-  background-color: rgba(255, 77, 0, 0.1);
+  background-color: var(--sys-primary-dim);
   border-bottom: 1px solid rgba(255, 77, 0, 0.2);
 }
 .hdr-banner-resume p {
-  color: #fff7ed;
+  color: var(--sys-text);
 }
 .hdr-banner-resume button {
   background-color: #FF4D00;
@@ -96,7 +96,7 @@
   align-items: center;
   padding: 0.5rem 0.75rem; /* optimized for mobile */
   height: 4rem; /* h-16 */
-  background-color: rgba(var(--sys-bg-rgb, 10, 10, 26), 0.9);
+  background-color: color-mix(in srgb, var(--sys-bg) 90%, transparent);
   backdrop-filter: blur(24px);
   border-bottom: 1px solid var(--sys-border);
   z-index: 50;
@@ -296,8 +296,8 @@
   gap: 0.375rem;
   padding: 0.375rem 0.75rem;
   border-radius: 0.75rem;
-  background-color: rgba(var(--sys-primary-rgb, 255, 77, 0), 0.1);
-  border: 1px solid rgba(var(--sys-primary-rgb, 255, 77, 0), 0.2);
+  background-color: var(--sys-primary-dim);
+  border: 1px solid rgba(255, 77, 0, 0.2);
 }
 @media (min-width: 640px) { .hdr-credit-infinite { display: flex; } }
 
@@ -356,7 +356,7 @@
   margin-top: 0.5rem;
   border-radius: 0.75rem;
   border: 1px solid var(--sys-border);
-  background-color: rgba(var(--sys-surface-rgb, 20, 20, 40), 0.95);
+  background-color: color-mix(in srgb, var(--sys-surface) 95%, transparent);
   backdrop-filter: blur(16px);
   overflow: hidden;
   animation: hdr-fade-in 0.2s ease-out;

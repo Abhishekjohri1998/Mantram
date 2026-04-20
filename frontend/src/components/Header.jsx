@@ -211,19 +211,19 @@ export default function Header({ title, subtitle, onMenuToggle }) {
                                                             ? 'text-[var(--sys-text)]'
                                                             : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]'
                                                     }`}
-                                                    style={activeBrand?._id === brand._id ? { background: 'rgba(255,77,0,0.1)', border: '1px solid rgba(255,77,0,0.15)' } : { border: '1px solid transparent' }}>
+                                                    style={activeBrand?._id === brand._id ? { background: 'var(--sys-primary-dim)', border: '1px solid var(--sys-primary)' } : { border: '1px solid transparent' }}>
                                                     <div className="w-6 h-6 rounded-md flex items-center justify-center text-xs font-bold text-[var(--sys-text)] flex-shrink-0"
                                                         style={{ background: brand.dna?.colors?.[0]?.hex || '#8b5cf6' }}>
                                                         {brand.name?.charAt(0)}
                                                     </div>
                                                     <span className="text-sm font-medium truncate flex-1">{brand.name}</span>
                                                     {activeBrand?._id === brand._id && (
-                                                        <span className="material-symbols-outlined text-sm" style={{ color: '#FF4D00' }}>check_circle</span>
+                                                        <span className="material-symbols-outlined text-sm text-primary">check_circle</span>
                                                     )}
                                                     {brandJobs.length > 0 && (
                                                         <span className="flex h-2 w-2">
-                                                            <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-[#FF4D00] opacity-75" />
-                                                            <span className="relative inline-flex rounded-full h-2 w-2 bg-[#FF4D00]" />
+                                                            <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-primary opacity-75" />
+                                                            <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
                                                         </span>
                                                     )}
                                                 </button>
