@@ -2446,7 +2446,7 @@ function APlusTool({ brandId, onContextReady, externalContext }) {
         <div style={{ position: 'relative' }}>
             <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
                 {[{ id: 'url', label: 'Product URL', icon: 'link' }, { id: 'catalog', label: 'Brand Catalog', icon: 'inventory_2' }, { id: 'sample', label: 'Upload Sample', icon: 'upload' }].map(m => (
-                    <button key={m.id} onClick={() => setInputMode(m.id)} style={{ padding: '10px 18px', borderRadius: 10, border: '1px solid ' + (inputMode === m.id ? 'rgba(124,58,237,0.4)' : 'rgba(255,255,255,0.1)'), background: inputMode === m.id ? 'rgba(124,58,237,0.15)' : 'rgba(255,255,255,0.04)', color: inputMode === m.id ? '#A78BFA' : 'rgba(255,255,255,0.6)', fontWeight: 600, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7 }}>
+                    <button key={m.id} onClick={() => setInputMode(m.id)} style={{ padding: '10px 18px', borderRadius: 10, border: '1px solid ' + (inputMode === m.id ? 'rgba(124,58,237,0.4)' : 'var(--sys-border)'), background: inputMode === m.id ? 'rgba(124,58,237,0.15)' : 'color-mix(in srgb, var(--sys-text) 4%, var(--sys-surface))', color: inputMode === m.id ? '#A78BFA' : 'var(--sys-text-muted)', fontWeight: 600, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7 }}>
                         <span className="material-symbols-outlined" style={{ fontSize: 16 }}>{m.icon}</span>{m.label}
                     </button>
                 ))}
@@ -2458,7 +2458,7 @@ function APlusTool({ brandId, onContextReady, externalContext }) {
                     <div style={{ display: 'flex', gap: 10 }}>
                         <input value={productUrl} onChange={e => setProductUrl(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleAnalyzeUrl()}
                             placeholder="https://www.amazon.in/dp/XXXXXXXXXX or any product link..."
-                            style={{ flex: 1, background: 'color-mix(in srgb, var(--sys-text) 6%, var(--sys-surface))', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '12px 16px', color: 'var(--sys-text)', fontSize: 14, outline: 'none' }} />
+                            style={{ flex: 1, background: 'color-mix(in srgb, var(--sys-text) 6%, var(--sys-surface))', border: '1px solid var(--sys-border)', borderRadius: 10, padding: '12px 16px', color: 'var(--sys-text)', fontSize: 14, outline: 'none' }} />
                         <button onClick={handleAnalyzeUrl} disabled={pdiStep === 'analyzing' || !productUrl}
                             style={{ background: 'rgba(124,58,237,0.2)', border: '1px solid rgba(124,58,237,0.4)', color: '#A78BFA', padding: '12px 20px', borderRadius: 10, fontWeight: 700, cursor: 'pointer', fontSize: 13, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
                             <span className="material-symbols-outlined" style={{ fontSize: 16 }}>{pdiStep === 'analyzing' ? 'hourglass_empty' : 'palette'}</span>
@@ -3040,45 +3040,45 @@ function ProductContextBar({ brandId, activeContext, onContextChange }) {
             <div style={{
                 background: activeContext
                     ? 'linear-gradient(135deg, rgba(124,58,237,0.1) 0%, rgba(245,158,11,0.05) 100%)'
-                    : 'rgba(255,255,255,0.03)',
-                border: `1px solid ${activeContext ? 'rgba(124,58,237,0.22)' : 'rgba(255,255,255,0.08)'}`,
+                    : 'color-mix(in srgb, var(--sys-text) 3%, var(--sys-surface))',
+                border: `1px solid ${activeContext ? 'rgba(124,58,237,0.22)' : 'var(--sys-border)'}`,
                 borderRadius: 14, padding: '13px 18px', marginBottom: 18,
                 display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
             }}>
-                <div style={{ width: 30, height: 30, borderRadius: 8, background: activeContext ? 'rgba(124,58,237,0.18)' : 'rgba(255,255,255,0.06)', border: `1px solid ${activeContext ? 'rgba(124,58,237,0.3)' : 'rgba(255,255,255,0.1)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <span className="material-symbols-outlined" style={{ fontSize: 16, color: activeContext ? '#A78BFA' : 'rgba(255,255,255,0.4)' }}>palette</span>
+                <div style={{ width: 30, height: 30, borderRadius: 8, background: activeContext ? 'rgba(124,58,237,0.18)' : 'color-mix(in srgb, var(--sys-text) 6%, var(--sys-surface))', border: `1px solid ${activeContext ? 'rgba(124,58,237,0.3)' : 'var(--sys-border)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 16, color: activeContext ? '#A78BFA' : 'var(--sys-text-muted)' }}>palette</span>
                 </div>
 
                 {activeContext ? (
                     <>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 12, fontWeight: 700, color: '#FFF', display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--sys-text)', display: 'flex', alignItems: 'center', gap: 6 }}>
                                 <span className="material-symbols-outlined" style={{ fontSize: 13, color: '#22C55E' }}>check_circle</span>
                                 {productName || 'Active Product'}
-                                {moodName && <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', fontWeight: 400 }}>· {moodName}</span>}
+                                {moodName && <span style={{ fontSize: 10, color: 'var(--sys-text-muted)', fontWeight: 400 }}>· {moodName}</span>}
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 3, marginTop: 4 }}>
                                 {palette.slice(0,8).map((c, i) => (
-                                    <div key={i} title={`${c.name} ${c.hex}`} style={{ width: 13, height: 13, borderRadius: 3, background: c.hex, border: '1px solid rgba(255,255,255,0.1)' }} />
+                                    <div key={i} title={`${c.name} ${c.hex}`} style={{ width: 13, height: 13, borderRadius: 3, background: c.hex, border: '1px solid var(--sys-border)' }} />
                                 ))}
-                                <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', marginLeft: 4 }}>Color Guard · All tools use this palette</span>
+                                <span style={{ fontSize: 9, color: 'var(--sys-text-muted)', marginLeft: 4 }}>Color Guard · All tools use this palette</span>
                             </div>
                         </div>
-                        <button onClick={handleSave} disabled={saving} style={{ background: saved ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.06)', border: `1px solid ${saved ? 'rgba(34,197,94,0.3)' : 'rgba(255,255,255,0.12)'}`, color: saved ? '#22C55E' : '#FFF', padding: '6px 13px', borderRadius: 7, cursor: 'pointer', fontWeight: 600, fontSize: 12, display: 'flex', alignItems: 'center', gap: 5, transition: 'all 0.2s' }}>
+                        <button onClick={handleSave} disabled={saving} style={{ background: saved ? 'rgba(34,197,94,0.12)' : 'color-mix(in srgb, var(--sys-text) 6%, var(--sys-surface))', border: `1px solid ${saved ? 'rgba(34,197,94,0.3)' : 'var(--sys-border)'}`, color: saved ? '#22C55E' : 'var(--sys-text)', padding: '6px 13px', borderRadius: 7, cursor: 'pointer', fontWeight: 600, fontSize: 12, display: 'flex', alignItems: 'center', gap: 5, transition: 'all 0.2s' }}>
                             <span className="material-symbols-outlined" style={{ fontSize: 13 }}>{saved ? 'check' : saving ? 'hourglass_empty' : 'bookmark'}</span>
                             {saved ? 'Saved!' : saving ? 'Saving...' : 'Save Context'}
                         </button>
                         <button onClick={() => setShowLibrary(true)} style={{ background: 'rgba(124,58,237,0.1)', border: '1px solid rgba(124,58,237,0.2)', color: '#A78BFA', padding: '6px 13px', borderRadius: 7, cursor: 'pointer', fontWeight: 600, fontSize: 12, display: 'flex', alignItems: 'center', gap: 5 }}>
                             <span className="material-symbols-outlined" style={{ fontSize: 13 }}>library_books</span>Library
                         </button>
-                        <button onClick={() => onContextChange(null)} title="Clear active context" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.4)', padding: '6px 8px', borderRadius: 7, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <button onClick={() => onContextChange(null)} title="Clear active context" style={{ background: 'color-mix(in srgb, var(--sys-text) 4%, var(--sys-surface))', border: '1px solid var(--sys-border)', color: 'var(--sys-text-muted)', padding: '6px 8px', borderRadius: 7, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             <span className="material-symbols-outlined" style={{ fontSize: 14 }}>close</span>
                         </button>
                     </>
                 ) : (
                     <>
-                        <div style={{ flex: 1, fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>
-                            <strong style={{ color: 'rgba(255,255,255,0.8)' }}>No active product context.</strong> Analyze a product in A+ Listing to lock its palette + mood — or load a saved context from your library.
+                        <div style={{ flex: 1, fontSize: 12, color: 'var(--sys-text-muted)' }}>
+                            <strong style={{ color: 'var(--sys-text)' }}>No active product context.</strong> Analyze a product in A+ Listing to lock its palette + mood — or load a saved context from your library.
                         </div>
                         <button onClick={() => setShowLibrary(true)} style={{ background: 'rgba(124,58,237,0.12)', border: '1px solid rgba(124,58,237,0.25)', color: '#A78BFA', padding: '8px 14px', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
                             <span className="material-symbols-outlined" style={{ fontSize: 15 }}>library_books</span>Load Saved Context
