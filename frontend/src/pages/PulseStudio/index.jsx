@@ -1765,35 +1765,37 @@ function QuickPostPanel({
                     ) : null}
 
                     {/* Download Panel */}
-                    <div style={{ background: 'rgba(34,197,94,0.05)', border: '1px solid rgba(34,197,94,0.15)', borderRadius: 12, padding: 16 }}>
-                        <div style={{ fontSize: 10, color: '#22C55E', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700 }}>
-                            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>download</span>
-                            Download Creative
-                        </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
-                            {Object.entries({ ...qpResult.backgrounds, ...qpCompositeUrls })
-                                .filter(([, url]) => url)
-                                .map(([size, url]) => (
-                                    <button key={size} onClick={() => handleDownload(url, size)} style={{
-                                        background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.25)',
-                                        color: '#22C55E', padding: '10px 16px', borderRadius: 8, cursor: 'pointer',
-                                        fontWeight: 700, fontSize: 13, display: 'flex', alignItems: 'center', gap: 8,
-                                    }}>
-                                        <span className="material-symbols-outlined" style={{ fontSize: 16 }}>download</span>
-                                        Download {size}
-                                    </button>
-                                ))}
+                    {Object.values({ ...qpResult.backgrounds, ...qpCompositeUrls }).some(url => url) && (
+                        <div style={{ background: 'rgba(34,197,94,0.05)', border: '1px solid rgba(34,197,94,0.15)', borderRadius: 12, padding: 16 }}>
+                            <div style={{ fontSize: 10, color: '#22C55E', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700 }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>download</span>
+                                Download Creative
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
+                                {Object.entries({ ...qpResult.backgrounds, ...qpCompositeUrls })
+                                    .filter(([, url]) => url)
+                                    .map(([size, url]) => (
+                                        <button key={size} onClick={() => handleDownload(url, size)} style={{
+                                            background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.25)',
+                                            color: '#22C55E', padding: '10px 16px', borderRadius: 8, cursor: 'pointer',
+                                            fontWeight: 700, fontSize: 13, display: 'flex', alignItems: 'center', gap: 8,
+                                        }}>
+                                            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>download</span>
+                                            Download {size}
+                                        </button>
+                                    ))}
 
-                            <button onClick={handleGenerate} style={{
-                                background: 'rgba(124,58,237,0.1)', border: '1px solid rgba(124,58,237,0.25)',
-                                color: '#A78BFA', padding: '10px 16px', borderRadius: 8, cursor: 'pointer',
-                                fontWeight: 700, fontSize: 13, display: 'flex', alignItems: 'center', gap: 8,
-                            }}>
-                                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>refresh</span>
-                                Regenerate
-                            </button>
+                                <button onClick={handleGenerate} style={{
+                                    background: 'rgba(124,58,237,0.1)', border: '1px solid rgba(124,58,237,0.25)',
+                                    color: '#A78BFA', padding: '10px 16px', borderRadius: 8, cursor: 'pointer',
+                                    fontWeight: 700, fontSize: 13, display: 'flex', alignItems: 'center', gap: 8,
+                                }}>
+                                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>refresh</span>
+                                    Regenerate
+                                </button>
+                            </div>
                         </div>
-                    </div>
+                    )}
 
                     {/* Hidden canvas for compositor */}
                     <canvas ref={canvasRef} style={{ display: 'none' }} />
