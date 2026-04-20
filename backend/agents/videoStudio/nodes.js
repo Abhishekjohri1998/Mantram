@@ -594,11 +594,25 @@ export async function pollGenerationStatus(state) {
                     let retryPayload = JSON.parse(JSON.stringify(state.generation._atlasCloudPayload || state.generation._piApiPayload)); // Deep copy 
 
                     // 🛡️ SAFE MODE PIVOT: If Bytedance blocked the generation due to a Real Person
-                    // Strip the offending starting image (Avatar) and retry. Let Seedance hallucinate 
-                    // an Avatar via Text-To-Video while continuing to map the product.
-                    if (statusResult.safetyTriggered && retryPayload.input?.image_urls?.length > 0) {
-                        console.log(`🛡️ Safe Mode Pivot: Dropping offending image reference to bypass safety protocol`);
-                        retryPayload.input.image_urls.shift(); // Drop the first image
+                    if (statusResult.safetyTriggered) {
+                        console.log(`🛡️ Safe Mode Pivot: Dropping offending image references to bypass safety protocol`);
+                        // Strip image URLs
+                        if (retryPayload.input?.image_urls) retryPayload.input.image_urls = [];
+                        if (retryPayload.input?.reference_images) retryPayload.input.reference_images = [];
+                        
+                        // Strip injected face-lock instruction from prompt
+                        if (retryPayload.input?.prompt) {
+                            retryPayload.input.prompt = retryPayload.input.prompt
+                                .replace(/@Image\d+\s+(?:and\s+@Image\d+\s+)*(?:is|are) the real person who must appear in this video\. Preserve their exact facial geometry, skin tone, eye shape, hair, and expression throughout every frame\. Do not hallucinate or substitute a different face\./gi, '')
+                                .trim();
+                        }
+                        
+                        // Fallback task type to text-to-video since we have no images
+                        if (retryPayload.task_type && retryPayload.task_type.includes('reference-to-video')) {
+                            retryPayload.task_type = retryPayload.task_type.replace('reference-to-video', 'text-to-video');
+                        } else if (retryPayload.task_type && retryPayload.task_type.includes('image-to-video')) {
+                            retryPayload.task_type = retryPayload.task_type.replace('image-to-video', 'text-to-video');
+                        }
                     }
 
                     const retryResult = await resubmitAtlasCloudTask(retryPayload);
