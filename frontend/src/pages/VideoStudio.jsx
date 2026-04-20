@@ -788,8 +788,13 @@ export default function VideoStudio() {
                                             <div className="relative w-full sm:w-28 h-40 sm:h-16 flex-shrink-0 rounded-lg overflow-hidden bg-[var(--sys-surface)] cursor-pointer"
                                                 onClick={() => { if (videoUrl) setPlayingVideo(videoUrl); else loadProject(p._id) }}>
                                                 {videoUrl ? (
-                                                    <video src={`${videoUrl}#t=1`} className="w-full h-full object-cover" muted playsInline preload="auto"
-                                                        onLoadedData={e => { e.target.currentTime = 1 }} />
+                                                    <video 
+                                                        src={`${videoUrl}#t=1`} 
+                                                        poster={p.generation?.thumbnailUrl || p.thumbUrl || p.advancedConfig?.firstImageUrl || ''}
+                                                        className="w-full h-full object-cover" 
+                                                        muted playsInline preload="metadata"
+                                                        onLoadedData={e => { e.target.currentTime = 1 }} 
+                                                    />
                                                 ) : (
                                                     <div className="w-full h-full flex items-center justify-center bg-[var(--sys-surface)] border border-[var(--sys-border)]">
                                                         <span className="material-symbols-outlined text-[var(--sys-text-muted)] text-xl">
@@ -883,8 +888,13 @@ export default function VideoStudio() {
                                             <div className="relative aspect-video bg-[var(--sys-surface)] cursor-pointer"
                                                 onClick={() => { if (videoUrl) setPlayingVideo(videoUrl); else loadProject(p._id) }}>
                                                 {videoUrl ? (
-                                                    <video src={`${videoUrl}#t=1`} className="w-full h-full object-cover" muted playsInline crossOrigin="anonymous" preload="auto"
-                                                        onLoadedData={e => { e.target.currentTime = 1 }} />
+                                                    <video 
+                                                        src={`${videoUrl}#t=1`} 
+                                                        poster={p.generation?.thumbnailUrl || p.thumbUrl || p.advancedConfig?.firstImageUrl || ''}
+                                                        className="w-full h-full object-cover" 
+                                                        muted playsInline crossOrigin="anonymous" preload="metadata"
+                                                        onLoadedData={e => { e.target.currentTime = 1 }} 
+                                                    />
                                                 ) : (
                                                     <div className="w-full h-full flex items-center justify-center bg-[var(--sys-surface)] border border-[var(--sys-border)]">
                                                         <span className="material-symbols-outlined text-[var(--sys-text-muted)] text-2xl">

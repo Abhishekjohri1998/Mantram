@@ -887,8 +887,8 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
                         >
                             <video
                                 src={`${videoSrc}#t=1`}
-                                poster={p.generation?.thumbnailUrl || p.thumbUrl || ''}
-                                muted loop autoPlay={false} playsInline preload="auto"
+                                poster={p.generation?.thumbnailUrl || p.thumbUrl || ac.firstImageUrl || ''}
+                                muted loop autoPlay={false} playsInline preload="metadata"
                             />
                             {/* pointer-events: none on overlay, auto on buttons only */}
                             <div className="vm-bg-overlay">
