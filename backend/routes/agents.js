@@ -898,8 +898,13 @@ Bold, ${moodPhrase} visual suitable for advertising and social media. ${ratioPhr
                 console.log(`AI Photoshoot: using model ${selectedModelId}...`);
                 const url = `https://generativelanguage.googleapis.com/v1beta/models/${selectedModelId}:generateContent?key=${imageKey}`;
 
+                // Clean aspectRatio to guaranteed valid native values
+                const safeARs = ["1:1","1:4","1:8","2:3","3:2","3:4","4:1","4:3","4:5","5:4","8:1","9:16","16:9","21:9"];
+                const nativeAspectRatio = safeARs.includes(aspectRatio) ? aspectRatio : '1:1';
+
                 const requestBody = {
                     contents: [{
+                        role: 'user',
                         parts: await (async () => {
                             const parts = [
                                 // IMAGE FIRST — model treats it as primary input to edit
@@ -946,16 +951,65 @@ Bold, ${moodPhrase} visual suitable for advertising and social media. ${ratioPhr
                     generationConfig: {
                         responseModalities: ['TEXT', 'IMAGE'],
                         temperature: temperature,
+                        imageConfig: {
+                            aspectRatio: nativeAspectRatio,
+                            imageSize: "2K"
+                        }
                     },
                 };
 
-                const response = await fetch(url, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(requestBody),
-                });
+                // Retry loop with timeout — aligned with Gemini Provider (gemini.js)
+                let response, data, lastAttemptError = null;
+                for (let attempt = 1; attempt <= 2; attempt++) {
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 90_000); // 90s timeout per attempt
+                    try {
+                        response = await fetch(url, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(requestBody),
+                            signal: controller.signal,
+                        });
 
-                const data = await response.json();
+                        data = await response.json();
+
+                        if (data.error) {
+                            const errMsg = data.error.message || JSON.stringify(data.error);
+                            const lowerMsg = String(errMsg).toLowerCase();
+                            const isBusy = lowerMsg.includes('high demand') || lowerMsg.includes('busy') ||
+                                           response.status === 503 || response.status === 429;
+
+                            if (isBusy && attempt === 1) {
+                                console.warn(`⚠️ Photoshoot attempt 1 busy (${response.status}) — retrying in 3s...`);
+                                lastAttemptError = errMsg;
+                                await new Promise(r => setTimeout(r, 3000));
+                                continue;
+                            }
+                            // Not retryable or final attempt — fall through to error handling below
+                        }
+                        lastAttemptError = null;
+                        break; // Success or non-retryable error
+                    } catch (attemptErr) {
+                        const isTimeout = attemptErr.name === 'AbortError';
+                        if (isTimeout && attempt === 1) {
+                            console.warn(`⏳ Photoshoot attempt 1 timed out (90s) — retrying...`);
+                            lastAttemptError = 'timeout';
+                            await new Promise(r => setTimeout(r, 2000));
+                            continue;
+                        }
+                        if (isTimeout) {
+                            return res.status(200).json({ success: false, modelBusy: true, error: `${modelCfg.name} timed out after 90 seconds. Google servers are likely overloaded. Please try again or switch to a different model.` });
+                        }
+                        throw attemptErr;
+                    } finally {
+                        clearTimeout(timeoutId);
+                    }
+                }
+
+                // If all attempts were busy/timed out without getting a valid response
+                if (lastAttemptError && (!data || data.error)) {
+                    return res.status(200).json({ success: false, modelBusy: true, error: `${modelCfg.name} is currently busy with high demand. Please try again or switch to a different model.` });
+                }
 
                 if (data.error) {
                     const errMsg = data.error.message || JSON.stringify(data.error);
