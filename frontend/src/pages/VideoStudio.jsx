@@ -54,6 +54,35 @@ const VIDEO_TYPES = [
     { id: 'explainer', label: 'Explainer', icon: 'lightbulb', desc: 'Explain a concept or service' },
 ]
 
+// ── Lazy Video Thumbnail ──
+const LazyVideoThumbnail = ({ src, poster }) => {
+    const [isVisible, setIsVisible] = useState(false)
+    const ref = useRef()
+
+    useEffect(() => {
+        const observer = new IntersectionObserver(entries => {
+            if (entries[0].isIntersecting) {
+                setIsVisible(true)
+                observer.disconnect()
+            }
+        }, { rootMargin: '100px' })
+        if (ref.current) observer.observe(ref.current)
+        return () => observer.disconnect()
+    }, [])
+
+    return (
+        <div ref={ref} className="w-full h-full bg-[var(--sys-surface)] relative overflow-hidden">
+            {isVisible ? (
+                <video src={src} poster={poster} className="w-full h-full object-cover block" muted playsInline crossOrigin="anonymous" preload="metadata" onLoadedData={e => { e.target.currentTime = 1 }} />
+            ) : poster ? (
+                <img src={poster} className="w-full h-full object-cover block" loading="lazy" alt="" />
+            ) : (
+                <div className="absolute inset-0 bg-[#ffffff05] animate-pulse" />
+            )}
+        </div>
+    )
+}
+
 export default function VideoStudio() {
     const { user } = useAuth()
     const { activeBrand, brands } = useBrand()
@@ -788,13 +817,7 @@ export default function VideoStudio() {
                                             <div className="relative w-full sm:w-28 h-40 sm:h-16 flex-shrink-0 rounded-lg overflow-hidden bg-[var(--sys-surface)] cursor-pointer"
                                                 onClick={() => { if (videoUrl) setPlayingVideo(videoUrl); else loadProject(p._id) }}>
                                                 {videoUrl ? (
-                                                    <video 
-                                                        src={`${videoUrl}#t=1`} 
-                                                        poster={p.generation?.thumbnailUrl || p.thumbUrl || p.advancedConfig?.firstImageUrl || ''}
-                                                        className="w-full h-full object-cover" 
-                                                        muted playsInline preload="metadata"
-                                                        onLoadedData={e => { e.target.currentTime = 1 }} 
-                                                    />
+                                                    <LazyVideoThumbnail src={`${videoUrl}#t=1`} poster={p.generation?.thumbnailUrl || p.thumbUrl || p.advancedConfig?.firstImageUrl || ''} />
                                                 ) : (
                                                     <div className="w-full h-full flex items-center justify-center bg-[var(--sys-surface)] border border-[var(--sys-border)]">
                                                         <span className="material-symbols-outlined text-[var(--sys-text-muted)] text-xl">
@@ -888,13 +911,7 @@ export default function VideoStudio() {
                                             <div className="relative aspect-video bg-[var(--sys-surface)] cursor-pointer"
                                                 onClick={() => { if (videoUrl) setPlayingVideo(videoUrl); else loadProject(p._id) }}>
                                                 {videoUrl ? (
-                                                    <video 
-                                                        src={`${videoUrl}#t=1`} 
-                                                        poster={p.generation?.thumbnailUrl || p.thumbUrl || p.advancedConfig?.firstImageUrl || ''}
-                                                        className="w-full h-full object-cover" 
-                                                        muted playsInline crossOrigin="anonymous" preload="metadata"
-                                                        onLoadedData={e => { e.target.currentTime = 1 }} 
-                                                    />
+                                                    <LazyVideoThumbnail src={`${videoUrl}#t=1`} poster={p.generation?.thumbnailUrl || p.thumbUrl || p.advancedConfig?.firstImageUrl || ''} />
                                                 ) : (
                                                     <div className="w-full h-full flex items-center justify-center bg-[var(--sys-surface)] border border-[var(--sys-border)]">
                                                         <span className="material-symbols-outlined text-[var(--sys-text-muted)] text-2xl">

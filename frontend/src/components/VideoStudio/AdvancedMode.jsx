@@ -210,6 +210,35 @@ function ConfigDropdown({ value, onChange, options, label }) {
     )
 }
 
+// ── Lazy Video Thumbnail ──
+const LazyVideoThumbnail = ({ src, poster }) => {
+    const [isVisible, setIsVisible] = useState(false)
+    const ref = useRef()
+
+    useEffect(() => {
+        const observer = new IntersectionObserver(entries => {
+            if (entries[0].isIntersecting) {
+                setIsVisible(true)
+                observer.disconnect()
+            }
+        }, { rootMargin: '100px' })
+        if (ref.current) observer.observe(ref.current)
+        return () => observer.disconnect()
+    }, [])
+
+    return (
+        <div ref={ref} style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden' }}>
+            {isVisible ? (
+                <video src={src} poster={poster} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none' }} muted loop autoPlay={false} playsInline preload="metadata" />
+            ) : poster ? (
+                <img src={poster} loading="lazy" alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none' }} />
+            ) : (
+                <div style={{ position: 'absolute', inset: 0, background: 'rgba(255,255,255,0.02)' }} />
+            )}
+        </div>
+    )
+}
+
 export default function AdvancedMode({ activeBrand, initialData, projects = [], projectsLoaded = false }) {
     // ── Completed videos grid (local state, prepend new ones) ──
     const [gridVideos, setGridVideos] = useState(() => {
@@ -885,10 +914,9 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
                             onMouseEnter={e => { const v = e.currentTarget.querySelector('video'); if (v) v.play().catch(() => {}); }}
                             onMouseLeave={e => { const v = e.currentTarget.querySelector('video'); if (v) { v.pause(); v.currentTime = 1; } }}
                         >
-                            <video
+                            <LazyVideoThumbnail
                                 src={`${videoSrc}#t=1`}
                                 poster={p.generation?.thumbnailUrl || p.thumbUrl || ac.firstImageUrl || ''}
-                                muted loop autoPlay={false} playsInline preload="metadata"
                             />
                             {/* pointer-events: none on overlay, auto on buttons only */}
                             <div className="vm-bg-overlay">
